@@ -486,6 +486,24 @@ BridgedOwnedString BridgedPassContext::mangleWithExplodedPackArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
+BridgedOwnedString BridgedPassContext::mangleWithDifferentiableFunctionArgs(
+    BridgedArrayRef bridgedDifferentiableFunctionArgs,
+    BridgedArrayRef bridgedComponentRoots, BridgedFunction applySiteCallee) const {
+  auto *callee = applySiteCallee.getFunction();
+  Mangle::FunctionSignatureSpecializationMangler mangler(
+      callee->getASTContext(), Demangle::SpecializationPass::ClosureSpecializer,
+      callee->getSerializedKind(), callee);
+
+  for (auto arg : bridgedDifferentiableFunctionArgs.unbridged<ClosureArgMangling>()) {
+    mangler.setArgumentDifferentiableFunctionProp(unsigned(arg.argIdx), arg.inst.unbridged());
+  }
+  SmallVector<SILInstruction *, 8> components;
+  for (auto root : bridgedComponentRoots.unbridged<ClosureArgMangling>()) {
+    components.push_back(root.inst.unbridged());
+  }
+  return BridgedOwnedString(mangler.mangleWithDifferentiableFunctionComponents(components));
+}
+
 BridgedOwnedString BridgedPassContext::mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const {
   auto pass = Demangle::SpecializationPass::EmbeddedWitnessCallSpecialization;
 

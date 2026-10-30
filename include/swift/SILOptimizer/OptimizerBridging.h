@@ -246,6 +246,9 @@ struct BridgedPassContext {
                                                       BridgedFunction bridgedOriginalFunction) const;
   BridgedOwnedString mangleWithExplodedPackArgs(BridgedArrayRef bridgedPackArgs,
                                                 BridgedFunction applySiteCallee) const;
+  BridgedOwnedString mangleWithDifferentiableFunctionArgs(BridgedArrayRef bridgedDifferentiableFunctionArgs,
+                                                        BridgedArrayRef bridgedComponentRoots,
+                                                        BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;

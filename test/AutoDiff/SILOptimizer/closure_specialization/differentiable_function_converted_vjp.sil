@@ -1,0 +1,210 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialization -module-name src %s -o %t
+// RUN: %FileCheck %s --check-prefix=CHECK < %t
+// RUN: %FileCheck %s --check-prefix=SPECIALIZED < %t
+
+// EQUIRES: swift_in_compiler
+
+// Derived from test/AutoDiff/validation-test/differentiable_function_specialization.swift.
+// Capture command (with the runtime harness disabled, as in the supplied source):
+//   swift-frontend -emit-sil -O -module-name=src \
+//     -Xllvm -sil-print-around=closure-specialization \
+//     differentiable_function_specialization.swift > dfs.sil 2> dfs.log
+// The input below is extracted pre-pass SIL, not the final -O output.
+// Only ClosureSpecialization (closure-specialization) snapshots are used here;
+// AutodiffClosureSpecialization is a different pass also present in that log.
+// Debug instructions and printed analysis summaries are omitted. Unneeded leaf
+// bodies are declarations; all functions needed for applied-use analysis remain.
+// Do not add SILCombine: dead differentiable_function instructions in callers
+// are intentionally still present immediately after this pass.
+// Keep -module-name src: the component types participate in specialization names.
+
+// Test5: specialize a converted bundle used by valueWithGradient through a
+// capturing wrapper. Keep the wrapper/derivative definitions used by the
+// applied-use analysis. This is not an assertion about later VJP inlining.
+
+// Immediate post-pass caller: dfs.log:20829-20861, after #15358.
+// CHECK-LABEL: sil [ossa] @$s3src10test5EntryySd5value_Sd8gradienttSd_AA12Test2DerivedCtF : $@convention(thin) (Double, @guaranteed Test2Derived) -> (Double, Double) {
+// CHECK: bb0([[X:%[0-9]+]] : $Double, [[CONTEXT:%[0-9]+]] : @guaranteed $Test2Derived):
+// CHECK: [[ORIGINAL:%[0-9]+]] = function_ref @$s3src13test5EvaluateyS2d_AA9Test2BaseCtF : $@convention(thin) (Double, @guaranteed Test2Base) -> Double
+// CHECK: [[JVP:%[0-9]+]] = function_ref @$s3src13test5EvaluateyS2d_AA9Test2BaseCtFTJfSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// CHECK: [[VJP:%[0-9]+]] = function_ref @$s3src13test5EvaluateyS2d_AA9Test2BaseCtFTJrSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// CHECK: [[CLOSURE:%[0-9]+]] = thin_to_thick_function [[ORIGINAL]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> Double
+// CHECK: [[CONVERTED:%[0-9]+]] = convert_function [[CLOSURE]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> Double
+// CHECK: [[CLOSURE2:%[0-9]+]] = thin_to_thick_function [[JVP]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// CHECK: [[CONVERTED2:%[0-9]+]] = convert_function [[CLOSURE2]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// CHECK: [[CLOSURE3:%[0-9]+]] = thin_to_thick_function [[VJP]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// CHECK: [[CONVERTED3:%[0-9]+]] = convert_function [[CLOSURE3]] to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+// CHECK: [[BUNDLE:%[0-9]+]] = differentiable_function [parameters 0] [results 0] [[CONVERTED]] with_derivative {[[CONVERTED2]], [[CONVERTED3]]}
+// CHECK: [[CALLEE:%[0-9]+]] = function_ref @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtF : $@convention(thin) (Double, @guaranteed Test2Derived, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double) -> (Double, Double)
+// CHECK-NOT: apply [[CALLEE]](
+// CHECK: [[SPECIALIZED_FN:%[0-9]+]] = function_ref @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFSdAFSdIgygd_SdAFS3dIegyd_Igygdo_SdAFS3dIegyd_Igygdo_Tf1nna_n029$s3src13test5EvaluateyS2d_AA9H7BaseCtF0jkl1_mhnO9FTJfSUpSr0jkl1_mhno4FTJrqR0Tf1nnccc_n : $@convention(thin) (Double, @guaranteed Test2Derived) -> (Double, Double)
+// CHECK-NOT: apply [[CALLEE]](
+// CHECK: [[RESULT:%[0-9]+]] = apply [[SPECIALIZED_FN]]([[X]], [[CONTEXT]]) : $@convention(thin) (Double, @guaranteed Test2Derived) -> (Double, Double)
+// CHECK-NOT: apply [[CALLEE]](
+// CHECK: return [[RESULT]]
+// CHECK-NOT: apply [[CALLEE]](
+// CHECK: } // end sil function '$s3src10test5EntryySd5value_Sd8gradienttSd_AA12Test2DerivedCtF'
+
+// These definitions must be produced by this pass; none is seeded in the input.
+// SPECIALIZED-DAG: sil shared [noinline] [ossa] @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFSdAFSdIgygd_SdAFS3dIegyd_Igygdo_SdAFS3dIegyd_Igygdo_Tf1nna_n029$s3src13test5EvaluateyS2d_AA9H7BaseCtF0jkl1_mhnO9FTJfSUpSr0jkl1_mhno4FTJrqR0Tf1nnccc_n : $@convention(thin) (Double, @guaranteed Test2Derived) -> (Double, Double) {
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import _Differentiation
+
+public class Test2Base {
+  @_hasStorage public final let value: Double { get }
+  public init(_ value: Double)
+  deinit
+}
+
+@_inheritsConvenienceInitializers public class Test2Derived : Test2Base {
+  override init(_ value: Double)
+  deinit
+}
+
+// External functions referenced by the extracted bodies.
+sil [noinline] @$s3src13test5EvaluateyS2d_AA9Test2BaseCtF : $@convention(thin) (Double, @guaranteed Test2Base) -> Double
+
+sil @$s3src13test5EvaluateyS2d_AA9Test2BaseCtFTJfSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+
+sil @$s3src13test5EvaluateyS2d_AA9Test2BaseCtFTJrSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+
+sil [transparent] [reabstraction_thunk] @$sS2dIgyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+
+sil [transparent] [reabstraction_thunk] @$sS4dIegyd_Igydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+
+sil @_fatalErrorForwardModeDifferentiationDisabled : $@convention(thin) () -> Never
+
+// Extracted from dfs.log:20793-20823, before #15358.
+// test5Entry(_:_:)
+sil [ossa] @$s3src10test5EntryySd5value_Sd8gradienttSd_AA12Test2DerivedCtF : $@convention(thin) (Double, @guaranteed Test2Derived) -> (Double, Double) {
+bb0(%0 : $Double, %1 : @guaranteed $Test2Derived):
+  // function_ref test5Evaluate(_:_:)
+  %4 = function_ref @$s3src13test5EvaluateyS2d_AA9Test2BaseCtF : $@convention(thin) (Double, @guaranteed Test2Base) -> Double
+  // function_ref forward-mode derivative of test5Evaluate(_:_:)
+  %5 = function_ref @$s3src13test5EvaluateyS2d_AA9Test2BaseCtFTJfSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of test5Evaluate(_:_:)
+  %6 = function_ref @$s3src13test5EvaluateyS2d_AA9Test2BaseCtFTJrSUpSr : $@convention(thin) (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %7 = thin_to_thick_function %4 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> Double
+  %8 = convert_function %7 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> Double
+  %9 = thin_to_thick_function %5 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %10 = convert_function %9 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %11 = thin_to_thick_function %6 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Base) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %12 = convert_function %11 to $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %13 = differentiable_function [parameters 0] [results 0] %8 with_derivative {%10, %12}
+  // function_ref test5UseConvertedVJP(_:_:_:)
+  %14 = function_ref @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtF : $@convention(thin) (Double, @guaranteed Test2Derived, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double) -> (Double, Double)
+  %15 = apply %14(%0, %1, %13) : $@convention(thin) (Double, @guaranteed Test2Derived, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double) -> (Double, Double)
+  return %15
+} // end sil function '$s3src10test5EntryySd5value_Sd8gradienttSd_AA12Test2DerivedCtF'
+
+// Extracted from dfs.log:20603-20680, before #15351.
+// test5UseConvertedVJP(_:_:_:)
+sil hidden [noinline] [ossa] @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtF : $@convention(thin) (Double, @guaranteed Test2Derived, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double) -> (Double, Double) {
+bb0(%0 : $Double, %1 : @guaranteed $Test2Derived, %2 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double):
+  // function_ref closure #1 in test5UseConvertedVJP(_:_:_:)
+  %6 = function_ref @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_ : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> Double
+  %7 = copy_value %2
+  %8 = copy_value %1
+  %9 = copy_value %2
+  %10 = copy_value %1
+  %11 = copy_value %1
+  %12 = copy_value %2
+  %13 = partial_apply [callee_guaranteed] %6(%12, %11) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> Double
+  // function_ref forward-mode derivative of closure #1 in test5UseConvertedVJP(_:_:_:)
+  %14 = function_ref @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJfSUUpSr : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %15 = partial_apply [callee_guaranteed] %14(%7, %8) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  // function_ref reverse-mode derivative of closure #1 in test5UseConvertedVJP(_:_:_:)
+  %16 = function_ref @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJrSUUpSr : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %17 = partial_apply [callee_guaranteed] %16(%9, %10) : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  %18 = differentiable_function [parameters 0] [results 0] %13 with_derivative {%15, %17}
+  %19 = copy_value %18
+  destroy_value %18
+  %21 = convert_escape_to_noescape %19 to $@differentiable(reverse) @noescape @callee_guaranteed (Double) -> Double
+  %22 = begin_borrow %21
+  %23 = differentiable_function_extract [original] %22
+  %24 = copy_value %23
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double)
+  %25 = function_ref @$sS2dIgyd_S2dIegnr_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %26 = partial_apply [callee_guaranteed] %25(%24) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> Double) -> @out Double
+  %27 = convert_function %26 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %28 = copy_value %27
+  destroy_value %27
+  %30 = convert_escape_to_noescape %28 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>
+  %31 = differentiable_function_extract [jvp] %22
+  %32 = copy_value %31
+  // function_ref thunk for @callee_guaranteed (@unowned Double) -> (@unowned Double, @owned @escaping @callee_guaranteed (@unowned Double) -> (@unowned Double))
+  %33 = function_ref @$sS4dIegyd_Igydo_S2dxq_Ri_zRi1_zRi0_zRi__Ri1__Ri0__r0_lyS2dIsegnr_Iegnro_TR : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %34 = partial_apply [callee_guaranteed] %33(%32) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %35 = convert_function %34 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %36 = copy_value %35
+  destroy_value %35
+  %38 = convert_escape_to_noescape %36 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %39 = differentiable_function_extract [vjp] %22
+  %40 = copy_value %39
+  %41 = partial_apply [callee_guaranteed] %33(%40) : $@convention(thin) (@in_guaranteed Double, @guaranteed @noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)) -> (@out Double, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Double, Double>)
+  %42 = convert_function %41 to $@callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %43 = copy_value %42
+  destroy_value %42
+  %45 = convert_escape_to_noescape %43 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2, τ_0_3> (@in_guaranteed τ_0_0) -> (@out τ_0_1, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_0_2, τ_0_3>) for <Double, Double, Double, Double>
+  %46 = differentiable_function [parameters 0] [results 0] %30 with_derivative {%38, %45}
+  %47 = apply %39(%0) : $@noescape @callee_guaranteed (Double) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  (%48, %49) = destructure_tuple %47
+  %50 = float_literal $Builtin.FPIEEE64, 0x3FF0000000000000
+  %51 = struct $Double (%50)
+  %52 = apply %49(%51) : $@callee_guaranteed (Double) -> Double
+  end_borrow %22
+  destroy_value %46
+  destroy_value %21
+  destroy_value %49
+  %57 = tuple (%48, %52)
+  destroy_value %19
+  destroy_value %28
+  destroy_value %36
+  destroy_value %43
+  return %57
+} // end sil function '$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtF'
+
+// Extracted from dfs.log:20759-20775, before #15354.
+// closure #1 in test5UseConvertedVJP(_:_:_:)
+sil private [ossa] @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_ : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> Double {
+bb0(%0 : $Double, %1 : @closureCapture @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, %2 : @closureCapture @guaranteed $Test2Derived):
+  %4 = apply %1(%0, %2) : $@differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double
+  return %4
+} // end sil function '$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_'
+
+// Extracted from dfs.log:22582-22595, before #15555.
+// forward-mode derivative of closure #1 in test5UseConvertedVJP(_:_:_:)
+sil private [ossa] @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJfSUUpSr : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double) {
+bb0(%0 : $Double, %1 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, %2 : @guaranteed $Test2Derived):
+  // function_ref _fatalErrorForwardModeDifferentiationDisabled
+  %3 = function_ref @_fatalErrorForwardModeDifferentiationDisabled : $@convention(thin) () -> Never
+  %4 = apply %3() : $@convention(thin) () -> Never
+  unreachable
+} // end sil function '$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJfSUUpSr'
+
+// Extracted from dfs.log:22610-22632, before #15558.
+// reverse-mode derivative of closure #1 in test5UseConvertedVJP(_:_:_:)
+sil private [ossa] @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJrSUUpSr : $@convention(thin) (Double, @guaranteed @differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double) {
+bb0(%0 : $Double, %1 : @guaranteed $@differentiable(reverse) @noescape @callee_guaranteed (Double, @noDerivative @guaranteed Test2Derived) -> Double, %2 : @guaranteed $Test2Derived):
+  %4 = differentiable_function_extract [vjp] %1
+  %5 = apply %4(%0, %2) : $@noescape @callee_guaranteed (Double, @guaranteed Test2Derived) -> (Double, @owned @callee_guaranteed (Double) -> Double)
+  (%6, %7) = destructure_tuple %5
+  // function_ref pullback of closure #1 in test5UseConvertedVJP(_:_:_:)
+  %8 = function_ref @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJpSUUpSr : $@convention(thin) (Double, @owned @callee_guaranteed (Double) -> Double) -> Double
+  %9 = partial_apply [callee_guaranteed] %8(%7) : $@convention(thin) (Double, @owned @callee_guaranteed (Double) -> Double) -> Double
+  %10 = tuple (%6, %9)
+  return %10
+} // end sil function '$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJrSUUpSr'
+
+// Extracted from dfs.log:22656-22671, before #15561.
+// pullback of closure #1 in test5UseConvertedVJP(_:_:_:)
+sil private [ossa] @$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJpSUUpSr : $@convention(thin) (Double, @owned @callee_guaranteed (Double) -> Double) -> Double {
+bb0(%0 : $Double, %1 : @owned $@callee_guaranteed (Double) -> Double):
+  %2 = apply %1(%0) : $@callee_guaranteed (Double) -> Double
+  destroy_value %1
+  return %2
+} // end sil function '$s3src20test5UseConvertedVJPySd5value_Sd8gradienttSd_AA12Test2DerivedCS2d_AFYktYjrXEtFS2dcfU_TJpSUUpSr'
