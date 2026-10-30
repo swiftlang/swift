@@ -13,6 +13,9 @@
 // RUN: %yaml2obj %S/Inputs/DwarfNesting.yaml -o %t/nesting.o
 // RUN: %target-run %t/DwarfReaderLookups %t/nesting.o 0x1050 0x1015 0x1065 0x1085 0x1086 | %FileCheck %s --check-prefix=NESTING
 
+// RUN: %yaml2obj %S/Inputs/DwarfArangesLine.yaml -o %t/arangesline.o
+// RUN: %target-run %t/DwarfReaderLookups %t/arangesline.o 0x1008 0x1018 0x1020 0x2000 | %FileCheck %s --check-prefix=ARANGES
+
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: backtracing
 // REQUIRES: executable_test
@@ -113,6 +116,22 @@ struct DwarfReaderLookups {
     // NESTING-NEXT: inline: calleeW <unknown>:4:1
     // NESTING-NEXT: inline: calleeZ <unknown>:3:1
     // NESTING-NEXT: inline: calleeX <unknown>:1:1
+
+    // Units that we find using .debug_aranges haven't been resolved, so we
+    // need to do that before we can find their line number programs.  The
+    // address that we look up first has to be one that we haven't looked up a
+    // function for, because that would resolve the unit too.
+
+    // ARANGES: address 0x1008:
+    // ARANGES-NEXT: location: /src/file.c:42:0
+    // ARANGES-NEXT: function: <none>
+    // ARANGES-NEXT: address 0x1018:
+    // ARANGES-NEXT: location: /src/file.c:50:0
+    // ARANGES-NEXT: function: <none>
+    // ARANGES-NEXT: address 0x1020:
+    // ARANGES-NEXT: function: <none>
+    // ARANGES-NEXT: address 0x2000:
+    // ARANGES-NEXT: function: <none>
 
     if !testDwarfLookupsFor(path: CommandLine.arguments[1],
                             addresses: addresses) {
