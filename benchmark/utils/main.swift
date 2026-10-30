@@ -213,6 +213,7 @@ import StringMatch
 import StringRemoveDupes
 import StringRepeating
 import StringReplaceSubrange
+import SmallString
 import StringSplitting
 import StringSwitch
 import StringTests
@@ -437,6 +438,7 @@ register(StringMatch.benchmarks)
 register(StringRemoveDupes.benchmarks)
 register(StringRepeating.benchmarks)
 register(StringReplaceSubrange.benchmarks)
+register(SmallString.benchmarks)
 
 if #available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *) {
   register(StringSplitting.benchmarks)
