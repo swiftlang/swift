@@ -516,3 +516,32 @@ bb2(%error : @owned $any Error):
   destroy_value %nonescaping_nothrower : $@noescape @callee_guaranteed () -> (Int, @error any Error) 
   throw %error
 } 
+
+// A mutation through the copyable address must stay on the capture copy.
+// Rebinding that address to the original would mutate the borrowed parameter.
+// CHECK-LABEL: sil [ossa] @testWrappedCaptureWithMutation :
+// CHECK: [[ORIGINAL:%.*]] = copyable_to_moveonlywrapper_addr %0
+// CHECK: [[COPY:%.*]] = alloc_stack $@moveOnly T
+// CHECK: copy_addr [[ORIGINAL]] to [init] [[COPY]]
+// CHECK: [[CAPTURE:%.*]] = moveonlywrapper_to_copyable_addr [[COPY]]
+// CHECK: apply {{.*}}([[CAPTURE]]) : $@convention(thin) <{{.*}}> (@inout {{.*}}) -> ()
+// CHECK: partial_apply [callee_guaranteed] [on_stack] {{.*}}([[CAPTURE]])
+// CHECK: destroy_addr [[CAPTURE]]
+// CHECK: dealloc_stack [[COPY]]
+// CHECK-LABEL: } // end sil function 'testWrappedCaptureWithMutation'
+sil [ossa] @testWrappedCaptureWithMutation : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %original = copyable_to_moveonlywrapper_addr %0 : $*T
+  %copy = alloc_stack $@moveOnly T
+  copy_addr %original to [init] %copy : $*@moveOnly T
+  %capture = moveonlywrapper_to_copyable_addr %copy : $*@moveOnly T
+  apply undef<T>(%capture) : $@convention(thin) <T> (@inout T) -> ()
+  %closure = partial_apply [callee_guaranteed] undef<T>(%capture) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %nonescaping = convert_escape_to_noescape [not_guaranteed] %closure : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  apply undef(%nonescaping) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %nonescaping : $@noescape @callee_guaranteed () -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  dealloc_stack %copy : $*@moveOnly T
+  %result = tuple ()
+  return %result : $()
+}
