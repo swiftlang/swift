@@ -55,8 +55,8 @@ ForwardModeTests.test("Array.init(repeating:count:)") {
 
 ForwardModeTests.test("Array.DifferentiableView.init") {
   @differentiable(reverse)
-  func constructView(_ x: [Float]) -> Array<Float>.DifferentiableView {
-    return Array<Float>.DifferentiableView(x)
+  func constructView(_ x: [Float]) -> Array<Float>.ArrayTangentVector {
+    return Array<Float>.TangentVector(x)
   }
 
   let forward = differential(at: [5, 6, 7, 8], of: constructView)
@@ -67,12 +67,12 @@ ForwardModeTests.test("Array.DifferentiableView.init") {
 
 ForwardModeTests.test("Array.DifferentiableView.base") {
   @differentiable(reverse)
-  func accessBase(_ x: Array<Float>.DifferentiableView) -> [Float] {
-    return x.base
+  func accessBase(_ x: Array<Float>.ArrayTangentVector) -> [Float] {
+    x.asArray()
   }
 
   let forward = differential(
-    at: Array<Float>.DifferentiableView([5, 6, 7, 8]),
+    at: Array<Float>.ArrayTangentVector([5, 6, 7, 8]),
     of: accessBase)
   expectEqual(
     FloatArrayTan([1, 2, 3, 4]),
