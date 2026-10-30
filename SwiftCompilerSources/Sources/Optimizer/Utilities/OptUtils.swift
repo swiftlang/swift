@@ -1107,8 +1107,19 @@ func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalTy
 
 func isCastSupportedInEmbeddedSwift(from sourceType: Type,
                                     to destType: Type ) -> Bool {
-  if !sourceType.isExistential {
+  // The runtime unwraps an Optional source, so an Optional of an existential
+  // works as well as the existential.
+  var source = sourceType.rawType
+  while source.isOptional {
+    source = source.optionalObjectType
+  }
+  if !source.isExistential {
     return false
+  }
+  // Unwrapping Optionals down to exactly the destination existential only
+  // checks for `nil`; the runtime answers it by matching metadata.
+  if destType.isExistential {
+    return source.canonical == destType.rawType.canonical
   }
   if destType.hasArchetype {
     return false
