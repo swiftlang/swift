@@ -64,6 +64,7 @@ include("${${PROJECT_NAME}_VENDOR_MODULE_DIR}/Settings.cmake" OPTIONAL)
 option(${PROJECT_NAME}_ENABLE_BACKTRACING "Enable backtracing support"
   ${SwiftCore_ENABLE_BACKTRACING})
 
+option(${PROJECT_NAME}_EMBED_PLIST "Embed the generated plist in targets" ${APPLE})
 option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
 
