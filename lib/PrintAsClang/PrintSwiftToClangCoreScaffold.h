@@ -26,7 +26,8 @@ class SwiftToClangInteropContext;
 void printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
                                    ASTContext &astContext,
                                    PrimitiveTypeMapping &typeMapping,
-                                   llvm::raw_ostream &os);
+                                   llvm::raw_ostream &os,
+                                   bool useClangDeploymentTarget);
 
 } // end namespace swift
 
