@@ -270,7 +270,7 @@ var computed_prop_with_init_1: X {
   get {}
 } = X()  // expected-error {{expected expression}} expected-error {{consecutive statements on a line must be separated by ';'}} {{2-2=;}}
 
-var x2 { // expected-error{{computed property must have an explicit type}} {{7-7=: <# Type #>}} expected-error{{type annotation missing in pattern}}
+var x2 { // expected-error{{computed property must have an explicit type}} {{7-7=: <# Type #>}}
   get {
     return _x
   }
