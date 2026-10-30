@@ -16,6 +16,12 @@
 /// The elements of this view are a concatenation of the elements of
 /// each sequence in the base.
 ///
+/// When `Base` and its elements both conform to `Collection`,
+/// `FlattenSequence` also conforms to `Collection`, and the standard library
+/// provides the `FlattenCollection` type alias for it. When `Base` and its
+/// elements both conform to `BidirectionalCollection`, `FlattenSequence`
+/// also conforms to `BidirectionalCollection`.
+///
 /// The `joined` method is always lazy, but does not implicitly
 /// confer laziness on algorithms applied to its result.  In other
 /// words, for ordinary sequences `s`:
