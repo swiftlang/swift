@@ -24,6 +24,7 @@
 #include "ResultPlan.h"
 #include "SILGenFunction.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
@@ -1742,15 +1743,21 @@ enum class CreateTaskOptions {
   /// The builtin has optional arguments for everything.
   OptionalEverything = 0x1,
 
-  /// The builtin is for a DiscardingTaskGroup and so expects the function
-  /// to return Void.
-  Discarding = 0x2,
+  /// The builtin is for a discarding task, which has no result.
+  /// Expects the operation to return Void.
+  DiscardingResult = 0x2,
 
   /// The builtin has a non-optional TaskGroup argument.
   TaskGroup = 0x4,
 
   /// The builtin has a non-optional TaskExecutor argument.
   TaskExecutor = 0x8,
+
+  /// The task's operation is a synchronous function,
+  /// i.e. the operation cannot ever suspend.
+  ///
+  /// For now, only a non-throwing '() -> ()' operation is supported.
+  SynchronousOperation = 0x10,
 };
 
 /// Emit SIL for the various createAsyncTask builtins.
@@ -1759,7 +1766,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
                                         PreparedArguments &&preparedArgs,
                                         OptionSet<CreateTaskOptions> options) {
 #ifndef NDEBUG
-  if (options & CreateTaskOptions::Discarding) {
+  if (options & CreateTaskOptions::DiscardingResult) {
     assert(!subs);
   } else {
     assert(subs && subs.getReplacementTypes().size() == 1);
@@ -1840,7 +1847,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
 
   auto functionValue = [&] {
     // No reabstraction required.
-    if (options & CreateTaskOptions::Discarding) {
+    if (options & CreateTaskOptions::DiscardingResult) {
       return nextArg().getAsSingleValue(SGF);
     }
 
@@ -1886,6 +1893,10 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     return std::move(fnArg).getConverted(SGF, conversion);
   }();
 
+  assert(bool(options & CreateTaskOptions::SynchronousOperation) ==
+             !functionValue.getType().castTo<SILFunctionType>()->isAsync() &&
+         "only a synchronous discarding task has a synchronous operation");
+
   assert(nextArgIdx == args.size() && "didn't exhaust builtin arguments?");
 
   SILValue builtinArgs[] = {
@@ -1918,7 +1929,7 @@ static ManagedValue emitBuiltinCreateAsyncDiscardingTaskInGroup(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&args, SGFContext C) {
   return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
-      { CreateTaskOptions::TaskGroup, CreateTaskOptions::Discarding });
+      { CreateTaskOptions::TaskGroup, CreateTaskOptions::DiscardingResult });
 }
 
 // Emit SIL for the named builtin: createAsyncTaskWithExecutor.
@@ -1943,7 +1954,7 @@ static ManagedValue emitBuiltinCreateAsyncDiscardingTaskInGroupWithExecutor(
     PreparedArguments &&args, SGFContext C) {
   return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
       { CreateTaskOptions::TaskGroup, CreateTaskOptions::TaskExecutor,
-        CreateTaskOptions::Discarding });
+        CreateTaskOptions::DiscardingResult });
 }
 
 // Emit SIL for the named builtin: createAsyncTask.
@@ -1967,7 +1978,37 @@ static ManagedValue emitBuiltinCreateDiscardingTask(
     PreparedArguments &&args, SGFContext C) {
   return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
       { CreateTaskOptions::OptionalEverything,
-        CreateTaskOptions::Discarding });
+                  CreateTaskOptions::DiscardingResult });
+}
+
+// Emit SIL for the named builtin: createSynchronousDiscardingTask.
+//
+// This emits a 'createAsyncTask' SIL builtin with a synchronous,
+// non-throwing, Void-returning operation.
+static ManagedValue emitBuiltinCreateSynchronousDiscardingTask(
+    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+    PreparedArguments &&preparedArgs, SGFContext C) {
+  ASTContext &ctx = SGF.getASTContext();
+
+  // Older runtimes treat the operation as an async function, so the builtin
+  // must be used where the synchronous operation task availability holds
+  if (!ctx.LangOpts.hasFeature(Feature::Embedded) &&
+      !ctx.LangOpts.DisableAvailabilityChecking &&
+      loc.getSourceLoc().isValid()) {
+    auto availability =
+        AvailabilityContext::forLocation(loc.getSourceLoc(), SGF.FunctionDC);
+    if (!availability.getPlatformRange().isContainedIn(
+            ctx.getSynchronousOperationTaskAvailability())) {
+      SGF.SGM.diagnose(loc, diag::invalid_sil_builtin,
+                       "Builtin.createSynchronousDiscardingTask requires the "
+                       "synchronous operation task availability (Swift 6.5)");
+    }
+  }
+
+  return emitCreateAsyncTask(SGF, loc, subs, std::move(preparedArgs),
+                             {CreateTaskOptions::OptionalEverything,
+                              CreateTaskOptions::DiscardingResult,
+                              CreateTaskOptions::SynchronousOperation});
 }
 
 // Emit SIL for the named builtin: createTaskGroup.

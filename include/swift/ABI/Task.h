@@ -1010,6 +1010,11 @@ public:
 
   bool isFuture() const { return Flags.task_isFuture(); }
 
+  /// Is the operation of this task a synchronous function?
+  bool hasSynchronousOperation() const {
+    return Flags.task_hasSynchronousOperation();
+  }
+
   FutureFragment *futureFragment() {
     assert(isFuture());
     return reinterpret_cast<FutureFragment *>(
@@ -1238,6 +1243,20 @@ public:
       asyncEntryPoint;
   void *closureContext;
   SwiftError *errorResult;
+};
+
+/// Storage that is allocated before the initial AsyncContext of a synchronous
+/// discarding task.
+///
+/// It has no 'errorResult', no 'indirectResult' and the operation is
+/// synchronous.
+class SynchronousDiscardingContextPrefix {
+public:
+  using FunctionType = SWIFT_CC(swift) void(SWIFT_CONTEXT void *);
+
+  /// The synchronous task function, which is called with `closureContext`
+  FunctionType *__ptrauth_swift_synchronous_task_operation function;
+  void *closureContext;
 };
 
 } // end namespace swift

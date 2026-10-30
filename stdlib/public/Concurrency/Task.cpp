@@ -1310,6 +1310,25 @@ static void completeTaskAndRelease(SWIFT_ASYNC_CONTEXT AsyncContext *context,
   swift_release(task);
 }
 
+/// Similar to 'completeTaskAndRelease' however specifically for tasks with a
+/// synchronous operation.
+SWIFT_CC(swiftasync)
+static void completeSynchronousOperationTaskAndRelease(
+    SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+  // Set that there's no longer a running task in the current thread
+  auto task = _swift_task_clearCurrent();
+  assert(task && "completing task, but there is no active task registered");
+  assert(task->hasSynchronousOperation() && !task->isFuture());
+
+  // The task has no result or error to store, and no future to complete
+  task->Private.complete(task);
+
+  SWIFT_TASK_DEBUG_LOG("synchronous operation task %p completed", task);
+
+  // Release the task, balancing the retain that a running task has on itself
+  swift_release(task);
+}
+
 /// The function that we put in the context of a simple task
 /// to handle the final return from a closure.
 SWIFT_CC(swiftasync)
@@ -1323,6 +1342,17 @@ static void completeTaskWithClosure(SWIFT_ASYNC_CONTEXT AsyncContext *context,
 
   // Clean up the rest of the task.
   return completeTaskAndRelease(context, error);
+}
+
+SWIFT_CC(swiftasync)
+static void completeSynchronousOperationTaskWithClosure(
+    SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+  auto prefix = reinterpret_cast<SynchronousDiscardingContextPrefix *>(
+      reinterpret_cast<char *>(context) -
+      sizeof(SynchronousDiscardingContextPrefix));
+  swift_release((HeapObject *)prefix->closureContext);
+
+  return completeSynchronousOperationTaskAndRelease(context);
 }
 
 /// The function that we put in the context of an inline task to handle the
@@ -1359,6 +1389,18 @@ static void future_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
       asyncContextPrefix->closureContext);
 }
 
+/// The resume function of a synchronous operation task: call the operation,
+/// then complete the task. It never suspends.
+SWIFT_CC(swiftasync)
+static void
+synchronous_operation_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *context) {
+  auto prefix = reinterpret_cast<SynchronousDiscardingContextPrefix *>(
+      reinterpret_cast<char *>(context) -
+      sizeof(SynchronousDiscardingContextPrefix));
+  prefix->function(prefix->closureContext);
+  return context->ResumeParent(context);
+}
+
 SWIFT_CC(swiftasync)
 static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 
@@ -1391,6 +1433,10 @@ const void
 const void
     *const swift::_swift_concurrency_debug_task_future_wait_resume_adapter =
         reinterpret_cast<void *>(task_future_wait_resume_adapter);
+[[gnu::used, gnu::retain]]
+const void
+    *const swift::_swift_concurrency_debug_synchronous_operation_adapter =
+        reinterpret_cast<void *>(synchronous_operation_adapter);
 
 const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
   auto resumeTask = ResumeTask;
@@ -1417,6 +1463,11 @@ const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
     result = reinterpret_cast<const void *>(context->ResumeParent);
   } else if (resumeTask == task_future_wait_resume_adapter) {
     result = reinterpret_cast<const void *>(ResumeContext->ResumeParent);
+  } else if (resumeTask == synchronous_operation_adapter) {
+    auto syncPrefix = reinterpret_cast<SynchronousDiscardingContextPrefix *>(
+        reinterpret_cast<char *>(ResumeContext) -
+        sizeof(SynchronousDiscardingContextPrefix));
+    result = reinterpret_cast<const void *>(syncPrefix->function);
   }
 
   return __ptrauth_swift_runtime_function_entry_strip(result);
@@ -1457,10 +1508,10 @@ static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags
 static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
     const AsyncTask *parent, const TaskGroup *group,
     ResultTypeInfo futureResultType, size_t initialContextSize,
-    bool hasTaskName) {
+    TaskCreateFlags taskCreateFlags, JobFlags jobFlags) {
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
-  if (hasTaskName) {
+  if (jobFlags.task_hasInitialTaskName()) {
     // The NameFragment must be the FIRST tail-allocated fragment so that
     // its slot lives at the constant offset `sizeof(AsyncTask)` (exported
     // as `_swift_concurrency_debug_asyncTaskNameOffset`).
@@ -1472,7 +1523,13 @@ static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
   if (group) {
     headerSize += sizeof(AsyncTask::GroupChildFragment);
   }
-  if (!futureResultType.isNull()) {
+
+  if (taskCreateFlags.hasSynchronousOperation()) {
+    assert(futureResultType.isNull() &&
+           "a synchronous operation task must not have a result");
+    assert(initialContextSize == sizeof(AsyncContext));
+    headerSize += sizeof(SynchronousDiscardingContextPrefix);
+  } else if (!futureResultType.isNull()) {
     headerSize += FutureFragment::fragmentSize(headerSize, futureResultType);
     // Add the future async context prefix.
     headerSize += sizeof(FutureAsyncContextPrefix);
@@ -1594,8 +1651,28 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     }
   }
 
+  // Validate 'synchronous operation' task
+  bool hasSyncOperation = taskCreateFlags.hasSynchronousOperation();
+  if (hasSyncOperation) {
+    // TODO: we could relax using synchronous operation tasks to more situations
+    //       and use this to optimize tasks where the operation closure is synchronous,
+    //       for some reason.
+    assert(taskCreateFlags.isDiscardingTask() &&
+           "Currently, only discarding synchronous operation tasks are supported");
+    // The task has no result. Like for any discarding task the compiler may
+    // still pass a result type (e.g. Embedded Swift's result type record),
+    // which is not used
+    futureResultType = ResultTypeInfo();
+    assert(!group && !asyncLet && !runInlineOption &&
+           !taskCreateFlags.isChildTask() &&
+           !taskCreateFlags.isImmediateTask() &&
+           "Currently, synchronous operation task must be unstructured");
+    jobFlags.task_setHasSynchronousOperation(true);
+  }
+
   #if SWIFT_CONCURRENCY_EMBEDDED
-  assert(!futureResultType.isNull());
+  assert((hasSyncOperation || !futureResultType.isNull()) &&
+         "embedded task without result type info");
   #endif
 
   if (!futureResultType.isNull()) {
@@ -1694,13 +1771,40 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   size_t headerSize, amountToAllocate;
   std::tie(headerSize, amountToAllocate) = amountToAllocateForHeaderAndTask(
-      parent, group, futureResultType, initialContextSize,
-      /*hasTaskName=*/jobFlags.task_hasInitialTaskName());
+      parent, group, futureResultType, initialContextSize, taskCreateFlags,
+      jobFlags);
 
   unsigned initialSlabSize = 512;
 
   void *allocation = nullptr;
-  if (asyncLet) {
+  if (hasSyncOperation) {
+    // A synchronous operation rarely allocates from the task allocator, so the
+    // task's first slab is right-sized for what the runtime itself allocates
+    // before the task runs (the copied task-local values and the dependency
+    // record of enqueueing it), and tail-allocated with the task instead of
+    // being allocated separately on the task's first allocation. Anything that
+    // does not fit makes the allocator allocate a regular slab; we bet that
+    // this is uncommon.
+    size_t requiredCapacity = 0;
+    if (taskCreateFlags.enqueueJob()) {
+      requiredCapacity += TaskAllocator::slabCapacityForAllocation(
+          sizeof(TaskDependencyStatusRecord));
+    }
+    if (taskCreateFlags.copyTaskLocals()) {
+      if (auto *locals = TaskLocal::Storage::getCurrent(currentTask))
+        requiredCapacity += locals->copyToSlabCapacity();
+    }
+    if (requiredCapacity > 0) {
+      assert(requiredCapacity <=
+                 UINT32_MAX - TaskAllocator::slabHeaderSize() &&
+             "slab capacity is a 32-bit value");
+      initialSlabSize = TaskAllocator::slabHeaderSize() + requiredCapacity;
+    } else {
+      initialSlabSize = 0;
+    }
+    allocation = swift_slowAlloc(amountToAllocate + initialSlabSize,
+                                 alignof(AsyncTask) - 1);
+  } else if (asyncLet) {
     assert(parent);
 
     // If there isn't enough room in the fixed async let allocation to
@@ -1737,8 +1841,10 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   } else {
     allocation = swift_slowAlloc(amountToAllocate, alignof(AsyncTask) - 1);
   }
-  SWIFT_TASK_DEBUG_LOG("allocate task %p, parent = %p, slab %u", allocation,
-                       parent, initialSlabSize);
+  SWIFT_TASK_DEBUG_LOG("allocate task %p, parent = %p, slab %u%s", allocation,
+                       parent,
+                       initialSlabSize,
+                       hasSyncOperation ? " [synchronous operation]" : "");
 
   AsyncContext *initialContext =
     reinterpret_cast<AsyncContext*>(
@@ -1752,7 +1858,20 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   //  the async context to get at the parameters.
   //  See e.g. FutureAsyncContextPrefix.
 
-  if (futureResultType.isNull() || taskCreateFlags.isDiscardingTask()) {
+  if (hasSyncOperation) {
+    // 'function' is synchronous
+    auto syncPrefix = reinterpret_cast<SynchronousDiscardingContextPrefix *>(
+        reinterpret_cast<char *>(allocation) + headerSize -
+        sizeof(SynchronousDiscardingContextPrefix));
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+    syncPrefix->function =
+        reinterpret_cast<SynchronousDiscardingContextPrefix::FunctionType *>(
+            function);
+#pragma clang diagnostic pop
+    syncPrefix->closureContext = closureContext;
+    function = synchronous_operation_adapter;
+  } else if (futureResultType.isNull() || taskCreateFlags.isDiscardingTask()) {
     auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
         sizeof(AsyncContextPrefix));
@@ -1848,10 +1967,21 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Initialize the resumption funclet pointer (async return address) to
   // the final funclet for completing the task.
 
-  // Inline tasks are unmanaged, non-throwing, and use a non-escaping
-  // task function.  The final funclet doesn't expect to get passed an error,
-  // and it doesn't clean up either the function or the task directly.
-  if (runInlineOption) {
+  if (hasSyncOperation) {
+    // A synchronous operation task completes from
+    // 'synchronous_operation_adapter' after calling the operation,
+    // which never throws
+    if (closureContext && !taskCreateFlags.isTaskFunctionConsumed()) {
+      initialContext->ResumeParent =
+          &completeSynchronousOperationTaskWithClosure;
+    } else {
+      initialContext->ResumeParent =
+          &completeSynchronousOperationTaskAndRelease;
+    }
+  } else if (runInlineOption) {
+    // Inline tasks are unmanaged, non-throwing, and use a non-escaping
+    // task function.  The final funclet doesn't expect to get passed an error,
+    // and it doesn't clean up either the function or the task directly.
     initialContext->ResumeParent = &completeInlineTask;
 
   // `async let` tasks are unmanaged and use a non-escaping task function.
@@ -1876,9 +2006,11 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   // Initialize the task-local allocator and our other private runtime
   // state for the task.
-  if ((asyncLet || (runInlineOption && runInlineOption->getAllocation())) &&
+  if ((asyncLet || (runInlineOption && runInlineOption->getAllocation()) ||
+       hasSyncOperation) &&
       initialSlabSize > 0) {
-    assert(parent || (runInlineOption && runInlineOption->getAllocation()));
+    assert(parent || (runInlineOption && runInlineOption->getAllocation()) ||
+           hasSyncOperation);
     void *initialSlab = (char*)allocation + amountToAllocate;
     task->Private.initializeWithSlab(basePriority, initialSlab,
                                      initialSlabSize);
@@ -1995,6 +2127,24 @@ getAsyncClosureEntryPointAndContextSize(void *function) {
           fnPtr->ExpectedContextSize};
 }
 
+/// Extract the entry point address and initial context size from a
+/// synchronous closure value. There is no async function pointer record: the
+/// closure value is the synchronous function itself, signed like any Swift
+/// function of its type, and its task only needs a bare initial context.
+template<uint16_t AuthDiscriminator>
+SWIFT_ALWAYS_INLINE // so this doesn't hang out as a ptrauth gadget
+std::pair<SynchronousDiscardingContextPrefix::FunctionType *, size_t>
+getSynchronousClosureEntryPointAndContextSize(void *function) {
+  auto fnPtr =
+      reinterpret_cast<SynchronousDiscardingContextPrefix::FunctionType *>(
+          function);
+#if SWIFT_PTRAUTH
+  fnPtr = ptrauth_auth_function(fnPtr, ptrauth_key_function_pointer,
+                                AuthDiscriminator);
+#endif
+  return {fnPtr, sizeof(AsyncContext)};
+}
+
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
 SWIFT_CC(swift)
 void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
@@ -2026,7 +2176,9 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   size_t minimumAllocationSize =
       amountToAllocateForHeaderAndTask(/*parent=*/nullptr, /*group=*/nullptr,
                                        futureResultType, closureContextSize,
-                                       /*hasTaskName=*/false)
+                                       TaskCreateFlags(),
+                                       JobFlags(JobKind::Task,
+                                                JobPriority::Unspecified))
           .second;
   void *allocation = nullptr;
   size_t allocationBytes = 0;
@@ -2067,6 +2219,26 @@ AsyncTaskAndContext swift::swift_task_create(
     const Metadata *futureResultType,
     void *closureEntry, HeapObject *closureContext) {
   TaskCreateFlags taskCreateFlags(rawTaskCreateFlags);
+
+  if (taskCreateFlags.hasSynchronousOperation()) {
+    SynchronousDiscardingContextPrefix::FunctionType *taskEntry;
+    size_t initialContextSize;
+
+    std::tie(taskEntry, initialContextSize) =
+      getSynchronousClosureEntryPointAndContextSize<
+        SpecialPointerAuthDiscriminators::SynchronousTaskOperation>(
+          closureEntry);
+
+    // The task has no result, so the result type which the compiler passes
+    // for a discarding task is not used
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+    return swift_task_create_common(
+        rawTaskCreateFlags, options, /*futureResultType=*/nullptr,
+        reinterpret_cast<TaskContinuationFunction *>(taskEntry), closureContext,
+        initialContextSize);
+#pragma clang diagnostic pop
+  }
 
   if (taskCreateFlags.isDiscardingTask()) {
     ThinNullaryAsyncSignature::FunctionType *taskEntry;

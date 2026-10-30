@@ -578,3 +578,6 @@ Added: _$ss6TaskIDV9_rawValues6UInt64Vvg
 Added: _$ss6TaskIDV9_rawValues6UInt64VvM
 Added: _$ss6TaskIDV9_rawValues6UInt64VvpMV
 Added: _$ss6TaskIDV9_rawValues6UInt64Vvs
+
+// The resume function of a synchronous operation task, for tools
+Added: __swift_concurrency_debug_synchronous_operation_adapter

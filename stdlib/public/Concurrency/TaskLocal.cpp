@@ -504,6 +504,21 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
   assert(!(target->_private().Local.head) &&
       "Task must not have any task-local values bound before copying into it");
 
+  forEachValueItemToCopy(
+      [&](ValueItem *valueItem) { valueItem->copyTo(target); });
+}
+
+size_t TaskLocal::Storage::copyToSlabCapacity() const {
+  size_t capacity = 0;
+  forEachValueItemToCopy([&](ValueItem *valueItem) {
+    capacity += TaskAllocator::slabCapacityForAllocation(
+        ValueItem::itemSize(valueItem->valueType));
+  });
+  return capacity;
+}
+
+void TaskLocal::Storage::forEachValueItemToCopy(
+    llvm::function_ref<void(ValueItem *)> body) const {
   // Set of keys for which we already have copied to the new task.
   // We only ever need to copy the *first* encounter of any given key,
   // because it is the most "specific"/"recent" binding and any other binding
@@ -518,7 +533,7 @@ void TaskLocal::Storage::copyTo(AsyncTask *target) {
       // i.e. if we've already seen an item for this key, we can skip it.
       bool alreadyCopied = !copied.insert(valueItem->key);
       if (!alreadyCopied) {
-        valueItem->copyTo(target);
+        body(valueItem);
       } else {
         SWIFT_TASK_LOCAL_DEBUG_LOG(
             valueItem->key,

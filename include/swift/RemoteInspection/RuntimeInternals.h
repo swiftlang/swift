@@ -158,6 +158,13 @@ struct FutureAsyncContextPrefix {
   typename Runtime::StoredPointer ErrorResult;
 };
 
+/// Precedes the bare initial `AsyncContext` of a synchronous operation task.
+template <typename Runtime>
+struct SynchronousDiscardingContextPrefix {
+  typename Runtime::StoredSignedPointer Function;
+  typename Runtime::StoredPointer ClosureContext;
+};
+
 template <typename Runtime>
 struct alignas(2 * sizeof(typename Runtime::StoredPointer))
     ActiveActorStatusWithEscalation {

@@ -709,6 +709,9 @@ EXPERIMENTAL_FEATURE(Cells, true)
 /// Extend `@specialized` for `@specialized(exported: true, ...)`.
 EXPERIMENTAL_FEATURE(ExtendedSpecializedAttribute, false)
 
+/// Builtin.createSynchronousDiscardingTask
+LANGUAGE_FEATURE(BuiltinCreateSynchronousDiscardingTask, 0, "Builtin.createSynchronousDiscardingTask")
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
