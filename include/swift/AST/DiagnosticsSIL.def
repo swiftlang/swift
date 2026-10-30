@@ -1443,5 +1443,13 @@ ERROR(invalid_multiple_return_borrow_accessor, none,
 ERROR(unsupported_borrow_abstraction, none,
       "cannot witness borrow requirement for result type %0",
       (Type))
+
+/// C++ foreign reference types
+ERROR(foreign_reference_subclass_field_not_fixed_size, none,
+      "%kind0 cannot have type %1, whose size is not known at compile time, "
+      "because it is declared in a class that subclasses a C++ foreign "
+      "reference type",
+      (const ValueDecl *, Type))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"
