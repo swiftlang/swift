@@ -36,6 +36,16 @@ public actor ActorClass {
     @_expose(Cxx) // expected-error {{async instance method 'methodAsync()' can not be exposed to C++}}
     public nonisolated func methodAsync() async {
     }
+
+    @_expose(Cxx) // expected-error {{async property 'asyncProp' can not be exposed to C++}}
+    public nonisolated var asyncProp: Int {
+        get async { 42 }
+    }
+
+    @_expose(Cxx) // expected-error {{async property 'asyncThrowsProp' can not be exposed to C++}}
+    public nonisolated var asyncThrowsProp: Int {
+        get async throws { 42 }
+    }
 }
 
 @_expose(Cxx)
