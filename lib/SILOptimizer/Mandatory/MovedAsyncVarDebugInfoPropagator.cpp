@@ -727,6 +727,11 @@ bool DebugInfoPropagator::applyDataflow() {
       if (!debugInst || !debugInst.getWasMoved())
         continue;
 
+      // performInitialLocalDataflow skips these, so they have no entry in
+      // dbgVarToDbgVarIndexMap.
+      if (debugInst.hasDebugReconstructionBlock())
+        continue;
+
       auto debugInfo = debugInst.getVarInfo();
       if (!debugInfo)
         continue;
