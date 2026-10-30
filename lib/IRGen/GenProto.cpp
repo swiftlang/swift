@@ -1277,9 +1277,20 @@ static llvm::Value *emitWitnessTableAccessorCall(
     IRGenFunction &IGF, CanType conformingType,
     const ProtocolConformance *conformance,
     llvm::Value **srcMetadataCache) {
-  auto conformanceDescriptor =
-    IGF.IGM.getAddrOfProtocolConformanceDescriptor(
-                                             conformance->getRootConformance());
+  llvm::Value *conformanceDescriptor =
+      IGF.IGM.getAddrOfProtocolConformanceDescriptor(
+          conformance->getRootConformance());
+
+  // Sign the descriptor.
+  auto schema = IGF.IGM.getOptions()
+                    .PointerAuth.ProtocolConformanceDescriptorsAsArguments;
+  if (schema) {
+    auto authInfo = PointerAuthInfo::emit(
+        IGF, schema, nullptr,
+        PointerAuthEntity::Special::ProtocolConformanceDescriptorAsArgument);
+    conformanceDescriptor =
+        emitPointerAuthSign(IGF, conformanceDescriptor, authInfo);
+  }
 
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
@@ -1611,7 +1622,10 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
       if (isRelative)
         Table.addRelativeAddress(descriptor);
       else
-        Table.add(descriptor);
+        Table.addSignedPointer(
+            descriptor,
+            IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors,
+            PointerAuthEntity::Special::ProtocolConformanceDescriptor);
     }
 
     /// A base protocol is witnessed by a pointer to the conformance

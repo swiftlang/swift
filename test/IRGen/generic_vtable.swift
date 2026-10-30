@@ -176,7 +176,7 @@ public class Concrete : Derived<Int> {
 
 
 // CHECK-LABEL: define {{(dllexport )?}}{{(protected )?}}swiftcc %swift.metadata_response @"$s14generic_vtable8ConcreteCMa"
-// CHECK: call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, ptr @"$s14generic_vtable8ConcreteCMn")
+// CHECK: call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, ptr @"$s14generic_vtable8ConcreteCMn{{(\.ptrauth(\.[0-9]+)?)?}}")
 // CHECK: ret
 
 //// Metadata response function for 'Concrete' is fairly simple.

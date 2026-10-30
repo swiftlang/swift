@@ -76,7 +76,7 @@ sil_vtable SubclassOfClassWithResilientField {}
 // CHECK-OLD-SAME: ptr null,
 
 // Superclass field is filled in statically:
-// CHECK-NEW-SAME: @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMf"
+// CHECK-NEW-SAME: @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMf{{(\.ptrauth)?}}"
 
 // CHECK-SAME: }>
 
@@ -136,6 +136,7 @@ bb0:
 // ... dealloc_ref also does the same thing.
 
 // CHECK-NEXT: [[META:%.*]] = load ptr, ptr [[ALLOC]]
+// CHECK-ptrauth: [[META:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-32-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds i8, ptr [[META]], i32 28
 // CHECK-64-NEXT: [[SIZE_ADDR:%.*]] = getelementptr inbounds i8, ptr [[META]], i32 48
 // CHECK-32-NEXT: [[SIZE:%.*]] = load i32, ptr [[SIZE_ADDR]]
@@ -162,7 +163,7 @@ bb0:
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, ptr @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMn")
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, ptr @"$s42class_update_callback_without_fixed_layout23ClassWithResilientFieldCMn{{(\.ptrauth(\.[0-9]+)?)?}}")
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT: br label %cont
@@ -294,7 +295,7 @@ bb0(%0 : $ClassWithResilientField):
 // CHECK-NEXT: br i1 [[COND]], label %cacheIsNull, label %cont
 
 // CHECK: cacheIsNull:
-// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, ptr @"$s42class_update_callback_without_fixed_layout22ClassWithResilientEnumCMn")
+// CHECK-NEXT: [[RESPONSE:%.*]] = call swiftcc %swift.metadata_response @swift_getSingletonMetadata([[INT]] %0, ptr @"$s42class_update_callback_without_fixed_layout22ClassWithResilientEnumCMn{{(\.ptrauth(\.[0-9]+)?)?}}")
 // CHECK-NEXT: [[METADATA:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 0
 // CHECK-NEXT: [[STATUS:%.*]] = extractvalue %swift.metadata_response [[RESPONSE]], 1
 // CHECK-NEXT: br label %cont

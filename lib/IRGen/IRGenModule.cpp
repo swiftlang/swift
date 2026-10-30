@@ -500,7 +500,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     ObjCClassPtrTy,
     OpaquePtrTy,
     OpaquePtrTy,
-    IntPtrTy
+    OpaquePtrTy
   };
   ObjCClassStructTy->setBody(objcClassElts);
 

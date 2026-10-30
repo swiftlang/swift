@@ -1066,6 +1066,34 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   llvm_unreachable("bad link entity kind");
 }
 
+bool LinkEntity::isProtocolRequirementDescriptor() const {
+  switch (getKind()) {
+  case Kind::AssociatedTypeDescriptor:
+  case Kind::AssociatedConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor:
+    return true;
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorDerivative:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+    return isa<ProtocolDecl>(getDecl()->getDeclContext());
+  default:
+    return false;
+  }
+}
+
+bool LinkEntity::isClassMethodDescriptor() const {
+  switch (getKind()) {
+  case Kind::MethodDescriptor:
+  case Kind::MethodDescriptorDerivative:
+  case Kind::MethodDescriptorInitializer:
+  case Kind::MethodDescriptorAllocator:
+    return !isa<ProtocolDecl>(getDecl()->getDeclContext());
+  default:
+    return false;
+  }
+}
+
 bool LinkEntity::isContextDescriptor() const {
   switch (getKind()) {
   case Kind::ModuleDescriptor:

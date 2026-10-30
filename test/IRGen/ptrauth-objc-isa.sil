@@ -1,0 +1,42 @@
+// RUN: %swift -module-name test -import-objc-header %S/Inputs/ptrauth-foreign.h %s -parse-stdlib -parse-as-library -emit-ir -target arm64e-apple-ios12.0 | %FileCheck %s --check-prefixes=CHECK,STRIP
+// RUN: %swift -module-name test -import-objc-header %S/Inputs/ptrauth-foreign.h %s -parse-stdlib -parse-as-library -emit-ir -target arm64e-apple-ios14.5 | %FileCheck %s --check-prefixes=CHECK,AUTH
+
+// REQUIRES: CPU=arm64e
+// REQUIRES: OS=ios
+
+// The class pointer in the isa of an object is signed with the address of the
+// object. Authenticate it after masking the isa of an object whose class has
+// Objective-C ancestry, or strip its signature before iOS 14.5.
+
+import Builtin
+
+open class Sub : ObjCWidget {
+  open func foo()
+}
+
+sil @Sub_foo : $@convention(method) (@guaranteed Sub) -> ()
+
+sil_vtable Sub {
+  #Sub.foo: (Sub) -> () -> () : @Sub_foo
+}
+
+sil @test_call_sub : $@convention(thin) (@guaranteed Sub) -> () {
+bb0(%0 : $Sub):
+  %1 = class_method %0 : $Sub, #Sub.foo : (Sub) -> () -> (), $@convention(method) (@guaranteed Sub) -> ()
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Sub) -> ()
+  return %2 : $()
+}
+// CHECK-LABEL: define swiftcc void @test_call_sub(ptr %0)
+// CHECK:      [[ISA:%.*]] = load i64, ptr %0, align
+// CHECK-NEXT: [[MASK:%.*]] = load i64, ptr @swift_isaMask, align
+// CHECK-NEXT: [[MASKED:%.*]] = and i64 [[ISA]], [[MASK]]
+// CHECK-NEXT: [[MASKED_PTR:%.*]] = inttoptr i64 [[MASKED]] to ptr
+// STRIP-NEXT: [[MASKED_INT:%.*]] = ptrtoint ptr [[MASKED_PTR]] to i64
+// STRIP-NEXT: [[STRIPPED:%.*]] = call i64 @llvm.ptrauth.strip(i64 [[MASKED_INT]], i32 2)
+// STRIP-NEXT: [[META:%.*]] = inttoptr i64 [[STRIPPED]] to ptr
+// AUTH-NEXT:  [[ADDR:%.*]] = ptrtoint ptr %0 to i64
+// AUTH-NEXT:  [[DISC:%.*]] = call i64 @llvm.ptrauth.blend(i64 [[ADDR]], i64 27361)
+// AUTH-NEXT:  [[MASKED_INT:%.*]] = ptrtoint ptr [[MASKED_PTR]] to i64
+// AUTH-NEXT:  [[AUTHED:%.*]] = call i64 @llvm.ptrauth.auth(i64 [[MASKED_INT]], i32 2, i64 [[DISC]])
+// AUTH-NEXT:  [[META:%.*]] = inttoptr i64 [[AUTHED]] to ptr
+// CHECK-NEXT: getelementptr inbounds ptr, ptr [[META]]
