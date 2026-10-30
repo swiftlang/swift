@@ -2878,6 +2878,33 @@ bb0(%0 : @guaranteed $NCG<T>):
   return %4 : $()
 }
 
+// A copy of the mark that is captured rather than stored does not prevent the
+// elision.
+//
+// CHECK-LABEL: sil hidden [ossa] @test_elide_borrow_copy_with_captured_copy :
+// CHECK:       bb0(%0 : $*NCG<T>):
+// CHECK-NOT:     copy_addr %0
+// CHECK:         [[MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] %0 : $*NCG<T>
+// CHECK:         copy_addr [[MARK]] to [init] [[CAPTURE:%[^,]+]] : $*NCG<T>
+// CHECK:         partial_apply [callee_guaranteed] {{%[^,]+}}<T>([[CAPTURE]])
+// CHECK-NOT:     destroy_addr [[MARK]]
+// CHECK-LABEL: } // end sil function 'test_elide_borrow_copy_with_captured_copy'
+sil hidden [ossa] @test_elide_borrow_copy_with_captured_copy : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> () {
+bb0(%0 : @guaranteed $NCG<T>):
+  %1 = copy_value %0 : $NCG<T>
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1 : $NCG<T>
+  %f = function_ref @borrow_use_NCG : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> ()
+  %3 = copy_value %2 : $NCG<T>
+  %4 = partial_apply [callee_guaranteed] %f<T>(%3) : $@convention(thin) <T> (@in_guaranteed NCG<T>) -> ()
+  %5 = convert_escape_to_noescape [not_guaranteed] %4 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %6 = apply %5() : $@noescape @callee_guaranteed () -> ()
+  destroy_value %5 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %4 : $@callee_guaranteed () -> ()
+  destroy_value %2 : $NCG<T>
+  %7 = tuple ()
+  return %7 : $()
+}
+
 // Verify that the init_enum_data_addr instruction is created before its first
 // use.  Although the opaque values are visited in forward order, their
 // uses are visited at the same time.  At that point, addresses are

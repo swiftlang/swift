@@ -128,7 +128,8 @@ func captureImmutableOwned_callee(_ cl: () -> ()) {}
 // CHECK:         [[BOX_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[BOX]]
 // CHECK:         [[ADDR:%[^,]+]] = project_box [[BOX_LIFETIME]]
 // CHECK:         [[CLOSURE:%[^,]+]] = function_ref @$s22opaque_values_closures32captureImmutableOwnedNoncopyableyyFyyXEfU_
-// CHECK:         [[COPY:%[^,]+]] = load [copy] [[ADDR]]
+// CHECK:         [[MARKED:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[ADDR]]
+// CHECK:         [[COPY:%[^,]+]] = load [copy] [[MARKED]]
 // CHECK:         [[CONTEXT:%[^,]+]] = partial_apply [callee_guaranteed] [[CLOSURE]]([[COPY]])
 // CHECK:         [[NOESCAPE_CONTEXT:%[^,]+]] = convert_escape_to_noescape [not_guaranteed] [[CONTEXT]]
 // CHECK:         apply {{%[^,]+}}([[NOESCAPE_CONTEXT]])

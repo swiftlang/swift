@@ -431,7 +431,8 @@ static bool isStoreCopy(SILValue value) {
 ///   %source = <guaranteed ownership>
 ///   %value = copy_value %source             // users: %mark
 ///   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign] %value
-///   where no users of %mark are copy_value instructions.
+///   where no users of %mark are copy_value instructions whose only use is a
+///   store.
 static bool isMarkUnresolvedCopy(SILValue value) {
   auto *copyInst = dyn_cast<CopyValueInst>(value);
   if (!copyInst)
@@ -451,9 +452,12 @@ static bool isMarkUnresolvedCopy(SILValue value) {
   if (inst->getCheckKind() !=
       MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign)
     return false;
-  // Reject if the mark has any copy_value users.
+  // isStoreCopy classifies a copy of the mark by the mark's liveness, which
+  // shrinks once visitCopyValueInst erases the mark's destroys.
   for (auto *use : inst->getUses()) {
-    if (isa<CopyValueInst>(use->getUser()))
+    auto *copy = dyn_cast<CopyValueInst>(use->getUser());
+    if (copy && copy->hasOneUse() &&
+        isa<StoreInst>(copy->getSingleUse()->getUser()))
       return false;
   }
   return true;

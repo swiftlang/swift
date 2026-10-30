@@ -1,0 +1,57 @@
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -enable-sil-opaque-values -sil-move-only-checker -enable-sil-verify-all %s | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-sil-opt -sil-print-types -module-name moveonly -enable-sil-opaque-values -sil-move-only-checker -address-lowering -enable-sil-verify-all %s | %FileCheck %s --check-prefix=AL
+
+// A noncopyable `let` captured by a closure, as SILGen emits it under opaque
+// values after MandatoryAllocBoxToStack.
+
+sil_stage raw
+
+import Swift
+import Builtin
+
+struct MOAny : ~Copyable {
+  var a: Any
+}
+
+sil @callee : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+sil @closure : $@convention(thin) (@in_guaranteed MOAny) -> ()
+
+// CHECK-LABEL: sil [ossa] [opaque] @captureImmutableOwnedNoncopyable :
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack [lexical] [var_decl] $MOAny, let, name "mo"
+// CHECK-NOT:     mark_unresolved_non_copyable_value
+// CHECK-NOT:     load [copy]
+// CHECK:         [[TAKE:%[^,]+]] = load [take] [[STACK]]
+// CHECK:         partial_apply [callee_guaranteed] {{%[^,]+}}([[TAKE]])
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'captureImmutableOwnedNoncopyable'
+
+// AL-LABEL: sil [ossa] @captureImmutableOwnedNoncopyable :
+// AL:       bb0([[ARG:%[^,]+]] : $*MOAny):
+// AL:         [[CAPTURE:%[^,]+]] = alloc_stack $MOAny
+// AL:         [[STACK:%[^,]+]] = alloc_stack [lexical] [var_decl] $MOAny, let, name "mo"
+// AL:         copy_addr [take] [[ARG]] to [init] [[STACK]]
+// AL:         copy_addr [take] [[STACK]] to [init] [[CAPTURE]]
+// AL:         [[CLOSURE:%[^,]+]] = partial_apply [callee_guaranteed] {{%[^,]+}}([[CAPTURE]])
+// AL:         destroy_value [[CLOSURE]]
+// AL-NOT:     destroy_addr
+// AL:         dealloc_stack [[STACK]]
+// AL:         dealloc_stack [[CAPTURE]]
+// AL-LABEL: } // end sil function 'captureImmutableOwnedNoncopyable'
+sil [ossa] @captureImmutableOwnedNoncopyable : $@convention(thin) (@in MOAny) -> () {
+bb0(%0 : @owned $MOAny):
+  %1 = alloc_stack [lexical] [var_decl] $MOAny, let, name "mo"
+  %2 = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*MOAny
+  store %0 to [init] %2 : $*MOAny
+  %4 = function_ref @closure : $@convention(thin) (@in_guaranteed MOAny) -> ()
+  %5 = load [copy] %2 : $*MOAny
+  %6 = partial_apply [callee_guaranteed] %4(%5) : $@convention(thin) (@in_guaranteed MOAny) -> ()
+  %7 = convert_escape_to_noescape [not_guaranteed] %6 : $@callee_guaranteed () -> () to $@noescape @callee_guaranteed () -> ()
+  %8 = function_ref @callee : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %7 : $@noescape @callee_guaranteed () -> ()
+  destroy_value %6 : $@callee_guaranteed () -> ()
+  destroy_addr %2 : $*MOAny
+  dealloc_stack %1 : $*MOAny
+  %14 = tuple ()
+  return %14 : $()
+}

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-sil-opaque-values -emit-sil %s
+// RUN: %target-swift-frontend -enable-sil-opaque-values -sil-verify-all -emit-sil %s
 
 // Regression test for the following cases:
 
@@ -48,6 +48,41 @@ struct Loaner<T> {
   let value: T
   var property: T { borrowing get { value } }
   borrowing func method() -> T { value }
+}
+
+// The projection above must also apply to a `borrowing` non-`Copyable`
+// parameter that a closure captures, which copies the mark.
+
+protocol P: ~Copyable {}
+
+func check(_ x: borrowing any P & ~Copyable) -> Bool { true }
+func checkGeneric<T: ~Copyable>(_ x: borrowing T) -> Bool { true }
+
+func viaClosure(_ c: () -> Bool) -> Bool { c() }
+func viaAutoclosure(_ c: @autoclosure () -> Bool) -> Bool { c() }
+
+func existentialClosure(_ x: borrowing any P & ~Copyable) -> Bool {
+  viaClosure { check(x) }
+}
+
+func existentialAutoclosure(_ x: borrowing any P & ~Copyable) -> Bool {
+  viaAutoclosure(check(x))
+}
+
+func existentialAnd(_ x: borrowing any P & ~Copyable) -> Bool {
+  check(x) && check(x)
+}
+
+func genericClosure<T: ~Copyable>(_ x: borrowing T) -> Bool {
+  viaClosure { checkGeneric(x) }
+}
+
+struct Wrapper<T>: ~Copyable {
+  var value: T
+
+  func selfClosure() -> Bool {
+    viaClosure { checkGeneric(self) }
+  }
 }
 
 // Passing a stored `~Copyable` value as a `borrowing` argument produces, under
