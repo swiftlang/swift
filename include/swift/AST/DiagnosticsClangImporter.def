@@ -274,6 +274,9 @@ NOTE(cxx_unsafe_skipped_lifetime_escapable_capture, none,
      "Swift cannot represent the lifetime annotation on "
      "%select{'self'|parameter '%1'}0, which is Escapable and imported by "
      "value", (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_constructed_self, none,
+     "Swift cannot represent a parameter capturing 'self' in an initializer",
+     ())
 
 // Why a type's escapability could not be determined. Also emitted at the type,
 // which is why these do not name it either.

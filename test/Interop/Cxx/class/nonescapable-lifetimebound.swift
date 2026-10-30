@@ -140,6 +140,8 @@ void captureGlobalAndOut(View v [[clang::lifetime_capture_by_global]] [[clang::l
 }
 
 struct SWIFT_NONESCAPABLE MoreCaptures {
+    MoreCaptures(View v [[clang::lifetime_capture_by_this]]) : view(v) {}
+
     static void staticCapture(View &out, View v [[clang::lifetime_capture_by(out)]]) {
         out = v;
     }
@@ -366,6 +368,7 @@ struct SWIFT_NONESCAPABLE IndependentCtor {
 // CHECK: sil {{.*}}[clang fromRvalueRefTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} Owner) -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang fromRvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} NonTrivialByValue) -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang IndependentCtor.init] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(immortal) @out IndependentCtor
+// CHECK-DAG: sil {{.*}}[clang MoreCaptures.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out MoreCaptures
 // CHECK-DAG: sil {{.*}}[clang MoreCaptures.staticCapture] {{.*}} : $@convention(c) (@lifetime(copy 1) @inout View, View) -> ()
 
 //--- test.swift
@@ -443,6 +446,7 @@ func independentCtor(_ o: Owner) {
 
 func moreCaptures(_ o: Owner, _ v: View) {
     var a = View()
+    let _ = MoreCaptures(v)
     MoreCaptures.staticCapture(&a, v)
 }
 
