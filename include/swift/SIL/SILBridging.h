@@ -664,6 +664,7 @@ struct BridgedFunction {
   SwiftInt specializationLevel() const;
   SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedSubstitutionMap contextSubs,
                                                                     BridgedCanType selfType) const;
+  SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getPartialMethodSubstitutions(BridgedSubstitutionMap contextSubs) const;
   BRIDGED_INLINE OptionalSourceFileKind getSourceFileKind() const;
 
   enum class ParseEffectsMode {

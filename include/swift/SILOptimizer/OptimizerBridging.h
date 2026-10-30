@@ -223,12 +223,14 @@ struct BridgedPassContext {
   SWIFT_IMPORT_UNSAFE OptionalBridgedFunction specializeFunction(BridgedFunction function,
                                                                  BridgedSubstitutionMap substitutions,
                                                                  bool convertIndirectToDirect,
-                                                                 bool isMandatory) const;
+                                                                 bool isMandatory,
+                                                                 bool allowPartialSpecialization) const;
   void deserializeAllCallees(BridgedFunction function, bool deserializeAll) const;
   bool specializeClassMethodInst(BridgedInstruction cm) const;
   bool specializeWitnessMethodInst(BridgedInstruction wm) const;
   bool specializeKeyPathInst(BridgedInstruction kpi) const;
-  bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
+  bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory,
+                                   bool allowPartialSpecialization) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
 

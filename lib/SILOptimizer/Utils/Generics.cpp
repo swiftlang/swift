@@ -592,7 +592,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       return false;
 
     // Bail if the callee should not be partially specialized.
-    if (shouldNotSpecialize(Callee, Apply.getFunction(), ParamSubs))
+    if (shouldNotSpecialize(Callee, Apply ? Apply.getFunction() : nullptr, ParamSubs))
       return false;
   }
 
