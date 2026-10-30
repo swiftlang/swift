@@ -1,0 +1,15 @@
+module ConcreteTemplateTypes {
+  header "types.h"
+  export *
+  requires cplusplus
+}
+module AdditionalTemplateTypes {
+  header "additional.h"
+  export *
+  requires cplusplus
+}
+module TemplateVisibility {
+  requires cplusplus
+  explicit module Base { header "visibility-base.h" }
+  explicit module Extra { header "visibility-extra.h" export Base }
+}
