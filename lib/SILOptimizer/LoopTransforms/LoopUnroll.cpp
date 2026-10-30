@@ -313,6 +313,84 @@ static bool isPackIterationLoop(SILLoop *Loop) {
   return false;
 }
 
+struct UnrollablePackLoopInfo {
+  SILBasicBlock *header;
+  unsigned depth;
+};
+
+/// Collect loop headers with an argument that is used as a dynamic pack index
+/// by an `open_pack_element` instruction whose opened Pack types contain no
+/// expansions. These are the headers of candidate loops for Pack Loop
+/// Unrolling.
+///
+/// Returns an array containing each loop header and its depth.
+static auto collectPackLoopHeaders(SILLoopInfo *LoopInfo, SILFunction *Fun) {
+  llvm::SmallVector<UnrollablePackLoopInfo> packLoopHeaders;
+  // Multiple `open_pack_element` instructions could use the same header
+  // argument, so keep track of which ones we have already collected.
+  BasicBlockSet collectedBlocks(Fun);
+
+  for (auto *OutermostLoop : *LoopInfo) {
+    for (auto *BB : OutermostLoop->getBlocks()) {
+      for (auto &Inst : *BB) {
+        // Match the pattern:
+        // headerbb(%arg):
+        //   dynamic_pack_index %arg
+        //   (pack_pack_index)*
+        //   open_pack_element ... of $Pack{Concrete, Types}
+        auto *ope = dyn_cast<OpenPackElementInst>(&Inst);
+        if (!ope)
+          continue;
+        auto *opeIdx = ope->getIndexOperand();
+        while (auto *ppi = dyn_cast<PackPackIndexInst>(opeIdx)) {
+          opeIdx = ppi->getSliceIndexOperand();
+        }
+        auto *dpi = dyn_cast<DynamicPackIndexInst>(opeIdx);
+        if (!dpi)
+          continue;
+        auto *indexArg = dyn_cast<SILArgument>(dpi->getOperand());
+        if (!indexArg || !LoopInfo->isLoopHeader(indexArg->getParent()))
+          continue;
+
+        // Check if every opened Pack type contains a list of non-pack expansion
+        // (scalar) types.
+        bool allScalar = true;
+        ope->getOpenedGenericEnvironment()->forEachPackElementBinding(
+            [&](ElementArchetypeType *elementArchetype, PackType *pack) {
+              if (!allScalar)
+                return;
+
+              if (pack->getNumElements() == 0 ||
+                  pack->containsPackExpansionType()) {
+                allScalar = false;
+              }
+            });
+
+        if (allScalar && !collectedBlocks.contains(indexArg->getParent())) {
+          collectedBlocks.insert(indexArg->getParent());
+          packLoopHeaders.push_back(
+              {indexArg->getParent(),
+               LoopInfo->getLoopDepth(indexArg->getParent())});
+        }
+      }
+    }
+  }
+
+  return packLoopHeaders;
+}
+
+/// Check whether we can duplicate the instructions in the loop.
+static bool canUnrollLoop(SILLoop *Loop, DeadEndBlocks *deb) {
+  for (auto *BB : Loop->getBlocks()) {
+    for (auto &Inst : *BB) {
+      if (!canDuplicateLoopInstruction(Loop, &Inst, deb)) {
+        return false;
+      }
+    }
+  }
+  return true;
+}
+
 /// Check whether we can duplicate the instructions in the loop and use a
 /// heuristic that looks at the trip count and the cost of the instructions in
 /// the loop to determine whether we should unroll this loop.
@@ -501,33 +579,11 @@ updateSSA(SILFunction *Fn, SILLoop *Loop,
   }
 }
 
-/// Try to fully unroll the loop if we can determine the trip count and the trip
-/// count is below a threshold.
-static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEndBlocks *deb) {
-  assert(Loop->getSubLoops().empty() && "Expecting innermost loops");
-
-  LLVM_DEBUG(llvm::dbgs() << "Trying to unroll loop : \n" << *Loop);
-  auto *Preheader = Loop->getLoopPreheader();
-  if (!Preheader)
-    return false;
-
-  auto *Latch = Loop->getLoopLatch();
-  if (!Latch)
-    return false;
-
-  auto *Header = Loop->getHeader();
-
-  std::optional<uint64_t> MaxTripCount =
-      getMaxLoopTripCount(Loop, Preheader, Header, Latch);
-  if (!MaxTripCount) {
-    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, did not find trip count\n");
-    return false;
-  }
-
-  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value(), SRA, deb)) {
-    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
-    return false;
-  }
+/// Fully unroll a loop that has a Preheader, Header, Latch & known max trip
+/// count.
+static bool unrollLoop(SILLoop *Loop, SILBasicBlock *Preheader,
+                       SILBasicBlock *Header, SILBasicBlock *Latch,
+                       uint64_t MaxTripCount) {
 
   // TODO: We need to split edges from non-condbr exits for the SSA updater. For
   // now just don't handle loops containing such exits.
@@ -550,7 +606,7 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEnd
   MapVector<SILValue, SmallVector<SILValue, 8>> LoopLiveOutValues;
 
   // Copy the body MaxTripCount-1 times.
-  for (uint64_t Cnt = 1; Cnt < *MaxTripCount; ++Cnt) {
+  for (uint64_t Cnt = 1; Cnt < MaxTripCount; ++Cnt) {
     // Clone the blocks in the loop.
     LoopCloner cloner(Loop);
     cloner.cloneLoop();
@@ -592,9 +648,133 @@ static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA, DeadEnd
   return true;
 }
 
+/// Try to fully unroll the loop if we can determine the trip count and the trip
+/// count is below a threshold.
+static bool tryToUnrollLoop(SILLoop *Loop, IsSelfRecursiveAnalysis *SRA,
+                            DeadEndBlocks *deb) {
+  assert(Loop->getSubLoops().empty() && "Expecting innermost loops");
+
+  LLVM_DEBUG(llvm::dbgs() << "Trying to unroll loop : \n" << *Loop);
+  auto *Preheader = Loop->getLoopPreheader();
+  if (!Preheader)
+    return false;
+
+  auto *Latch = Loop->getLoopLatch();
+  if (!Latch)
+    return false;
+
+  auto *Header = Loop->getHeader();
+
+  std::optional<uint64_t> MaxTripCount =
+      getMaxLoopTripCount(Loop, Preheader, Header, Latch);
+  if (!MaxTripCount) {
+    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, did not find trip count\n");
+    return false;
+  }
+
+  if (!canAndShouldUnrollLoop(Loop, MaxTripCount.value(), SRA, deb)) {
+    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, exceeds cost threshold\n");
+    return false;
+  }
+
+  return unrollLoop(Loop, Preheader, Header, Latch, *MaxTripCount);
+}
+
+/// Try to fully unroll the loop if we can determine the trip count.
+static bool tryToUnrollPackLoop(SILLoop *Loop, DeadEndBlocks *deb) {
+  assert(isPackIterationLoop(Loop) && "Expecting dynamic pack loop");
+
+  LLVM_DEBUG(llvm::dbgs() << "Trying to unroll pack loop : \n" << *Loop);
+  auto *Preheader = Loop->getLoopPreheader();
+  if (!Preheader)
+    return false;
+
+  auto *Latch = Loop->getLoopLatch();
+  if (!Latch)
+    return false;
+
+  auto *Header = Loop->getHeader();
+
+  std::optional<uint64_t> MaxTripCount =
+      getMaxLoopTripCount(Loop, Preheader, Header, Latch);
+  if (!MaxTripCount) {
+    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, did not find trip count\n");
+    return false;
+  }
+
+  if (!canUnrollLoop(Loop, deb)) {
+    LLVM_DEBUG(llvm::dbgs() << "Not unrolling, contains instruction(s) that "
+                               "cannot be duplicated\n");
+    return false;
+  }
+
+  return unrollLoop(Loop, Preheader, Header, Latch, *MaxTripCount);
+}
+
 // =============================================================================
 //                                 Driver
 // =============================================================================
+
+static void cleanupAfterUnrolling(SILFunction *Fun, SILPassManager *PM) {
+  updateAllGuaranteedPhis(PM, Fun);
+  PM->invalidateAnalysis(Fun, SILAnalysis::InvalidationKind::FunctionBody);
+  removeUnreachableBlocks(*Fun);
+  if (Fun->needBreakInfiniteLoops())
+    breakInfiniteLoops(PM, Fun);
+  if (Fun->needCompleteLifetimes())
+    completeAllLifetimes(PM, Fun);
+}
+
+namespace swift {
+bool unrollPackLoopsInFunction(SILFunction *Fun, SILPassManager *PM) {
+  SILLoopInfo *LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
+
+  auto unrollablePackLoopHeaders = collectPackLoopHeaders(LoopInfo, Fun);
+
+  if (unrollablePackLoopHeaders.empty())
+    return false;
+
+  DeadEndBlocks *deb = PM->getAnalysis<DeadEndBlocksAnalysis>()->get(Fun);
+  DominanceInfo *dom = PM->getAnalysis<DominanceAnalysis>()->get(Fun);
+  bool anyChanged = false;
+
+  // Attempt to unroll every collected pack loop, deepest first. Unrolling an
+  // inner loop does not affect the blocks outside it, so the set of
+  // unrollable Pack loop headers is unaffected. This lets us avoid repeating
+  // the analysis to precisely detect pack loops, which is non-trivial.
+  llvm::sort(unrollablePackLoopHeaders,
+             [&](const auto &a, const auto &b) { return a.depth > b.depth; });
+  auto lastAnalysisDepth = unrollablePackLoopHeaders[0].depth;
+  bool changed = false;
+  for (const auto &packLoopInfo : unrollablePackLoopHeaders) {
+    const auto depth = packLoopInfo.depth;
+    if (changed && depth != lastAnalysisDepth) {
+      // An inner loop was unrolled, invalidating the loop and dead-end blocks
+      // analyses for all loops at shallower depths. Clean up and re-analyse.
+      cleanupAfterUnrolling(Fun, PM);
+      LoopInfo = PM->getAnalysis<SILLoopAnalysis>()->get(Fun);
+      deb = PM->getAnalysis<DeadEndBlocksAnalysis>()->get(Fun);
+      dom = PM->getAnalysis<DominanceAnalysis>()->get(Fun);
+      changed = false;
+      lastAnalysisDepth = depth;
+    }
+
+    auto *Loop = LoopInfo->getLoopFor(packLoopInfo.header);
+    ASSERT(Loop && "All collected blocks are loop headers.");
+    // First canonicalize and rotate the loop so more pack loops can unroll.
+    changed |= canonicalizeLoop(Loop, dom, LoopInfo);
+    changed |=
+        rotateLoopAtMostUpToLatch(Loop, dom, LoopInfo, PM, /*ignoreCost=*/true);
+    changed |= tryToUnrollPackLoop(Loop, deb);
+    anyChanged |= changed;
+  }
+
+  if (changed)
+    cleanupAfterUnrolling(Fun, PM);
+
+  return anyChanged;
+}
+} // namespace swift
 
 namespace {
 
@@ -636,14 +816,18 @@ class LoopUnrolling : public SILFunctionTransform {
       Changed |= tryToUnrollLoop(Loop, SRA, deb);
 
     if (Changed) {
-      updateAllGuaranteedPhis(PM, Fun);
-      invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
-      removeUnreachableBlocks(*Fun);
-      if (Fun->needBreakInfiniteLoops())
-        breakInfiniteLoops(getPassManager(), Fun);
-      if (Fun->needCompleteLifetimes())
-        completeAllLifetimes(getPassManager(), Fun);
+      cleanupAfterUnrolling(Fun, PM);
     }
+  }
+};
+
+class PackLoopUnrolling : public SILFunctionTransform {
+  void run() override {
+    auto *Fun = getFunction();
+
+    LLVM_DEBUG(llvm::dbgs() << "Pack Loop Unroll running on function : "
+                            << Fun->getName() << "\n");
+    unrollPackLoopsInFunction(Fun, PM);
   }
 };
 
@@ -652,3 +836,5 @@ class LoopUnrolling : public SILFunctionTransform {
 SILTransform *swift::createLoopUnroll() {
   return new LoopUnrolling();
 }
+
+SILTransform *swift::createPackLoopUnroll() { return new PackLoopUnrolling(); }

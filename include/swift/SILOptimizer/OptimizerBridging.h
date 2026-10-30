@@ -229,6 +229,7 @@ struct BridgedPassContext {
   bool specializeWitnessMethodInst(BridgedInstruction wm) const;
   bool specializeKeyPathInst(BridgedInstruction kpi) const;
   bool specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const;
+  bool unrollPackLoopsInFunction(BridgedFunction function) const;
   BridgedOwnedString mangleOutlinedVariable(BridgedFunction function) const;
   BridgedOwnedString mangleAsyncRemoved(BridgedFunction function) const;
 
