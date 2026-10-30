@@ -977,7 +977,7 @@ class NotSendable {}
         let stream = AsyncThrowingStream<Int, Error>(unfolding: { @MainActor in
           counter += 1
           if counter == 3 { throw thrownError }
-          return counter < 3 ? counter : nil
+          return counter
         })
         var iterator = stream.makeAsyncIterator()
         do {
