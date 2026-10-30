@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -38,6 +38,16 @@ func genericLogicalOps<T>(
   and: a .& b,
   or: a .| b,
   xor: a .^ b
+)}
+
+func genericReplacements<T>(
+  _ a: SIMDMask<T>, _ b: SIMDMask<T>, _ m: SIMDMask<T>
+) -> (
+  vector: SIMDMask<T>,
+  bool: SIMDMask<T>
+) where T: SIMD, T.Scalar: SignedInteger & FixedWidthInteger {(
+  vector: a.replacing(with: b, where: m),
+  bool: a.replacing(with: true, where: m)
 )}
 
 func genericComparisons<T>(
@@ -93,6 +103,31 @@ ${Scalar}x${n}Mask_TestSuite.test("replacing") {
   expectEqual(f.replacing(with: t, where: a), a)
   expectEqual(t.replacing(with: false, where: a), .!a)
   expectEqual(f.replacing(with: true, where: a), a)
+
+  let m = SIMDMask<${Vector}>.random()
+  let (vector, bool) = genericReplacements(a, b, m)
+  expectEqual(vector, a.replacing(with: b, where: m))
+  expectEqual(bool, a.replacing(with: true, where: m))
+
+  var c = a
+  c.replace(with: b, where: m)
+  expectEqual(vector, c)
+
+  var h = a
+  h.replace(with: true, where: m)
+  expectEqual(bool, h)
+
+  var d = a
+  d.replace(with: b, where: t)
+  expectEqual(d, b)
+
+  var e = t
+  e.replace(with: false, where: a)
+  expectEqual(e, .!a)
+
+  var g = f
+  g.replace(with: true, where: a)
+  expectEqual(g, a)
 }
 
 %  end
