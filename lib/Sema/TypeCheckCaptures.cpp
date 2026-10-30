@@ -505,7 +505,7 @@ public:
 
     // Capture list entries are diagnosed where they're declared.
     auto *var = dyn_cast_or_null<VarDecl>(capture.getDecl());
-    if (!var || !var->hasInterfaceType())
+    if (!var || !var->isLocalCapture() || !var->hasInterfaceType())
       return;
 
     // The owning closure's capture list entries are diagnosed separately.
