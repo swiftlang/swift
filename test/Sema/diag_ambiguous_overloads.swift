@@ -163,6 +163,13 @@ do {
 
   f2(f1) // expected-error {{no 'f1' candidates produce the expected type '(String) -> Void' for parameter #0}}
 }
+do {
+  func `open`(_ p: Int) {} // expected-note {{found candidate with type '(Int) -> ()'}}
+  func `open`(_ p: Bool) {} // expected-note {{found candidate with type '(Bool) -> ()'}}
+  func degrees(_ value: Int) {}
+
+  degrees(open) // expected-error {{no 'open' candidates produce the expected type 'Int' for parameter #0}}
+}
 
 // https://forums.swift.org/t/1-x-type-inference/69417/15
 protocol N { associatedtype D }
