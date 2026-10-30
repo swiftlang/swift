@@ -13,21 +13,21 @@
 /// Extends the lifetime of the given instance.
 ///
 /// - Parameters:
-///   - x: An instance to preserve until this function returns.
+///   - instance: An instance to preserve until this function returns.
 @export(implementation)
 @_transparent
 public func extendLifetime<T: ~Copyable & ~Escapable>(
-  _ x: borrowing T
+  _ instance: borrowing T
 ) {
-  Builtin.fixLifetime(x)
+  Builtin.fixLifetime(instance)
 }
 
 /// Evaluates a closure while ensuring that the given instance is not destroyed
 /// before the closure returns.
 ///
 /// - Parameters:
-///   - x: An instance to preserve until the execution of `body` is completed.
-///   - body: A closure to execute that depends on the lifetime of `x` being
+///   - instance: An instance to preserve until the execution of `body` is completed.
+///   - body: A closure to execute that depends on the lifetime of `instance` being
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
@@ -38,10 +38,10 @@ public func withExtendedLifetime<
   E: Error,
   Result: ~Copyable
 >(
-  _ x: borrowing T,
+  _ instance: borrowing T,
   _ body: () throws(E) -> Result
 ) throws(E) -> Result {
-  defer { _fixLifetime(x) }
+  defer { _fixLifetime(instance) }
   return try body()
 }
 
@@ -60,8 +60,8 @@ internal func __abi_withExtendedLifetime<T, Result>(
 /// before the closure returns.
 ///
 /// - Parameters:
-///   - x: An instance to preserve until the execution of `body` is completed.
-///   - body: A closure to execute that depends on the lifetime of `x` being
+///   - instance: An instance to preserve until the execution of `body` is completed.
+///   - body: A closure to execute that depends on the lifetime of `instance` being
 ///     extended. If `body` has a return value, that value is also used as the
 ///     return value for the `withExtendedLifetime(_:_:)` method.
 /// - Returns: The return value, if any, of the `body` closure parameter.
@@ -72,11 +72,11 @@ public func withExtendedLifetime<
   E: Error,
   Result: ~Copyable
 >(
-  _ x: borrowing T,
+  _ instance: borrowing T,
   _ body: (borrowing T) throws(E) -> Result
 ) throws(E) -> Result {
-  defer { _fixLifetime(x) }
-  return try body(x)
+  defer { _fixLifetime(instance) }
+  return try body(instance)
 }
 
 @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)

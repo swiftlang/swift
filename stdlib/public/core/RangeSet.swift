@@ -175,7 +175,7 @@ extension RangeSet {
   ///
   /// - Parameters:
   ///   - indices: The indices to include in the range set. All members of
-  ///   `indices` must be valid indicies of `collection` that aren't
+  ///   `indices` must be valid indices of `collection` that aren't
   ///   equal to the collection's `endIndex`.
   ///   - collection: The collection that contains `index`.
   @inlinable
