@@ -518,6 +518,7 @@ UNINTERESTING_FEATURE(GenerateBindingsForNoncopyableTypesInCXX)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
 UNINTERESTING_FEATURE(AllowRuntimeSymbolDeclarations)
 UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
+UNINTERESTING_FEATURE(DistributedProtocolStubTypealias)
 
 // TODO: Detect scope arguments anywhere in the declaration's interface type,
 // which are printed even when elided, and explicit scope parameters.
