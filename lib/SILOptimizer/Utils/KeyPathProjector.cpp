@@ -705,6 +705,8 @@ KeyPathProjector::create(SILValue keyPath, SILValue root,
         }
         break;
       case KeyPathPatternComponent::Kind::StoredProperty: {
+        if (comp.getStoredPropertyDecl()->getPointerAuthQualifier().isPresent())
+          return nullptr;
         auto *declCtxt = comp.getStoredPropertyDecl()->getDeclContext();
         if (!isa<StructDecl>(declCtxt) && !isa<ClassDecl>(declCtxt)) {
           // This can happen, e.g. for ObjectiveC class properties, which are

@@ -7341,6 +7341,34 @@ void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
   }
 }
 
+/// The imported field whose storage is accessed by a `begin_access [signed]`.
+static VarDecl *getSignedAccessField(BeginAccessInst *access) {
+  SILValue operand = access->getOperand();
+  if (auto *sea = dyn_cast<StructElementAddrInst>(operand))
+    return sea->getField();
+  return cast<RefElementAddrInst>(operand)->getField();
+}
+
+/// Return the pointer authentication schema that Swift uses for the value of
+/// a `__ptrauth`-qualified field once it has been loaded out of the field.
+static PointerAuthInfo
+getSwiftSidePointerAuthInfo(IRGenFunction &IGF, SILType fieldAddrType,
+                            llvm::Value *storageAddress) {
+  // ClangImporter imports nullable pointers as optional types.
+  SILType valueType = fieldAddrType.getOptionalObjectType();
+  if (!valueType)
+    valueType = fieldAddrType;
+
+  auto fnType = valueType.getAs<SILFunctionType>();
+  if (!fnType || fnType->getRepresentation() !=
+                     SILFunctionTypeRepresentation::CFunctionPointer)
+    return PointerAuthInfo();
+
+  return PointerAuthInfo::emit(
+      IGF, IGF.IGM.getOptions().PointerAuth.FunctionPointers, storageAddress,
+      PointerAuthEntity(fnType));
+}
+
 static ExclusivityFlags getExclusivityAction(SILAccessKind kind) {
   switch (kind) {
   case SILAccessKind::Read:
@@ -7428,14 +7456,15 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
   }
   case SILAccessEnforcement::Signed: {
     auto &ti = getTypeInfo(access->getType());
-    auto *sea = cast<StructElementAddrInst>(access->getOperand());
+    SILValue operand = access->getOperand();
+    VarDecl *field = getSignedAccessField(access);
     if (access->getAccessKind() == SILAccessKind::Read) {
       // When we see a signed read access, generate code to:
       // authenticate the signed pointer if non-null, and store the
       // authenticated value to a shadow stack location. Set the lowered address
       // of the access to this stack location.
-      auto pointerAuthQual = sea->getField()->getPointerAuthQualifier();
-      auto *pointerToSignedFptr = getLoweredAddress(sea).getAddress();
+      auto pointerAuthQual = field->getPointerAuthQualifier();
+      auto *pointerToSignedFptr = getLoweredAddress(operand).getAddress();
       auto *signedFptr = Builder.CreateLoad(pointerToSignedFptr, IGM.PtrTy,
                                             IGM.getPointerAlignment());
 
@@ -7456,12 +7485,8 @@ void IRGenSILFunction::visitBeginAccessInst(BeginAccessInst *access) {
       Builder.emitBlock(resignNonNull);
       auto oldAuthInfo =
           PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
-      // ClangImporter imports the c function pointer as an optional type.
-      PointerAuthEntity entity(
-          sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
-      auto newAuthInfo = PointerAuthInfo::emit(
-          *this, IGM.getOptions().PointerAuth.FunctionPointers,
-          pointerToSignedFptr, entity);
+      auto newAuthInfo = getSwiftSidePointerAuthInfo(*this, operand->getType(),
+                                                     pointerToSignedFptr);
       auto *resignedFptr =
           emitPointerAuthResign(*this, signedFptr, oldAuthInfo, newAuthInfo);
       Builder.CreateStore(resignedFptr, tempAddressToIntPtr,
@@ -7586,13 +7611,11 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
     }
     // When we see a signed modify access, get the lowered address of the
     // access which is the shadow stack slot, sign the value if non-null and
-    // write back to the struct field.
-    auto *sea = cast<StructElementAddrInst>(access->getOperand());
-    auto pointerAuthQual = cast<StructElementAddrInst>(access->getOperand())
-                               ->getField()
-                               ->getPointerAuthQualifier();
-    auto *pointerToSignedFptr =
-        getLoweredAddress(access->getOperand()).getAddress();
+    // write back to the struct/class field.
+    SILValue operand = access->getOperand();
+    auto pointerAuthQual =
+        getSignedAccessField(access)->getPointerAuthQualifier();
+    auto *pointerToSignedFptr = getLoweredAddress(operand).getAddress();
     auto tempAddress = getLoweredAddress(access).getAddress();
     auto *tempAddressValue = Builder.CreateLoad(tempAddress, IGM.PtrTy,
                                                 IGM.getPointerAlignment());
@@ -7607,13 +7630,9 @@ void IRGenSILFunction::visitEndAccessInst(EndAccessInst *i) {
 
     Builder.emitBlock(resignNonNull);
 
-    // If non-null, resign
-    // ClangImporter imports the c function pointer as an optional type.
-    PointerAuthEntity entity(
-        sea->getType().getOptionalObjectType().getAs<SILFunctionType>());
-    auto oldAuthInfo = PointerAuthInfo::emit(
-        *this, IGM.getOptions().PointerAuth.FunctionPointers,
-        tempAddress, entity);
+    // If non-null, resign (or just sign, for values that Swift keeps unsigned).
+    auto oldAuthInfo =
+        getSwiftSidePointerAuthInfo(*this, operand->getType(), tempAddress);
     auto newAuthInfo =
         PointerAuthInfo::emit(*this, pointerAuthQual, pointerToSignedFptr);
     auto *signedFptr = emitPointerAuthResign(*this, tempAddressValue,
