@@ -432,6 +432,15 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addLoopInvariantCodeMotion();
   // Simplify CFG after LICM that creates new exit blocks
   P.addSimplifyCFG();
+  // LoopRotate cannot rotate when the header contains a begin_access. LICM can
+  // only hoist code that runs in every iteration, which LoopRotate can achieve
+  // for the loop body. The earlier LICM may have hoisted a begin_access that
+  // had prevented that LoopRotate. Try LoopRotate again so that LICM can hoist
+  // other begin_access and more. This is cheap: a pass is skipped if the
+  // function didn't change since the pass last ran on it.
+  P.addLoopRotate();
+  P.addLoopInvariantCodeMotion();
+  P.addSimplifyCFG();
   // LICM might have added new merging potential by hoisting
   // we don't want to restart the pipeline - ignore the
   // potential of merging out of two loops

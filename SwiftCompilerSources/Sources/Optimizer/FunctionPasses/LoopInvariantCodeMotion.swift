@@ -75,7 +75,6 @@ private struct AnalyzedInstructions {
   var loopReadOnlyEffects: StackWithCount<Instruction>
   var loads: Stack<LoadInst>
   var stores: Stack<StoreInst>
-  var scopedInsts: Stack<UnaryInstruction>
 
   // loop blocks that dominate all exiting and latch blocks
   var dominatingBlocks: BasicBlockSet
@@ -90,7 +89,6 @@ private struct AnalyzedInstructions {
     self.loopReadOnlyEffects = StackWithCount<Instruction>(context)
     self.loads = Stack<LoadInst>(context)
     self.stores = Stack<StoreInst>(context)
-    self.scopedInsts = Stack<UnaryInstruction>(context)
     self.dominatingBlocks = loop.getBlocksThatDominateAllExitingAndLatchBlocks(context)
   }
   
@@ -99,7 +97,6 @@ private struct AnalyzedInstructions {
     loopReadOnlyEffects.deinitialize()
     loads.deinitialize()
     stores.deinitialize()
-    scopedInsts.deinitialize()
     dominatingBlocks.deinitialize()
   }
 }
@@ -141,8 +138,6 @@ private func analyzeInstructions(
         continue // Don't set `hasOtherMemReadingInsts`
       case let storeInst as StoreInst:
         analyzedInstructions.stores.append(storeInst)
-      case let beginAccessInst as BeginAccessInst:
-        analyzedInstructions.scopedInsts.append(beginAccessInst)
       default:
         break
       }
@@ -1236,22 +1231,7 @@ private extension ScopedInstruction {
     guard endInstructions.allSatisfy({ loop.contains(block: $0.parentBlock) && !($0 is TermInst) }) else {
       return false
     }
-    
-    // Instruction specific preconditions
-    switch self {
-    case is BeginAccessInst, is LoadBorrowInst:
-      guard (analyzedInstructions.scopedInsts
-        .allSatisfy { otherScopedInst in
-          guard self != otherScopedInst else { return true }
 
-          return operands.first!.value.accessPath.isDistinct(from: otherScopedInst.operand.value.accessPath)
-        }) else {
-        return false
-      }
-    default:
-      break
-    }
-    
     var scope = InstructionRange(begin: self, ends: endInstructions, context)
     defer { scope.deinitialize() }
     
