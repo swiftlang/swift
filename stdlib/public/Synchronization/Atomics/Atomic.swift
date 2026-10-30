@@ -13,19 +13,19 @@
 import Builtin
 
 /// An atomic value.
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 @frozen
 @_rawLayout(like: Value.AtomicRepresentation)
 @_staticExclusiveOnly
 public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @export(implementation)
   @_transparent
   var _address: UnsafeMutablePointer<Value.AtomicRepresentation> {
     unsafe UnsafeMutablePointer<Value.AtomicRepresentation>(_rawAddress)
   }
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @export(implementation)
   @_transparent
   var _rawAddress: Builtin.RawPointer {
@@ -35,7 +35,7 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
   /// Initializes a value of this atomic with the given initial value.
   ///
   /// - Parameter initialValue: The initial value to set this atomic.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @export(implementation)
   @_transparent
   public init(_ initialValue: consuming Value) {
@@ -44,7 +44,7 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
 
   // Deinit's can't be marked @_transparent. Do these things need all of these
   // attributes..?
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @export(implementation)
   deinit {
     let oldValue = unsafe Value.decodeAtomicRepresentation(_address.pointee)
@@ -54,5 +54,5 @@ public struct Atomic<Value: AtomicRepresentable>: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension Atomic: @unchecked Sendable where Value: Sendable {}
