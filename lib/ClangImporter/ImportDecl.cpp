@@ -4409,6 +4409,14 @@ namespace {
               paramHasAnnotation[idx] = true;
               unsigned targetIdx;
               if (hasThisParam && param == clang::LifetimeCaptureByAttr::This) {
+                // A constructor's 'this' is the object it produces.
+                if (isa<clang::CXXConstructorDecl>(decl)) {
+                  if (isScoped)
+                    scopedLifetimeParamIndicesForReturn[idx] = true;
+                  else
+                    inheritLifetimeParamIndicesForReturn[idx] = true;
+                  continue;
+                }
                 targetIdx = result->getSelfIndex();
               } else {
                 targetIdx = param - hasThisParam;
@@ -4435,11 +4443,18 @@ namespace {
             /*forSelf=*/true);
       for (const auto *attr :
            getImplicitObjectParamAnnotations<clang::LifetimeCaptureByAttr>(
-               decl))
+               decl)) {
+        // A parameter cannot depend on the object being constructed.
+        if (isa<clang::CXXConstructorDecl>(decl)) {
+          skipLifetime(
+              Diagnostic(diag::cxx_unsafe_skipped_lifetime_constructed_self));
+          continue;
+        }
         processLifetimeCaptureBy(
             attr, result->getSelfIndex(),
             cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
             /*forSelf=*/true);
+      }
 
       for (auto &[idx, depIndices] : capturedArgDependences) {
         lifetimeDependencies.emplace_back(
