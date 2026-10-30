@@ -15,6 +15,15 @@ project(SwiftDistributed
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
 
+# The compatibility shim for CMake <3.31 the other runtime projects carry, so
+# that the threading package below sees WASI as Core does.
+if(CMAKE_VERSION VERSION_LESS 3.31)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic" AND CMAKE_SYSTEM_PROCESSOR MATCHES "wasm32")
+    set(CMAKE_SYSTEM_NAME WASI)
+    set(WASI 1)
+  endif()
+endif()
+
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Distributed must build as a standalone project")
 endif()
@@ -91,8 +100,77 @@ add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
 add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
+# The threading package, so that the C++ sources and the threading objects
+# below agree with the Core the library links: the package given on the
+# command line, else the one Core's config file exports, else the one Core
+# itself defaults to on the platform (Runtimes/Core/cmake/modules/
+# DefaultSettings.cmake), which matches a Core built with its defaults. A Core
+# found without its config file (FindSwiftCore.cmake, an SDK's or a
+# toolchain's) exports nothing, so one built with another package needs its
+# config file, or the package given. On Darwin the primitives are inline
+# system calls, so when neither names a package it stays unset there and
+# include/swift/Threading/Impl.h selects Darwin itself.
+set(${PROJECT_NAME}_THREADING_PACKAGES DARWIN LINUX PTHREADS C11 WIN32 NONE)
+if("${${PROJECT_NAME}_THREADING_PACKAGE}" STREQUAL "")
+  set(${PROJECT_NAME}_THREADING_PACKAGE "${SwiftCore_THREADING_PACKAGE}")
+endif()
+if("${${PROJECT_NAME}_THREADING_PACKAGE}" STREQUAL "" AND NOT APPLE)
+  if(LINUX)
+    set(${PROJECT_NAME}_THREADING_PACKAGE LINUX)
+  elseif(WASI)
+    set(${PROJECT_NAME}_THREADING_PACKAGE NONE)
+  elseif(ANDROID OR BSD OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    set(${PROJECT_NAME}_THREADING_PACKAGE PTHREADS)
+  elseif(WIN32)
+    set(${PROJECT_NAME}_THREADING_PACKAGE WIN32)
+  endif()
+  if(NOT "${${PROJECT_NAME}_THREADING_PACKAGE}" STREQUAL "")
+    message(STATUS "${PROJECT_NAME}_THREADING_PACKAGE defaulted to "
+      "${${PROJECT_NAME}_THREADING_PACKAGE}, the package Core defaults to on "
+      "this platform, since the Core found exports none")
+  endif()
+endif()
+if(NOT "${${PROJECT_NAME}_THREADING_PACKAGE}" STREQUAL "")
+  set(${PROJECT_NAME}_THREADING_PACKAGE "${${PROJECT_NAME}_THREADING_PACKAGE}"
+    CACHE STRING "Threading Package: DARWIN LINUX PTHREADS C11 WIN32 NONE")
+  # The macros are spelled in uppercase; the cache keeps the spelling given.
+  string(TOUPPER "${${PROJECT_NAME}_THREADING_PACKAGE}" ${PROJECT_NAME}_THREADING_PACKAGE)
+  if(NOT ${PROJECT_NAME}_THREADING_PACKAGE IN_LIST ${PROJECT_NAME}_THREADING_PACKAGES)
+    message(FATAL_ERROR "${PROJECT_NAME}_THREADING_PACKAGE is "
+      "'${${PROJECT_NAME}_THREADING_PACKAGE}', expected DARWIN, LINUX, PTHREADS, "
+      "C11, WIN32 or NONE")
+  endif()
+endif()
+
+# DistributedActor.cpp uses the runtime's threading primitives, whose
+# out-of-line parts a shared libswiftCore does not export, so the library
+# carries the threading objects itself, as swift_Concurrency does, unless it
+# links a static Core, whose archive supplies them. With no package (Darwin,
+# above) the objects would be empty and are left out.
+get_target_property(SwiftCore_LIBRARY_TYPE swiftCore TYPE)
+if(NOT "${${PROJECT_NAME}_THREADING_PACKAGE}" STREQUAL ""
+    AND NOT SwiftCore_LIBRARY_TYPE STREQUAL "STATIC_LIBRARY")
+  add_library(swiftDistributedThreading OBJECT
+    "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/lib/Threading/C11.cpp"
+    "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/lib/Threading/Linux.cpp"
+    "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/lib/Threading/Pthreads.cpp"
+    "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/lib/Threading/WindowsThreading.cpp")
+  target_compile_definitions(swiftDistributedThreading PRIVATE
+    -DSWIFT_THREADING_${${PROJECT_NAME}_THREADING_PACKAGE})
+  target_include_directories(swiftDistributedThreading PRIVATE
+    "${${PROJECT_NAME}_SWIFTC_SOURCE_DIR}/include"
+    "${${PROJECT_NAME}_PATH_TO_SWIFT_RUNTIME_HEADERS}"
+    # For llvm/support headers
+    "${PROJECT_SOURCE_DIR}/include")
+  # swiftCore for `swift/Runtime/CMakeConfig.h`, as swiftDistributed gets it.
+  target_link_libraries(swiftDistributedThreading PRIVATE
+    swiftShims
+    swiftCore)
+endif()
+
 add_library(swiftDistributed
   DistributedActor.cpp
+  ThreadingError.cpp
   DistributedActor.swift
   DistributedActorSystem.swift
   DistributedAssertions.swift
@@ -117,7 +195,8 @@ if(Policy157Enabled STREQUAL NEW)
 endif()
 
 target_compile_definitions(swiftDistributed PRIVATE
-  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftDistributed>)
+  $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftDistributed>
+  $<$<AND:$<COMPILE_LANGUAGE:C,CXX>,$<BOOL:${${PROJECT_NAME}_THREADING_PACKAGE}>>:-DSWIFT_THREADING_${${PROJECT_NAME}_THREADING_PACKAGE}>)
 target_compile_options(swiftDistributed PRIVATE
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AllowUnsafeAttribute>
@@ -142,6 +221,7 @@ target_link_libraries(swiftDistributed PRIVATE
   swiftCore
   swift_Concurrency
   swift_Builtin_float
+  $<$<TARGET_EXISTS:swiftDistributedThreading>:swiftDistributedThreading>
   $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Windows>:swiftWinSDK>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)

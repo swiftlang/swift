@@ -127,6 +127,24 @@ internal func _getDistributedAccessibleRecord(
   _ targetNameLength: UInt
 ) -> UnsafeRawPointer?
 
+/// A distributed target's signature as the runtime caches it per accessor
+/// record. A negative `parameterCount` means the name could not be resolved;
+/// `parameterTypes` and `returnType` are nil for a generic target.
+internal typealias _DistributedTargetSignature = (
+  parameterCount: Int,
+  parameterTypes: UnsafeRawPointer?, // const Metadata *const *
+  returnType: Any.Type?,
+  genericEnvironment: UnsafeRawPointer? // GenericEnvironmentDescriptor *
+)
+
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_distributed_getTargetSignature")
+internal func _getDistributedTargetSignature(
+  _ accessorRecord: UnsafeRawPointer,
+  _ targetNameStart: UnsafePointer<UInt8>,
+  _ targetNameLength: UInt
+) -> _DistributedTargetSignature
+
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_distributed_makeDistributedTargetAccessorNotFoundError")
