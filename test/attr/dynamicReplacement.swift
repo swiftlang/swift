@@ -95,3 +95,23 @@ extension ImplicitModifier {
     }
   }
 }
+
+// https://github.com/swiftlang/swift/issues/93317
+dynamic func replacedByLocal() {}
+dynamic var replacedByLocalVar: Int { 0 }
+
+func localReplacements() {
+  @_dynamicReplacement(for: replacedByLocal) func localFunc() {} // expected-error {{dynamicReplacement(for:) of 'localFunc' is not defined in an extension or at the file level}}
+
+  @_dynamicReplacement(for: replacedByLocalVar) var localVar: Int { 0 } // expected-error {{dynamicReplacement(for:) of 'localVar' is not defined in an extension or at the file level}}
+
+  _ = {
+    @_dynamicReplacement(for: replacedByLocal) func funcInClosure() {} // expected-error {{dynamicReplacement(for:) of 'funcInClosure' is not defined in an extension or at the file level}}
+  }
+}
+
+extension ImplicitModifier {
+  func method() {
+    @_dynamicReplacement(for: replacedByLocal) func funcInMethod() {} // expected-error {{dynamicReplacement(for:) of 'funcInMethod' is not defined in an extension or at the file level}}
+  }
+}
