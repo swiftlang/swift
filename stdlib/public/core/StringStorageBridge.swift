@@ -275,7 +275,7 @@ extension __StringStorage {
   }
   
   @objc(_fastUTF8StringContents:utf8Length:)
-  @_effects(readonly)
+  @_effects(releasenone) // writes through outUTF8Length; not readonly
   final internal func _fastUTF8StringContents(
     _ requiresNulTermination: Int8,
     _ outUTF8Length: UnsafeMutablePointer<UInt>
@@ -422,7 +422,7 @@ extension __SharedStringStorage {
   }
   
   @objc(_fastUTF8StringContents:utf8Length:)
-  @_effects(readonly)
+  @_effects(releasenone) // writes through outUTF8Length; not readonly
   final internal func _fastUTF8StringContents(
     _ requiresNulTermination: Int8,
     _ outUTF8Length: UnsafeMutablePointer<UInt>
@@ -783,10 +783,10 @@ fileprivate func isEqual(
     return 0
   }
   
-  let result = unsafe withCocoaASCIIPointer(selfNS) { (selfPtr) -> Int8? in
-    //We know self is ASCII at this point
+  let result = unsafe withCocoaUTF8Pointer(selfNS) {
+    (selfPtr, selfUTF8Count) -> Int8? in
     let otherBytes = unsafe RawSpan(_unsafeStart: otherPtr, byteCount: otherByteCount)
-    let selfBytes = unsafe Span(_unsafeStart: selfPtr, count: selfCount).bytes
+    let selfBytes = unsafe RawSpan(_unsafeStart: selfPtr, byteCount: selfUTF8Count)
     switch otherEncoding {
     case _cocoaASCIIEncoding, _cocoaUTF8Encoding:
       if otherBytes.isIdentical(to: selfBytes) {
@@ -794,7 +794,10 @@ fileprivate func isEqual(
       }
       return isEqual(bytes: otherBytes, bytes: selfBytes) ? 1 : 0
     case _cocoaUTF16Encoding:
-      return isEqual(asciiBytes: selfBytes, utf16Bytes: otherBytes) ? 1 : 0
+      if selfUTF8Count == selfCount {
+        return isEqual(asciiBytes: selfBytes, utf16Bytes: otherBytes) ? 1 : 0
+      }
+      return isEqual(utf8Bytes: selfBytes, utf16Bytes: otherBytes) ? 1 : 0
     default:
       fatalError("Unsupported combination of encodings")
     }
