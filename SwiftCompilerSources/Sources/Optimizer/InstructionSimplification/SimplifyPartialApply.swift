@@ -18,12 +18,24 @@ extension PartialApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
       return
     }
 
-    let optimizedApplyOfPartialApply = context.tryOptimizeApplyOfPartialApply(closure: self)
+    let keepForDebugInfo =
+      context.preserveDebugInfo && uses.contains(where: { $0.instruction is DebugValueInst })
+
+    let optimizedApplyOfPartialApply: Bool
+    if keepForDebugInfo && !type.isImplicitlyDestroyable(in: parentFunction) {
+      // Combining the calls of a closure that can't be destroyed implicitly is correct only if the
+      // closure is then deleted. The combiner checks that the closure can be deleted, but it
+      // expects debug uses to be salvaged. Here the closure is kept for its debug info instead, so
+      // keep its calls.
+      optimizedApplyOfPartialApply = false
+    } else {
+      optimizedApplyOfPartialApply = context.tryOptimizeApplyOfPartialApply(closure: self)
+    }
     if optimizedApplyOfPartialApply {
       context.notifyInvalidatedStackNesting()
     }
 
-    if context.preserveDebugInfo && uses.contains(where: { $0.instruction is DebugValueInst }) {
+    if keepForDebugInfo {
       return
     }
 
