@@ -1,0 +1,19 @@
+// A byte count that fits in 64 bits but not in a 32-bit size value should be
+// diagnosed rather than crashing IRGen.
+// RUN: %swift -disable-legacy-type-info -target armv7-apple-ios7 %s -emit-ir -o /dev/null -verify
+// RUN: %swift -disable-legacy-type-info -target i386-apple-ios7 %s -emit-ir -o /dev/null -verify
+
+// REQUIRES: CODEGENERATOR=ARM
+// REQUIRES: CODEGENERATOR=X86
+
+import Builtin
+
+sil @stack_alloc_builtin: $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1073741824
+  %1 = integer_literal $Builtin.Word, 8
+  %2 = builtin "stackAlloc"(%0 : $Builtin.Word, %1 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.RawPointer // expected-error{{allocation byte count too large}}
+  %3 = builtin "stackDealloc"(%2 : $Builtin.RawPointer) : $()
+  %r = tuple ()
+  return %r : $()
+}
