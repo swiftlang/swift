@@ -1753,7 +1753,8 @@ encodeStaticKeyPathComponentHeader(
 }
 
 llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
-    KeyPathInst *KPI, SmallVectorImpl<uint32_t> *argDataOffsets) {
+    KeyPathInst *KPI, SmallVectorImpl<uint32_t> *argDataOffsets,
+    SmallVectorImpl<StaticKeyPathSignedField> *signedFields) {
   assert(canEmitStaticKeyPathInstance(KPI) &&
          "callers must check canEmitStaticKeyPathInstance() first");
 
@@ -2008,17 +2009,21 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
     }
   }
 
-  auto *ObjectHeaderTy = RefCountedStructTy;
-  auto *objectHeader = llvm::ConstantStruct::get(
-      ObjectHeaderTy,
-      {llvm::ConstantExpr::getBitCast(metadata,
-                                      ObjectHeaderTy->getElementType(0)),
-       swiftImmortalRefCount});
-
   ConstantInitBuilder initBuilder(*this);
   auto fields = initBuilder.beginStruct();
 
-  fields.add(objectHeader);
+  // The runtime authenticates the isa of every object it loads, so sign it the
+  // same way `emitConstantObject` does for static arrays: with the isa schema,
+  // address-discriminated on the slot within this global.
+  {
+    auto objectHeader = fields.beginStruct(RefCountedStructTy);
+    objectHeader.addSignedPointer(
+        llvm::ConstantExpr::getBitCast(metadata,
+                                       RefCountedStructTy->getElementType(0)),
+        getOptions().PointerAuth.ObjCIsaPointersSign, PointerAuthEntity());
+    objectHeader.add(swiftImmortalRefCount);
+    objectHeader.finishAndAddTo(fields);
+  }
 
   // `AnyKeyPath._kvcKeyPathStringPtr`. This slot is overloaded: it holds either
   // a real ObjC KVC string, or an encoded root-to-value byte offset, or null.
@@ -2107,17 +2112,28 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
       bytesInData += ptrSize;
 
       auto schema = getOptions().PointerAuth.KeyPaths;
-      fields.addSignedPointer(step.getter, schema,
-                              PointerAuthEntity::Special::KeyPathGetter);
-      bytesInData += ptrSize;
+      // Add an accessor field and, if it's signed against its own address,
+      // record it so a copy of a template can re-sign it.
+      auto addSignedAccessor = [&](llvm::Constant *accessor,
+                                   PointerAuthEntity::Special entity) {
+        fields.addSignedPointer(accessor, schema, entity);
+        if (signedFields && schema && schema.isAddressDiscriminated())
+          signedFields->push_back(
+              {static_cast<uint32_t>(bodySize + paddingBytes + 4 +
+                                     pointerAlignmentSkewBytes + bytesInData),
+               accessor,
+               PointerAuthInfo::getOtherDiscriminator(*this, schema, entity)});
+        bytesInData += ptrSize;
+      };
+
+      addSignedAccessor(step.getter, PointerAuthEntity::Special::KeyPathGetter);
 
       if (step.setter) {
         auto setterAuth =
             step.computedKind == KeyPathComponentHeader::SettableMutating
                 ? PointerAuthEntity::Special::KeyPathMutatingSetter
                 : PointerAuthEntity::Special::KeyPathNonmutatingSetter;
-        fields.addSignedPointer(step.setter, schema, setterAuth);
-        bytesInData += ptrSize;
+        addSignedAccessor(step.setter, setterAuth);
       }
 
       if (step.argWitnesses) {

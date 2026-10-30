@@ -1238,6 +1238,34 @@ static SILValue constantFoldIsConcrete(BuiltinInst *BI) {
   return inst;
 }
 
+/// Fold `Builtin.typePtrAuthDiscriminator<T>` to the discriminator of `T`
+/// lowered in the context where the builtin appears.
+static SILValue constantFoldTypePtrAuthDiscriminator(BuiltinInst *BI) {
+  CanType type =
+      BI->getSubstitutions().getReplacementTypes()[0]->getCanonicalType();
+  // A bare type parameter doesn't say how values of the type are passed yet.
+  if (!isa<AnyFunctionType>(type) || type->hasTypeParameter())
+    return SILValue();
+
+  // Lower the same way IRGen does for this builtin, so that folding doesn't
+  // change the discriminator of any type it could already lower.
+  auto fnType = BI->getModule()
+                    .Types
+                    .getLoweredType(
+                        type, TypeExpansionContext::maximalResilienceExpansionOnly())
+                    .getAs<SILFunctionType>();
+  // C function pointers, blocks and the like use Clang's discriminators.
+  if (!fnType || fnType->getLanguage() != SILFunctionLanguage::Swift)
+    return SILValue();
+
+  SILBuilderWithScope builder(BI);
+  auto *inst = builder.createIntegerLiteral(
+      BI->getLoc(), BI->getType(),
+      fnType->getPointerAuthDiscriminator(&BI->getModule()));
+  BI->replaceAllUsesWith(inst);
+  return inst;
+}
+
 SILValue swift::constantFoldBuiltin(BuiltinInst *BI,
                                     std::optional<bool> &ResultsInError) {
   const IntrinsicInfo &Intrinsic = BI->getIntrinsicInfo();
@@ -1722,7 +1750,8 @@ void ConstantFolder::initializeWorklist(SILFunction &f) {
       }
 
       if (isApplyOfBuiltin(*inst, BuiltinValueKind::GlobalStringTablePointer) ||
-          isApplyOfBuiltin(*inst, BuiltinValueKind::IsConcrete)) {
+          isApplyOfBuiltin(*inst, BuiltinValueKind::IsConcrete) ||
+          isApplyOfBuiltin(*inst, BuiltinValueKind::TypePtrAuthDiscriminator)) {
         WorkList.insert(inst);
         continue;
       }
@@ -1970,6 +1999,16 @@ ConstantFolder::processWorkList() {
     if (isApplyOfBuiltin(*I, BuiltinValueKind::IsConcrete)) {
       if (constantFoldIsConcrete(cast<BuiltinInst>(I))) {
         // Here, the builtin instruction got folded, so clean it up.
+        recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
+                                                   deleter.getCallbacks());
+      }
+      continue;
+    }
+
+    if (isApplyOfBuiltin(*I, BuiltinValueKind::TypePtrAuthDiscriminator)) {
+      if (auto folded =
+              constantFoldTypePtrAuthDiscriminator(cast<BuiltinInst>(I))) {
+        WorkList.insert(folded->getDefiningInstruction());
         recursivelyDeleteTriviallyDeadInstructions(I, /*force*/ true,
                                                    deleter.getCallbacks());
       }
