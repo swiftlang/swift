@@ -1,0 +1,88 @@
+{
+  "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs" : [
+    {
+      "artifacts" : [
+        {
+          "location" : {
+            "uri" : "file://TMP_DIR/a.swift"
+          },
+          "roles" : [
+
+          ],
+          "sourceLanguage" : "swift"
+        },
+        {
+          "location" : {
+            "uri" : "file://TMP_DIR/b.swift"
+          },
+          "roles" : [
+
+          ],
+          "sourceLanguage" : "swift"
+        }
+      ],
+      "columnKind" : "utf16CodeUnits",
+      "results" : [
+        {
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 17,
+                  "endLine" : 1,
+                  "startColumn" : 16,
+                  "startLine" : 1
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "initialization of immutable value 'inA' was never used; consider replacing with assignment to '_' or removing it"
+          },
+          "ruleId" : "pbd_never_used",
+          "ruleIndex" : 0
+        },
+        {
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 1
+                },
+                "region" : {
+                  "endColumn" : 17,
+                  "endLine" : 1,
+                  "startColumn" : 16,
+                  "startLine" : 1
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "initialization of immutable value 'inB' was never used; consider replacing with assignment to '_' or removing it"
+          },
+          "ruleId" : "pbd_never_used",
+          "ruleIndex" : 0
+        }
+      ],
+      "tool" : {
+        "driver" : {
+          "informationUri" : "https://swift.org",
+          "name" : "Swift Compiler",
+          "organization" : "Swift Project",
+          "rules" : [
+            {
+              "id" : "pbd_never_used"
+            }
+          ],
+          "version" : "SWIFT_VERSION"
+        }
+      }
+    }
+  ],
+  "version" : "2.1.0"
+}
