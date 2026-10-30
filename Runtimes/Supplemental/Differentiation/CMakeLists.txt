@@ -129,6 +129,12 @@ target_link_libraries(swift_Differentiation PRIVATE
   $<$<PLATFORM_ID:WASI>:swiftWASILibc>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
+if(TARGET swift_Concurrency)
+  target_sources(swift_Differentiation PRIVATE
+    DifferentialOperators+Async.swift)
+  target_link_libraries(swift_Differentiation PRIVATE
+    swift_Concurrency)
+endif()
 
 install(TARGETS swift_Differentiation
   EXPORT SwiftSupplementalTargets
