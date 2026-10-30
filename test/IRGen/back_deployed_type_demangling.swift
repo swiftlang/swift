@@ -1,7 +1,6 @@
 // RUN: %target-swift-frontend -emit-ir -parse-as-library -target %target-cpu-apple-macosx13.0 %s | %FileCheck %s --check-prefix=OLD
 // RUN: %target-swift-frontend -emit-ir -parse-as-library -target %target-cpu-apple-macosx15.0 %s | %FileCheck %s --check-prefix=NEW
 
-// REQUIRES: swift_feature_BackDeployFrozenValueTypes
 // REQUIRES: OS=macosx
 // REQUIRES: CPU=arm64 || CPU=x86_64
 
