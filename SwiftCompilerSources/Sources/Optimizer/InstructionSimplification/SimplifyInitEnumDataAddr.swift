@@ -12,7 +12,7 @@
 
 import SIL
 
-extension InitEnumDataAddrInst : OnoneSimplifiable {
+extension InitEnumDataAddrInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // Optimize the sequence
@@ -27,16 +27,19 @@ extension InitEnumDataAddrInst : OnoneSimplifiable {
     //   %1 = enum  $E, #someCaseWithPayload, %payload
     //   store %1 to %enum_addr
     // ```
-    // This store and inject instructions must appear in consecutive order.
+    // This store and inject instructions must appear in consecutive order, except for
+    // `end_borrow`s in between, which don't access memory. E.g. the borrow scope of the
+    // payload's source can end there after inlining.
     // But usually this is the case, because it's generated this way by SILGen.
-    // We also check that between the init and the store, no instruction writes to memory.
+    // The init can be anywhere before the store, even in another block and with
+    // memory writes in between: it only projects the payload address and doesn't
+    // write the enum. The `enum` and its store are created at the store.
     //
     if let store = self.uses.singleUse?.instruction as? StoreInst,
        store.destination == self,
-       let inject = store.next as? InjectEnumAddrInst,
+       let inject = instructionAfterEndBorrows(store) as? InjectEnumAddrInst,
        inject.enum == self.enum,
-       inject.enum.type.isLoadable(in: parentFunction),
-       !anyInstructionMayWriteToMemory(between: self, and: store) {
+       inject.enum.type.isLoadable(in: parentFunction) {
 
       assert(self.caseIndex == inject.caseIndex, "mismatching case indices when creating an enum")
 
@@ -51,18 +54,10 @@ extension InitEnumDataAddrInst : OnoneSimplifiable {
   }
 }
 
-// Returns false if `first` and `last` are in the same basic block and no instructions between them write to memory. True otherwise.
-private func anyInstructionMayWriteToMemory(between first: Instruction, and last: Instruction) -> Bool {
-  var nextInstruction = first.next
-  while let i = nextInstruction {
-    if i == last {
-      return false
-    }
-    if i.mayWriteToMemory {
-      return true
-    }
-    nextInstruction = i.next
+private func instructionAfterEndBorrows(_ inst: Instruction) -> Instruction? {
+  var next = inst.next
+  while let endBorrow = next as? EndBorrowInst {
+    next = endBorrow.next
   }
-  // End of basic block, and we did not find `last`
-  return true
+  return next
 }

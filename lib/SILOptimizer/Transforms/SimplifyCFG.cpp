@@ -696,6 +696,7 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
   //   switch_enum %val, case A: bb1, case B: bb2
   // bb1:
   //   use %val   // We know that %val has case A
+  SILBasicBlock *OrigUsedInBB = UsedInBB;
   SILBasicBlock *Pred = UsedInBB->getSinglePredecessorBlock();
   int Limit = 3;
   // A very simple dominator check: just walk up the single predecessor chain.
@@ -708,6 +709,31 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
     }
     UsedInBB = Pred;
     Pred = UsedInBB->getSinglePredecessorBlock();
+  }
+
+  // In OSSA, a switch_enum on an owned enum switches on a borrow of it.
+  if (auto *BBI = dyn_cast<BeginBorrowInst>(Val)) {
+    return getEnumCaseRecursive(BBI->getOperand(), OrigUsedInBB,
+                                RecursionDepth + 1, HandledArgs);
+  }
+
+  // A copy has the enum case of its operand.
+  if (auto *CVI = dyn_cast<CopyValueInst>(Val)) {
+    return getEnumCaseRecursive(CVI->getOperand(), OrigUsedInBB,
+                                RecursionDepth + 1, HandledArgs);
+  }
+
+  // The payload of an enum instruction, possibly copied or borrowed, is its
+  // operand.
+  if (auto *UEDI = dyn_cast<UncheckedEnumDataInst>(Val)) {
+    SILValue op = UEDI->getOperand();
+    while (isa<CopyValueInst>(op) || isa<BeginBorrowInst>(op))
+      op = cast<SingleValueInstruction>(op)->getOperand(0);
+    auto *EI = dyn_cast<EnumInst>(op);
+    if (!EI || EI->getElement() != UEDI->getElement() || !EI->hasOperand())
+      return nullptr;
+    return getEnumCaseRecursive(EI->getOperand(), OrigUsedInBB,
+                                RecursionDepth + 1, HandledArgs);
   }
 
   // In case of a phi, recursively check the enum cases of all
@@ -767,6 +793,27 @@ static int getThreadingCost(SILInstruction *I) {
   return 0;
 }
 
+/// Returns true if \p V, a borrow of it, or its enum payload is switched on in
+/// \p BB.
+static bool isSwitchedOnInBlock(SILValue V, SILBasicBlock *BB,
+                                int recursionDepth = 0) {
+  if (recursionDepth > 2)
+    return false;
+  for (Operand *use : V->getUses()) {
+    auto *user = use->getUser();
+    if (user->getParent() != BB)
+      continue;
+    if (isa<SwitchEnumInst>(user) || isa<SelectEnumInst>(user))
+      return true;
+    if (isa<BeginBorrowInst>(user) || isa<UncheckedEnumDataInst>(user)) {
+      if (isSwitchedOnInBlock(cast<SingleValueInstruction>(user), BB,
+                              recursionDepth + 1))
+        return true;
+    }
+  }
+  return false;
+}
+
 static int maxBranchRecursionDepth = 6;
 /// couldSimplifyUsers - Check to see if any simplifications are possible if
 /// "Val" is substituted for BBArg.  If so, return true, if nothing obvious
@@ -787,6 +834,13 @@ static bool couldSimplifyEnumUsers(SILArgument *BBArg, int Budget,
     // user. If this is the case we have a single block switch_enum loop.
     if (isa<SwitchEnumInst>(User) || isa<SelectEnumInst>(User))
       return true;
+
+    // In OSSA, a switch_enum on an owned enum switches on a borrow of it. The
+    // switch can also be on the payload of the enum.
+    if (isa<BeginBorrowInst>(User) || isa<UncheckedEnumDataInst>(User)) {
+      if (isSwitchedOnInBlock(cast<SingleValueInstruction>(User), BB))
+        return true;
+    }
 
     // Also allow enum of enum, which usually can be combined to a single
     // instruction. This helps to simplify the creation of an enum from an

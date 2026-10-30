@@ -141,6 +141,10 @@ private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) -> Bo
     return false
   }
 
+  if let ownedValue = enclosingOwnedValue(of: copy.fromValue, context) {
+    sinkDeadEndDestroys(of: ownedValue, below: collectedUses.destroys, context)
+  }
+
   var liverange = InstructionRange(begin: copy, context)
   defer { liverange.deinitialize() }
   liverange.insert(contentsOf: collectedUses.destroys)
@@ -157,6 +161,63 @@ private func optimize(copy: CopyValueInst, _ context: FunctionPassContext) -> Bo
 
   remove(copy: copy, collectedUses: collectedUses, liverange: liverange)
   return true
+}
+
+/// Returns the owned value whose lifetime encloses `value`: `value` itself if it's owned, or the operand
+/// of the `begin_borrow` whose scope encloses it.
+private func enclosingOwnedValue(of value: Value, _ context: FunctionPassContext) -> Value? {
+  switch value.ownership {
+  case .owned:
+    return value
+  case .guaranteed:
+    if case .beginBorrow(let beginBorrow) = singleBorrowIntroducer(of: value, context),
+       beginBorrow.borrowedValue.ownership == .owned
+    {
+      return beginBorrow.borrowedValue
+    }
+    return nil
+  case .none, .unowned:
+    return nil
+  }
+}
+
+/// Moves a `destroy_value [dead_end]` of `value`, which is in the same block as and above one of the
+/// copy's `destroys`, below that destroy. Then it doesn't end the lifetime of `value` within the copy's
+/// lifetime. E.g.
+/// ```
+///   destroy_value [dead_end] %value
+///   destroy_value %copy
+///   unreachable
+/// ```
+/// A `destroy_value [dead_end]` has no effect at runtime, and `value` isn't used after it.
+private func sinkDeadEndDestroys(of value: Value, below destroys: Stack<Instruction>,
+                                 _ context: FunctionPassContext)
+{
+  // Usually `value` has only a few lifetime-ending uses, and none of them is a `destroy_value [dead_end]`.
+  // Only the blocks of those need to be scanned.
+  var destroySet: InstructionSet? = nil
+  defer { destroySet?.deinitialize() }
+
+  for use in value.uses.endingLifetime {
+    guard let deadEndDestroy = use.instruction as? DestroyValueInst, deadEndDestroy.isDeadEnd else {
+      continue
+    }
+    if destroySet == nil {
+      destroySet = InstructionSet(context)
+      destroySet!.insert(contentsOf: destroys)
+    }
+    var lastDestroyBelow: Instruction? = nil
+    var inst = deadEndDestroy.next
+    while let i = inst {
+      if destroySet!.contains(i) {
+        lastDestroyBelow = i
+      }
+      inst = i.next
+    }
+    if let lastDestroyBelow {
+      deadEndDestroy.move(before: lastDestroyBelow.next!, context)
+    }
+  }
 }
 
 /// Removes a `copy_value` if the result is only destroyed and there are not deinit-barriers
