@@ -211,6 +211,11 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
       return false;
     if (embedded)
       return true;
+    // A back-deployed type has availability going back past the deployment
+    // target, but the generated header refers to the OS's metadata for it, and
+    // that doesn't exist when the target's runtime is older.
+    if (nominal->isBackDeployedIntoClient())
+      return false;
     return AvailabilityRange::forDeploymentTarget(astContext)
         .isContainedIn(AvailabilityInference::availableRange(nominal));
   };
