@@ -63,11 +63,48 @@ private extension CheckedCastAddrBranchInst {
 
 extension UnconditionalCheckedCastInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
+    if tryOptimizeCastToClassExistential(context) {
+      return
+    }
     tryOptimizeCastToExistentialMetatype(context)
   }
 }
 
 private extension UnconditionalCheckedCastInst {
+  // Replace
+  //     %1 = unconditional_checked_cast %0 : $C<Int> to any P
+  // with
+  //     %1 = init_existential_ref %0 : $C<Int> : $C<Int>, $any P
+  // if the concrete class type C<Int> conforms to the class-bound protocol P.
+  // Unlike the cast, init_existential_ref references the conformance statically, which lets the
+  // witness table specialization create a specialized witness table for it.
+  func tryOptimizeCastToClassExistential(_ context: SimplifyContext) -> Bool {
+    let sourceType = sourceFormalType
+    let targetType = targetFormalType
+    guard targetType.isClassExistential,
+          !sourceType.isExistential,
+          sourceType.isClass,
+          !sourceType.hasArchetype,
+          !sourceType.hasTypeParameter,
+          let proto = targetType.nominal as? ProtocolDecl,
+          operand.value.type.isClass
+    else {
+      return false
+    }
+    let conformance = sourceType.checkConformance(to: proto)
+    guard conformance.isValid,
+          conformance.matchesActorIsolation(in: parentFunction)
+    else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    let conformances = sourceType.collectExistentialConformances(existentialType: targetType)
+    let iere = builder.createInitExistentialRef(instance: operand.value, existentialType: self.type,
+                                                formalConcreteType: sourceType, conformances: conformances)
+    self.replace(with: iere, context)
+    return true
+  }
+
   // Replace
   //     %1 = unconditional_checked_cast %0 : $@thick T.Type to any P.Type
   // with
