@@ -913,11 +913,8 @@ func asyncWorkload(_ a: Float, _ b: Float) async -> Float {
 // CHECK: [VARIED]   %19 = builtin "finishAsyncLet"(%13 : $Builtin.RawPointer, %7 : $Builtin.RawPointer) : $()
 // CHECK: [NONE]   %21 = builtin "endAsyncLetLifetime"(%13 : $Builtin.RawPointer) : $()
 
-// expected-error @+1 {{function is not differentiable}}
 @differentiable(reverse)
-// expected-note @+1 {{when differentiating this function definition}}
 func testAsyncWork(_ a: Float, _ b: Float) async -> Float {
-// expected-note @+1 {{expression is not differentiable}}
   async let result = asyncWorkload(a, b)
 
   return await result

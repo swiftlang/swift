@@ -520,6 +520,7 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
     return Result;
   }
 
+  case Kind::AsyncDerivativeFunctionPointer:
   case Kind::AsyncFunctionPointerAST: {
     std::string Result = getSILDeclRef().mangle();
     Result.append("Tu");
@@ -627,6 +628,12 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
 }
 
 SILDeclRef LinkEntity::getSILDeclRef() const {
+  if (getKind() == Kind::AsyncDerivativeFunctionPointer) {
+    auto *original = const_cast<ValueDecl *>(getDecl());
+    return SILDeclRef(original)
+        .asForeign(requiresForeignEntryPoint(original))
+        .asAutoDiffDerivativeFunction(getAutoDiffDerivativeFunctionIdentifier());
+  }
   auto ref = SILDeclRef(const_cast<ValueDecl *>(getDecl()), getSILDeclRefKind());
   if (getKind() == Kind::DistributedAccessor)
     return ref.getDistributedThunkDeclRef();
@@ -976,6 +983,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::SILFunction:
     return getSILFunction()->getEffectiveSymbolLinkage();
 
+  case Kind::AsyncDerivativeFunctionPointer:
+    return getSILDeclRef().getLinkage(forDefinition);
+
   case Kind::AsyncFunctionPointerAST:
   case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::CoroFunctionPointerAST:
@@ -1076,6 +1086,7 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::OpaqueTypeDescriptor:
     return true;
   case Kind::AsyncFunctionPointer:
+  case Kind::AsyncDerivativeFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::PropertyDescriptor:
@@ -1289,6 +1300,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::DistributedAccessorAsyncPointer:
+  case Kind::AsyncDerivativeFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::KnownAsyncFunctionPointer:
     return IGM.AsyncFunctionPointerTy;
@@ -1351,6 +1363,7 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::DistributedAccessorAsyncPointer:
   case Kind::KnownAsyncFunctionPointer:
+  case Kind::AsyncDerivativeFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::ObjCClassRef:
   case Kind::ObjCClass:
@@ -1433,6 +1446,7 @@ bool LinkEntity::isText() const {
   case Kind::ObjCResilientClassStub:
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::DynamicallyReplaceableFunctionVariableAST:
+  case Kind::AsyncDerivativeFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::ProtocolWitnessTable:
   case Kind::TypeMetadata:
@@ -1579,6 +1593,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
     return false;
   }
 
+  case Kind::AsyncDerivativeFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::CoroFunctionPointerAST:
@@ -1704,6 +1719,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
 
 DeclContext *LinkEntity::getDeclContextForEmission() const {
   switch (getKind()) {
+  case Kind::AsyncDerivativeFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
   case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::CoroFunctionPointerAST:

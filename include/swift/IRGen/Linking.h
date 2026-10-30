@@ -383,6 +383,12 @@ class LinkEntity {
     /// The pointer is an AbstractFunctionDecl*.
     AsyncFunctionPointerAST,
 
+    /// The descriptor of a synthesized async JVP or VJP. The pointer is the
+    /// original AbstractFunctionDecl*, and the secondary pointer is its
+    /// AutoDiffDerivativeFunctionIdentifier*. Ordinary async entities keep
+    /// their existing representation.
+    AsyncDerivativeFunctionPointer,
+
     /// The same as CoroFunctionPointer but with a different stored value, for
     /// use by TBDGen.
     /// The pointer is an AbstractFunctionDecl*.
@@ -1388,6 +1394,15 @@ public:
 
   static LinkEntity forAsyncFunctionPointer(SILDeclRef declRef) {
     LinkEntity entity;
+    if (declRef.isAutoDiffDerivativeFunction()) {
+      entity.setForDecl(Kind::AsyncDerivativeFunctionPointer,
+                        declRef.getAbstractFunctionDecl());
+      entity.SecondaryPointer =
+          declRef.getAutoDiffDerivativeFunctionIdentifier();
+      assert(entity.getSILDeclRef() == declRef &&
+             "expected the canonical derivative reference");
+      return entity;
+    }
     entity.setForDecl(declRef.isDistributedThunk()
                           ? Kind::DistributedThunkAsyncFunctionPointer
                           : Kind::AsyncFunctionPointerAST,
@@ -1714,7 +1729,8 @@ public:
   AutoDiffDerivativeFunctionIdentifier *
   getAutoDiffDerivativeFunctionIdentifier() const {
     assert(getKind() == Kind::DispatchThunkDerivative ||
-           getKind() == Kind::MethodDescriptorDerivative);
+           getKind() == Kind::MethodDescriptorDerivative ||
+           getKind() == Kind::AsyncDerivativeFunctionPointer);
     return reinterpret_cast<AutoDiffDerivativeFunctionIdentifier*>(
         SecondaryPointer);
   }

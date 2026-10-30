@@ -21,6 +21,7 @@
 #include "swift/Basic/SmallBitVector.h"
 #include "swift/SIL/BasicBlockData.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OperandDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -505,94 +506,12 @@ static bool isProjectedFromAggregate(SILValue value) {
   return visitor.isProjectedFromAggregate;
 }
 
-namespace {
-using AsyncLetSourceValue =
-    llvm::PointerUnion<PartialApplyInst *, ThinToThickFunctionInst *>;
-} // namespace
-
-static std::optional<AsyncLetSourceValue>
-findAsyncLetPartialApplyFromStart(SILValue value) {
-  // If our operand is Sendable then we want to return nullptr. We only want to
-  // return a value if we are not
-  auto fType = value->getType().castTo<SILFunctionType>();
-  if (fType->isSendable())
-    return {};
-
-  SILValue temp = value;
-  while (true) {
-    if (isa<ConvertEscapeToNoEscapeInst>(temp) ||
-        isa<ConvertFunctionInst>(temp)) {
-      temp = cast<SingleValueInstruction>(temp)->getOperand(0);
-    }
-    if (temp == value)
-      break;
-    value = temp;
-  }
-
-  // We can also get a thin_to_thick_function here if we do not capture
-  // anything. In such a case, we just do not process the partial apply get
-  if (auto *ttfi = dyn_cast<ThinToThickFunctionInst>(value))
-    return {{ttfi}};
-
-  // Ok, we could still have a reabstraction thunk. In such a case, we want the
-  // partial_apply that we process to be the original partial_apply (or
-  // thin_to_thick)... so in that case process recursively.
-  auto *pai = cast<PartialApplyInst>(value);
-  if (auto *calleeFunction = pai->getCalleeFunction()) {
-    if (calleeFunction->isThunk() == IsReabstractionThunk) {
-      return findAsyncLetPartialApplyFromStart(pai->getArgument(0));
-    }
-  }
-
-  // Otherwise, this is the right partial_apply... apply it!
-  return {{pai}};
-}
-
-/// This recurses through reabstraction thunks.
-static std::optional<AsyncLetSourceValue>
-findAsyncLetPartialApplyFromStart(BuiltinInst *bi) {
-  return findAsyncLetPartialApplyFromStart(bi->getOperand(1));
-}
-
-/// This recurses through reabstraction thunks.
-static std::optional<AsyncLetSourceValue>
-findAsyncLetPartialApplyFromGet(ApplyInst *ai) {
-  auto *bi = cast<BuiltinInst>(FullApplySite(ai).getArgument(0));
-  assert(*bi->getBuiltinKind() ==
-         BuiltinValueKind::StartAsyncLetWithLocalBuffer);
-  return findAsyncLetPartialApplyFromStart(bi);
-}
-
 static bool isAsyncLetBeginPartialApply(PartialApplyInst *pai) {
   if (auto *fas = pai->getCalleeFunction())
     if (fas->isThunk())
       return false;
 
-  // Look through reabstraction thunks.
-  SILValue result = pai;
-  while (true) {
-    SILValue iter = result;
-
-    if (auto *use = iter->getSingleUse()) {
-      if (auto *maybeThunk = dyn_cast<PartialApplyInst>(use->getUser())) {
-        if (auto *fas = maybeThunk->getCalleeFunction()) {
-          if (fas->isThunk()) {
-            iter = maybeThunk;
-          }
-        }
-      }
-    }
-
-    if (auto *cfi = iter->getSingleUserOfType<ConvertFunctionInst>())
-      iter = cfi;
-    if (auto *cvt = iter->getSingleUserOfType<ConvertEscapeToNoEscapeInst>())
-      iter = cvt;
-
-    if (iter == result)
-      break;
-
-    result = iter;
-  }
+  SILValue result = lookThroughAsyncLetClosureUsers(pai);
 
   auto *bi = result->getSingleUserOfType<BuiltinInst>();
   if (!bi)
@@ -2732,8 +2651,11 @@ public:
   /// For discussion on how we handle async let, please see the comment on
   /// translateAsyncLetStart.
   void translateAsyncLetGet(ApplyInst *ai) {
-    // This looks through reabstraction thunks.
-    auto source = findAsyncLetPartialApplyFromGet(ai);
+    // Preserve RegionAnalysis's Sendable filtering at the original discovery
+    // boundaries. Other clients can use structural discovery without it.
+    auto source = findAsyncLetPartialApplyFromGet(ai, [](SILValue value) {
+      return !value->getType().castTo<SILFunctionType>()->isSendable();
+    });
     assert(source.has_value());
 
     // If we didn't find a partial_apply, then we must have had a
