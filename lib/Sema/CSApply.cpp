@@ -4278,6 +4278,14 @@ namespace {
         // Continue anyway.
       }
 
+      if (castKind == CheckedCastKind::Unresolved ||
+          castKind == CheckedCastKind::ValueCast) {
+        if (TypeChecker::noncopyableOptionalPayloadCastKind(fromType, toType, dc)) {
+          // Unwrapping an optional noncopyable would consume it, so don't
+          return expr;
+        }
+      }
+
       // Dig through the optionals in the from/to types.
       SmallVector<Type, 2> fromOptionals;
       fromType->lookThroughAllOptionalTypes(fromOptionals);
@@ -4803,6 +4811,13 @@ namespace {
       case CheckedCastKind::ValueCast:
         expr->setCastKind(castKind);
         break;
+      }
+
+      if (expr->getCastKind() == CheckedCastKind::ValueCast &&
+          TypeChecker::noncopyableOptionalPayloadCastKind(fromType, toType, dc)) {
+        // Unwrapping an optional noncopyable would consume it, so don't
+        cs.setType(expr, OptionalType::get(toType));
+        return expr;
       }
 
       return handleOptionalBindingsForCast(expr, simplifyType(cs.getType(expr)),
