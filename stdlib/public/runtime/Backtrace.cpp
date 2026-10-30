@@ -1591,7 +1591,8 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   startupInfo.cb = sizeof(startupInfo);
 
   DWORD dwCreationFlags = 0;
-  if (!GetConsoleWindow()
+  if (isGUISubsystem()
+      && !GetConsoleWindow()
       && _swift_backtraceSettings.outputTo != OutputTo::Console)
     dwCreationFlags |= CREATE_NO_WINDOW;
 
