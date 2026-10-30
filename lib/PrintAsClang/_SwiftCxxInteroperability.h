@@ -21,6 +21,9 @@
 
 #include <cstdint>
 #include <stdlib.h>
+#if __cplusplus >= 201703L
+#include <type_traits>
+#endif
 #if defined(_WIN32)
 #include <malloc.h>
 #endif
@@ -112,6 +115,9 @@ namespace _impl {
 extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
+
+extern "C" SWIFT_CALL void *_Nonnull swift_getObjectType(
+    void *_Nonnull object) noexcept;
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wreserved-identifier"
@@ -269,7 +275,272 @@ public:
   }
 };
 
+#if defined(SWIFT_CXX_EXISTENTIAL_INTEROP) && __cplusplus >= 201703L
+
+// Forward-declared; defined after VWT in the generated scaffolding.
+struct ValueWitnessTable;
+
+struct BoxPair {
+  void *_Nonnull object;
+  void *_Nonnull buffer;
+};
+extern "C" BoxPair swift_allocBox(void *_Nonnull type) noexcept;
+extern "C" void *_Nonnull swift_projectBox(void *_Nonnull object) noexcept;
+
+// --- Tag traits for existential type parameters (C++17, no concepts) ---
+//
+// A protocol tag has a WitnessTable typedef (generated per-protocol).
+// A marker protocol tag has an IsMarker member but no WitnessTable.
+// Keep only the NonCopyable inverse tag: it gates ~Copyable lifecycle.
+// All other inverses stay out of the scaffolding by design.
+
+struct NonCopyable {};
+
+template <typename T, typename = void>
+struct HasWitnessTable : std::false_type {};
+template <typename T>
+struct HasWitnessTable<T, std::void_t<typename T::WitnessTable>>
+    : std::true_type {};
+
+template <typename T, typename = void>
+struct HasIsMarker : std::false_type {};
+template <typename T>
+struct HasIsMarker<T, std::void_t<decltype(T::IsMarker)>> : std::true_type {};
+
+template <typename T>
+struct IsValidExistentialTag : std::integral_constant<bool,
+    HasWitnessTable<T>::value || HasIsMarker<T>::value ||
+    std::is_same<T, NonCopyable>::value> {};
+
+// --- Shared tag traits ---
+
+template <typename... Tags>
+struct ExistentialTagTraits {
+  static constexpr size_t NumWitnessTables =
+      (0 + ... + (HasWitnessTable<Tags>::value ? 1 : 0));
+  static constexpr bool IsCopyable =
+      !(... || std::is_same_v<Tags, NonCopyable>);
+};
+
+// --- Conditional conversion to Any (C++17, no concepts) ---
+//
+// CRTP base providing the implicit conversion to Any
+// (SwiftExistentialType<>). The primary template is empty; only the
+// <Derived, true> specialization declares the operator. Any itself and
+// ~Copyable existentials inherit the empty base, so they never declare a
+// conversion to self: that keeps -Wclass-conversion quiet without concepts
+// (a constrained-out requires member is skipped when Any is instantiated,
+// but a SFINAE member template pattern still warns).
+template <typename... Tags> class SwiftExistentialType;
+
+template <typename Derived, bool Enable>
+struct SwiftExistentialAnyConversion {};
+template <typename Derived>
+struct SwiftExistentialAnyConversion<Derived, true> {
+  SWIFT_INLINE_THUNK operator SwiftExistentialType<>() const noexcept;
+};
+
+// --- Opaque existential container ---
+
+/// C++ wrapper for a Swift opaque existential container.
+/// Layout: [value buffer: 3 words][type metadata][witness tables...]
+template <typename... Tags>
+class SwiftExistentialType : public SwiftExistentialAnyConversion<
+                                 SwiftExistentialType<Tags...>,
+                                 (sizeof...(Tags) > 0 &&
+                                     ExistentialTagTraits<Tags...>::
+                                         IsCopyable)> {
+  using Traits = ExistentialTagTraits<Tags...>;
+  static_assert((... && IsValidExistentialTag<Tags>::value),
+      "SwiftExistentialType tags must be protocol tags (with a WitnessTable "
+      "typedef), marker tags (with an IsMarker member), or NonCopyable. See "
+      "the generated protocol header for valid tags.");
+
+  template <typename... U> friend class SwiftExistentialType;
+  template <typename... U> friend class SwiftClassExistentialType;
+  template <typename D, bool B> friend struct SwiftExistentialAnyConversion;
+
+  // Defined out-of-line; needs complete VWT and arm64e ptrauth.
+  SWIFT_INLINE_PRIVATE_HELPER const ValueWitnessTable *_Nonnull
+  _getVWT() const noexcept;
+
+  // Defined out-of-line; needs complete VWT.
+  SWIFT_INLINE_PRIVATE_HELPER void _destroyValue() noexcept;
+
+public:
+  // Defined out-of-line; needs complete VWT.
+  // Unconditional declarations with a static_assert in the copy definition:
+  // a C++17 template copy ctor cannot SFINAE away the implicit copy ctor
+  // (the deleted implicit copy still wins overload resolution), so the
+  // definition fails loudly instead when Tags contain NonCopyable.
+  SWIFT_INLINE_THUNK SwiftExistentialType(
+      const SwiftExistentialType &other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType(
+      SwiftExistentialType &&other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType &
+  operator=(const SwiftExistentialType &other) noexcept;
+  SWIFT_INLINE_THUNK SwiftExistentialType &
+  operator=(SwiftExistentialType &&other) noexcept;
+  SWIFT_INLINE_THUNK ~SwiftExistentialType() noexcept;
+
+  /// Implicit conversion to Any comes from the public
+  /// SwiftExistentialAnyConversion base above: only inhabited for copyable
+  /// non-Any existentials, so Any itself never declares a conversion to
+  /// self (drops witness tables).
+
+protected:
+  struct uninit_t {};
+  SWIFT_INLINE_THUNK SwiftExistentialType(uninit_t) noexcept {}
+
+  // Defined out-of-line; needs complete VWT.
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithCopy(const SwiftExistentialType &src) noexcept;
+
+  // Defined out-of-line; needs complete VWT. _type must be set first.
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithValue(const void *_Nonnull src) noexcept;
+
+  // Defined out-of-line; needs complete VWT.
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _projectValue() const noexcept;
+
+  template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+  SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitness(
+      const void *_Nonnull wt) const {
+    struct slot {
+      FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+    };
+    auto *s = reinterpret_cast<const slot *>(
+        reinterpret_cast<const void *const *>(wt) + EntryOffset);
+    return s->fn;
+  }
+
+  void *_Nonnull _buffer[3];
+  void *_Nonnull _type;
+  const void *_Nonnull
+      _witnessTables[Traits::NumWitnessTables > 0 ? Traits::NumWitnessTables
+                                                  : 1];
+};
+
+// --- Class-bound existential container ---
+
+/// C++ wrapper for a Swift class-bound existential container.
+/// Layout: [class pointer][witness tables...]
+template <typename... Tags>
+class SwiftClassExistentialType {
+  using Traits = ExistentialTagTraits<Tags...>;
+  static_assert((... && IsValidExistentialTag<Tags>::value),
+      "SwiftClassExistentialType tags must be protocol tags (with a "
+      "WitnessTable typedef), marker tags (with an IsMarker member), or "
+      "NonCopyable. See the generated protocol header for valid tags.");
+
+  template <typename... U> friend class SwiftExistentialType;
+  template <typename... U> friend class SwiftClassExistentialType;
+
+public:
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(
+      const SwiftClassExistentialType &other) noexcept
+      : _value(other._value) {
+    if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
+    if constexpr (Traits::NumWitnessTables > 0) {
+      for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
+        this->_witnessTables[i] = other._witnessTables[i];
+    }
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(
+      SwiftClassExistentialType &&other) noexcept
+      : _value(other._value) {
+    other._value = nullptr;
+    if constexpr (Traits::NumWitnessTables > 0) {
+      for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
+        this->_witnessTables[i] = other._witnessTables[i];
+    }
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType &
+  operator=(const SwiftClassExistentialType &other) noexcept {
+    if (this != &other) {
+      auto *old = _value;
+      _value = other._value;
+      if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
+      if (old) swift_release(reinterpret_cast<void *_Nonnull>(old));
+      if constexpr (Traits::NumWitnessTables > 0) {
+        for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
+          this->_witnessTables[i] = other._witnessTables[i];
+      }
+    }
+    return *this;
+  }
+  SWIFT_INLINE_THUNK SwiftClassExistentialType &
+  operator=(SwiftClassExistentialType &&other) noexcept {
+    if (this != &other) {
+      if (_value) swift_release(reinterpret_cast<void *_Nonnull>(_value));
+      _value = other._value;
+      other._value = nullptr;
+      if constexpr (Traits::NumWitnessTables > 0) {
+        for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
+          this->_witnessTables[i] = other._witnessTables[i];
+      }
+    }
+    return *this;
+  }
+  SWIFT_INLINE_THUNK ~SwiftClassExistentialType() noexcept {
+    if (_value) swift_release(reinterpret_cast<void *_Nonnull>(_value));
+  }
+
+  /// Implicit conversion to Any (repacks from class-bound to opaque layout).
+  SWIFT_INLINE_THUNK operator SwiftExistentialType<>() const noexcept;
+
+protected:
+  struct uninit_t {};
+  SWIFT_INLINE_THUNK SwiftClassExistentialType(uninit_t) noexcept
+      : _value(nullptr) {}
+
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _initializeWithCopy(const SwiftClassExistentialType &src) noexcept {
+    _value = src._value;
+    if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
+    if constexpr (Traits::NumWitnessTables > 0) {
+      for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
+        this->_witnessTables[i] = src._witnessTables[i];
+    }
+  }
+
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _projectValue() const noexcept {
+    return reinterpret_cast<void *_Nonnull>(_value);
+  }
+
+  SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
+  _getType() const noexcept {
+    return swift_getObjectType(
+        reinterpret_cast<void *_Nonnull>(_value));
+  }
+
+  template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+  SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitness(
+      const void *_Nonnull wt) const {
+    struct slot {
+      FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+    };
+    auto *s = reinterpret_cast<const slot *>(
+        reinterpret_cast<const void *const *>(wt) + EntryOffset);
+    return s->fn;
+  }
+
+  void *_Nullable _value;
+  const void *_Nonnull
+      _witnessTables[Traits::NumWitnessTables > 0 ? Traits::NumWitnessTables
+                                                  : 1];
+};
+
+#endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cplusplus >= 201703L
+
 } // namespace _impl
+
+#if defined(SWIFT_CXX_EXISTENTIAL_INTEROP) && __cplusplus >= 201703L
+/// Swift.Any -- the unconstrained existential type.
+using Any = _impl::SwiftExistentialType<>;
+#endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cplusplus >= 201703L
 
 /// Swift's Int type.
 using Int = ptrdiff_t;
