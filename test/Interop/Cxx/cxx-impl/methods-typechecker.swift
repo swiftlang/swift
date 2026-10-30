@@ -62,6 +62,25 @@ extension Pair {
   func adjustAlias(_ x: Int32) -> Int32 { return value + x }
 }
 
+// `mutating` only tells apart the members of a const/non-const pair. Without
+// one, a second implementation of an overload is a duplicate even if it
+// disagrees about `mutating`.
+
+extension Gauge {
+  // expected-note@+2{{previously implemented here}}
+  @cxx @implementation
+  func scale(_ x: Int32) -> Int32 { return value * x }
+
+  @cxx @implementation
+  func scale(_ x: Double) -> Int32 { return Int32(Double(value) * x) }
+}
+
+extension Gauge {
+  // expected-error@+1{{duplicate implementation of imported instance method 'scale'}}
+  @cxx(scale) @implementation
+  mutating func scaleAlias(_ x: Int32) -> Int32 { return value * x }
+}
+
 
 // The receiver may be a non-trivial C++ class: `this` is a pointer, so the
 // receiver is not copied at the boundary.
