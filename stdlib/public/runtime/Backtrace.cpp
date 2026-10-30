@@ -246,6 +246,40 @@ bool isStdinATty()
 #endif
 }
 
+#ifdef _WIN32
+// Returns the NT headers for the given module, or NULL if `hModule` is NULL
+// or the DOS/NT signatures don't check out.
+const IMAGE_NT_HEADERS *getNtHeaders(HMODULE hModule)
+{
+  if (!hModule)
+    return nullptr;
+
+  auto dosHeader = reinterpret_cast<const IMAGE_DOS_HEADER *>(hModule);
+  if (dosHeader->e_magic != IMAGE_DOS_SIGNATURE)
+    return nullptr;
+
+  auto ntHeaders = reinterpret_cast<const IMAGE_NT_HEADERS *>(
+    reinterpret_cast<const BYTE *>(hModule) + dosHeader->e_lfanew);
+  if (ntHeaders->Signature != IMAGE_NT_SIGNATURE)
+    return nullptr;
+
+  return ntHeaders;
+}
+
+// Returns true if this process is a GUI-subsystem (IMAGE_SUBSYSTEM_WINDOWS_GUI)
+// executable, as opposed to a console-subsystem one.  This is a property of
+// the executable file itself, unlike GetConsoleWindow(), which only tells you
+// whether a console happens to be attached right now.
+bool isGUISubsystem()
+{
+  const IMAGE_NT_HEADERS *ntHeaders = getNtHeaders(GetModuleHandleW(NULL));
+  if (!ntHeaders)
+    return false;
+
+  return ntHeaders->OptionalHeader.Subsystem == IMAGE_SUBSYSTEM_WINDOWS_GUI;
+}
+#endif
+
 #endif // SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 
 void _swift_processBacktracingSetting(llvm::StringRef key, llvm::StringRef value);
@@ -432,7 +466,12 @@ BacktraceInitializer::BacktraceInitializer() {
 
   if (_swift_backtraceSettings.outputTo == OutputTo::Auto) {
 #ifdef _WIN32
-    if (!GetConsoleWindow())
+    // GUI-subsystem programs don't have a console by default, and we don't
+    // want to pop up a spurious console window just to report a crash that
+    // the program may barely log at all.  If one has gone to the trouble of
+    // creating/attaching a console of its own, though, honor it and write
+    // there like we would for a console-subsystem program.
+    if (isGUISubsystem() && !GetConsoleWindow())
       _swift_backtraceSettings.outputTo = OutputTo::EventLog;
     else
 #endif
