@@ -66,11 +66,11 @@ func duplicatedMessage() {}
 // An unrecognized platform in a platform-version list is a warning, and the
 // entry is dropped -- so this must not become an error in either parser.
 @backDeployed(before: macos 12.0)
-// expected-warning@-1 {{unknown platform 'macos' for attribute '@backDeployed'; did you mean 'macOS'?}} {{23-28=macOS}}
+// expected-warning@-1 {{unknown platform 'macos' for '@backDeployed' attribute; did you mean 'macOS'?}} {{23-28=macOS}}
 public func backDeployedPlatformTypo() {}
 
 @backDeployed(before: NotAPlatform 12.0)
-// expected-warning@-1 {{unknown platform 'NotAPlatform' for attribute '@backDeployed'}}
+// expected-warning@-1 {{unknown platform 'NotAPlatform' for '@backDeployed' attribute}}
 public func backDeployedUnknownPlatform() {}
 
 // '*' names no platform here. It is reported, and unlike an unrecognized name it

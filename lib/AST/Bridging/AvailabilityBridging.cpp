@@ -60,8 +60,11 @@ BridgedOptionalPlatformKind PlatformKind_fromDomainOrIdentifier(
   // Keep this in sync with getPlatformFromDomainOrIdentifier() in
   // lib/Parse/ParseDecl.cpp, which is what the C++ parser uses here.
   auto domainOrIdentifier = cVal.unbridged();
-  if (auto domain = domainOrIdentifier.getAsDomain())
-    return domain->getPlatformKind();
+  if (auto domain = domainOrIdentifier.getAsDomain()) {
+    if (auto kind = domain->getPlatformKind())
+      return *kind;
+    return BridgedOptionalPlatformKind();
+  }
 
   return PlatformKind_fromIdentifier(*domainOrIdentifier.getAsIdentifier());
 }

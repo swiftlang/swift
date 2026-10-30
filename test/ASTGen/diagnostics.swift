@@ -88,7 +88,7 @@ default test
 // expected-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
 func scopedMissingLParen(b: @_scoped Int) {}
-// expected-error@-1:29{{expected arguments for '_scoped' attribute}}
+// expected-error@-1:30{{expected '(' in '_scoped' attribute}}
 
 func scopedNotAName(b: @_scoped(0) Int) {}
 // expected-error@-1:33{{invalid argument in '_scoped' attribute}}

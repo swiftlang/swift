@@ -60,7 +60,7 @@ struct EmptyGenericParams< {}
 // ASTGen used to leave the decl valid, and Sema then dereferenced a null
 // nominal type.
 deinit {}
-// expected-error@-1 {{deinitializers may only be declared within a class, actor, or noncopyable type}}
+// expected-error@-1 {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 
 // Only an infix operator may declare a precedence group; passing one through for
 // a prefix operator violated an OperatorDecl invariant.

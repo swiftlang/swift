@@ -496,18 +496,17 @@ extension ASTGenVisitor {
 
       // If the name is a platform name, use it.
       //
-      // `*` maps to `PlatformKind.none`, which is a value but not a platform:
-      // wildcards are not meaningful in this kind of list. Check for it before
-      // appending, or `AvailabilityDomain::forPlatform` asserts downstream.
-      // Note this deliberately does not set `droppedNonPlatform`, matching the
-      // C++ parser, which still reports an otherwise-empty list as needing a
-      // platform version.
+      // `*` is not a platform: wildcards are not meaningful in this kind of
+      // list. Note this deliberately does not set `droppedNonPlatform`,
+      // matching the C++ parser, which still reports an otherwise-empty list as
+      // needing a platform version.
+      if platformName == "*" {
+        self.diagnose(.attr_availability_wildcard_ignored(attrName), at: platformToken)
+        continue
+      }
+
       let platform = BridgedOptionalPlatformKind(from: platformName.bridged)
       if platform.hasValue {
-        guard platform.value != .none else {
-          self.diagnose(.attr_availability_wildcard_ignored(attrName), at: platformToken)
-          continue
-        }
         result.versions.append((platform: platform.value, version: version))
         continue
       }
@@ -539,7 +538,7 @@ extension ASTGenVisitor {
           // rather than an identifier -- a wildcard is one -- so ask for the
           // platform in a way that accepts either.
           let platform = BridgedOptionalPlatformKind(from: spec.domainOrIdentifier)
-          guard platform.hasValue, platform.value != .none else {
+          guard platform.hasValue else {
             continue
           }
           result.versions.append((platform: platform.value, version: spec.rawVersion))
