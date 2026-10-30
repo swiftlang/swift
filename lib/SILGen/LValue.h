@@ -108,6 +108,7 @@ public:
     PhysicalKeyPathApplicationKind, // applying a key path
     BorrowValueKind,  // load_borrow the base rvalue for a projection
     BorrowMutateKind, // borrow and mutate accessor
+    UncheckedAddressCastKind,       // unchecked_addr_cast of a physical base
 
     // Logical LValue kinds
     GetterSetterKind, // property or subscript getter/setter
@@ -449,6 +450,11 @@ public:
   void add(As &&... args) {
     Path.emplace_back(new T(std::forward<As>(args)...));
   }
+
+  /// Reinterpret the lvalue's current physical projection as another
+  /// layout-compatible type. The path must currently end in a physical
+  /// component.
+  void addUncheckedAddressCast(LValueTypeData typeData);
 
   // NOTE: Optional<ActorIsolation> inside of LValues
   // Some path components carry an ActorIsolation value, which is an indicator

@@ -2,6 +2,9 @@
 // to the one property, not all of `self`. Reproducer for rdar://190152763.
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -verify %s -o /dev/null
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -verify %s -o /dev/null -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple
+
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 // expected-warning@<unknown> * {{libc not found for }}
 
