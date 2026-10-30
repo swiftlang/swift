@@ -4296,6 +4296,10 @@ namespace {
         resultTypeForEscapability =
             Impl.getClangASTContext().getCanonicalTagType(ctordecl->getParent());
 
+      const auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
+      // Clang numbers 'this' as parameter 0 only for implicit object members.
+      bool hasThisParam = method && method->isImplicitObjectMemberFunction();
+
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
       LifetimeDependenceInfo immortalLifetime(
           nullptr, nullptr, returnIdx,
@@ -4404,11 +4408,10 @@ namespace {
 
               paramHasAnnotation[idx] = true;
               unsigned targetIdx;
-              if (isa<clang::CXXMethodDecl>(decl) &&
-                  param == clang::LifetimeCaptureByAttr::This) {
+              if (hasThisParam && param == clang::LifetimeCaptureByAttr::This) {
                 targetIdx = result->getSelfIndex();
               } else {
-                targetIdx = param - isa<clang::CXXMethodDecl>(decl);
+                targetIdx = param - hasThisParam;
               }
               auto [it, inserted] = capturedArgDependences.try_emplace(
                   targetIdx, dependencyVecSize);
