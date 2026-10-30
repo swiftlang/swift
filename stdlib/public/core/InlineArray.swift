@@ -355,6 +355,21 @@ extension InlineArray where Element: ~Copyable {
     }
   }
 
+  /// Creates an array, then calls the given closure with an output span
+  /// to initialize the array's elements.
+  ///
+  /// The output span is empty when the closure is called, and it a capacity of
+  /// exactly `count`, the static count of the array.
+  ///
+  /// NOTE: The closure must initialize every element of the `OutputSpan`.
+  ///       If the closure does not do so, the initializer will trap.
+  ///
+  /// The closure is allowed to throw an error at any point during
+  /// initialization at which point the array will stop initialization,
+  /// and deinitialize every currently initialized element.
+  ///
+  /// - Parameter initializer: A closure that initializes the array's elements
+  ///     by appending them to the given `OutputSpan`.
   @available(SwiftStdlib 6.2, *)
   @export(implementation)
   public init<E: Error>(
@@ -385,6 +400,56 @@ extension InlineArray where Element: Copyable {
       let buffer = unsafe Self._initializationBuffer(start: $0)
 
       unsafe buffer.initialize(repeating: value)
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: - Consuming
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 6.5, *)
+extension InlineArray where Element: ~Copyable {
+  /// Consumes this array by passing all of its elements to a closure
+  /// through an input span.
+  ///
+  /// The closure takes ownership of the elements: it can do anything with them,
+  /// including nothing. Any elements still initialized when the input span
+  /// goes out of scope are deinitialized, whether the closure returns normally
+  /// or by throwing.
+  ///
+  /// The input span has a capacity equal to the array's count.
+  ///
+  /// - Parameter consumer: A closure that takes ownership of an `InputSpan`
+  ///     containing the elements of this array.
+  @export(implementation)
+  public consuming func consumeAll<E: Error, R: ~Copyable>(
+    consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    // If the closure to `withTemporaryAllocation` were known by the compiler
+    // to run exactly once, we could consume `self` into it. As it is, we
+    // use a mutable `Optional` to transfer the array into the closure;
+    // the optimizer handles the pattern correctly.
+    // TODO: use `Optional.edit()` instead (SE-0561)
+    var box: Optional = consume self
+    defer {
+      _precondition(box == nil)
+    }
+    return try withTemporaryAllocation(of: Self.self, capacity: 1) {
+      span throws(E) -> R in
+      span.append(box.take()!)
+      return try unsafe span.withUnsafeMutableBufferPointer {
+        (buffer, count) throws(E) -> R in
+        count = 0
+        return try unsafe buffer.withMemoryRebound(to: Element.self) {
+          elements throws(E) -> R in
+          _internalInvariant(elements.count == Self.count)
+          let span = unsafe InputSpan(
+            buffer: elements, initializedCount: elements.count
+          )
+          return try consumer(span)
+        }
+      }
     }
   }
 }

@@ -540,6 +540,86 @@ suite.test("finalize identity mismatch")
   _ = span.finalize(for: b.extracting(1...))
 }
 
+private struct NCTracked: ~Copyable {
+  let tracked: LifetimeTracked
+  init(_ value: Int) { tracked = LifetimeTracked(value) }
+  var value: Int { tracked.value }
+}
+
+suite.test("InlineArray.consumeAll")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let array = InlineArray<5, NCTracked> { NCTracked($0) }
+  expectEqual(LifetimeTracked.instances, 5)
+  var borrowedValues: [Int] = []
+  for i in array.indices {
+    borrowedValues.append(array[i].value)
+  }
+
+  let consumedValues = array.consumeAll {
+    (span: consuming InputSpan<NCTracked>) -> [Int] in
+    var values: [Int] = []
+    expectEqual(span.count, 5)
+    expectTrue(span.isFull)
+    while !span.isEmpty {
+      values.append(span.removeFirst().value)
+    }
+    return values
+  }
+  expectEqual(consumedValues, borrowedValues)
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
+suite.test("InlineArray.consumeAll cleans up any remaining elements")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let array = InlineArray<5, NCTracked> { NCTracked($0) }
+  array.consumeAll {
+    (span: consuming InputSpan<NCTracked>) in
+    expectEqual(span.removeFirst().value, 0)
+    expectEqual(span.count, 4)
+    expectEqual(LifetimeTracked.instances, 4)
+  }
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
+suite.test("InlineArray.consumeAll throwing")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let array = InlineArray<5, NCTracked> { NCTracked($0) }
+  do throws(TestError) {
+    try array.consumeAll {
+      (span: consuming InputSpan<NCTracked>) throws(TestError) in
+      expectEqual(span.removeFirst().value, 0)
+      expectEqual(LifetimeTracked.instances, 4)
+      throw TestError()
+    }
+    expectUnreachable("consumeAll should have thrown")
+  } catch {
+    expectEqual(error, TestError())
+  }
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
+suite.test("InlineArray.consumeAll for an empty array")
+.require(.stdlib_6_5).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let array = InlineArray<0, NCTracked> { _ in NCTracked(0) }
+  var called = false
+  array.consumeAll { (span: consuming InputSpan<NCTracked>) in
+    expectEqual(called, false)
+    called = true
+    expectTrue(span.isEmpty)
+    expectEqual(span.capacity, 0)
+  }
+  expectEqual(called, true)
+  expectEqual(LifetimeTracked.instances, 0)
+}
+
 suite.test("Iterable conformance")
 .require(.stdlib_6_5).code {
   guard #available(SwiftStdlib 6.5, *) else { return }
