@@ -38,7 +38,7 @@ internal import Musl
 ///   - mangledName: A mangled Swift symbol.
 /// - Returns: A human readable demangled Swift symbol.
 /// - Throws: When the demangling fails for any reason.
-/// - Warning: The demangled output is lossy is not not guaranteed to be stable across Swift versions.
+/// - Warning: The demangled output is lossy and is not guaranteed to be stable across Swift versions.
 ///            Future versions of Swift may choose to print more (or less) information in the demangled format.
 @available(SwiftStdlib 6.4, *)
 public func demangle(_ mangledName: String) throws(DemanglingError) -> String {
@@ -80,7 +80,7 @@ public func demangle(_ mangledName: String) throws(DemanglingError) -> String {
 ///   - mangledName: A mangled Swift symbol.
 ///   - output: A pre-allocated span to demangle the Swift symbol into.
 /// - Throws: When the demangling failed entirely, and the output span will not have been written to.
-/// - Warning: The demangled output is lossy is not not guaranteed to be stable across Swift versions.
+/// - Warning: The demangled output is lossy and is not guaranteed to be stable across Swift versions.
 ///            Future versions of Swift may choose to print more (or less) information in the demangled format.
 @available(SwiftStdlib 6.4, *)
 public func demangle(
