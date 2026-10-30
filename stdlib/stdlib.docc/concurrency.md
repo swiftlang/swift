@@ -68,6 +68,7 @@ Perform asynchronous and parallel operations.
 
 ### Actors
 
+- <doc:managing-actor-reentrancy>
 - ``Swift/Sendable``
 - ``Swift/Actor``
 - ``Swift/MainActor``

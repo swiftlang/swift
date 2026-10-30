@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Two calls to price(for:) for the same symbol, ACME. Call 1 starts the earlier fetch, which returns the old price of 100. Call 2 reenters and starts a later fetch, which returns the new price of 105 and finishes first. Call 2 writes 105 to the cache. Call 1 resumes afterward and overwrites the cache with the stale price of 100." font-family="Helvetica, Arial, sans-serif">
+<defs>
+<pattern id="hatch-c1" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#F78461" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#D84005" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c2" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#85D0EA" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#0070C9" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c3" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#58C9AF" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#00867D" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-neutral" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#B2B2B2" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#666666" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#666666"/></marker>
+</defs>
+<text x="24" y="173.7" font-size="18" font-weight="bold" fill="#D84005">Call 1</text>
+<text x="24" y="195.7" font-size="16" fill="#666666">"ACME"</text>
+<rect x="200" y="135.0" width="570" height="83.33333333333333" rx="6" fill="#E5E5E5"/>
+<rect x="200.0" y="135.0" width="81.4" height="83.33333333333333" rx="6" fill="#F78461"/>
+<text x="240.7" y="182.7" text-anchor="middle" font-size="16" font-weight="bold" fill="#333333">miss</text>
+<rect x="281.4" y="135.0" width="358.3" height="83.33333333333333" fill="url(#hatch-c1)"/>
+<text x="460.6" y="182.7" text-anchor="middle" font-size="16" font-weight="normal" fill="#333333">fetch: 100</text>
+<rect x="639.7" y="135.0" width="81.4" height="83.33333333333333" rx="6" fill="#F78461"/>
+<text x="680.4" y="182.7" text-anchor="middle" font-size="16" font-weight="bold" fill="#333333">write</text>
+<text x="24" y="297.0" font-size="18" font-weight="bold" fill="#0070C9">Call 2</text>
+<text x="24" y="319.0" font-size="16" fill="#666666">"ACME"</text>
+<rect x="200" y="258.3333333333333" width="570" height="83.33333333333333" rx="6" fill="#E5E5E5"/>
+<rect x="322.1" y="258.3333333333333" width="81.4" height="83.33333333333333" rx="6" fill="#85D0EA"/>
+<text x="362.9" y="306.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#333333">miss</text>
+<rect x="403.6" y="258.3333333333333" width="122.1" height="83.33333333333333" fill="url(#hatch-c2)"/>
+<text x="464.6" y="306.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#333333">fetch: 105</text>
+<rect x="525.7" y="258.3333333333333" width="81.4" height="83.33333333333333" rx="6" fill="#85D0EA"/>
+<text x="566.4" y="306.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#333333">write</text>
+<text x="24" y="420.3" font-size="18" font-weight="bold" fill="#666666">Cache</text>
+<text x="24" y="442.3" font-size="16" fill="#666666">cache["ACME"]</text>
+<rect x="200" y="381.66666666666663" width="570" height="83.33333333333333" rx="6" fill="#E5E5E5"/>
+<rect x="609.1" y="387.66666666666663" width="110.0" height="71.33333333333333" rx="6" fill="#FFFFFF" stroke="#0070C9" stroke-width="2"/>
+<text x="664.1" y="429.3" text-anchor="middle" font-size="16" font-weight="bold" fill="#0070C9">105</text>
+<rect x="723.1" y="387.66666666666663" width="44.9" height="71.33333333333333" rx="6" fill="#FFFFFF" stroke="#D6076A" stroke-width="2"/>
+<text x="745.6" y="429.3" text-anchor="middle" font-size="16" font-weight="bold" fill="#D6076A">100</text>
+<line x1="721.1" y1="117.0" x2="721.1" y2="465.0" stroke="#D6076A" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="721.1" y="109.0" text-anchor="end" font-size="18" font-weight="bold" fill="#D6076A">Stale overwrite</text>
+<line x1="200" y1="495.0" x2="770" y2="495.0" stroke="#666666" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="770" y="519.0" text-anchor="end" font-size="16" fill="#666666">time</text>
+<rect x="24" y="551" width="28" height="20" rx="4" fill="#B2B2B2"/>
+<text x="62" y="566" font-size="16" fill="#666666">Running on the actor</text>
+<rect x="277.20000000000005" y="551" width="28" height="20" rx="4" fill="url(#hatch-neutral)"/>
+<text x="315.20000000000005" y="566" font-size="16" fill="#666666">Suspended</text>
+</svg>
