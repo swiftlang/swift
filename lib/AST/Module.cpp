@@ -305,7 +305,11 @@ void SourceLookupCache::addToUnqualifiedLookupCache(Range items,
       if (onlyDerivatives)
         if (AbstractFunctionDecl *AFD = getDerivative())
           CustomDerivatives.push_back(AFD);
-      if (!onlyOperators && !onlyDerivatives && VD->hasName()) {
+      // Skip a '@specialized' declaration without a body so that calls in this
+      // module still find the imported declaration: it names that declaration
+      // instead of declaring one.
+      if (!onlyOperators && !onlyDerivatives && VD->hasName() &&
+          !SpecializedAttr::isSpecializationDeclaration(VD)) {
         TopLevelValues.add(VD);
         if (VD->getAttrs().hasAttribute<CustomAttr>())
           MayHaveAuxiliaryDecls.push_back(VD);

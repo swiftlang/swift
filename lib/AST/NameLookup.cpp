@@ -1600,6 +1600,12 @@ void MemberLookupTable::addMember(Decl *member) {
   if (!A && !vd->hasName())
     return;
 
+  // Skip a '@specialized' declaration without a body so that member accesses
+  // still find the imported member: it names that member instead of declaring
+  // one.
+  if (SpecializedAttr::isSpecializationDeclaration(vd))
+    return;
+
   // If this declaration is already in the lookup table, don't add it
   // again.
   if (vd->isAlreadyInLookupTable()) {

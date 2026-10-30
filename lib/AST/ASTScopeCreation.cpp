@@ -447,7 +447,22 @@ public:
         WhatScope, GenericTypeOrExtensionWholePortion>(p, w);                  \
   }
 
-  VISIT_AND_CREATE_WHOLE_PORTION(ExtensionDecl, ExtensionScope)
+  ASTScopeImpl *visitExtensionDecl(ExtensionDecl *e, ASTScopeImpl *p,
+                                   ScopeCreator &scopeCreator) {
+    // Give its '@specialized' attributes their own scopes, so that names like
+    // 'T' in their 'where' clauses resolve. They come before the extended
+    // type, outside the extension's scope, so their scopes go in the parent,
+    // in source order (the attributes are in reverse order).
+    SmallVector<AbstractSpecializeAttr *, 2> attrs;
+    for (auto *attr : e->getAttrs().getAttributes<AbstractSpecializeAttr>())
+      if (!attr->isImplicit())
+        attrs.push_back(const_cast<AbstractSpecializeAttr *>(attr));
+    for (auto *attr : llvm::reverse(attrs))
+      scopeCreator.constructExpandAndInsert<SpecializeAttributeScope>(p, attr,
+                                                                      e);
+    return scopeCreator.constructWithPortionExpandAndInsert<
+        ExtensionScope, GenericTypeOrExtensionWholePortion>(p, e);
+  }
   VISIT_AND_CREATE_WHOLE_PORTION(StructDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(ClassDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(ProtocolDecl, NominalTypeScope)
