@@ -49,6 +49,18 @@ import SwiftShims
 /// implement the required `next()` method. Each call to `next()` must produce
 /// a uniform and independent random value.
 ///
+/// A uniform value means that every possible `UInt64` value is equally likely
+/// to be returned, or equivalently, that each of the 64 bits of the result is
+/// independently equally likely to be `0` or `1`. The standard library's
+/// random APIs, such as `Int.random(in:using:)` and `shuffle(using:)`, rely on
+/// this property, and produce biased results if it doesn't hold.
+///
+/// For example, a generator that returns the result of the C `rand()` or
+/// `lrand48()` functions converted to `UInt64` isn't a valid
+/// `RandomNumberGenerator`. Those functions return nonnegative values no
+/// greater than `Int32.max`, so the upper bits of every value returned by
+/// `next()` would always be zero.
+///
 /// Types that conform to `RandomNumberGenerator` should specifically document
 /// the thread safety and quality of the generator.
 public protocol RandomNumberGenerator {
