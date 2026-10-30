@@ -57,6 +57,8 @@ struct EmittedClangHeaderDependencyInfo {
 };
 
 /// Prints the declarations of \p M to \p os in C++ language mode.
+/// The standard library header provides the common ABI support. Embedded
+/// Swift emits that support in the module header instead.
 ///
 /// \returns Dependencies required by this module.
 EmittedClangHeaderDependencyInfo
