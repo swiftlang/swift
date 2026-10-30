@@ -423,6 +423,13 @@ struct VariableNameInferrer::CallResultNamer {
       if (auto declRef = fn->getDeclRef())
         if (auto *decl = declRef.getDecl())
           return {getNameFromDecl(decl), decl};
+      // A specialization of a function, such as the one that
+      // MandatoryAllocBoxToStack creates for a closure or local function whose
+      // box it promotes, has no SILDeclRef. It keeps the original function's
+      // location, which names the same decl.
+      if (fn->hasLocation())
+        if (auto *decl = fn->getLocation().getAsASTNode<ValueDecl>())
+          return {getNameFromDecl(decl), decl};
       // Fall back to the SILFunction's name (e.g. for SIL-only declarations
       // that carry no AST decl).
       return {fn->getName(), nullptr};
