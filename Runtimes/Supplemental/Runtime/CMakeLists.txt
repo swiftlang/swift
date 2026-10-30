@@ -70,6 +70,8 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
+option(${PROJECT_NAME}_ENABLE_SANITIZE_COVERAGE "Enable sanitizer coverage for fuzzing" OFF)
+
 add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
@@ -217,6 +219,12 @@ set_target_properties(swiftRuntime PROPERTIES
   Swift_MODULE_NAME Runtime)
 target_compile_definitions(swiftRuntime PRIVATE
   SWIFT_ASM_AVAILABLE)
+
+if(${PROJECT_NAME}_ENABLE_SANITIZE_COVERAGE)
+  target_compile_options(swiftRuntime PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:-sanitize=fuzzer>"
+    "$<$<COMPILE_LANGUAGE:Swift>:-DLLVM_USE_SANITIZE_COVERAGE>")
+endif()
 target_compile_options(swiftRuntime PUBLIC
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fmodule-map-file=${CMAKE_CURRENT_SOURCE_DIR}/modules/module.modulemap>")
 # FIXME: We should split out the parts that are needed by the runtime to avoid
