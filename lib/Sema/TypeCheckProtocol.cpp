@@ -813,6 +813,14 @@ bool swift::TypeChecker::witnessStructureMatches(ValueDecl *req,
 
 static PossibleEffects getEffects(ValueDecl *value);
 
+/// Whether \p req is a '@oneway' function witnessed by a non-'@oneway' one
+static bool isOnewayRelaxedWitness(ValueDecl *req, ValueDecl *witness) {
+  auto *reqFunc = dyn_cast<FuncDecl>(req);
+  auto *witnessFunc = dyn_cast<FuncDecl>(witness);
+  return reqFunc && witnessFunc && reqFunc->isOneway() &&
+         !witnessFunc->isOneway();
+}
+
 RequirementMatch swift::matchWitness(
     DeclContext *dc, ValueDecl *req, ValueDecl *witness,
     llvm::function_ref<MatchWitnessTypes(void)> setup,
@@ -961,6 +969,19 @@ RequirementMatch swift::matchWitness(
 
       if (auto result = matchTypes(std::get<0>(types), std::get<1>(types))) {
         return std::move(result.value());
+      }
+    }
+
+    // A non-'@oneway' requirement cannot be witnessed by a '@oneway' function,
+    // because callers of the requirement are not required to use 'send'. The
+    // other direction is fine: a '@oneway' requirement may be witnessed by a
+    // plain function, which is merely a more capable implementation, similar
+    // to a witness with fewer effects. An exact '@oneway' witness is preferred,
+    // see the 'FewerEffects' match kind below
+    if (auto *reqFunc = dyn_cast<FuncDecl>(req)) {
+      if (auto *witnessFunc = dyn_cast<FuncDecl>(witness)) {
+        if (!reqFunc->isOneway() && witnessFunc->isOneway())
+          return RequirementMatch(witness, MatchKind::OnewayConflict);
       }
     }
 
@@ -1483,6 +1504,9 @@ swift::matchWitness(WitnessChecker::RequirementEnvironmentCache &reqEnvCache,
     else if (getEffects(req) - getEffects(witness))
       // when the difference is non-empty, the witness has fewer effects.
       matchKind = MatchKind::FewerEffects;
+    else if (isOnewayRelaxedWitness(req, witness))
+      // a plain witness for a '@oneway' requirement ranks below an exact one
+      matchKind = MatchKind::FewerEffects;
 
     assert(getEffects(req).contains(getEffects(witness))
                && "witness has more effects than requirement?");
@@ -1562,6 +1586,20 @@ static bool isBetterMatch(DeclContext *dc, ValueDecl *requirement,
 
   case Comparison::Unordered:
     break;
+  }
+
+  // A '@oneway' requirement is witnessed by the '@oneway' function, rather
+  // than by a plain one, even if neither one has all the effects of the
+  // requirement, such as 'async'
+  if (auto *reqFunc = dyn_cast<FuncDecl>(requirement)) {
+    if (reqFunc->isOneway()) {
+      auto *witness1 = dyn_cast<FuncDecl>(match1.Witness);
+      auto *witness2 = dyn_cast<FuncDecl>(match2.Witness);
+      bool isOneway1 = witness1 && witness1->isOneway();
+      bool isOneway2 = witness2 && witness2->isOneway();
+      if (isOneway1 != isOneway2)
+        return isOneway1;
+    }
   }
 
   // Earlier match kinds are better. This prefers exact matches over matches
@@ -3393,6 +3431,10 @@ diagnoseMatch(ModuleDecl *module, NormalProtocolConformance *conformance,
     diags.diagnose(match.Witness, diag::protocol_witness_async_conflict,
                    cast<AbstractFunctionDecl>(match.Witness)->hasAsync(),
                    req->isObjC());
+    break;
+
+  case MatchKind::OnewayConflict:
+    diags.diagnose(match.Witness, diag::protocol_witness_oneway_conflict);
     break;
 
   case MatchKind::ThrowsConflict:

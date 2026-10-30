@@ -18,7 +18,7 @@
 actor Logger {
   var logged: [Int] = []
 
-  func log(_ value: Int) {
+  @oneway func log(_ value: Int) {
     logged.append(value)
   }
 

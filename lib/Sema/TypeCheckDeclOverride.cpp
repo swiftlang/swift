@@ -1685,6 +1685,12 @@ namespace  {
     UNINTERESTING_ATTR(UsableFromInline)
     UNINTERESTING_ATTR(ObjCNonLazyRealization)
     UNINTERESTING_ATTR(Once)
+    // An override can neither add nor drop '@oneway', see
+    // checkSingleOverride()
+    UNINTERESTING_ATTR(Oneway)
+    // An override of a '@oneway(never)' method is treated as
+    // '@oneway(never)' too, see FuncDecl::isOnewayNever()
+    UNINTERESTING_ATTR(OnewayNever)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)
@@ -1945,6 +1951,19 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
 
   ASTContext &ctx = override->getASTContext();
   auto &diags = ctx.Diags;
+
+  // '@oneway' does not affect the function type, so check that an override
+  // agrees on it: a call of the overridden method is also a call of the
+  // override, so they must be called the same way
+  if (auto *baseFunc = dyn_cast<FuncDecl>(base)) {
+    auto *overrideFunc = dyn_cast<FuncDecl>(override);
+    if (overrideFunc && overrideFunc->isOneway() != baseFunc->isOneway()) {
+      diags.diagnose(overrideFunc, diag::override_oneway_mismatch,
+                     overrideFunc, overrideFunc->isOneway(), baseFunc);
+      diags.diagnose(baseFunc, diag::overridden_here);
+      return true;
+    }
+  }
 
   // Check property and subscript overriding.
   if (auto *baseASD = dyn_cast<AbstractStorageDecl>(base)) {

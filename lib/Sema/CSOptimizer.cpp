@@ -705,10 +705,37 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   if (argumentType->hasTypeVariable())
     return DisjunctionInfo::none();
 
+  // Whether the overload choices differ in being '@oneway', i.e. some of
+  // them are '@oneway' and some are not. Computed lazily, only when an
+  // async/sync mismatch would otherwise drop a choice
+  std::optional<bool> hasMixedOneway;
+  auto choicesMixOneway = [&]() -> bool {
+    if (!hasMixedOneway) {
+      bool anyOneway = false, anyNotOneway = false;
+      if (cs.getASTContext().LangOpts.hasFeature(Feature::SendCalls)) {
+        for (auto *choice : disjunction->getNestedConstraints()) {
+          if (choice->isDisabled())
+            continue;
+          auto *func =
+              dyn_cast_or_null<FuncDecl>(getOverloadChoiceDecl(choice));
+          if (!func)
+            continue;
+          if (func->isOneway())
+            anyOneway = true;
+          else
+            anyNotOneway = true;
+        }
+      }
+      hasMixedOneway = anyOneway && anyNotOneway;
+    }
+    return *hasMixedOneway;
+  };
+
   SmallVector<Constraint *, 2> favoredChoices;
   forEachDisjunctionChoice(
       cs, disjunction,
-      [&cs, &argumentType, &favoredChoices, &argument](
+      [&cs, &argumentType, &favoredChoices, &argument,
+       &choicesMixOneway](
           Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
           return;
@@ -725,9 +752,19 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
           return;
 
         if (argumentType->isEqual(param.getPlainType())) {
+          // Don't favor an overload whose async-ness doesn't match the
+          // context, unless the overloads differ in being '@oneway'. Then
+          // whether the call is the operand of a 'send' decides between
+          // e.g. '@oneway func f(_: T)' and 'func f(_: T) async' (see
+          // SK_OnewayMismatch, which ranks above SK_SyncInAsync), so
+          // both have to be attempted. The operand of a 'send' is
+          // type-checked in an async closure, so this filter would
+          // otherwise always drop a synchronous '@oneway' overload, and
+          // drop a synchronous non-'@oneway' overload of an awaited call
           if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
             if (func->isAsyncContext() !=
-                cs.isAsynchronousContext(choice->getDeclContext()))
+                    cs.isAsynchronousContext(choice->getDeclContext()) &&
+                !choicesMixOneway())
               return;
           }
 

@@ -6,22 +6,22 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_SendCalls
 
-// A 'send' of an 'async' function creates a task at the call site (CHECK). A
-// 'send' of a synchronous function is enqueued through the '_enqueueOneway*'
-// helpers instead (SYNC), which create a task whose operation is synchronous
-// where the runtime supports it, and fall back to a task with an async
-// operation before Swift 6.5 (HELPER, IR)
+// A 'send' of an 'async' function, '@oneway' or not, creates a task at the call
+// site (CHECK). A 'send' of a synchronous function, '@oneway' or not, is
+// enqueued through the '_enqueueOneway*' helpers instead (SYNC), which create a
+// task whose operation is synchronous where the runtime supports it, and fall
+// back to a task with an async operation before Swift 6.5 (HELPER, IR)
 
 // ==== -----------------------------------------------------------------------
 // MARK: 'send' of an 'async' function
 
 actor Greeter {
-  func greet() async {}
+  @oneway func greet() async {}
 }
 
 @MainActor
 final class GlobalGreeter {
-  func greet() async {}
+  @oneway func greet() async {}
 }
 
 // 'send' lowers to a discarding 'createAsyncTask': flags carry
@@ -74,6 +74,7 @@ func testGlobal(_ g: GlobalGreeter) throws {
 public actor A {
   public func tell(_ x: Int) {}
   public func tellAsync(_ x: Int) async {}
+  @oneway public func onewayAsync() async {}
 }
 
 @MainActor public func onMain(_ x: Int) {}
@@ -82,12 +83,14 @@ public actor A {
 // SYNC:         function_ref @$ss14_enqueueOneway2on_yx_yxYictScARzlF
 // SYNC:         [[ASYNC_OP:%.*]] = function_ref @$s4main4test1ayAA1AC_tYaFyyYaKXOfU0_ : $@convention(thin) @async
 // SYNC:         builtin "createAsyncTask"
-// SYNC-NOT:     builtin "createAsyncTask"
+// SYNC:         [[ONEWAY_ASYNC_OP:%.*]] = function_ref @$s4main4test1ayAA1AC_tYaFyyYaKXOfU1_ : $@convention(thin) @async
+// SYNC:         builtin "createAsyncTask"
 // SYNC:         function_ref @$ss25_enqueueOnewayIsolatedAnyyyyyYAcF
 // SYNC:       } // end sil function '$s4main4test1ayAA1AC_tYaF'
 public func test(a: A) async {
   send a.tell(1)
   send a.tellAsync(2)
+  send a.onewayAsync()
   send onMain(4)
 }
 

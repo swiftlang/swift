@@ -9012,6 +9012,16 @@ public:
 
   bool isStatic() const;
 
+  /// Whether this function is declared '@oneway': it is meant to be called
+  /// with 'send'. This does not affect the function type, so a function
+  /// which differs from another one only in being '@oneway' redeclares it
+  bool isOneway() const;
+
+  /// Whether this function is declared '@oneway(never)', or overrides a
+  /// method which is: a 'send' of a call to it from outside of its isolation
+  /// domain is diagnosed, since it should be called with 'await'
+  bool isOnewayNever() const;
+
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {
     return static_cast<StaticSpellingKind>(Bits.FuncDecl.StaticSpelling);

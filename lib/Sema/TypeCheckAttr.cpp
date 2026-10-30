@@ -556,6 +556,24 @@ public:
 
   void visitCoroutineAttr(CoroutineAttr *attr);
   void visitScopeParamsAttr(ScopeParamsAttr *attr);
+  void visitOnewayAttr(OnewayAttr *attr);
+  void visitOnewayNeverAttr(OnewayNeverAttr *attr) {
+    // '@oneway(never)' only affects the diagnostics at call sites, so it is
+    // valid on any 'func', but it contradicts '@oneway'. The C++ parser
+    // already drops the later of the two, ASTGen keeps both
+    auto *oneway = D->getAttrs().getAttribute<OnewayAttr>();
+    if (!oneway)
+      return;
+    bool neverIsLater =
+        Ctx.SourceMgr.isBefore(oneway->getLocation(), attr->getLocation());
+    diagnose(neverIsLater ? attr->getLocation() : oneway->getLocation(),
+             diag::mutually_exclusive_attr_names,
+             neverIsLater ? "@oneway(never)" : "@oneway",
+             neverIsLater ? "@oneway" : "@oneway(never)",
+             /*isModifier=*/false);
+    // Keep '@oneway', which also affects overload resolution
+    attr->setInvalid();
+  }
 };
 
 } // end anonymous namespace
@@ -2841,6 +2859,56 @@ void AttributeChecker::visitSILGenNameAttr(SILGenNameAttr *A) {
 
 void AttributeChecker::visitCoroutineAttr(CoroutineAttr *attr) {
   // FIXME: allow only on @differentiable for modify accessorts
+}
+
+void AttributeChecker::visitOnewayAttr(OnewayAttr *attr) {
+  // '@oneway' is only allowed on 'func' declarations, so not on accessors,
+  // initializers, deinitializers or subscripts
+  auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || isa<AccessorDecl>(FD))
+    return;
+
+  // A 'send' of a distributed function would have to make a remote call
+  // without waiting for its reply, which distributed actor systems do not
+  // support yet
+  if (FD->isDistributed()) {
+    diagnoseAndRemoveAttr(attr, diag::oneway_distributed_not_supported, FD);
+    return;
+  }
+
+  // A '@oneway' function is called with 'send', which never observes a reply,
+  // so it must return 'Void', and which has no caller to receive an error, so
+  // it must not throw. A 'throws(Never)' function does not throw
+  auto resultTy = FD->getResultInterfaceType();
+  if (!resultTy || resultTy->hasError())
+    return;
+  if (!resultTy->isVoid()) {
+    diagnoseAndRemoveAttr(attr, diag::oneway_requires_void_result, FD);
+    return;
+  }
+  if (auto thrownTy = FD->getEffectiveThrownErrorType();
+      thrownTy && !(*thrownTy)->isNever()) {
+    diagnoseAndRemoveAttr(attr, diag::oneway_requires_nonthrowing, FD);
+    return;
+  }
+
+  // A 'send' call is enqueued on the callee's actor, so a '@oneway' function
+  // must be isolated to an actor: an actor instance, also through an
+  // 'isolated' parameter, or a global actor, 'async' or not. A nonisolated,
+  // 'nonisolated(nonsending)' or '@concurrent' function, a static method of
+  // an actor, and a requirement of a protocol which is neither constrained to
+  // 'Actor' or 'DistributedActor' nor isolated to a global actor are not
+  auto isolation = getActorIsolation(FD);
+  if (!isolation.isActorInstanceIsolated() && !isolation.isGlobalActor()) {
+    diagnoseAndRemoveAttr(attr, diag::oneway_requires_actor_isolation);
+    return;
+  }
+
+  // An Objective-C entry point could be called without 'send'
+  if (FD->isObjC()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_objc, attr, FD);
+    return;
+  }
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {

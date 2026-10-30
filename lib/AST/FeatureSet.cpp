@@ -645,6 +645,12 @@ static bool usesFeatureSendCalls(Decl *decl) {
     return finder.found;
   };
 
+  // The '@oneway' and '@oneway(never)' attributes are gated on this feature
+  if (decl->getAttrs().hasAttribute<OnewayAttr>() ||
+      decl->getAttrs().hasAttribute<OnewayNeverAttr>())
+    return true;
+
+  // An inlinable body which uses 'send' is printed into the interface
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(decl))
     return hasInlinableSendCall(afd);
   if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))

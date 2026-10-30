@@ -613,6 +613,27 @@ namespace {
     /// a remote distributed actor in the given context.
     bool isDistributedThunk(ConcreteDeclRef ref, Expr *context);
 
+    /// How the call of a '@oneway' function is made
+    enum class OnewayCallSiteKind {
+      /// The call is the operand of a 'send'
+      Send,
+      /// The call is covered by an explicit 'await', but no 'send'
+      Await,
+      /// A plain call
+      Plain,
+    };
+
+    /// Determine how the apply expression on top of \c ExprStack is made: as
+    /// the direct operand of a 'send' expression, i.e. it is reached from the
+    /// enclosing 'SendExpr' only by unwrapping the implicit 'try'/'await'
+    /// (and any parens) that 'send' pre-checking wraps its operand in;
+    /// covered by an explicit 'await', which is returned in \p explicitAwait;
+    /// or as a plain call. The 'send' expression is returned in \p sendExpr
+    /// if requested
+    OnewayCallSiteKind
+    getOnewayCallSiteKind(AwaitExpr *&explicitAwait,
+                                SendExpr **sendExpr = nullptr) const;
+
   public:
     /// Build a reference to the given declaration.
     Expr *buildDeclRef(SelectedOverload overload, DeclNameLoc loc,
@@ -3852,7 +3873,13 @@ namespace {
     }
 
     /// Whether the callee of the 'send' call \p apply is a function which is
-    /// isolated to an actor.
+    /// isolated to an actor instance (also through an 'isolated' parameter)
+    /// or to a global actor. A 'nonisolated', 'nonisolated(nonsending)' or
+    /// '@concurrent' function is not, and neither is a requirement of a
+    /// protocol which is neither constrained to 'Actor' or 'DistributedActor'
+    /// nor isolated to a global actor, also when it is called through an
+    /// existential or a generic parameter. Whether the function is '@oneway'
+    /// does not matter, since '@oneway' requires the same isolation.
     ///
     /// A call of a function value, like a closure, is
     /// accepted only if its function type is isolated to a global actor or
@@ -3945,7 +3972,7 @@ namespace {
 
       // 'send' runs a call without waiting for it, so there is nobody to
       // receive its result or its error: it can be applied to any call which
-      // returns 'Void' and does not throw
+      // returns 'Void' and does not throw, of a '@oneway' function or not
       auto *call = getSendOperandCall(closure);
       if (!call) {
         diagnoseSendOfNonCall(closure, expr);
@@ -3957,6 +3984,11 @@ namespace {
         expr->setSubExpr(error);
         return expr;
       }
+
+      // Pre-checking only marks a call which is the operand itself, mark one
+      // in an optional chain as well ('send a?.f()')
+      if (!expr->isImplicit())
+        call->setIsOnewaySendOperand();
 
       // A 'send' call is enqueued on the callee's actor, so the callee must
       // be isolated to an actor: an actor instance, also through an
@@ -4472,8 +4504,8 @@ namespace {
     /// Whether a 'send' call of the synchronous \p callee is enqueued
     /// without any async code (see 'lowerSynchronousSend'): 'send' already
     /// requires the call to return 'Void' and not to throw, and the lowering
-    /// checks the isolation of the callee. An 'async' callee keeps the
-    /// task-based lowering
+    /// checks the isolation of the callee. An 'async' callee, '@oneway' or
+    /// not, keeps the task-based lowering
     bool isSynchronouslyEnqueuedSendCallee(FuncDecl *callee) {
       return ctx.LangOpts.hasFeature(Feature::SendCalls) &&
              !callee->hasAsync();
@@ -4482,8 +4514,8 @@ namespace {
     /// Lower the operation closure '{ <call> }' of a 'send' call to a synchronous expression,
     /// so that the call site has no async code and can be in a synchronous context:
     ///
-    /// A synchronous function (see 'isSynchronouslyEnqueuedSendCallee')
-    /// is enqueued as a task whose operation is synchronous
+    /// A synchronous function (see 'isSynchronouslyEnqueuedSendCallee'),
+    /// '@oneway' or not, is enqueued as a task whose operation is synchronous
     /// where the runtime supports it, see '_enqueueOnewayUnchecked':
     ///
     /// - An actor-isolated method is enqueued on the actor:
@@ -9697,6 +9729,65 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
       apply->setImplicitlyThrows(true);
     }
 
+    // A '@oneway(never)' function is meant to be waited for, so a 'send' of
+    // it from another isolation domain is diagnosed. An 'await' of a
+    // '@oneway' function is diagnosed by the actor isolation checker, which knows whether the call
+    // crosses into another isolation domain, see 'diagnoseAwaitedOnewayCall'.
+    //
+    // This is only enforced when 'send' can be written, i.e. with the
+    // 'SendCalls' feature. Skip 'SelfApplyExpr': a member call is a curried
+    // self-application ('g.thanks') wrapped in an outer call ('(...)'), both
+    // of which resolve to the same callee, so only the outer, user-visible
+    // call needs to be checked. Skip implicit calls: synthesized code has no
+    // 'send' or 'await' to write and isn't user-facing
+    if (ctx.LangOpts.hasFeature(Feature::SendCalls) &&
+        !isa<SelfApplyExpr>(apply) && !apply->isImplicit()) {
+      auto *FD = dyn_cast_or_null<FuncDecl>(callee.getDecl());
+      if (FD && !FD->isOneway() && FD->isOnewayNever()) {
+        // A '@oneway(never)' function is meant to be waited for, so it should
+        // not be called with 'send' from another isolation domain. This is
+        // checked by the callee declaration, so a call through a function
+        // value is not diagnosed
+        AwaitExpr *explicitAwait = nullptr;
+        SendExpr *sendExpr = nullptr;
+        if (getOnewayCallSiteKind(explicitAwait, &sendExpr) ==
+            OnewayCallSiteKind::Send) {
+          // The operand of 'send' is type-checked in an implicit closure, so
+          // look at the context around it
+          DeclContext *callerDC = dc;
+          while (auto *closure = dyn_cast<AbstractClosureExpr>(callerDC)) {
+            if (!closure->isImplicit())
+              break;
+            callerDC = closure->getParent();
+          }
+
+          // A 'send' within the callee's own isolation domain, like
+          // 'send self.f()' in one of the actor's methods or a 'send' from a
+          // function isolated to the same global actor, enqueues the call on
+          // that actor, and is not diagnosed. The actor isolation checker
+          // runs after the operand of 'send' is lowered into a closure, so
+          // this is decided here, like for the lowering. The isolation of a
+          // closure is not known yet, so a 'send' in a closure is always
+          // diagnosed, even if the closure is isolated to the callee's actor
+          Expr *base = nullptr;
+          Expr *calleeFn = apply->getFn();
+          while (auto *conversion = dyn_cast<ImplicitConversionExpr>(calleeFn))
+            calleeFn = conversion->getSubExpr();
+          if (auto *selfApply = dyn_cast<SelfApplyExpr>(calleeFn))
+            base = selfApply->getBase();
+          if (getSendCallerIsolation(apply, base, callerDC) ==
+              SendCallerIsolation::None) {
+            auto diag = ctx.Diags.diagnose(
+                apply->getLoc(), diag::oneway_never_call_uses_send,
+                /*isDecl=*/true, FD);
+            // In an async context the call can wait with 'await' instead
+            if (sendExpr && callerDC->isAsyncContext())
+              diag.fixItReplace(sendExpr->getSendLoc(), "await");
+          }
+        }
+      }
+    }
+
     solution.setExprTypes(apply);
     Expr *result = TypeChecker::substituteInputSugarTypeForResult(apply);
     cs.cacheExprTypes(result);
@@ -9765,6 +9856,44 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
   // Tail-recur to actually call the constructor.
   return finishApply(apply, openedType, locator, calleeLoc);
+}
+
+ExprRewriter::OnewayCallSiteKind
+ExprRewriter::getOnewayCallSiteKind(AwaitExpr *&explicitAwait,
+                                          SendExpr **sendExpr) const {
+  // 'ExprStack' holds every ancestor of the apply expression currently being
+  // finished, with the apply itself on top. 'send' pre-checking wraps its
+  // operand in an implicit '{ try await <call> }' closure, but the
+  // 'ExprWalker' rewrites a closure's body via a nested 'applySolution' call
+  // and never pushes the 'ClosureExpr' itself onto 'ExprStack' (see
+  // 'ExprWalker::walkToExprPre'), so the closure is invisible here: walk up
+  // through any 'try'/'await'/parens and an optional chain around the call
+  // ('send a?.f()'), and check whether the next ancestor is directly the
+  // 'SendExpr' that owns that closure. Remember an explicit 'await' on the
+  // way, the 'await' of 'send' is implicit
+  explicitAwait = nullptr;
+  for (auto it = ExprStack.rbegin() + 1, end = ExprStack.rend(); it != end;
+       ++it) {
+    Expr *ancestor = *it;
+    if (auto *await = dyn_cast<AwaitExpr>(ancestor)) {
+      if (!await->isImplicit() && !explicitAwait)
+        explicitAwait = await;
+      continue;
+    }
+    if (isa<AnyTryExpr>(ancestor) || isa<ParenExpr>(ancestor) ||
+        isa<OptionalEvaluationExpr>(ancestor) ||
+        isa<InjectIntoOptionalExpr>(ancestor))
+      continue;
+
+    if (auto *send = dyn_cast<SendExpr>(ancestor)) {
+      if (sendExpr)
+        *sendExpr = send;
+      return OnewayCallSiteKind::Send;
+    }
+    break;
+  }
+  return explicitAwait ? OnewayCallSiteKind::Await
+                       : OnewayCallSiteKind::Plain;
 }
 
 bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {

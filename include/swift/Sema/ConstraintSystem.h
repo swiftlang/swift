@@ -2118,6 +2118,10 @@ public:
   /// function or closure.
   bool isAsynchronousContext(DeclContext *dc);
 
+  /// Determine whether the given locator refers to the callee of a call
+  /// which is the operand of a 'send', e.g. the 'x.f' in 'send x.f()'
+  bool isSendCallee(ConstraintLocator *locator);
+
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
   bool hasFixFor(ConstraintLocator *locator,

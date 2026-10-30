@@ -448,12 +448,16 @@ void CallableTypeAttr::printImpl(ASTPrinter &printer,
 ///
 std::optional<DeclAttrKind>
 DeclAttribute::getAttrKindFromString(StringRef Str) {
-  return llvm::StringSwitch<std::optional<DeclAttrKind>>(Str)
+  auto kind = llvm::StringSwitch<std::optional<DeclAttrKind>>(Str)
 #define DECL_ATTR(X, CLASS, ...) .Case(#X, DeclAttrKind::CLASS)
 #define DECL_ATTR_ALIAS(X, CLASS) .Case(#X, DeclAttrKind::CLASS)
 #include "swift/AST/DeclAttr.def"
       .Case(SPI_AVAILABLE_ATTRNAME, DeclAttrKind::Available)
       .Default(std::nullopt);
+  // '@oneway(never)' can only be spelled as '@oneway' with an argument
+  if (kind == DeclAttrKind::OnewayNever)
+    return std::nullopt;
+  return kind;
 }
 
 DeclAttribute *DeclAttribute::createSimple(const ASTContext &context,
@@ -2125,6 +2129,10 @@ std::optional<Feature> DeclAttribute::getRequiredFeature(DeclAttrKind DK) {
 }
 
 StringRef DeclAttribute::getAttrName() const {
+  // '@oneway(never)' is spelled as '@oneway' with an argument in source
+  if (getKind() == DeclAttrKind::OnewayNever)
+    return "oneway(never)";
+
   switch (getKind()) {
 #define SIMPLE_DECL_ATTR(NAME, CLASS, ...)                                     \
   case DeclAttrKind::CLASS:                                                    \

@@ -12,8 +12,8 @@
 // REQUIRES: concurrency_runtime
 
 // In Embedded Swift 'send' can be applied to any Void, non-throwing call of an
-// actor isolated function: a synchronous actor method is enqueued on the
-// actor, FIFO with other work enqueued on
+// actor isolated function: a synchronous actor method which is not
+// '@oneway' is enqueued on the actor, FIFO with other work enqueued on
 // it, and a function isolated through an 'isolated' parameter runs in a new
 // task, whose operation the task consumes
 

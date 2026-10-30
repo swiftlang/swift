@@ -9,8 +9,9 @@
 // UNSUPPORTED: use_os_stdlib
 
 // 'send' can be applied to any Void, non-throwing call of an actor isolated
-// function. For a synchronous or 'async' actor method the call is enqueued
-// on the actor in program order. A global actor isolated function runs on its
+// function. For a synchronous or 'async' actor method which is not
+// '@oneway' the call is enqueued on the actor in program order, like
+// for a '@oneway' one. A global actor isolated function runs on its
 // global actor, and a function with an 'isolated' parameter on that actor
 
 actor Mailbox {

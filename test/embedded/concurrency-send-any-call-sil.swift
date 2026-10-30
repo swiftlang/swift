@@ -14,7 +14,8 @@
 
 // In Embedded Swift 'send' on a synchronous method of a plain actor or a
 // synchronous function isolated to a global actor is enqueued on the actor
-// without any async code at the call site
+// without any async code at the call site, whether the callee is
+// '@oneway' or not
 
 import _Concurrency
 

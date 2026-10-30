@@ -13,7 +13,7 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_SendCalls
 
-// In Embedded Swift 'send' on a synchronous method of a plain actor
+// In Embedded Swift 'send' on a synchronous '@oneway' method of a plain actor
 // or of a global actor lowers to a direct call of '_enqueueOneway' /
 // '_enqueueOnewayIsolatedAny' with a synchronous closure: no 'createAsyncTask'
 // and no 'hop_to_executor' at the call site, and no async funclets in the
@@ -23,7 +23,7 @@ import _Concurrency
 
 actor Counter {
   var n = 0
-  func bump(_ by: Int) { n += by }
+  @oneway func bump(_ by: Int) { n += by }
 }
 
 @globalActor actor Background {
@@ -32,7 +32,7 @@ actor Counter {
 
 @Background var backgroundTotal = 0
 
-@Background func note(_ by: Int) { backgroundTotal += by }
+@Background @oneway func note(_ by: Int) { backgroundTotal += by }
 
 func sendPlain(_ c: Counter, _ x: Int) {
   send c.bump(x)
