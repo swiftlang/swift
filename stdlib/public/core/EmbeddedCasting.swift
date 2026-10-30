@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-struct DynamicCastFlags {
+fileprivate struct DynamicCastFlags {
   static let Default           = UInt(bitPattern: 0x0)
   static let Unconditional     = UInt(bitPattern: 0x1)
   static let TakeOnSuccess     = UInt(bitPattern: 0x2)
@@ -230,7 +230,7 @@ private func tryCast(
     return unsafe tryCast(
       dst: dst,
       dstMetadata: dstMetadata,
-      src: srcInner,
+      src: UnsafeMutableRawPointer(mutating: srcInner),
       srcMetadata: srcInnerMetadata,
       takeOnSuccess: takeOnSuccess && src == srcInner
     )
@@ -293,7 +293,7 @@ public func swift_dynamicCast(
   // A nil destination means "test only" to tryCast(), so ensure we pass a
   // non-nil one. The address of a zero-sized type may be null.
   var zeroSizedScratch: UInt = 0
-  let castResult = unsafe withUnsafeMutablePointer(to: &zeroSizedScratch) {
+  let castResult = withUnsafeMutablePointer(to: &zeroSizedScratch) {
     scratch in
     let dst = unsafe dest ?? UnsafeMutableRawPointer(scratch)
     return unsafe tryCast(
@@ -354,7 +354,7 @@ public func swift_dynamicCastTest(
   let castResult = unsafe tryCast(
     dst: nil,
     dstMetadata: dstMetadata,
-    src: src,
+    src: UnsafeMutableRawPointer(mutating: src),
     srcMetadata: srcMetadata,
     takeOnSuccess: false
   )
