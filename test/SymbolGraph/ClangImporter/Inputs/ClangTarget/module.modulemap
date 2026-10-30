@@ -1,0 +1,3 @@
+module ClangTarget {
+  header "ClangTarget.h"
+}
