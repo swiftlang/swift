@@ -399,6 +399,34 @@ public:
   }
   void checkSILInstruction(SILInstruction *I) {}
 };
+
+/// Information about the computed C array projection, if any, attached to a
+/// given stored property.
+struct CArrayProjectionInfo {
+  VarDecl *computedProperty;
+  CArrayProjection storedProjection;
+  CArrayProjection computedProjection;
+  Decl *computedCounterpart;
+
+  static std::optional<CArrayProjectionInfo>
+  forStoredProperty(VarDecl *property) {
+    auto *attr = property->getAttrs().getAttribute<CArrayProjectionAttr>();
+    if (!attr)
+      return std::nullopt;
+    
+    auto *modern = dyn_cast_or_null<VarDecl>(attr->getCounterpart());
+    if (!modern)
+      return std::nullopt;
+
+    auto *modernAttr = modern->getAttrs().getAttribute<CArrayProjectionAttr>();
+    if (!modernAttr)
+      return std::nullopt;
+
+    return CArrayProjectionInfo{modern, attr->getProjection(),
+                                modernAttr->getProjection(),
+                                modernAttr->getCounterpart()};
+  }
+};
 } // end anonymous namespace
 
 namespace {
@@ -507,23 +535,40 @@ void verifyKeyPathComponent(SILModule &M,
               "property");
     }
 
-    auto fieldTy = baseTy->getTypeOfMember(property)
-                         ->getReferenceStorageReferent()
-                         ->getCanonicalType();
-    require(getTypeInExpansionContext(fieldTy) ==
-                getTypeInExpansionContext(componentTy),
-            "property decl should be a member of the base with the same type "
-            "as the component");
     require(property->hasStorage(), "property must be stored");
     require(!checkResilience(property, M.getSwiftModule(),
                              expansion, serializedKind),
             "cannot access storage of resilient property");
-    auto propertyTy =
-        loweredBaseTy.getFieldType(property, M, typeExpansionContext);
-    require(propertyTy.getObjectType()
-              == loweredComponentTy.getObjectType(),
-            "component type should match the maximal abstraction of the "
-            "formal type");
+
+    // Modern C array projections use a `stored_property` component with
+    // the legacy projection in `getStoredPropertyDecl()`, but the modern
+    // projection's type in `getComponentTy()`.
+    auto cArrayInfo = CArrayProjectionInfo::forStoredProperty(property);
+    if (cArrayInfo && baseTy->getTypeOfMember(cArrayInfo->computedProperty)
+                          ->getCanonicalType() == componentTy) {
+      require(cArrayInfo->storedProjection != CArrayProjection::Modern,
+              "stored property must not be a modern C array projection");
+      require(cArrayInfo->computedProjection == CArrayProjection::Modern,
+              "computed property must be a modern C array projection");
+      require(cArrayInfo->computedCounterpart == property,
+              "C array counterpart relationship must be reciprocal");
+      require(!cArrayInfo->computedProperty->hasStorage(),
+              "modern projection of a C array must not be stored");
+    } else {
+      auto fieldTy = baseTy->getTypeOfMember(property)
+                           ->getReferenceStorageReferent()
+                           ->getCanonicalType();
+      require(getTypeInExpansionContext(fieldTy) ==
+                  getTypeInExpansionContext(componentTy),
+              "property decl should be a member of the base with the same "
+              "type as the component");
+      auto propertyTy =
+          loweredBaseTy.getFieldType(property, M, typeExpansionContext);
+      require(propertyTy.getObjectType()
+                == loweredComponentTy.getObjectType(),
+              "component type should match the maximal abstraction of the "
+              "formal type");
+    }
     break;
   }
     

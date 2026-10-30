@@ -3621,25 +3621,6 @@ LValue SILGenLValue::visitExpr(Expr *e, SGFAccessKind accessKind,
   llvm_unreachable("unimplemented lvalue expr");
 }
 
-/// If \p storage is a computed C array property that forwards to a stored
-/// property holding its other representation, find that stored property.
-static VarDecl *findStoredCArrayCounterpart(AbstractStorageDecl *storage) {
-  auto *var = dyn_cast<VarDecl>(storage);
-  auto *attr = storage->getAttrs().getAttribute<CArrayProjectionAttr>();
-  if (!var || !attr || var->hasStorage())
-    return nullptr;
-
-  auto *counterpart = dyn_cast_or_null<VarDecl>(attr->getCounterpart());
-  if (!counterpart || !counterpart->hasStorage())
-    return nullptr;
-
-  ASSERT(counterpart->isStatic() == var->isStatic() &&
-           counterpart->getDeclContext() == var->getDeclContext() &&
-           "counterparts not accessible via same base");
-
-  return counterpart;
-}
-
 namespace {
   /// A CRTP class for emitting accesses.
   template <class Impl, class StorageType>
@@ -3675,7 +3656,7 @@ namespace {
 
       // Peephole the (technically computed) modern projection of a stored C
       // array property so that it behaves like a stored property.
-      if (auto *stored = findStoredCArrayCounterpart(Storage))
+      if (auto *stored = SILGenModule::findStoredCArrayCounterpart(Storage))
         return asImpl().emitUsingUncheckedAddressCastOfStorage(stored);
 
       switch (strategy.getKind()) {

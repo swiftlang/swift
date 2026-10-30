@@ -5,6 +5,7 @@
 
 // REQUIRES: swift_feature_ModernImportedCArrays
 // REQUIRES: executable_test
+// UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
 // RUN: %empty-directory(%t/include)
 // RUN: %empty-directory(%t/src)
@@ -14,10 +15,12 @@
 
 //
 // Checks for SIL output:
-// * legacy{,Newtype}Func() and modern{,Newtype}Func() are emitted into clients
-//   and can coexist.
-// * legacy{,Newtype}Func() should always use the legacy projection.
-// * modern{,Newtype}Func() should always use the modern projection.
+// * legacy{,Newtype,Union}Func() and modern{,Newtype,Union}Func() are emitted
+//   into clients and can coexist.
+// * legacy{,Newtype,Union}Func() should always use the legacy projection.
+// * modern{,Newtype,Union}Func() should always use the modern projection.
+// * Key paths to the fields of S and NT are stored in both projections, but
+//   key paths to a union's fields are always computed.
 //
 
 // SIL-LABEL: sil shared {{.*}}@$s9LegacyLib10legacyFuncyyF
@@ -33,8 +36,18 @@
 // SIL: [[BIT_CAST_VALUE:%.*]] = unchecked_trivial_bit_cast [[LOAD_VALUE]] to $(Int32, Int32, Int32, Int32)
 // SIL: struct $S ({{%.*}})
 // SIL: keypath $WritableKeyPath
-// SIL-SAME: <S, InlineArray<4, Int32>>, (root $S; settable_property $InlineArray<4, Int32>,  id @$sSo1SV5arrays11InlineArrayVy$3_s5Int32VGvg : {{.*}}, getter @$sSo1SV5arrays11InlineArrayVy$3_s5Int32VGvpABTKq : {{.*}}
+// SIL-SAME: <S, InlineArray<4, Int32>>, (root $S; stored_property #S.array : $InlineArray<4, Int32>)
 // SIL: } // end sil function '$s9ModernLib10modernFuncyyF'
+
+// SIL-LABEL: sil shared {{.*}}@$s9LegacyLib15legacyUnionFuncyyF
+// SIL: keypath $WritableKeyPath
+// SIL-SAME: <U, (Int32, Int32, Int32, Int32)>, (root $U; settable_property $(Int32, Int32, Int32, Int32),
+// SIL: } // end sil function '$s9LegacyLib15legacyUnionFuncyyF'
+
+// SIL-LABEL: sil shared {{.*}}@$s9ModernLib15modernUnionFuncyyF
+// SIL: keypath $WritableKeyPath
+// SIL-SAME: <U, InlineArray<4, Int32>>, (root $U; settable_property $InlineArray<4, Int32>,
+// SIL: } // end sil function '$s9ModernLib15modernUnionFuncyyF'
 
 // SIL-LABEL: sil shared {{.*}}@$s9LegacyLib17legacyNewtypeFuncyyF
 // SIL-NOT: unchecked_trivial_bit_cast
@@ -46,7 +59,7 @@
 // SIL: [[ALLOC_STACK_VALUE:%.*]] = alloc_stack $InlineArray<4, Int32>
 // SIL: [[LOAD_VALUE:%.*]] = load [[ALLOC_STACK_VALUE]]
 // SIL: keypath $KeyPath
-// SIL-SAME: <NT, InlineArray<4, Int32>>, (root $NT; gettable_property $InlineArray<4, Int32>,  id @$sSo2NTa8rawValues11InlineArrayVy$3_s5Int32VGvg : {{.*}}, getter @$sSo2NTa8rawValues11InlineArrayVy$3_s5Int32VGvpABTKq : {{.*}}
+// SIL-SAME: <NT, InlineArray<4, Int32>>, (root $NT; stored_property #NT.rawValue : $InlineArray<4, Int32>)
 // SIL: } // end sil function '$s9ModernLib17modernNewtypeFuncyyF'
 
 //
@@ -57,6 +70,10 @@
 // OUTPUT-NEXT: S 0 1 2 3
 // OUTPUT-NEXT: modernFunc:
 // OUTPUT-NEXT: S 0 1 2 3
+// OUTPUT-NEXT: legacyUnionFunc:
+// OUTPUT-NEXT: U 0 1 2 3
+// OUTPUT-NEXT: modernUnionFunc:
+// OUTPUT-NEXT: U 0 1 2 3
 // OUTPUT-NEXT: legacyNewtypeFunc:
 // OUTPUT-NEXT: NT 2147483647 1 2 3
 // OUTPUT-NEXT: modernNewtypeFunc:
@@ -85,6 +102,7 @@
 // OUTPUT-NEXT: HugeNT 7
 // OUTPUT-NEXT: main:
 // OUTPUT-NEXT: S 0 1 2 3
+// OUTPUT-NEXT: U 0 1 2 3
 // OUTPUT-NEXT: NT 2147483647 1 2 3
 // OUTPUT-NEXT: Row 2147483647 1 2 3
 // OUTPUT-NEXT: Row 2147483647 1 2 3
@@ -95,7 +113,14 @@
 //--- include/CLib.h
 
 struct S {
+  // Stored property key path in both projections
   int array[4];
+};
+
+union U {
+  // Computed property key path in both projections
+  int array[4];
+  float other;
 };
 
 typedef int NT[4] __attribute__((swift_newtype(struct)));
@@ -129,6 +154,7 @@ struct NestedHugeRow {
 };
 
 void print_s(const struct S *ptr);
+void print_u(const union U *ptr);
 void print_row(const Row *ptr);
 void print_huge(const struct HugeRow *ptr);
 void print_nested_huge(const struct NestedHugeRow *ptr);
@@ -153,6 +179,13 @@ import CLib
   s.array.0 = 0
   blackHole(\S.array)
   print_s(&s)
+}
+
+@export(implementation) public func legacyUnionFunc() {
+  var u = U(array: (.max, 1, 2, 3))
+  u.array.0 = 0
+  blackHole(\U.array)
+  print_u(&u)
 }
 
 @export(implementation) public func legacyNewtypeFunc() {
@@ -193,6 +226,10 @@ import CLib
   print("S", ptr.pointee.array.0, ptr.pointee.array.1, ptr.pointee.array.2, ptr.pointee.array.3)
 }
 
+@c(print_u) @implementation public func print_u(_ ptr: UnsafePointer<U>!) {
+  print("U", ptr.pointee.array.0, ptr.pointee.array.1, ptr.pointee.array.2, ptr.pointee.array.3)
+}
+
 // FIXME: This can't be `@c @implementation public` until `@c` allows C arrays
 @c(print_row) @usableFromInline internal func printRowImpl(_ ptr: UnsafePointer<Int32>!) {
   print("Row", ptr[0], ptr[1], ptr[2], ptr[3])
@@ -211,6 +248,13 @@ import CLib
   s.array[0] = 0
   blackHole(\S.array)
   print_s(&s)
+}
+
+@export(implementation) public func modernUnionFunc() {
+  var u = U(array: [.max, 1, 2, 3])
+  u.array[0] = 0
+  blackHole(\U.array)
+  print_u(&u)
 }
 
 @export(implementation) public func modernNewtypeFunc() {
@@ -296,6 +340,12 @@ legacyFunc()
 print("modernFunc:")
 modernFunc()
 
+print("legacyUnionFunc:")
+legacyUnionFunc()
+
+print("modernUnionFunc:")
+modernUnionFunc()
+
 print("legacyNewtypeFunc:")
 legacyNewtypeFunc()
 
@@ -339,6 +389,10 @@ print("main:")
 var s = S(array: (.max, 1, 2, 3))
 s.array.0 = 0
 print_s(&s)
+
+var un = U(array: (.max, 1, 2, 3))
+un.array.0 = 0
+print_u(&un)
 
 let nt = NT(rawValue: (.max, 1, 2, 3))
 print("NT", nt.rawValue.0, nt.rawValue.1, nt.rawValue.2, nt.rawValue.3)
@@ -385,6 +439,12 @@ legacyFunc()
 print("modernFunc:")
 modernFunc()
 
+print("legacyUnionFunc:")
+legacyUnionFunc()
+
+print("modernUnionFunc:")
+modernUnionFunc()
+
 print("legacyNewtypeFunc:")
 legacyNewtypeFunc()
 
@@ -428,6 +488,10 @@ print("main:")
 var s = S(array: [.max, 1, 2, 3])
 s.array[0] = 0
 print_s(&s)
+
+var un = U(array: [.max, 1, 2, 3])
+un.array[0] = 0
+print_u(&un)
 
 let nt = NT(rawValue: [.max, 1, 2, 3])
 print("NT", nt.rawValue[0], nt.rawValue[1], nt.rawValue[2], nt.rawValue[3])

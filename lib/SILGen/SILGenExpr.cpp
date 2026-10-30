@@ -5123,6 +5123,13 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
         return KeyPathPatternComponent::forStoredProperty(var, componentTy);
       }
 
+      // Makes e.g. `offset(of:)` work on a modern C array projection as though
+      // it were a stored property.
+      if (auto *stored = findStoredCArrayCounterpart(var))
+        if (canStorageUseStoredKeyPathComponent(stored, expansion))
+          return KeyPathPatternComponent::forStoredProperty(stored,
+                                                            componentTy);
+
       // We need thunks to bring the getter and setter to the right signature
       // expected by the key path runtime.
       auto id = getIdForKeyPathComponentComputedProperty(*this, var, expansion,

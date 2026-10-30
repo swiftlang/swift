@@ -112,7 +112,21 @@ public:
         parentAccessType = AccessType::Modify;
       
       parent->project(parentAccessType, [&](SILValue parentValue) {
-        auto addr = builder.createStructElementAddr(loc, parentValue, storedProperty);
+        SILValue addr =
+            builder.createStructElementAddr(loc, parentValue, storedProperty);
+
+        // The modern projection of a C array reinterprets its stored
+        // counterpart as a different type.
+        if (storedProperty->getAttrs().hasAttribute<CArrayProjectionAttr>()) {
+          SILType componentTy =
+              builder.getFunction()
+                  .getLoweredType(Lowering::AbstractionPattern::getOpaque(),
+                                  component.getComponentType())
+                  .getAddressType();
+          if (addr->getType() != componentTy)
+            addr = builder.createUncheckedAddrCast(loc, addr, componentTy);
+        }
+
         // If we're setting, destroy the old value (the callback expects uninitialized memory)
         if (accessType == AccessType::Set)
           builder.createDestroyAddr(loc, addr);

@@ -2189,6 +2189,24 @@ void SILGenModule::visitEmittedAccessors(
   });
 }
 
+VarDecl *
+SILGenModule::findStoredCArrayCounterpart(AbstractStorageDecl *storage) {
+  auto *var = dyn_cast<VarDecl>(storage);
+  auto *attr = storage->getAttrs().getAttribute<CArrayProjectionAttr>();
+  if (!var || !attr || var->hasStorage())
+    return nullptr;
+
+  auto *counterpart = dyn_cast_or_null<VarDecl>(attr->getCounterpart());
+  if (!counterpart || !counterpart->hasStorage())
+    return nullptr;
+
+  ASSERT(counterpart->isStatic() == var->isStatic() &&
+           counterpart->getDeclContext() == var->getDeclContext() &&
+           "counterparts not accessible via same base");
+
+  return counterpart;
+}
+
 bool
 SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
                                                   ResilienceExpansion expansion) {
