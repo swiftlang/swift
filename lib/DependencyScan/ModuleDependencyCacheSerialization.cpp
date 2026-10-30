@@ -22,18 +22,6 @@ using namespace swift;
 using namespace dependencies;
 using namespace module_dependency_cache_serialization;
 
-namespace {
-ModuleDependencyKind &operator++(ModuleDependencyKind &e) {
-  if (e == ModuleDependencyKind::LastKind) {
-    llvm_unreachable(
-        "Attempting to increment last enum value on ModuleDependencyKind");
-  }
-  e = ModuleDependencyKind(
-      static_cast<std::underlying_type<ModuleDependencyKind>::type>(e) + 1);
-  return e;
-}
-} // namespace
-
 // MARK: Deserialization
 namespace swift {
 
@@ -341,6 +329,18 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
       ArrayRef<uint64_t> identifierIDs;
       IdentifierArrayLayout::readRecord(Scratch, identifierIDs);
       ArraysOfIdentifierIDs.push_back(identifierIDs.vec());
+      break;
+    }
+
+    case INPUT_FILE_STATUS_NODE: {
+      unsigned pathID;
+      uint64_t size, modificationTime;
+      InputFileStatusLayout::readRecord(Scratch, pathID, size,
+                                        modificationTime);
+      auto path = getIdentifier(pathID);
+      if (!path)
+        llvm::report_fatal_error("Bad input file path");
+      cache.inputFileStatuses[*path] = {size, modificationTime};
       break;
     }
 
@@ -1189,6 +1189,7 @@ class ModuleDependenciesCacheSerializer {
   void writeSerializationTime(const llvm::sys::TimePoint<> &scanInitializationTime);
   void writeIdentifiers();
   void writeArraysOfIdentifiers();
+  void writeInputFileStatuses(const ModuleDependenciesCache &cache);
 
   void writeLinkLibraries(const ModuleDependenciesCache &cache);
   unsigned writeLinkLibraryInfos(const ModuleDependencyInfo &dependencyInfo);
@@ -1259,6 +1260,7 @@ void ModuleDependenciesCacheSerializer::writeBlockInfoBlock() {
   BLOCK_RECORD(graph_block, TIME_NODE);
   BLOCK_RECORD(graph_block, IDENTIFIER_NODE);
   BLOCK_RECORD(graph_block, IDENTIFIER_ARRAY_NODE);
+  BLOCK_RECORD(graph_block, INPUT_FILE_STATUS_NODE);
 
   BLOCK_RECORD(graph_block, LINK_LIBRARY_NODE);
   BLOCK_RECORD(graph_block, LINK_LIBRARY_ARRAY_NODE);
@@ -1313,6 +1315,16 @@ void ModuleDependenciesCacheSerializer::writeArraysOfIdentifiers() {
     IdentifierArrayLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[IdentifierArrayLayout::Code], vec);
   }
+}
+
+void ModuleDependenciesCacheSerializer::writeInputFileStatuses(
+    const ModuleDependenciesCache &cache) {
+  using namespace graph_block;
+  for (const auto &entry : cache.inputFileStatuses)
+    InputFileStatusLayout::emitRecord(
+        Out, ScratchRecord, AbbrCodes[InputFileStatusLayout::Code],
+        getIdentifier(entry.getKey().str()), entry.second.size,
+        entry.second.modificationTime);
 }
 
 void ModuleDependenciesCacheSerializer::writeLinkLibraries(
@@ -1856,6 +1868,9 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
     const ModuleDependenciesCache &cache) {
   addIdentifier(cache.scannerContextHash);
 
+  for (const auto &entry : cache.inputFileStatuses)
+    addIdentifier(entry.getKey().str());
+
   for (const auto &entry : cache.clangModulesVisibleFromNamedLookup) {
     auto moduleName = entry.getKey().str();
     addIdentifier(moduleName);
@@ -2038,6 +2053,7 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   registerRecordAbbr<TimeLayout>();
   registerRecordAbbr<IdentifierNodeLayout>();
   registerRecordAbbr<IdentifierArrayLayout>();
+  registerRecordAbbr<InputFileStatusLayout>();
   registerRecordAbbr<LinkLibraryLayout>();
   registerRecordAbbr<LinkLibraryArrayLayout>();
   registerRecordAbbr<MacroDependencyLayout>();
@@ -2069,6 +2085,9 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
 
   // Write the arrays
   writeArraysOfIdentifiers();
+
+  // Write the observed status of module input files
+  writeInputFileStatuses(cache);
 
   // Write the cached sets of visible modules
   writeVisibleClangModuleInfo(cache);
