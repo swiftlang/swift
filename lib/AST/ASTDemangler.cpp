@@ -26,6 +26,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclNameExtractor.h"
 #include "swift/AST/ExtInfo.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -408,8 +409,29 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
   if (ordinal >= opaqueDecl->getOpaqueGenericParams().size())
     return Type();
 
-  SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
-      opaqueDecl->getGenericSignature(), allArgs);
+  // Map the arguments into context and back out, so that a conformance on a
+  // type parameter that the signature makes concrete is stored concretely, as
+  // in the original type. This doesn't apply inside a nested generic context.
+  auto opaqueSig = opaqueDecl->getGenericSignature();
+  auto isValidInContext = [&](Type arg) {
+    return !arg.findIf([&](Type t) {
+      return t->isTypeParameter() && !GenericSig->isValidTypeParameter(t);
+    });
+  };
+
+  SubstitutionMap subs;
+  if (GenericSig && ParameterPackStack.empty() &&
+      llvm::all_of(allArgs, isValidInContext)) {
+    auto *genericEnv = GenericSig.getGenericEnvironment();
+    SmallVector<Type, 8> contextualArgs;
+    for (auto arg : allArgs)
+      contextualArgs.push_back(genericEnv->mapTypeIntoEnvironment(arg));
+    subs = createSubstitutionMapFromGenericArgs(opaqueSig, contextualArgs)
+               .mapReplacementTypesOutOfEnvironment();
+  } else {
+    subs = createSubstitutionMapFromGenericArgs(opaqueSig, allArgs);
+  }
+
   Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
   return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
