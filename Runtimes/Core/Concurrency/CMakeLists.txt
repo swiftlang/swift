@@ -26,6 +26,7 @@ add_library(swift_Concurrency
   "${PROJECT_SOURCE_DIR}/CompatibilityOverride/CompatibilityOverride.cpp"
   "./linker-support/magic-symbols-for-install-name.c"
   Actor.swift
+  Actor+Send.swift
   AsyncCompactMapSequence.swift
   AsyncDropFirstSequence.swift
   AsyncDropWhileSequence.swift
