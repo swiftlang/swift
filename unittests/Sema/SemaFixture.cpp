@@ -120,7 +120,7 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
                    /*trailingWhere=*/nullptr);
   PD->setImplicit();
 
-  return ProtocolType::get(PD, parent, Context);
+  return ProtocolType::get(PD, parent);
 }
 
 const BindingSet &SemaTest::inferBindings(ConstraintSystem &cs,

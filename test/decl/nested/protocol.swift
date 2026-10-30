@@ -372,3 +372,25 @@ struct HasNested: Delegate {}
 func testNestedInExtension() {
   let _: HasNested.Nested
 }
+
+// Issues with canonicalization
+typealias OuterEnumAlias = OuterEnum
+
+protocol ProtocolWithNestedProtocol {
+  func f() -> any OuterEnum.C
+}
+
+struct ConformerWithNestedProtocol: ProtocolWithNestedProtocol {
+  func f() -> any OuterEnumAlias.C {
+    fatalError()
+  }
+}
+
+struct GenericHolder<T> {
+  var t: T
+}
+
+func f(t: any OuterEnum.C) -> GenericHolder<any OuterEnumAlias.C> {
+  let g = GenericHolder<any OuterEnum.C>(t: t)
+  return g
+}
