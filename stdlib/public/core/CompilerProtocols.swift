@@ -302,8 +302,18 @@ public protocol _ExpressibleByBuiltinIntegerLiteral {
 public protocol ExpressibleByIntegerLiteral {
   /// A type that represents an integer literal.
   ///
-  /// The standard library integer and floating-point types are all valid types
-  /// for `IntegerLiteralType`.
+  /// When you write an integer literal for a value of a conforming type, the
+  /// literal is first converted to an instance of `IntegerLiteralType`, which
+  /// is then passed to the `init(integerLiteral:)` initializer. You choose
+  /// `IntegerLiteralType` through the parameter type of that initializer.
+  ///
+  /// The standard library integer types, such as `Int` and `UInt8`, and
+  /// floating-point types, such as `Double`, can all be used as
+  /// `IntegerLiteralType`. For example, a type that stores its value as a
+  /// `Double` can declare `init(integerLiteral value: Double)`, so that the
+  /// literal `5` is passed to the initializer as `5.0`. The literal's value
+  /// must be representable in `IntegerLiteralType`. For example, if
+  /// `IntegerLiteralType` is `Int8`, the literal `300` is a compile-time error.
   associatedtype IntegerLiteralType: _ExpressibleByBuiltinIntegerLiteral
 
   /// Creates an instance initialized to the specified integer value.
