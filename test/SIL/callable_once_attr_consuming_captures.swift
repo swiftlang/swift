@@ -420,12 +420,11 @@ func testUseAfterIsCheckOfFunction(_ body: @callable(once) () -> Void) {
   body() // expected-casting-note {{consumed again here}}
 }
 
-// FIXME: An `is` check of an optional should only borrow its operand too, but
-// it's lowered to an `as?` that consumes the payload (rdar://191036883).
+// An `is` check of an optional only borrows its operand too
 func testIsCheckOfOptionalDoesNotConsumeCapture(
   _ shape: consuming (any Shape & ~Copyable)?
-  // expected-casting-error@-1 {{missing reinitialization of closure capture 'shape' after consume}}
 ) {
-  _ = andAtMostOnce(true, shape is Circle) // expected-casting-note {{consumed here}}
+  _ = andAtMostOnce(true, shape is Circle)
+  _ = consume shape
 }
 #endif

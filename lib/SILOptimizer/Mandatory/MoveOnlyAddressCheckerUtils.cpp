@@ -2765,6 +2765,23 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
   }
 
   auto *ccabi = dyn_cast<CheckedCastAddrBranchInst>(user);
+
+  // A conditional cast initializes Dest only when it succeeds, so record the
+  // init at the entry of the success block, as with a TakeOnSuccess Src.
+  if (ccabi && ccabi->getDest() == op->get()) {
+    LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Dest: " << *user);
+    SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
+    TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
+    if (!leafRanges.size()) {
+      LLVM_DEBUG(llvm::dbgs() << "Failed to form leaf type range!\n");
+      return false;
+    }
+    for (auto leafRange : leafRanges)
+      useState.recordInitUse(&ccabi->getSuccessBB()->front(), op->get(),
+                             leafRange);
+    return true;
+  }
+
   if (ccabi && ccabi->getSrc() == op->get()) {
     LLVM_DEBUG(llvm::dbgs() << "Found checked_cast_addr_br Src: "
                             << *user);

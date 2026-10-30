@@ -1633,8 +1633,7 @@ bool EnumElementPatternInitialization::tryInitializeFromStorageReference(
   FormalEvaluationScope scope(SGF);
   LValue lv = SGF.emitLValue(storageExpr, SGFAccessKind::OwnedAddressConsume);
   ManagedValue addr = SGF.emitConsumedLValue(loc, std::move(lv));
-  if (!addr.getType().isAddress())
-    return false;
+  ASSERT(addr.getType().isAddress());
 
   return emitTakeCastAndBind(SGF, loc, addr, sourceType->getCanonicalType(),
                              targetType, subInitialization.get(), getInitInfo(),

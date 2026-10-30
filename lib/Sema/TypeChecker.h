@@ -749,6 +749,19 @@ bool typeCheckCondition(Expr *&expr, DeclContext *dc);
 /// are not decided here.
 bool isStaticallyImpossibleNoncopyableCast(Type fromType, Type toType);
 
+/// If a cast from \p fromType to \p toType should be applied to an Optional
+/// source as it stands rather than to its unwrapped payload, the kind of the
+/// cast of the payload; otherwise None.
+///
+/// This is the case when \p fromType is one level of Optional around a
+/// non-`Copyable` payload and \p toType is not optional. Unwrapping it would
+/// consume it, even when the cast then fails; a cast of the Optional itself
+/// fails on `nil` and otherwise casts the payload, so the runtime unwraps it
+/// only on success.
+std::optional<CheckedCastKind>
+noncopyableOptionalPayloadCastKind(Type fromType, Type toType,
+                                   DeclContext *dc);
+
 /// Determine the semantics of a checked cast operation.
 ///
 /// \param fromType       The source type of the cast.
