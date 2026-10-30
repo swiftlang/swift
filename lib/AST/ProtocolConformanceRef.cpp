@@ -208,7 +208,12 @@ Type ProtocolConformanceRef::getTypeWitness(AssociatedTypeDecl *assocType,
       return ErrorType::get(assocType->getASTContext());
     return witnessType;
   }
-
+  // If we have a HoleType, propagate it to the type witness, which will produce
+  // better diagnostics.
+  if (auto *holeTy = conformingType->getAs<HoleType>()) {
+    return HoleType::get(DependentMemberType::get(holeTy->getOriginator(),
+                                                  assocType));
+  }
   return DependentMemberType::get(conformingType, assocType);
 }
 
