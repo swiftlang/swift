@@ -62,14 +62,17 @@ namespace swift {
 /// All nodes are stored in a single linked list, sorted by priority.
 /// Within the same priority jobs are sorted in the FIFO order.
 ///
-template <class Node, class NodeTraits>
+/// `StoredNode` is the type of the queue's own head and tail fields. It must
+/// convert to and from `Node`, for example a `__ptrauth`-qualified `Node`.
+///
+template <class Node, class NodeTraits, class StoredNode = Node>
 class PriorityQueue {
 private:
   /// Head of the linked list.
-  Node head;
+  StoredNode head;
   /// Last node of the corresponding priority, or null if no nodes of that
   /// priority exist.
-  Node tails[NodeTraits::prioritiesCount];
+  StoredNode tails[NodeTraits::prioritiesCount];
 
 public:
   PriorityQueue() : head(), tails{} {}
@@ -112,13 +115,14 @@ public:
   }
 
   Node dequeue() {
-    if (!head) {
-      return head;
+    Node result = head;
+    if (!result) {
+      return result;
     }
-    auto result = head;
     int resultIndex = NodeTraits::getPriorityIndex(result);
-    head = NodeTraits::getNext(result);
-    if (!head || resultIndex != NodeTraits::getPriorityIndex(head)) {
+    Node newHead = NodeTraits::getNext(result);
+    head = newHead;
+    if (!newHead || resultIndex != NodeTraits::getPriorityIndex(newHead)) {
       tails[resultIndex] = Node();
     }
     return result;
@@ -139,9 +143,9 @@ private:
         head = runHead;
         break;
       }
-      if (tails[i]) {
-        NodeTraits::setNext(runTail, NodeTraits::getNext(tails[i]));
-        NodeTraits::setNext(tails[i], runHead);
+      if (Node tail = tails[i]) {
+        NodeTraits::setNext(runTail, NodeTraits::getNext(tail));
+        NodeTraits::setNext(tail, runHead);
         break;
       }
     }

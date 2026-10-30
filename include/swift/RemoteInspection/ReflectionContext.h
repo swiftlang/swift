@@ -1933,8 +1933,12 @@ public:
     if (!JobObj)
       return 0;
 
-    // This is a JobRef which stores flags in the low bits.
-    return JobObj->SchedulerPrivate[0] & ~StoredPointer(0x3);
+    // This is a JobRef which stores flags in the low bits. The pointer is
+    // signed.
+    return stripSignedPointer(
+               RemoteAddress(JobObj->SchedulerPrivate[0] & ~StoredPointer(0x3),
+                             RemoteAddress::DefaultAddressSpace))
+        .getRawAddress();
   }
 
 private:
@@ -2278,8 +2282,13 @@ private:
 
     // Don't read FirstJob when idle.
     if (Info.State != concurrency::ActorFlagConstants::Idle) {
-      // This is a JobRef which stores flags in the low bits.
-      Info.FirstJob = ActorObj->Status.FirstJob & ~0x3;
+      // This is a JobRef which stores flags in the low bits. The pointer is
+      // signed.
+      Info.FirstJob =
+          stripSignedPointer(
+              RemoteAddress(ActorObj->Status.FirstJob & ~StoredPointer(0x3),
+                            RemoteAddress::DefaultAddressSpace))
+              .getRawAddress();
     }
 
     std::tie(Info.HasThreadPort, Info.ThreadPort) =
