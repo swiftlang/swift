@@ -68,3 +68,49 @@ var tryExpr = try? someThrowingFunc()
 // CHECK: @_hasInitialValue internal var tryExpr: SomeError? = try? someThrowingFunc()
 
 var tryForceExpr = try! someThrowingFunc()
+
+func isCollectionDowncast(_ xs: [Any]) -> Bool {
+  return xs is [Int]
+}
+// CHECK-LABEL: internal func isCollectionDowncast(_ xs: [Any]) -> Bool {
+// CHECK:   return xs is [Int]
+// CHECK: }
+
+func isOptionalImbalance(_ x: Any?) -> Bool {
+  return x is Int
+}
+// CHECK-LABEL: internal func isOptionalImbalance(_ x: Any?) -> Bool {
+// CHECK:   return x is Int
+// CHECK: }
+
+func explicitConditionalCast(_ xs: [Any]) -> [Int]? {
+  return xs as? [Int]
+}
+// CHECK-LABEL: internal func explicitConditionalCast(_ xs: [Any]) -> [Int]? {
+// CHECK:   return xs as? [Int]
+// CHECK: }
+
+func isExplicitConditionalCast(_ xs: [Any]) -> Bool {
+  return (xs as? [Int]) is [Int]
+}
+// CHECK-LABEL: internal func isExplicitConditionalCast(_ xs: [Any]) -> Bool {
+// CHECK:   return (xs as? [Int]) is [Int]
+// CHECK: }
+
+func isNestedOptionalImbalance(_ x: Any??) -> Bool {
+  return x is Int
+}
+// CHECK-LABEL: internal func isNestedOptionalImbalance(_ x: Any??) -> Bool {
+// CHECK:   return x is Int
+// CHECK: }
+
+struct OptionalPayload {
+  var value: Any?
+}
+
+func isExplicitOptionalChain(_ payload: OptionalPayload?) -> Bool {
+  return payload?.value is Int
+}
+// CHECK-LABEL: internal func isExplicitOptionalChain(_ payload: OptionalPayload?) -> Bool {
+// CHECK:   return payload?.value is Int
+// CHECK: }
