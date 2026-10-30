@@ -758,6 +758,12 @@ private enum ImmutableScope {
       case .dependence(let markDep):
         // ignore mark_dependence for the purpose of alias analysis.
         self.init(for: markDep.value, context)
+      case .borrowOrMutateAccessor(let apply):
+        // The address is only valid within the accessor's access to its 'self'.
+        guard let accessorSelf = apply.selfAddressOfBorrowOrMutateAddressResult else {
+          return nil
+        }
+        self.init(for: accessorSelf, context)
     }
   }
 

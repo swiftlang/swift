@@ -95,6 +95,11 @@ public func findPointerEscapingUse(of value: Value) -> Bool {
 /// TODO: when phi lifetime flags are implemented, phis will introduce
 /// a lifetime in the same way as move_value.
 ///
+/// A guaranteed lifetime also extends through a borrow accessor whose
+/// 'self' and result are both @guaranteed: the result is a borrow
+/// within 'self'. ForwardingDefUseWalker reports the call as a use of
+/// 'self' and also walks the uses of the result.
+///
 /// This walker is used to query basic lifetime attributes on values,
 /// such as "escaping" or "lexical". It must be precise for
 /// correctness and is performance critical.
@@ -122,6 +127,12 @@ extension ForwardingUseDefWalker {
     if let phi = Phi(value) {
       return walkUp(phi: phi, path)
     }
+    if let apply = value as? ApplyInst, let selfOperand = apply.guaranteedBorrowAccessorSelfOperand {
+      if needWalk(for: selfOperand.value, path) {
+        return walkUp(value: selfOperand.value, path)
+      }
+      return .continueWalk
+    }
     return introducer(value, path)
   }
   public mutating func walkUp(instruction: ForwardingInstruction, _ path: PathContext)
@@ -144,6 +155,18 @@ extension ForwardingUseDefWalker {
       }
     }
     return .continueWalk
+  }
+}
+
+private extension ApplyInst {
+  var guaranteedBorrowAccessorSelfOperand: Operand? {
+    guard isGuaranteedApplyResult,
+          functionConvention.hasSelfParameter,
+          let selfOperand = argumentOperands.last,
+          convention(of: selfOperand) == .directGuaranteed else {
+      return nil
+    }
+    return selfOperand
   }
 }
 
@@ -290,6 +313,13 @@ extension ForwardingDefUseWalker {
     }
     if let phi = Phi(using: operand) {
       return walkDownUses(of: phi.value, using: operand)
+    }
+    if let apply = operand.instruction as? ApplyInst, apply.guaranteedBorrowAccessorSelfOperand == operand {
+      // The call itself is a use of 'self', even if the result is not tracked.
+      if nonForwardingUse(of: operand) == .abortWalk {
+        return .abortWalk
+      }
+      return walkDownUses(of: apply, using: operand)
     }
     return nonForwardingUse(of: operand)
   }

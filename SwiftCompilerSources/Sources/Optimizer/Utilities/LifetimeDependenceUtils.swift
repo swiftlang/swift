@@ -282,18 +282,6 @@ private func guaranteedResultBase(of value: Value) -> Value? {
   return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
 }
 
-/// If `value` is an address result of a call that returns `@guaranteed_address`,
-/// return the argument that the result is a borrow of.
-private func guaranteedAddressResultBase(of value: Value) -> Value? {
-  guard value.type.isAddress,
-        let apply = value.definingInstruction as? ApplyInst,
-        apply.hasGuaranteedAddressResult,
-        let selfArgument = apply.selfArgument else {
-    return nil
-  }
-  return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
-}
-
 // Scope initialization.
 extension LifetimeDependence.Scope {
   /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
@@ -309,11 +297,6 @@ extension LifetimeDependence.Scope {
   /// multiple guaranteed values.
   init(base: Value, _ context: some Context) {
     if base.type.isAddress {
-      if let accessorBase = guaranteedAddressResultBase(of: base) {
-        // When `base` is @guaranteed_address result of a borrow accessor, root the dependence on the accessor's base.
-        self.init(base: accessorBase, context)
-        return
-      }
       self.init(enclosingAccess: base.enclosingAccessScope, address: base, context)
       return
     }
@@ -337,6 +320,13 @@ extension LifetimeDependence.Scope {
       self.init(accessBase: accessBase, address: address, context)
     case let .dependence(markDep):
       self = .unknown(markDep)
+    case let .borrowOrMutateAccessor(apply):
+      // The address is a projection of the accessor's 'self'. Root the dependence on the accessor's base.
+      guard let accessorSelf = apply.selfArgument else {
+        self = .unknown(apply)
+        return
+      }
+      self.init(base: guaranteedReferenceRoot(of: accessorSelf) ?? accessorSelf, context)
     }
   }
 
@@ -1213,7 +1203,13 @@ extension LifetimeDependenceDefUseWalker {
 
     // Get the local variable access that encloses this store.
     var storeAccess = storedOperand.instruction
-    if case let .access(beginAccess) = storeAddress.enclosingAccessScope {
+    var enclosingScope = storeAddress.enclosingAccessScope
+    // A store into the address returned by a mutate accessor is within the accessor's access to its inout 'self'.
+    while case let .borrowOrMutateAccessor(apply) = enclosingScope,
+          let accessorSelf = apply.selfAddressOfBorrowOrMutateAddressResult {
+      enclosingScope = accessorSelf.enclosingAccessScope
+    }
+    if case let .access(beginAccess) = enclosingScope {
       storeAccess = beginAccess
     }
     if !localReachability.gatherAllReachableDependentUses(of: storeAccess, in: &accessStack) {
@@ -1431,8 +1427,8 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
 /// This utility finds a value or address that is the best-effort "root" of the chain of temporary lifetime-dependent
 /// values.
 ///
-/// This "looks through" projections: a property that is either visible as a stored property or access via
-/// unsafe[Mutable]Address.
+/// This "looks through" projections: a property that is either visible as a stored property, access via
+/// unsafe[Mutable]Address, or returned by a borrow or mutate accessor.
 ///
 ///     dependsOn(lvalue.field) // finds 'lvalue' when 'field' is a stored property
 ///
@@ -1515,6 +1511,12 @@ extension LifetimeDependenceUseDefValueWalker {
     case let load as LoadInstruction:
       return walkUp(newLifetime: load.address)
     case let apply as FullApplySite:
+      // Skip the borrow accessor for its @guaranteed result when 'self' is @in_guaranteed. Treat it like a projection
+      // of 'self' rather than a separate variable, as with unsafe[Mutable]Address. ForwardingUseDefWalker handles a
+      // @guaranteed 'self'.
+      if value.isGuaranteedApplyResult, let accessorSelf = apply.selfArgument, accessorSelf.type.isAddress {
+        return walkUp(newLifetime: accessorSelf)
+      }
       // TODO: add an annotation for standard library functions to declare that a pointer result is derived
       // from an argument.
       if let f = apply.referencedFunction, f.isConvertPointerToPointerArgument {
@@ -1565,6 +1567,11 @@ extension LifetimeDependenceUseDefAddressWalker {
   mutating func walkUpDefault(address: Value, access: AccessBaseAndScopes) -> WalkResult {
     if !needWalk(for: address) {
       return .continueWalk
+    }
+    // Skip a borrow or mutate accessor. Treat its address like a projection of 'self' rather than a separate variable,
+    // as with unsafe[Mutable]Address.
+    if case let .borrowOrMutateAccessor(accessor) = access.enclosingAccess, let accessorSelf = accessor.selfArgument {
+      return walkUp(newLifetime: accessorSelf)
     }
     if let beginAccess = access.innermostAccess {
       // Skip the access scope for unsafe[Mutable]Address. Treat it like a projection of 'self' rather than a separate

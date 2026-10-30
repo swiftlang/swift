@@ -227,12 +227,19 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       bases.append(source.value)
     case .result, .inParameter, .inoutParameter:
       // addressable dependencies directly depend on the incoming address, unless that address is projected from an
-      // unsafe[Mutable]Address accessor. Then it depends on the accessor's 'self', which gatherVariableIntroducers
-      // finds.
-      if source.convention.isAddressable(for: source.value)
-           && source.value.accessBaseWithScopes.innermostAccess?.unsafeAddressorSelf == nil {
-        bases.append(source.value)
-        return
+      // unsafe[Mutable]Address, borrow, or mutate accessor. Then it depends on the accessor's 'self', which
+      // gatherVariableIntroducers finds.
+      if source.convention.isAddressable(for: source.value) {
+        let access = source.value.accessBaseWithScopes
+        switch access.enclosingAccess {
+        case .borrowOrMutateAccessor:
+          break
+        case .access, .base, .dependence:
+          if access.innermostAccess?.unsafeAddressorSelf == nil {
+            bases.append(source.value)
+            return
+          }
+        }
       }
       // Create a new dependence on the apply's access to the argument.
       for varIntroducer in gatherVariableIntroducers(for: source.value, ignoreTrivialCopies: !source.isInout, context) {
@@ -356,8 +363,8 @@ func gatherVariableIntroducers(for value: Value, ignoreTrivialCopies: Bool, _ co
 /// source of a lifetime dependent argument. If no lvalue is found, then it finds the "root" of the chain of temporary
 /// rvalues.
 ///
-/// This "looks through" projections: a property that is either visible as a stored property or access via
-/// unsafe[Mutable]Address.
+/// This "looks through" projections: a property that is either visible as a stored property, access via
+/// unsafe[Mutable]Address, or returned by a borrow or mutate accessor.
 ///
 ///     dependsOn(lvalue.field) // finds 'lvalue' when 'field' is a stored property
 ///

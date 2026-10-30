@@ -556,6 +556,9 @@ public enum EnclosingAccessScope {
   case access(BeginAccessInst)
   case base(AccessBase)
   case dependence(MarkDependenceInst)
+  // A borrow or mutate accessor call that returns the address. The address is only valid within the accessor's
+  // access to its 'self', which the access path continues into.
+  case borrowOrMutateAccessor(ApplyInst)
 
   // TODO: make this non-optional after fixing AccessBase.global.
   public var address: Value? {
@@ -566,6 +569,8 @@ public enum EnclosingAccessScope {
       return accessBase.address
     case let .dependence(markDep):
       return markDep
+    case let .borrowOrMutateAccessor(apply):
+      return apply
     }
   }
 }
@@ -599,11 +604,16 @@ extension AccessBaseAndScopes {
   public var isOnlyReadAccess: Bool {
     scopes.allSatisfy(
       {
-        if case let .access(beginAccess) = $0 {
+        switch $0 {
+        case let .access(beginAccess):
           return beginAccess.accessKind == .read
+        case let .borrowOrMutateAccessor(apply):
+          // A borrow accessor reads its 'self'.
+          return apply.hasGuaranteedAddressResult
+        case .base, .dependence:
+          // preserve any dependence scopes.
+          return false
         }
-        // preserve any dependence scopes.
-        return false
       })
   }
 }
@@ -618,11 +628,11 @@ extension BeginAccessInst {
       return nil
     }
     switch self.address.enclosingAccessScope {
-    case .access, .base:
+    case .access, .base, .borrowOrMutateAccessor:
       return nil
     case let .dependence(markDep):
       switch markDep.value.enclosingAccessScope {
-      case .access, .dependence:
+      case .access, .dependence, .borrowOrMutateAccessor:
         return nil
       case let .base(accessBase):
         guard case .pointer = accessBase else {
@@ -631,6 +641,23 @@ extension BeginAccessInst {
         return markDep.base
       }
     }
+  }
+}
+
+extension ApplyInst {
+  public var selfAddressOfBorrowOrMutateAddressResult: Value? {
+    guard functionConvention.hasAddressResult,
+          let selfOperand = argumentOperands.last,
+          let accessorSelf = selfArgument,
+          accessorSelf.type.isAddress else {
+      return nil
+    }
+    if hasGuaranteedAddressResult {
+      // borrow accessor
+      return accessorSelf
+    }
+    // mutate accessor: only a mutating 'self' covers the @inout result.
+    return convention(of: selfOperand) == .indirectInout ? accessorSelf : nil
   }
 }
 
@@ -661,6 +688,9 @@ private struct EnclosingAccessWalker : AddressUseDefWalker {
     case let md as MarkDependenceInst:
       enclosingScope = .dependence(md)
       return .continueWalk
+    case let apply as ApplyInst where apply.type.isAddress:
+      enclosingScope = .borrowOrMutateAccessor(apply)
+      return .continueWalk
     default:
       return walkUpDefault(address: address, path: path)
     }
@@ -670,7 +700,7 @@ private struct EnclosingAccessWalker : AddressUseDefWalker {
 private struct AccessPathWalker : AddressUseDefWalker {
   var result = AccessPath.unidentified()
 
-  // List of nested BeginAccessInst & MarkDependenceInst: inside-out order.
+  // List of nested BeginAccessInst, MarkDependenceInst & borrow or mutate accessor ApplyInst: inside-out order.
   var foundEnclosingScopes = SingleInlineArray<EnclosingAccessScope>()
 
   let enforceConstantProjectionPath: Bool
@@ -728,6 +758,9 @@ private struct AccessPathWalker : AddressUseDefWalker {
       return walkUpDefault(address: address, path: path)
     case let md as MarkDependenceInst:
       foundEnclosingScopes.push(.dependence(md))
+      return walkUpDefault(address: address, path: path)
+    case let apply as ApplyInst where apply.type.isAddress:
+      foundEnclosingScopes.push(.borrowOrMutateAccessor(apply))
       return walkUpDefault(address: address, path: path)
     default:
       return walkUpDefault(address: address, path: path)

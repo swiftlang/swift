@@ -623,6 +623,9 @@ extension ScopeExtension {
         // ignore recursive mark_dependence base for the purpose of extending scopes. This pass will extend the base
         // of that mark_dependence (if it is unresolved) later as a separate LifetimeDependence.Scope.
         break
+      case .borrowOrMutateAccessor:
+        // The accessor's access to its 'self', if any, is also in 'scopes'.
+        break
       }
     }
   }
