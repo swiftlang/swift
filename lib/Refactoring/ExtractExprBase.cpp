@@ -25,11 +25,12 @@ struct ReferenceCollector : public SourceEntityWalker {
   SmallVector<ValueDecl *, 4> References;
 
   ReferenceCollector(Expr *E) { walk(E); }
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override {
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type T,
+                                    ReferenceMetaData Data) override {
     References.emplace_back(D);
-    return true;
+    return Action::Continue();
   }
   bool operator==(const ReferenceCollector &Other) const {
     if (References.size() != Other.References.size())
@@ -74,12 +75,12 @@ struct SimilarExprCollector : public SourceEntityWalker {
         Bucket(Bucket), SelectedTokens(getExprSlice(SelectedExpr)),
         SelectedReferences(SelectedExpr) {}
 
-  bool walkToExprPre(Expr *E) override {
+  PreWalkAction walkToExprPre(Expr *E) override {
     // We don't extract implicit expressions.
     if (E->isImplicit())
-      return true;
+      return Action::Continue();
     if (E->getKind() != SelectedExpr->getKind())
-      return true;
+      return Action::Continue();
 
     // First check the underlying token arrays have the same content.
     if (compareTokenContent(getExprSlice(E), SelectedTokens)) {
@@ -89,7 +90,7 @@ struct SimilarExprCollector : public SourceEntityWalker {
       if (CurrentReferences == SelectedReferences)
         Bucket.insert(E);
     }
-    return true;
+    return Action::Continue();
   }
 };
 
@@ -217,10 +218,10 @@ bool RefactoringActionExtractExprBase::performChange() {
   struct DeclCollector : public SourceEntityWalker {
     llvm::SetVector<ValueDecl *> &Bucket;
     DeclCollector(llvm::SetVector<ValueDecl *> &Bucket) : Bucket(Bucket) {}
-    bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+    PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
       if (auto *VD = dyn_cast<ValueDecl>(D))
         Bucket.insert(VD);
-      return true;
+      return Action::Continue();
     }
   } Collector(AllVisibleDecls);
 
