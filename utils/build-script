@@ -934,6 +934,10 @@ def main_normal():
         if not args.caching_enable_mccas:
             os.environ["CLANG_CACHE_DISABLE_MCCAS"] = '1'
 
+    if args.enable_swiftpm_caching and args.swiftpm_build_cache_path is None:
+        args.swiftpm_build_cache_path = os.path.join(
+            SWIFT_BUILD_ROOT, 'swiftpm-build-cache')
+
     cmake = CMake(args=args, toolchain=toolchain)
     toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
                                            build_root=SWIFT_BUILD_ROOT)
