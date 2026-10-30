@@ -11,13 +11,15 @@ target_link_libraries(swift_COM_Concurrency PRIVATE
   $<$<PLATFORM_ID:Windows>:swiftWinSDK>
   $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
+emit_swift_interface(swift_COM_Concurrency)
 install(TARGETS swift_COM_Concurrency
   EXPORT SwiftSupplementalTargets
   COMPONENT ${PROJECT_NAME}_runtime
   ARCHIVE DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${${PROJECT_NAME}_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swift_COM_Concurrency)
-install_swift_interface(swift_COM_Concurrency)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT ${PROJECT_NAME}_development
+    DESTINATION "${${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR}")
 
 embed_manifest(swift_COM_Concurrency)

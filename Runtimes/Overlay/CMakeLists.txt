@@ -46,7 +46,6 @@ include(gyb)
 include(AvailabilityMacros)
 include(DefaultSettings)
 include(EmitSwiftInterface)
-include(InstallSwiftInterface)
 include(PlatformInfo)
 include(ResourceEmbedding)
 

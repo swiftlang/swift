@@ -41,12 +41,14 @@ install(FILES
   std_span.apinotes
   std_string_view.apinotes
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/apinotes)
+emit_swift_interface(swiftCxxStdlib)
 install(TARGETS swiftCxxStdlib
   EXPORT SwiftCxxOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftCxxStdlib)
-install_swift_interface(swiftCxxStdlib)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT SwiftOverlay_development
+    DESTINATION "${SwiftOverlay_INSTALL_SWIFTMODULEDIR}")
 
 embed_manifest(swiftCxxStdlib)
