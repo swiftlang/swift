@@ -95,6 +95,10 @@ public func findPointerEscapingUse(of value: Value) -> Bool {
 /// TODO: when phi lifetime flags are implemented, phis will introduce
 /// a lifetime in the same way as move_value.
 ///
+/// A guaranteed lifetime also extends through a borrow accessor whose
+/// 'self' and result are both @guaranteed: the result is a borrow
+/// within 'self'. ForwardingDefUseWalker does not follow this yet.
+///
 /// This walker is used to query basic lifetime attributes on values,
 /// such as "escaping" or "lexical". It must be precise for
 /// correctness and is performance critical.
@@ -122,6 +126,12 @@ extension ForwardingUseDefWalker {
     if let phi = Phi(value) {
       return walkUp(phi: phi, path)
     }
+    if let accessorSelf = value.guaranteedBorrowAccessorSelf {
+      if needWalk(for: accessorSelf, path) {
+        return walkUp(value: accessorSelf, path)
+      }
+      return .continueWalk
+    }
     return introducer(value, path)
   }
   public mutating func walkUp(instruction: ForwardingInstruction, _ path: PathContext)
@@ -144,6 +154,21 @@ extension ForwardingUseDefWalker {
       }
     }
     return .continueWalk
+  }
+}
+
+private extension Value {
+  /// If this is the @guaranteed result of a borrow accessor whose 'self' is
+  /// also @guaranteed, the accessor's 'self' argument.
+  var guaranteedBorrowAccessorSelf: Value? {
+    guard isGuaranteedApplyResult,
+          let apply = definingInstruction as? ApplyInst,
+          apply.functionConvention.hasSelfParameter,
+          let selfOperand = apply.argumentOperands.last,
+          apply.convention(of: selfOperand) == .directGuaranteed else {
+      return nil
+    }
+    return selfOperand.value
   }
 }
 

@@ -398,3 +398,93 @@ bb0:
   %14 = tuple ()
   return %14
 }
+
+struct NCItems: ~Copyable {
+  var p: UnsafeRawPointer
+}
+
+struct NCWrapper: ~Copyable {
+  let items: NCItems
+}
+
+sil @borrowAddressAccessor : $@convention(method) (@guaranteed NCItems) -> @guaranteed_address TrivialHolder
+sil @borrowValueAccessor : $@convention(method) (@guaranteed NCItems) -> @guaranteed TrivialHolder
+sil @getNEFromTrivial : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @getNEFromPointer : $@convention(thin) (@in_guaranteed UnsafeRawPointer) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+// rdar://191315943 (Borrow accessors: ownership verification and escape diagnosis issues)
+//
+// A borrow accessor's result is a projection of its 'self'. When 'self' is SILGen's temporary borrow of a
+// noncopyable aggregate, the dependence is on the variable behind that borrow, not on the temporary borrow.
+//
+// CHECK-LABEL: sil [ossa] @testBorrowAddressAccessorTemporary : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE {
+// CHECK: bb0(%0 : @guaranteed $NCWrapper):
+// CHECK:   [[NE:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on %0
+// CHECK-LABEL: } // end sil function 'testBorrowAddressAccessorTemporary'
+sil [ossa] @testBorrowAddressAccessorTemporary : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE {
+bb0(%0 : @guaranteed $NCWrapper):
+  %1 = copy_value %0
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
+  %3 = begin_borrow %2
+  %4 = struct_extract %3, #NCWrapper.items
+  %5 = function_ref @borrowAddressAccessor : $@convention(method) (@guaranteed NCItems) -> @guaranteed_address TrivialHolder
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed NCItems) -> @guaranteed_address TrivialHolder
+  %7 = load [trivial] %6
+  %8 = alloc_stack $TrivialHolder
+  store %7 to [trivial] %8
+  %10 = function_ref @getNEFromTrivial : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %11 = apply %10(%8) : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
+  dealloc_stack %8
+  end_borrow %3
+  destroy_value %2
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @testBorrowAddressAccessorProjection : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE {
+// CHECK: bb0(%0 : @guaranteed $NCWrapper):
+// CHECK:   [[NE:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed UnsafeRawPointer) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on %0
+// CHECK-LABEL: } // end sil function 'testBorrowAddressAccessorProjection'
+sil [ossa] @testBorrowAddressAccessorProjection : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE {
+bb0(%0 : @guaranteed $NCWrapper):
+  %1 = copy_value %0
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
+  %3 = begin_borrow %2
+  %4 = struct_extract %3, #NCWrapper.items
+  %5 = function_ref @borrowAddressAccessor : $@convention(method) (@guaranteed NCItems) -> @guaranteed_address TrivialHolder
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed NCItems) -> @guaranteed_address TrivialHolder
+  %7 = struct_element_addr %6, #TrivialHolder.pointer
+  %8 = load [trivial] %7
+  %9 = alloc_stack $UnsafeRawPointer
+  store %8 to [trivial] %9
+  %11 = function_ref @getNEFromPointer : $@convention(thin) (@in_guaranteed UnsafeRawPointer) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %12 = apply %11(%9) : $@convention(thin) (@in_guaranteed UnsafeRawPointer) -> @lifetime(borrow address_for_deps 0) @owned NE
+  dealloc_stack %9
+  end_borrow %3
+  destroy_value %2
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @testBorrowValueAccessorTemporary : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE {
+// CHECK: bb0(%0 : @guaranteed $NCWrapper):
+// CHECK:   [[NE:%.*]] = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK:   mark_dependence [unresolved] [[NE]] on %0
+// CHECK-LABEL: } // end sil function 'testBorrowValueAccessorTemporary'
+sil [ossa] @testBorrowValueAccessorTemporary : $@convention(method) (@guaranteed NCWrapper) -> @lifetime(borrow 0) @owned NE {
+bb0(%0 : @guaranteed $NCWrapper):
+  %1 = copy_value %0
+  %2 = mark_unresolved_non_copyable_value [no_consume_or_assign] %1
+  %3 = begin_borrow %2
+  %4 = struct_extract %3, #NCWrapper.items
+  %5 = function_ref @borrowValueAccessor : $@convention(method) (@guaranteed NCItems) -> @guaranteed TrivialHolder
+  %6 = apply %5(%4) : $@convention(method) (@guaranteed NCItems) -> @guaranteed TrivialHolder
+  %7 = alloc_stack $TrivialHolder
+  store %6 to [trivial] %7
+  %9 = function_ref @getNEFromTrivial : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %10 = apply %9(%7) : $@convention(thin) (@in_guaranteed TrivialHolder) -> @lifetime(borrow address_for_deps 0) @owned NE
+  dealloc_stack %7
+  end_borrow %3
+  destroy_value %2
+  return %10
+}
