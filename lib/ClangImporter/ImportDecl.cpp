@@ -4250,6 +4250,10 @@ namespace {
           result->getImportAsMemberStatus().isImportAsMember() &&
           !isa<clang::CXXMethodDecl, clang::ObjCMethodDecl>(decl))
         return;
+      // Parameter indices below are shared between Clang and Swift. A variadic
+      // function gets a trailing 'CVarArg...' parameter.
+      assert(result->getParameters()->size() ==
+             decl->getNumParams() + decl->isVariadic());
 
       // The note for a lifetime annotation Swift could not represent. The first
       // one found is the one reported.
@@ -4292,7 +4296,8 @@ namespace {
       // A constructor's return type is 'void'; the value it produces is its
       // class, so that is what decides whether the result is escapable.
       clang::QualType resultTypeForEscapability = retType;
-      if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl))
+      const auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl);
+      if (ctordecl)
         resultTypeForEscapability =
             Impl.getClangASTContext().getCanonicalTagType(ctordecl->getParent());
 
@@ -4304,13 +4309,10 @@ namespace {
       LifetimeDependenceInfo immortalLifetime(
           nullptr, nullptr, returnIdx,
           LifetimeFlags().withImmortalSpecifier().withAnnotated());
-      if (hasUnsafeAPIAttr(decl) && !isEscapable(resultTypeForEscapability)) {
-        lifetimeDependencies.push_back(immortalLifetime);
-        Impl.SwiftContext.evaluator.cacheOutput(
-            LifetimeDependenceInfoRequest{result},
-            Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
-        return;
-      }
+      // An independent result ignores 'lifetimebound' and is immortal unless a
+      // constructor captures into the object it produces.
+      bool resultIsIndependent =
+          hasUnsafeAPIAttr(decl) && !isEscapable(resultTypeForEscapability);
 
       auto warnForEscapableReturnType = [&] {
         if (isEscapableAnnotatedType(retType.getTypePtr())) {
@@ -4327,6 +4329,10 @@ namespace {
       };
 
       const auto dependencyVecSize = returnIdx;
+      auto toIndexSubset = [&](const SmallBitVector &indices) -> IndexSubset * {
+        return indices.any() ? IndexSubset::get(Impl.SwiftContext, indices)
+                             : nullptr;
+      };
       SmallBitVector inheritLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector paramHasAnnotation(dependencyVecSize);
@@ -4336,6 +4342,7 @@ namespace {
       struct TargetDependenceIndices {
         SmallBitVector inheritIndices;
         SmallBitVector scopeIndices;
+        bool annotated = false;
         TargetDependenceIndices(unsigned size)
             : inheritIndices(size), scopeIndices(size) {}
       };
@@ -4409,112 +4416,109 @@ namespace {
               paramHasAnnotation[idx] = true;
               unsigned targetIdx;
               if (hasThisParam && param == clang::LifetimeCaptureByAttr::This) {
-                // A constructor's 'this' is the object it produces.
-                if (isa<clang::CXXConstructorDecl>(decl)) {
-                  if (isScoped)
-                    scopedLifetimeParamIndicesForReturn[idx] = true;
-                  else
-                    inheritLifetimeParamIndicesForReturn[idx] = true;
+                // A constructor's 'this' is the object it produces, so the
+                // capture is a result dependence.
+                if (ctordecl) {
+                  processLifetimeBound(idx, ty);
                   continue;
                 }
                 targetIdx = result->getSelfIndex();
               } else {
                 targetIdx = param - hasThisParam;
               }
-              auto [it, inserted] = capturedArgDependences.try_emplace(
-                  targetIdx, dependencyVecSize);
+              auto &deps = capturedArgDependences
+                               .try_emplace(targetIdx, dependencyVecSize)
+                               .first->second;
+              deps.annotated = true;
               if (isScoped)
-                it->second.scopeIndices[idx] = true;
+                deps.scopeIndices[idx] = true;
               else
-                it->second.inheritIndices[idx] = true;
+                deps.inheritIndices[idx] = true;
             }
           };
       for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
-        if (param->hasAttr<clang::LifetimeBoundAttr>())
+        if (!resultIsIndependent && param->hasAttr<clang::LifetimeBoundAttr>())
           processLifetimeBound(idx, param->getType());
         for (const auto *attr :
              param->specific_attrs<clang::LifetimeCaptureByAttr>())
           processLifetimeCaptureBy(attr, idx, param->getType());
       }
-      if (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
-        processLifetimeBound(
-            result->getSelfIndex(),
-            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
-            /*forSelf=*/true);
+      if (!resultIsIndependent &&
+          getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(decl))
+        processLifetimeBound(result->getSelfIndex(),
+                             method->getThisType()->getPointeeType(),
+                             /*forSelf=*/true);
       for (const auto *attr :
            getImplicitObjectParamAnnotations<clang::LifetimeCaptureByAttr>(
                decl)) {
         // A parameter cannot depend on the object being constructed.
-        if (isa<clang::CXXConstructorDecl>(decl)) {
+        if (ctordecl) {
           skipLifetime(
               Diagnostic(diag::cxx_unsafe_skipped_lifetime_constructed_self));
           continue;
         }
-        processLifetimeCaptureBy(
-            attr, result->getSelfIndex(),
-            cast<clang::CXXMethodDecl>(decl)->getThisType()->getPointeeType(),
-            /*forSelf=*/true);
+        processLifetimeCaptureBy(attr, result->getSelfIndex(),
+                                 method->getThisType()->getPointeeType(),
+                                 /*forSelf=*/true);
       }
 
-      for (auto &[idx, depIndices] : capturedArgDependences) {
-        lifetimeDependencies.emplace_back(
-            depIndices.inheritIndices.any()
-                ? IndexSubset::get(Impl.SwiftContext, depIndices.inheritIndices)
-                : nullptr,
-            depIndices.scopeIndices.any()
-                ? IndexSubset::get(Impl.SwiftContext, depIndices.scopeIndices)
-                : nullptr,
-            idx, LifetimeFlags().withAnnotated());
-      }
-
-      auto &clangCtx = Impl.getClangASTContext();
-
+      std::optional<LifetimeDependenceInfo> resultDependence;
       if (inheritLifetimeParamIndicesForReturn.any() ||
           scopedLifetimeParamIndicesForReturn.any())
-        lifetimeDependencies.emplace_back(
-            inheritLifetimeParamIndicesForReturn.any()
-                ? IndexSubset::get(Impl.SwiftContext,
-                                   inheritLifetimeParamIndicesForReturn)
-                : nullptr,
-            scopedLifetimeParamIndicesForReturn.any()
-                ? IndexSubset::get(Impl.SwiftContext,
-                                   scopedLifetimeParamIndicesForReturn)
-                : nullptr,
-            returnIdx, LifetimeFlags().withAnnotated());
-      else if (auto *ctordecl = dyn_cast<clang::CXXConstructorDecl>(decl)) {
-        // Assume default constructed view types have no dependencies.
-        if (ctordecl->isDefaultConstructor()) {
-          auto *parentTy =
-              clangCtx.getCanonicalTagType(ctordecl->getParent()).getTypePtr();
+        resultDependence.emplace(
+            toIndexSubset(inheritLifetimeParamIndicesForReturn),
+            toIndexSubset(scopedLifetimeParamIndicesForReturn), returnIdx,
+            LifetimeFlags().withAnnotated());
+      // Independent results and default constructed view types have no
+      // dependencies.
+      else if (resultIsIndependent ||
+               (ctordecl && ctordecl->isDefaultConstructor() &&
+                !isEscapable(resultTypeForEscapability)))
+        resultDependence.emplace(immortalLifetime);
 
-          if (evaluateOrDefault(Impl.SwiftContext.evaluator,
-                                ClangTypeEscapability({parentTy, &Impl}),
-                                CxxEscapability::Unknown) ==
-              CxxEscapability::NonEscapable) {
-            lifetimeDependencies.push_back(immortalLifetime);
-          }
-        }
-      }
       bool resultIsNonEscapable =
           isNonEscapableAnnotatedType(resultTypeForEscapability.getTypePtr());
-      bool resultDependenceIsAnnotated =
-          getLifetimeDependenceFor(lifetimeDependencies, returnIdx).has_value();
+      bool resultDependenceIsAnnotated = resultDependence.has_value();
       // A '@lifetime(...)' written as a 'swift_attr' is parsed into a
       // LifetimeAttr and honored by LifetimeDependenceInfoRequest; the author
       // has said what the result depends on.
       bool hasHandWrittenLifetimeAttr =
           result->getAttrs().hasAttribute<LifetimeAttr>();
 
-      if (!lifetimeDependencies.empty()) {
+      // We skipped a lifetime annotation we could not faithfully represent.
+      // The API is imported @unsafe (below); give the non-escapable result an
+      // immortal lifetime so the implicit single-parameter inference does not
+      // synthesize a scoped dependency that would be invalid.
+      if (capturedArgDependences.empty() && !resultDependence &&
+          skippedLifetime && resultIsNonEscapable)
+        resultDependence.emplace(immortalLifetime);
+
+      if (!capturedArgDependences.empty() || resultDependence) {
+        // Caching dependencies bypasses Swift's inference, so repeat its
+        // '@lifetime(x: copy x)' for 'inout' non-Escapable parameters and a
+        // mutating non-Escapable 'self'.
+        for (auto [idx, param] : llvm::enumerate(decl->parameters()))
+          if (result->getParameters()->get(idx)->isInOut() &&
+              !isEscapable(param->getType().getNonReferenceType()))
+            capturedArgDependences.try_emplace(idx, dependencyVecSize)
+                .first->second.inheritIndices[idx] = true;
+        auto *fn = dyn_cast<FuncDecl>(result);
+        if (hasThisParam && fn && fn->isMutating() &&
+            !isEscapable(method->getThisType()->getPointeeType())) {
+          unsigned selfIdx = result->getSelfIndex();
+          capturedArgDependences.try_emplace(selfIdx, dependencyVecSize)
+              .first->second.inheritIndices[selfIdx] = true;
+        }
+        for (auto &[idx, depIndices] : capturedArgDependences)
+          lifetimeDependencies.emplace_back(
+              toIndexSubset(depIndices.inheritIndices),
+              toIndexSubset(depIndices.scopeIndices), idx,
+              LifetimeFlags().withAnnotated(depIndices.annotated));
+        if (resultDependence)
+          lifetimeDependencies.push_back(*resultDependence);
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
-      } else if (skippedLifetime && resultIsNonEscapable) {
-        // We skipped a lifetime annotation we could not faithfully represent
-        // The API is imported @unsafe (below); give the non-escapable result an
-        // immortal lifetime so the implicit single-parameter inference does not
-        // synthesize a scoped dependency that would be invalid.
-        cacheImmortalLifetime(result);
       } else if (resultIsNonEscapable && !hasHandWrittenLifetimeAttr) {
         auto policy = Impl.getClangASTContext().getPrintingPolicy();
         policy.SuppressTagKeyword = true;
@@ -4540,7 +4544,7 @@ namespace {
         Impl.LifetimeUnsafetyReasons.insert(
             {result, skippedLifetime.value_or(Diagnostic(
                          diag::cxx_unsafe_inferred_result_dependence))});
-      } else {
+      } else if (!resultIsIndependent) {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
           if (isEscapable(param->getType()))
             continue;
