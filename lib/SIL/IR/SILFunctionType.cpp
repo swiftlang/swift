@@ -3921,6 +3921,61 @@ static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
   return !tl.isTrivial() && type->isPointerType();
 }
 
+/// Which record results are +1 (owned).
+enum class OwnedRecordPolicy {
+  CXXRecordOnly,
+  AnyNonTrivialRecord,
+  AnyRecord,
+};
+
+static bool isOwnedRecordResult(clang::QualType resultType,
+                                OwnedRecordPolicy policy) {
+  const clang::Type *desugared = resultType->getUnqualifiedDesugaredType();
+  switch (policy) {
+  case OwnedRecordPolicy::CXXRecordOnly:
+    return desugared->getAsCXXRecordDecl() != nullptr;
+  case OwnedRecordPolicy::AnyNonTrivialRecord:
+    if (desugared->getAsCXXRecordDecl())
+      return true;
+    if (const clang::RecordDecl *record = desugared->getAsRecordDecl()) {
+      assert(!isa<clang::CXXRecordDecl>(record) &&
+             "CXX records handled above");
+      return record->isNonTrivialToPrimitiveCopy() ||
+             record->isNonTrivialToPrimitiveDestroy();
+    }
+    return false;
+  case OwnedRecordPolicy::AnyRecord:
+    return isa<clang::RecordType>(desugared);
+  }
+  llvm_unreachable("unhandled owned-record policy");
+}
+
+/// Shared result logic for CF-typedef returns. `isPlusOneResult` is the
+/// caller-specific +1 inference: ObjC method family or C create rule.
+static ResultConvention
+getCFPointeeResultConvention(const TypeLowering &tl, ASTContext &ctx,
+                             const clang::NamedDecl *decl,
+                             bool isPlusOneResult) {
+  // Trust the explicit attributes.
+  if (decl->hasAttr<clang::CFReturnsRetainedAttr>())
+    return ResultConvention::Owned;
+  if (decl->hasAttr<clang::CFReturnsNotRetainedAttr>())
+    // Probably not actually autoreleased.
+    return ResultConvention::Autoreleased;
+
+  // Otherwise, infer +1 from the method family (ObjC) or the create rule (C).
+  if (isPlusOneResult)
+    return ResultConvention::Owned;
+
+  if (tl.getLoweredType().isForeignReferenceType()) {
+    if (auto convention = importer::getOwnershipOfReturnedFRT(decl, ctx))
+      return convention.value();
+    return ResultConvention::Unowned;
+  }
+
+  return ResultConvention::Autoreleased;
+}
+
 /// Given nothing but a formal C parameter type that's passed
 /// indirectly, deduce the convention for it.
 ///
@@ -4128,22 +4183,8 @@ public:
     // change that, but that's an annoying change to make to Clang
     // right now.
     assert(isCFTypedef(tl, resultType));
-
-    // Trust the explicit attributes.
-    if (Method->hasAttr<clang::CFReturnsRetainedAttr>())
-      return ResultConvention::Owned;
-    if (Method->hasAttr<clang::CFReturnsNotRetainedAttr>())
-      return ResultConvention::Autoreleased;
-
-    // Otherwise, infer based on the method family.
-    if (isImplicitPlusOneCFResult())
-      return ResultConvention::Owned;
-
-    if (tl.getLoweredType().isForeignReferenceType())
-      return importer::getOwnershipOfReturnedFRT(Method, Ctx)
-          .value_or(ResultConvention::Unowned);
-
-    return ResultConvention::Autoreleased;
+    return getCFPointeeResultConvention(tl, Ctx, Method,
+                                        isImplicitPlusOneCFResult());
   }
 
   ParameterConvention
@@ -4239,9 +4280,8 @@ public:
       return ResultConvention::Owned;
     if (tl.getLoweredType().isForeignReferenceType())
       return ResultConvention::Unowned;
-    if (FnType->getReturnType()
-            ->getUnqualifiedDesugaredType()
-            ->getAsCXXRecordDecl()) {
+    if (isOwnedRecordResult(FnType->getReturnType(),
+                            OwnedRecordPolicy::CXXRecordOnly)) {
       return ResultConvention::Owned;
     }
 
@@ -4304,23 +4344,14 @@ public:
 
     if (isCFTypedef(tl, TheDecl->getReturnType())) {
       // The CF attributes aren't represented in the type, so we need
-      // to check them here.
-      if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>()) {
-        return ResultConvention::Owned;
-      } else if (TheDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()) {
-        // Probably not actually autoreleased.
-        return ResultConvention::Autoreleased;
-
-      // The CF Create/Copy rule only applies to functions that return
-      // a CF-runtime type; it does not apply to methods, and it does
-      // not apply to functions returning ObjC types.
-      } else if (clang::ento::coreFoundation::followsCreateRule(TheDecl)) {
-        return ResultConvention::Owned;
-      } else if (tl.getLoweredType().isForeignReferenceType()) {
-        return ResultConvention::Unowned;
-      } else {
-        return ResultConvention::Autoreleased;
-      }
+      // to check them here. The CF Create/Copy rule only applies to
+      // functions that return a CF-runtime type; it does not apply to
+      // methods, and it does not apply to functions returning ObjC types.
+      // (The FRT query above already returned when present, so the
+      // helper's query falls through to Unowned here, as before.)
+      return getCFPointeeResultConvention(
+          tl, Ctx, TheDecl,
+          clang::ento::coreFoundation::followsCreateRule(TheDecl));
     }
 
     // Otherwise, fall back on the ARC annotations, which are part
