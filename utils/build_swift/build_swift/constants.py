@@ -154,13 +154,20 @@ def _get_swift_build_root(source_root, env=None):
 
     Users are able to manually override the build root by setting the SWIFT_BUILD_ROOT
     environment variable. If that cannot be found then this function returns the path
-    to a directory named "build" in the given source root.
+    to a directory named "build" in the given source root, or None if the source root
+    is None.
     """
 
     env = env or {}
 
     if "SWIFT_BUILD_ROOT" in env:
         return env["SWIFT_BUILD_ROOT"]
+
+    # _get_swift_source_root returns None outside a valid Swift checkout. Return None
+    # here too instead of failing at import time, so that tools like build-script
+    # can report the missing source root themselves.
+    if source_root is None:
+        return None
 
     return os.path.join(source_root, "build")
 
