@@ -291,6 +291,20 @@ func testCaptures(nt: NonTransferable, ntc: NonTransferableClass, value: Int) {
   takesNontransferable { [value] in _ = value } // Ok
 }
 
+// Implicitly main actor-isolated, since this file is in script mode.
+var mainActorNT = NonTransferable()
+
+// Global variables are referenced, not captured.
+@MainActor func testGlobalReferences() {
+  mainActorNT.use() // Ok
+  takesTransferable { mainActorNT.use() } // Ok
+  takesEscapingTransferable { mainActorNT.use() } // Ok
+  takesNontransferable { mainActorNT.use() } // Ok
+
+  func localFn() { mainActorNT.use() } // Ok
+  takesTransferable { localFn() } // Ok
+}
+
 func testAutoclosureCaptures(nt: NonTransferable) {
   func takesAutoclosure(_: @autoclosure () -> Void) {}
   func takesNontransferableAutoclosure(_: @autoclosure @nontransferable () -> Void) {}
