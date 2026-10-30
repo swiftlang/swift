@@ -66,6 +66,48 @@ int main() {
 }
 ```
 
+### Using the standard library without a Swift module
+
+C++ programs can include `<swift/Swift.h>` to use Swift standard library types
+without generating a header for a user module:
+
+```c++
+#include <swift/Swift.h>
+
+int main() {
+  swift::String message = "hello";
+  auto messages = swift::Array<swift::String>::init();
+  messages.append(message);
+  auto first = swift::Optional<swift::String>::some(messages[0]);
+  return first.get().getCount() == 5 ? 0 : 1;
+}
+```
+
+The header is installed with the Swift standard library. Add
+`<toolchain>/usr/lib/swift` to the C++ header search path. The header selects
+bindings for the compiler's target operating system and architecture.
+
+Use headers and runtime libraries from the same toolchain. Builds that provide
+a static standard library install its headers under `lib/swift_static` instead
+of `lib/swift`; use that copy when linking the static runtime. Custom runtime
+installations can change the library directory. The shared header is for the
+regular Swift runtime and does not support Embedded Swift.
+
+The program must link the Swift runtime and the C++ standard library. For
+example, using the tools from a macOS toolchain:
+
+```sh
+clang++ -std=c++17 -I /path/to/toolchain/usr/lib/swift -c main.cpp -o main.o
+swiftc main.o -o example -lswiftCore -lc++
+```
+
+Use the same target and SDK settings for compilation and linking. Runtime
+library search paths and the C++ standard library linker option depend on the
+target platform.
+
+Generated module headers keep their existing standard library bindings. The
+public header can be included alongside them in either order.
+
 ## Calling Swift Functions
 
 Swift functions that are callable from C++ are available in their corresponding module namespace. Their return and parameter types are transcribed to C++ primitive types and class types that represents the underlying Swift return and parameter types.
