@@ -1043,6 +1043,7 @@ enum Project {
   XCTest
   Testing
   TestSupport
+  TestBacktrace
   ClangBuiltins
   ClangRuntime
   SwiftInspect
@@ -3424,7 +3425,8 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
-# Builds StdlibUnittest and its dependencies against the platform SDK.
+# Builds StdlibUnittest and its dependencies, and a backtracer, against the
+# platform SDK.
 function Build-TestSupport([Hashtable] $Platform) {
   Sync-Runtimes
 
@@ -3442,6 +3444,22 @@ function Build-TestSupport([Hashtable] $Platform) {
       # FIXME(#83449): avoid using `SwiftCMakeConfig.h`
       CMAKE_CXX_FLAGS = @("-I$(Get-ProjectBinaryCache $Platform DynamicRuntime)\include");
       Swift_SDKROOT = (Get-SwiftSDK -OS $Platform.OS);
+    }
+
+  # The platform SDK has a backtracer only when it is linked statically.
+  Build-CMakeProject `
+    -Src $SourceCache\swift\Runtimes\Supplemental\StackWalker `
+    -Bin (Get-ProjectBinaryCache $Platform TestBacktrace) `
+    -InstallTo "$(Get-ProjectBinaryCache $Platform TestSupport)\usr" `
+    -Platform $Platform `
+    -CXXCompiler $Compilers.Stage1.GNUCXX `
+    -SwiftCompiler $Compilers.Stage1.Swift `
+    -SwiftSDK $null `
+    -Defines @{
+      SwiftCore_DIR       = "$(Get-ProjectBinaryCache $Platform DynamicRuntime)\cmake\SwiftCore";
+      SwiftCxxOverlay_DIR = "$(Get-ProjectBinaryCache $Platform DynamicOverlay)\Cxx\cmake\SwiftCxxOverlay";
+      SwiftOverlay_DIR    = "$(Get-ProjectBinaryCache $Platform DynamicOverlay)\cmake\SwiftOverlay";
+      SwiftRuntime_DIR    = "$(Get-ProjectBinaryCache $Platform DynamicRuntimeModule)\cmake\SwiftRuntime";
     }
 }
 
