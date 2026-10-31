@@ -162,9 +162,10 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 
 #if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
 
-// We need swiftBacktracePath to be aligned on a page boundary, and it also
-// needs to be a multiple of the system page size.
-#define SWIFT_BACKTRACE_BUFFER_SIZE 16384
+// These buffers must be aligned and sized for any supported system page size,
+// which can differ from the page size on the machine that builds the runtime.
+constexpr size_t SWIFT_BACKTRACE_BUFFER_SIZE =
+    SWIFT_PAGE_SIZE > 16384 ? SWIFT_PAGE_SIZE : 16384;
 
 static_assert((SWIFT_BACKTRACE_BUFFER_SIZE % SWIFT_PAGE_SIZE) == 0,
               "The backtrace path buffer must be a multiple of the system "
@@ -172,7 +173,8 @@ static_assert((SWIFT_BACKTRACE_BUFFER_SIZE % SWIFT_PAGE_SIZE) == 0,
               "code because we'll protect more than just the buffer.");
 
 // The same goes for swiftBacktraceEnvironment
-#define SWIFT_BACKTRACE_ENVIRONMENT_SIZE 32768
+constexpr size_t SWIFT_BACKTRACE_ENVIRONMENT_SIZE =
+    SWIFT_PAGE_SIZE > 32768 ? SWIFT_PAGE_SIZE : 32768;
 
 static_assert((SWIFT_BACKTRACE_ENVIRONMENT_SIZE % SWIFT_PAGE_SIZE) == 0,
               "The environment buffer must be a multiple of the system "
@@ -180,7 +182,8 @@ static_assert((SWIFT_BACKTRACE_ENVIRONMENT_SIZE % SWIFT_PAGE_SIZE) == 0,
               "code because we'll protect more than just the buffer.");
 
 // And the output path
-#define SWIFT_BACKTRACE_OUTPUT_PATH_SIZE 16384
+constexpr size_t SWIFT_BACKTRACE_OUTPUT_PATH_SIZE =
+    SWIFT_PAGE_SIZE > 16384 ? SWIFT_PAGE_SIZE : 16384;
 
 static_assert((SWIFT_BACKTRACE_OUTPUT_PATH_SIZE % SWIFT_PAGE_SIZE) == 0,
               "The output path buffer must be a multiple of the system "

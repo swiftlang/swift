@@ -128,8 +128,8 @@ layoutStringMemcpyArm64(void *dest, const void *src, size_t size) {
     ret
 
 7:  // > 128 bytes
-    b       _memcpy
-)");
+)"
+    "    b " SWIFT_SYMBOL_PREFIX_STRING "memcpy\n");
 }
 #endif
 

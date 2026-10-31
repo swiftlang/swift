@@ -385,6 +385,15 @@ string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
 # the final link line. Keep the swiftrt target for its usage requirements, and
 # explicitly propagate the object payload through swiftCore's interface.
 if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
+  if(NOT WASI AND NOT CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
+    if(BUILD_SHARED_LIBS)
+      target_link_options(swiftCore PRIVATE
+        "LINKER:-z,max-page-size=${SwiftCore_PAGE_SIZE}")
+    else()
+      target_link_options(swiftCore INTERFACE
+        "LINKER:-z,max-page-size=${SwiftCore_PAGE_SIZE}")
+    endif()
+  endif()
   target_link_libraries(swiftCore INTERFACE
     swiftrt
     $<TARGET_OBJECTS:swiftrt>)
