@@ -322,6 +322,11 @@ def update_single_repository(pool_args: UpdateArguments):
         if pool_args.partial_clone:
             fetch_extra_args.extend(["--filter", "blob:none"])
 
+        # With '--skip-tags', pass '--no-tags' rather than just omitting
+        # '--tags', because git otherwise still fetches tags that point into
+        # the fetched history.
+        fetch_tags = ["--no-tags"] if pool_args.skip_tags else ["--tags"]
+
         cross_repo = False
         checkout_target = None
         if pool_args.tag:
@@ -413,7 +418,9 @@ def update_single_repository(pool_args: UpdateArguments):
                         [
                             "fetch",
                             "--recurse-submodules=yes",
-                            "--tags",
+                        ]
+                        + fetch_tags
+                        + [
                             "origin",
                             f"+refs/heads/{checkout_target}"
                             f":refs/remotes/origin/{checkout_target}",
@@ -444,7 +451,8 @@ def update_single_repository(pool_args: UpdateArguments):
                 else:
                     Git.run(
                         repo_path,
-                        ["fetch", "--recurse-submodules=yes", "--tags"]
+                        ["fetch", "--recurse-submodules=yes"]
+                        + fetch_tags
                         + fetch_extra_args,
                         echo=verbose,
                         prefix=prefix,
@@ -471,10 +479,12 @@ def update_single_repository(pool_args: UpdateArguments):
         # which branch was checked out during the fetch. Without history, the
         # tags are not needed, and fetching each of them at depth 1 takes
         # minutes in the larger repositories.
-        fetch_tags = [] if pool_args.skip_history else ["--tags"]
+        final_fetch_tags = fetch_tags
+        if pool_args.skip_history and not pool_args.skip_tags:
+            final_fetch_tags = []
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes"] + fetch_tags + fetch_extra_args,
+            ["fetch", "--recurse-submodules=yes"] + final_fetch_tags + fetch_extra_args,
             echo=verbose,
             prefix=prefix,
         )
@@ -720,6 +730,7 @@ def update_all_repositories(
             stash=args.stash,
             cross_repos_pr=cross_repos_pr,
             skip_history=args.skip_history,
+            skip_tags=args.skip_tags,
             partial_clone=args.partial_clone,
             output_prefix="Updating",
             verbose=args.verbose,
