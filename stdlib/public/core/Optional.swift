@@ -172,7 +172,61 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
+extension Optional where Wrapped: ~Copyable {
+  /// Returns a borrowed reference to the payload within the optional, if there
+  /// is one.
+  @available(StdlibDeploymentTarget 6.4, *)
+  @export(implementation)
+  @_transparent
+  public var ref: Ref<Wrapped>? {
+    @_lifetime(borrow self)
+    get {
+      switch self {
+      case .some(let wrapped):
+        return Ref(wrapped)
+  
+      case .none:
+        return nil
+      }
+    }
+  }
+
+  /// Returns the mutable reference to the payload within the optional, if there
+  /// is one.
+  @available(StdlibDeploymentTarget 6.4, *)
+  @export(implementation)
+  public var mutableRef: MutableRef<Wrapped>? {
+    @_lifetime(&self)
+    @_transparent
+    mutating get {
+      if self == nil {
+        return nil
+      }
+    
+      let ptr = unsafe UnsafeMutablePointer<Wrapped>(
+        Builtin.unprotectedAddressOf(&self)
+      )
+      return unsafe MutableRef(unsafeAddress: ptr, mutating: &self)
+    }
+  }
+}
+
 extension Optional {
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal func map<U>(
+    _ transform: (Wrapped) throws -> U
+  ) rethrows -> U? {
+    switch self {
+    case .some(let y):
+      return .some(try transform(y))
+    case .none:
+      return .none
+    }
+  }
+}
+
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Evaluates the given closure when this `Optional` instance is not `nil`,
   /// passing the unwrapped value as a parameter.
   ///
@@ -195,35 +249,7 @@ extension Optional {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @export(implementation)
-  public func map<E: Error, U: ~Copyable>(
-    _ transform: (Wrapped) throws(E) -> U
-  ) throws(E) -> U? {
-    switch self {
-    case .some(let y):
-      return .some(try transform(y))
-    case .none:
-      return .none
-    }
-  }
-
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
-  internal func map<U>(
-    _ transform: (Wrapped) throws -> U
-  ) rethrows -> U? {
-    switch self {
-    case .some(let y):
-      return .some(try transform(y))
-    case .none:
-      return .none
-    }
-  }
-}
-
-extension Optional where Wrapped: ~Copyable {
-  // FIXME(NCG): Make this public.
-  @export(implementation)
-  public consuming func _consumingMap<U: ~Copyable, E: Error>(
+  public consuming func map<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch consume self {
@@ -233,22 +259,24 @@ extension Optional where Wrapped: ~Copyable {
       return .none
     }
   }
+}
 
-  // FIXME(NCG): Make this public.
-  @export(implementation)
-  public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
-    _ transform: (borrowing Wrapped) throws(E) -> U
-  ) throws(E) -> U? {
+extension Optional {
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  internal func flatMap<U>(
+    _ transform: (Wrapped) throws -> U?
+  ) rethrows -> U? {
     switch self {
     case .some(let y):
-      return .some(try transform(y))
+      return try transform(y)
     case .none:
       return .none
     }
   }
 }
 
-extension Optional {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Evaluates the given closure when this `Optional` instance is not `nil`,
   /// passing the unwrapped value as a parameter.
   ///
@@ -269,35 +297,7 @@ extension Optional {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @export(implementation)
-  public func flatMap<E: Error, U: ~Copyable>(
-    _ transform: (Wrapped) throws(E) -> U?
-  ) throws(E) -> U? {
-    switch self {
-    case .some(let y):
-      return try transform(y)
-    case .none:
-      return .none
-    }
-  }
-
-  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @usableFromInline
-  internal func flatMap<U>(
-    _ transform: (Wrapped) throws -> U?
-  ) rethrows -> U? {
-    switch self {
-    case .some(let y):
-      return try transform(y)
-    case .none:
-      return .none
-    }
-  }
-}
-
-extension Optional where Wrapped: ~Copyable {
-  // FIXME(NCG): Make this public.
-  @export(implementation)
-  public consuming func _consumingFlatMap<U: ~Copyable, E: Error>(
+  public consuming func flatMap<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch consume self {
@@ -307,22 +307,9 @@ extension Optional where Wrapped: ~Copyable {
       return .none
     }
   }
-
-  // FIXME(NCG): Make this public.
-  @export(implementation)
-  public func _borrowingFlatMap<U: ~Copyable, E: Error>(
-    _ transform: (borrowing Wrapped) throws(E) -> U?
-  ) throws(E) -> U? {
-    switch self {
-    case .some(let y):
-      return try transform(y)
-    case .none:
-      return .none
-    }
-  }
 }
 
-extension Optional where Wrapped: ~Escapable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// The wrapped value of this instance, unwrapped without checking whether
   /// the instance is `nil`.
   ///
@@ -347,15 +334,13 @@ extension Optional where Wrapped: ~Escapable {
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
   @inlinable
-  @_preInverseGenerics
   @unsafe
+  @_owned
+  @_preInverseGenerics
   public var unsafelyUnwrapped: Wrapped {
-    // FIXME: Generalize this for ~Copyable wrapped types. Note that the current
-    // implementation is copying the value, so that generalization will need to
-    // be emitted into clients -- `@_preInverseGenerics` will not cut it.
     @inline(__always)
     @_lifetime(copy self)
-    get {
+    consuming get {
       if let x = self {
         return x
       }
@@ -365,50 +350,23 @@ extension Optional where Wrapped: ~Escapable {
 }
 
 extension Optional where Wrapped: ~Copyable & ~Escapable {
-  // FIXME(NCG): Do we want this? It seems like we do. Make this public.
-  @export(implementation)
-  @_lifetime(copy self)
-  public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
-    switch consume self {
-    case .some(let x):
-      return x
-    case .none:
-      _debugPreconditionFailure("consumingUsafelyUnwrap of nil optional")
-    }
-  }
-}
-
-extension Optional where Wrapped: ~Escapable {
   /// - Returns: `unsafelyUnwrapped`.
   ///
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   @inlinable
+  @unsafe
+  @_owned
   @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
     @_lifetime(copy self)
-    get {
+    consuming get {
       if let x = self {
         return x
       }
       _internalInvariantFailure("_unsafelyUnwrappedUnchecked of nil optional")
     }
-  }
-}
-
-extension Optional where Wrapped: ~Copyable & ~Escapable {
-  /// - Returns: `unsafelyUnwrapped`.
-  ///
-  /// This version is for internal stdlib use; it avoids any checking
-  /// overhead for users, even in Debug builds.
-  @export(implementation)
-  @_lifetime(copy self)
-  internal consuming func _consumingUncheckedUnwrapped() -> Wrapped {
-    if let x = self {
-      return x
-    }
-    _internalInvariantFailure("_uncheckedUnwrapped of nil optional")
   }
 }
 
