@@ -1,0 +1,12 @@
+// RUN: %empty-directory(%t)
+// RUN: %timer-scale-test --begin 1000 --end 2000 --superlinear-threshold 1.3 --ignore-no-data --trace --typecheck --select typecheck-expr.instr %s
+// REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=aarch64
+
+// Every row is its own connected component; merging the rows' partial
+// solutions must not cost time proportional to the whole literal per row.
+
+let _: [[Int]] = [
+%for i in range(0, N):
+  [${i}, 1, 2, 3],
+%end
+]

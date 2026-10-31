@@ -1147,6 +1147,12 @@ private:
     /// The number of fixes in the innermost partial solution scope.
     unsigned numPartialSolutionFixes = 0;
 
+    /// The length of the trail when the innermost partial solution scope
+    /// began, or \c std::nullopt outside of one. A partial solution is only
+    /// ever replayed on top of the state that existed at that point, so it
+    /// only has to record what changed since.
+    std::optional<unsigned> partialSolutionTrailStart;
+
     // Statistics
     #define CS_STATISTIC(Name, Description) unsigned Name = 0;
     #include "ConstraintSolverStats.def"
@@ -1379,6 +1385,15 @@ private:
   ///
   /// \returns the solution.
   Solution finalize();
+
+  /// Copy every entry of the trail-recorded maps into \p solution.
+  void recordAllState(Solution &solution) const;
+
+  /// Copy only the entries of the trail-recorded maps that changed after the
+  /// trail had length \p trailStart, which is all a partial solution needs:
+  /// it is replayed on top of the state that existed at that point. Copying
+  /// everything instead makes a system split into N components cost O(N^2).
+  void recordChangedState(Solution &solution, unsigned trailStart) const;
 
   /// Apply the given solution to the current constraint system.
   ///
