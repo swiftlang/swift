@@ -3951,6 +3951,32 @@ static bool isOwnedRecordResult(clang::QualType resultType,
   llvm_unreachable("unhandled owned-record policy");
 }
 
+/// Shared trivial-result prologue. ObjC methods refine plain Unowned with
+/// inner-pointer cases; other C-like conventions pass no method.
+static ResultConvention
+getTrivialResultConvention(const TypeLowering &tl,
+                           const clang::ObjCMethodDecl *method = nullptr) {
+  if (method) {
+    if (method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
+      return ResultConvention::UnownedInnerPointer;
+    auto type = tl.getLoweredType();
+    if (type.unwrapOptionalType().getASTType()->isUnmanaged())
+      return ResultConvention::UnownedInnerPointer;
+  }
+  return ResultConvention::Unowned;
+}
+
+/// Shared foreign-reference-type query. Returns nullopt for non-FRT values
+/// and for FRT values with no explicit ownership, in which case the caller
+/// falls through to its next rule.
+static std::optional<ResultConvention>
+getFRTResultConvention(const TypeLowering &tl, const clang::NamedDecl *decl,
+                       ASTContext &ctx) {
+  if (!tl.getLoweredType().isForeignReferenceType())
+    return std::nullopt;
+  return importer::getOwnershipOfReturnedFRT(decl, ctx);
+}
+
 /// Shared result logic for CF-typedef returns. `isPlusOneResult` is the
 /// caller-specific +1 inference: ObjC method family or C create rule.
 static ResultConvention
@@ -4156,15 +4182,8 @@ public:
   ResultConvention getResult(const TypeLowering &tl) const override {
     // If we imported the result as something trivial, we need to
     // use one of the unowned conventions.
-    if (tl.isTrivial()) {
-      if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
-        return ResultConvention::UnownedInnerPointer;
-
-      auto type = tl.getLoweredType();
-      if (type.unwrapOptionalType().getASTType()->isUnmanaged())
-        return ResultConvention::UnownedInnerPointer;
-      return ResultConvention::Unowned;
-    }
+    if (tl.isTrivial())
+      return getTrivialResultConvention(tl, Method);
 
     // Otherwise, the return type had better be a retainable object pointer.
     auto resultType = Method->getReturnType();
@@ -4276,7 +4295,7 @@ public:
 
   ResultConvention getResult(const TypeLowering &tl) const override {
     if (tl.isTrivial())
-      return ResultConvention::Unowned;
+      return getTrivialResultConvention(tl);
     if (FnType->getExtInfo().getProducesResult())
       return ResultConvention::Owned;
     if (tl.getLoweredType().isForeignReferenceType())
@@ -4338,10 +4357,8 @@ public:
       return ResultConvention::Indirect;
     }
 
-    if (tl.getLoweredType().isForeignReferenceType()) {
-      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl, Ctx))
-        return convention.value();
-    }
+    if (auto convention = getFRTResultConvention(tl, TheDecl, Ctx))
+      return convention.value();
 
     if (isCFTypedef(tl, TheDecl->getReturnType())) {
       // The CF attributes aren't represented in the type, so we need
@@ -4420,13 +4437,12 @@ public:
       return ResultConvention::Indirect;
     }
 
-    if (resultTL.getLoweredType().isForeignReferenceType()) {
-      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl, Ctx))
-        return convention.value();
+    if (auto convention = getFRTResultConvention(resultTL, TheDecl, Ctx))
+      return convention.value();
 
-      if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
-        return ResultConvention::Owned;
-    }
+    if (resultTL.getLoweredType().isForeignReferenceType() &&
+        TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
+      return ResultConvention::Owned;
 
     return CFunctionTypeConventions::getResult(resultTL);
   }
