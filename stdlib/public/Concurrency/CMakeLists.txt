@@ -114,6 +114,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_C_SOURCES
 
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Actor.swift
+  Actor+Send.swift
   AsyncLet.swift
   CheckedContinuation.swift
   Continuation.swift
