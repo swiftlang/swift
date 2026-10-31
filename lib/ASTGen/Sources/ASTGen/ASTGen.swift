@@ -538,8 +538,14 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedArrayRef {
-    node.map(generate(inheritedTypeList:)) ?? .init()
+  func generate(
+    inheritedTypeList node: InheritedTypeListSyntax?,
+    allowClassRequirement: Bool = false,
+    allowAnyObject: Bool = false
+  ) -> BridgedArrayRef {
+    node.map {
+      generate(inheritedTypeList: $0, allowClassRequirement: allowClassRequirement, allowAnyObject: allowAnyObject)
+    } ?? .init()
   }
 
   @inline(__always)
@@ -559,6 +565,7 @@ extension Collection {
     }
 
     let baseAddress = astgen.allocator.allocate(T.self, count: self.count).baseAddress!
+    var initializedCount = 0
     do {
       // A loop instead of `initialize(from: self.lazy.compactMap(transform))` because we aren't
       // doing a great job optimizing the latter.
@@ -570,10 +577,13 @@ extension Collection {
 
         currentAddress.initialize(to: transformed)
         currentAddress += 1
+        initializedCount += 1
       }
     }
 
-    return .init(data: baseAddress, count: self.count)
+    // Elements the transform dropped leave their slots uninitialized, so the
+    // array is only as long as what was initialized.
+    return .init(data: baseAddress, count: initializedCount)
   }
 }
 

@@ -251,7 +251,7 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes, allowClassRequirement: true, allowAnyObject: true),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
       braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
@@ -298,7 +298,7 @@ extension ASTGenVisitor {
       associatedtypeKeywordLoc: self.generateSourceLoc(node.associatedtypeKeyword),
       name: name,
       nameLoc: nameLoc,
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes, allowAnyObject: true),
       defaultType: self.generate(type: node.initializer?.value),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
@@ -498,7 +498,8 @@ extension ASTGenVisitor {
   private func generate(
     accessorDecl node: AccessorDeclSyntax,
     kind: swift.AccessorKind,
-    for storage: BridgedAbstractStorageDecl
+    for storage: BridgedAbstractStorageDecl,
+    allowBody: Bool = true
   ) -> BridgedAccessorDecl? {
     var attrs = BridgedDeclAttributes()
 
@@ -564,7 +565,7 @@ extension ASTGenVisitor {
     // (ParsedAccessors::record).  ASTGen only parses surface source.
     accessor.remapLegacyCoroutineAccessorIfEnabled()
     accessor.asDecl.attachParsedAttrs(attrs)
-    if let body = node.body {
+    if allowBody, let body = node.body {
       self.withDeclContext(accessor.asDeclContext) {
         accessor.setParsedBody(self.generate(codeBlock: body))
       }
@@ -801,6 +802,14 @@ extension ASTGenVisitor {
       var hasEffectfulGet = false
       var nonGetSoFar: [(kind: swift.AccessorKind, node: AccessorDeclSyntax)] = []
       let isSubscript = accessorBlock.parent?.is(SubscriptDeclSyntax.self) == true
+      // Whether the storage is a protocol requirement.
+      var inProtocol = false
+      for ancestor in sequence(first: accessorBlock.parent, next: { $0?.parent }) {
+        if let ancestor, ancestor.is(VariableDeclSyntax.self) || ancestor.is(SubscriptDeclSyntax.self) {
+          inProtocol = self.isProtocolMember(ancestor)
+          break
+        }
+      }
 
       let record = BridgedAccessorRecord(
         lBraceLoc: leftBrace,
@@ -819,6 +828,29 @@ extension ASTGenVisitor {
           guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier,
                                          modifiers: node.modifiers) else {
             return nil
+          }
+          // A protocol requirement allows only some accessors, and they have no
+          // body or setter parameter name.
+          var allowBody = true
+          if inProtocol {
+            switch kind {
+            case .get, .set, .yielding_borrow, .borrow, .mutate, .yielding_mutate:
+              break
+            default:
+              self.diagnose(.expected_getreadborrowsetmutate_in_protocol, at: node.accessorSpecifier)
+              return nil
+            }
+            if node.parameters != nil {
+              self.diagnose(.protocol_setter_name, at: node.accessorSpecifier)
+            }
+            if let body = node.body {
+              self.diagnose(
+                .unexpected_getset_implementation_in_protocol(
+                  String(bridged: kind.diagnosticName(article: false, underscored: false))),
+                at: body.leftBrace
+              )
+              allowBody = false
+            }
           }
           if let previous = firstOfKind[kind] {
             self.diagnoseDuplicateAccessor(
@@ -852,7 +884,7 @@ extension ASTGenVisitor {
               )
             }
           }
-          guard let decl = self.generate(accessorDecl: node, kind: kind, for: storage) else {
+          guard let decl = self.generate(accessorDecl: node, kind: kind, for: storage, allowBody: allowBody) else {
             return nil
           }
           generated.append(ParsedAccessor(kind: kind, node: node, decl: decl))
@@ -869,6 +901,14 @@ extension ASTGenVisitor {
       )
       return record
     case .getter(let codeBlock):
+      // `subscript(i: Int) -> Int {}` in a protocol: an empty body is an empty
+      // accessor list, and a subscript requirement needs a getter. (Elsewhere it
+      // is an empty getter body.)
+      if codeBlock.isEmpty, let subscriptDecl = accessorBlock.parent?.as(SubscriptDeclSyntax.self),
+        self.isProtocolMember(subscriptDecl), !accessorBlock.hasError
+      {
+        self.diagnose(.subscript_without_get, at: leftBrace)
+      }
       let accessor = BridgedAccessorDecl.createParsed(
         self.ctx,
         declContext: self.declContext,
@@ -1316,6 +1356,15 @@ extension ASTGenVisitor {
     self.diagnoseProtocolDefaultArguments(
       in: node.signature.parameterClause.parameters, of: node, at: node.initKeyword,
       .protocol_init_argument_init)
+    // Initializers only exist in types. The C++ parser points at the token after
+    // `init` and tells the type checker not to touch the declaration.
+    let constructorsNotAllowed = !self.declContext.isTypeContext
+    if constructorsNotAllowed {
+      self.diagnose(
+        .initializer_decl_wrong_scope,
+        at: node.initKeyword.nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(node.initKeyword)
+      )
+    }
     let signature = self.generate(
       functionSignature: node.signature,
       for: .initializer
@@ -1341,7 +1390,10 @@ extension ASTGenVisitor {
       attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
-    
+    if constructorsNotAllowed {
+      decl.asDecl.setInvalid()
+    }
+
     if let returnClause = node.signature.returnClause {
       // `init() -> T`. The result type is ignored -- an initializer's result is
       // implicit -- but it has to be reported, or this is accepted where the C++
@@ -1807,9 +1859,47 @@ extension ASTGenVisitor {
     return allMembers
   }
 
-  @inline(__always)
-  func generate(inheritedTypeList node: InheritedTypeListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate(type: $0.type) }.bridgedArray(in: self)
+  /// Generate an inheritance clause, diagnosing the placement of a `class`
+  /// requirement as `Parser::parseInheritance` does.
+  func generate(
+    inheritedTypeList node: InheritedTypeListSyntax,
+    allowClassRequirement: Bool = false,
+    allowAnyObject: Bool = false
+  ) -> BridgedArrayRef {
+    var firstClassRequirement: ClassRestrictionTypeSyntax? = nil
+    // Entries the C++ parser drops after diagnosing them.
+    var dropped = Set<SyntaxIdentifier>()
+    for (index, entry) in node.enumerated() {
+      guard let classRequirement = entry.type.as(ClassRestrictionTypeSyntax.self),
+        classRequirement.classKeyword.presence == .present
+      else {
+        continue
+      }
+      if !allowClassRequirement {
+        dropped.insert(entry.id)
+        self.diagnose(.unexpected_class_constraint, at: classRequirement.classKeyword)
+        if allowAnyObject {
+          self.diagnose(
+            .suggest_anyobject,
+            at: classRequirement.classKeyword,
+            fixIts: [.init(replace: self.generateCharSourceRange(classRequirement.classKeyword), with: "AnyObject")]
+          )
+        }
+      } else if firstClassRequirement != nil {
+        // If we already saw a class requirement, complain.
+        dropped.insert(entry.id)
+        self.diagnose(.redundant_class_requirement, at: classRequirement.classKeyword)
+      } else {
+        firstClassRequirement = classRequirement
+        // If the class requirement was not the first requirement, complain.
+        if index != 0 {
+          self.diagnose(.late_class_requirement, at: classRequirement.classKeyword)
+        }
+      }
+    }
+    return node.compactMap(in: self) { entry in
+      dropped.contains(entry.id) ? nil : self.generate(type: entry.type)
+    }
   }
 
   @inline(__always)

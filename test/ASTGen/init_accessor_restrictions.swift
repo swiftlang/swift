@@ -1,13 +1,12 @@
 // The names in '@storageRestrictions(initializes: a, b, accesses: c)' continue
 // across unlabeled arguments, so 'b' is part of 'initializes'.
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature InitAccessors
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature InitAccessors \
+// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift \
 // RUN:   -enable-experimental-feature ParserASTGen
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
-// REQUIRES: swift_feature_InitAccessors
 
 struct S {
   var x: Int

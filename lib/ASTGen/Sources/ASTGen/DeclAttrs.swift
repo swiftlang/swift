@@ -96,9 +96,46 @@ extension ASTGenVisitor {
         self.diagnose(
           diagnostic,
           at: introducer.map(Syntax.init) ?? Syntax(node),
-          fixIts: [.init(remove: self.generateCharSourceRange(node))]
+          fixIts: [self.tidyRemovalFixIt(node)]
         )
         return
+      }
+
+      // `class` members only exist in classes: in a struct, enum or protocol the
+      // C++ parser reports it and treats it as `static`.
+      var spelling = spelling
+      if spelling == .class {
+        let declNode = node.parent?.parent
+        var container = declNode?.parent
+        while let current = container, current.is(MemberBlockItemSyntax.self) || current.is(MemberBlockItemListSyntax.self)
+          || current.is(MemberBlockSyntax.self)
+        {
+          container = current.parent
+        }
+        let isProtocol = container?.is(ProtocolDeclSyntax.self) == true
+        if container?.is(StructDeclSyntax.self) == true || container?.is(EnumDeclSyntax.self) == true || isProtocol {
+          let diagnostic: CompilerDiagnostic?
+          if declNode?.is(FunctionDeclSyntax.self) == true {
+            diagnostic = .class_func_not_in_class(isProtocol)
+          } else if declNode?.is(VariableDeclSyntax.self) == true {
+            diagnostic = .class_var_not_in_class(isProtocol)
+          } else if declNode?.is(SubscriptDeclSyntax.self) == true {
+            diagnostic = .class_subscript_not_in_class(isProtocol)
+          } else {
+            diagnostic = nil
+          }
+          if let diagnostic {
+            // Reported at the declaration's introducer, after the modifiers.
+            let introducer = node.parent?.as(DeclModifierListSyntax.self)?.last?
+              .nextToken(viewMode: .sourceAccurate)
+            self.diagnose(
+              diagnostic,
+              at: introducer.map(Syntax.init) ?? Syntax(node),
+              fixIts: [.init(replace: self.generateCharSourceRange(node), with: "static")]
+            )
+            spelling = .static
+          }
+        }
       }
 
       // FIXME: Model static/class as a DeclAttribute.

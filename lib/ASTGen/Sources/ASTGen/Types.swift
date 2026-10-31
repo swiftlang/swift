@@ -242,7 +242,7 @@ extension ASTGenVisitor {
   func generate(tupleType node: TupleTypeSyntax) -> BridgedTupleTypeRepr {
     .createParsed(
       self.ctx,
-      elements: self.generate(tupleTypeElementList: node.elements),
+      elements: self.generate(tupleTypeElementList: node.elements, isFunctionType: false),
       leftParenLoc: self.generateSourceLoc(node.leftParen),
       rightParenLoc: self.generateSourceLoc(node.rightParen)
     )
@@ -289,7 +289,7 @@ extension ASTGenVisitor {
       // FIXME: Why does `FunctionTypeSyntax` not have a `TupleTypeSyntax` child?
       argsType: BridgedTupleTypeRepr.createParsed(
         self.ctx,
-        elements: self.generate(tupleTypeElementList: node.parameters),
+        elements: self.generate(tupleTypeElementList: node.parameters, isFunctionType: true),
         leftParenLoc: self.generateSourceLoc(node.leftParen),
         rightParenLoc: self.generateSourceLoc(node.rightParen)
       ).asTypeRepr,
@@ -550,8 +550,65 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func generate(tupleTypeElementList node: TupleTypeElementListSyntax) -> BridgedArrayRef {
-    node.lazy.map { element in
+  /// Diagnose the labels of a tuple type element, as `Parser::parseTupleTypeBody`
+  /// does: a function type's parameters have no argument labels, and a tuple
+  /// element may have only one label.
+  private func diagnoseTupleTypeElementLabels(_ element: TupleTypeElementSyntax, isFunctionType: Bool) {
+    guard let firstName = element.firstName else { return }
+    let hasFirstLabel = firstName.rawTokenKind != .wildcard
+    if !isFunctionType {
+      if element.secondName != nil {
+        // `(a b: Int)`: remove the second label.
+        self.diagnose(
+          .tuple_type_multiple_labels,
+          at: firstName,
+          fixIts: [.init(remove: self.labelRemovalRange(element, firstName: firstName, hasFirstLabel: hasFirstLabel))]
+        )
+      }
+      return
+    }
+
+    // Arguments in function types are always unlabeled.
+    if hasFirstLabel {
+      let fixIt: CompilerDiagnosticFixIt
+      if element.secondName == nil {
+        fixIt = .init(
+          replace: CharSourceRange(start: self.generateSourceLoc(firstName), byteLength: 0), with: "_ ")
+      } else if element.secondName?.rawTokenKind == .wildcard {
+        fixIt = .init(remove: self.labelRemovalRange(element, firstName: firstName, hasFirstLabel: false))
+      } else {
+        fixIt = .init(replace: self.generateCharSourceRange(firstName), with: "_")
+      }
+      self.diagnose(
+        .function_type_argument_label(self.generateIdentifier(firstName)),
+        at: firstName,
+        fixIts: [fixIt]
+      )
+    }
+  }
+
+  /// The range to delete to drop a tuple element's extra label.
+  private func labelRemovalRange(
+    _ element: TupleTypeElementSyntax, firstName: TokenSyntax, hasFirstLabel: Bool
+  ) -> CharSourceRange {
+    if !hasFirstLabel {
+      // `_ b: Int`: remove from the first name up to the type.
+      return self.generateCharSourceRange(
+        start: firstName.positionAfterSkippingLeadingTrivia,
+        length: SourceLength(
+          utf8Length: element.type.positionAfterSkippingLeadingTrivia.utf8Offset
+            - firstName.positionAfterSkippingLeadingTrivia.utf8Offset))
+    }
+    // `a b: Int`: remove the text between the first name and the second.
+    let start = firstName.endPositionBeforeTrailingTrivia
+    let end = element.secondName!.endPositionBeforeTrailingTrivia
+    return self.generateCharSourceRange(
+      start: start, length: SourceLength(utf8Length: end.utf8Offset - start.utf8Offset))
+  }
+
+  func generate(tupleTypeElementList node: TupleTypeElementListSyntax, isFunctionType: Bool) -> BridgedArrayRef {
+    node.compactMap(in: self) { element -> BridgedTupleTypeElement? in
+      self.diagnoseTupleTypeElementLabels(element, isFunctionType: isFunctionType)
       let (firstName, firstNameLoc) =
         self.generateIdentifierAndSourceLoc(element.firstName)
       let (secondName, secondNameLoc) = self.generateIdentifierAndSourceLoc(element.secondName)
@@ -575,7 +632,7 @@ extension ASTGenVisitor {
         Type: type,
         TrailingCommaLoc: self.generateSourceLoc(element.trailingComma)
       )
-    }.bridgedArray(in: self)
+    }
   }
 }
 

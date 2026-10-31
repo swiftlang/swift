@@ -169,6 +169,39 @@ extension ASTGenVisitor {
     }
   }
 
+  /// A fix-it that deletes `node`, tidying up the whitespace around the hole the
+  /// way `InFlightDiagnostic::fixItRemove(SourceRange)` does: if only whitespace
+  /// precedes the node on its line and a newline follows it, the whole line goes;
+  /// if a space follows it and whitespace precedes it, that one space goes too.
+  func tidyRemovalFixIt(_ node: some SyntaxProtocol) -> CompilerDiagnosticFixIt {
+    let start = node.positionAfterSkippingLeadingTrivia.utf8Offset
+    let end = node.endPositionBeforeTrailingTrivia.utf8Offset
+    let after: UInt8? = end < self.base.count ? self.base[end] : nil
+    let before: UInt8? = start > 0 ? self.base[start - 1] : nil
+    func isSpace(_ c: UInt8?) -> Bool {
+      guard let c else { return false }
+      return c == UInt8(ascii: " ") || c == UInt8(ascii: "\t") || c == UInt8(ascii: "\n") || c == UInt8(ascii: "\r")
+    }
+
+    var removalStart = start
+    var length = end - start
+    if after == UInt8(ascii: "\n") || after == UInt8(ascii: "\r") {
+      var lineStart = start
+      while lineStart > 0, self.base[lineStart - 1] != UInt8(ascii: "\n"), self.base[lineStart - 1] != UInt8(ascii: "\r") {
+        lineStart -= 1
+      }
+      if self.base[lineStart..<start].allSatisfy({ isSpace($0) }) {
+        removalStart = lineStart
+        length = (start - lineStart) + length + 1
+      }
+    } else if after == UInt8(ascii: " "), isSpace(before) {
+      length += 1
+    }
+    return .init(
+      remove: self.generateCharSourceRange(
+        start: AbsolutePosition(utf8Offset: removalStart), length: SourceLength(utf8Length: length)))
+  }
+
   /// The character range covering `node`, excluding trivia.
   func generateCharSourceRange(_ node: some SyntaxProtocol) -> CharSourceRange {
     self.generateCharSourceRange(
