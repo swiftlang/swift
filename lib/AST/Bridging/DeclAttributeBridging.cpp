@@ -560,6 +560,11 @@ BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str) {
   return role.has_value() ? *role : BridgedMacroRoleNone;
 }
 
+bool BridgedMacroRole_isSupported(BridgedMacroRole role,
+                                  BridgedASTContext cContext) {
+  return isMacroSupported(unbridge(role), cContext.unbridged());
+}
+
 MacroSyntax unbridge(BridgedMacroSyntax cSyntax) {
   switch (cSyntax) {
   case BridgedMacroSyntaxAttached:

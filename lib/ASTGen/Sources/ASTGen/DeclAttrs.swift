@@ -1861,14 +1861,23 @@ extension ASTGenVisitor {
 
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
       // Macro role.
+      var roleToken: TokenSyntax?
       let role = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
-        BridgedMacroRole(from: $0.rawText.bridged)
+        roleToken = $0
+        return BridgedMacroRole(from: $0.rawText.bridged)
       }
       guard let role = role else {
         return nil
       }
       guard role != .none else {
         // TODO: Diagnose.
+        return nil
+      }
+      guard role.isSupported(in: self.ctx) else {
+        self.diagnose(
+          .macro_experimental(roleToken!.text, ""),
+          at: roleToken!
+        )
         return nil
       }
       if role.isAttached != isAttached {

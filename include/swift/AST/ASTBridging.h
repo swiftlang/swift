@@ -1317,6 +1317,10 @@ BRIDGED_INLINE swift::MacroRole unbridge(BridgedMacroRole cRole);
 SWIFT_NAME("BridgedMacroRole.init(from:)")
 BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str);
 
+SWIFT_NAME("BridgedMacroRole.isSupported(self:in:)")
+bool BridgedMacroRole_isSupported(BridgedMacroRole role,
+                                  BridgedASTContext cContext);
+
 SWIFT_NAME("getter:BridgedMacroRole.isAttached(self:)")
 BRIDGED_INLINE bool BridgedMacroRole_isAttached(BridgedMacroRole role);
 
