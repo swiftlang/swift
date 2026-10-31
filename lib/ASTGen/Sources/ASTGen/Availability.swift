@@ -346,6 +346,17 @@ extension ASTGenVisitor {
       let version = self.generate(versionTuple: versionNode)
       let versionRange = self.generateSourceRange(versionNode)
 
+      // A version cannot be empty (`0`, `0.0`): the C++ parser warns, until
+      // Swift 6, and drops the whole specification.
+      if let versionNode, let version, version.components.allSatisfy({ $0 == 0 }) {
+        self.diagnose(
+          CompilerDiagnostic.avail_query_expected_version_number.warnUntilLanguageMode(6),
+          at: versionNode
+        )
+        self.availabilitySpecListIsInvalid = true
+        return
+      }
+
       if context != .macro {
         // Try expand macro first.
         let expanded = ctx.availabilityMacroMap.get(
@@ -596,12 +607,13 @@ extension ASTGenVisitor {
         "AvailabilityConditionSyntax keyword is neither '#available' nor '#unavailable'"
       )
     }
+    self.availabilitySpecListIsInvalid = false
     let specs = self.generateAvailabilitySpecList(
       args: node.availabilityArguments,
       context: specListContext
     )
 
-    return .createParsed(
+    let info = BridgedPoundAvailableInfo.createParsed(
       self.ctx,
       poundLoc: self.generateSourceLoc(node.availabilityKeyword),
       lParenLoc: self.generateSourceLoc(node.leftParen),
@@ -609,6 +621,13 @@ extension ASTGenVisitor {
       rParenLoc: self.generateSourceLoc(node.rightParen),
       isUnavailable: specListContext == .poundUnavailable
     )
+    // As in the C++ parser, a specification list that failed to parse makes
+    // the whole condition invalid.
+    if self.availabilitySpecListIsInvalid {
+      info.setInvalid()
+      self.availabilitySpecListIsInvalid = false
+    }
+    return info
   }
 
 }

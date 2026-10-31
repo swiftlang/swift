@@ -59,9 +59,25 @@ final class FingerprintVisitor: SyntaxVisitor {
     return .skipChildren
   }
 
+  /// The member block being fingerprinted. Its own tokens are hashed; the
+  /// member blocks of nominal types and extensions nested inside it are not,
+  /// because those have fingerprints of their own.
+  var root: MemberBlockSyntax?
+
   override func visit(_ node: MemberBlockSyntax) -> SyntaxVisitorContinueKind {
-    // Skip nominal decl / extension member blocks.
-    return .skipChildren
+    // Skip nested nominal decl / extension member blocks.
+    return node == root ? .visitChildren : .skipChildren
+  }
+
+  override func visit(_ node: AccessorBlockSyntax) -> SyntaxVisitorContinueKind {
+    // The statements of an implicit getter (`var p: Int { return 0 }`) are a
+    // function body just like a `CodeBlockSyntax`, but are not wrapped in one.
+    if case .getter = node.accessors {
+      hasher.combine(text: node.leftBrace.rawText)
+      hasher.combine(text: node.rightBrace.rawText)
+      return .skipChildren
+    }
+    return .visitChildren
   }
 
   override func visit(_ node: CodeBlockSyntax) -> SyntaxVisitorContinueKind {
@@ -94,6 +110,7 @@ func getSourceFileFingerprint(
 extension ASTGenVisitor {
   func generateFingerprint(declGroup node: some DeclGroupSyntax) -> Fingerprint {
     let visitor = FingerprintVisitor(configuredRegions: self.configuredRegions)
+    visitor.root = node.memberBlock
     visitor.walk(node.memberBlock)
     return visitor.finalize()
   }

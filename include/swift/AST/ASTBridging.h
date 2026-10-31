@@ -2602,6 +2602,9 @@ BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
     swift::SourceLoc lParenLoc, BridgedArrayRef cSpecs,
     swift::SourceLoc rParenLoc, bool isUnavailability);
 
+SWIFT_NAME("BridgedPoundAvailableInfo.setInvalid(self:)")
+void BridgedPoundAvailableInfo_setInvalid(BridgedPoundAvailableInfo info);
+
 SWIFT_NAME("BridgedStmtConditionElement.createHasSymbol(_:poundLoc:lParenLoc:"
            "symbol:rParenLoc:)")
 BridgedStmtConditionElement BridgedStmtConditionElement_createHasSymbol(

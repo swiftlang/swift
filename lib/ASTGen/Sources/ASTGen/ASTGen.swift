@@ -41,6 +41,10 @@ struct ASTGenVisitor {
   /// attribute list being generated, to diagnose duplicates.
   @Boxed var seenExposureKinds: [UInt8] = []
 
+  /// Set when an availability specification list was diagnosed and had a
+  /// specification dropped, so the condition is marked invalid.
+  @Boxed var availabilitySpecListIsInvalid: Bool = false
+
   /// Whether the accessors being generated belong to a declaration that was
   /// already diagnosed as invalid, so they are marked invalid too.
   @Boxed var accessorsAreInvalid: Bool = false

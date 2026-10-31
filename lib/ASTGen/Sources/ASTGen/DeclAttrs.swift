@@ -829,8 +829,31 @@ extension ASTGenVisitor {
       baseType = _baseType
       (declName, declNameLoc) = self.generateDeclNameRef(declReferenceExpr: memberExpr.declName)
 
+    } else if let typeExpr = expr.as(TypeExprSyntax.self),
+      let identifierType = typeExpr.type.as(IdentifierTypeSyntax.self),
+      identifierType.genericArgumentClause == nil
+    {
+      // SwiftParser parses a bare name followed by an accessor label
+      // (`of: property.set`) as a type.
+      baseType = nil
+      (declName, declNameLoc) = self.generateDeclNameRef(
+        moduleSelector: identifierType.moduleSelector,
+        baseName: identifierType.name
+      )
+
+    } else if let typeExpr = expr.as(TypeExprSyntax.self),
+      let memberType = typeExpr.type.as(MemberTypeSyntax.self),
+      memberType.genericArgumentClause == nil
+    {
+      // `of: Base.property.set`
+      baseType = self.generate(type: memberType.baseType)
+      (declName, declNameLoc) = self.generateDeclNameRef(
+        moduleSelector: nil,
+        baseName: memberType.name
+      )
+
     } else {
-      // TODO: Diagnosse.
+      // TODO: Diagnose.
       fatalError("invalid expression for @derivative original decl name")
     }
 
@@ -968,22 +991,47 @@ extension ASTGenVisitor {
   ///   ```
   ///   @derivative(of: foo(arg:), wrt: self)
   ///   ```
+  /// The accessor kind that a label such as `get` in `@derivative(of: p.get)`
+  /// names.
+  static func accessorKind(forLabel label: String) -> swift.AccessorKind? {
+    switch label {
+    case "get": return .get
+    case "set": return .set
+    case "willSet": return .willSet
+    case "didSet": return .didSet
+    case "_read": return ._read
+    case "_modify": return ._modify
+    case "unsafeAddress": return .unsafeAddress
+    case "unsafeMutableAddress": return .unsafeMutableAddress
+    default: return nil
+    }
+  }
+
   func generateDerivativeAttr(attribute node: AttributeSyntax) -> BridgedDerivativeAttr? {
     guard let args = node.arguments?.as(DerivativeAttributeArgumentsSyntax.self) else {
       fatalError("(compiler bug) invalid arguments for @derivative attribute")
     }
-    guard let originalDecl = self.generateDerivativeOriginalDecl(expr: args.originalDeclName) else {
+    // SwiftParser may leave an accessor label inside the original name
+    // (`of: property.get`), where the C++ parser takes a final `get`/`set`/...
+    // as the accessor kind of what comes before it.
+    var originalName = args.originalDeclName
+    var accessorKind: swift.AccessorKind? = nil
+    if args.accessorSpecifier == nil, let member = originalName.as(MemberAccessExprSyntax.self),
+      let base = member.base, member.declName.argumentNames == nil,
+      let kind = Self.accessorKind(forLabel: member.declName.baseName.text)
+    {
+      originalName = base
+      accessorKind = kind
+    }
+    guard let originalDecl = self.generateDerivativeOriginalDecl(expr: originalName) else {
       return nil
     }
 
-    let accessorKind: swift.AccessorKind?
     if let accessorToken = args.accessorSpecifier {
       accessorKind = self.generate(
         accessorSpecifier: accessorToken,
         modifiers: []
       )
-    } else {
-      accessorKind = nil
     }
 
     let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)

@@ -63,6 +63,10 @@ BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
                                     specs, rParenLoc, isUnavailability);
 }
 
+void BridgedPoundAvailableInfo_setInvalid(BridgedPoundAvailableInfo info) {
+  info.unbridged()->setInvalid();
+}
+
 BridgedStmtConditionElement BridgedStmtConditionElement_createHasSymbol(
     BridgedASTContext cContext, SourceLoc poundLoc, SourceLoc lParenLoc,
     BridgedNullableExpr cSymbolExpr, SourceLoc rParenLoc) {
