@@ -12,7 +12,7 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftDiagnostics
+@_spi(Compiler) import SwiftDiagnostics
 import SwiftSyntax
 
 fileprivate struct PerFrontendDiagnosticState {
@@ -80,11 +80,16 @@ public func emitDiagnostic(
   diagnosticSeverity: DiagnosticSeverity,
   messageSuffix: String? = nil
 ) {
-  // Attach the Fix-It to the diagnostic itself, as the C++ parser does, rather
-  // than emitting it as a separate note. SwiftParser can offer several
-  // alternative Fix-Its for one diagnostic (e.g. "insert newline" or
-  // "insert ';'"); they cannot all be applied together, so only the first is
-  // attached.
+  // SwiftParser diagnostics: attach the Fix-It to the diagnostic itself, as the
+  // C++ parser does, rather than emitting it as a separate note. SwiftParser
+  // can offer several alternative Fix-Its for one diagnostic (e.g. "insert
+  // newline" or "insert ';'"); they cannot all be applied together, so only the
+  // first is attached.
+  //
+  // Other sources, such as SwiftIfConfig, have no C++-parser counterpart that
+  // attaches the Fix-It; the C++ side reports those as notes, so keep that.
+  let domain = diagnostic.diagnosticID.domain
+  let attachFixIt = domain == "SwiftParser" || domain == "SwiftLexer"
   emitDiagnosticParts(
     diagnosticEngine: diagnosticEngine,
     sourceFileBuffer: sourceFileBuffer,
@@ -93,8 +98,23 @@ public func emitDiagnostic(
     position: diagnostic.position,
     offset: sourceFileBufferOffset,
     highlights: diagnostic.highlights,
-    edits: diagnostic.fixIts.first?.edits ?? []
+    edits: attachFixIt ? (diagnostic.fixIts.first?.edits ?? []) : []
   )
+
+  if !attachFixIt {
+    // FIXME: Ths assumes the fixIt is on the same tree/buffer, which is not guaranteed.
+    for fixIt in diagnostic.fixIts {
+      emitDiagnosticParts(
+        diagnosticEngine: diagnosticEngine,
+        sourceFileBuffer: sourceFileBuffer,
+        message: fixIt.message.message,
+        severity: .note,
+        position: diagnostic.position,
+        offset: sourceFileBufferOffset,
+        edits: fixIt.edits
+      )
+    }
+  }
 
   // Emit any notes as follow-ons.
   // FIXME: Ths assumes the node is on the same tree/buffer, which is not guaranteed.
