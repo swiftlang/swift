@@ -105,10 +105,29 @@ extension ASTGenVisitor {
   }
 
   func generate(valueBindingPattern node: ValueBindingPatternSyntax) -> BridgedBindingPattern {
+    let introducer: BridgedVarDeclIntroducer
+    switch node.bindingSpecifier.text {
+    case "let": introducer = .let
+    case "inout": introducer = .inOut
+    case "borrowing", "_borrowing":
+      // `borrowing` in a pattern is deprecated spelling for `let`, but it still
+      // gives the bindings the borrowing introducer. It applies only directly to
+      // a binding name.
+      introducer = .borrowing
+      self.diagnose(
+        .borrowing_syntax_change,
+        at: node.bindingSpecifier,
+        fixIts: [.init(replace: self.generateCharSourceRange(node.bindingSpecifier), with: "let")]
+      )
+      if !node.pattern.is(IdentifierPatternSyntax.self) {
+        self.diagnose(.borrowing_subpattern_unsupported, at: node.pattern)
+      }
+    default: introducer = .var
+    }
     return .createParsed(
       self.ctx,
       keywordLoc: self.generateSourceLoc(node.bindingSpecifier),
-      isLet: node.bindingSpecifier.keywordKind == .let,
+      introducer: introducer,
       subPattern: self.generate(pattern: node.pattern)
     )
   }

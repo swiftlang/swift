@@ -52,6 +52,28 @@ BridgedAnyPattern BridgedAnyPattern_createImplicit(BridgedASTContext cContext) {
   return AnyPattern::createImplicit(cContext.unbridged());
 }
 
+BridgedBindingPattern BridgedBindingPattern_createParsedWithIntroducer(
+    BridgedASTContext cContext, SourceLoc keywordLoc,
+    BridgedVarDeclIntroducer cIntroducer, BridgedPattern cSubPattern) {
+  VarDecl::Introducer introducer;
+  switch (cIntroducer) {
+  case BridgedVarDeclIntroducerLet:
+    introducer = VarDecl::Introducer::Let;
+    break;
+  case BridgedVarDeclIntroducerVar:
+    introducer = VarDecl::Introducer::Var;
+    break;
+  case BridgedVarDeclIntroducerInOut:
+    introducer = VarDecl::Introducer::InOut;
+    break;
+  case BridgedVarDeclIntroducerBorrowing:
+    introducer = VarDecl::Introducer::Borrowing;
+    break;
+  }
+  return BindingPattern::createParsed(cContext.unbridged(), keywordLoc,
+                                      introducer, cSubPattern.unbridged());
+}
+
 BridgedBindingPattern
 BridgedBindingPattern_createParsed(BridgedASTContext cContext,
                                    SourceLoc keywordLoc, bool isLet,

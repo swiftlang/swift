@@ -6,11 +6,11 @@ func foo() {}
 @diagnose(Deprecate, as: warning) // expected-warning {{the diagnostic group identifier 'Deprecate' is unknown}}
 func bar() {}
 
-@diagnose(DeprecatedDeclaration, as: what) // expected-cparser-error {{expected diagnostic behavior argument 'what' to be either 'error', 'warning' or 'ignored'}}
+@diagnose(DeprecatedDeclaration, as: what) // expected-error {{expected diagnostic behavior argument 'what' to be either 'error', 'warning' or 'ignored'}}
 func baz() {}
 
 // expected-warning @+1 {{the diagnostic group identifier 'Hmm' is unknown}}
-@diagnose(Hmm, as: what) // expected-cparser-error {{expected diagnostic behavior argument 'what' to be either 'error', 'warning' or 'ignored'}}
+@diagnose(Hmm, as: what) // expected-error {{expected diagnostic behavior argument 'what' to be either 'error', 'warning' or 'ignored'}}
 func qux() {}
 
 @diagnose(ExistentialAny, as: ignored, reason: "for a lit test")

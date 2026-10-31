@@ -204,6 +204,20 @@ extension ASTGenVisitor {
   }
 
   func generate(awaitExpr node: AwaitExprSyntax) -> BridgedAwaitExpr {
+    // 'try' must precede 'await'.
+    if let tryExpr = node.expression.as(TryExprSyntax.self) {
+      self.diagnose(
+        .await_before_try,
+        at: node.awaitKeyword,
+        fixIts: [
+          self.tidyRemovalFixIt(node.awaitKeyword),
+          .init(
+            replace: CharSourceRange(
+              start: self.generateSourceLoc(tryExpr.expression), byteLength: 0),
+            with: "await "),
+        ]
+      )
+    }
     return .createParsed(
       self.ctx,
       awaitLoc: self.generateSourceLoc(node.awaitKeyword),

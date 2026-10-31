@@ -658,8 +658,9 @@ extension ASTGenVisitor {
         }
         return intExpr.representedLiteralValue
       }
-      guard let value, value > 0 else {
-        // TODO: Diagnose.
+      // Zero is accepted here; Sema diagnoses a value that is not a power of two.
+      guard let value, value >= 0, value <= Int(UInt32.max) else {
+        self.diagnose(.alignment_must_be_positive_integer, at: node.attributeName)
         return nil
       }
 
@@ -976,13 +977,18 @@ extension ASTGenVisitor {
           var implementation: BridgedStringRef = BridgedStringRef()
           var threading: BridgedCOMThreadingModel? = .apartment
 
+          if arguments.isEmpty {
+            self.diagnose(.attr_com_expected_label, at: node.attributeName)
+            return nil
+          }
+
           for argument in arguments {
             switch argument.label?.rawText {
             case let label where label == "interface":
               guard let value =
                   generateConsumingSimpleStringLiteralAttrOption(args: &arguments,
                                                                  label: label) else {
-                    // TODO: diagnose
+                    self.diagnose(.attr_expected_string_literal("com"), at: node.attributeName)
                     return nil
                   }
               interface = value
@@ -990,7 +996,7 @@ extension ASTGenVisitor {
               guard let value =
                   generateConsumingSimpleStringLiteralAttrOption(args: &arguments,
                                                                  label: label) else {
-                    // TODO: diagnose
+                    self.diagnose(.attr_expected_string_literal("com"), at: node.attributeName)
                     return nil
                   }
               implementation = value
@@ -1007,8 +1013,20 @@ extension ASTGenVisitor {
                   case "neutral"?: .neutral
                   default: nil
                   }
-            default:
-              // TODO: diagnose
+              if threading == nil {
+                if let member = argument.expression.as(MemberAccessExprSyntax.self) {
+                  self.diagnose(
+                    .attr_com_unknown_threading_model(member.declName.baseName.text),
+                    at: node.attributeName)
+                } else {
+                  self.diagnose(.attr_com_expected_threading_model, at: node.attributeName)
+                }
+              }
+            case nil:
+              self.diagnose(.attr_com_expected_label, at: node.attributeName)
+              return nil
+            case let label?:
+              self.diagnose(.attr_com_unknown_label(String(syntaxText: label)), at: node.attributeName)
               return nil
             }
           }
@@ -2834,7 +2852,10 @@ extension ASTGenVisitor {
             case "error": return swift.WarningGroupBehavior.error
             case "warning": return swift.WarningGroupBehavior.warning
             case "ignored": return swift.WarningGroupBehavior.ignored
-            default: return nil
+            default:
+              self.diagnose(
+                .attr_diagnose_expected_known_behavior(declRefExpr.baseName.text), at: node.attributeName)
+              return nil
             }
           })
       else {

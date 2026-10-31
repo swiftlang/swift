@@ -3179,6 +3179,11 @@ BridgedBindingPattern_createParsed(BridgedASTContext cContext,
                                    swift::SourceLoc keywordLoc, bool isLet,
                                    BridgedPattern cSubPattern);
 
+SWIFT_NAME("BridgedBindingPattern.createParsed(_:keywordLoc:introducer:subPattern:)")
+BridgedBindingPattern BridgedBindingPattern_createParsedWithIntroducer(
+    BridgedASTContext cContext, swift::SourceLoc keywordLoc,
+    BridgedVarDeclIntroducer introducer, BridgedPattern cSubPattern);
+
 SWIFT_NAME("BridgedBindingPattern.createImplicitCatch(_:loc:)")
 BridgedBindingPattern
 BridgedBindingPattern_createImplicitCatch(BridgedDeclContext cDeclContext,

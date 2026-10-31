@@ -379,13 +379,13 @@ func testSequenceExpr() async throws(Never) {
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 
   _ = await try! getIntAsync() + getIntAsync()
-  // expected-cparser-warning@-1 {{'try' must precede 'await'}}
+  // expected-warning@-1 {{'try' must precede 'await'}}
 
   _ = unsafe await try! getIntAsync() + getIntAsync()
-  // expected-cparser-warning@-1 {{'try' must precede 'await'}}
+  // expected-warning@-1 {{'try' must precede 'await'}}
   // expected-warning@-2{{no unsafe operations occur within 'unsafe' expression}}
   _ = try unsafe await try! getIntAsync() + getIntAsync()
-  // expected-cparser-warning@-1 {{'try' must precede 'await'}}
+  // expected-warning@-1 {{'try' must precede 'await'}}
   // expected-warning@-2 {{no calls to throwing functions occur within 'try' expression}}
   // expected-warning@-3{{no unsafe operations occur within 'unsafe' expression}}
   try _ = (try! getInt()) + getInt()
