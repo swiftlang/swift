@@ -671,10 +671,105 @@ static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
   return false;
 }
 
+/// Whether \p sig suppresses Deinitable for a type that \p parentSig, the
+/// signature of the enclosing context, doesn't already suppress it for.
+static bool hasOwnDeinitableInverse(GenericSignature sig,
+                                    GenericSignature parentSig) {
+  auto getSubjects = [](GenericSignature sig) {
+    SmallVector<CanType, 2> subjects;
+    if (!sig)
+      return subjects;
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    sig->getRequirementsWithInverses(reqs, inverses);
+    for (auto inverse : inverses)
+      if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
+        subjects.push_back(inverse.subject->getCanonicalType());
+    return subjects;
+  };
+
+  auto subjects = getSubjects(sig);
+  if (subjects.empty())
+    return false;
+
+  auto parentSubjects = getSubjects(parentSig);
+  return llvm::any_of(subjects, [&](CanType subject) {
+    return !llvm::is_contained(parentSubjects, subject);
+  });
+}
+
+/// Whether the declaration suppresses `Deinitable` in its inheritance clause,
+/// its generic signature, its opaque result type, or the associated types of
+/// its requirement signature, or extends a type that does.
+static bool suppressesDeinitable(Decl *decl) {
+  // Only the standard library and modules with NondeinitableTypes can
+  // suppress Deinitable.
+  if (!decl->getModuleContext()->isStdlibModule() &&
+      !decl->getASTContext().LangOpts.hasFeature(Feature::NondeinitableTypes))
+    return false;
+
+  // An extension of a type that suppresses Deinitable. An unconstrained
+  // extension of a type with a `~Deinitable` generic parameter has a signature
+  // in which the parameter is Deinitable.
+  if (auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+    auto *nominal = ext->getExtendedNominal();
+    if (nominal && !isa<ProtocolDecl>(nominal) && suppressesDeinitable(nominal))
+      return true;
+  }
+
+  // A struct or enum that suppresses Deinitable.
+  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
+  if (nominal && !isa<ProtocolDecl>(nominal)) {
+    InvertibleProtocolSet inverses;
+    bool anyObject = false;
+    (void)getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject);
+    if (inverses.contains(InvertibleProtocolKind::Deinitable))
+      return true;
+  }
+
+  // A generic signature that suppresses Deinitable. Inverses that are
+  // inherited from the enclosing context, like those of the `Self` parameter
+  // of a protocol requirement, belong to the enclosing declaration. The
+  // inverses of a protocol's own `Self` come from its inheritance clause.
+  auto *genericContext = decl->getAsGenericContext();
+  if (genericContext && !isa<ProtocolDecl>(decl)) {
+    if (hasOwnDeinitableInverse(
+            genericContext->getGenericSignature(),
+            decl->getDeclContext()->getGenericSignatureOfContext()))
+      return true;
+  }
+
+  // An opaque result type that suppresses Deinitable.
+  if (auto *value = dyn_cast<ValueDecl>(decl)) {
+    if (auto *opaque = value->getOpaqueResultTypeDecl()) {
+      if (hasOwnDeinitableInverse(
+              opaque->getOpaqueInterfaceGenericSignature(),
+              value->getInnermostDeclContext()->getGenericSignatureOfContext()))
+        return true;
+    }
+  }
+
+  // A protocol with an associated type that suppresses Deinitable.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverses;
+    proto->getRequirementSignature().getRequirementsWithInverses(proto, reqs,
+                                                                 inverses);
+    auto selfType = proto->getSelfInterfaceType();
+    for (auto inverse : inverses) {
+      if (inverse.getKind() == InvertibleProtocolKind::Deinitable &&
+          !inverse.subject->isEqual(selfType))
+        return true;
+    }
+  }
+
+  return false;
+}
+
 static bool usesFeatureDeinitableProtocol(Decl *decl) {
   auto *proto = dyn_cast<ProtocolDecl>(decl);
   if (!proto)
-    return false;
+    return suppressesDeinitable(decl);
 
   if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
     return true;
@@ -682,6 +777,9 @@ static bool usesFeatureDeinitableProtocol(Decl *decl) {
   // The printer never prints Sendable's inverses.
   if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
     return false;
+
+  if (suppressesDeinitable(proto))
+    return true;
 
   // Copyable inherits Deinitable, and a protocol may suppress it.
   InheritedTypes inherited(proto);
@@ -834,44 +932,7 @@ static bool usesFeatureNondeinitableTypes(Decl *decl) {
   if (!ctx.LangOpts.hasFeature(Feature::NondeinitableTypes))
     return false;
 
-  // A struct or enum that suppresses Deinitable, or an extension of one.
-  auto *nominal = dyn_cast<NominalTypeDecl>(decl);
-  if (auto *ext = dyn_cast<ExtensionDecl>(decl))
-    nominal = ext->getExtendedNominal();
-  if (nominal) {
-    InvertibleProtocolSet inverses;
-    bool anyObject = false;
-    (void)getDirectlyInheritedNominalTypeDecls(nominal, inverses, anyObject);
-    if (inverses.contains(InvertibleProtocolKind::Deinitable))
-      return true;
-  }
-
-  // A generic signature that suppresses Deinitable.
-  if (auto *genericContext = decl->getAsGenericContext()) {
-    if (auto sig = genericContext->getGenericSignature()) {
-      SmallVector<Requirement, 2> reqs;
-      SmallVector<InverseRequirement, 2> inverses;
-      sig->getRequirementsWithInverses(reqs, inverses);
-      for (auto inverse : inverses) {
-        if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
-          return true;
-      }
-    }
-  }
-
-  // A protocol with an associated type that suppresses Deinitable.
-  if (auto *proto = dyn_cast<ProtocolDecl>(decl)) {
-    SmallVector<Requirement, 2> reqs;
-    SmallVector<InverseRequirement, 2> inverses;
-    proto->getRequirementSignature().getRequirementsWithInverses(proto, reqs,
-                                                                 inverses);
-    for (auto inverse : inverses) {
-      if (inverse.getKind() == InvertibleProtocolKind::Deinitable)
-        return true;
-    }
-  }
-
-  return false;
+  return suppressesDeinitable(decl);
 }
 
 // ----------------------------------------------------------------------------
@@ -912,11 +973,12 @@ static bool hasFeatureSuppressionAttribute(Decl *decl, StringRef featureName,
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunused"
 static bool disallowFeatureSuppression(StringRef featureName, Decl *decl) {
-  // Compilers without the Deinitable protocol must not see it at all.
+  // Compilers without the Deinitable protocol must not see it at all. Only
+  // protocols can be printed without their references to it.
   if (featureName == "DeinitableProtocol") {
-    if (auto *proto = dyn_cast<ProtocolDecl>(decl))
-      if (proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
-        return true;
+    auto *proto = dyn_cast<ProtocolDecl>(decl);
+    if (!proto || proto->isSpecificProtocol(KnownProtocolKind::Deinitable))
+      return true;
   }
 
   return hasFeatureSuppressionAttribute(decl, featureName, true);
