@@ -42,6 +42,15 @@ BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext) {
   return cContext.unbridged().LangOpts;
 }
 
+bool BridgedLangOptions_isLanguageModeAtLeast(BridgedLangOptions cLangOpts,
+                                              SwiftInt major, SwiftInt minor) {
+  for (auto mode : LanguageMode::allSupportedModes()) {
+    if (mode.version() == std::make_pair((unsigned)major, (unsigned)minor))
+      return cLangOpts.unbridged().isLanguageModeAtLeast(mode);
+  }
+  llvm_unreachable("not a supported language mode");
+}
+
 unsigned BridgedASTContext::getMajorLanguageVersion() const {
   return unbridged().LangOpts.EffectiveLanguageVersion[0];
 }

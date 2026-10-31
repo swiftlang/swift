@@ -275,6 +275,12 @@ BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);
 SWIFT_NAME("getter:BridgedASTContext.langOpts(self:)")
 BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext);
 
+/// Whether the effective language mode is at least `major.minor`, which must
+/// name a supported language mode (e.g. 4.2 or 5.0).
+SWIFT_NAME("BridgedLangOptions.isLanguageModeAtLeast(self:major:minor:)")
+bool BridgedLangOptions_isLanguageModeAtLeast(BridgedLangOptions cLangOpts,
+                                              SwiftInt major, SwiftInt minor);
+
 SWIFT_NAME("BridgedLangOptions.hasAttributeNamed(self:_:)")
 bool BridgedLangOptions_hasAttributeNamed(BridgedLangOptions cLangOpts,
                                           BridgedStringRef cName);

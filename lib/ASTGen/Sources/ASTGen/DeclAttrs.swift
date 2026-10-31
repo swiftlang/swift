@@ -257,22 +257,53 @@ extension ASTGenVisitor {
       case nil where attrName == "_unavailableInEmbedded":
         return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
-      // Renamed attributes.
+      // Renamed attributes. These keep working, with a diagnostic whose
+      // severity matches the C++ parser's.
       case nil where attrName == "_functionBuilder":
-        // TODO: Diagnostics. '_functionBuilder' is renamed to 'resultBuilder'
+        self.diagnoseRenamedAttribute(node, to: "resultBuilder", warning: true)
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .ResultBuilder))
-      case nil where attrName == "_inlineable":
-        // TODO: Diagnose.
-        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Inlinable))
       case nil where attrName == "inlineable":
-        // TODO: Diagnose.
+        self.diagnoseRenamedAttribute(node, to: "inlinable", closeMatch: true)
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Inlinable))
+      case nil where attrName == "_inlineable":
+        self.diagnoseRenamedAttributeByLanguageMode(node, to: "inlinable")
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Inlinable))
       case nil where attrName == "_versioned":
-        // TODO: Diagnose.
+        self.diagnoseRenamedAttributeByLanguageMode(node, to: "usableFromInline")
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .UsableFromInline))
+      case nil where attrName == "propertyDelegate" || attrName == "_propertyWrapper":
+        self.diagnoseRenamedAttribute(node, to: "propertyWrapper", warning: true)
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .PropertyWrapper))
+      case nil where attrName == "_section":
+        self.diagnoseRenamedAttribute(node, to: "section", warning: true)
+        return handle(self.generateSectionAttr(attribute: node)?.asDeclAttribute)
+      case nil where attrName == "_used":
+        self.diagnoseRenamedAttribute(node, to: "used", warning: true)
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Used))
+      case nil where attrName == "_predatesConcurrency":
+        self.diagnoseRenamedAttribute(node, to: "preconcurrency", warning: true)
+        return handle(self.generateSimpleDeclAttr(attribute: node, kind: .Preconcurrency))
       case nil where attrName == "warn":
-        // TODO: Diagnose. 'warn' is renamed to 'diagnose'
+        self.diagnoseRenamedAttribute(node, to: "diagnose", warning: true)
         return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
+
+      // Removed attributes. The C++ parser diagnoses and drops them.
+      case nil where attrName == "_unsafeSendable" || attrName == "_unsafeMainActor":
+        self.diagnose(
+          .warn_attr_unsafe_removed(String(syntaxText: attrName)),
+          at: node.atSign,
+          fixIts: [.init(remove: self.generateCharSourceRange(attribute: node))]
+        )
+        return
+      case nil where attrName == "warn_unused_result":
+        // The behavior is now the default, so drop the attribute, with its
+        // arguments if it has any.
+        self.diagnose(
+          .attr_warn_unused_result_removed,
+          at: node.atSign,
+          fixIts: [.init(remove: self.generateCharSourceRange(attribute: node))]
+        )
+        return
 
       // Simple attributes.
       case .AddressableSelf,
@@ -426,6 +457,50 @@ extension ASTGenVisitor {
     }
 
     return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
+  }
+
+  /// The range of `node` from its `@` through its last token, excluding trivia.
+  func generateCharSourceRange(attribute node: AttributeSyntax) -> CharSourceRange {
+    self.generateCharSourceRange(
+      start: node.atSign.positionAfterSkippingLeadingTrivia,
+      length: SourceLength(utf8Length: node.endPositionBeforeTrailingTrivia.utf8Offset
+        - node.atSign.positionAfterSkippingLeadingTrivia.utf8Offset)
+    )
+  }
+
+  /// Diagnose the use of an old spelling of an attribute, replacing it with
+  /// `newName`.
+  func diagnoseRenamedAttribute(
+    _ node: AttributeSyntax,
+    to newName: String,
+    warning: Bool = false,
+    closeMatch: Bool = false
+  ) {
+    let oldName = node.attributeName.trimmedDescription
+    let diagnostic: CompilerDiagnostic =
+      if closeMatch {
+        .attr_name_close_match(oldName, newName)
+      } else if warning {
+        .attr_renamed_warning(oldName, newName)
+      } else {
+        .attr_renamed(oldName, newName)
+      }
+    self.diagnose(
+      diagnostic,
+      at: node.attributeName,
+      fixIts: [.init(replace: self.generateCharSourceRange(node.attributeName), with: newName)]
+    )
+  }
+
+  /// `@_versioned` and `@_inlineable` are errors in Swift 5 and later, warnings
+  /// in Swift 4.2, and silently accepted before that.
+  func diagnoseRenamedAttributeByLanguageMode(_ node: AttributeSyntax, to newName: String) {
+    let langOpts = self.ctx.langOpts
+    if langOpts.isLanguageModeAtLeast(major: 5, minor: 0) {
+      self.diagnoseRenamedAttribute(node, to: newName)
+    } else if langOpts.isLanguageModeAtLeast(major: 4, minor: 2) {
+      self.diagnoseRenamedAttribute(node, to: newName, warning: true)
+    }
   }
 
   /// Diagnose an attribute that requires an argument clause but does not have a
