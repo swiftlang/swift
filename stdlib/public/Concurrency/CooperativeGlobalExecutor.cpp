@@ -12,102 +12,53 @@
 ///
 /// The implementation of the cooperative global executor.
 ///
-/// This file is included into GlobalExecutor.cpp only when
-/// the cooperative global executor is enabled.  It is expected to
-/// declare the following functions:
-///   swift_task_asyncMainDrainQueueImpl
-///   swift_task_checkIsolatedImpl
-///   swift_task_donateThreadToGlobalExecutorUntilImpl
-///   swift_task_enqueueGlobalImpl
-///   swift_task_enqueueMainExecutorImpl
-///   swift_task_getMainExecutorImpl
-///   swift_task_isMainExecutorImpl
-/// as well as any cooperative-executor-specific functions in the runtime.
+/// It defines the executor entrypoints declared in EmbeddedPlatform.h.
 ///
 ///===------------------------------------------------------------------===///
 
 #include "swift/shims/Visibility.h"
 
-#include "swift/Basic/PriorityQueue.h"
-
-#include "ExecutorImpl.h"
+#include "SwiftJobPriorityQueue.h"
+#include "swift/EmbeddedPlatform.h"
 
 using namespace swift;
 
-namespace {
-
-struct JobQueueTraits {
-  static SwiftJob *&storage(SwiftJob *cur) {
-    return reinterpret_cast<SwiftJob*&>(cur->schedulerPrivate[0]);
-  }
-
-  static SwiftJob *getNext(SwiftJob *job) {
-    return storage(job);
-  }
-  static void setNext(SwiftJob *job, SwiftJob *next) {
-    storage(job) = next;
-  }
-  enum { prioritiesCount = SwiftJobPriorityBucketCount };
-  static int getPriorityIndex(SwiftJob *job) {
-    return swift_priority_getBucketIndex(swift_job_getPriority(job));
-  }
-};
-using JobPriorityQueue = PriorityQueue<SwiftJob*, JobQueueTraits>;
-
-} // end anonymous namespace
-
-static JobPriorityQueue JobQueue;
+static SwiftJobPriorityQueue JobQueue;
 
 /// Insert a job into the cooperative global queue.
-SWIFT_CC(swift)
-void swift_task_enqueueGlobalImpl(SwiftJob *job) {
+void _swift_concurrency_enqueueGlobal(SwiftJob *job) {
   assert(job && "no job provided");
   JobQueue.enqueue(job);
 }
 
 /// Enqueues a task on the main executor.
-SWIFT_CC(swift)
-void swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
+void _swift_concurrency_enqueueMainExecutor(SwiftJob *job) {
   // The cooperative executor does not distinguish between the main
   // queue and the global queue.
-  swift_task_enqueueGlobalImpl(job);
+  _swift_concurrency_enqueueGlobal(job);
 }
 
-SWIFT_CC(swift)
-void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
-  swift_executor_invokeSwiftCheckIsolated(executor);
-}
-
-SWIFT_CC(swift)
-int8_t swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
-  return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
-}
-
-SWIFT_CC(swift) void
-swift_task_donateThreadToGlobalExecutorUntilImpl(bool (*condition)(void *),
-                                                 void *conditionContext) {
+void _swift_concurrency_donateThreadToGlobalExecutorUntil(
+    bool (*condition)(void *), void *conditionContext) {
   while (!condition(conditionContext)) {
     auto job = JobQueue.dequeue();
     if (!job) return;
-    swift_job_run(job, swift_executor_generic());
+    swift_job_runSynchronously(job, swift_executor_generic());
   }
 }
 
-SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
-void swift_task_asyncMainDrainQueueImpl() {
+void _swift_concurrency_asyncMainDrainQueue(void) {
   while (true) {
     auto job = JobQueue.dequeue();
     assert(job && "We should never run out of jobs on the async main queue.");
-    swift_job_run(job, swift_executor_generic());
+    swift_job_runSynchronously(job, swift_executor_generic());
   }
 }
 
-SWIFT_CC(swift)
-SwiftExecutorRef swift_task_getMainExecutorImpl() {
+SwiftExecutorRef _swift_concurrency_getMainExecutor(void) {
   return swift_executor_generic();
 }
 
-SWIFT_CC(swift)
-bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
   return swift_executor_isGeneric(executor);
 }
