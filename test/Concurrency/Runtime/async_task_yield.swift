@@ -9,6 +9,11 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// RUN: %if embedded_cooperative_executor %{ %target-run-embedded-cooperative-swift() %}
+// RUN: %if embedded_dispatch_executor %{ %target-run-embedded-dispatch-swift() %}
+
+import _Concurrency
+
 @available(SwiftStdlib 5.1, *)
 protocol Go: Actor {
   func go(times: Int) async -> Int
