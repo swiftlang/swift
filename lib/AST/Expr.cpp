@@ -2584,8 +2584,14 @@ Type KeyPathExpr::getValueType() const {
 KeyPathExpr::Component KeyPathExpr::Component::forSubscript(
     ASTContext &ctx, ConcreteDeclRef subscript, ArgumentList *argList,
     Type elementType, ArrayRef<ProtocolConformanceRef> indexHashables) {
+  // The argument list synthesized for a `subscript(dynamicMember:)` reference
+  // has no brackets; like `SubscriptExpr::getLoc()`, fall back to the start of
+  // the arguments, which is the location of the member access.
+  auto loc = argList->getLParenLoc();
+  if (loc.isInvalid())
+    loc = argList->getStartLoc();
   return Component(subscript, argList, indexHashables, Kind::Subscript,
-                   elementType, argList->getLParenLoc());
+                   elementType, loc);
 }
 
 KeyPathExpr::Component
