@@ -101,10 +101,10 @@ Solution ConstraintSystem::finalize() {
     }
   }
 
-  // Copy over the resolved overloads.
-  solution.overloadChoices.reserve(ResolvedOverloads.size());
-  solution.overloadChoices.insert(ResolvedOverloads.begin(),
-                                  ResolvedOverloads.end());
+  if (auto trailStart = solverState->partialSolutionTrailStart)
+    recordChangedState(solution, *trailStart);
+  else
+    recordAllState(solution);
 
   // For each of the constraint restrictions, record it with simplified,
   // canonical types.
@@ -140,43 +140,6 @@ Solution ConstraintSystem::finalize() {
     solution.FixedRequirements.push_back(fix);
   }
 
-  // Remember all the disjunction choices we made.
-  for (auto &choice : DisjunctionChoices) {
-    solution.DisjunctionChoices.insert(choice);
-  }
-
-  // Remember all the applied disjunctions.
-  for (auto &choice : AppliedDisjunctions) {
-    solution.AppliedDisjunctions.insert(choice);
-  }
-
-  // Remember all of the argument/parameter matching choices we made.
-  solution.argumentMatchingChoices.reserve(argumentMatchingChoices.size());
-  for (auto &argumentMatch : argumentMatchingChoices) {
-    auto inserted = solution.argumentMatchingChoices.insert(argumentMatch);
-    assert(inserted.second || inserted.first->second == argumentMatch.second);
-    (void)inserted;
-  }
-
-  // Remember implied results.
-  for (auto impliedResult : ImpliedResults)
-    solution.ImpliedResults.insert(impliedResult);
-
-  // Remember the opened types.
-  for (const auto &opened : OpenedTypes) {
-    // We shouldn't ever register opened types multiple times,
-    // but saving and re-applying solutions can cause us to get
-    // multiple entries.  We should use an optimized PartialSolution
-    // structure for that use case, which would optimize a lot of
-    // stuff here.
-#if false
-    assert((solution.OpenedTypes.count(opened.first) == 0 ||
-            solution.OpenedTypes[opened.first] == opened.second)
-            && "Already recorded");
-#endif
-    solution.OpenedTypes.insert(opened);
-  }
-
   // Remember the opened existential types.
   for (auto &openedExistential : OpenedExistentialTypes) {
     openedExistential.second = simplifyType(openedExistential.second)
@@ -195,29 +158,6 @@ Solution ConstraintSystem::finalize() {
                    expansion.second &&
                "Already recorded");
     solution.OpenedPackExpansionTypes.insert(expansion);
-  }
-
-  // Remember the defaulted type variables.
-  solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
-                                       DefaultedConstraints.end());
-
-  solution.nodeTypes.reserve(NodeTypes.size());
-  for (auto &nodeType : NodeTypes) {
-    solution.nodeTypes.insert(nodeType);
-  }
-  solution.keyPathComponentTypes.reserve(KeyPathComponentTypes.size());
-  for (auto &keyPathComponentType : KeyPathComponentTypes) {
-    solution.keyPathComponentTypes.insert(keyPathComponentType);
-  }
-
-  // Remember key paths.
-  for (const auto &keyPaths : KeyPaths) {
-    solution.KeyPaths.insert(keyPaths);
-  }
-
-  // Remember contextual types.
-  for (auto &entry : contextualTypes) {
-    solution.contextualTypes.push_back({entry.first, entry.second.first});
   }
 
   for (auto &target : targets)
@@ -246,15 +186,6 @@ Solution ConstraintSystem::finalize() {
     solution.appliedPropertyWrappers.insert(appliedWrapper);
   }
 
-  // Remember argument lists.
-  for (const auto &argListMapping : ArgumentLists) {
-    solution.argumentLists.insert(argListMapping);
-  }
-
-  for (const auto &implicitInfo : ImplicitCallAsFunctions) {
-    solution.ImplicitCallAsFunctions.insert(implicitInfo);
-  }
-
   for (const auto &env : PackExpansionEnvironments) {
     solution.PackExpansionEnvironments.insert(env);
   }
@@ -262,11 +193,142 @@ Solution ConstraintSystem::finalize() {
   for (const auto &packEnv : PackElementExpansions)
     solution.PackElementExpansions.insert(packEnv);
 
-  for (const auto &synthesized : SynthesizedConformances) {
-    solution.SynthesizedConformances.insert(synthesized);
+  return solution;
+}
+
+void ConstraintSystem::recordAllState(Solution &solution) const {
+  solution.overloadChoices.reserve(ResolvedOverloads.size());
+  solution.overloadChoices.insert(ResolvedOverloads.begin(),
+                                  ResolvedOverloads.end());
+
+  solution.DisjunctionChoices.insert(DisjunctionChoices.begin(),
+                                     DisjunctionChoices.end());
+  solution.AppliedDisjunctions.insert(AppliedDisjunctions.begin(),
+                                      AppliedDisjunctions.end());
+
+  solution.argumentMatchingChoices.reserve(argumentMatchingChoices.size());
+  for (auto &argumentMatch : argumentMatchingChoices) {
+    auto inserted = solution.argumentMatchingChoices.insert(argumentMatch);
+    assert(inserted.second || inserted.first->second == argumentMatch.second);
+    (void)inserted;
   }
 
-  return solution;
+  solution.ImpliedResults.insert(ImpliedResults.begin(), ImpliedResults.end());
+  solution.OpenedTypes.insert(OpenedTypes.begin(), OpenedTypes.end());
+  solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
+                                       DefaultedConstraints.end());
+
+  solution.nodeTypes.reserve(NodeTypes.size());
+  solution.nodeTypes.insert(NodeTypes.begin(), NodeTypes.end());
+
+  solution.keyPathComponentTypes.reserve(KeyPathComponentTypes.size());
+  solution.keyPathComponentTypes.insert(KeyPathComponentTypes.begin(),
+                                        KeyPathComponentTypes.end());
+
+  solution.KeyPaths.insert(KeyPaths.begin(), KeyPaths.end());
+
+  for (auto &entry : contextualTypes)
+    solution.contextualTypes.push_back({entry.first, entry.second.first});
+
+  solution.argumentLists.insert(ArgumentLists.begin(), ArgumentLists.end());
+  solution.ImplicitCallAsFunctions.insert(ImplicitCallAsFunctions.begin(),
+                                          ImplicitCallAsFunctions.end());
+  solution.SynthesizedConformances.insert(SynthesizedConformances.begin(),
+                                          SynthesizedConformances.end());
+}
+
+/// The entry a trail change recorded. Entries are only erased by undoing
+/// their change, so one exists for every change still on the trail.
+template <typename Map, typename Key>
+static const auto &getRecordedEntry(const Map &map, const Key &key) {
+  auto found = map.find(key);
+  assert(found != map.end() && "Trail change without a recorded entry");
+  return *found;
+}
+
+void ConstraintSystem::recordChangedState(Solution &solution,
+                                          unsigned trailStart) const {
+  using ChangeKind = SolverTrail::ChangeKind;
+
+  for (const auto &change : solverState->Trail.getChangesSince(trailStart)) {
+    switch (change.Kind) {
+    case ChangeKind::ResolvedOverload:
+      solution.overloadChoices.insert(
+          getRecordedEntry(ResolvedOverloads, change.TheLocator));
+      break;
+
+    case ChangeKind::RecordedDisjunctionChoice:
+      solution.DisjunctionChoices.insert(
+          getRecordedEntry(DisjunctionChoices, change.TheLocator));
+      break;
+
+    case ChangeKind::RecordedAppliedDisjunction:
+      solution.AppliedDisjunctions.insert(
+          getRecordedEntry(AppliedDisjunctions, change.TheLocator));
+      break;
+
+    case ChangeKind::RecordedMatchCallArgumentResult:
+      solution.argumentMatchingChoices.insert(
+          getRecordedEntry(argumentMatchingChoices, change.TheLocator));
+      break;
+
+    case ChangeKind::RecordedImpliedResult:
+      solution.ImpliedResults.insert(
+          getRecordedEntry(ImpliedResults, change.TheExpr));
+      break;
+
+    case ChangeKind::RecordedOpenedTypes:
+      solution.OpenedTypes.insert(
+          getRecordedEntry(OpenedTypes, change.TheLocator));
+      break;
+
+    case ChangeKind::RecordedDefaultedConstraint:
+      solution.DefaultedConstraints.insert(change.TheLocator);
+      break;
+
+    // A node's type can be set more than once; the map holds the latest.
+    case ChangeKind::RecordedNodeType:
+      solution.nodeTypes[change.Node.Node] =
+          getRecordedEntry(NodeTypes, change.Node.Node).second;
+      break;
+
+    case ChangeKind::RecordedKeyPathComponentType: {
+      auto key = std::make_pair(change.KeyPath.Expr, change.Options);
+      solution.keyPathComponentTypes[key] =
+          getRecordedEntry(KeyPathComponentTypes, key).second;
+      break;
+    }
+
+    case ChangeKind::RecordedKeyPath:
+      solution.KeyPaths.insert(getRecordedEntry(KeyPaths, change.KeyPath.Expr));
+      break;
+
+    // setContextualInfo() never overwrites, so each node appears once.
+    case ChangeKind::RecordedContextualInfo:
+      solution.contextualTypes.push_back(
+          {change.Node.Node,
+           getRecordedEntry(contextualTypes, change.Node.Node).second.first});
+      break;
+
+    case ChangeKind::RecordedArgumentList:
+      solution.argumentLists.insert(
+          getRecordedEntry(ArgumentLists, change.TheLocator));
+      break;
+
+    case ChangeKind::RecordedImplicitCallAsFunction:
+      solution.ImplicitCallAsFunctions.insert(
+          getRecordedEntry(ImplicitCallAsFunctions, change.TheLocator));
+      break;
+
+    case ChangeKind::RecordedSynthesizedConformance:
+      solution.SynthesizedConformances.insert(
+          getRecordedEntry(SynthesizedConformances, change.TheLocator));
+      break;
+
+    default:
+      break;
+    }
+  }
 }
 
 void ConstraintSystem::replaySolution(const Solution &solution,
