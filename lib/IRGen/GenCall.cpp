@@ -6852,14 +6852,19 @@ void irgen::emitAsyncReturn(
 
   Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_end_async, arguments);
 
-  if (IGF.IGM.AsyncTailCallKind == llvm::CallInst::TCK_MustTail) {
-    Builder.CreateUnreachable();
-  } else {
-    // If target doesn't support musttail (e.g. WebAssembly), the function
-    // passed to coro.end.async can return control back to the caller.
-    // So use ret void instead of unreachable to allow it.
-    Builder.CreateRetVoid();
-  }
+  // Always end with `ret void` rather than `unreachable`, even when the
+  // target supports musttail calls. CoroSplit inserts its own `ret void`
+  // here when it splits the coroutine, but mid-pipeline function passes run
+  // first and treat `unreachable` as "nothing after this point is
+  // observable". That lets DSE delete stores to the caller-owned indirect
+  // result buffer when the success path relies on a store from an earlier
+  // block (e.g. a value captured by a task-group child and returned from
+  // both `do` and `catch`), silently dropping the value at -O. Ending with
+  // `ret void` keeps those stores live at exit, matching what CoroSplit
+  // produces anyway. (Targets without musttail, e.g. WebAssembly, already
+  // took the `ret void` path because the resume function can return control
+  // back to the caller there.)
+  Builder.CreateRetVoid();
 }
 
 void irgen::emitAsyncReturn(IRGenFunction &IGF, AsyncContextLayout &asyncLayout,
