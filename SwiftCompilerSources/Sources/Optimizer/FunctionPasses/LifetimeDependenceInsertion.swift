@@ -356,8 +356,8 @@ func gatherVariableIntroducers(for value: Value, ignoreTrivialCopies: Bool, _ co
 /// source of a lifetime dependent argument. If no lvalue is found, then it finds the "root" of the chain of temporary
 /// rvalues.
 ///
-/// This "looks through" projections: a property that is either visible as a stored property or access via
-/// unsafe[Mutable]Address.
+/// This "looks through" projections: a property that is either visible as a stored property, access via
+/// unsafe[Mutable]Address, or returned by a borrow accessor.
 ///
 ///     dependsOn(lvalue.field) // finds 'lvalue' when 'field' is a stored property
 ///

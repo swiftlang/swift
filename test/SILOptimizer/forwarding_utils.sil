@@ -280,3 +280,29 @@ entry(%0 : @owned $C, %1 : @owned $C):
   %void = tuple()
   return %void : $()
 }
+
+sil @borrowPairA : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+sil @borrowPairAIndirect : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+
+// Test that the @guaranteed result of a borrow accessor forwards from its 'self' only when 'self' is also @guaranteed.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingBorrowAccessorTest: forwarding_use_def_test with: %result
+// CHECK: INTRODUCER: %0 = argument of bb0 : $CPair
+// CHECK-LABEL: end running test 1 of 2 on forwardingBorrowAccessorTest: forwarding_use_def_test with: %result
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingBorrowAccessorTest: forwarding_use_def_test with: %indirectResult
+// CHECK: INTRODUCER: %{{.*}} = apply %{{.*}}(%0) : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+// CHECK-LABEL: end running test 2 of 2 on forwardingBorrowAccessorTest: forwarding_use_def_test with: %indirectResult
+sil [ossa] @forwardingBorrowAccessorTest : $@convention(thin) (@guaranteed CPair) -> () {
+entry(%0 : @guaranteed $CPair):
+  %f = function_ref @borrowPairA : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+  %result = apply %f(%0) : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+  specify_test "forwarding_use_def_test %result"
+
+  %g = function_ref @borrowPairAIndirect : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+  %indirectResult = apply %g(%0) : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+  specify_test "forwarding_use_def_test %indirectResult"
+
+  %void = tuple()
+  return %void : $()
+}
