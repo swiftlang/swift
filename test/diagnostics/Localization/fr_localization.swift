@@ -8,8 +8,9 @@ _ = "HI!
 
 // FIXME: This used to produce a localized diagnostic.
 
-var self1 = self1 // expected-note {{through reference here}}
-// expected-error@-1 {{circular reference}}
+struct Circular { let x = x }
+// expected-note@-1 {{through reference here}}
+// expected-error@-2 {{circular reference}}
 
 struct Broken {
   var b : Bool = True // expected-error{{impossible de trouver 'True' portée}}

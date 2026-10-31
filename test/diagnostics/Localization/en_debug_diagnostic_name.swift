@@ -3,7 +3,7 @@
 _ = "HI!
 // CHECK_NAMES: error: unterminated string literal [lex_unterminated_string]{{$}}
 
-var self1 = self1
+struct Circular { let x = x }
 // CHECK_NAMES: error: circular reference [circular_reference]{{$}}
 // CHECK_NAMES: note: through reference here [circular_reference_through]{{$}}
 
