@@ -1121,14 +1121,12 @@ public:
     return result;
   }
 };
+} // end anonymous namespace
 
-/// Determines which C array projection, besides the modern one, \p decl needs.
-/// \c Modern indicates that no C array projections are involved.
-static CArrayProjection
-getNeededCArrayCounterpart(const clang::NamedDecl *decl) {
+CArrayProjection
+importer::getNeededCArrayCounterpart(const clang::NamedDecl *decl) {
   return DeclNeededCArrayCounterpartVisitor().Visit(decl);
 }
-} // end anonymous namespace
 
 Decl *ClangImporter::Implementation::forEachCArrayProjectionImpl(
     const clang::NamedDecl *decl, ImportNameVersion version,

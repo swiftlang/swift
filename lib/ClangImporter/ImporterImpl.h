@@ -2408,6 +2408,10 @@ ImportedType
 computeLegacyCArrayType(ImportedType modernType,
                         CArrayProjection projection = CArrayProjection::Legacy);
 
+/// Determines which C array projection, besides the modern one, \p decl needs.
+/// \c Modern indicates that no C array projections are involved.
+CArrayProjection getNeededCArrayCounterpart(const clang::NamedDecl *decl);
+
 /// The other C array projection of \p decl, or null if \p decl has none (or
 /// has no projections at all). To tell a declaration with no projections apart
 /// from one with a modern projection only, check for a

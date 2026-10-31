@@ -13240,11 +13240,11 @@ Type TypeBase::getSwiftNewtypeUnderlyingType() {
   if (!clangNode || !clangNode->hasAttr<clang::SwiftNewTypeAttr>())
     return {};
 
-  // Underlying type is the type of rawValue
+  // Underlying type is the type of RawValue
   for (auto member : structDecl->getMembers())
-    if (auto varDecl = dyn_cast<VarDecl>(member))
-      if (varDecl->getName() == getASTContext().Id_rawValue)
-        return varDecl->getInterfaceType();
+    if (auto typealiasDecl = dyn_cast<TypeAliasDecl>(member))
+      if (typealiasDecl->getName() == getASTContext().Id_RawValue)
+        return typealiasDecl->getUnderlyingType();
 
   return {};
 }

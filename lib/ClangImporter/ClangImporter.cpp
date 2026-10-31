@@ -20,6 +20,8 @@
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -101,6 +103,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringExtras.h"
@@ -4885,6 +4888,411 @@ void ClangImporter::printStatistics() const {
   }
 }
 
+#ifndef NDEBUG
+namespace {
+/// Verifies the C array projections of every declaration it reaches, including
+/// members, accessors, and parameters.
+class CArrayProjectionVerifier : public ASTWalker {
+  ClangImporter::Implementation &impl;
+
+  /// Verify the invariants of the dual C array projections of a declaration
+  /// imported from Clang.
+  void verifyDecl(ValueDecl *D);
+
+  /// Verify the invariants relating a modern projection and its counterpart.
+  static void verifyCounterpartConsistency(ValueDecl *modern,
+                                           ValueDecl *counterpart);
+
+public:
+  CArrayProjectionVerifier(ClangImporter::Implementation &impl) : impl(impl) {}
+
+  /// Verify that the \c ImportedDecls cache agrees with the C array
+  /// projections the declarations record. Doesn't import anything.
+  void verifyCache();
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::None;
+  }
+
+  LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+    return LazyInitializerWalking::None;
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (!shouldVerify(D, impl.SwiftContext))
+      return Action::SkipNode();
+
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      verifyDecl(VD);
+
+    // If there are lazy or unparsed members, walk the ones that have been
+    // loaded already and skip the rest; otherwise walk everything.
+    if (auto dc = dyn_cast<IterableDeclContext>(D)) {
+      if (dc->hasLazyMembers() || dc->hasUnparsedMembers()) {
+        for (auto *member : dc->getCurrentMembersWithoutLoading())
+          member->walk(*this);
+        return Action::SkipNode();
+      }
+    }
+
+    return Action::Continue();
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    return Action::SkipNode(E);
+  }
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    return Action::SkipNode(S);
+  }
+
+  PreWalkResult<Pattern *> walkToPatternPre(Pattern *P) override {
+    return Action::SkipNode(P);
+  }
+
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
+    return Action::SkipNode();
+  }
+};
+} // end anonymous namespace
+
+void CArrayProjectionVerifier::verifyCache() {
+  auto fail = [&](StringRef message, const clang::Decl *clangDecl, Decl *D) {
+    llvm::errs() << message << "\n";
+    clangDecl->dump(llvm::errs());
+    if (D)
+      D->dump(llvm::errs());
+    abort();
+  };
+
+  for (const auto &entry : impl.ImportedDecls) {
+    const clang::Decl *clangDecl = entry.first.first;
+    auto version = entry.first.second;
+    Decl *D = entry.second;
+    if (!D || version.withoutCArrayProjection() != impl.CurrentVersion)
+      continue;
+
+    auto *attr = D->getAttrs().getAttribute<CArrayProjectionAttr>();
+
+    // An entry for a non-modern projection holds that projection, or, if the
+    // declaration has no C arrays, the declaration itself.
+    if (version.getCArrayProjection() != CArrayProjection::Modern) {
+      if (attr) {
+        if (attr->getProjection() != version.getCArrayProjection())
+          fail("ImportedDecls entry for a C array projection holds a "
+               "declaration that isn't that projection", clangDecl, D);
+      } else {
+        auto modern = impl.ImportedDecls.find(
+            {clangDecl, version.withCArrayProjection(CArrayProjection::Modern)});
+        if (modern == impl.ImportedDecls.end() || modern->second != D)
+          fail("ImportedDecls entry for a C array projection holds a "
+               "declaration without C array projections that isn't the "
+               "modern entry's", clangDecl, D);
+      }
+      continue;
+    }
+
+    // A modern projection's entry comes with entries for its counterpart
+    // projections, which are null if it doesn't have them.
+    if (!attr)
+      continue;
+    for (auto projection :
+         {CArrayProjection::Legacy, CArrayProjection::HiddenStorage}) {
+      auto key = std::make_pair(clangDecl,
+                                version.withCArrayProjection(projection));
+      auto found = impl.ImportedDecls.find(key);
+      if (found == impl.ImportedDecls.end()) {
+        // Accessors are registered along with their storage, which can be
+        // after they were cached, so the cache never learns of their
+        // counterparts. Accessors are only found through their storage.
+        if (isa<AccessorDecl>(D))
+          continue;
+        fail("ImportedDecls has no entry for a counterpart C array "
+             "projection", clangDecl, D);
+      }
+      if (found->second != importer::getDeclForCArrayProjection(D, projection))
+        fail("ImportedDecls entry for a C array projection doesn't match "
+             "its counterpart", clangDecl, D);
+    }
+  }
+}
+
+static bool doesInterfaceTypeMention(ValueDecl *D,
+                                     llvm::function_ref<bool(Type)> predicate) {
+  // These decls' types are part of their parents' type.
+  if (isa<ParamDecl, AccessorDecl>(D))
+    return false;
+
+  // Don't force lazy interface type computation too early.
+  if (!D->hasInterfaceType())
+    return false;
+
+  auto type = D->getInterfaceType();
+  return type && type.findIf(predicate);
+}
+
+void CArrayProjectionVerifier::verifyDecl(ValueDecl *D) {
+  PrettyStackTraceDecl debugStack("verifying C array projections", D);
+
+  auto *attr = D->getAttrs().getAttribute<CArrayProjectionAttr>();
+
+  auto fail = [&](StringRef message) {
+    llvm::errs() << message << "\n";
+    D->dump(llvm::errs());
+    abort();
+  };
+
+  // Only declarations of Clang modules have C array projections (but that
+  // includes some decls without a Clang node).
+  auto *file =
+      dyn_cast<FileUnit>(D->getDeclContext()->getModuleScopeContext());
+  if (!file || file->getKind() != FileUnitKind::ClangModule) {
+    if (attr)
+      fail("C array projection of a declaration outside a Clang module");
+    return;
+  }
+
+  auto visibleProjection = impl.VisibleCArrayProjection;
+
+  bool isHidden = D->hasAccess() &&
+                  D->getFormalAccess() <= AccessLevel::Internal;
+
+  bool hasInlineArray = doesInterfaceTypeMention(D, [](Type type) {
+    return !type->getInlineArrayElementType().isNull();
+  });
+
+  bool hasInlineArrayNewtype = doesInterfaceTypeMention(D, [](Type type) {
+    auto underlying = type->getSwiftNewtypeUnderlyingType();
+    return underlying && underlying.findIf([](Type underlyingPart) {
+      return !underlyingPart->getInlineArrayElementType().isNull();
+    });
+  });
+
+  // InlineArrays should *never* be visible in legacy mode, no matter what
+  // scenario might allow them to leak out.
+  if (visibleProjection == CArrayProjection::Legacy && !isHidden &&
+          (hasInlineArray || hasInlineArrayNewtype))
+    fail("imported decl exposes an InlineArray when the legacy C array "
+         "projection is visible");
+
+  // Checks for non-C array decls; bails out.
+  if (!attr) {
+    if (!isa<ParamDecl, AccessorDecl>(D)) {
+      auto *clangDecl = dyn_cast_or_null<clang::NamedDecl>(D->getClangDecl());
+      if (clangDecl && importer::getNeededCArrayCounterpart(clangDecl) !=
+                           CArrayProjection::Modern)
+        fail("dual-projected decl imported without @_cArrayProjection");
+    }
+
+    if (!isa<TypeDecl>(D) && hasInlineArray)
+      fail("imported decl has an InlineArray in its type but no "
+           "@_cArrayProjection");
+
+    return;
+  }
+
+  // Checks for TypeDecls; bails out.
+  if (auto typeDecl = dyn_cast<TypeDecl>(D)) {
+    // The only situation where we put @_cArrayProjection on a type is for a
+    // modern-only newtype.
+    auto declTy = typeDecl->getDeclaredInterfaceType();
+    if (attr->getProjection() != CArrayProjection::Modern ||
+            attr->getCounterpart() ||
+            declTy->getSwiftNewtypeUnderlyingType().isNull())
+      fail("a type with a C array projection must be a modern-only newtype");
+
+    // Since this is otherwise impossible, there's nothing else to check.
+    return;
+  }
+
+  // Checks for C array decls that are not part of the visible projection.
+  if (attr->getProjection() != visibleProjection) {
+    if (!isHidden)
+      fail("imported decl is not the visible C array projection but is "
+           "not hidden");
+
+    if (!D->isUsableFromInline())
+      fail("imported decl is not the visible C array projection but is not "
+           "@usableFromInline");
+  }
+
+  // Consistency checks for accessors and their storage. Note that a modern
+  // accessor may not have a counterpart if its storage's counterpart is stored.
+  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+    auto *storage = accessor->getStorage();
+    auto *storageAttr = storage->getAttrs()
+                            .getAttribute<CArrayProjectionAttr>();
+
+    if (!storageAttr)
+      fail("accessor has a C array projection but its storage doesn't");
+
+    if (storageAttr->getProjection() != attr->getProjection())
+      fail("accessor and its storage are different C array projections");
+
+    if (auto *counterpart = attr->getCounterpart())
+      if (auto *counterpartAccessor = dyn_cast<AccessorDecl>(counterpart))
+        if (counterpartAccessor->getStorage() != storageAttr->getCounterpart())
+          fail("accessor's counterpart is not an accessor of its storage's "
+               "counterpart");
+  }
+
+  // Checks based on the specific projection.
+  switch (attr->getProjection()) {
+  case CArrayProjection::Modern: {
+    if (auto *var = dyn_cast<VarDecl>(D))
+      if (var->hasStorage())
+        fail("modern C array projection is stored");
+
+    if (!isa<AccessorDecl>(D) && D->hasInterfaceType() &&
+            !hasInlineArray && !hasInlineArrayNewtype)
+      fail("modern C array projection doesn't mention an InlineArray");
+
+    auto context = AvailabilityContext::forDeclSignature(D);
+    auto &ctx = D->getASTContext();
+    if (!context.isUnavailable() &&
+          !context.getPlatformRange().isContainedIn(
+              ctx.getInlineArrayAvailability()))
+      fail("imported modern C array projection is available where "
+           "InlineArray isn't");
+
+    verifyCounterpartConsistency(D, attr->getCounterpart());
+    break;
+  }
+
+  case CArrayProjection::HiddenStorage: {
+    auto *var = dyn_cast<VarDecl>(D);
+    if (!var || !var->hasStorage())
+      fail("hidden C array storage is not a stored property");
+
+    // Otherwise the same as Legacy.
+    LLVM_FALLTHROUGH;
+  }
+
+  case CArrayProjection::Legacy:
+    if (hasInlineArray)
+      fail("non-modern C array projection mentions an InlineArray");
+
+    verifyCounterpartConsistency(attr->getCounterpart(), D);
+    break;
+  }
+}
+
+void CArrayProjectionVerifier::verifyCounterpartConsistency(
+    ValueDecl *modern, ValueDecl *counterpart) {
+  auto fail = [&](StringRef message) {
+    llvm::errs() << message << "\n";
+
+    llvm::errs() << "modern projection: ";
+    if (modern)
+      modern->dump(llvm::errs());
+    else
+      llvm::errs() << "<null>\n";
+
+    llvm::errs() << "counterpart projection: ";
+    if (counterpart)
+      counterpart->dump(llvm::errs());
+    else
+      llvm::errs() << "<null>\n";
+
+    abort();
+  };
+
+  if (!modern)
+    fail("non-modern C array projection has no modern counterpart");
+
+  auto modernAttr = modern->getAttrs().getAttribute<CArrayProjectionAttr>();
+  if (!modernAttr)
+    fail("non-modern C array projection's counterpart must be marked as a "
+         "projection");
+  if (modernAttr->getProjection() != CArrayProjection::Modern)
+    fail("non-modern C array projection's counterpart must be modern");
+
+  // A modern projection is allowed to have no counterpart.
+  if (!counterpart)
+    return;
+
+  auto counterpartAttr = counterpart->getAttrs()
+                              .getAttribute<CArrayProjectionAttr>();
+  if (!counterpartAttr)
+    fail("modern C array projection's counterpart must be marked as a "
+         "projection");
+  if (counterpartAttr->getProjection() == CArrayProjection::Modern)
+    fail("modern C array projection's counterpart must not be modern");
+
+  if (modernAttr->getCounterpart() != counterpart ||
+          counterpartAttr->getCounterpart() != modern)
+    fail("C array projection counterparts do not refer to each other");
+
+  // Counterparts have to be reachable the same way as the declaration.
+  if (modern->getKind() != counterpart->getKind())
+    fail("C array projection counterparts are different kinds of "
+         "declaration");
+  if (modern->getDeclContext() != counterpart->getDeclContext())
+    fail("C array projection counterparts are in different contexts");
+  if (modern->isInstanceMember() != counterpart->isInstanceMember())
+    fail("C array projection counterparts differ in being instance "
+         "members");
+  if (auto *accessor = dyn_cast<AccessorDecl>(counterpart))
+    if (cast<AccessorDecl>(modern)->getAccessorKind() !=
+            accessor->getAccessorKind())
+      fail("C array projection counterparts are different kinds of "
+           "accessor");
+
+  // The name check is complicated: base names must match and, if the name is
+  // compound, the legacy projection's labels must be a subset of the
+  // modern projection's.
+  if (counterpart->getName().getBaseName() != modern->getName().getBaseName())
+    fail("C array projection counterparts have different base names");
+
+  for (Identifier label : counterpart->getName().getArgumentNames())
+    if (!llvm::is_contained(modern->getName().getArgumentNames(), label))
+      fail("a C array counterpart projection has an argument label that its "
+           "modern projection doesn't");
+
+  // Check the accessors on a stored variable's modern projection. Since they
+  // have no counterparts, we must work starting from the stored property.
+  if (auto *storedVar = dyn_cast<VarDecl>(counterpart)) {
+    if (storedVar && storedVar->hasStorage()) {
+      auto *modernVar = cast<VarDecl>(modern);
+      auto *getter = modernVar->getAccessor(AccessorKind::Get);
+      auto *setter = modernVar->getAccessor(AccessorKind::Set);
+
+      if (storedVar->isLet() ? !!setter : !setter)
+        fail("modern C array projection of a stored property has a "
+             "setter only if the stored property is mutable");
+
+      // Getter is mandatory
+      if (!getter || !getter->getAttrs().hasAttribute<TransparentAttr>())
+        fail("modern C array projection of a stored property has no "
+             "transparent getter");
+
+      // Setter is optional
+      if (setter && !setter->getAttrs().hasAttribute<TransparentAttr>())
+        fail("modern C array projection of a stored property has a "
+             "non-transparent setter");
+    }
+  }
+
+  // Check that the counterpart projection's type matches the modern decl's,
+  // converted to its legacy type. (This check won't work for initializers with
+  // different arities.)
+  if (!isa<AccessorDecl, ParamDecl>(modern)
+          && modern->getName() == counterpart->getName()
+          && modern->hasInterfaceType() && counterpart->hasInterfaceType()) {
+    auto expected =
+        importer::computeLegacyCArrayType({ modern->getInterfaceType(), false },
+                                          counterpartAttr->getProjection());
+    if (!expected.getType())
+      fail("a modern C array projection with a counterpart has no "
+           "representation in the counterpart's projection");
+    if (expected.getType()->getCanonicalType() !=
+            counterpart->getInterfaceType()->getCanonicalType())
+      fail("C array projection counterparts have types that don't "
+           "correspond");
+  }
+}
+#endif
+
 void ClangImporter::verifyAllModules() {
 #ifndef NDEBUG
   if (Impl.VerifiedDeclsCounter == Impl.ImportedDecls.size())
@@ -4892,15 +5300,25 @@ void ClangImporter::verifyAllModules() {
 
   // Collect the Decls before verifying them; the act of verifying may cause
   // more decls to be imported and modify the map while we are iterating it.
+  // (Counterintutively, `withoutCArrayProjection()` here ensures that we see
+  // all projections, not just Modern.)
   size_t verifiedCounter = Impl.ImportedDecls.size();
-  SmallVector<Decl *, 8> Decls;
+  llvm::SetVector<Decl *> Decls;
   for (const auto &I : Impl.ImportedDecls)
-    if (I.first.second == Impl.CurrentVersion)
+    if (I.first.second.withoutCArrayProjection() == Impl.CurrentVersion)
       if (Decl *D = I.second)
-        Decls.push_back(D);
+        Decls.insert(D);
+
+  CArrayProjectionVerifier cArrayVerifier(Impl);
+  cArrayVerifier.verifyCache();
 
   for (auto D : Decls)
     verify(D);
+
+  // Verify C arrays in a separate loop so it benefits from anywhere `verify()`
+  // has forced `getInterfaceType()`.
+  for (auto D : Decls)
+    D->walk(cArrayVerifier);
 
   Impl.VerifiedDeclsCounter = verifiedCounter;
 #endif
