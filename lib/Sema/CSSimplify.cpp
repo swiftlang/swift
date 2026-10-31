@@ -5466,6 +5466,14 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
   return false;
 }
 
+/// Whether an inline array \p count can hold exactly \p numElements elements.
+/// The comparison is done on the full-width value so that negative or very
+/// large counts never compare equal after truncation.
+static bool inlineArrayCountMatches(IntegerType *count, unsigned numElements) {
+  auto value = count->getValue();
+  return !value.isNegative() && value == numElements;
+}
+
 /// Attempt to repair typing failures and record fixes if needed.
 /// \return true if at least some of the failures has been repaired
 /// successfully, which allows type matcher to continue.
@@ -6790,11 +6798,10 @@ bool ConstraintSystem::repairFailures(
         if (auto inlineCount = rhs->castTo<StructType>()
                                    ->getGenericArgs()[0]
                                    ->getAs<IntegerType>()) {
-          if (inlineCount->getValue() != literalCount) {
+          if (!inlineArrayCountMatches(inlineCount, literalCount)) {
             conversionsOrFixes.push_back(
                 AllowInlineArrayLiteralCountMismatch::create(
-                    *this, inlineCount->getValue().getSExtValue(), literalCount,
-                    loc));
+                    *this, inlineCount, literalCount, loc));
             return true;
           }
         }
@@ -9320,15 +9327,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         return SolutionKind::Solved;
       }
 
-      unsigned inlineArrayCount = 0;
-      if (auto *intCount = inlineArrayCountParam->getAs<IntegerType>()) {
-        inlineArrayCount = intCount->getValue().getZExtValue();
-      } else {
+      auto *inlineArrayCount = inlineArrayCountParam->getAs<IntegerType>();
+      if (!inlineArrayCount)
         return SolutionKind::Error;
-      }
 
       // If the counts are already equal, '2' == '2', then we're done.
-      if (inlineArrayCount == arrayLiteral->getNumElements()) {
+      if (inlineArrayCountMatches(inlineArrayCount,
+                                  arrayLiteral->getNumElements())) {
         return SolutionKind::Solved;
       }
 

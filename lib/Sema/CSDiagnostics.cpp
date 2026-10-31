@@ -10067,7 +10067,10 @@ bool InvalidTypeAsKeyPathSubscriptIndex::diagnoseAsError() {
 }
 
 bool IncorrectInlineArrayLiteralCount::diagnoseAsError() {
-  emitDiagnostic(diag::inlinearray_literal_incorrect_count, lhsCount, rhsCount);
+  SmallString<20> expectedCount;
+  lhsCount->getValue().toStringSigned(expectedCount);
+  emitDiagnostic(diag::inlinearray_literal_incorrect_count, expectedCount,
+                 rhsCount);
   return true;
 }
 
