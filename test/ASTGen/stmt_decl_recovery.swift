@@ -43,7 +43,7 @@ struct Layout<S> {}
 @_specialize(where S: _Trivial(64, ))
 // expected-error@-1 {{expected non-negative alignment to be specified in layout constraint}}
 // expected-astgen-error@-2 {{expected alignment in layout requirement}}
-// expected-astgen-note@-3 {{insert alignment}}
+//
 public func specialized<S>(_ s: S) {}
 
 // An empty generic parameter list, which recovery produces for `struct S< {}`.
@@ -53,7 +53,7 @@ public func specialized<S>(_ s: S) {}
 struct EmptyGenericParams< {}
 // expected-astgen-error@-1 {{expected '>' to end generic parameter clause}}
 // expected-astgen-note@-2 {{to match this opening '<'}}
-// expected-astgen-note@-3 {{insert '>'}}
+//
 // expected-cxx-error@-4 {{expected an identifier to name generic parameter}}
 
 // A 'deinit' outside a struct, enum, class, or @_objcImplementation extension.
@@ -68,7 +68,7 @@ precedencegroup SomeGroup {}
 prefix operator +++** : SomeGroup { }
 // expected-error@-1 {{only infix operators may declare a precedence}}
 // expected-astgen-error@-2 {{operator should not be declared with body}}
-// expected-astgen-note@-3 {{remove operator body}}
+//
 // expected-cxx-error@-4 {{operator should no longer be declared with body}}
 
 // A repeated precedence group attribute. ASTGen reported this through an ad-hoc
@@ -103,9 +103,9 @@ protocol HasAssociatedType {
 struct MissingInitParens {
   init c d: Int {}
   // expected-astgen-error@-1 {{expected '(' to start parameter clause}}
-  // expected-astgen-note@-2 {{insert '('}}
+  //
   // expected-astgen-error@-3 {{expected ')' to end parameter clause}}
-  // expected-astgen-note@-4 {{insert ')'}}
+  //
   // expected-cxx-error@-5 {{expected '(' for initializer parameters}}
   // expected-cxx-error@-6 {{initializer requires a body}}
 }
@@ -113,15 +113,15 @@ struct MissingInitParens {
 struct MissingSubscriptParens {
   subscript x y : Int -> Int {
     // expected-astgen-error@-1 {{expected '(' to start parameter clause}}
-    // expected-astgen-note@-2 {{insert '('}}
+    //
     // expected-astgen-error@-3 {{expected '(' to start function type}}
-    // expected-astgen-note@-4 {{insert '('}}
+    //
     // expected-astgen-error@-5 {{expected ')' in function type}}
-    // expected-astgen-note@-6 {{insert ')'}}
+    //
     // expected-astgen-error@-7 {{expected ')' to end parameter clause}}
-    // expected-astgen-note@-8 {{insert ')'}}
+    //
     // expected-astgen-error@-9 {{expected '->' and return type in subscript}}
-    // expected-astgen-note@-10 {{insert '->' and return type}}
+    //
     // expected-cxx-error@-11 {{expected '(' for subscript parameters}}
     get { 0 }
   }
@@ -132,7 +132,7 @@ struct MissingSubscriptParens {
 struct EmptySubscriptParams {
   subscript -> Int {
     // expected-astgen-error@-1 {{expected parameter clause in subscript}}
-    // expected-astgen-note@-2 {{insert parameter clause}}
+    //
     // expected-cxx-error@-3 {{expected '(' for subscript parameters}}
     get { 0 }
   }
@@ -154,13 +154,13 @@ func doThrowsWithoutCatch() {
 func synthesizedIfBody(a: Int?) {
   if let case x = a {}
   // expected-astgen-error@-1 {{expected pattern in optional binding}}
-  // expected-astgen-note@-2 {{insert pattern}}
+  //
   // expected-astgen-error@-3 {{expected '{' in 'if' statement}}
-  // expected-astgen-note@-4 {{insert '{'}}
+  //
   // expected-astgen-error@-5 {{'case' can only appear inside a 'switch' statement or 'enum' declaration}}
   // expected-astgen-error@-6 {{unwrap condition requires a valid identifier}}
   // expected-astgen-error@-7 {{expected '}' to end 'if' statement}}
-  // expected-astgen-note@-8 {{insert '}'}}
+  //
   // expected-cxx-error@-9 {{pattern matching binding is spelled with 'case let', not 'let case'}}
   // expected-cxx-warning@-10 {{'if' condition is always true}}
   // expected-cxx-warning@-11 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}

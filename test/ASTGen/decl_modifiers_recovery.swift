@@ -36,7 +36,7 @@ class Holder {
 nonisolated(something) func badNonisolatedArgument() async {}
 // expected-astgen-error@-1 {{expected identifier in modifier}}
 // expected-astgen-error@-2 {{unexpected code 'something' in modifier}}
-// expected-astgen-note@-3 {{insert identifier}}
+//
 // expected-cxx-error@-4 {{consecutive statements on a line must be separated by ';'}}
 // expected-cxx-error@-5 {{cannot find 'nonisolated' in scope}}
 // expected-cxx-error@-6 {{cannot find 'something' in scope}}
@@ -45,7 +45,7 @@ nonisolated(something) func badNonisolatedArgument() async {}
 public(get) var badAccessControlArgument = 1
 // expected-astgen-error@-1 {{expected 'set' in modifier}}
 // expected-astgen-error@-2 {{internal variable cannot have a public setter}}
-// expected-astgen-note@-3 {{replace 'get' with 'set'}}
+//
 // expected-cxx-error@-4 {{expected 'set' as subject of 'public' modifier}}
 
 // Well-formed forms still work.

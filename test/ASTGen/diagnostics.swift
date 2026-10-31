@@ -30,8 +30,8 @@ func testEditorPlaceholder() -> Int {
 }
 
 _ = [(Int) -> async throws Int]()
-// expected-error@-1{{'async throws' must precede '->'}}
-// expected-note@-2{{move 'async throws' in front of '->'}}{{15-21=}} {{21-28=}} {{12-12=async }} {{12-12=throws }}
+// expected-error@-1{{'async throws' must precede '->'}} {{15-21=}} {{21-28=}} {{12-12=async }} {{12-12=throws }}
+//
 
 @freestanding // expected-error {{expected '(' in 'freestanding' attribute}}
 func dummy() {}
@@ -41,7 +41,7 @@ func _whatever()
 
 struct S {
     subscript(x: Int) { _ = 1 } // expected-error@:23 {{expected '->' and return type in subscript}}
-                                // expected-note@-1:23 {{insert '->' and return type}}
+                                //
 }
 
 struct ExpansionRequirementTest<each T> {}
@@ -64,17 +64,17 @@ class TestDiagnosticInNominalTy {
 
 func misisngExprTest() {
   func fn(x: Int, y: Int) {}
-  fn(x: 1, y:) // expected-error {{expected value in function call}}
-               // expected-note@-1 {{insert value}} {{14-14= <#expression#>}}
+  fn(x: 1, y:) // expected-error {{expected value in function call}} {{14-14= <#expression#>}}
+               //
 }
 
 func misisngTypeTest() {
-  func fn() -> {} // expected-error {{expected return type in function signature}}
-                  // expected-note@-1 {{insert return type}} {{16-16=<#type#> }}
+  func fn() -> {} // expected-error {{expected return type in function signature}} {{16-16=<#type#> }}
+                  //
 }
 func misisngPatternTest(arr: [Int]) {
-  for {} // expected-error {{expected pattern, 'in', and expression in 'for' statement}}
-         // expected-note@-1 {{insert pattern, 'in', and expression}} {{7-7=<#pattern#> }} {{7-7=in }} {{7-7=<#expression#> }}
+  for {} // expected-error {{expected pattern, 'in', and expression in 'for' statement}} {{7-7=<#pattern#> }} {{7-7=in }} {{7-7=<#expression#> }}
+         //
 }
 
 default @MainActor // expected-note {{file-level default isolation previously declared here}}
@@ -104,4 +104,4 @@ func scopedTrailingComma(a: Int, b: @_scoped(a,) Int) {}
 
 func scopedLabelWithoutSpecifier(b: @_scoped(left:) Int) {}
 // expected-error@-1:51{{expected value in attribute}}
-// expected-note@-2:51{{insert value}}
+//

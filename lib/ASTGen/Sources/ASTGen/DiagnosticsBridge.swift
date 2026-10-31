@@ -80,7 +80,11 @@ public func emitDiagnostic(
   diagnosticSeverity: DiagnosticSeverity,
   messageSuffix: String? = nil
 ) {
-  // Emit the main diagnostic
+  // Attach the Fix-It to the diagnostic itself, as the C++ parser does, rather
+  // than emitting it as a separate note. SwiftParser can offer several
+  // alternative Fix-Its for one diagnostic (e.g. "insert newline" or
+  // "insert ';'"); they cannot all be applied together, so only the first is
+  // attached.
   emitDiagnosticParts(
     diagnosticEngine: diagnosticEngine,
     sourceFileBuffer: sourceFileBuffer,
@@ -88,22 +92,9 @@ public func emitDiagnostic(
     severity: diagnosticSeverity,
     position: diagnostic.position,
     offset: sourceFileBufferOffset,
-    highlights: diagnostic.highlights
+    highlights: diagnostic.highlights,
+    edits: diagnostic.fixIts.first?.edits ?? []
   )
-
-  // Emit Fix-Its.
-  // FIXME: Ths assumes the fixIt is on the same tree/buffer, which is not guaranteed.
-  for fixIt in diagnostic.fixIts {
-    emitDiagnosticParts(
-      diagnosticEngine: diagnosticEngine,
-      sourceFileBuffer: sourceFileBuffer,
-      message: fixIt.message.message,
-      severity: .note,
-      position: diagnostic.position,
-      offset: sourceFileBufferOffset,
-      edits: fixIt.edits
-    )
-  }
 
   // Emit any notes as follow-ons.
   // FIXME: Ths assumes the node is on the same tree/buffer, which is not guaranteed.

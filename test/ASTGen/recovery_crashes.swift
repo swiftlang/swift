@@ -1,6 +1,10 @@
 // Malformed input that used to crash the compiler under ParserASTGen. These
 // only check that compilation fails with diagnostics rather than crashing.
 
+// REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: swift_feature_SourceWarningControl
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
