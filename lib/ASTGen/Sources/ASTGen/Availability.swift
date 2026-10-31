@@ -478,6 +478,10 @@ extension ASTGenVisitor {
     /// `EmptyPlatformAndVersions` flag).
     var droppedNonPlatform = false
 
+    /// Whether the list failed to parse, so the attribute is dropped. The C++
+    /// parser stops at the first entry it cannot parse.
+    var hadError = false
+
     /// Whether the caller should report that no platform version was given.
     var needsPlatformVersionDiagnostic: Bool {
       versions.isEmpty && !droppedNonPlatform
@@ -491,6 +495,32 @@ extension ASTGenVisitor {
     attrName: String
   ) -> GeneratedPlatformVersionList {
     var result = GeneratedPlatformVersionList()
+
+    /// Warn, with a spelling suggestion if one is close enough. The entry is
+    /// skipped -- the C++ parser also only warns.
+    func diagnoseUnknownPlatform(_ platformToken: TokenSyntax) {
+      let platformName = platformToken.rawText
+      let corrected = PlatformKind_closestCorrectedString(platformName.bridged)
+      if corrected.count > 0 {
+        let correctedText = String(bridged: corrected)
+        self.diagnose(
+          .attr_availability_suggest_platform(
+            String(syntaxText: platformName),
+            attrName,
+            correctedText
+          ),
+          at: platformToken,
+          fixIts: [
+            .init(replace: self.generateCharSourceRange(platformToken), with: correctedText)
+          ]
+        )
+      } else {
+        self.diagnose(
+          .attr_availability_unknown_platform(String(syntaxText: platformName), attrName),
+          at: platformToken
+        )
+      }
+    }
 
     for element in node {
       let platformVersionNode = element.platformVersion
@@ -524,6 +554,52 @@ extension ASTGenVisitor {
         )
       }
 
+      // An availability macro is looked up before anything else; naming a macro
+      // with a version it does not define is an error.
+      let expanded = ctx.availabilityMacroMap.get(
+        name: platformName.bridged,
+        version: version
+      )
+      if expanded.isEmpty, ctx.availabilityMacroMap.has(name: platformName.bridged) {
+        self.diagnose(
+          .attr_availability_unknown_version(
+            platformVersionNode.version?.trimmedDescription ?? "0",
+            String(syntaxText: platformName)
+          ),
+          at: platformVersionNode
+        )
+        result.hadError = true
+        continue
+      }
+
+      // A version cannot be empty (`0`, `0.0`): warn, until Swift 6, and give up
+      // on the attribute.
+      if let versionNode = platformVersionNode.version,
+        let parsed = self.generate(versionTuple: versionNode),
+        parsed.components.allSatisfy({ $0 == 0 })
+      {
+        self.diagnose(
+          CompilerDiagnostic.attr_availability_expected_version(attrName).warnUntilLanguageMode(6),
+          at: versionNode
+        )
+        result.hadError = true
+        continue
+      }
+
+      // Everything but a macro needs a version. An unknown name is warned about
+      // first.
+      if platformVersionNode.version == nil, !ctx.availabilityMacroMap.has(name: platformName.bridged) {
+        if !BridgedOptionalPlatformKind(from: platformName.bridged).hasValue {
+          diagnoseUnknownPlatform(platformToken)
+        }
+        self.diagnose(
+          .attr_availability_expected_version(attrName),
+          at: platformToken.nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(platformToken)
+        )
+        result.hadError = true
+        continue
+      }
+
       let platform = BridgedOptionalPlatformKind(from: platformName.bridged)
       if platform.hasValue {
         result.versions.append((platform: platform.value, version: version))
@@ -531,10 +607,6 @@ extension ASTGenVisitor {
       }
 
       // If there's matching macro, use it.
-      let expanded = ctx.availabilityMacroMap.get(
-        name: platformName.bridged,
-        version: version
-      )
       if !expanded.isEmpty {
         var specs: [BridgedAvailabilitySpec] = []
         expanded.withElements(ofType: UnsafeRawPointer.self) { buffer in
@@ -565,29 +637,9 @@ extension ASTGenVisitor {
         continue
       }
 
-      // Neither a platform nor a macro. Warn, with a spelling suggestion if one
-      // is close enough, and skip the entry -- the C++ parser also only warns.
+      // Neither a platform nor a macro.
       result.droppedNonPlatform = true
-      let corrected = PlatformKind_closestCorrectedString(platformName.bridged)
-      if corrected.count > 0 {
-        let correctedText = String(bridged: corrected)
-        self.diagnose(
-          .attr_availability_suggest_platform(
-            String(syntaxText: platformName),
-            attrName,
-            correctedText
-          ),
-          at: platformToken,
-          fixIts: [
-            .init(replace: self.generateCharSourceRange(platformToken), with: correctedText)
-          ]
-        )
-      } else {
-        self.diagnose(
-          .attr_availability_unknown_platform(String(syntaxText: platformName), attrName),
-          at: platformToken
-        )
-      }
+      diagnoseUnknownPlatform(platformToken)
     }
     return result
   }

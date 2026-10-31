@@ -758,6 +758,9 @@ extension ASTGenVisitor {
       platformVersionList: args.platforms,
       attrName: "@backDeployed"
     )
+    if platformVersions.hadError {
+      return []
+    }
     if platformVersions.needsPlatformVersionDiagnostic {
       self.diagnose(.attr_availability_need_platform_version("@backDeployed"), at: node.attributeName)
       return []
@@ -2155,6 +2158,9 @@ extension ASTGenVisitor {
       platformVersionList: args.platforms,
       attrName: "@_originallyDefinedIn"
     )
+    if platformVersions.hadError {
+      return []
+    }
     if platformVersions.needsPlatformVersionDiagnostic {
       self.diagnose(
         .attr_availability_need_platform_version("@_originallyDefinedIn"),
