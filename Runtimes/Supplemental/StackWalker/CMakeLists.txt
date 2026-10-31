@@ -65,6 +65,7 @@ endif()
 add_executable(swift-backtrace
   main.swift
   AnsiColor.swift
+  EventLog.swift
   JSON.swift
   TargetMacOS.swift
   TargetLinux.swift

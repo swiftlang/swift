@@ -259,6 +259,20 @@ function(add_swift_compiler_modules_library name)
     list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
   endif()
 
+  # The toolchain lib/ added above can contain both swift/ and swift_static/,
+  # each with a parent module map for SwiftShims. Clang searches subdirectories
+  # of include paths for module maps and would load both, redefining SwiftShims.
+  # Clang's Darwin driver already disables this search on recent SDKs.
+  if(NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND
+     NOT CMAKE_SYSTEM_NAME STREQUAL "Windows" AND
+     NOT SWIFT_HOST_VARIANT_SDK STREQUAL "EMSCRIPTEN")
+    swift_supports_compiler_arguments(SWIFT_SUPPORTS_NO_MODULEMAP_SUBDIR_SEARCH
+      -Xcc -fno-modulemap-allow-subdirectory-search)
+    if(SWIFT_SUPPORTS_NO_MODULEMAP_SUBDIR_SEARCH)
+      list(APPEND swift_compile_options "-Xcc" "-fno-modulemap-allow-subdirectory-search")
+    endif()
+  endif()
+
   set(all_obj_files)
   set(all_module_targets)
   set(all_module_files)
