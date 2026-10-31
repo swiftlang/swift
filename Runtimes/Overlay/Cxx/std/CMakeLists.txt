@@ -18,7 +18,8 @@ target_compile_options(swiftCxxStdlib PRIVATE
   # module or qualify types with module names
   "SHELL:-disable-upcoming-feature MemberImportVisibility"
   "SHELL:-Xfrontend -module-interface-preserve-types-as-written"
-  "SHELL:-Xfrontend -disable-module-selectors-in-module-interface")
+  "SHELL:-Xfrontend -disable-module-selectors-in-module-interface"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>")
 
 target_link_libraries(swiftCxxStdlib PUBLIC
   $<$<BOOL:${HAVE___GLIBCXX__}>:libstdcxx>
