@@ -96,6 +96,10 @@ extension VariableDeclSyntax {
   var isImmutable: Bool {
     return bindingSpecifier.tokenKind == .keyword(.let)
   }
+
+  var lazyModifier: DeclModifierSyntax? {
+    modifiers.first { $0.name.tokenKind == .keyword(.lazy) }
+  }
   
   func isEquivalent(to other: VariableDeclSyntax) -> Bool {
     if isInstance != other.isInstance {
