@@ -161,7 +161,8 @@ extension ASTGenVisitor {
         // Consume literals before this interpolation.
         consumeCurrentLiteralValue()
 
-        let loc = self.generateSourceLoc(seg)
+        // The C++ parser locates an interpolation segment at its '('.
+        let loc = self.generateSourceLoc(seg.leftParen)
 
         // Construct '$interpolation.appendExpression(<interpolation value>)'
         let interpolationVarRef = BridgedDeclRefExpr.create(
@@ -175,7 +176,7 @@ extension ASTGenVisitor {
           base: interpolationVarRef.asExpr,
           dotLoc: self.generateSourceLoc(seg.backslash),
           name: appendInterpolation,
-          nameLoc: BridgedDeclNameLoc.createParsed(self.generateSourceLoc(seg))
+          nameLoc: BridgedDeclNameLoc.createParsed(loc)
         )
         appendInterpolationRef.asExpr.setImplicit()
         let argList = self.generateArgumentList(

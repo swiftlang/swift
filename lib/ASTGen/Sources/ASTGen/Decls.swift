@@ -1513,7 +1513,7 @@ extension ASTGenVisitor {
     let (precedenceGroupName, precedenceGroupLoc) =
       self.generateIdentifierAndSourceLoc(precedenceAndTypes?.precedenceGroup)
 
-    return .createParsed(
+    let decl = BridgedOperatorDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       fixity: fixity,
@@ -1524,6 +1524,21 @@ extension ASTGenVisitor {
       precedenceGroupName: precedenceGroupName,
       precedenceGroupLoc: precedenceGroupLoc
     )
+
+    // The C++ parser parses the fixity as a declaration modifier, so the
+    // declaration carries an `infix`, `prefix` or `postfix` attribute.
+    var attrs = BridgedDeclAttributes()
+    let fixityKind: swift.DeclAttrKind =
+      switch fixity {
+      case .infix: .Infix
+      case .prefix: .Prefix
+      case .postfix: .Postfix
+      }
+    attrs.add(
+      BridgedDeclAttribute.createSimple(
+        self.ctx, kind: fixityKind, atLoc: nil, nameLoc: self.generateSourceLoc(node.fixitySpecifier)))
+    decl.asDecl.attachParsedAttrs(attrs)
+    return decl
   }
 }
 

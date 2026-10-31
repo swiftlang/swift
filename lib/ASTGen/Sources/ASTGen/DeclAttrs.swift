@@ -2685,7 +2685,9 @@ extension ASTGenVisitor {
             // TODO: Diagnose duplicated label.
           }
           argState.current = .accesses
-        case nil where argState.current == .invalid:
+        case nil:
+          // An unlabeled name continues the list of the preceding label:
+          // `initializes: y, full, accesses: x`.
           break
         default:
           if argState.hasSeen(.invalid) {

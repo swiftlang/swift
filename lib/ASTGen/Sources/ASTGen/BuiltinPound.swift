@@ -201,6 +201,14 @@ extension ASTGenVisitor {
       fatalError("magic identifier token with arguments")
     }
 
+    // `#file` is spelled the same for two kinds, and the name lookup finds the
+    // first. It means `#fileID` only with ConciseMagicFile, and `#filePath`
+    // otherwise.
+    var kind = kind
+    if kind == .fileIDSpelledAsFile, !self.ctx.langOpts.hasFeature(.ConciseMagicFile) {
+      kind = .filePathSpelledAsFile
+    }
+
     return BridgedMagicIdentifierLiteralExpr.createParsed(
       self.ctx,
       kind: kind,

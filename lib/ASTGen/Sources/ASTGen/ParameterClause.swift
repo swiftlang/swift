@@ -255,7 +255,7 @@ extension ASTGenVisitor {
         ]
       )
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(paramNameNode)
-      (argName, argNameLoc) = argNameByDefault ? (paramName, paramNameLoc) : (nil, nil)
+      (argName, argNameLoc) = argNameByDefault ? (paramName, nil) : (nil, nil)
     case let (argNameNode?, paramNameNode?):
       (argName, argNameLoc) = self.generateIdentifierAndSourceLoc(argNameNode)
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(paramNameNode)
@@ -283,7 +283,10 @@ extension ASTGenVisitor {
       // The (nil, nameNode?) case should never happen (since a single label
       // should be the firstName), but treat it the same it to be defensive.
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(nameNode)
-      (argName, argNameLoc) = argNameByDefault ? (paramName, paramNameLoc) : (nil, nil)
+      // The argument label is the parameter name, but has no location of its own:
+      // there is nothing written for it, and the C++ parser leaves it invalid.
+      // (A fix-it that renames the label depends on that.)
+      (argName, argNameLoc) = argNameByDefault ? (paramName, nil) : (nil, nil)
     default:
       (argName, argNameLoc, paramName, paramNameLoc) = (nil, nil, nil, nil)
     }
