@@ -746,7 +746,7 @@ wait_paused(uint32_t expected, const struct timespec *timeout)
    We don't want to require CAP_SYS_PTRACE because we're potentially being
    used inside of a Docker container, which won't have that enabled. */
 
-char memserver_stack[4096] __attribute__((aligned(SWIFT_MAX_PAGE_SIZE)));
+char memserver_stack[4096] __attribute__((aligned(SWIFT_PAGE_SIZE)));
 char memserver_buffer[4096];
 int memserver_fd;
 sigjmp_buf memserver_fault_buf;

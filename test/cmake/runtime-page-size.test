@@ -1,0 +1,6 @@
+# RUN: %cmake -DOUTPUT_DIR=%t -P %S/Inputs/RuntimePageSize.cmake
+# RUN: not %cmake -DPAGE_SIZE=0 -P %S/Inputs/RuntimePageSize.cmake 2>&1 | %FileCheck %s
+# RUN: not %cmake -DPAGE_SIZE=-4096 -P %S/Inputs/RuntimePageSize.cmake 2>&1 | %FileCheck %s
+# RUN: not %cmake -DPAGE_SIZE=49152 -P %S/Inputs/RuntimePageSize.cmake 2>&1 | %FileCheck %s
+# RUN: not %cmake -DPAGE_SIZE=invalid -P %S/Inputs/RuntimePageSize.cmake 2>&1 | %FileCheck %s
+# CHECK: Runtime page size must be a positive power of two

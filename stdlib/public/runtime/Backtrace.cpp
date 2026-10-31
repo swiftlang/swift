@@ -165,27 +165,27 @@ SWIFT_ALLOWED_RUNTIME_GLOBAL_CTOR_END
 // These buffers must be aligned and sized for any supported system page size,
 // which can differ from the page size on the machine that builds the runtime.
 constexpr size_t SWIFT_BACKTRACE_BUFFER_SIZE =
-    SWIFT_MAX_PAGE_SIZE > 16384 ? SWIFT_MAX_PAGE_SIZE : 16384;
+    SWIFT_PAGE_SIZE > 16384 ? SWIFT_PAGE_SIZE : 16384;
 
-static_assert((SWIFT_BACKTRACE_BUFFER_SIZE % SWIFT_MAX_PAGE_SIZE) == 0,
+static_assert((SWIFT_BACKTRACE_BUFFER_SIZE % SWIFT_PAGE_SIZE) == 0,
               "The backtrace path buffer must be a multiple of the system "
               "page size.  If it isn't, you'll get weird crashes in other "
               "code because we'll protect more than just the buffer.");
 
 // The same goes for swiftBacktraceEnvironment
 constexpr size_t SWIFT_BACKTRACE_ENVIRONMENT_SIZE =
-    SWIFT_MAX_PAGE_SIZE > 32768 ? SWIFT_MAX_PAGE_SIZE : 32768;
+    SWIFT_PAGE_SIZE > 32768 ? SWIFT_PAGE_SIZE : 32768;
 
-static_assert((SWIFT_BACKTRACE_ENVIRONMENT_SIZE % SWIFT_MAX_PAGE_SIZE) == 0,
+static_assert((SWIFT_BACKTRACE_ENVIRONMENT_SIZE % SWIFT_PAGE_SIZE) == 0,
               "The environment buffer must be a multiple of the system "
               "page size.  If it isn't, you'll get weird crashes in other "
               "code because we'll protect more than just the buffer.");
 
 // And the output path
 constexpr size_t SWIFT_BACKTRACE_OUTPUT_PATH_SIZE =
-    SWIFT_MAX_PAGE_SIZE > 16384 ? SWIFT_MAX_PAGE_SIZE : 16384;
+    SWIFT_PAGE_SIZE > 16384 ? SWIFT_PAGE_SIZE : 16384;
 
-static_assert((SWIFT_BACKTRACE_OUTPUT_PATH_SIZE % SWIFT_MAX_PAGE_SIZE) == 0,
+static_assert((SWIFT_BACKTRACE_OUTPUT_PATH_SIZE % SWIFT_PAGE_SIZE) == 0,
               "The output path buffer must be a multiple of the system "
               "page size.  If it isn't, you'll get weird crashes in other "
               "code because we'll protect more than just the buffer.");
@@ -208,12 +208,12 @@ __declspec(allocate(SWIFT_BACKTRACE_SECTION)) CHAR swiftBacktraceOutputPath[SWIF
 #if defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
 const char swiftBacktracePath[] = SWIFT_RUNTIME_FIXED_BACKTRACER_PATH;
 #else
-char swiftBacktracePath[SWIFT_BACKTRACE_BUFFER_SIZE] __attribute__((section(SWIFT_BACKTRACE_SECTION), aligned(SWIFT_MAX_PAGE_SIZE)));
+char swiftBacktracePath[SWIFT_BACKTRACE_BUFFER_SIZE] __attribute__((section(SWIFT_BACKTRACE_SECTION), aligned(SWIFT_PAGE_SIZE)));
 #endif // !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH
 
-char swiftBacktraceEnv[SWIFT_BACKTRACE_ENVIRONMENT_SIZE] __attribute__((section(SWIFT_BACKTRACE_SECTION), aligned(SWIFT_MAX_PAGE_SIZE)));
+char swiftBacktraceEnv[SWIFT_BACKTRACE_ENVIRONMENT_SIZE] __attribute__((section(SWIFT_BACKTRACE_SECTION), aligned(SWIFT_PAGE_SIZE)));
 
-char swiftBacktraceOutputPath[SWIFT_BACKTRACE_OUTPUT_PATH_SIZE] __attribute__((section(SWIFT_BACKTRACE_SECTION), aligned(SWIFT_MAX_PAGE_SIZE)));
+char swiftBacktraceOutputPath[SWIFT_BACKTRACE_OUTPUT_PATH_SIZE] __attribute__((section(SWIFT_BACKTRACE_SECTION), aligned(SWIFT_PAGE_SIZE)));
 
 #endif // defined(__linux__) || TARGET_OS_OSX
 
@@ -952,7 +952,7 @@ struct spawn_info {
   int memserver;
 };
 
-uint8_t spawn_stack[4096] __attribute__((aligned(SWIFT_MAX_PAGE_SIZE)));
+uint8_t spawn_stack[4096] __attribute__((aligned(SWIFT_PAGE_SIZE)));
 
 int
 do_spawn(void *ptr) {
