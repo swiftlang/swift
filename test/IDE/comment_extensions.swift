@@ -24,6 +24,12 @@
 
 // CHECK: {{.*}}DocCommentAsXML=none
 
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>keyword()</Name><USR>s:14swift_ide_test7keywordyyF</USR><Declaration>func keyword()</Declaration><CommentParts><Discussion><Keyword><Para>subscript</Para></Keyword></Discussion></CommentParts></Function>]
+
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>mutatingvariant()</Name><USR>s:14swift_ide_test15mutatingvariantyyF</USR><Declaration>func mutatingvariant()</Declaration><CommentParts><Discussion><Mutatingvariant><Para>sort()</Para></Mutatingvariant></Discussion></CommentParts></Function>]
+
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>nonmutatingvariant()</Name><USR>s:14swift_ide_test18nonmutatingvariantyyF</USR><Declaration>func nonmutatingvariant()</Declaration><CommentParts><Discussion><Nonmutatingvariant><Para>sorted()</Para></Nonmutatingvariant></Discussion></CommentParts></Function>]
+
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>note()</Name><USR>s:14swift_ide_test4noteyyF</USR><Declaration>func note()</Declaration><CommentParts><Discussion><Note><Para>This function is very hip and exciting.</Para></Note></Discussion></CommentParts></Function>]
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>postcondition(_:)</Name><USR>s:14swift_ide_test13postconditionyySizF</USR><Declaration>func postcondition(_ x: inout Int)</Declaration><CommentParts><Discussion><Postcondition><Para>x is unchanged</Para></Postcondition></Discussion></CommentParts></Function>]
@@ -32,6 +38,10 @@
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>precondition(_:)</Name><USR>s:14swift_ide_test12preconditionyySiF</USR><Declaration>func precondition(_ x: Int)</Declaration><CommentParts><Discussion><Precondition><Para><codeVoice>x &lt; 100</codeVoice></Para></Precondition></Discussion></CommentParts></Function>]
 // CHECK: {{.*}}DocCommentAsXML=none
+
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>recommended()</Name><USR>s:14swift_ide_test11recommendedyyF</USR><Declaration>func recommended()</Declaration><CommentParts><Discussion><Recommended><Para>sorted()</Para></Recommended></Discussion></CommentParts></Function>]
+
+// CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>recommendedover()</Name><USR>s:14swift_ide_test15recommendedoveryyF</USR><Declaration>func recommendedover()</Declaration><CommentParts><Discussion><Recommendedover><Para>sort()</Para></Recommendedover></Discussion></CommentParts></Function>]
 
 // CHECK: {{.*}}DocCommentAsXML=[<Function file="{{.*}}" line="{{.*}}" column="{{.*}}"><Name>remark()</Name><USR>s:14swift_ide_test6remarkyyF</USR><Declaration>func remark()</Declaration><CommentParts><Discussion><Remark><Para>Always, no, never forget to check your references.</Para></Remark></Discussion></CommentParts></Function>]
 
