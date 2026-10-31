@@ -911,14 +911,30 @@ function(_compile_swift_files
       list(APPEND module_outputs "${api_descriptor_file}")
   endif()
 
-  swift_install_in_component(DIRECTORY "${specific_module_dir}"
-                             DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
-                             COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
-                             OPTIONAL
-                             PATTERN "Project" EXCLUDE
-                             ${exclude_binary_swiftmodule_installation_args})
+  if("${SWIFTFILE_SDK}" STREQUAL "embedded")
+    # All embedded triples share one <Module>.swiftmodule directory, and this
+    # function runs once per triple. Install only this triple's files so the
+    # whole directory isn't re-installed once per triple.
+    set(module_install_files ${module_outputs})
+    if(exclude_binary_swiftmodule_installation_args)
+      list(REMOVE_ITEM module_install_files "${module_file}")
+    endif()
+    swift_install_in_component(FILES ${module_install_files}
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}/${SWIFTFILE_MODULE_NAME}.swiftmodule"
+                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
+                               OPTIONAL)
+  else()
+    swift_install_in_component(DIRECTORY "${specific_module_dir}"
+                               DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/${library_subdir}"
+                               COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
+                               OPTIONAL
+                               PATTERN "Project" EXCLUDE
+                               ${exclude_binary_swiftmodule_installation_args})
+  endif()
 
-  if(SWIFTFILE_STATIC)
+  # Embedded modules are only looked up in lib/swift/embedded, so skip the
+  # swift_static copy for them.
+  if(SWIFTFILE_STATIC AND NOT "${SWIFTFILE_SDK}" STREQUAL "embedded")
     swift_install_in_component(DIRECTORY "${specific_module_dir_static}"
                                DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift_static/${library_subdir}"
                                COMPONENT "${SWIFTFILE_INSTALL_IN_COMPONENT}"
