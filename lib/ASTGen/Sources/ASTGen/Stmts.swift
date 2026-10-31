@@ -589,7 +589,36 @@ extension ASTGenVisitor {
     )
   }
 
+  /// The 1-based byte column of `position` within its line.
+  private func column(of position: AbsolutePosition) -> Int {
+    var start = position.utf8Offset
+    while start > 0 && self.base[start - 1] != UInt8(ascii: "\n") && self.base[start - 1] != UInt8(ascii: "\r") {
+      start -= 1
+    }
+    return position.utf8Offset - start + 1
+  }
+
+  /// Warn when the expression after `return` or `then` is on a different line
+  /// from the keyword but has the same indentation, since it is then taken as
+  /// the operand even though it may have been meant as a separate statement.
+  private func diagnoseUnindentedExpression(
+    after keyword: TokenSyntax,
+    _ expression: ExprSyntax?,
+    _ diagnostic: CompilerDiagnostic
+  ) {
+    guard let expression,
+      self.column(of: keyword.positionAfterSkippingLeadingTrivia)
+        == self.column(of: expression.positionAfterSkippingLeadingTrivia)
+    else {
+      return
+    }
+    self.diagnose(diagnostic, at: expression)
+    self.diagnose(.indent_expression_to_silence, at: expression)
+  }
+
   func generate(returnStmt node: ReturnStmtSyntax) -> BridgedReturnStmt {
+    self.diagnoseUnindentedExpression(
+      after: node.returnKeyword, node.expression, .unindented_code_after_return)
     return .createParsed(
       self.ctx,
       loc: self.generateSourceLoc(node.returnKeyword),
@@ -598,6 +627,8 @@ extension ASTGenVisitor {
   }
 
   func generate(thenStmt node: ThenStmtSyntax) -> BridgedThenStmt {
+    self.diagnoseUnindentedExpression(
+      after: node.thenKeyword, node.expression, .unindented_code_after_then)
     return .createParsed(
       self.ctx,
       thenLoc: self.generateSourceLoc(node.thenKeyword),
@@ -639,6 +670,27 @@ extension ASTGenVisitor {
       items = CollectionOfOne(item).bridgedArray(in: self)
       terminatorLoc = self.generateSourceLoc(node.colon)
     }
+    // A case needs at least one statement.
+    if node.statements.isEmpty, !node.hasError {
+      let isDefault: Bool
+      let afterColon: AbsolutePosition
+      switch node.label {
+      case .case(let label):
+        (isDefault, afterColon) = (false, label.colon.endPositionBeforeTrailingTrivia)
+      case .default(let label):
+        (isDefault, afterColon) = (true, label.colon.endPositionBeforeTrailingTrivia)
+      }
+      self.diagnose(
+        .case_stmt_without_body(isDefault),
+        at: introducerLoc,
+        fixIts: [
+          .init(
+            replace: CharSourceRange(start: SourceLoc(at: afterColon, in: self.base), byteLength: 0),
+            with: " break")
+        ]
+      )
+    }
+
     // A switch case body has no braces in the source, so its locations have to
     // be synthesized. They must be *valid*: `CaseStmt::getLabelItemsRange()`
     // falls back to `SourceRange(getLoc(), getBody()->getEndLoc())` when the
@@ -648,7 +700,14 @@ extension ASTGenVisitor {
     //
     // `Parser::parseStmtCase` picks the same locations: the start of the body if
     // it has any items, otherwise the position just past the label, for both.
-    let bodyRange = self.generateImplicitBraceRange(node.statements)
+    // An empty body sits at the label's terminator, like the C++ parser's
+    // `PreviousLoc`. The position of the empty statement list itself would be
+    // *after* the colon's trailing trivia, and an end on trivia lexes forward
+    // into the next case, whose scope it then overlaps.
+    let bodyRange =
+      node.statements.isEmpty && terminatorLoc.isValid
+      ? SourceRange(start: terminatorLoc, end: terminatorLoc)
+      : self.generateImplicitBraceRange(node.statements)
     let body = BridgedBraceStmt.createImplicit(
       self.ctx,
       lBraceLoc: bodyRange.start,
@@ -668,6 +727,8 @@ extension ASTGenVisitor {
 
   func generate(switchCaseList node: SwitchCaseListSyntax) -> BridgedArrayRef {
     var allBridgedCases: [BridgedCaseStmt] = []
+    var hasDefault = false
+    var reportedCaseAfterDefault = false
     visitIfConfigElements(node, of: SwitchCaseSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -681,6 +742,21 @@ extension ASTGenVisitor {
         return .skip
       }
     } body: { caseNode in
+      // We cannot have additional cases after a default clause. Complain on
+      // the first offender.
+      if hasDefault && !reportedCaseAfterDefault {
+        reportedCaseAfterDefault = true
+        let introducer: SyntaxProtocol
+        switch caseNode.label {
+        case .case(let label): introducer = label.caseKeyword
+        case .default(let label): introducer = label.defaultKeyword
+        }
+        self.diagnose(.case_after_default, at: introducer)
+      }
+      if case .default = caseNode.label {
+        hasDefault = true
+      }
+
       // A `case` without its keyword is a recovery artifact, e.g. the stray
       // `@MainActor` in `default @MainActor`. The C++ parser stops
       // the case list there ("expected declaration") rather than forming a
@@ -691,8 +767,6 @@ extension ASTGenVisitor {
       }
       allBridgedCases.append(self.generate(switchCase: caseNode))
     }
-
-    // TODO: Diagnose 'case' after 'default'.
 
     return allBridgedCases.lazy.bridgedArray(in: self)
   }

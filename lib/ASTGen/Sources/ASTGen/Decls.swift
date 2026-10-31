@@ -864,7 +864,7 @@ extension ASTGenVisitor {
         generated,
         isSubscript: isSubscript,
         braceLoc: leftBrace,
-        isInvalid: accessorBlock.hasError,
+        isInvalid: accessorBlock.hasError || self.accessorsAreInvalid,
         storageSyntax: accessorBlock.parent
       )
       return record
@@ -881,6 +881,9 @@ extension ASTGenVisitor {
         throwsSpecifierLoc: nil,
         thrownType: nil
       )
+      if self.accessorsAreInvalid {
+        accessor.asDecl.setInvalid()
+      }
       self.withDeclContext(accessor.asDeclContext) {
         let brace = BridgedBraceStmt.createParsed(
           self.ctx,
@@ -907,6 +910,39 @@ extension ASTGenVisitor {
       return nil
     }
 
+    // A computed property needs a type: there is no initializer to infer it from.
+    var missingType = false
+    if binding.typeAnnotation == nil, let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
+      let accessorBlock = binding.accessorBlock
+    {
+      var hasReadOrWriteAccessor = false
+      switch accessorBlock.accessors {
+      case .getter:
+        hasReadOrWriteAccessor = true
+      case .accessors(let accessors):
+        hasReadOrWriteAccessor = accessors.contains {
+          switch $0.accessorSpecifier.keywordKind {
+          case .get, .set, .unsafeAddress, .unsafeMutableAddress: return true
+          default: return false
+          }
+        }
+      }
+      if hasReadOrWriteAccessor {
+        missingType = true
+        self.diagnose(
+          .computed_property_missing_type,
+          at: identifier,
+          fixIts: [
+            .init(
+              replace: CharSourceRange(
+                start: SourceLoc(at: identifier.endPositionBeforeTrailingTrivia, in: self.base),
+                byteLength: 0),
+              with: ": <# Type #>")
+          ]
+        )
+      }
+    }
+
     let pattern = generate(pattern: binding.pattern)
     if isAsyncLet {
       // `async let _ = ...` has no VarDecl to carry the `async` attribute, so
@@ -930,11 +966,14 @@ extension ASTGenVisitor {
       }
     }
     if let accessors = binding.accessorBlock {
+      self.accessorsAreInvalid = missingType
+      defer { self.accessorsAreInvalid = false }
       // FIXME: We ought to have a better way of converting from the Nullable
       // wrapper back to Optional.
       if let primaryVar = pattern.singleVar.raw.map(BridgedVarDecl.init) {
         let storage = primaryVar.asAbstractStorageDecl
         storage.setAccessors(generate(accessorBlock: accessors, for: storage))
+
       } else {
         self.diagnose(.getset_nontrivial_pattern, at: binding.pattern)
       }
@@ -1311,8 +1350,14 @@ extension ASTGenVisitor {
     }
 
     if let body = node.body {
-      self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(codeBlock: body))
+      if self.isProtocolMember(node) {
+        // A protocol requirement has no body. The C++ parser diagnoses the
+        // body and skips it.
+        self.diagnose(.protocol_init_with_body, at: body.leftBrace)
+      } else {
+        self.withDeclContext(decl.asDeclContext) {
+          decl.setParsedBody(self.generate(codeBlock: body))
+        }
       }
     }
 

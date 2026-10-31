@@ -41,6 +41,10 @@ struct ASTGenVisitor {
   /// attribute list being generated, to diagnose duplicates.
   @Boxed var seenExposureKinds: [UInt8] = []
 
+  /// Whether the accessors being generated belong to a declaration that was
+  /// already diagnosed as invalid, so they are marked invalid too.
+  @Boxed var accessorsAreInvalid: Bool = false
+
   let ctx: BridgedASTContext
 
   let configuredRegions: ConfiguredRegions

@@ -97,6 +97,34 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
   *cAttrs = attrs;
 }
 
+BridgedDuplicateAttributeInfo BridgedDeclAttributes_checkDuplicate(
+    const BridgedDeclAttributes *_Nonnull attrs, BridgedDeclAttribute newAttr) {
+  BridgedDuplicateAttributeInfo info{false, false, false, SourceLoc(),
+                                     SourceLoc()};
+  auto *attr = newAttr.unbridged();
+  auto kind = attr->getKind();
+  // Custom attributes (property wrappers, global actors, macros, ...) are not
+  // parsed by `Parser::parseNewDeclAttribute`, and may repeat.
+  if (kind == DeclAttrKind::Custom ||
+      DeclAttribute::allowMultipleAttributes(kind))
+    return info;
+  auto *previous = attrs->unbridged().getAttribute(kind);
+  if (!previous)
+    return info;
+
+  info.isDuplicate = true;
+  info.isModifier = DeclAttribute::isDeclModifier(kind);
+  info.newLoc = attr->getLocation();
+  info.previousLoc = previous->getLocation();
+  if (auto *access = dyn_cast<AccessControlAttr>(attr))
+    info.hasDifferentAccessLevel =
+        access->getAccess() != cast<AccessControlAttr>(previous)->getAccess();
+  else if (auto *access = dyn_cast<SetterAccessAttr>(attr))
+    info.hasDifferentAccessLevel =
+        access->getAccess() != cast<SetterAccessAttr>(previous)->getAccess();
+  return info;
+}
+
 bool BridgedDeclAttributes_hasAttribute(
     const BridgedDeclAttributes *_Nonnull attrs, swift::DeclAttrKind kind) {
   return attrs->unbridged().getAttribute(kind) != nullptr;

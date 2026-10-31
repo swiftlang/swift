@@ -55,7 +55,19 @@ extension ASTGenVisitor {
       guard let attr else {
         return
       }
-      // FIXME: Diagnostics for duplicated attrs.
+      // Diagnose, and drop, an attribute that may appear only once but
+      // already did.
+      let duplicate = attrs.checkDuplicate(attr)
+      if duplicate.isDuplicate {
+        if duplicate.hasDifferentAccessLevel {
+          self.diagnose(.multiple_access_level_modifiers, at: duplicate.newLoc)
+          self.diagnose(.previous_access_level_modifier, at: duplicate.previousLoc)
+        } else {
+          self.diagnose(.duplicate_attribute(duplicate.isModifier), at: duplicate.newLoc)
+          self.diagnose(.previous_attribute(duplicate.isModifier), at: duplicate.previousLoc)
+        }
+        return
+      }
       attrs.add(attr)
     }
 
@@ -149,6 +161,18 @@ extension ASTGenVisitor {
         } else {
           nil
         }
+      }
+
+      // A declaration modifier spelled as an attribute (`@override`) is
+      // accepted, with an error and a fix-it that removes the '@'.
+      if let attrKind, attrKind != .Rethrows, attrKind != .Reasync,
+        BridgedDeclAttribute.isDeclModifier(attrKind)
+      {
+        self.diagnose(
+          .cskeyword_not_attribute(String(syntaxText: attrName)),
+          at: node.atSign,
+          fixIts: [.init(remove: self.generateCharSourceRange(node.atSign))]
+        )
       }
 
       switch attrKind {

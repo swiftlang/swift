@@ -940,6 +940,25 @@ SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
                                BridgedDeclAttribute add);
 
+/// The result of checking a new attribute against those already on a
+/// declaration; see `BridgedDeclAttributes_checkDuplicate`.
+struct BridgedDuplicateAttributeInfo {
+  bool isDuplicate;
+  /// Whether the attribute is a declaration modifier (affects the wording).
+  bool isModifier;
+  /// Whether both are access-level attributes that specify different levels,
+  /// which is diagnosed differently from a plain duplicate.
+  bool hasDifferentAccessLevel;
+  swift::SourceLoc newLoc;
+  swift::SourceLoc previousLoc;
+};
+
+/// Check whether \p newAttr duplicates an attribute in \p attrs of a kind that
+/// may appear only once, as `Parser::parseNewDeclAttribute` does.
+SWIFT_NAME("BridgedDeclAttributes.checkDuplicate(self:_:)")
+BridgedDuplicateAttributeInfo BridgedDeclAttributes_checkDuplicate(
+    const BridgedDeclAttributes *_Nonnull attrs, BridgedDeclAttribute newAttr);
+
 SWIFT_NAME("BridgedDeclAttributes.hasAttribute(self:_:)")
 bool BridgedDeclAttributes_hasAttribute(
     const BridgedDeclAttributes *_Nonnull attrs, swift::DeclAttrKind kind);

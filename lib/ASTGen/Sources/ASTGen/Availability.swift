@@ -505,6 +505,14 @@ extension ASTGenVisitor {
         continue
       }
 
+      // Only the major and minor version numbers are used.
+      if let versionNode = platformVersionNode.version, versionNode.components.count > 1 {
+        self.diagnose(
+          .attr_availability_platform_version_major_minor_only(attrName),
+          at: versionNode
+        )
+      }
+
       let platform = BridgedOptionalPlatformKind(from: platformName.bridged)
       if platform.hasValue {
         result.versions.append((platform: platform.value, version: version))
