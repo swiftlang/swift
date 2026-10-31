@@ -770,7 +770,10 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
-      name: name ?? "",
+      // No name must be a *null* string, not an empty one: Sema treats an
+      // empty-but-non-null name of a `@c` function as an explicit (empty)
+      // selector, which then never matches the header's declaration.
+      name: name ?? BridgedStringRef(),
       underscored: underscored
     )
   }

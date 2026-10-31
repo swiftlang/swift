@@ -92,8 +92,32 @@ extension ASTGenVisitor {
           break
         }
       }
+      // SwiftParser parses `yield(...)` as a call; in a coroutine it is a
+      // `yield` statement, as it is for the C++ parser.
+      if let call = node.as(FunctionCallExprSyntax.self), let yieldStmt = self.generate(yieldCall: call) {
+        return .stmt(yieldStmt.asStmt)
+      }
       return .expr(self.generate(expr: node))
     }
+  }
+
+  /// A `yield(...)` call inside a coroutine, as a `yield` statement.
+  private func generate(yieldCall call: FunctionCallExprSyntax) -> BridgedYieldStmt? {
+    guard self.declContext.isCoroutineFunction,
+      let callee = call.calledExpression.as(DeclReferenceExprSyntax.self),
+      callee.baseName.text == "yield", callee.argumentNames == nil,
+      call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty,
+      let leftParen = call.leftParen
+    else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      yieldLoc: self.generateSourceLoc(callee.baseName),
+      lParenLoc: self.generateSourceLoc(leftParen),
+      yields: call.arguments.lazy.map({ self.generate(expr: $0.expression) }).bridgedArray(in: self),
+      rParenLoc: self.generateSourceLoc(call.rightParen)
+    )
   }
 
   @inline(__always)

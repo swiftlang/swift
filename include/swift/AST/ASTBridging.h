@@ -669,6 +669,11 @@ bool BridgedDeclContext_allowsDestructorDecl(BridgedDeclContext dc);
 SWIFT_NAME("getter:BridgedDeclContext.isProtocolContext(self:)")
 bool BridgedDeclContext_isProtocolContext(BridgedDeclContext dc);
 
+/// Whether this context is a coroutine function (a `_read`/`_modify`
+/// accessor, ...), inside which `yield` is a keyword.
+SWIFT_NAME("getter:BridgedDeclContext.isCoroutineFunction(self:)")
+bool BridgedDeclContext_isCoroutineFunction(BridgedDeclContext dc);
+
 SWIFT_NAME("getter:BridgedDeclContext.isClosureExpr(self:)")
 BRIDGED_INLINE bool BridgedDeclContext_isClosureExpr(BridgedDeclContext dc);
 

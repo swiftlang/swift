@@ -68,6 +68,11 @@ bool BridgedDeclContext_allowsDestructorDecl(BridgedDeclContext cDeclContext) {
   return false;
 }
 
+bool BridgedDeclContext_isCoroutineFunction(BridgedDeclContext cDeclContext) {
+  auto *func = dyn_cast<AbstractFunctionDecl>(cDeclContext.unbridged());
+  return func && func->isCoroutine();
+}
+
 bool BridgedDeclContext_isProtocolContext(BridgedDeclContext cDeclContext) {
   return isa<ProtocolDecl>(cDeclContext.unbridged());
 }

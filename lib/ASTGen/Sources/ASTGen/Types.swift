@@ -390,6 +390,7 @@ extension ASTGenVisitor {
     var sendingLoc: SourceLoc = nil
     var lifetimeEntry: BridgedLifetimeEntry? = nil
     var nonisolatedLoc: SourceLoc = nil
+    var specifierAttributes: [BridgedTypeOrCustomAttr] = []
 
     for node in node.specifiers {
       let loc = self.generateSourceLoc(node)
@@ -467,13 +468,24 @@ extension ASTGenVisitor {
             self.generateLifetimeDescriptor(lifetimeSpecifierArgument: $0)
           }
         )
-      case .nonisolatedTypeSpecifier(_):
-        nonisolatedLoc = loc
+      case .nonisolatedTypeSpecifier(let specifier):
+        if specifier.argument != nil {
+          // `nonisolated(nonsending)`.
+          nonisolatedLoc = loc
+        } else {
+          // A bare `nonisolated`, as in `extension C: nonisolated P`, is a
+          // simple type attribute.
+          specifierAttributes.append(
+            .typeAttr(
+              BridgedTypeAttribute.createSimple(
+                self.ctx, kind: .Nonisolated, atLoc: nil,
+                nameLoc: self.generateSourceLoc(specifier.nonisolatedKeyword))))
+        }
       }
     }
 
     // Attributes.
-    let typeAttributes = self.generateTypeAttributes(node)
+    let typeAttributes = specifierAttributes + self.generateTypeAttributes(node)
 
     if !typeAttributes.isEmpty {
       type =
