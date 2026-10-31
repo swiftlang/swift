@@ -9,6 +9,9 @@
 // RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -cxx-interoperability-mode=default -verify-additional-prefix legacy-c-array-
 // RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -cxx-interoperability-mode=default -o /dev/null
 
+// Availability can only be tested on Apple platforms.
+// RUN: %if VENDOR=apple %{ %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/availability.swift -I %t/include -cxx-interoperability-mode=default -enable-experimental-feature ModernImportedCArraysOnly %}
+
 // RUN: %target-swift-ide-test -print-module -module-to-print=CArrays -source-filename=x -I %t/include -cxx-interoperability-mode=default --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly -target %target-has-inline-array-triple | %FileCheck %s %if VENDOR=apple %{ --check-prefixes CHECK,APPLE %}
 
 // REQUIRES: swift_feature_ModernImportedCArrays
@@ -28,6 +31,24 @@ struct SubIndex {
 
 struct SubResult {
   int (*operator[](int index) const)[4];
+};
+
+// Declared availability that is lower than InlineArray's is raised to it, on
+// the subscript as well as its accessors.
+// (anyAppleOS can't express a version below InlineArray's.)
+#define OLD_AVAILABILITY \
+    __attribute__((availability(macos, introduced = 12.0))) \
+    __attribute__((availability(ios, introduced = 15.0))) \
+    __attribute__((availability(tvos, introduced = 15.0))) \
+    __attribute__((availability(watchos, introduced = 8.0))) \
+    __attribute__((availability(visionos, introduced = 1.0)))
+
+struct OldSubIndex {
+  int operator[](int (*array)[4]) const OLD_AVAILABILITY;
+};
+
+struct OldSubResult {
+  int (*operator[](int index) const)[4] OLD_AVAILABILITY;
 };
 
 struct Ops {
@@ -67,6 +88,18 @@ func test(
   // expected-modern-c-array-error@-1 {{cannot convert value of type 'Ops' to expected argument type 'Int'}}
   _ = ops + array
   // expected-legacy-c-array-error@-1 {{cannot convert value of type 'Ops' to expected argument type 'Int'}}
+}
+
+//--- availability.swift
+import CArrays
+
+func testOldAvailability(_ index: OldSubIndex, _ result: inout OldSubResult) {
+  // expected-note@-1 3 {{add '@available' attribute to enclosing global function}}
+  _ = index[nil]
+  // expected-error@-1 {{'subscript(_:)' is only available in}} expected-note@-1 {{add 'if #available' version check}}
+  // expected-error@-2 {{getter for 'subscript(_:)' is only available in}} expected-note@-2 {{add 'if #available' version check}}
+  _ = result[0]
+  // expected-error@-1 {{'subscript(_:)' is only available in}} expected-note@-1 {{add 'if #available' version check}}
 }
 
 //--- codegen.swift

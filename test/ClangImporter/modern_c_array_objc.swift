@@ -14,6 +14,8 @@
 // RUN: %target-swift-frontend -typecheck -verify %t/typecheck.swift -I %t/include -verify-additional-prefix legacy-c-array-
 // RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -o /dev/null
 
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/availability.swift -I %t/include -enable-experimental-feature ModernImportedCArraysOnly
+
 // RUN: %target-swift-ide-test -print-module -module-to-print=CLib -source-filename=x -I %t/include --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly -target %target-has-inline-array-triple | %FileCheck %s
 
 //--- include/module.modulemap
@@ -113,6 +115,24 @@ NS_ASSUME_NONNULL_BEGIN
 @interface Table : NSObject
 - (int (*)[4])objectAtIndexedSubscript:(NSUInteger)index;
 - (void)setObject:(int (*)[4])object atIndexedSubscript:(NSUInteger)index;
+@end
+
+// Declared availability that is lower than InlineArray's is raised to it, on
+// the storage as well as its accessors.
+// (anyAppleOS can't express a version below InlineArray's.)
+#define OLD_AVAILABILITY \
+    API_AVAILABLE(macos(12.0), ios(15.0), tvos(15.0), watchos(8.0), visionos(1.0))
+@interface OldAvailability : NSObject
+@property (nonatomic) int (*row)[4] OLD_AVAILABILITY;
+@property (nonatomic, readonly) int (*readonlyRow)[4] OLD_AVAILABILITY;
+@property (nonatomic, readonly) int (*redeclaredRow)[4] OLD_AVAILABILITY;
+- (int (*)[4])objectAtIndexedSubscript:(NSUInteger)index OLD_AVAILABILITY;
+- (void)setObject:(int (*)[4])object
+    atIndexedSubscript:(NSUInteger)index OLD_AVAILABILITY;
+@end
+
+@interface OldAvailability ()
+@property (nonatomic, readwrite) int (*redeclaredRow)[4] OLD_AVAILABILITY;
 @end
 
 // Parameters declared as arrays decay to pointers to arrays, however they are
@@ -339,6 +359,35 @@ func testDecayedArrayParameters(
   _ = Matrix(source: 0, informationMatrixSymmetric: constArray)
   // expected-legacy-c-array-error@-1 {{cannot convert value of type 'UnsafePointer<InlineArray<6, Float>>' to expected argument type 'UnsafePointer<(CFloat /* ... repeated 6 times ... */)>' (aka 'UnsafePointer<(Float /* ... repeated 6 times ... */)>')}}
   // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('InlineArray<6, Float>' and '(CFloat /* ... repeated 6 times ... */)' (aka '(Float /* ... repeated 6 times ... */)')) are expected to be equal}}
+}
+
+//--- availability.swift
+import CLib
+
+// The availability of the modern projection is the declared availability
+// limited by InlineArray's, even when that is declared on an accessor.
+
+func testOldAvailability(_ obj: OldAvailability) {
+  // expected-note@-1 12 {{add '@available' attribute to enclosing global function}}
+  _ = obj.row
+  // expected-error@-1 {{'row' is only available in}} expected-note@-1 {{add 'if #available' version check}}
+  obj.row = obj.row
+  // expected-error@-1 2 {{'row' is only available in}} expected-note@-1 2 {{add 'if #available' version check}}
+  _ = obj.readonlyRow
+  // expected-error@-1 {{'readonlyRow' is only available in}} expected-note@-1 {{add 'if #available' version check}}
+  _ = obj.redeclaredRow
+  // expected-error@-1 {{'redeclaredRow' is only available in}} expected-note@-1 {{add 'if #available' version check}}
+  obj.redeclaredRow = obj.row
+  // expected-error@-1 {{'redeclaredRow' is only available in}} expected-note@-1 {{add 'if #available' version check}}
+  // expected-error@-2 {{'row' is only available in}} expected-note@-2 {{add 'if #available' version check}}
+
+  _ = obj[0]
+  // expected-error@-1 {{'subscript(_:)' is only available in}} expected-note@-1 {{add 'if #available' version check}}
+  // expected-error@-2 {{getter for 'subscript(_:)' is only available in}} expected-note@-2 {{add 'if #available' version check}}
+  obj[1] = obj.row
+  // expected-error@-1 {{'subscript(_:)' is only available in}} expected-note@-1 {{add 'if #available' version check}}
+  // expected-error@-2 {{setter for 'subscript(_:)' is only available in}} expected-note@-2 {{add 'if #available' version check}}
+  // expected-error@-3 {{'row' is only available in}} expected-note@-3 {{add 'if #available' version check}}
 }
 
 //--- codegen.swift

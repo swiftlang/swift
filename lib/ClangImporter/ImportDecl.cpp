@@ -6102,8 +6102,6 @@ namespace {
       if (!getter)
         return nullptr;
 
-      Impl.importAttributes(decl, getter);
-
       ////
       // Combine the getter and the VarDecl into a computed property.
 
@@ -7164,29 +7162,52 @@ namespace {
     /// \see VisitObjCPropertyDecl
     void handlePropertyRedeclaration(VarDecl *original,
                                      const clang::ObjCPropertyDecl *redecl) {
-      applyPropertyRedeclaration(original, redecl);
+      auto *originalSetter = applyPropertyRedeclaration(original, redecl);
+      AccessorDecl *counterpartSetter = nullptr;
 
       // The original's other projection (if it has one) is also redeclared. A
       // setter for it has to be imported as that projection.
-      if (auto *counterpart =
-              importer::getDeclForCounterpartCArrayProjection(original)) {
+      auto *counterpart =
+          importer::getDeclForCounterpartCArrayProjection(original);
+      if (counterpart) {
         auto *attr =
             counterpart->getAttrs().getAttribute<CArrayProjectionAttr>();
         auto counterpartVersion =
             getVersion().withCArrayProjection(attr->getProjection());
         llvm::SaveAndRestore<ImportNameVersion>
             saveVersion(version, counterpartVersion);
-        applyPropertyRedeclaration(counterpart, redecl);
+        counterpartSetter = applyPropertyRedeclaration(counterpart, redecl);
       }
+
+      // The property was registered before it had this setter, so register it
+      // now, and only then import its attributes.
+      if (auto *attr =
+              original->getAttrs().getAttribute<CArrayProjectionAttr>()) {
+        bool originalIsModern =
+            attr->getProjection() == CArrayProjection::Modern;
+        auto *modernSetter =
+            originalIsModern ? originalSetter : counterpartSetter;
+        auto *legacySetter =
+            originalIsModern ? counterpartSetter : originalSetter;
+        ASSERT((!counterpart || (bool)modernSetter == (bool)legacySetter) &&
+               "projections got different setters");
+        if (modernSetter)
+          synthesizer.registerCArrayProjections(modernSetter, legacySetter);
+      }
+      auto *clangSetter = redecl->getSetterMethodDecl();
+      for (auto *setter : {originalSetter, counterpartSetter})
+        if (setter)
+          Impl.importAttributes(clangSetter, setter);
     }
 
     /// Apply the redeclaration \p redecl of a property to \p original , which
     /// is one projection of it.
-    void applyPropertyRedeclaration(VarDecl *original,
-                                    const clang::ObjCPropertyDecl *redecl) {
+    AccessorDecl *
+    applyPropertyRedeclaration(VarDecl *original,
+                               const clang::ObjCPropertyDecl *redecl) {
       // If the property isn't from Clang, we can't safely update it.
       if (!original->hasClangNode())
-        return;
+        return nullptr;
 
       // If the original declaration was implicit, we may want to change that.
       if (original->isImplicit() && !redecl->isImplicit() &&
@@ -7201,18 +7222,18 @@ namespace {
 
       auto clangSetter = redecl->getSetterMethodDecl();
       if (!clangSetter)
-        return;
+        return nullptr;
 
       // The only other transformation we know how to do safely is add a
       // setter. If the property is already settable, we're done.
       if (original->isSettable(nullptr))
-        return;
+        return nullptr;
 
       AccessorDecl *setter = importAccessor(clangSetter,
                                             original, AccessorKind::Set,
                                             original->getDeclContext());
       if (!setter)
-        return;
+        return nullptr;
 
       // Check that the redeclared property's setter uses the same type as the
       // original property. Objective-C can get away with the types being
@@ -7228,9 +7249,10 @@ namespace {
       const ParamDecl *param = setter->getParameters()->get(0);
       if (!param->getInterfaceType()->isEqual(
               original->getInterfaceType()->getReferenceStorageReferent()))
-        return;
+        return nullptr;
 
       original->setComputedSetter(setter);
+      return setter;
     }
 
     Decl *importObjCPropertyDecl(const clang::ObjCPropertyDecl *decl,
@@ -8380,7 +8402,6 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   if (!swiftGetter)
     return nullptr;
 
-  Impl.importAttributes(getter, swiftGetter);
   Impl.ImportedDecls[Impl.getImportedDeclsKey(getter, getVersion())] =
       swiftGetter;
   if (swift3GetterName)
@@ -8395,7 +8416,6 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     if (!swiftSetter)
       return nullptr;
 
-    Impl.importAttributes(setter, swiftSetter);
     Impl.ImportedDecls[Impl.getImportedDeclsKey(setter, getVersion())] =
         swiftSetter;
     if (swift3SetterName)
@@ -9177,11 +9197,6 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   // Record the subscript as an alternative declaration.
   Impl.addAlternateDecl(associateWithSetter ? setter : getter, subscript);
 
-  // Import attributes for the accessors if there is a pair.
-  Impl.importAttributes(getterObjCMethod, getterThunk);
-  if (setterObjCMethod)
-    Impl.importAttributes(setterObjCMethod, setterThunk);
-
   subscript->setIsSetterMutating(false);
   ClangImporter::Implementation::makeComputed(subscript, getterThunk,
                                               setterThunk);
@@ -9224,8 +9239,6 @@ SwiftDeclConverter::importAccessor(const clang::ObjCMethodDecl *clangAccessor,
   if (!accessor) {
     return nullptr;
   }
-
-  Impl.importAttributes(clangAccessor, accessor);
 
   return accessor;
 }
@@ -10577,6 +10590,10 @@ void ClangImporter::Implementation::importAttributes(
     Decl *MappedDecl,
     const clang::ObjCContainerDecl *NewContext)
 {
+  ASSERT((getNeededCArrayCounterpart(ClangDecl) == CArrayProjection::Modern ||
+          MappedDecl->getAttrs().hasAttribute<CArrayProjectionAttr>()) &&
+         "importAttributes() before registerCArrayProjections()");
+
   // Subscripts are special-cased since there isn't a 1:1 mapping
   // from its accessor(s) to the subscript declaration.
   if (isa<SubscriptDecl>(MappedDecl))
@@ -10594,8 +10611,9 @@ void ClangImporter::Implementation::importAttributes(
     isAsync = func->hasAsync();
 
   // If the declaration is imported as InlineArray, that limits its
-  // availability.
-  bool hasMinAvailability = false;
+  // availability. Accessors inherit this from their storage, so we only apply
+  // it to the Clang availability they already have; we don't add any.
+  bool hasMinAvailability = isa<AccessorDecl>(MappedDecl);
   llvm::VersionTuple minAvailability;
   if (auto cArrayAttr =
         MappedDecl->getAttrs().getAttribute<CArrayProjectionAttr>())
@@ -10962,6 +10980,46 @@ static void canonicalizeVersionedSwiftAttributes(
     mutableDecl->addAttr(attr->getAdditionalAttr());
 }
 
+static void finalizeImportedDecl(ClangImporter::Implementation &impl,
+                                 const clang::NamedDecl *ClangDecl,
+                                 Decl *result,
+                                 llvm::SmallPtrSetImpl<Decl *> &finalized) {
+  // An accessor can also be the declaration we're importing, so only do this
+  // once.
+  if (!finalized.insert(result).second)
+    return;
+  impl.importAttributes(ClangDecl, result);
+
+  // Both callers have `getAlternateDecls()` loops; the fact that we have to
+  // walk accessors and storage here anyway means that we aren't registering
+  // alternates correctly.
+  // FIXME: Actually fix this instead of papering over it.
+
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(result))
+    for (auto *accessor : storage->getAllAccessors())
+      if (auto *clangAccessor =
+              dyn_cast_or_null<clang::NamedDecl>(accessor->getClangDecl()))
+        finalizeImportedDecl(impl, clangAccessor, accessor, finalized);
+
+  // Handles implicit properties formed from import-as-member functions.
+  if (auto *accessor = dyn_cast<AccessorDecl>(result)) {
+    if (!isa_and_nonnull<clang::FunctionDecl>(accessor->getClangDecl()))
+      return;
+
+    auto *storage = accessor->getStorage();
+    auto *getter = storage->getParsedAccessor(AccessorKind::Get);
+    if (!getter || getter == accessor)
+      return;
+
+    finalizeImportedDecl(impl, cast<clang::NamedDecl>(getter->getClangDecl()),
+                         getter, finalized);
+    if (finalized.insert(storage).second)
+      if (auto *attr = storage->getAttrs().getAttribute<CArrayProjectionAttr>())
+        if (attr->getProjection() == CArrayProjection::Modern)
+          impl.addInlineArrayAvailability(storage);
+  }
+}
+
 Decl *
 ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
                                               ImportNameVersion version,
@@ -11074,9 +11132,13 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
     return nullptr;
   }
 
-  // Finalize the imported declaration.
+  // Finalize the imported declaration. This happens after the C array
+  // projections are registered, which is what `importAttributes()` needs.
+  llvm::SmallPtrSet<Decl *, 4> finalized;
   auto finalizeDecl = [&](Decl *result) {
-    importAttributes(ClangDecl, result);
+    if (finalized.count(result))
+      return;
+    finalizeImportedDecl(*this, ClangDecl, result, finalized);
 
     // Hack to deal with Objective-C protocols without availability annotation.
     // If the protocol comes from clang and is not annotated and the protocol
@@ -11425,6 +11487,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
   if (result) {
     assert(result->getClangDecl() && result->getClangDecl() == canon);
 
+    llvm::SmallPtrSet<Decl *, 4> finalized;
     auto updateMirroredDecl = [&](Decl *result) {
       result->setImplicit();
       if (auto VD = dyn_cast<ValueDecl>(result)) {
@@ -11432,7 +11495,7 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
       }
 
       // Map the Clang attributes onto Swift attributes.
-      importAttributes(decl, result);
+      finalizeImportedDecl(*this, decl, result, finalized);
 
       if (proto->getAttrs().hasAttribute<AvailableAttr>()) {
         if (!result->getAttrs().hasAttribute<AvailableAttr>()) {

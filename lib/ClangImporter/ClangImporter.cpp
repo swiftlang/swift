@@ -22,6 +22,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityContext.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConcreteDeclRef.h"
@@ -4903,6 +4904,15 @@ class CArrayProjectionVerifier : public ASTWalker {
   static void verifyCounterpartConsistency(ValueDecl *modern,
                                            ValueDecl *counterpart);
 
+  /// Whether \p decl is no more available than \p bound. An unavailable
+  /// declaration is no more available than anything.
+  ///
+  /// \param declaredOnly Whether to consider only the availability that
+  ///        \p decl declares itself, instead of everything it inherits from its
+  ///        context too.
+  static bool isNoMoreAvailable(ValueDecl *decl, ValueDecl *bound,
+                                bool declaredOnly);
+
 public:
   CArrayProjectionVerifier(ClangImporter::Implementation &impl) : impl(impl) {}
 
@@ -5075,6 +5085,16 @@ void CArrayProjectionVerifier::verifyDecl(ValueDecl *D) {
     fail("imported decl exposes an InlineArray when the legacy C array "
          "projection is visible");
 
+  // We do this before the `!attr` bail-out so it fires when the storage has an
+  // attribute but the accessor doesn't.
+  if (auto *accessor = dyn_cast<AccessorDecl>(D)) {
+    auto *storage = accessor->getStorage();
+    if (storage->getAttrs().hasAttribute<CArrayProjectionAttr>() &&
+        accessor->getAvailableAttrForPlatformIntroduction() &&
+        !isNoMoreAvailable(accessor, storage, /*declaredOnly=*/true))
+      fail("imported accessor is more available than its storage");
+  }
+
   // Checks for non-C array decls; bails out.
   if (!attr) {
     if (!isa<ParamDecl, AccessorDecl>(D)) {
@@ -5147,13 +5167,10 @@ void CArrayProjectionVerifier::verifyDecl(ValueDecl *D) {
             !hasInlineArray && !hasInlineArrayNewtype)
       fail("modern C array projection doesn't mention an InlineArray");
 
-    auto context = AvailabilityContext::forDeclSignature(D);
-    auto &ctx = D->getASTContext();
-    if (!context.isUnavailable() &&
-          !context.getPlatformRange().isContainedIn(
-              ctx.getInlineArrayAvailability()))
-      fail("imported modern C array projection is available where "
-           "InlineArray isn't");
+    if (auto *inlineArray = D->getASTContext().getInlineArrayDecl())
+      if (!isNoMoreAvailable(D, inlineArray, /*declaredOnly=*/false))
+        fail("imported modern C array projection is available where "
+             "InlineArray isn't");
 
     verifyCounterpartConsistency(D, attr->getCounterpart());
     break;
@@ -5175,6 +5192,26 @@ void CArrayProjectionVerifier::verifyDecl(ValueDecl *D) {
     verifyCounterpartConsistency(attr->getCounterpart(), D);
     break;
   }
+}
+
+bool CArrayProjectionVerifier::isNoMoreAvailable(ValueDecl *decl,
+                                                 ValueDecl *bound,
+                                                 bool declaredOnly) {
+  auto declContext = AvailabilityContext::forDeclSignature(decl);
+  if (declContext.isUnavailable())
+    return true;
+
+  auto declRange = declContext.getPlatformRange();
+  if (declaredOnly) {
+    // The range of the bound is relative to the inlining target.
+    declRange = AvailabilityInference::availableRange(decl);
+    declRange.intersectWith(
+        AvailabilityContext::forInliningTarget(decl->getASTContext())
+            .getPlatformRange());
+  }
+
+  return declRange.isContainedIn(
+      AvailabilityContext::forDeclSignature(bound).getPlatformRange());
 }
 
 void CArrayProjectionVerifier::verifyCounterpartConsistency(
