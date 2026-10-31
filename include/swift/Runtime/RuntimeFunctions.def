@@ -114,6 +114,16 @@ FUNCTION(AllocObject, Swift, swift_allocObject, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::Allocating),
          UNKNOWN_MEMEFFECTS)
 
+// RefCounted *swift_allocObjectMaybeClassAllocated(Metadata *type, size_t size, size_t alignMask);
+FUNCTION(AllocObjectMaybeClassAllocated, Swift,
+         swift_allocObjectMaybeClassAllocated, C_CC,
+         ClassAllocatorsAvailability,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Allocating),
+         UNKNOWN_MEMEFFECTS)
+
 // RefCounted *swift_allocObjectTyped(Metadata *type, size_t size, size_t alignMask, uint64_t typeId);
 FUNCTION(AllocObjectTyped, Swift, swift_allocObjectTyped, C_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
@@ -194,6 +204,16 @@ FUNCTION(DeallocClassInstance, Swift, swift_deallocClassInstance, C_CC, AlwaysAv
 FUNCTION(DeallocClassInstanceTyped, Swift, swift_deallocClassInstanceTyped, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(RefCountedPtrTy, SizeTy, SizeTy, Int64Ty),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void swift_deallocClassInstanceMaybeClassAllocated(HeapObject *obj, size_t size, size_t alignMask);
+FUNCTION(DeallocClassInstanceMaybeClassAllocated, Swift,
+         swift_deallocClassInstanceMaybeClassAllocated, C_CC,
+         ClassAllocatorsAvailability,
+         RETURNS(VoidTy),
+         ARGS(RefCountedPtrTy, SizeTy, SizeTy),
          ATTRS(NoUnwind),
          EFFECT(RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)

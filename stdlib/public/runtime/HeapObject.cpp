@@ -21,6 +21,7 @@
 #include "swift/Runtime/Once.h"
 #include "swift/ABI/System.h"
 #include "MetadataCache.h"
+#include "ClassAllocator.h"
 #include "Private.h"
 #include "RuntimeInvocationsTracking.h"
 #include "WeakReference.h"
@@ -316,21 +317,23 @@ inline void deallocateHeapObject(HeapObject *object, size_t size, size_t align) 
   size_t offset = getInstanceAddressPoint(object->metadata);
   swift_slowDealloc(reinterpret_cast<char *>(object) - offset, size, align);
 }
+
+/// deallocateHeapObject for an object whose class may have an allocator
+/// declared with `@allocator`, which then receives the allocation.
+inline void deallocateHeapObjectMaybeClassAllocated(HeapObject *object,
+                                                    size_t size,
+                                                    size_t align) {
+  if (SWIFT_UNLIKELY(class_allocator::hasClassAllocator(object->metadata)))
+    return class_allocator::deallocate(object, size, align);
+  deallocateHeapObject(object, size, align);
 }
 
-static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
-                                       size_t requiredSize,
-                                       size_t requiredAlignmentMask) {
-  assert(isAlignmentMask(requiredAlignmentMask));
-  auto prefix =
-      getInstancePrefix(metadata, requiredSize, requiredAlignmentMask);
-#if SWIFT_STDLIB_HAS_MALLOC_TYPE
-  auto allocation = swift_slowAllocTyped(requiredSize, requiredAlignmentMask,
-                                          getMallocTypeId(metadata));
-#else
-  auto allocation = swift_slowAlloc(requiredSize, requiredAlignmentMask);
-#endif
-
+/// Initialize a heap object in a new allocation: copy the instance prefix
+/// template, if any, and construct the header at the address point.
+SWIFT_ALWAYS_INLINE
+inline HeapObject *initializeHeapObject(void *allocation,
+                                        HeapMetadata const *metadata,
+                                        const InstancePrefix &prefix) {
   if (prefix.TemplateSize) {
     auto *prefixAddress = reinterpret_cast<char *>(allocation) +
                           prefix.AddressPoint - prefix.TemplateSize;
@@ -353,11 +356,52 @@ static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
 
   return object;
 }
+}
+
+static HeapObject *_swift_allocObject_(HeapMetadata const *metadata,
+                                       size_t requiredSize,
+                                       size_t requiredAlignmentMask) {
+  assert(isAlignmentMask(requiredAlignmentMask));
+  auto prefix =
+      getInstancePrefix(metadata, requiredSize, requiredAlignmentMask);
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+  auto allocation = swift_slowAllocTyped(requiredSize, requiredAlignmentMask,
+                                          getMallocTypeId(metadata));
+#else
+  auto allocation = swift_slowAlloc(requiredSize, requiredAlignmentMask);
+#endif
+  return initializeHeapObject(allocation, metadata, prefix);
+}
 
 HeapObject *swift::swift_allocObject(HeapMetadata const *metadata,
                                      size_t requiredSize,
                                      size_t requiredAlignmentMask) {
   CALL_IMPL_CHECK(swift_allocObject, (metadata, requiredSize, requiredAlignmentMask));
+}
+
+HeapObject *swift::swift_allocObjectMaybeClassAllocated(
+    HeapMetadata const *metadata, size_t requiredSize,
+    size_t requiredAlignmentMask) {
+  assert(isAlignmentMask(requiredAlignmentMask));
+  // Instances of classes with an allocator bypass the _swift_allocObject hook,
+  // which only knows the default allocator.
+  if (SWIFT_UNLIKELY(class_allocator::hasClassAllocator(metadata))) {
+    auto prefix =
+        getInstancePrefix(metadata, requiredSize, requiredAlignmentMask);
+    if (void *allocation = class_allocator::allocate(
+            static_cast<const ClassMetadata *>(metadata), requiredSize,
+            requiredAlignmentMask))
+      return initializeHeapObject(allocation, metadata, prefix);
+  }
+  return swift_allocObject(metadata, requiredSize, requiredAlignmentMask);
+}
+
+HeapObject *swift::swift_initHeapObject(HeapMetadata const *metadata,
+                                        void *allocation, size_t size,
+                                        size_t alignMask) {
+  assert(isAlignmentMask(alignMask));
+  auto prefix = getInstancePrefix(metadata, size, alignMask);
+  return initializeHeapObject(allocation, metadata, prefix);
 }
 
 HeapObject *
@@ -784,8 +828,9 @@ void swift::swift_unownedRelease(HeapObject *object) {
 
   if (object->refCounts.decrementUnownedShouldFree(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    deallocateHeapObject(object, classMetadata->getInstanceSize(),
-                         classMetadata->getInstanceAlignMask());
+    deallocateHeapObjectMaybeClassAllocated(
+        object, classMetadata->getInstanceSize(),
+        classMetadata->getInstanceAlignMask());
   }
 #endif
 }
@@ -808,8 +853,9 @@ void swift::swift_nonatomic_unownedRelease(HeapObject *object) {
 
   if (object->refCounts.decrementUnownedShouldFreeNonAtomic(1)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    deallocateHeapObject(object, classMetadata->getInstanceSize(),
-                         classMetadata->getInstanceAlignMask());
+    deallocateHeapObjectMaybeClassAllocated(
+        object, classMetadata->getInstanceSize(),
+        classMetadata->getInstanceAlignMask());
   }
 }
 
@@ -838,8 +884,9 @@ void swift::swift_unownedRelease_n(HeapObject *object, int n) {
 
   if (object->refCounts.decrementUnownedShouldFree(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    deallocateHeapObject(object, classMetadata->getInstanceSize(),
-                         classMetadata->getInstanceAlignMask());
+    deallocateHeapObjectMaybeClassAllocated(
+        object, classMetadata->getInstanceSize(),
+        classMetadata->getInstanceAlignMask());
   }
 #endif
 }
@@ -862,8 +909,9 @@ void swift::swift_nonatomic_unownedRelease_n(HeapObject *object, int n) {
 
   if (object->refCounts.decrementUnownedShouldFreeNonAtomic(n)) {
     auto classMetadata = static_cast<const ClassMetadata*>(object->metadata);
-    deallocateHeapObject(object, classMetadata->getInstanceSize(),
-                         classMetadata->getInstanceAlignMask());
+    deallocateHeapObjectMaybeClassAllocated(
+        object, classMetadata->getInstanceSize(),
+        classMetadata->getInstanceAlignMask());
   }
 }
 
@@ -981,14 +1029,23 @@ void swift::swift_rootObjCDealloc(HeapObject *self) {
   assert(metadata->isClassObject());
   auto classMetadata = static_cast<const ClassMetadata*>(metadata);
   assert(classMetadata->isTypeMetadata());
-  swift_deallocClassInstance(self, classMetadata->getInstanceSize(),
-                             classMetadata->getInstanceAlignMask());
+  // Not compiler-controlled, so the class may have an allocator.
+  swift_deallocClassInstanceMaybeClassAllocated(
+      self, classMetadata->getInstanceSize(),
+      classMetadata->getInstanceAlignMask());
 }
 #endif
 
-void swift::swift_deallocClassInstance(HeapObject *object,
-                                       size_t allocatedSize,
-                                       size_t allocatedAlignMask) {
+static inline void swift_deallocObjectImpl(HeapObject *object,
+                                           size_t allocatedSize,
+                                           size_t allocatedAlignMask,
+                                           bool isDeiniting,
+                                           bool isClassAllocated = false);
+
+/// The part of swift_deallocClassInstance that precedes the release of the
+/// object's memory.
+SWIFT_ALWAYS_INLINE
+static inline void prepareToDeallocClassInstance(HeapObject *object) {
   size_t retainCount = swift_retainCount(object);
   if (SWIFT_UNLIKELY(retainCount > 1)) {
     auto descriptor = object->metadata->getTypeContextDescriptor();
@@ -1017,8 +1074,37 @@ void swift::swift_deallocClassInstance(HeapObject *object,
     objc_destructInstance((id)object);
   }
 #endif
+}
 
+void swift::swift_deallocClassInstance(HeapObject *object,
+                                       size_t allocatedSize,
+                                       size_t allocatedAlignMask) {
+  prepareToDeallocClassInstance(object);
   swift_deallocObject(object, allocatedSize, allocatedAlignMask);
+}
+
+void swift::swift_deallocClassInstanceMaybeClassAllocated(
+    HeapObject *object, size_t allocatedSize, size_t allocatedAlignMask) {
+  if (SWIFT_LIKELY(!class_allocator::hasClassAllocator(object->metadata)))
+    return swift_deallocClassInstance(object, allocatedSize,
+                                      allocatedAlignMask);
+  prepareToDeallocClassInstance(object);
+  swift_deallocObjectImpl(object, allocatedSize, allocatedAlignMask,
+                          /*isDeiniting=*/true, /*isClassAllocated=*/true);
+}
+
+void *swift::swift_deallocClassInstanceBegin(HeapObject *object) {
+  prepareToDeallocClassInstance(object);
+  assert(object->refCounts.isDeiniting());
+  SWIFT_RT_TRACK_INVOCATION(object, swift_deallocObject);
+  SWIFT_LEAKS_STOP_TRACKING_OBJECT(object);
+  // See swift_deallocObjectImpl.
+  if (object->refCounts.canBeFreedNow())
+    return reinterpret_cast<char *>(object) -
+           getInstanceAddressPoint(object->metadata);
+  // The last unowned release frees the memory, through the class allocator.
+  swift_unownedRelease(object);
+  return nullptr;
 }
 
 /// Variant of the above used in constructor failure paths.
@@ -1087,7 +1173,9 @@ void swift::swift_deallocPartialClassInstance(HeapObject *object,
   bool shouldDeallocate = object->refCounts.decrementShouldDeinit(1, nullptr);
   assert(shouldDeallocate);
   (void) shouldDeallocate;
-  swift_deallocClassInstance(object, allocatedSize, allocatedAlignMask);
+  // Not compiler-controlled, so the class may have an allocator.
+  swift_deallocClassInstanceMaybeClassAllocated(object, allocatedSize,
+                                                allocatedAlignMask);
 }
 
 #if !defined(__APPLE__) && SWIFT_RUNTIME_CLOBBER_FREED_OBJECTS
@@ -1102,10 +1190,13 @@ static inline void memset_pattern8(void *b, const void *pattern8, size_t len) {
 }
 #endif
 
+/// \p isClassAllocated: \p object is an instance of a class with an
+/// allocator (ClassFlags::HasCustomAllocator), which must free its memory.
 static inline void swift_deallocObjectImpl(HeapObject *object,
                                            size_t allocatedSize,
                                            size_t allocatedAlignMask,
-                                           bool isDeiniting) {
+                                           bool isDeiniting,
+                                           bool isClassAllocated) {
   assert(isAlignmentMask(allocatedAlignMask));
   if (!isDeiniting) {
     assert(object->refCounts.isUniquelyReferenced());
@@ -1202,7 +1293,10 @@ static inline void swift_deallocObjectImpl(HeapObject *object,
 
   if (object->refCounts.canBeFreedNow()) {
     // object state DEINITING -> DEAD
-    deallocateHeapObject(object, allocatedSize, allocatedAlignMask);
+    if (isClassAllocated)
+      class_allocator::deallocate(object, allocatedSize, allocatedAlignMask);
+    else
+      deallocateHeapObject(object, allocatedSize, allocatedAlignMask);
   } else {
     // object state DEINITING -> DEINITED
     swift_unownedRelease(object);

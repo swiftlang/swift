@@ -151,11 +151,14 @@ void emitDeallocateUninitializedHeapObject(IRGenFunction &IGF,
                                            std::optional<uint64_t> mallocTypeId);
 
 /// Emit a class instance deallocation.
+/// If \p maybeClassAllocated, the object's class may have an `@allocator`;
+/// call swift_deallocClassInstanceMaybeClassAllocated.
 void emitDeallocateClassInstance(IRGenFunction &IGF,
                                  llvm::Value *object,
                                  llvm::Value *size,
                                  llvm::Value *alignMask,
-                                 std::optional<uint64_t> mallocTypeId);
+                                 std::optional<uint64_t> mallocTypeId,
+                                 bool maybeClassAllocated = false);
 
 /// Emit a class instance deallocation with malloc type
 void emitDeallocateClassInstanceTyped(IRGenFunction &IGF,

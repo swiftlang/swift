@@ -248,6 +248,7 @@
     "LifetimeManager.swift",
     "Macros.swift",
     "ManagedBuffer.swift",
+    "ClassAllocator.swift",
     "Misc.swift",
     "OptionSet.swift",
     "OutputStream.swift",

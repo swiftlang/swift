@@ -205,6 +205,12 @@ namespace irgen {
                                              ClassDecl *theClass,
                                              llvm::Value *metadata);
 
+  /// The size and alignment mask that `alloc_ref` of \p selfType (without
+  /// tail elements) passes to swift_allocObject. Backs
+  /// Builtin.classInstanceSize and Builtin.classInstanceAlignMask.
+  std::pair<llvm::Value *, llvm::Value *>
+  emitClassInstanceSizeAndAlignMask(IRGenFunction &IGF, SILType selfType);
+
   /// For VFE, returns a type identifier for the given base method on a class.
   llvm::MDString *typeIdForMethod(IRGenModule &IGM, SILDeclRef method);
 

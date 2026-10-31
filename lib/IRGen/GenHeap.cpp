@@ -472,7 +472,11 @@ void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
                                         llvm::Value *object,
                                         llvm::Value *size,
                                         llvm::Value *alignMask,
-                                        std::optional<uint64_t> mallocTypeId) {
+                                        std::optional<uint64_t> mallocTypeId,
+                                        bool maybeClassAllocated) {
+  // Class allocators are not supported in Embedded Swift, the only user of
+  // typed deallocation.
+  assert(!(mallocTypeId && maybeClassAllocated));
   if (mallocTypeId) {
     auto descriptorConst = llvm::ConstantInt::get(IGF.IGM.Int64Ty,
                                                   *mallocTypeId);
@@ -481,8 +485,11 @@ void irgen::emitDeallocateClassInstance(IRGenFunction &IGF,
   }
   // FIXME: We should call a fast deallocator for heap objects with
   // known size.
-  IGF.Builder.CreateCall(IGF.IGM.getDeallocClassInstanceFunctionPointer(),
-                         {object, size, alignMask});
+  IGF.Builder.CreateCall(
+      maybeClassAllocated
+          ? IGF.IGM.getDeallocClassInstanceMaybeClassAllocatedFunctionPointer()
+          : IGF.IGM.getDeallocClassInstanceFunctionPointer(),
+      {object, size, alignMask});
 }
 
 void irgen::emitDeallocateClassInstanceTyped(

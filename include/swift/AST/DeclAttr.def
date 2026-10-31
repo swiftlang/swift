@@ -965,7 +965,13 @@ DECL_ATTR(_scopeParams, ScopeParams,
   182)
 DECL_ATTR_FEATURE_REQUIREMENT(ScopeParams, ScopeRestrictions)
 
-LAST_DECL_ATTR(ScopeParams)
+DECL_ATTR(allocator, Allocator,
+  OnClass,
+  ABIBreakingToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnreachableInABIAttr,
+  183)
+DECL_ATTR_FEATURE_REQUIREMENT(Allocator, ClassAllocators)
+
+LAST_DECL_ATTR(Allocator)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

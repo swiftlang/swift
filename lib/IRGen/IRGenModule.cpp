@@ -1023,6 +1023,14 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability ClassAllocatorsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getClassAllocatorsAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability ClearSensitiveAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getClearSensitiveAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {

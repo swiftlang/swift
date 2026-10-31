@@ -464,10 +464,13 @@ public:
                                    llvm::Type *expectedPointedToType,
                                    const llvm::Twine &name = "");
 
+  /// If \p maybeClassAllocated, the class may have an `@allocator`; call
+  /// swift_allocObjectMaybeClassAllocated.
   llvm::Value *emitAllocObjectCall(llvm::Value *metadata, llvm::Value *size,
                                    llvm::Value *alignMask,
                                    std::optional<uint64_t> mallocTypeId,
-                                   const llvm::Twine &name = "");
+                                   const llvm::Twine &name = "",
+                                   bool maybeClassAllocated = false);
   llvm::Value *emitAllocObjectTypedCall(llvm::Value *metadata,
                                         llvm::Value *size,
                                         llvm::Value *alignMask,

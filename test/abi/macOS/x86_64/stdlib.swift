@@ -1387,3 +1387,19 @@ Added: _$ss9ConstCellVMn
 
 // Removed: _createOffsetBasedKeyPath
 Removed: _$ss25_createOffsetBasedKeyPath4root5value6offsets03AnydE0CypXp_ypXpSitF
+
+// ClassAllocator, and runtime support for classes with an `@allocator`
+Added: _$ss14ClassAllocatorMp
+Added: _$ss14ClassAllocatorP10deallocate_9byteCount9alignment3forySv_S2iyXlXptFZTj
+Added: _$ss14ClassAllocatorP10deallocate_9byteCount9alignment3forySv_S2iyXlXptFZTq
+Added: _$ss14ClassAllocatorP10usableSize2of3forSiSgSV_yXlXptFZTj
+Added: _$ss14ClassAllocatorP10usableSize2of3forSiSgSV_yXlXptFZTq
+Added: _$ss14ClassAllocatorP8allocate9byteCount9alignment3forSvSi_SiyXlXptFZTj
+Added: _$ss14ClassAllocatorP8allocate9byteCount9alignment3forSvSi_SiyXlXptFZTq
+Added: _$ss14ClassAllocatorPsE10usableSize2of3forSiSgSV_yXlXptFZ
+Added: _$ss14ClassAllocatorTL
+Added: _swift_allocObjectMaybeClassAllocated
+Added: _swift_deallocClassInstanceBegin
+Added: _swift_deallocClassInstanceMaybeClassAllocated
+Added: _swift_initHeapObject
+Added: _swift_objectAllocationSize

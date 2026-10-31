@@ -1730,6 +1730,24 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Allocator: {
+    Printer.printAttrName("@allocator");
+    Printer << "(";
+    Printer.callPrintNamePre(PrintNameContext::Attribute);
+    auto *attr = cast<AllocatorAttr>(this);
+    auto *repr = attr->getParsedAllocatorTypeRepr();
+    auto cls = dyn_cast<ClassDecl>(D);
+    // Module interfaces need the resolved, fully-qualified type; the type as
+    // written may not resolve in the interface's context.
+    if (cls && (Options.IsForSwiftInterface || !repr))
+      attr->getResolvedType(cls)->print(Printer, Options);
+    else if (repr)
+      repr->print(Printer, Options);
+    Printer.printNamePost(PrintNameContext::Attribute);
+    Printer << ")";
+    break;
+  }
+
   case DeclAttrKind::Custom: {
     auto *attr = cast<CustomAttr>(this);
     attr->printCustomAttr(Printer, Options);
@@ -2160,6 +2178,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_dynamicReplacement";
   case DeclAttrKind::TypeEraser:
     return "_typeEraser";
+  case DeclAttrKind::Allocator:
+    return "allocator";
   case DeclAttrKind::PrivateImport:
     return "_private";
   case DeclAttrKind::RestatedObjCConformance:
@@ -2555,6 +2575,49 @@ bool TypeEraserAttr::isEquivalent(const TypeEraserAttr *other,
   if (thisType.isNull() || otherType.isNull())
     return false;
   return thisType->getCanonicalType() == otherType->getCanonicalType();
+}
+
+AllocatorAttr *AllocatorAttr::create(ASTContext &ctx, SourceLoc atLoc,
+                                     SourceRange range,
+                                     TypeExpr *allocatorExpr) {
+  return new (ctx) AllocatorAttr(atLoc, range, allocatorExpr, nullptr, 0,
+                                 /*implicit=*/false);
+}
+
+AllocatorAttr *AllocatorAttr::create(ASTContext &ctx,
+                                     LazyMemberLoader *Resolver, uint64_t Data,
+                                     bool implicit) {
+  return new (ctx) AllocatorAttr(SourceLoc(), SourceRange(), nullptr,
+                                 Resolver, Data, implicit);
+}
+
+TypeRepr *AllocatorAttr::getParsedAllocatorTypeRepr() const {
+  return AllocatorExpr ? AllocatorExpr->getTypeRepr() : nullptr;
+}
+
+SourceLoc AllocatorAttr::getLoc() const {
+  return AllocatorExpr ? AllocatorExpr->getLoc() : SourceLoc();
+}
+
+Type AllocatorAttr::getTypeWithoutResolving() const {
+  return AllocatorExpr ? AllocatorExpr->getInstanceType() : Type();
+}
+
+Type AllocatorAttr::getResolvedType(const ClassDecl *CD) const {
+  auto &ctx = CD->getASTContext();
+  return evaluateOrDefault(ctx.evaluator,
+                           ResolveClassAllocatorTypeRequest{
+                               const_cast<ClassDecl *>(CD),
+                               const_cast<AllocatorAttr *>(this)},
+                           ErrorType::get(ctx));
+}
+
+bool AllocatorAttr::isEquivalent(const AllocatorAttr *other,
+                                 Decl *attachedTo) const {
+  auto cls = dyn_cast<ClassDecl>(attachedTo);
+  if (!cls)
+    return true;
+  return eqTypes(getResolvedType(cls), other->getResolvedType(cls));
 }
 
 PreInverseGenericsAttr::PreInverseGenericsAttr(SourceLoc AtLoc,

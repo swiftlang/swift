@@ -4069,6 +4069,32 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Allocator: {
+    // Parse leading '('
+    if (!isAtAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    SourceLoc LParenLoc = consumeAttributeLParen();
+    ParserResult<TypeRepr> AllocatorType =
+        parseType(diag::attr_allocator_expected_type);
+    bool invalid = AllocatorType.hasCodeCompletion() || AllocatorType.isNull();
+
+    // Parse matching ')'
+    SourceLoc RParenLoc;
+    invalid |= parseMatchingToken(tok::r_paren, RParenLoc,
+                                  diag::attr_allocator_expected_rparen,
+                                  LParenLoc);
+    if (invalid)
+      return makeParserSuccess();
+
+    auto *TE = new (Context) TypeExpr(AllocatorType.get());
+    Attributes.add(AllocatorAttr::create(Context, AtLoc, {Loc, RParenLoc}, TE));
+    break;
+  }
+
   case DeclAttrKind::Specialize:
   case DeclAttrKind::Specialized: {
     if (!isAtAttributeLParen()) {

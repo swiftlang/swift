@@ -21,6 +21,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -63,6 +64,7 @@
 #include "GenDecl.h"
 #include "GenPointerAuth.h"
 #include "GenPoly.h"
+#include "GenProto.h"
 #include "GenStruct.h"
 #include "GenValueWitness.h"
 #include "GenericArguments.h"
@@ -451,6 +453,46 @@ void IRGenModule::addVTableTypeMetadata(
                      std::make_pair(minOffset, maxOffset + relptrSize));
 }
 
+/// The access function referenced by the TargetClassAllocatorDescriptor of a
+/// class declared with `@allocator(A)`: a Swift-CC function, taking no
+/// arguments, that returns A's type metadata and the witness table for A's
+/// conformance to `ClassAllocator`. Returns null if \p cls does not itself
+/// declare a valid allocator; classes that inherit one have no record.
+static llvm::Function *getClassAllocatorAccessFunction(IRGenModule &IGM,
+                                                       ClassDecl *cls) {
+  if (cls->isForeign() || cls->getAllocatorDeclaringClass() != cls)
+    return nullptr;
+  Type allocatorType = cls->getAllocatorType();
+  if (!allocatorType)
+    return nullptr;
+
+  CanType canAllocatorType = allocatorType->getCanonicalType();
+  auto *proto = IGM.Context.getProtocol(KnownProtocolKind::ClassAllocator);
+  auto conformance = lookupConformance(canAllocatorType, proto);
+  assert(!conformance.isInvalid() && "checked by ClassDecl::getAllocatorType");
+
+  auto *resultTy = llvm::StructType::get(IGM.getLLVMContext(),
+                                         {IGM.TypeMetadataPtrTy,
+                                          IGM.WitnessTablePtrTy});
+  std::string name = "__swift_class_allocator_";
+  name += LinkEntity::forNominalTypeDescriptor(cls).mangleAsString(IGM.Context);
+  auto *fn = IGM.getOrCreateHelperFunction(
+      name, resultTy, {},
+      [&](IRGenFunction &IGF) {
+        llvm::Value *metadata = IGF.emitTypeMetadataRef(canAllocatorType);
+        llvm::Value *witnessTable =
+            emitWitnessTableRef(IGF, canAllocatorType, conformance);
+        llvm::Value *result = llvm::UndefValue::get(resultTy);
+        result = IGF.Builder.CreateInsertValue(result, metadata, 0);
+        result = IGF.Builder.CreateInsertValue(result, witnessTable, 1);
+        IGF.Builder.CreateRet(result);
+      },
+      /*setIsNoInline=*/true, /*forPrologue=*/false,
+      /*isPerformanceConstraint=*/false, /*optionalLinkageOverride=*/nullptr,
+      IGM.SwiftCC);
+  return cast<llvm::Function>(fn);
+}
+
 static void addPaddingAfterGenericParamDescriptors(IRGenModule &IGM,
                                             ConstantStructBuilder &b,
                                             unsigned numDescriptors) {
@@ -557,8 +599,12 @@ namespace {
                                asImpl().isUniqueDescriptor(),
                                !asImpl().getInvertedProtocols().empty(),
                                asImpl().getKindSpecificFlags())
+          .withClassAllocator(asImpl().hasClassAllocator())
           .getIntValue());
     }
+
+    /// Whether the descriptor has a trailing TargetClassAllocatorDescriptor.
+    bool hasClassAllocator() { return false; }
     
     void addParent() {
       ConstantReference parent = asImpl().getParent();
@@ -2184,6 +2230,17 @@ namespace {
       addInvertedProtocols();
       maybeAddSingletonMetadataPointer();
       maybeAddDefaultOverrideTable();
+      maybeAddClassAllocator();
+    }
+
+    bool hasClassAllocator() {
+      return getClassAllocatorAccessFunction(IGM, getType()) != nullptr;
+    }
+
+    void maybeAddClassAllocator() {
+      // TargetClassAllocatorDescriptor
+      if (auto *accessor = getClassAllocatorAccessFunction(IGM, getType()))
+        B.addCompactFunctionReference(accessor);
     }
 
     void addIncompleteMetadataOrRelocationFunction() {
@@ -4344,6 +4401,12 @@ static ClassFlags getClassFlags(ClassDecl *classDecl) {
   }
   if (attrs.hasAttribute<ObjCRuntimeNameAttr>())
     flags |= ClassFlags::HasCustomObjCName;
+
+  // Classes with an `@allocator`, their own or inherited. The runtime only
+  // looks for a class allocator in classes with this flag.
+  if ((flags & ClassFlags::UsesSwiftRefcounting) &&
+      classDecl->getAllocatorType())
+    flags |= ClassFlags::HasCustomAllocator;
 
   return flags;
 }
@@ -7703,6 +7766,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::Clock:
   case KnownProtocolKind::ExecutorFactory:
+  case KnownProtocolKind::ClassAllocator:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:

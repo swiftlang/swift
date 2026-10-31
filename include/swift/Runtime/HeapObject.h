@@ -77,6 +77,26 @@ SWIFT_RUNTIME_EXPORT
 HeapObject *swift_initStackObject(HeapMetadata const *metadata,
                                   HeapObject *object);
 
+/// swift_allocObject for an instance of a class that may have an allocator
+/// declared with `@allocator` (ClassFlags::HasCustomAllocator). The compiler
+/// calls this instead of swift_allocObject for such classes, and when the
+/// allocated class is only known dynamically, so that swift_allocObject never
+/// needs to look at the metadata.
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
+HeapObject *swift_allocObjectMaybeClassAllocated(HeapMetadata const *metadata,
+                                                 size_t requiredSize,
+                                                 size_t requiredAlignmentMask);
+
+/// Initialize an instance of a class with an allocator in \p allocation,
+/// which compiled code obtained from the allocator directly, given the
+/// allocation's size and alignment mask. Copies the class's instance prefix,
+/// if any, and returns the object at the instance address point, in the same
+/// state as one returned by swift_allocObject.
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+HeapObject *swift_initHeapObject(HeapMetadata const *metadata,
+                                 void *allocation, size_t size,
+                                 size_t alignMask);
+
 /// Initializes the object header of a static object which is statically
 /// allocated in the data section.
 ///
@@ -333,6 +353,23 @@ SWIFT_RUNTIME_EXPORT
 void swift_deallocClassInstance(HeapObject *object,
                                  size_t allocatedSize,
                                  size_t allocatedAlignMask);
+
+/// swift_deallocClassInstance for an instance of a class that may have an
+/// allocator declared with `@allocator` (ClassFlags::HasCustomAllocator),
+/// which then frees the memory. The compiler calls this from the deallocating
+/// deinit of such classes.
+SWIFT_RUNTIME_EXPORT
+void swift_deallocClassInstanceMaybeClassAllocated(HeapObject *object,
+                                                   size_t allocatedSize,
+                                                   size_t allocatedAlignMask);
+
+/// Everything swift_deallocClassInstance does for \p object, an instance of a
+/// class with an allocator, except freeing its memory. Returns the base of the
+/// object's allocation if the caller must now return it to the class's
+/// allocator, or null if unowned references remain, in which case the last
+/// unowned release frees it.
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+void *swift_deallocClassInstanceBegin(HeapObject *object);
 
 /// Deallocate the given memory after destroying instance variables.
 ///

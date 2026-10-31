@@ -871,6 +871,14 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
       params);
 }
 
+BridgedAllocatorAttr
+BridgedAllocatorAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
+                                  SourceRange range,
+                                  BridgedTypeExpr cTypeExpr) {
+  return AllocatorAttr::create(cContext.unbridged(), atLoc, range,
+                               cTypeExpr.unbridged());
+}
+
 BridgedTypeEraserAttr
 BridgedTypeEraserAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                                    SourceRange range,

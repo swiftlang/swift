@@ -5589,6 +5589,16 @@ public:
       const_cast<ClassDecl *>(this)->isForeignReferenceType();
   }
 
+  /// The class (this class or its nearest superclass) whose `@allocator`
+  /// attribute applies to instances of this class, or null if instances use
+  /// the default allocator.
+  ClassDecl *getAllocatorDeclaringClass() const;
+
+  /// The `ClassAllocator` type that allocates and frees instances of this
+  /// class, from its own `@allocator` attribute or one it inherits, or a null
+  /// type if instances use the default allocator.
+  Type getAllocatorType() const;
+
   /// Whether the class is (known to be) a default actor.
   bool isDefaultActor() const;
   bool isDefaultActor(ModuleDecl *M, ResilienceExpansion expansion) const;

@@ -422,6 +422,9 @@ SWIFT_REQUEST(TypeChecker, ResolveMacroRequest,
 SWIFT_REQUEST(TypeChecker, ResolveMacroConformances,
               ArrayRef<Type>(const MacroRoleAttr *, const Decl *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, ResolveClassAllocatorTypeRequest,
+              Type(ClassDecl *, AllocatorAttr *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveTypeEraserTypeRequest,
               Type(ProtocolDecl *, TypeEraserAttr *),
               SeparatelyCached, NoLocationInfo)

@@ -13085,6 +13085,35 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   return nullptr;
 }
 
+ClassDecl *ClassDecl::getAllocatorDeclaringClass() const {
+  // Only native Swift classes have custom allocators: actors are allocated
+  // and freed by the concurrency runtime, and Objective-C classes by the
+  // Objective-C runtime.
+  if (isAnyActor() || isForeign() || checkAncestry(AncestryFlags::ObjC))
+    return nullptr;
+  for (auto *cls = const_cast<ClassDecl *>(this); cls;
+       cls = cls->getSuperclassDecl()) {
+    if (cls->getAttrs().hasAttribute<AllocatorAttr>())
+      return cls;
+  }
+  return nullptr;
+}
+
+Type ClassDecl::getAllocatorType() const {
+  auto *declaringClass = getAllocatorDeclaringClass();
+  if (!declaringClass)
+    return Type();
+  auto *attr = declaringClass->getAttrs().getAttribute<AllocatorAttr>();
+  Type allocatorType = attr->getResolvedType(declaringClass);
+  if (!allocatorType || allocatorType->hasError() ||
+      allocatorType->hasTypeParameter() || allocatorType->hasArchetype())
+    return Type();
+  auto *proto = getASTContext().getProtocol(KnownProtocolKind::ClassAllocator);
+  if (!proto || checkConformance(allocatorType, proto).isInvalid())
+    return Type();
+  return allocatorType;
+}
+
 bool ClassDecl::isRootDefaultActor() const {
   return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
 }

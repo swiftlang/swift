@@ -3526,6 +3526,17 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Allocator: {
+      auto abbrCode = S.DeclTypeAbbrCodes[AllocatorDeclAttrLayout::Code];
+      auto attr = cast<AllocatorAttr>(DA);
+      auto allocatorType = attr->getResolvedType(cast<ClassDecl>(D));
+      assert(allocatorType && "Failed to resolve allocator type!");
+      AllocatorDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          attr->isImplicit(),
+                                          S.addTypeRef(allocatorType));
+      return;
+    }
+
     case DeclAttrKind::Custom: {
       auto abbrCode = S.DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
       auto theAttr = cast<CustomAttr>(DA);

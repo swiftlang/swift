@@ -491,6 +491,10 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
+static bool usesFeatureClassAllocators(Decl *decl) {
+  return decl->getAttrs().hasAttribute<AllocatorAttr>();
+}
+
 UNINTERESTING_FEATURE(ClosureBodyMacro)
 UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
 UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)

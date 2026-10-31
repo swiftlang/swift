@@ -5721,6 +5721,13 @@ public:
     // TODO: Implement.
     printFoot();
   }
+  void visitAllocatorAttr(AllocatorAttr *Attr, Label label) {
+    printCommon(Attr, "allocator_attr", label);
+    printTypeField(Attr->getTypeWithoutResolving(), Label::always("type"));
+    printRec(Attr->getParsedAllocatorTypeRepr(),
+             Label::always("parsed_type_repr"));
+    printFoot();
+  }
   void visitTypeEraserAttr(TypeEraserAttr *Attr, Label label) {
     printCommon(Attr, "type_eraser_attr", label);
     printTypeField(Attr->getTypeWithoutResolving(), Label::always("type"));

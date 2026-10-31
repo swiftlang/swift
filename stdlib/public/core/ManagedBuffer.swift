@@ -71,6 +71,22 @@ open class ManagedBuffer<Header, Element: ~Copyable> {
 @available(*, unavailable)
 extension ManagedBuffer: Sendable where Element: ~Copyable {}
 
+/// The usable size of the allocation of the heap object at `object`: its
+/// class allocator's answer if its class has an `@allocator`, else
+/// `malloc_size`.
+@usableFromInline @_alwaysEmitIntoClient
+internal func _objectAllocationSize(_ object: UnsafeRawPointer) -> Int {
+#if !$Embedded
+  // SwiftStdlib 6.5
+  if #available(
+    macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *
+  ) {
+    return unsafe _swift_objectAllocationSize(object)
+  }
+#endif
+  return unsafe _swift_stdlib_malloc_size(object)
+}
+
 extension ManagedBuffer where Element: ~Copyable {
   /// Create a new instance of the most-derived class, calling
   /// `factory` on the partially-constructed object to generate
@@ -109,7 +125,7 @@ extension ManagedBuffer where Element: ~Copyable {
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public final var capacity: Int {
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
-    let endAddr = unsafe storageAddr + _swift_stdlib_malloc_size(storageAddr)
+    let endAddr = unsafe storageAddr + _objectAllocationSize(storageAddr)
     let realCapacity = unsafe endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
@@ -582,7 +598,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   internal var _capacityInBytes: Int {
-    return unsafe _swift_stdlib_malloc_size(_address)
+    return unsafe _objectAllocationSize(_address)
   }
 
   /// The address of this instance in a convenient pointer-to-bytes form

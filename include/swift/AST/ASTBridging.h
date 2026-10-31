@@ -1447,6 +1447,11 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
     BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
     BridgedArrayRef cParams);
 
+SWIFT_NAME("BridgedAllocatorAttr.createParsed(_:atLoc:range:typeExpr:)")
+BridgedAllocatorAttr BridgedAllocatorAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedTypeExpr cTypeExpr);
+
 SWIFT_NAME("BridgedTypeEraserAttr.createParsed(_:atLoc:range:typeExpr:)")
 BridgedTypeEraserAttr BridgedTypeEraserAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
