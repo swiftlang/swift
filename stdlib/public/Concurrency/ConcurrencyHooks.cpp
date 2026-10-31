@@ -21,6 +21,10 @@
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+#include "swift/EmbeddedPlatform.h"
+#endif
+
 using namespace swift;
 
 // Define all the hooks
@@ -42,7 +46,11 @@ using namespace swift;
 
 SWIFT_CC(swift) static void
 swift_task_enqueueGlobalOrig(Job *job) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  _swift_concurrency_enqueueGlobal(reinterpret_cast<SwiftJob *>(job));
+#else
   swift_task_enqueueGlobalImpl(reinterpret_cast<SwiftJob *>(job));
+#endif
 }
 
 void
@@ -114,7 +122,11 @@ swift::swift_task_enqueueGlobalWithDeadline(
 
 SWIFT_CC(swift) static void
 swift_task_checkIsolatedOrig(SerialExecutorRef executor) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  swift_task_invokeSwiftCheckIsolated(executor);
+#else
   swift_task_checkIsolatedImpl(*reinterpret_cast<SwiftExecutorRef *>(&executor));
+#endif
 }
 
 void
@@ -127,8 +139,12 @@ swift::swift_task_checkIsolated(SerialExecutorRef executor) {
 
 SWIFT_CC(swift) static int8_t
 swift_task_isIsolatingCurrentContextOrig(SerialExecutorRef executor) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  return swift_task_invokeSwiftIsIsolatingCurrentContext(executor);
+#else
   return swift_task_isIsolatingCurrentContextImpl(
       *reinterpret_cast<SwiftExecutorRef *>(&executor));
+#endif
 }
 
 int8_t
@@ -181,7 +197,11 @@ swift::swift_task_isOnExecutor(HeapObject *executor,
 
 SWIFT_CC(swift) static void
 swift_task_enqueueMainExecutorOrig(Job *job) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  _swift_concurrency_enqueueMainExecutor(reinterpret_cast<SwiftJob *>(job));
+#else
   swift_task_enqueueMainExecutorImpl(reinterpret_cast<SwiftJob *>(job));
+#endif
 }
 
 void
@@ -196,7 +216,11 @@ swift::swift_task_enqueueMainExecutor(Job *job) {
 
 SWIFT_CC(swift) static swift::SerialExecutorRef
 swift_task_getMainExecutorOrig() {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  auto ref = _swift_concurrency_getMainExecutor();
+#else
   auto ref = swift_task_getMainExecutorImpl();
+#endif
   return *reinterpret_cast<SerialExecutorRef *>(&ref);
 }
 
@@ -211,8 +235,13 @@ swift::swift_task_getMainExecutor() {
 
 SWIFT_CC(swift) static bool
 swift_task_isMainExecutorOrig(SerialExecutorRef executor) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  return _swift_concurrency_isMainExecutor(
+           *reinterpret_cast<SwiftExecutorRef *>(&executor));
+#else
   return swift_task_isMainExecutorImpl(
            *reinterpret_cast<SwiftExecutorRef *>(&executor));
+#endif
 }
 
 bool
@@ -227,7 +256,12 @@ swift::swift_task_isMainExecutor(SerialExecutorRef executor) {
 SWIFT_CC(swift) static void
 swift_task_donateThreadToGlobalExecutorUntilOrig(bool (*condition)(void *),
                                                  void *context) {
+#if SWIFT_CONCURRENCY_EMBEDDED
+  return _swift_concurrency_donateThreadToGlobalExecutorUntil(condition,
+                                                              context);
+#else
   return swift_task_donateThreadToGlobalExecutorUntilImpl(condition, context);
+#endif
 }
 
 void swift::
