@@ -118,12 +118,63 @@ public struct ObservableMacro {
       trailingTrivia: .space
     )
   }
+
+  static func invalidApplication(of node: AttributeSyntax, to declaration: some DeclGroupSyntax) -> DiagnosticsError? {
+    guard let identified = declaration.asProtocol(NamedDeclSyntax.self) else {
+      return nil
+    }
+    let observableType = identified.name.trimmed
+    if declaration.isEnum {
+      // enumerations cannot store properties
+      return DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to enumeration type '\(observableType.text)'", id: .invalidApplication)
+    }
+    if declaration.isStruct {
+      // structs are not yet supported; copying/mutation semantics tbd
+      return DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to struct type '\(observableType.text)'", id: .invalidApplication)
+    }
+    if declaration.isActor {
+      // actors cannot yet be supported for their isolation
+      return DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to actor type '\(observableType.text)'", id: .invalidApplication)
+    }
+    return nil
+  }
+
+  // 'lazy' properties cannot be rewritten as computed properties with an
+  // 'init' accessor, so they cannot be observed.
+  static func lazyPropertyDiagnostic(_ property: VariableDeclSyntax, lazyModifier: DeclModifierSyntax, offeringFixIt: Bool) -> Diagnostic {
+    let name = property.identifier?.trimmed.text ?? ""
+    var fixIts = [FixIt]()
+    if offeringFixIt {
+      var ignored = AttributeSyntax(
+        atSign: .atSignToken(),
+        attributeName: IdentifierTypeSyntax(name: .identifier(ignoredMacroName)),
+        trailingTrivia: .space
+      )
+      ignored.leadingTrivia = property.leadingTrivia
+      var ignoredProperty = property.with(\.leadingTrivia, [])
+      ignoredProperty.attributes = [.attribute(ignored)] + ignoredProperty.attributes
+      fixIts.append(FixIt(
+        message: ObservationFixItMessage(message: "add '@\(ignoredMacroName)'", domain: "Observation", id: .lazyProperty),
+        changes: [.replace(oldNode: Syntax(property), newNode: Syntax(ignoredProperty))]
+      ))
+    }
+    return Diagnostic(
+      node: Syntax(lazyModifier),
+      message: ObservationDiagnostic(
+        message: "'@Observable' does not support 'lazy' properties; mark '\(name)' with '@\(ignoredMacroName)' to exclude it from observation",
+        domain: "Observation",
+        id: .lazyProperty
+      ),
+      fixIts: fixIts
+    )
+  }
 }
 
 struct ObservationDiagnostic: DiagnosticMessage {
   enum ID: String {
     case invalidApplication = "invalid type"
     case missingInitializer = "missing initializer"
+    case lazyProperty = "lazy property"
   }
   
   var message: String
@@ -140,6 +191,16 @@ struct ObservationDiagnostic: DiagnosticMessage {
     self.message = message
     self.diagnosticID = MessageID(domain: domain, id: id.rawValue)
     self.severity = severity
+  }
+}
+
+struct ObservationFixItMessage: FixItMessage {
+  var message: String
+  var fixItID: MessageID
+
+  init(message: String, domain: String, id: ObservationDiagnostic.ID) {
+    self.message = message
+    self.fixItID = MessageID(domain: domain, id: id.rawValue)
   }
 }
 
@@ -324,20 +385,12 @@ extension ObservableMacro: MemberMacro {
     }
     
     let observableType = identified.name.trimmed
-    
-    if declaration.isEnum {
-      // enumerations cannot store properties
-      throw DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to enumeration type '\(observableType.text)'", id: .invalidApplication)
+
+    // diagnosed by the extension expansion
+    if ObservableMacro.invalidApplication(of: node, to: declaration) != nil {
+      return []
     }
-    if declaration.isStruct {
-      // structs are not yet supported; copying/mutation semantics tbd
-      throw DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to struct type '\(observableType.text)'", id: .invalidApplication)
-    }
-    if declaration.isActor {
-      // actors cannot yet be supported for their isolation
-      throw DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to actor type '\(observableType.text)'", id: .invalidApplication)
-    }
-    
+
     var declarations = [DeclSyntax]()
 
     declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType, context: context), to: &declarations)
@@ -363,6 +416,11 @@ extension ObservableMacro: MemberAttributeMacro {
     providingAttributesFor member: MemberDeclaration,
     in context: Context
   ) throws -> [AttributeSyntax] {
+    // diagnosed by the extension expansion
+    if ObservableMacro.invalidApplication(of: node, to: declaration) != nil {
+      return []
+    }
+
     guard let property = member.as(VariableDeclSyntax.self), property.isValidForObservation,
           property.identifier != nil else {
       return []
@@ -373,8 +431,12 @@ extension ObservableMacro: MemberAttributeMacro {
        property.hasMacroApplication(ObservableMacro.trackedMacroName) {
       return []
     }
-    
-    
+
+    if let lazyModifier = property.lazyModifier {
+      context.diagnose(ObservableMacro.lazyPropertyDiagnostic(property, lazyModifier: lazyModifier, offeringFixIt: true))
+      return []
+    }
+
     return [
       AttributeSyntax(attributeName: IdentifierTypeSyntax(name: .identifier(ObservableMacro.trackedMacroName)))
     ]
@@ -389,6 +451,13 @@ extension ObservableMacro: ExtensionMacro {
     conformingTo protocols: [TypeSyntax],
     in context: some MacroExpansionContext
   ) throws -> [ExtensionDeclSyntax] {
+    // Diagnose here rather than in the member expansion, because the
+    // compiler doesn't always expand member macros (for example, on an enum
+    // whose members are never looked up), but it always expands this one.
+    if let error = invalidApplication(of: node, to: declaration) {
+      throw error
+    }
+
     // This method can be called twice - first with an empty `protocols` when
     // no conformance is needed, and second with a `MissingTypeSyntax` instance.
     if protocols.isEmpty {
@@ -429,6 +498,12 @@ public struct ObservationTrackedMacro: AccessorMacro {
 
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
+    }
+
+    // '@Observable' does not attach '@ObservationTracked' to 'lazy' properties,
+    // so this is an explicit application.
+    if let lazyModifier = property.lazyModifier {
+      throw DiagnosticsError(diagnostics: [ObservableMacro.lazyPropertyDiagnostic(property, lazyModifier: lazyModifier, offeringFixIt: false)])
     }
 
     let initAccessor: AccessorDeclSyntax =
@@ -505,7 +580,12 @@ extension ObservationTrackedMacro: PeerMacro {
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) {
       return []
     }
-    
+
+    // diagnosed by the accessor expansion
+    if property.lazyModifier != nil {
+      return []
+    }
+
     let localContext = LocalMacroExpansionContext(context: context)
     let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute, removingAttribute: ObservableMacro.trackedAttribute, in: localContext))
     return [storage]
