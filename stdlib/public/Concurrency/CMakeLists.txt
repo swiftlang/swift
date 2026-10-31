@@ -284,6 +284,7 @@ add_swift_target_library(swift_Concurrency ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     -parse-stdlib
     ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
+    -Xfrontend -enable-sil-opaque-values
   ${swift_concurrency_options}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
   INSTALL_IN_COMPONENT stdlib
