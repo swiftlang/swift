@@ -18,15 +18,12 @@
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class SWIFT_SYMBOL("s:Sq") Optional;
-
-// CHECK: class SWIFT_SYMBOL("s:SS") String;
-
-// CHECK: template<class T_0_0>
+// CHECK-NEXT: class SWIFT_SYMBOL("s:SS") String;
+// CHECK-NEXT: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
 // CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0>
 // CHECK-NEXT: #endif
 // CHECK-NEXT: class SWIFT_SYMBOL("s:Sa") Array;
-// CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
 // CHECK: template<class T_0_0>
 // CHECK-NEXT: #ifdef __cpp_concepts
