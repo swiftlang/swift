@@ -603,6 +603,169 @@ extension ASTGenVisitor {
     )
   }
 
+  /// An accessor that was generated, with the syntax it came from.
+  private struct ParsedAccessor {
+    let kind: swift.AccessorKind
+    let node: AccessorDeclSyntax
+    let decl: BridgedAccessorDecl
+  }
+
+  /// Diagnose accessors that cannot be provided together, and storage that has
+  /// a writing accessor but nothing to read through.
+  ///
+  /// This is `Parser::ParsedAccessors::classify`.
+  private func classifyAccessors(
+    _ accessors: [ParsedAccessor],
+    isSubscript: Bool,
+    braceLoc: SourceLoc,
+    isInvalid: Bool,
+    storageSyntax: Syntax?
+  ) {
+    // If there was a problem parsing the accessors, mark them all invalid to
+    // avoid tripping later invariants, and don't diagnose what is missing.
+    if isInvalid {
+      for accessor in accessors {
+        accessor.decl.asDecl.setInvalid()
+      }
+    }
+
+    // The first accessor of each kind is the one that counts.
+    var first: [swift.AccessorKind: ParsedAccessor] = [:]
+    for accessor in accessors where first[accessor.kind] == nil {
+      first[accessor.kind] = accessor
+    }
+    func accessor(_ kind: swift.AccessorKind) -> ParsedAccessor? { first[kind] }
+
+    let coroutineAccessors = self.ctx.langOpts.hasFeature(.CoroutineAccessors)
+    func name(_ kind: swift.AccessorKind, article: Bool, legacy: Bool) -> String {
+      String(bridged: kind.diagnosticName(article: article, underscored: legacy))
+    }
+    /// The legacy spelling that corresponds to a yielding accessor.
+    func legacyKind(of kind: swift.AccessorKind) -> swift.AccessorKind? {
+      switch kind {
+      case .yielding_borrow: return ._read
+      case .yielding_mutate: return ._modify
+      default: return nil
+      }
+    }
+    func diagnoseConflict(_ firstKind: swift.AccessorKind, _ secondKind: swift.AccessorKind) {
+      guard let firstAccessor = accessor(firstKind), let secondAccessor = accessor(secondKind) else {
+        return
+      }
+      let legacy =
+        legacyKind(of: firstKind) == secondKind || legacyKind(of: secondKind) == firstKind
+        || coroutineAccessors
+      self.diagnose(
+        .conflicting_accessor(
+          isSubscript ? 1 : 0,
+          name(secondKind, article: true, legacy: legacy),
+          name(firstKind, article: true, legacy: legacy)
+        ),
+        at: secondAccessor.node.accessorSpecifier
+      )
+      self.diagnose(
+        .previous_accessor(name(firstKind, article: false, legacy: legacy), false),
+        at: firstAccessor.node.accessorSpecifier
+      )
+      secondAccessor.decl.asDecl.setInvalid()
+    }
+
+    // The observing accessors are not allowed on subscripts.
+    if isSubscript {
+      for (kind, index) in [(swift.AccessorKind.willSet, UInt(0)), (.didSet, UInt(1))] {
+        if let observer = accessor(kind) {
+          self.diagnose(.observing_accessor_in_subscript(index), at: observer.node.accessorSpecifier)
+          observer.decl.asDecl.setInvalid()
+        }
+      }
+    }
+
+    // 'get', '_read', 'read' and a non-mutable addressor are all exclusive.
+    if accessor(.get) != nil {
+      diagnoseConflict(.get, ._read)
+      diagnoseConflict(.get, .yielding_borrow)
+      diagnoseConflict(.get, .unsafeAddress)
+      diagnoseConflict(.get, .borrow)
+    } else if accessor(._read) != nil {
+      diagnoseConflict(._read, .yielding_borrow)
+      diagnoseConflict(._read, .unsafeAddress)
+      diagnoseConflict(._read, .borrow)
+    } else if accessor(.yielding_borrow) != nil {
+      diagnoseConflict(.yielding_borrow, .unsafeAddress)
+      diagnoseConflict(.yielding_borrow, .borrow)
+    } else if accessor(.unsafeAddress) != nil {
+      // Nothing to check; the C++ parser compares 'yielding borrow' with
+      // 'borrow' here, which can never both exist in this branch.
+    } else if accessor(.borrow) != nil {
+      // Nothing can go wrong.
+    } else if let mutator = [.Init, .set, ._modify, .yielding_mutate, .unsafeMutableAddress, .mutate]
+      .lazy.compactMap({ accessor($0) }).first
+    {
+      // A writing accessor needs a reading one.
+      if !isInvalid {
+        let diagnostic: CompilerDiagnostic
+        let mutatorName = name(
+          mutator.kind, article: true, legacy: mutator.kind == ._modify || coroutineAccessors)
+        if accessor(.unsafeMutableAddress) != nil || accessor(._modify) != nil
+          || accessor(.yielding_mutate) != nil
+        {
+          diagnostic = .missing_reading_accessor(isSubscript ? 1 : 0, mutatorName)
+        } else if accessor(.mutate) != nil {
+          diagnostic = .missing_borrow_accessor(isSubscript ? 1 : 0, mutatorName)
+        } else {
+          diagnostic = .missing_getter(isSubscript ? 1 : 0, mutatorName)
+        }
+        self.diagnose(diagnostic, at: mutator.node.accessorSpecifier)
+      }
+    } else if isSubscript {
+      // Subscripts always have to have some sort of accessor.
+      if !isInvalid {
+        self.diagnose(.subscript_without_get, at: braceLoc)
+      }
+    }
+
+    // '_modify', 'modify' and 'unsafeMutableAddress' are all mutually exclusive;
+    // so are 'mutate' and 'set', and 'unsafeMutableAddress' with 'set'/'mutate'.
+    if accessor(.set) != nil {
+      diagnoseConflict(.set, .unsafeMutableAddress)
+      diagnoseConflict(.set, .mutate)
+    } else if accessor(._modify) != nil {
+      diagnoseConflict(._modify, .yielding_mutate)
+      diagnoseConflict(._modify, .unsafeMutableAddress)
+    } else if accessor(.mutate) != nil {
+      diagnoseConflict(.mutate, .unsafeMutableAddress)
+    }
+
+    if let initAccessor = accessor(.Init) {
+      var enclosing: Syntax? = storageSyntax?.parent
+      while let current = enclosing, !(current.is(ExtensionDeclSyntax.self) || current.is(StructDeclSyntax.self)
+        || current.is(ClassDeclSyntax.self) || current.is(EnumDeclSyntax.self) || current.is(ActorDeclSyntax.self)
+        || current.is(ProtocolDeclSyntax.self))
+      {
+        enclosing = current.parent
+      }
+      if enclosing?.is(ExtensionDeclSyntax.self) == true {
+        self.diagnose(.init_accessor_is_not_in_the_primary_declaration, at: initAccessor.node.accessorSpecifier)
+      } else if !self.declContext.isTypeContext || isSubscript {
+        self.diagnose(.init_accessor_is_not_on_property, at: initAccessor.node.accessorSpecifier)
+      }
+    }
+
+    // A 'borrow' can only be paired with 'mutate'.
+    if let borrow = accessor(.borrow),
+      accessor(.set) != nil || accessor(._modify) != nil || accessor(.yielding_mutate) != nil
+        || accessor(.unsafeMutableAddress) != nil
+    {
+      self.diagnose(.borrow_mutate_pair_restrict("borrow", "mutate"), at: borrow.node.accessorSpecifier)
+    }
+    if let mutate = accessor(.mutate),
+      accessor(.get) != nil || accessor(._read) != nil || accessor(.yielding_borrow) != nil
+        || accessor(.unsafeAddress) != nil
+    {
+      self.diagnose(.borrow_mutate_pair_restrict("mutate", "borrow"), at: mutate.node.accessorSpecifier)
+    }
+  }
+
   private func generate(
     accessorBlock: AccessorBlockSyntax,
     for storage: BridgedAbstractStorageDecl
@@ -623,17 +786,23 @@ extension ASTGenVisitor {
       )
     }
 
-    // FIXME: We still need to handle the conflicting-accessor and
-    // missing-reading-accessor diagnostics in ParsedAccessors::classify, or defer
-    // them to the type-checker. The duplicate check below is handled here because
-    // omitting it lets an invalid AST reach the verifier; see
+    // The duplicate check below, and `classifyAccessors` after it, are handled
+    // here because omitting them lets an invalid AST reach the verifier; see
     // `diagnoseDuplicateAccessor`.
     switch accessorBlock.accessors {
     case .accessors(let accessors):
       /// The first accessor seen of each kind, for duplicate detection.
       var firstOfKind: [swift.AccessorKind: AccessorDeclSyntax] = [:]
+      /// Every accessor that was generated, in order, for `classify`.
+      var generated: [ParsedAccessor] = []
+      /// Whether a 'get' that is 'async' or 'throws' has been seen, and the
+      /// accessors other than 'get' seen so far. An effectful 'get' cannot
+      /// coexist with any other accessor.
+      var hasEffectfulGet = false
+      var nonGetSoFar: [(kind: swift.AccessorKind, node: AccessorDeclSyntax)] = []
+      let isSubscript = accessorBlock.parent?.is(SubscriptDeclSyntax.self) == true
 
-      return BridgedAccessorRecord(
+      let record = BridgedAccessorRecord(
         lBraceLoc: leftBrace,
         // Use `compactMap(in:)` rather than `lazy.compactMap { }.bridgedArray`:
         // the latter evaluates the transform twice, once to compute `count` and
@@ -661,10 +830,44 @@ extension ASTGenVisitor {
           } else {
             firstOfKind[kind] = node
           }
-          return self.generate(accessorDecl: node, kind: kind, for: storage)
+          if kind == .get {
+            let effects = node.effectSpecifiers
+            if effects?.asyncSpecifier != nil || effects?.throwsClause != nil {
+              if !hasEffectfulGet {
+                for previous in nonGetSoFar {
+                  self.diagnose(
+                    .invalid_accessor_with_effectful_get(String(bridged: previous.kind.name)),
+                    at: previous.node.accessorSpecifier
+                  )
+                }
+              }
+              hasEffectfulGet = true
+            }
+          } else {
+            nonGetSoFar.append((kind, node))
+            if hasEffectfulGet {
+              self.diagnose(
+                .invalid_accessor_with_effectful_get(String(bridged: kind.name)),
+                at: node.accessorSpecifier
+              )
+            }
+          }
+          guard let decl = self.generate(accessorDecl: node, kind: kind, for: storage) else {
+            return nil
+          }
+          generated.append(ParsedAccessor(kind: kind, node: node, decl: decl))
+          return decl
         },
         rBraceLoc: rightBrace
       )
+      self.classifyAccessors(
+        generated,
+        isSubscript: isSubscript,
+        braceLoc: leftBrace,
+        isInvalid: accessorBlock.hasError,
+        storageSyntax: accessorBlock.parent
+      )
+      return record
     case .getter(let codeBlock):
       let accessor = BridgedAccessorDecl.createParsed(
         self.ctx,
@@ -837,6 +1040,32 @@ extension ASTGenVisitor {
       return nil
     }
 
+    // Reject accessors on a 'let'.
+    if introducer == .let, !attrs.attributes.hasAttribute(.HasStorage),
+      let accessorBlock = node.bindings.first?.accessorBlock
+    {
+      var observing = false
+      var addressed = false
+      if case .accessors(let accessors) = accessorBlock.accessors {
+        for accessor in accessors {
+          switch accessor.accessorSpecifier.keywordKind {
+          case .willSet, .didSet: observing = true
+          case .unsafeAddress, .unsafeMutableAddress: addressed = true
+          default: break
+          }
+        }
+      }
+      let diagnostic: CompilerDiagnostic =
+        observing
+        ? .let_cannot_be_observing_property
+        : addressed ? .let_cannot_be_addressed_property : .let_cannot_be_computed_property
+      self.diagnose(
+        diagnostic,
+        at: accessorBlock.leftBrace,
+        fixIts: [.init(replace: self.generateCharSourceRange(node.bindingSpecifier), with: "var")]
+      )
+    }
+
     let decl = BridgedPatternBindingDecl.createParsed(
       self.ctx,
       declContext: topLevelDecl?.asDeclContext ?? self.declContext,
@@ -862,8 +1091,41 @@ extension ASTGenVisitor {
     }
   }
 
+  /// Whether `node` is declared directly in a protocol.
+  private func isProtocolMember(_ node: some SyntaxProtocol) -> Bool {
+    var parent = node.parent
+    while let current = parent {
+      if let block = current.as(MemberBlockSyntax.self) {
+        return block.parent?.is(ProtocolDeclSyntax.self) == true
+      }
+      guard current.is(MemberBlockItemSyntax.self) || current.is(MemberBlockItemListSyntax.self) else {
+        return false
+      }
+      parent = current.parent
+    }
+    return false
+  }
+
+  /// Diagnose a default argument in a protocol requirement.
+  ///
+  /// The C++ parser also drops the declaration; ASTGen keeps it, which only
+  /// matters for what is diagnosed afterwards.
+  private func diagnoseProtocolDefaultArguments(
+    in parameters: FunctionParameterListSyntax,
+    of node: some SyntaxProtocol,
+    at keyword: TokenSyntax,
+    _ diagnostic: CompilerDiagnostic
+  ) {
+    if isProtocolMember(node), parameters.contains(where: { $0.defaultValue != nil }) {
+      self.diagnose(diagnostic, at: keyword)
+    }
+  }
+
   func generate(subscriptDecl node: SubscriptDeclSyntax) -> BridgedSubscriptDecl {
     let attrs = generateDeclAttributes(node, allowStatic: true)
+    self.diagnoseProtocolDefaultArguments(
+      in: node.parameterClause.parameters, of: node, at: node.subscriptKeyword,
+      .protocol_subscript_argument_init)
 
     let subscriptDecl = BridgedSubscriptDecl.createParsed(
       self.ctx,
@@ -964,6 +1226,9 @@ extension ASTGenVisitor {
     guard node.funcKeyword.presence == .present else {
       return nil
     }
+    self.diagnoseProtocolDefaultArguments(
+      in: node.signature.parameterClause.parameters, of: node, at: node.funcKeyword,
+      .protocol_method_argument_init)
 
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
@@ -1009,6 +1274,9 @@ extension ASTGenVisitor {
 
   func generate(initializerDecl node: InitializerDeclSyntax) -> BridgedConstructorDecl {
     var attrs = self.generateDeclAttributes(node, allowStatic: false)
+    self.diagnoseProtocolDefaultArguments(
+      in: node.signature.parameterClause.parameters, of: node, at: node.initKeyword,
+      .protocol_init_argument_init)
     let signature = self.generate(
       functionSignature: node.signature,
       for: .initializer
