@@ -24,23 +24,12 @@
 #ifndef SWIFT_CONCURRENCY_EXECUTORIMPL_H
 #define SWIFT_CONCURRENCY_EXECUTORIMPL_H
 
-#if !defined(__swift__) && __has_feature(ptrauth_calls)
-#include <ptrauth.h>
-#endif
+#include "ExecutorTypes.h"
 
 #include <inttypes.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdlib.h>
-
-// This must match __ptrauth_swift_heap_object_metadata in
-// swift/Runtime/Config.h, which this header cannot include
-#if !defined(__swift__) && __has_feature(ptrauth_calls)
-#define __ptrauth_swift_heap_object_metadata                                   \
-  __ptrauth(ptrauth_key_process_independent_data, 1, 0x6AE1)
-#else
-#define __ptrauth_swift_heap_object_metadata
-#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,32 +43,6 @@ extern "C" {
 #ifndef SWIFT_RUNTIME_ATTRIBUTE_NORETURN
 #define SWIFT_RUNTIME_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #endif
-
-// -- C versions of types executors might need ---------------------------------
-
-/// Represents a Swift type
-typedef struct SwiftHeapMetadata SwiftHeapMetadata;
-
-/// Jobs have flags, which currently encode a kind and a priority
-typedef uint32_t SwiftJobFlags;
-
-typedef size_t SwiftJobKind;
-enum {
-  SwiftTaskJobKind = 0,
-
-  // Job kinds >= 192 are private to the implementation
-  SwiftFirstReservedJobKind = 192,
-};
-
-typedef size_t SwiftJobPriority;
-enum {
-  SwiftUserInteractiveJobPriority = 0x21, /* UI */
-  SwiftUserInitiatedJobPriority   = 0x19, /* IN */
-  SwiftDefaultJobPriority         = 0x15, /* DEF */
-  SwiftUtilityJobPriority         = 0x11, /* UT */
-  SwiftBackgroundJobPriority      = 0x09, /* BG */
-  SwiftUnspecifiedJobPriority     = 0x00, /* UN */
-};
 
 enum { SwiftJobPriorityBucketCount = 5 };
 
@@ -96,15 +59,6 @@ static inline int swift_priority_getBucketIndex(SwiftJobPriority priority) {
     return 4;
 }
 
-/// Used by the Concurrency runtime to represent a job.  The `schedulerPrivate`
-/// field may be freely used by the executor implementation.
-typedef struct {
-  SwiftHeapMetadata const *__ptrauth_swift_heap_object_metadata _Nonnull metadata;
-  uintptr_t refCounts;
-  void * _Nullable schedulerPrivate[2];
-  SwiftJobFlags flags;
-} __attribute__((aligned(2 * sizeof(void *)))) SwiftJob;
-
 /// Indexes in the schedulerPrivate array
 enum {
   // These are only relevant for the Dispatch executor
@@ -115,17 +69,12 @@ enum {
 
 /// Get the kind of a job, by directly accessing the flags field.
 static inline SwiftJobKind swift_job_getKind(SwiftJob * _Nonnull job) {
-  return (SwiftJobKind)(job->flags & 0xff);
+  return swift_job_getKindFromFlags(job);
 }
 
 /// Get the priority of a job, by directly accessing the flags field.
 static inline SwiftJobPriority swift_job_getPriority(SwiftJob * _Nonnull job) {
-  return (SwiftJobPriority)((job->flags >> 8) & 0xff);
-}
-
-/// Get a pointer to the scheduler private data.
-static inline void * _Nonnull * _Nonnull swift_job_getPrivateData(SwiftJob * _Nonnull job) {
-  return &job->schedulerPrivate[0];
+  return swift_job_getPriorityFromFlags(job);
 }
 
 /// Allocate memory associated with a job.
@@ -133,88 +82,6 @@ void * _Nullable swift_job_alloc(SwiftJob * _Nonnull job, size_t size);
 
 /// Release memory allocated using `swift_job_alloc()`.
 void swift_job_dealloc(SwiftJob * _Nonnull job, void * _Nonnull ptr);
-
-/// Swift's refcounted objects start with this header
-typedef struct {
-  SwiftHeapMetadata const *__ptrauth_swift_heap_object_metadata _Nonnull metadata;
-} SwiftHeapObject;
-
-/// A reference to an executor consists of two words; the first is a pointer
-/// which may or may not be to a Swift heap object.
-typedef struct {
-  SwiftHeapObject * _Nullable identity;
-  uintptr_t implementation;
-} SwiftExecutorRef;
-
-/// Indicates whether or not an executor can be compared by just looking at
-/// the `identity` field.
-typedef unsigned SwiftExecutorKind;
-enum {
-  SwiftExecutorOrdinaryKind = 0,
-  SwiftExecutorComplexEqualityKind = 1
-};
-
-typedef struct SwiftExecutorWitnessTable SwiftExecutorWitnessTable;
-
-/// Return the generic executor.
-static inline SwiftExecutorRef swift_executor_generic(void) {
-  return (SwiftExecutorRef){ NULL, 0 };
-}
-
-/// Return an ordinary executor with the specified identity and witness table.
-static inline SwiftExecutorRef
-swift_executor_ordinary(SwiftHeapObject * _Nullable identity,
-                        SwiftExecutorWitnessTable * _Nullable witnessTable) {
-  return (SwiftExecutorRef){ identity,
-                             (uintptr_t)witnessTable
-                             | SwiftExecutorOrdinaryKind };
-}
-
-/// Return a complex equality executor with the specified identity and
-/// witness table.
-static inline SwiftExecutorRef
-swift_executor_complexEquality(SwiftHeapObject * _Nullable identity,
-                               SwiftExecutorWitnessTable * _Nullable witnessTable) {
-  return (SwiftExecutorRef){ identity,
-                             (uintptr_t)witnessTable
-                             | SwiftExecutorComplexEqualityKind };
-}
-
-/// Get the type of executor (ordinary vs complex equality).
-static inline SwiftExecutorKind
-swift_executor_getKind(SwiftExecutorRef executor) {
-  const uintptr_t mask = ~(uintptr_t)(sizeof(void *) - 1);
-  return executor.implementation & ~mask;
-}
-
-/// Return `true` if this is the generic executor.
-static inline bool swift_executor_isGeneric(SwiftExecutorRef executor) {
-  return executor.identity == NULL;
-}
-
-/// Return `true` if this executor is in fact the default actor.
-static inline bool swift_executor_isDefaultActor(SwiftExecutorRef executor) {
-  return !swift_executor_isGeneric(executor) && executor.implementation == 0;
-}
-
-/// Retrieve the identity of an executor.
-static inline SwiftHeapObject * _Nullable
-swift_executor_getIdentity(SwiftExecutorRef executor) {
-  return executor.identity;
-}
-
-/// Test if an executor has a valid witness table.
-static inline bool swift_executor_hasWitnessTable(SwiftExecutorRef executor) {
-  return (!swift_executor_isGeneric(executor)
-          && !swift_executor_isDefaultActor(executor));
-}
-
-/// Retrieve the witness table of an executor.
-static inline const SwiftExecutorWitnessTable * _Nullable
-swift_executor_getWitnessTable(SwiftExecutorRef executor) {
-  const uintptr_t mask = ~(uintptr_t)(sizeof(void *) - 1);
-  return (const SwiftExecutorWitnessTable *)(executor.implementation & mask);
-}
 
 /// Test if this is the main executor.
 static inline bool swift_executor_isMain(SwiftExecutorRef executor) {
@@ -247,10 +114,7 @@ swift_executor_invokeSwiftIsIsolatingCurrentContext(SwiftExecutorRef executor) {
 /// Execute the specified job while running on the specified executor.
 static inline void swift_job_run(SwiftJob * _Nonnull job,
                                  SwiftExecutorRef executor) {
-  extern void _swift_job_run_c(SwiftJob * _Nonnull job,
-                               SwiftExecutorRef executor);
-
-  _swift_job_run_c(job, executor);
+  swift_job_runSynchronously(job, executor);
 }
 
 /// A delay in nanoseconds.
@@ -323,6 +187,19 @@ SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift) void
 SWIFT_CC(swift) void
   swift_task_donateThreadToGlobalExecutorUntilImpl(bool (* _Nonnull condition)(void * _Nullable),
                                                    void * _Nullable conditionContext);
+
+// -- Main executor functions that Embedded Swift executors must implement ----
+// EmbeddedPlatform.h declares the other functions such an executor implements.
+
+/// Enqueue a job on the main executor, which may be the global executor.
+void _swift_concurrency_enqueueMainExecutor(SwiftJob * _Nonnull job);
+
+/// Get a reference to the main executor.
+SwiftExecutorRef _swift_concurrency_getMainExecutor(void);
+
+/// Check if the specified executor is the main executor. This function must
+/// not call `swift_executor_isMain`, which calls it.
+bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor);
 
 #ifdef __cplusplus
 } // extern "C"

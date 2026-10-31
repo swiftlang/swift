@@ -1,6 +1,7 @@
 /* A custom executor to test that we can build an external executor
    and use it with libswift_Concurrency.a. */
 
+#include <swift/EmbeddedPlatform.h>
 #include <swift/ExecutorImpl.h>
 
 #include <assert.h>
@@ -47,9 +48,11 @@ static SwiftJob *job_heap_fixup(SwiftJob *job) {
   SwiftJob *left = job_left(job);
   SwiftJob *right = job_right(job);
 
-  SwiftJobPriority priority = swift_job_getPriority(job);
-  SwiftJobPriority leftPriority = left ? swift_job_getPriority(left) : 0;
-  SwiftJobPriority rightPriority = right ? swift_job_getPriority(right) : 0;
+  SwiftJobPriority priority = swift_job_getPriorityFromFlags(job);
+  SwiftJobPriority leftPriority =
+      left ? swift_job_getPriorityFromFlags(left) : 0;
+  SwiftJobPriority rightPriority =
+      right ? swift_job_getPriorityFromFlags(right) : 0;
 
   SwiftJob *temp;
 
@@ -83,7 +86,7 @@ static void job_heap_push(SwiftJob *job) {
 
   // Otherwise, make the existing top node a child of this one, then fix the
   // heap condition.
-  SwiftJobPriority jobPriority = swift_job_getPriority(job);
+  SwiftJobPriority jobPriority = swift_job_getPriorityFromFlags(job);
 
   job_setLeft(job, jobHeap);
   jobHeap = job_heap_fixup(job);
@@ -134,8 +137,7 @@ static SwiftJob *job_heap_pop(void) {
 // .. Interface functions ......................................................
 
 /// Enqueue a job on the global executor.
-SWIFT_CC(swift) void
-swift_task_enqueueGlobalImpl(SwiftJob *job) {
+void _swift_concurrency_enqueueGlobal(SwiftJob *job) {
   debug("executor: job %p enqueued\n", job);
 
   job_heap_push(job);
@@ -143,45 +145,29 @@ swift_task_enqueueGlobalImpl(SwiftJob *job) {
 
 /// Enqueue a job on the main executor (which may or may not be the same as
 /// the global executor).
-SWIFT_CC(swift)
-void swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
-  swift_task_enqueueGlobalImpl(job);
-}
-
-/// Assert that the specified executor is the current executor.
-SWIFT_CC(swift)
-void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
-  swift_executor_invokeSwiftCheckIsolated(executor);
-}
-
-/// Check if the specified executor is the current executor.
-SWIFT_CC(swift)
-int8_t swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
-  return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
+void _swift_concurrency_enqueueMainExecutor(SwiftJob *job) {
+  _swift_concurrency_enqueueGlobal(job);
 }
 
 /// Get a reference to the main executor.
-SWIFT_CC(swift)
-SwiftExecutorRef swift_task_getMainExecutorImpl() {
+SwiftExecutorRef _swift_concurrency_getMainExecutor(void) {
   return swift_executor_generic();
 }
 
 /// Check if the specified executor is the main executor.
-SWIFT_CC(swift)
-bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
   return swift_executor_isGeneric(executor);
 }
 
 /// Drain the main executor's queue, processing jobs enqueued on it; this
 /// should never return.
-SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift) void
-swift_task_asyncMainDrainQueueImpl() {
+void _swift_concurrency_asyncMainDrainQueue(void) {
   debug("executor: running\n");
   while (true) {
     SwiftJob *job = job_heap_pop();
     assert(job && "We shouldn't run out of jobs here.");
     debug("executor: job %p running\n", job);
-    swift_job_run(job, swift_executor_generic());
+    swift_job_runSynchronously(job, swift_executor_generic());
   }
 }
 
@@ -189,16 +175,15 @@ swift_task_asyncMainDrainQueueImpl() {
 /// condition function returns `true`.  Support for this function is optional,
 /// but you should assert or provide a dummy implementation if your executor
 /// does not support it.
-SWIFT_CC(swift) void
-swift_task_donateThreadToGlobalExecutorUntilImpl(bool (*condition)(void *),
-                                                 void *conditionContext) {
+void _swift_concurrency_donateThreadToGlobalExecutorUntil(
+    bool (*condition)(void *), void *conditionContext) {
   debug("executor: running until condition\n");
   while (!condition(conditionContext)) {
     SwiftJob *job = job_heap_pop();
     if (!job)
       return;
     debug("executor: job %p running\n", job);
-    swift_job_run(job, swift_executor_generic());
+    swift_job_runSynchronously(job, swift_executor_generic());
   }
   debug("executor: condition satisfied or no more jobs\n");
 }
