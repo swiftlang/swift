@@ -1349,6 +1349,11 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Add any implicit conformances.
   if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
+    // Member macros can add cases or payloads. Expand them before deciding
+    // whether the enum implicitly conforms to Equatable and Hashable.
+    (void)evaluateOrDefault(ctx.evaluator,
+                            ExpandSynthesizedMemberMacroRequest{theEnum}, {});
+
     if (theEnum->hasCases() && theEnum->hasOnlyCasesWithoutAssociatedValues()) {
       // Simple enumerations conform to Equatable.
       addSynthesized(ctx.getProtocol(KnownProtocolKind::Equatable));
