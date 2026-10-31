@@ -193,6 +193,12 @@ Solution ConstraintSystem::finalize() {
   for (const auto &packEnv : PackElementExpansions)
     solution.PackElementExpansions.insert(packEnv);
 
+  if (auto *stats = getASTContext().Stats) {
+    stats->getFrontendCounters().NumSolutionEntriesRecorded +=
+        solution.typeBindings.size() + solution.nodeTypes.size() +
+        solution.overloadChoices.size();
+  }
+
   return solution;
 }
 
