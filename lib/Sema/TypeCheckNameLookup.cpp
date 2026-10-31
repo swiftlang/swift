@@ -1065,8 +1065,32 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
   return false;
 }
 
+/// Removes repeated locations from the delayed diagnostics for a declaration,
+/// keeping the most severe behavior for each location. A reference can be
+/// recorded more than once, because implicit expressions wrapping it, such as
+/// an `InjectIntoOptionalExpr` or a `LoadExpr`, refer to the same declaration.
+static void uniqueMissingImportLocs(
+    std::vector<std::pair<SourceLoc, DiagnosticBehavior>> &locsAndLimits) {
+  llvm::SmallDenseMap<SourceLoc, unsigned, 4> indexByLoc;
+  std::vector<std::pair<SourceLoc, DiagnosticBehavior>> unique;
+  for (auto [loc, limit] : locsAndLimits) {
+    auto [it, inserted] = indexByLoc.try_emplace(loc, unique.size());
+    if (inserted) {
+      unique.push_back({loc, limit});
+      continue;
+    }
+    // Behaviors are ordered from least to most limiting.
+    auto &existing = unique[it->second].second;
+    if (limit.kind < existing.kind)
+      existing = limit;
+  }
+  locsAndLimits = std::move(unique);
+}
+
 void migrateToMemberImportVisibility(SourceFile &sf) {
   auto delayedDiags = sf.takeDelayedMissingImportForMemberDiagnostics();
+  for (auto &declAndLocs : delayedDiags)
+    uniqueMissingImportLocs(declAndLocs.second);
   if (delayedDiags.empty())
     return;
 
@@ -1139,7 +1163,8 @@ void swift::diagnoseMissingImports(SourceFile &sf) {
   auto delayedDiags = sf.takeDelayedMissingImportForMemberDiagnostics();
   auto fixItCache = MissingImportFixItCache(sf);
 
-  for (auto declAndLocs : delayedDiags) {
+  for (auto &declAndLocs : delayedDiags) {
+    uniqueMissingImportLocs(declAndLocs.second);
     for (auto locAndLimit : declAndLocs.second) {
       auto [loc, limit] = locAndLimit;
       diagnoseAndFixMissingImportForMember(declAndLocs.first, &sf, loc, limit,
