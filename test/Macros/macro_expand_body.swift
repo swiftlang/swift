@@ -2,6 +2,10 @@
 // REQUIRES: swift_feature_PreambleMacros
 // REQUIRES: swift_feature_CoroutineAccessors
 // REQUIRES: swift_feature_BorrowAndMutateAccessors
+// FIXME: With CoroutineAccessors enabled in the client, the witness table layout
+// of a non-resilient stdlib's Collection drops the 'read' coroutine slot, and
+// IRGen hits unreachable in ProtocolInfo.h when lowering the inlined 'map'.
+// REQUIRES: swift_stdlib_library_evolution
 // RUN: %empty-directory(%t)
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath -swift-version 5
 

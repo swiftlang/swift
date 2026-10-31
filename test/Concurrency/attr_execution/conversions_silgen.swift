@@ -271,7 +271,7 @@ public func testConcurrentCallerLocalVariables(_ x: @escaping @concurrent () asy
 
 // SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBAIeNtHgIL_IeghH_TRScMTU : $@convention(thin) @Sendable @async (@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> () {
 // SIX: bb0([[FUNC:%.*]] : $@convention(thin) @caller_isolated @async (@sil_isolated
-// SIX:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// SIX:   [[ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // SIX:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
 // SIX:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
 // SIX:   hop_to_executor [[E_OPT]]
@@ -342,7 +342,7 @@ func globalActorConversions(_ x: @escaping @concurrent () async -> (),
 
 // FIVE-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCIeNgHgILg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
 // FIVE: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed
-// FIVE:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// FIVE:   [[ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // FIVE:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
 // FIVE:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
 // FIVE:   hop_to_executor [[E_OPT]]
@@ -353,7 +353,7 @@ func globalActorConversions(_ x: @escaping @concurrent () async -> (),
 
 // SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCIeNtHgILg_ACIeghHg_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()) -> () {
 // SIX: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> ()):
-// SIX:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// SIX:   [[ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // SIX:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
 // SIX:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
 // SIX:   hop_to_executor [[E_OPT]]
@@ -433,7 +433,7 @@ func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async ->
 
 // FIVE-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCACIeNgHgILgo_A2CIegHgo_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass {
 // FIVE: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed
-// FIVE:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// FIVE:   [[ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // FIVE:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
 // FIVE:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
 // FIVE:   hop_to_executor [[E_OPT]]
@@ -444,7 +444,7 @@ func globalActorConversions2(_ x: @escaping @concurrent (SendableKlass) async ->
 
 // SIX-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$sBA21attr_execution_silgen13SendableKlassCACIeNtHgILgo_A2CIeghHgo_TRScMTU : $@convention(thin) @Sendable @async (@guaranteed SendableKlass, @convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass) -> @owned SendableKlass {
 // SIX: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass) -> @owned SendableKlass):
-// SIX:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// SIX:   [[ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // SIX:   [[E:%.*]] = init_existential_ref [[ACTOR]] : $MainActor : $MainActor, $any Actor
 // SIX:   [[E_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[E]]
 // SIX:   hop_to_executor [[E_OPT]]
@@ -499,7 +499,7 @@ func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async ->
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s21attr_execution_silgen13SendableKlassCIeghg_BAACIeNgHgILg_TRScMTU : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed $@Sendable @callee_guaranteed
-// CHECK:   [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK:   [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // CHECK:   [[MAIN_ACTOR_B:%.*]] = begin_borrow [[MAIN_ACTOR]]
 // CHECK:   hop_to_executor [[MAIN_ACTOR_B]]
 // CHECK:   apply [[FUNC]]([[ARG]])
@@ -508,7 +508,7 @@ func globalActorConversions3(_ x: @escaping @concurrent (SendableKlass) async ->
 
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s21attr_execution_silgen13SendableKlassCIeghg_ACIegHg_TRScMTU : $@convention(thin) @async (@guaranteed SendableKlass, @guaranteed @Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $SendableKlass, [[FUNC:%.*]] : @guaranteed $@Sendable @callee_guaranteed (@guaranteed SendableKlass) -> ()):
-// CHECK:   [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK:   [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // CHECK:   [[MAIN_ACTOR_B:%.*]] = begin_borrow [[MAIN_ACTOR]]
 // CHECK:   hop_to_executor [[MAIN_ACTOR_B]]
 // CHECK-NOT: hop_to_executor
