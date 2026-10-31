@@ -3269,6 +3269,17 @@ static bool usePrespecialized(
   for (auto *SA : refF->getSpecializeAttrs()) {
     if (!SA->isExported())
       continue;
+    // A body that another module asked for exists only if this function's body
+    // can be specialized (see SILGenModule::prepareExportedSpecialization).
+    if (auto *decl = refF->getDeclRef().getDecl())
+      if (SA->isSpecializedSpelling() && SA->getSPIModule() &&
+          SA->getSPIModule() != decl->getModuleContext()) {
+        if (!refF->isDefinition())
+          funcBuilder.getModule().loadFunction(
+              refF, SILModule::LinkingMode::LinkNormal);
+        if (!refF->hasBodyForImportedSpecialization())
+          continue;
+      }
     // Check whether SPI allows using this function.
     auto spiGroup = SA->getSPIGroup();
     if (!spiGroup.empty()) {
