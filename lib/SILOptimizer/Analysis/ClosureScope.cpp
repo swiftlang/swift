@@ -1,4 +1,4 @@
-//===--- ClosureScope.cpp - Closure Scope Analysis ------------------------===//
+//===--- ClosureScope.cpp - Closure scope graph and order -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// Implementation of ClosureScopeAnalysis.
+/// Implementation of ClosureGraph and ClosureFunctionOrder.
 ///
 /// The "scope" of a closure is the function body that refers to the closure.
 ///
@@ -21,7 +21,6 @@
 #include "swift/SILOptimizer/Analysis/ClosureScope.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/SILModule.h"
 #include "llvm/ADT/iterator.h"
 
 namespace swift {
@@ -29,9 +28,8 @@ namespace swift {
 // A function is a node in this graph if it either refers to a closure or is
 // itself a closure.
 //
-// The graph is represented with two vectors. One for forward edges from "scope
-// functions" to closures. Another with backward edges from closures to
-// "scope functions".
+// The graph is represented with a vector of forward edges from "scope
+// functions" to closures, and the set of closures that have a scope.
 class ClosureGraph {
   struct Edge {
     SILFunction *from;
@@ -47,7 +45,7 @@ class ClosureGraph {
     }
   };
 
-  using EdgePos = std::vector<Edge>::iterator;
+  using EdgePos = Edge *;
   using EdgeRange = llvm::iterator_range<EdgePos>;
 
   struct NodeIterator
@@ -77,12 +75,9 @@ class ClosureGraph {
   //
   // from: parent function
   //   to: nonescaping child closure
-  std::vector<Edge> functionToClosures;
+  llvm::SmallVector<Edge, 8> functionToClosures;
 
-  // Map every nonescaping closure to the parent function that refers to it.
-  //
-  // from: nonescaping child closure
-  //   to: parent function
+  // Every nonescaping closure that a parent function refers to.
   //
   // A closure almost always has a single parent. A local function, however, may
   // be referenced recursively, even within a different closure. Notice that
@@ -96,31 +91,31 @@ class ClosureGraph {
   //     b.apply(closure)
   //   }
   //   a.apply(localFunc)
-  std::vector<Edge> closureToFunctions;
+  llvm::SmallPtrSet<SILFunction *, 8> scopedClosures;
 
 public:
   ClosureGraph() = default;
 
-  /// Visit the parent scopes of \p closure if it has any. If \p visitor returns
-  /// false, exit early and return false. Otherwise return true.
-  bool visitClosureScopes(SILFunction *closure,
-                          std::function<bool(SILFunction *scopeFunc)> visitor);
+  /// The edges to the closures directly referenced by \p scopeFunc.
+  EdgeRange getFunctionToClosureEdges(SILFunction *scopeFunc) {
+    return getEdgeRange(scopeFunc, functionToClosures);
+  }
 
-  /// Visit the closures directly referenced by \p scopeFunc.
-  bool visitClosures(SILFunction *scopeFunc,
-                     std::function<bool(SILFunction *closure)> visitor);
+  /// Return true if this function is a reachable closure.
+  bool isReachableClosure(SILFunction *function) {
+    return scopedClosures.contains(function);
+  }
 
-  /// Called when a \p function is removed from this module.
-  void erase(SILFunction *function);
-
-  /// Record all closure scopes in this module.
-  void compute(SILModule *M);
+  /// Records the scope edges among \p functions, which must be closed under
+  /// scope edges to definitions.
+  void compute(ArrayRef<SILFunction *> functions);
 
 protected:
   ClosureGraph(const ClosureGraph &) = delete;
   ClosureGraph &operator=(const ClosureGraph &) = delete;
 
-  EdgeRange getEdgeRange(SILFunction *node, std::vector<Edge> &edges) {
+  EdgeRange getEdgeRange(SILFunction *node,
+                         llvm::SmallVectorImpl<Edge> &edges) {
     auto it = std::lower_bound(NodeIterator(edges.begin()),
                                NodeIterator(edges.end()),
                                node, NodeCompare());
@@ -131,69 +126,57 @@ protected:
     }
     return EdgeRange(it.edgeIter(), next);
   }
-  
-  EdgeRange getFunctionToClosureEdges(SILFunction *scopeFunc) {
-    return getEdgeRange(scopeFunc, functionToClosures);
-  }
 
-  EdgeRange getClosureToFunctionEdges(SILFunction *closure) {
-    return getEdgeRange(closure, closureToFunctions);
-  }
-
-  void recordScope(ApplySite apply);
+  void recordScope(ApplySite apply,
+                   const llvm::SmallPtrSetImpl<SILFunction *> &within);
 
   void finalize();
 
   SWIFT_ASSERT_ONLY_DECL(void dump());
 };
 
-bool ClosureGraph::visitClosureScopes(
-    SILFunction *closure, std::function<bool(SILFunction *scopeFunc)> visitor) {
-  for (ClosureGraph::Edge &edge : getClosureToFunctionEdges(closure)) {
-    if (!visitor(edge.to))
-      return false;
-  }
-  return true;
+std::optional<CaptureEdge> getCaptureEdge(ApplySite apply) {
+  // The callee value's type, so a partial_apply that captures a box is an edge
+  // and an apply of its result isn't.
+  auto calleeTy = apply.getCallee()->getType().castTo<SILFunctionType>();
+  bool byAddress = isNonEscapingClosure(calleeTy);
+  if (!byAddress &&
+      llvm::none_of(calleeTy->getParameters(), [](SILParameterInfo param) {
+        return param.getInterfaceType()->is<SILBoxType>();
+      }))
+    return std::nullopt;
+
+  if (SILFunction *callee = apply.getCalleeFunction())
+    return CaptureEdge{callee, byAddress, /*dynamicallyReplaceable=*/false};
+
+  if (!apply.isCalleeDynamicallyReplaceable())
+    return std::nullopt; // An indirect callee.
+
+  SILValue origin = apply.getCalleeOrigin();
+  while (auto *pai = dyn_cast<PartialApplyInst>(origin))
+    origin = pai->getCalleeOrigin();
+
+  return CaptureEdge{
+      cast<FunctionRefBaseInst>(origin)->getInitiallyReferencedFunction(),
+      byAddress, /*dynamicallyReplaceable=*/true};
 }
 
-bool ClosureGraph::visitClosures(
-    SILFunction *scopeFunc, std::function<bool(SILFunction *closure)> visitor) {
-  for (ClosureGraph::Edge &edge : getFunctionToClosureEdges(scopeFunc)) {
-    if (!visitor(edge.to))
-      return false;
-  }
-  return true;
-}
-
-void ClosureGraph::erase(SILFunction *function) {
-  struct RefersToFunction {
-    SILFunction *function;
-
-    bool operator()(const Edge &edge) {
-      return edge.from == function || edge.to == function;
-    }
-  };
-  llvm::erase_if(functionToClosures, RefersToFunction{function});
-  llvm::erase_if(closureToFunctions, RefersToFunction{function});
-}
-
-// Handle both partial_apply and directly applied closures of the form:
-//   %f = function_ref @... : $(...inout_aliasable...) -> ...
-//   apply %f(...)
-void ClosureGraph::recordScope(ApplySite apply) {
-  // Only track scopes of non-escaping closures.
-  auto closureTy = apply.getCallee()->getType().castTo<SILFunctionType>();
-
-  // FIXME: isCalleeDynamicallyReplaceable should not be true but can today
-  // because local functions can be marked dynamic.
-  if (!isNonEscapingClosure(closureTy)
-      || apply.isCalleeDynamicallyReplaceable()) {
+void ClosureGraph::recordScope(
+    ApplySite apply, const llvm::SmallPtrSetImpl<SILFunction *> &within) {
+  // The graph holds the capture edges into non-escaping closures.
+  auto edge = getCaptureEdge(apply);
+  if (!edge || !edge->byAddress || edge->dynamicallyReplaceable)
     return;
-  }
-  auto closureFunc = apply.getCalleeFunction();
-  assert(closureFunc && "non-escaping closure needs a direct partial_apply.");
+  SILFunction *closureFunc = edge->callee;
 
   auto scopeFunc = apply.getFunction();
+  if (!within.count(closureFunc)) {
+    // The function set must be closed under scope edges to definitions. An
+    // edge to a declaration is fine to drop.
+    ASSERT(!closureFunc->isDefinition() &&
+           "function set is not closed under scope edges");
+    return;
+  }
   // Passes may assume that a deserialized function can only refer to
   // deserialized closures. For example, AccessEnforcementSelection skips
   // deserialized functions but assumes all a closure's parent scope have been
@@ -204,12 +187,11 @@ void ClosureGraph::recordScope(ApplySite apply) {
          "parent context");
 
   functionToClosures.push_back({scopeFunc, closureFunc});
-  closureToFunctions.push_back({closureFunc, scopeFunc});
+  scopedClosures.insert(closureFunc);
 }
 
 void ClosureGraph::finalize() {
   llvm::stable_sort(functionToClosures);
-  llvm::stable_sort(closureToFunctions);
 
   LLVM_DEBUG(dump());
 }
@@ -235,6 +217,11 @@ void ClosureGraph::dump() {
     llvm::dbgs() << "    CLOSURE: ";
     dumpFunctionName(edge.to);
   }
+  // The backward edges, from closures to scope functions.
+  llvm::SmallVector<Edge, 8> closureToFunctions;
+  for (auto &edge : functionToClosures)
+    closureToFunctions.push_back({edge.to, edge.from});
+  llvm::sort(closureToFunctions);
   currentFunc = nullptr;
   for (auto &edge : closureToFunctions) {
     auto *closure = edge.from;
@@ -249,72 +236,32 @@ void ClosureGraph::dump() {
 }
 #endif
 
-void ClosureGraph::compute(SILModule *M) {
-  for (auto &F : *M) {
-    for (auto &BB : F) {
-      for (auto &I : BB) {
-        if (auto apply = ApplySite::isa(&I)) {
-          recordScope(apply);
-        }
-      }
-    }
-  }
+void ClosureGraph::compute(ArrayRef<SILFunction *> functions) {
+  llvm::SmallPtrSet<SILFunction *, 16> within(functions.begin(),
+                                              functions.end());
+  for (SILFunction *F : functions)
+    for (auto &BB : *F)
+      for (auto &I : BB)
+        if (auto apply = ApplySite::isa(&I))
+          recordScope(apply, within);
   finalize();
-}
-
-ClosureScopeAnalysis::ClosureScopeAnalysis(SILModule *M)
-    : SILAnalysis(SILAnalysisKind::ClosureScope), M(M), scopeGraph(nullptr) {}
-
-ClosureScopeAnalysis::~ClosureScopeAnalysis() = default;
-
-bool ClosureScopeAnalysis::visitClosureScopes(
-    SILFunction *closure, std::function<bool(SILFunction *scopeFunc)> visitor) {
-  return getOrComputeGraph()->visitClosureScopes(closure, visitor);
-}
-
-bool ClosureScopeAnalysis::visitClosures(
-    SILFunction *scopeFunc, std::function<bool(SILFunction *closure)> visitor) {
-  return getOrComputeGraph()->visitClosures(scopeFunc, visitor);
-}
-
-void ClosureScopeAnalysis::invalidate() {
-  scopeGraph.reset();
-}
-
-void ClosureScopeAnalysis::notifyWillDeleteFunction(SILFunction *F) {
-  if (scopeGraph)
-    scopeGraph->erase(F);
-}
-
-ClosureGraph *ClosureScopeAnalysis::getOrComputeGraph() {
-  if (!scopeGraph) {
-    scopeGraph = std::make_unique<ClosureGraph>();
-    scopeGraph->compute(M);
-  }
-  return scopeGraph.get();
-}
-
-SILAnalysis *createClosureScopeAnalysis(SILModule *M) {
-  return new ClosureScopeAnalysis(M);
 }
 
 class ClosureFunctionOrder::ClosureDFS {
   ClosureFunctionOrder &functionOrder;
+  ClosureGraph &graph;
 
-  llvm::SmallBitVector visited;
-  llvm::SmallBitVector finished;
+  llvm::SmallPtrSet<SILFunction *, 16> visited;
+  llvm::SmallPtrSet<SILFunction *, 16> finished;
 
   SmallVector<SILFunction *, 4> postorderClosures;
 
 public:
-  ClosureDFS(ClosureFunctionOrder &functionOrder)
-    : functionOrder(functionOrder),
-      visited(functionOrder.csa->getModule()->getNumFunctionIndices()),
-      finished(functionOrder.csa->getModule()->getNumFunctionIndices())
-  {}
+  ClosureDFS(ClosureFunctionOrder &functionOrder, ClosureGraph &graph)
+      : functionOrder(functionOrder), graph(graph) {}
 
   bool isVisited(SILFunction *function) const {
-    return visited.test(function->getIndex());
+    return visited.contains(function);
   }
 
   void performDFS(SILFunction *root) {
@@ -330,42 +277,34 @@ public:
 
 protected:
   void recursiveDFS(SILFunction *function) {
-    unsigned index = function->getIndex();
-    if (visited.test(index)) {
-      if (!finished.test(index)) {
+    if (!visited.insert(function).second) {
+      if (!finished.contains(function)) {
         // Cycle in the closure graph.
         functionOrder.closureCycleHeads.insert(function);
       }
       return;
     }
-    visited.set(index);
 
-    functionOrder.csa->visitClosures(function, [this](SILFunction *closure) {
-      recursiveDFS(closure);
-      return true;
-    });
-    finished.set(index);
+    for (auto &edge : graph.getFunctionToClosureEdges(function))
+      recursiveDFS(edge.to);
+    finished.insert(function);
     postorderClosures.push_back(function);
   };
 };
 
-void ClosureFunctionOrder::compute() {
-  auto *module = csa->getModule();
+ClosureFunctionOrder::ClosureFunctionOrder(ArrayRef<SILFunction *> functions) {
+  ClosureGraph graph;
+  graph.compute(functions);
+  topDownFunctions.reserve(functions.size());
 
-  assert(topDownFunctions.empty() && closureCycleHeads.empty() &&
-         "attempting to recompute");
-  topDownFunctions.reserve(module->getNumFunctionIndices());
-
-  ClosureDFS dfs(*this);
+  ClosureDFS dfs(*this, graph);
   SmallVector<SILFunction *, 4> closureWorklist;
 
-  unsigned numFunctions = 0;
-  for (auto &function : module->getFunctionList()) {
-    ++numFunctions;
-    if (dfs.isVisited(&function))
+  for (SILFunction *function : functions) {
+    if (dfs.isVisited(function))
       continue;
 
-    if (csa->isReachableClosure(&function)) {
+    if (graph.isReachableClosure(function)) {
       // This is a closure, reachable from some other function. Reaching this
       // point is rare, because closures typically follow their parent in the
       // function list.
@@ -373,10 +312,10 @@ void ClosureFunctionOrder::compute() {
       // A closure at the head of a cycle might only be reachable from other
       // closures. So use a worklist to visit them once more as DFS roots after
       // finishing DFS from all acyclic functions.
-      closureWorklist.push_back(&function);
+      closureWorklist.push_back(function);
       continue;
     }
-    dfs.performDFS(&function);
+    dfs.performDFS(function);
   }
   // Revisit closures in forward order. DFS will immediately return except in
   // the unlikely event that this is an orphaned closure.
@@ -384,7 +323,8 @@ void ClosureFunctionOrder::compute() {
     dfs.performDFS(closure);
   }
   LLVM_DEBUG(dump());
-  assert(numFunctions == topDownFunctions.size() && "DFS missed a function");
+  assert(functions.size() == topDownFunctions.size() &&
+         "DFS missed a function");
 }
 
 #ifndef NDEBUG

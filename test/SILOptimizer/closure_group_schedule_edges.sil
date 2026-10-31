@@ -1,0 +1,193 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -access-enforcement-selection %s -o /dev/null
+
+// REQUIRES: asserts
+
+// Edges of the closure group schedule (ClosureGroupSchedule.h) that
+// closure_group_schedule.sil doesn't cover. Each member is printed with its
+// closure component's leader in brackets. In each multi-member group below,
+// dropping the edge under test would split the group. box_unapplied shows the
+// converse: a reference that passes no capture is no edge.
+
+sil_stage raw
+
+import Builtin
+
+class DtorC {}
+
+// CHECK-LABEL: begin running test 1 of 1 on indirect_apply: closure_group_schedule
+
+// An apply of a function value with an @inout_aliasable parameter has no
+// direct callee: it links nothing, and neither the scan nor
+// ClosureFunctionOrder (the second RUN line) asserts on it.
+// CHECK-NEXT: group 0
+// CHECK-NEXT:   [indirect_apply] indirect_apply
+
+// A thunk is never a closure link, but capture edges join it with both
+// of its scopes.
+// CHECK-NEXT: group 1
+// CHECK-NEXT:   [thunk_ia] thunk_ia
+// CHECK-NEXT:   [thunk_ia] thunk_ia_user1
+// CHECK-NEXT:   [thunk_ia] thunk_ia_user2
+
+// A capture edge looks through thin_to_thick_function.
+// CHECK-NEXT: group 2
+// CHECK-NEXT:   [box_thick] box_thick
+// CHECK-NEXT:   [box_thick] box_thick_user
+
+// A reference that passes no capture.
+// CHECK-NEXT: group 3
+// CHECK-NEXT:   [box_unapplied] box_unapplied
+// CHECK-NEXT: group 4
+// CHECK-NEXT:   [box_unapplied_user] box_unapplied_user
+
+// A release calls the deallocating deinit, which calls back: two components,
+// one group.
+// CHECK-NEXT: group 5
+// CHECK-NEXT:   [DtorC_dealloc] DtorC_dealloc
+// CHECK-NEXT:   [dtor_user] dtor_user
+
+// builtin "once" calls its initializer, which calls back: two components, one
+// group.
+// CHECK-NEXT: group 6
+// CHECK-NEXT:   [once_init] once_init
+// CHECK-NEXT:   [once_user] once_user
+// CHECK-NEXT: end running test 1 of 1 on indirect_apply: closure_group_schedule
+
+//===----------------------------------------------------------------------===//
+// An indirect apply of a non-escaping closure type
+//===----------------------------------------------------------------------===//
+
+sil @indirect_apply : $@convention(thin) (@convention(thin) (@inout_aliasable Builtin.Int64) -> ()) -> () {
+bb0(%0 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()):
+  specify_test "closure_group_schedule"
+  %s = alloc_stack $Builtin.Int64
+  %a = apply %0(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A thunk with an @inout_aliasable parameter, shared by two scopes. Without
+// capture edges there would be three groups: thunk_ia_user1's apply is
+// only a call edge, and thunk_ia_user2's partial_apply is no edge at all.
+//===----------------------------------------------------------------------===//
+
+sil [thunk] @thunk_ia : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @thunk_ia_user1 : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @thunk_ia : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %a = apply %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @thunk_ia_user2 : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @thunk_ia : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A box passed through thin_to_thick_function. Without the capture edge, the
+// call is one-way: two groups.
+//===----------------------------------------------------------------------===//
+
+sil @box_thick : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () {
+bb0(%0 : ${ var Builtin.Int64 }):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @box_thick_user : $@convention(thin) () -> () {
+bb0:
+  %b = alloc_box ${ var Builtin.Int64 }
+  %f = function_ref @box_thick : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  %t = thin_to_thick_function %f : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () to $@callee_guaranteed (@guaranteed { var Builtin.Int64 }) -> ()
+  %a = apply %t(%b) : $@callee_guaranteed (@guaranteed { var Builtin.Int64 }) -> ()
+  strong_release %b : ${ var Builtin.Int64 }
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A function with a box parameter that is referenced but never applied. The
+// reference passes no capture, so the two functions stay in separate groups.
+//===----------------------------------------------------------------------===//
+
+sil @box_unapplied : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () {
+bb0(%0 : ${ var Builtin.Int64 }):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @box_unapplied_user : $@convention(thin) () -> @owned @callee_guaranteed (@guaranteed { var Builtin.Int64 }) -> () {
+bb0:
+  %f = function_ref @box_unapplied : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  %t = thin_to_thick_function %f : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () to $@callee_guaranteed (@guaranteed { var Builtin.Int64 }) -> ()
+  return %t : $@callee_guaranteed (@guaranteed { var Builtin.Int64 }) -> ()
+}
+
+//===----------------------------------------------------------------------===//
+// A destructor edge. dtor_user reaches DtorC_dealloc only through the release,
+// so without that edge the call back from DtorC_dealloc is one-way: two groups.
+//===----------------------------------------------------------------------===//
+
+sil @dtor_user : $@convention(thin) () -> () {
+bb0:
+  %c = alloc_ref $DtorC
+  strong_release %c : $DtorC
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @DtorC_dealloc : $@convention(method) (@owned DtorC) -> () {
+bb0(%0 : $DtorC):
+  %f = function_ref @dtor_user : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  dealloc_ref %0 : $DtorC
+  %r = tuple ()
+  return %r : $()
+}
+
+sil_vtable DtorC {
+  #DtorC.deinit!deallocator: @DtorC_dealloc
+}
+
+//===----------------------------------------------------------------------===//
+// A builtin "once" edge. once_user calls once_init only through the builtin,
+// so without that edge the call back from once_init is one-way: two groups.
+//===----------------------------------------------------------------------===//
+
+sil_global private @once_token : $Builtin.Word
+
+sil @once_user : $@convention(thin) () -> () {
+bb0:
+  %t = global_addr @once_token : $*Builtin.Word
+  %p = address_to_pointer %t : $*Builtin.Word to $Builtin.RawPointer
+  %f = function_ref @once_init : $@convention(c) () -> ()
+  %o = builtin "once"(%p : $Builtin.RawPointer, %f : $@convention(c) () -> ()) : $()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @once_init : $@convention(c) () -> () {
+bb0:
+  %f = function_ref @once_user : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
