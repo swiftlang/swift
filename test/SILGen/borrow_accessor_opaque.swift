@@ -201,3 +201,56 @@ func mutateNonmutatingInout<T>(_ w: inout PointerWrapper<T>, _ v: T) {
   w.value = v
 }
 
+// A borrow accessor that returns the result of another borrow accessor, for a
+// generic element that may be noncopyable. `self` is loadable, so the only
+// thing that is indirect about the inner call is its @guaranteed_address
+// result.
+
+// The borrow of the inner accessor's result must not be returned: it is only
+// valid within the scope of the copy that wraps it.
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s22borrow_accessor_opaque16CheckedContainerVAARi_zrlEyxSicib : $@convention(method) <Element where Element : ~Copyable> (Int, CheckedContainer<Element>) -> @guaranteed_address Element {
+// CHECK:   [[RESULT:%.*]] = apply {{%.*}}<Element>({{%.*}}, {{%.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, CheckedContainer<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function '$s22borrow_accessor_opaque16CheckedContainerVAARi_zrlEyxSicib'
+struct CheckedContainer<Element: ~Copyable> {
+  var _storage: UnsafeMutablePointer<Element>
+  var _count: Int
+
+  subscript(unchecked position: Int) -> Element {
+    @_unsafeSelfDependentResult
+    borrow { unsafe (_storage + position).pointee }
+  }
+
+  subscript(position: Int) -> Element {
+    borrow {
+      precondition(position >= 0 && position < _count)
+      return unsafe self[unchecked: position]
+    }
+  }
+}
+
+// Same, with a noncopyable `self`.
+
+// The accessor returns the result of the inner call itself, not the borrow of
+// its copy.
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s22borrow_accessor_opaque27NoncopyableCheckedContainerVAARi_zrlEyxSicib : $@convention(method) <Element where Element : ~Copyable> (Int, @guaranteed NoncopyableCheckedContainer<Element>) -> @guaranteed_address Element {
+// CHECK:   [[RESULT:%.*]] = apply {{%.*}}<Element>({{%.*}}, {{%.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @guaranteed NoncopyableCheckedContainer<τ_0_0>) -> @guaranteed_address τ_0_0
+// CHECK:   return [[RESULT]]
+// CHECK: } // end sil function '$s22borrow_accessor_opaque27NoncopyableCheckedContainerVAARi_zrlEyxSicib'
+struct NoncopyableCheckedContainer<Element: ~Copyable>: ~Copyable {
+  var _storage: UnsafeMutablePointer<Element>
+  var _count: Int
+
+  subscript(unchecked position: Int) -> Element {
+    @_unsafeSelfDependentResult
+    borrow { unsafe (_storage + position).pointee }
+  }
+
+  subscript(position: Int) -> Element {
+    borrow {
+      precondition(position >= 0 && position < _count)
+      return unsafe self[unchecked: position]
+    }
+  }
+}
+
