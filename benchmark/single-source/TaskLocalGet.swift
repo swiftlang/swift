@@ -34,6 +34,17 @@ public var benchmarks: [BenchmarkInfo] {
       runFunction: run_TaskLocalGetBoundNested,
       tags: [.concurrency]
     ),
+    BenchmarkInfo(
+      name: "TaskLocalGet.Unbound.String",
+      runFunction: run_TaskLocalGetUnboundString,
+      tags: [.concurrency],
+      setUpFunction: { blackHole(BenchTaskLocals.string) }
+    ),
+    BenchmarkInfo(
+      name: "TaskLocalGet.Bound.String",
+      runFunction: run_TaskLocalGetBoundString,
+      tags: [.concurrency]
+    ),
   ]
 }
 
@@ -43,6 +54,8 @@ private enum BenchTaskLocals {
   @TaskLocal static var one: Int = 0
   @TaskLocal static var two: Int = 0
   @TaskLocal static var three: Int = 0
+  // A literal would be immortal and copy without a retain.
+  @TaskLocal static var string: String = String(repeating: "u", count: 32)
 }
 
 // Read a task-local that has no binding (returns defaultValue).
@@ -80,6 +93,26 @@ private func run_TaskLocalGetBoundNested(_ n: Int) {
             blackHole(BenchTaskLocals.one)
           }
         }
+      }
+    }
+  }
+}
+
+@available(macOS 14, iOS 17, tvOS 17, watchOS 10, *)
+private func run_TaskLocalGetUnboundString(_ n: Int) {
+  for _ in 0..<n {
+    for _ in 0..<10_000 {
+      blackHole(BenchTaskLocals.string)
+    }
+  }
+}
+
+@available(macOS 14, iOS 17, tvOS 17, watchOS 10, *)
+private func run_TaskLocalGetBoundString(_ n: Int) {
+  BenchTaskLocals.$string.withValue(String(repeating: "b", count: 32)) {
+    for _ in 0..<n {
+      for _ in 0..<10_000 {
+        blackHole(BenchTaskLocals.string)
       }
     }
   }
