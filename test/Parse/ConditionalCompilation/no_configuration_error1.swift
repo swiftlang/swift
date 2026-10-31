@@ -2,6 +2,6 @@
 
 // With a space next to the '#if'
 #if 
-// expected-error@-1 {{incomplete condition in conditional compilation directive}}
+// expected-cparser-error@-1 {{incomplete condition in conditional compilation directive}} expected-astgen-error@-1 {{invalid conditional compilation expression}}
 class C {}
-#endif  // expected-error {{unexpected conditional compilation block terminator}}
+#endif  // expected-cparser-error {{unexpected conditional compilation block terminator}}

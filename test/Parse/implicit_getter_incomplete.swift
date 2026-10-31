@@ -14,5 +14,5 @@ func test1() {
 func test2() { // expected-note {{match}}
   var a : Int { // expected-note {{match}} expected-note {{'a' declared here}}
     switch i { // expected-error {{cannot find 'i' in scope; did you mean 'a'}} expected-error{{'switch' statement body must have at least one 'case'}}
-}
-// expected-error@+1 2 {{expected '}'}}
+} // expected-astgen-error {{expected '}' to end variable}} expected-astgen-error {{expected '}' to end function}}
+// expected-cparser-error@+1 2 {{expected '}'}}

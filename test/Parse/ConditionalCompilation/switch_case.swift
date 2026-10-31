@@ -171,14 +171,14 @@ func foo(x: E, intVal: Int) {
 #if !ENABLE_C
       break
 #else
-    case .C: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+    case .C: // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{'case' can only appear inside a 'switch' statement or 'enum' declaration}}
       break
 #endif
   }
 
   // '#if ... case' after non-covered statements.
   switch x {
-    print() // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
+    print() // expected-cparser-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-astgen-error {{unexpected code 'print()' before conditional compilation clause}}
 #if ENABLE_C
     case .NOT_EXIST: // expected-error {{type 'E' has no member 'NOT_EXIST'}}
       break
@@ -191,9 +191,9 @@ func foo(x: E, intVal: Int) {
 
   // '#if ... stmt' after non-covered statements.
   switch x {
-    print() // expected-error {{all statements inside a switch must be covered by a 'case' or 'default'}}
+    print() // expected-cparser-error {{all statements inside a switch must be covered by a 'case' or 'default'}} expected-astgen-error {{unexpected code 'print()' before conditional compilation clause}}
 #if true
-    print()
+    print() // expected-astgen-error {{all statements inside a switch must be covered by a 'case' or 'default' label}}
 #endif
 #if ENABLE_C
     case .C:

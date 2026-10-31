@@ -527,8 +527,8 @@ func ff_inferredMagicFile() -> StaticString {
 
 func ff_inferredMagicLine() -> UInt {
     #if true
-    #line // expected-error {{#line directive was renamed to #sourceLocation}}
-    #endif // expected-error {{parameterless closing #sourceLocation() directive without prior opening #sourceLocation(file:,line:) directive}}
+    #line // expected-cparser-error {{#line directive was renamed to #sourceLocation}}
+    #endif // expected-cparser-error {{parameterless closing #sourceLocation() directive without prior opening #sourceLocation(file:,line:) directive}}
 }
 
 func ff_inferredMagicColumn() -> UInt {

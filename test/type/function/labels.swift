@@ -24,7 +24,7 @@ typealias Function3 = (a: Int,   // expected-error{{function types cannot have a
                        e _: Int, // expected-error{{function types cannot have argument labels; use '_' before 'e'}}{{24-29=}}
                        _: Int,   // okay
                        Int)      // okay
-    rethrows -> Int              // expected-error{{only function declarations may be marked 'rethrows'}}
+    rethrows -> Int              // expected-cparser-error{{only function declarations may be marked 'rethrows'}} expected-astgen-error{{expected throwing specifier; did you mean 'throws'?}}
 
 
 

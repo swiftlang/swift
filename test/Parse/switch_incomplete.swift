@@ -4,4 +4,4 @@
 // triggered an assertion failure.
 // expected-error@+1 {{switch must be exhaustive}} expected-note@+1{{add a default clause}}
 switch 1 { // expected-note{{to match this opening '{'}}
-case 1:    // expected-error@+1{{expected '}' at end of 'switch' statement}}
+case 1:    // expected-cparser-error@+1{{expected '}' at end of 'switch' statement}} expected-astgen-error {{'case' label in a 'switch' must have at least one executable statement}} expected-astgen-error {{expected '}' to end 'switch' statement}}

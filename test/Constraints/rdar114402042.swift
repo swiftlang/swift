@@ -28,5 +28,5 @@ var x: Int? = {
         return nil // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
     default:
         return nil // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
-    }
-}() // expected-error {{expected ')' in expression list}}
+    } // expected-astgen-error {{expected ')' to end function call}}
+}() // expected-cparser-error {{expected ')' in expression list}}

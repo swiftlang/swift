@@ -291,6 +291,6 @@ public struct Foo { // expected-note {{to match this opening '{'}}}
     // expected-error@-1{{type annotation missing in pattern}}
     // expected-error@-2{{'let' declarations cannot be computed properties}} {{17-20=var}}
     // expected-error@-3{{cannot find 'aaaaaa' in scope}}
-}
+} // expected-astgen-error {{expected '}' to end struct}}
 
-// expected-error@+1 {{expected '}' in struct}}
+// expected-cparser-error@+1 {{expected '}' in struct}}

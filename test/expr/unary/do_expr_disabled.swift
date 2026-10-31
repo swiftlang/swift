@@ -6,14 +6,14 @@ func throwsError() throws -> Int { 0 }
 
 func test1() -> Int {
   return do { 5 }
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{non-void function should return a value}}
   // expected-warning@-3 {{integer literal is unused}}
 }
 
 func test2() -> Int {
   return do { try throwsError() } catch { 0 }
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{non-void function should return a value}}
   // expected-warning@-3 {{integer literal is unused}}
   // expected-warning@-4 {{result of call to 'throwsError()' is unused}}
@@ -46,23 +46,23 @@ func test6() -> Int {
 
 func test7() -> Int {
   do { 5 } as Int
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
   // expected-warning@-2 {{integer literal is unused}}
-  // expected-error@-3 {{expected expression}}
+  // expected-cparser-error@-3 {{expected expression}} expected-astgen-error@-3 {{unexpected code 'as Int' in function}}
 }
 
 func test8() -> Int {
   do { try throwsError() } catch { 0 } as Int
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
   // expected-warning@-2 {{integer literal is unused}}
-  // expected-error@-3 {{expected expression}}
+  // expected-cparser-error@-3 {{expected expression}} expected-astgen-error@-3 {{unexpected code 'as Int' in function}}
   // expected-warning@-4 {{result of call to 'throwsError()' is unused}}
 }
 
 func test9() -> Int {
   let x = do { 5 }
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected initial value after '='}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected initial value after '='}} expected-astgen-error@-2 {{expected expression in variable}}
   // expected-warning@-3 {{integer literal is unused}}
 
   return x
@@ -70,8 +70,8 @@ func test9() -> Int {
 
 func test10() -> Int {
   let x = do { try throwsError() } catch { 0 }
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected initial value after '='}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected initial value after '='}} expected-astgen-error@-2 {{expected expression in variable}}
   // expected-warning@-3 {{integer literal is unused}}
   // expected-warning@-4 {{result of call to 'throwsError()' is unused}}
 

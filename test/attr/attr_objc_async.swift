@@ -59,11 +59,11 @@ actor MyActor {
   // expected-error@-1 {{typed 'throws' instance method cannot be represented in Objective-C}}
 }
 
-actor class MyActor2 { }
+actor class MyActor2 { } // expected-astgen-error {{unexpected code 'MyActor2' in actor}}
 // expected-error@-1 {{keyword 'class' cannot be used as an identifier here}}
 
 // CHECK: @objc actor MyObjCActor
 @objc actor MyObjCActor: NSObject { }
 
-@objc actor class MyObjCActor2: NSObject {}
+@objc actor class MyObjCActor2: NSObject {} // expected-astgen-error {{unexpected code 'MyObjCActor2: NSObject' in actor}}
 // expected-error@-1 {{keyword 'class' cannot be used as an identifier here}}

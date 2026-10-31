@@ -186,12 +186,12 @@ class WillSetInSubscript {
   }
 }
 
-subscript(i: Int) -> Int { // expected-error{{'subscript' functions may only be declared within a type}}
+subscript(i: Int) -> Int { // expected-cparser-error{{'subscript' functions may only be declared within a type}}
   get {}
 }
 
 func f() {  // expected-note * {{did you mean 'f'?}}
-  subscript (i: Int) -> Int { // expected-error{{'subscript' functions may only be declared within a type}}
+  subscript (i: Int) -> Int { // expected-cparser-error{{'subscript' functions may only be declared within a type}}
     get {}
   }
 }
@@ -235,8 +235,8 @@ struct MissingGetterSubscript2 {
 }
 
 struct MissingReturnTypeAndEmptyBodySubscript {
-  subscript(i: Int) { // expected-error{{expected '->' for subscript element type}}
-  // expected-error@-1{{expected subscripting element type}}
+  subscript(i: Int) { // expected-cparser-error{{expected '->' for subscript element type}}
+  // expected-cparser-error@-1{{expected subscripting element type}} expected-astgen-error@-1{{expected '->' and return type in subscript}}
   }
 }
 
@@ -396,13 +396,13 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-error@-1 {{no exact matches in call to subscript}}
   _ = s1.subscript("hello")
   // expected-error@-1 {{no exact matches in call to subscript}}
-  _ = s1.subscript("hello"
+  _ = s1.subscript("hello" // expected-astgen-error {{expected ')' to end function call}}
   // expected-error@-1 {{no exact matches in call to subscript}}
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
   // expected-error@-1 {{ambiguous use of 'subscript(_:)'}}
-  // expected-error@-2 {{expected ')' in expression list}}
+  // expected-cparser-error@-2 {{expected ')' in expression list}}
 }
 
 struct SubscriptTest2 {
@@ -443,7 +443,7 @@ class Foo {
 protocol r23952125 {
   associatedtype ItemType
   var count: Int { get }
-  subscript(index: Int) -> ItemType  // expected-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get <#set#> \}}}
+  subscript(index: Int) -> ItemType  // expected-cparser-error {{subscript in protocol must have explicit { get } or { get set } specifier}} {{36-36= { get <#set#> \}}}
 
   var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-14= { get <#set#> \}}}
 }
@@ -473,6 +473,6 @@ struct InOutSubscripts {
   subscript(x4: (inout Int, inout Int) -> ()) -> Int { return 0 } // ok
 
   subscript(inout x5: Int) -> Int { return 0 }
-  // expected-error@-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
+  // expected-cparser-error@-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} expected-astgen-error@-1 {{'inout' before a parameter name is not allowed}}
   // expected-error@-2 {{'inout' may only be used on function or initializer parameters}}
 }

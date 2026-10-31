@@ -354,8 +354,8 @@ func test_no_crash_with_circular_ref_due_to_error() {
     // `if` a multiple statement closure instead that uses
     // `next` inside.
     i let x = v, let next = arr.first?.x { // expected-error {{cannot find 'i' in scope}}
-      // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-      // expected-error@-2 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
+      // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+      // expected-cparser-error@-2 {{'let' cannot appear nested inside another 'var' or 'let' pattern}} expected-astgen-error@-2 {{consecutive statements on a line must be separated by newline or ';'}}
       // expected-error@-3 {{cannot call value of non-function type 'Int?'}}
       // expected-note@-4 {{'next' declared here}}
       print(next) // expected-error {{use of local variable 'next' before its declaration}}

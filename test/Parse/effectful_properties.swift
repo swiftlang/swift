@@ -104,16 +104,16 @@ protocol P {
 // invalid syntax
 
 var bad1 : Int {
-  get rethrows { 0 }  // expected-error{{only function declarations may be marked 'rethrows'; did you mean 'throws'?}}
+  get rethrows { 0 }  // expected-cparser-error{{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} expected-astgen-error{{expected throwing specifier; did you mean 'throws'?}}
 
   // expected-error@+1 {{'set' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'}}
-  set rethrows { }   // expected-error{{'set' accessor cannot have specifier 'rethrows'}}
+  set rethrows { }   // expected-cparser-error{{'set' accessor cannot have specifier 'rethrows'}} expected-astgen-error{{expected throwing specifier; did you mean 'throws'?}} expected-astgen-error {{'set' accessor cannot have specifier 'throws'}}
 }
 
 var bad2 : Int {
-  get reasync { 0 }  // expected-error{{expected '{' to start getter definition}}
+  get reasync { 0 }  // expected-cparser-error{{expected '{' to start getter definition}} expected-astgen-error{{expected async specifier; did you mean 'async'?}}
 
-  set reasync { }
+  set reasync { } // expected-astgen-error {{'set' accessor is not allowed on property with 'get' accessor that is 'async' or 'throws'}} expected-astgen-error {{expected async specifier; did you mean 'async'?}} expected-astgen-error {{'set' accessor cannot have specifier 'async'}}
 }
 
 var bad3 : Int {
@@ -125,22 +125,22 @@ var bad3 : Int {
 var bad4 : Int = 0 {
   // expected-error@+4 {{'willSet' accessor cannot have specifier 'throws'}}
   // expected-error@+3 {{'willSet' accessor cannot have specifier 'async'}}
-  // expected-error@+2 {{'willSet' accessor cannot have specifier 'rethrows'}}
-  // expected-error@+1 {{'willSet' accessor cannot have specifier 'reasync'}}
-  willSet(theValue) reasync rethrows async throws {}
+  // expected-cparser-error@+2 {{'willSet' accessor cannot have specifier 'rethrows'}} expected-astgen-error@+2 {{'rethrows' conflicts with 'throws'}}
+  // expected-cparser-error@+1 {{'willSet' accessor cannot have specifier 'reasync'}} expected-astgen-error@+1 {{expected async specifier; did you mean 'async'?}}
+  willSet(theValue) reasync rethrows async throws {} // expected-astgen-note {{'throws' declared here}}
 
-  // expected-error@+2 {{expected '{' to start 'didSet' definition}}
+  // expected-cparser-error@+2 {{expected '{' to start 'didSet' definition}} expected-astgen-error@+2 {{unexpected code 'bogus' in accessor}}
   // expected-error@+1 {{'didSet' accessor cannot have specifier 'throws'}}
   didSet throws bogus {}
 }
 
 var bad5 : Int {
-  get bogus rethrows {} // expected-error{{expected '{' to start getter definition}}
+  get bogus rethrows {} // expected-cparser-error{{expected '{' to start getter definition}} expected-astgen-error{{unexpected code 'bogus rethrows' in accessor}}
 }
 
 var bad6 : Int {
-  // expected-error@+2{{expected '{' to start getter definition}}
-  // expected-error@+1 {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}}
+  // expected-cparser-error@+2{{expected '{' to start getter definition}} expected-astgen-error@+2{{unexpected code '-> Int' in accessor}}
+  // expected-cparser-error@+1 {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} expected-astgen-error@+1 {{expected throwing specifier; did you mean 'throws'?}}
   get rethrows -> Int { 0 }
 }
 
@@ -152,18 +152,18 @@ var bad8 : Double {
   get {}
   // expected-error@+2 {{'_modify' accessor cannot have specifier 'async'}}
   // expected-error@+1 {{'_modify' accessor cannot have specifier 'throws'}}
-  _modify throws async { yield &bad8 }
+  _modify throws async { yield &bad8 } // expected-astgen-error {{'async' must precede 'throws'}}
 }
 
 protocol BadP {
-  var prop2 : Int { get bogus rethrows set } // expected-error{{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
+  var prop2 : Int { get bogus rethrows set } // expected-cparser-error{{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-astgen-error{{unexpected code 'bogus rethrows set' in variable}}
 
-  // expected-error@+2 {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}}
-  // expected-error@+1 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
+  // expected-cparser-error@+2 {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} expected-astgen-error@+2 {{unexpected code 'bogus set' in variable}}
+  // expected-cparser-error@+1 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-astgen-error@+1 {{expected throwing specifier; did you mean 'throws'?}}
   var prop3 : Int { get rethrows bogus set }
 
-  // expected-error@+1 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
-  var prop4 : Int { get reasync bogus set }
+  // expected-cparser-error@+1 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-astgen-error@+1 {{expected async specifier; did you mean 'async'?}}
+  var prop4 : Int { get reasync bogus set } // expected-astgen-error {{unexpected code 'bogus set' in variable}}
 
   var prop5 : Int { get throws async } // expected-error {{'async' must precede 'throws'}}
 }

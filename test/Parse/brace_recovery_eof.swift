@@ -2,5 +2,5 @@
 
 // Make sure source ranges satisfy the verifier.
 for foo in [1, 2] { // expected-note {{to match this opening '{'}}
-  _ = foo
-// expected-error@+1{{expected '}' at end of brace statement}}
+  _ = foo // expected-astgen-error {{expected '}' to end 'for' statement}}
+// expected-cparser-error@+1{{expected '}' at end of brace statement}}

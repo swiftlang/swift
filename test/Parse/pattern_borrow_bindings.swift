@@ -38,19 +38,19 @@ func testBorrowingPatterns(bar: borrowing Bar) {
     case borrowing (): // parses as `borrowing()` as before
         break
 
-    case borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-19=let}}
+    case borrowing x: // expected-cparser-warning{{'borrowing' in pattern matches is deprecated}} {{10-19=let}}
         useBorrowBar(x)
 
-    case .payload(borrowing x): // expected-warning{{'borrowing' in pattern matches is deprecated}} {{19-28=let}}
+    case .payload(borrowing x): // expected-cparser-warning{{'borrowing' in pattern matches is deprecated}} {{19-28=let}}
         useBorrowFoo(x)
 
-    case borrowing x.member: // expected-warning{{deprecated}} expected-error{{'borrowing' pattern modifier must be directly applied to pattern variable name}} expected-error{{cannot find 'x' in scope}}
+    case borrowing x.member: // expected-cparser-warning{{deprecated}} expected-astgen-warning{{'var' pattern has no effect; sub-pattern didn't bind any variables}} expected-cparser-error{{'borrowing' pattern modifier must be directly applied to pattern variable name}} expected-error{{cannot find 'x' in scope}}
         break
 
-    case borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-19=let}}
+    case borrowing x: // expected-cparser-warning{{'borrowing' in pattern matches is deprecated}} {{10-19=let}}
         useBorrowBar(x)
 
-    case _borrowing x: // expected-warning{{'borrowing' in pattern matches is deprecated}} {{10-20=let}}
+    case _borrowing x: // expected-cparser-warning{{'borrowing' in pattern matches is deprecated}} {{10-20=let}}
         useBorrowBar(x)
 
     default:

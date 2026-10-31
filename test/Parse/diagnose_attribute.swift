@@ -6,17 +6,17 @@ func foo() {}
 @diagnose(Deprecate, as: warning) // expected-warning {{the diagnostic group identifier 'Deprecate' is unknown}}
 func bar() {}
 
-@diagnose(DeprecatedDeclaration, as: what) // expected-error {{expected diagnostic behavior argument 'what' to be either 'error', 'warning' or 'ignored'}}
+@diagnose(DeprecatedDeclaration, as: what) // expected-cparser-error {{expected diagnostic behavior argument 'what' to be either 'error', 'warning' or 'ignored'}}
 func baz() {}
 
 // expected-warning @+1 {{the diagnostic group identifier 'Hmm' is unknown}}
-@diagnose(Hmm, as: what) // expected-error {{expected diagnostic behavior argument 'what' to be either 'error', 'warning' or 'ignored'}}
+@diagnose(Hmm, as: what) // expected-cparser-error {{expected diagnostic behavior argument 'what' to be either 'error', 'warning' or 'ignored'}}
 func qux() {}
 
 @diagnose(ExistentialAny, as: ignored, reason: "for a lit test")
 func quux() {}
 
-@diagnose(ExistentialAny, as: ignored, reason: BadReason) // expected-error {{expected string literal in 'diagnose' attribute}}
+@diagnose(ExistentialAny, as: ignored, reason: BadReason) // expected-cparser-error {{expected string literal in 'diagnose' attribute}} expected-astgen-error {{expected string literal}}
 func corge() {}
 
 // Backward compatibility: @warn is an alias for @diagnose
@@ -26,5 +26,5 @@ func warnAlias() {}
 @warn(ExistentialAny, as: ignored, reason: "backward compat test") // expected-warning {{'@warn' has been renamed to '@diagnose'}}
 func warnAliasWithReason() {}
 
-@warn(ExistentialAny, as: ignored, reason: BadReason) // expected-warning {{'@warn' has been renamed to '@diagnose'}} expected-error {{expected string literal in 'warn' attribute}}
+@warn(ExistentialAny, as: ignored, reason: BadReason) // expected-warning {{'@warn' has been renamed to '@diagnose'}} expected-cparser-error {{expected string literal in 'warn' attribute}} expected-astgen-error {{expected string literal}}
 func warnAliasCorge() {}

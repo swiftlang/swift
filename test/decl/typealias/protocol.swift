@@ -3,8 +3,8 @@
 // Tests for typealias inside protocols
 
 protocol Bad {
-  associatedtype X<T>  // expected-error {{associated types must not have a generic parameter list}}
-  typealias Y<T>       // expected-error {{expected '=' in type alias declaration}}
+  associatedtype X<T>  // expected-cparser-error {{associated types must not have a generic parameter list}} expected-astgen-error {{consecutive declarations on a line must be separated by newline or ';'}} expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected parameter clause in function signature}}
+  typealias Y<T>       // expected-cparser-error {{expected '=' in type alias declaration}} expected-astgen-error {{expected '=' and type in typealias declaration}}
 }
 
 protocol Col {
@@ -138,8 +138,8 @@ func go3<T : P1, U : P2>(_ x: T) -> U where T.F == U.B {
 
 // Specific diagnosis for things that look like Swift 2.x typealiases
 protocol P3 {
-  typealias T // expected-error {{type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
-  typealias U : P2 // expected-error {{type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
+  typealias T // expected-cparser-error {{type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement}} expected-astgen-error {{expected '=' and type in typealias declaration}}
+  typealias U : P2 // expected-cparser-error {{type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement}} expected-astgen-error {{expected '=' in typealias declaration}}
 }
 
 // Test for not crashing on recursive aliases

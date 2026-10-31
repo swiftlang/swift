@@ -8,7 +8,7 @@ var t7, t8 : Int
 var t9, t10 = 20 // expected-error {{type annotation missing in pattern}}
 var t11, t12 : Int = 20 // expected-error {{type annotation missing in pattern}}
 var t13 = 2.0, t14 : Int
-var (x = 123, // expected-error {{expected ',' separator}} {{7-7=,}} expected-error {{expected pattern}}
+var (x = 123, // expected-cparser-error {{expected ',' separator}} {{7-7=,}} expected-cparser-error {{expected pattern}} expected-astgen-error {{unexpected code in tuple pattern}}
      y = 456) : (Int,Int)
 var bfx : Int, bfy : Int
 
