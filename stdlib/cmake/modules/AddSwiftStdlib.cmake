@@ -3996,7 +3996,7 @@ function(add_embedded_swift_target_library prefix library_name)
       ${EMBLIB_UNPARSED_ARGUMENTS}
       GYB_SOURCES ${EMBLIB_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS ${per_target_swift_compile_flags}
-      C_COMPILE_FLAGS ${EMBLIB_C_COMPILE_FLAGS}
+      C_COMPILE_FLAGS -ffunction-sections -fdata-sections ${EMBLIB_C_COMPILE_FLAGS}
       SDK "embedded"
       ARCHITECTURE "${arch_key}"
       FILE_DEPENDS ${EMBLIB_FILE_DEPENDS}
