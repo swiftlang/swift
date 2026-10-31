@@ -25,6 +25,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
@@ -4673,18 +4674,8 @@ public:
   }
 
   ResultConvention getResult(const TypeLowering &tl) const override {
-    switch (Family) {
-    case ObjCSelectorFamily::Alloc:
-    case ObjCSelectorFamily::Copy:
-    case ObjCSelectorFamily::Init:
-    case ObjCSelectorFamily::MutableCopy:
-    case ObjCSelectorFamily::New:
+    if (isPlusOneSelectorFamily(Family))
       return ResultConvention::Owned;
-
-    case ObjCSelectorFamily::None:
-      // Defaults below.
-      break;
-    }
 
     // Get the underlying AST type, potentially stripping off one level of
     // optionality while we do it.
