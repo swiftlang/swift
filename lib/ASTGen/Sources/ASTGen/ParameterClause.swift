@@ -211,6 +211,21 @@ extension ASTGenVisitor {
     let argName: Identifier
     let argNameLoc: SourceLoc
 
+    // If 'let' or 'var' is being used as an argument label, allow it but
+    // warn. Closure parameters have no argument labels.
+    if keywordArgumentlessContext != .closure, let firstName = node.optionalFirstName,
+      // The parser turns a keyword used as an argument label into an
+      // identifier token, so compare the written text.
+      firstName.text == "let" || firstName.text == "var"
+        || (firstName.text == "inout" && self.ctx.langOpts.hasFeature(.ReferenceBindings))
+    {
+      self.diagnose(
+        .parameter_let_var_as_attr(firstName.text),
+        at: firstName,
+        fixIts: [.init(replace: self.generateCharSourceRange(firstName), with: "`\(firstName.text)`")]
+      )
+    }
+
     // Map the first name and second name to argument name and parameter name.
     // If we have both, use them. If we only have one, then use that as the
     // parameter name, inferring it as the argument name if we're allowed to.
@@ -244,6 +259,26 @@ extension ASTGenVisitor {
     case let (argNameNode?, paramNameNode?):
       (argName, argNameLoc) = self.generateIdentifierAndSourceLoc(argNameNode)
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(paramNameNode)
+
+      // If the first and second names are equivalent and non-empty, and we
+      // would have an argument label by default, complain.
+      if argNameByDefault, self.generateIdentifier(argNameNode) != nil, argNameNode.text == paramNameNode.text {
+        self.diagnose(
+          .parameter_extraneous_double_up(argName),
+          at: argNameNode,
+          fixIts: [
+            .init(
+              remove: self.generateCharSourceRange(
+                start: argNameNode.positionAfterSkippingLeadingTrivia,
+                length: SourceLength(
+                  utf8Length: paramNameNode.positionAfterSkippingLeadingTrivia.utf8Offset
+                    - argNameNode.positionAfterSkippingLeadingTrivia.utf8Offset
+                )
+              )
+            )
+          ]
+        )
+      }
     case (let nameNode?, nil), (nil, let nameNode?):
       // The (nil, nameNode?) case should never happen (since a single label
       // should be the firstName), but treat it the same it to be defensive.

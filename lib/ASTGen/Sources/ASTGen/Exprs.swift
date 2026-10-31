@@ -436,6 +436,36 @@ extension ASTGenVisitor {
     )
   }
 
+  /// Warn about an argument label that was escaped with backticks but did not
+  /// need to be. Only `_` needs escaping, because `foo(_: 3)` is taken to mean
+  /// `foo(3)`.
+  func diagnoseUnnecessarilyEscapedLabel(_ label: TokenSyntax) {
+    let written = label.rawText
+    guard written.count > 2, written.first == UInt8(ascii: "`"), written.last == UInt8(ascii: "`") else {
+      return
+    }
+    let text = String(syntaxText: SyntaxText(rebasing: written[1..<(written.count - 1)]))
+    // 'let', 'var' and 'inout' cannot be argument labels, so escaping them is
+    // required; and anything that is not a plain identifier needs the quotes.
+    guard text != "_", text != "let", text != "var", text != "inout",
+      let first = text.unicodeScalars.first, first == "_" || first.properties.isAlphabetic,
+      text.unicodeScalars.allSatisfy({ $0 == "_" || $0.properties.isAlphabetic || ("0"..."9").contains($0) })
+    else {
+      return
+    }
+    let range = self.generateCharSourceRange(label)
+    let openTick = CharSourceRange(start: range.getStart(), byteLength: 1)
+    let closeTick = CharSourceRange(
+      start: SourceLoc(at: label.endPositionBeforeTrailingTrivia.advanced(by: -1), in: self.base),
+      byteLength: 1
+    )
+    self.diagnose(
+      .escaped_parameter_name(text),
+      at: label,
+      fixIts: [.init(remove: openTick), .init(remove: closeTick)]
+    )
+  }
+
   func generateArgumentList(
     leftParen: TokenSyntax?,
     labeledExprList: LabeledExprListSyntax,
@@ -447,6 +477,9 @@ extension ASTGenVisitor {
     let bridgedArgs: BridgedArrayRef = {
       // Arguments before ')'
       let normalArgs = labeledExprList.lazy.map({ elem in
+        if let label = elem.label {
+          self.diagnoseUnnecessarilyEscapedLabel(label)
+        }
         let labelInfo = elem.label.map(self.generateIdentifierAndSourceLoc(_:))
         return BridgedCallArgument(
           labelLoc: labelInfo?.sourceLoc ?? SourceLoc(),
