@@ -21,8 +21,11 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
+#include "swift/AST/PluginLoader.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Feature.h"
+#include "swift/Basic/QuotedString.h"
 
 using namespace swift;
 
@@ -333,6 +336,42 @@ static bool canSynthesizeCodingKey(DerivedConformance &derived) {
   return true;
 }
 
+static ValueDecl *deriveCodingKeyViaMacros(DerivedConformance &derived,
+                                           ValueDecl *requirement) {
+  auto *enumDecl = cast<EnumDecl>(derived.Nominal);
+
+  auto rawType = enumDecl->getRawType();
+  auto name = requirement->getBaseName();
+
+  bool isInit = name.isConstructor();
+  auto argumentNames = requirement->getName().getArgumentNames();
+
+  DeclBaseName valueName = name;
+  if (isInit)
+    valueName = argumentNames.size() == 1 ? argumentNames[0] : Identifier();
+
+  bool isString = valueName == derived.Context.Id_stringValue;
+  bool usingRaw =
+      rawType && (isString ? rawType->isString() : rawType->isInt());
+
+  if (!isString && valueName != derived.Context.Id_intValue) {
+    derived.Context.Diags.diagnose(requirement->getLoc(),
+                                   diag::broken_coding_key_requirement);
+    return nullptr;
+  }
+
+  std::string macro;
+  auto os = llvm::raw_string_ostream(macro);
+  os << "#_deriveCodingKey(" << QuotedString(getNominalTypeInfoString(derived))
+     << ", " << QuotedString(isInit ? "init" : "valueVar") << ", "
+     << QuotedString(isString ? "string" : "int") << ", "
+     << (usingRaw ? "true" : "false") << ")";
+  os.flush();
+  return deriveRequirementViaMacro(
+      derived, requirement, macro,
+      BuiltinDerivedConformanceMacroKind::DeriveCodingKey);
+}
+
 ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
 
   // We can only synthesize CodingKey for enums.
@@ -343,6 +382,9 @@ ValueDecl *DerivedConformance::deriveCodingKey(ValueDecl *requirement) {
   // Check other preconditions for synthesized conformance.
   if (!canSynthesizeCodingKey(*this))
     return nullptr;
+
+  if (Context.LangOpts.hasFeature(Feature::DeriveConformancesViaMacros))
+    return deriveCodingKeyViaMacros(*this, requirement);
 
   auto rawType = enumDecl->getRawType();
   auto name = requirement->getBaseName();
