@@ -1839,7 +1839,7 @@ TypeConverter::getRawPointerTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getRawPointerTypeRef());
   if (descriptor == nullptr) {
-    setError("no TypeInfo for function type");
+    setError("no TypeInfo for Builtin.RawPointer");
     return nullptr;
   }
 
@@ -3044,6 +3044,8 @@ public:
 
     const TypeInfo *representationTI;
     auto pointerTI = TC.getRawPointerTypeInfo();
+    if (!pointerTI)
+      return nullptr;
 
     // The borrow uses pointer representation if:
     // - it's larger than four pointers; or
