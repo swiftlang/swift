@@ -759,7 +759,11 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   printer.printNominalTypeReference(typeDecl,
                                     /*moduleContext=*/nullptr);
   os << "> = ";
-  if (typeDecl->hasGenericParamList()) {
+  // A noncopyable type can't be a generic argument yet, as it would make the
+  // generic type conditionally noncopyable.
+  if (cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl)) {
+    os << "false";
+  } else if (typeDecl->hasGenericParamList()) {
     auto signature = typeDecl->getGenericSignature().getCanonicalSignature();
     llvm::interleave(
         signature.getInnermostGenericParams(), os,
@@ -770,11 +774,7 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
         },
         " && ");
   } else {
-    // A noncopyable argument would make the generic type conditionally
-    // noncopyable.
-    os << (cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl)
-               ? "false"
-               : "true");
+    os << "true";
   }
   os << ";\n";
 
