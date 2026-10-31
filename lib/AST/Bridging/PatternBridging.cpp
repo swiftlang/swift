@@ -36,6 +36,13 @@ BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern) {
   return cPattern.unbridged()->getSingleVar();
 }
 
+void BridgedPattern_markWildcardsAsAsyncLet(BridgedPattern cPattern) {
+  cPattern.unbridged()->forEachNode([](Pattern *P) {
+    if (auto *AP = dyn_cast<AnyPattern>(P))
+      AP->setIsAsyncLet();
+  });
+}
+
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  SourceLoc loc) {
   return new (cContext.unbridged()) AnyPattern(loc);

@@ -695,7 +695,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedPatternBindingEntry? {
+  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult, isAsyncLet: Bool, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedPatternBindingEntry? {
     if binding.pattern.is(MissingPatternSyntax.self) {
       // The availability checker requires declarations to have valid SourceLocs, but MissingPatternSyntax lowers to
       // an implicit AnyPattern with invalid SourceLocs. A top-level MissingPatternSyntax could therefore cause us to
@@ -705,6 +705,11 @@ extension ASTGenVisitor {
     }
 
     let pattern = generate(pattern: binding.pattern)
+    if isAsyncLet {
+      // `async let _ = ...` has no VarDecl to carry the `async` attribute, so
+      // the wildcard itself records it.
+      pattern.markWildcardsAsAsyncLet()
+    }
 
     let equalLoc = generateSourceLoc(binding.initializer?.equal)
 
@@ -743,10 +748,16 @@ extension ASTGenVisitor {
     var propagatedType: BridgedTypeRepr?
     var entries: [BridgedPatternBindingEntry] = []
 
+    let isAsyncLet =
+      node.bindingSpecifier.keywordKind == .let && node.modifiers.contains { $0.name.text == "async" }
+
     // Generate the bindings in reverse, keeping track of the TypeRepr to
     // propagate to earlier patterns if needed.
     for binding in node.bindings.reversed() {
-      guard var entry = self.generate(patternBinding: binding, attrs: attrs, topLevelDecl: topLevelDecl) else {
+      guard
+        var entry = self.generate(
+          patternBinding: binding, attrs: attrs, isAsyncLet: isAsyncLet, topLevelDecl: topLevelDecl)
+      else {
         // Missing pattern. Drop this binding.
         continue
       }
@@ -1277,7 +1288,7 @@ extension ASTGenVisitor {
       if let value = swift.Associativity(from: token.keywordKind) {
         associativityValue = value
       } else {
-        self.diagnose(.unexpectedTokenKind(token: token))
+        self.diagnose(.expected_precedencegroup_associativity, at: token)
         associativityValue = .none
       }
     } else {
@@ -1286,10 +1297,13 @@ extension ASTGenVisitor {
 
     let assignmentValue: Bool
     if let token = body.assignment?.value {
-      if token.keywordKind == .true {
+      switch token.keywordKind {
+      case .true:
         assignmentValue = true
-      } else {
-        self.diagnose(.unexpectedTokenKind(token: token))
+      case .false:
+        assignmentValue = false
+      default:
+        self.diagnose(.expected_precedencegroup_assignment, at: token)
         assignmentValue = false
       }
     } else {

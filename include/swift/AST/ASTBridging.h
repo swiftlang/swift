@@ -3125,6 +3125,11 @@ void BridgedTypeRepr_dump(BridgedTypeRepr type);
 SWIFT_NAME("getter:BridgedPattern.singleVar(self:)")
 BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern);
 
+/// Mark every wildcard in \p pattern as belonging to an `async let`, as the
+/// C++ parser does for the pattern of `async let _ = ...`.
+SWIFT_NAME("BridgedPattern.markWildcardsAsAsyncLet(self:)")
+void BridgedPattern_markWildcardsAsAsyncLet(BridgedPattern cPattern);
+
 SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  swift::SourceLoc loc);
