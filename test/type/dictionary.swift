@@ -25,9 +25,9 @@ func constructDictionary(_ n: Int) {
 }
 
 // Parse errors
-var y1: [String : Int = ["hello" : 1] // expected-error{{expected ']' in dictionary type}}
+var y1: [String : Int = ["hello" : 1] // expected-cparser-error{{expected ']' in dictionary type}} expected-astgen-error{{expected ']' to end dictionary type}}
   // expected-note @-1{{to match this opening '['}}
-var y2: [String : ] // expected-error{{expected dictionary value type}}
+var y2: [String : ] // expected-cparser-error{{expected dictionary value type}} expected-astgen-error{{expected value type in dictionary type}}
 
 
 struct NotHashable { }

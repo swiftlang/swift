@@ -2,8 +2,8 @@
 
 func simple_default_args() {
   // <rdar://problem/22753605> QoI: bad diagnostic when closure has default argument
-  let _ : (Int) -> Int = {(x : Int = 1) in x+1} // expected-error{{default arguments are not allowed in closures}} {{36-39=}}
-  let _ : () -> Int = {(_ x : Int = 1) in x+1} // expected-error{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}} expected-error {{default arguments are not allowed in closures}} {{35-38=}}
+  let _ : (Int) -> Int = {(x : Int = 1) in x+1} // expected-cparser-error{{default arguments are not allowed in closures}} {{36-39=}} expected-astgen-error{{unexpected code '= 1' in parameter clause}}
+  let _ : () -> Int = {(_ x : Int = 1) in x+1} // expected-error{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}} expected-cparser-error {{default arguments are not allowed in closures}} {{35-38=}} expected-astgen-error {{unexpected code '= 1' in parameter clause}}
   let _ : () -> Int = {(_ x : Int) in x+1} // expected-error{{contextual closure type '() -> Int' expects 0 arguments, but 1 was used in closure body}}
 }
 

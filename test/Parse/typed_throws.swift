@@ -26,10 +26,10 @@ func testTypes() {
 }
 
 func testMissingError() throws() { }
-// expected-error@-1{{expected thrown error type after 'throws('}}
+// expected-cparser-error@-1{{expected thrown error type after 'throws('}} expected-astgen-error@-1{{expected thrown type in throws clause}}
 
 func testRethrowsWithThrownType() rethrows(MyError) { }
-// expected-error@-1{{'rethrows' cannot be combined with a specific thrown error type}}
+// expected-cparser-error@-1{{'rethrows' cannot be combined with a specific thrown error type}} expected-astgen-error@-1{{'rethrows' function must take a throwing function argument}}
 
 struct S<Element, Failure: Error> {
   init(produce: @escaping () async throws(Failure) -> Element?) {

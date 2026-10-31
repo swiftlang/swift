@@ -2,7 +2,7 @@
 
 var t1a: (Int...) = (1)
 // expected-error@-1 {{variadic parameter cannot appear outside of a function parameter list}}
-var t2d: (Double = 0.0) = 1 // expected-error {{default argument not permitted in a tuple type}} {{18-23=}}
+var t2d: (Double = 0.0) = 1 // expected-cparser-error {{default argument not permitted in a tuple type}} {{18-23=}} expected-astgen-error {{unexpected code '= 0.0' in tuple type}}
 
 func f1(_ a: Int...) { for _ in a {} }
 f1()

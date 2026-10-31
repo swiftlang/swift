@@ -2,5 +2,5 @@
 
 // Make sure we don't crash
 func testInvalidInInterpolation(_ x: Int) {
-  _ = "\((x, \[]))" // expected-error {{invalid component of Swift key path}}
+  _ = "\((x, \[]))" // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{expected type in array type}}
 }

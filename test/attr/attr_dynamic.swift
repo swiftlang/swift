@@ -7,7 +7,7 @@ struct NotObjCAble {
 
 @objc class ObjCClass {}
 
-dynamic prefix operator +!+  // expected-error{{unexpected modifier 'dynamic' in operator declaration}} {{1-9=}}
+dynamic prefix operator +!+  // expected-cparser-error{{unexpected modifier 'dynamic' in operator declaration}} {{1-9=}} expected-astgen-error{{unexpected code 'dynamic' before operator declaration}}
 
 class Foo {
   @objc dynamic init() {}

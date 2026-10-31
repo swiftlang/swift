@@ -61,9 +61,9 @@ typealias InvalidAttrOnNonExistingParamType = @_lifetime(copy nonexisting) (_ ne
 
 typealias InvalidAttrOnNonExistingSelfType = @_lifetime(copy self) (_ ne: NE) -> NE // expected-error{{invalid lifetime dependence specifier on non-existent self}}
 
-typealias InvalidAttrOnExistingParamIndexType = @_lifetime(0) (_ ne: NE) -> NE // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+typealias InvalidAttrOnExistingParamIndexType = @_lifetime(0) (_ ne: NE) -> NE // expected-cparser-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}} expected-astgen-error{{cannot infer the lifetime dependence scope on a function with a non-'Escapable' parameter, specify '@_lifetime(borrow 0)' or '@_lifetime(copy 0)'}}
 
-typealias InvalidAttrOnNonExistingParamIndexType = @_lifetime(2) (_ ne: NE) -> NE // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+typealias InvalidAttrOnNonExistingParamIndexType = @_lifetime(2) (_ ne: NE) -> NE // expected-cparser-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}} expected-astgen-error{{invalid parameter index specified '2'}}
 
 typealias InvalidDuplicateLifetimeDependenceType = @_lifetime(copy ne, borrow ne) (_ ne: borrowing NE) -> NE // expected-error{{duplicate lifetime dependence specifier}}
 

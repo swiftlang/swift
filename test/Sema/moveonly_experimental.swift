@@ -10,7 +10,7 @@ func checkOldConsumeName() {
   let x = SomeValue()
 
   let _ = _move x // expected-error {{cannot find '_move' in scope}}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-warning@-2 {{expression of type 'SomeValue' is unused}}
 }
 

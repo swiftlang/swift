@@ -37,10 +37,10 @@ func argumentLabel(__owned __shared: Int) {}
 // We should parse them as argument labels in function types, even though that
 // isn't currently supported.
 
-func argumentLabel(borrowingInClosure: (borrowing consuming: Int) -> ()) {} // expected-error{{function types cannot have argument labels}}
-func argumentLabel(consumingInClosure: (consuming borrowing: Int) -> ()) {} // expected-error{{function types cannot have argument labels}}
-func argumentLabel(sharedInClosure: (__shared __owned: Int) -> ()) {} // expected-error{{function types cannot have argument labels}}
-func argumentLabel(ownedInClosure: (__owned __shared: Int) -> ()) {} // expected-error{{function types cannot have argument labels}}
+func argumentLabel(borrowingInClosure: (borrowing consuming: Int) -> ()) {} // expected-cparser-error{{function types cannot have argument labels}} expected-astgen-error{{'borrowing' before a parameter name is not allowed}}
+func argumentLabel(consumingInClosure: (consuming borrowing: Int) -> ()) {} // expected-cparser-error{{function types cannot have argument labels}} expected-astgen-error{{'consuming' before a parameter name is not allowed}}
+func argumentLabel(sharedInClosure: (__shared __owned: Int) -> ()) {} // expected-cparser-error{{function types cannot have argument labels}} expected-astgen-error{{'__shared' before a parameter name is not allowed}}
+func argumentLabel(ownedInClosure: (__owned __shared: Int) -> ()) {} // expected-cparser-error{{function types cannot have argument labels}} expected-astgen-error{{'__owned' before a parameter name is not allowed}}
 
 func argumentLabel(anonBorrowingInClosure: (_ borrowing: Int) -> ()) {}
 func argumentLabel(anonConsumingInClosure: (_ consuming: Int) -> ()) {}
