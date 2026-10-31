@@ -599,12 +599,15 @@ public:
 };
 
 // FIXME: Can we bridge InFlightDiagnostic?
+///
+/// If \p warnUntilMajor is nonzero, the diagnostic is downgraded to a warning
+/// in language modes before that major version.
 SWIFT_NAME("BridgedDiagnosticEngine.diagnose(self:at:_:_:highlightAt:"
-           "highlightLength:fixIts:)")
+           "highlightLength:fixIts:warnUntilMajor:)")
 void BridgedDiagnosticEngine_diagnose(
     BridgedDiagnosticEngine, swift::SourceLoc loc, swift::DiagID diagID,
     BridgedArrayRef arguments, swift::SourceLoc highlightStart,
-    uint32_t hightlightLength, BridgedArrayRef fixIts);
+    uint32_t hightlightLength, BridgedArrayRef fixIts, SwiftInt warnUntilMajor);
 
 SWIFT_NAME("BridgedDiagnosticEngine.getLocationFromExternalSource(self:path:line:column:)")
 swift::SourceLoc BridgedDiagnostic_getLocationFromExternalSource(

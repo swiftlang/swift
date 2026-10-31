@@ -57,7 +57,8 @@ void BridgedDiagnosticEngine_diagnose(
     BridgedDiagnosticEngine bridgedEngine, SourceLoc loc, DiagID diagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
     SourceLoc highlightStart, uint32_t hightlightLength,
-    BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
+    BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts,
+    SwiftInt warnUntilMajor) {
   auto *D = bridgedEngine.unbridged();
 
   SmallVector<DiagnosticArgument, 2> arguments;
@@ -78,6 +79,15 @@ void BridgedDiagnosticEngine_diagnose(
     auto range = unbridge(fixIt).getRange();
     auto text = unbridge(fixIt).getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
+  }
+
+  if (warnUntilMajor) {
+    for (auto mode : LanguageMode::allSupportedModes()) {
+      if (mode.version() == std::make_pair((unsigned)warnUntilMajor, 0u)) {
+        inflight.warnUntilLanguageMode(mode);
+        break;
+      }
+    }
   }
 }
 

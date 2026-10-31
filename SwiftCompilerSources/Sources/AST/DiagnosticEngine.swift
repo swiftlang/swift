@@ -107,7 +107,8 @@ public struct DiagnosticEngine {
           bridged.diagnose(at: bridgedSourceLoc, id, bridgedArgsRef,
                            highlightAt: highlightStart,
                            highlightLength: highlightLength,
-                           fixIts: bridgedFixItsRef)
+                           fixIts: bridgedFixItsRef,
+                           warnUntilMajor: 0)
         }
       }
     }

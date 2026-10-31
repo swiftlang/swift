@@ -384,37 +384,75 @@ extension ASTGenVisitor {
     // Specifiers
     var ownership: BridgedParamSpecifier = .default
     var ownershipLoc: SourceLoc = nil
+    var ownershipSpecifier: TokenSyntax? = nil
     var isolatedLoc: SourceLoc = nil
     var constLoc: SourceLoc = nil
     var sendingLoc: SourceLoc = nil
     var lifetimeEntry: BridgedLifetimeEntry? = nil
     var nonisolatedLoc: SourceLoc = nil
 
-    // TODO: Diagnostics for duplicated specifiers, and ordering.
     for node in node.specifiers {
       let loc = self.generateSourceLoc(node)
       switch node {
       case .simpleTypeSpecifier(let node):
-        switch node.specifier.keywordKind {
-        case .inout:
-          (ownership, ownershipLoc) = (.inOut, loc)
-        case .__shared:
-          (ownership, ownershipLoc) = (.legacyShared, loc)
-        case .__owned:
-          (ownership, ownershipLoc) = (.legacyOwned, loc)
-        case .borrowing:
-          (ownership, ownershipLoc) = (.borrowing, loc)
-        case .consuming:
-          (ownership, ownershipLoc) = (.consuming, loc)
+        let token = node.specifier
+        let newOwnership: BridgedParamSpecifier
+        switch token.keywordKind {
+        case .inout: newOwnership = .inOut
+        case .__shared: newOwnership = .legacyShared
+        case .__owned: newOwnership = .legacyOwned
+        case .borrowing: newOwnership = .borrowing
+        case .consuming: newOwnership = .consuming
         case .isolated:
+          if isolatedLoc.isValid {
+            self.diagnose(
+              .parameter_specifier_repeated,
+              at: token,
+              fixIts: [.init(remove: self.generateCharSourceRange(token))]
+            )
+          }
           isolatedLoc = loc
+          continue
         case ._const:
           constLoc = loc
+          continue
         case .sending:
+          // Only allow 'sending' to be written once.
+          if sendingLoc.isValid {
+            self.diagnose(
+              .sending_repeated,
+              at: token,
+              fixIts: [.init(remove: self.generateCharSourceRange(token))]
+            )
+          }
+          // 'sending' cannot be combined with 'borrowing'.
+          if ownershipLoc.isValid && ownership == .borrowing {
+            self.diagnose(.sending_cannot_be_used_with_borrowing("sending"), at: token)
+          }
           sendingLoc = loc
+          continue
         default:
           // TODO: Diagnostics.
           fatalError("(compiler bug) unrecognized type specifier")
+        }
+
+        if ownershipLoc.isValid {
+          // Only one of 'inout', 'borrowing' and 'consuming' is allowed. The
+          // first one wins, as in the C++ parser.
+          self.diagnose(
+            .parameter_specifier_repeated,
+            at: token,
+            fixIts: [.init(remove: self.generateCharSourceRange(ownershipSpecifier!))]
+          )
+        } else {
+          (ownership, ownershipLoc, ownershipSpecifier) = (newOwnership, loc, token)
+          // A specifier must come before 'sending'.
+          if sendingLoc.isValid {
+            self.diagnose(
+              .sending_before_parameter_specifier(String(syntaxText: token.rawText)),
+              at: token
+            )
+          }
         }
       case .lifetimeTypeSpecifier(let node):
         lifetimeEntry = .createParsed(

@@ -80,9 +80,20 @@ struct CompilerDiagnostic {
   let id: swift.DiagID
   let arguments: [CompilerDiagnosticArgument]
 
+  /// If nonzero, the diagnostic is only a warning in language modes before this
+  /// major version, like `InFlightDiagnostic::warnUntilLanguageMode`.
+  var warnUntilMajor: Int = 0
+
   init(_ id: swift.DiagID, _ arguments: [CompilerDiagnosticArgument] = []) {
     self.id = id
     self.arguments = arguments
+  }
+
+  /// This diagnostic, as a warning until the given language mode.
+  func warnUntilLanguageMode(_ major: Int) -> Self {
+    var copy = self
+    copy.warnUntilMajor = major
+    return copy
   }
 }
 
@@ -151,7 +162,8 @@ extension ASTGenVisitor {
           BridgedArrayRef(data: arguments.baseAddress, count: arguments.count),
           highlightAt: highlightRange?.getStart() ?? nil,
           highlightLength: highlightRange?.getByteLength() ?? 0,
-          fixIts: BridgedArrayRef(data: fixIts.baseAddress, count: fixIts.count)
+          fixIts: BridgedArrayRef(data: fixIts.baseAddress, count: fixIts.count),
+          warnUntilMajor: diagnostic.warnUntilMajor
         )
       }
     }

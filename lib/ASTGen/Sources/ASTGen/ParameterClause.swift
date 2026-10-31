@@ -18,6 +18,7 @@ import BasicBridging
 
 fileprivate protocol ValueParameterSyntax: SyntaxProtocol {
   var optionalAttributes: AttributeListSyntax? { get }
+  var modifiers: DeclModifierListSyntax { get }
   /// The `firstName` with optional type.
   ///
   /// This is the lowest denominator between `FunctionParameterSyntax` and `EnumCaseParameterSyntax`.
@@ -133,6 +134,58 @@ extension ASTGenVisitor {
     )
   }
 
+  /// Apply the specifiers that were written *before* the parameter name, e.g.
+  /// `isolated` in `isolated Int`, to the parameter's type.
+  ///
+  /// The C++ parser treats them as specifiers of the type, and diagnoses
+  /// that they should have been written in front of the type; the warning
+  /// becomes an error in Swift 6. ASTGen would otherwise drop them.
+  private func applyParameterTypeModifiers(
+    _ modifiers: DeclModifierListSyntax,
+    to base: BridgedTypeRepr
+  ) -> BridgedTypeRepr {
+    var type = base
+    var hasIsolated = false
+    var hasSending = false
+    for modifier in modifiers {
+      let name = modifier.name
+      switch name.keywordKind {
+      case .isolated, ._const, .sending:
+        if name.keywordKind == .sending && !self.ctx.langOpts.hasFeature(.SendingArgsAndResults) {
+          continue
+        }
+        self.diagnose(
+          .parameter_specifier_as_attr_disallowed(name.text)
+            .warnUntilLanguageMode(6),
+          at: name
+        )
+        if name.keywordKind == .isolated && hasIsolated || name.keywordKind == .sending && hasSending {
+          self.diagnose(
+            .parameter_specifier_repeated,
+            at: name,
+            fixIts: [.init(remove: self.generateCharSourceRange(name))]
+          )
+          continue
+        }
+        let loc = self.generateSourceLoc(name)
+        switch name.keywordKind {
+        case .isolated:
+          hasIsolated = true
+          type = BridgedIsolatedTypeRepr.createParsed(self.ctx, base: type, specifierLoc: loc).asTypeRepr
+        case ._const:
+          type = BridgedCompileTimeLiteralTypeRepr.createParsed(self.ctx, base: type, specifierLoc: loc)
+            .asTypeRepr
+        default:
+          hasSending = true
+          type = BridgedSendingTypeRepr.createParsed(self.ctx, base: type, specifierLoc: loc).asTypeRepr
+        }
+      default:
+        break
+      }
+    }
+    return type
+  }
+
   /// Generate a ParamDecl. If `argNameByDefault` is true, then the parameter's
   /// argument label is inferred from the first name if no second name is present.
   private func makeParamDecl(
@@ -208,6 +261,10 @@ extension ASTGenVisitor {
           base: base,
           ellipsisLoc: self.generateSourceLoc(ellipsis)
         ).asTypeRepr
+    }
+
+    if let base = type {
+      type = self.applyParameterTypeModifiers(node.modifiers, to: base)
     }
 
     let initContext: BridgedDefaultArgumentInitializer?
