@@ -7,11 +7,10 @@ if(NOT BUILD_SHARED_LIBS)
   set(libpthread)
   set(android_libraries -llog)
   set(concurrency_libs)
-  configure_file(
+  swift_runtime_configure_link_file(
     "${PROJECT_SOURCE_DIR}/static-stdlib-args.lnk.in"
-    static-stdlib-args.lnk
-    @ONLY
-    NEWLINE_STYLE LF)
+    "${CMAKE_CURRENT_BINARY_DIR}/static-stdlib-args.lnk"
+    "${SwiftCore_PAGE_SIZE}")
   install(FILES "${CMAKE_CURRENT_BINARY_DIR}/static-stdlib-args.lnk"
     COMPONENT SwiftOverlay_runtime
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift_static/${SwiftOverlay_PLATFORM_SUBDIR}")

@@ -128,6 +128,11 @@ option(SwiftCore_ENABLE_STDLIB_LAZY_LINK "Use lazy linking instead of dlsym for 
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
+set(SwiftCore_PAGE_SIZE "" CACHE STRING
+  "Maximum supported runtime page size in bytes, used for buffer alignment and ELF linking. Leave empty to use the target platform default.")
+include(SwiftRuntimePageSize)
+swift_runtime_get_page_size(SwiftCore_PAGE_SIZE
+  "${SwiftCore_MODULE_TRIPLE}" "${SwiftCore_PAGE_SIZE}")
 defaulted_option(SwiftCore_ENABLE_FATALERROR_BACKTRACE "Build stdlib fatalError with backtrace output")
 defaulted_option(SwiftCore_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization")
 defaulted_option(SwiftCore_ENABLE_STRICT_AVAILABILITY "Enable strict availability; this will cause things to break at desk or in CI if the host OS is a lower version than some `@availability` annotations in the runtime code")
