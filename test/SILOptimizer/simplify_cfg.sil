@@ -2382,7 +2382,7 @@ public class DD : PP {
 // CHECK-LABEL: sil @replace_try_apply_with_apply_cast_return_type : $@convention(method) (@guaranteed DD) -> @owned Optional<BB>
 // CHECK: bb0
 // CHECK: apply %{{.*}}
-// CHECK: convert_function
+// CHECK-NOT: convert_function
 // CHECK-NOT: try_apply
 // CHECK: apply
 // Check that return value is properly casted
@@ -2410,7 +2410,7 @@ bb2(%10 : $Error):
 // if the argument types of the converted function types do not match.
 // CHECK-LABEL: try_apply_with_apply_of_cast_argument
 // CHECK-NOT: try_apply {{%[0-9]+}}
-// CHECK: convert_function
+// CHECK-NOT: convert_function
 // CHECK: upcast
 // CHECK: apply
 // CHECK-NOT: try_apply
