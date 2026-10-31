@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "closure-lifetime-fixup"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
@@ -664,6 +665,25 @@ static bool lookThroughMarkDependenceChainForValue(MarkDependenceInst *mark,
   return lookThroughMarkDependenceChainForValue(markChain, pai);
 }
 
+/// Returns true if \p use may write to or deinitialize the memory it uses.
+static bool mayModifyAddress(Operand *use) {
+  SILInstruction *user = use->getUser();
+  if (auto *copy = dyn_cast<CopyAddrInst>(user))
+    return use->get() == copy->getDest() || copy->isTakeOfSrc();
+  // A load [copy] only reads, but its memory behavior is conservatively
+  // reported as having side effects.
+  if (auto *load = dyn_cast<LoadInst>(user))
+    if (load->getOwnershipQualifier() == LoadOwnershipQualifier::Copy)
+      return false;
+  if (isa<EndAccessInst>(user) || isa<EndFormalScopeInst>(user))
+    return false;
+  if (auto site = ApplySite::isa(user)) {
+    if (site.isArgumentOperand(*use))
+      return !site.getCaptureConvention(*use).isGuaranteedConventionInCaller();
+  }
+  return user->mayWriteToMemory();
+}
+
 /// Rewrite a partial_apply convert_escape_to_noescape sequence with a single
 /// apply/try_apply user to a partial_apply [stack] terminated with a
 /// dealloc_stack placed after the apply.
@@ -844,6 +864,10 @@ static SILValue tryRewriteToPartialApplyStack(
   SmallVector<SILBasicBlock *, 8> discoveredBlocks;
   SSAPrunedLiveness closureLiveness(cvt->getFunction(), &discoveredBlocks);
   closureLiveness.initializeDef(closureOp);
+  // The closure is live until its lifetime ends, so that a write to an
+  // original during that time keeps its copy.
+  for (auto *lifetimeEnd : lifetimeEnds)
+    closureLiveness.updateForUse(lifetimeEnd, /*lifetimeEnding=*/true);
 
   llvm::SmallSetVector<SILValue, 4> borrowedOriginals;
 
@@ -883,6 +907,10 @@ static SILValue tryRewriteToPartialApplyStack(
       LLVM_DEBUG(llvm::dbgs() << "-- not an alloc_stack\n");
       continue;
     }
+
+    // Complete OSSA lifetimes give the closure a lifetime end on every path.
+    // Without one, the check below would pass vacuously.
+    ASSERT(!lifetimeEnds.empty());
 
     if (DisableCopyEliminationOfCopyableCapture) {
       if (!copy->getType().isMoveOnly()) {
@@ -990,13 +1018,15 @@ static SILValue tryRewriteToPartialApplyStack(
         : public TransitiveAddressWalker<
               OrigUnmodifiedDuringClosureLifetimeWalker> {
       SSAPrunedLiveness &closureLiveness;
+      ArrayRef<SILInstruction *> lifetimeEnds;
       bool &origIsUnmodifiedDuringClosureLifetime;
 
     public:
       OrigUnmodifiedDuringClosureLifetimeWalker(
           SSAPrunedLiveness &closureLiveness,
+          ArrayRef<SILInstruction *> lifetimeEnds,
           bool &origIsUnmodifiedDuringClosureLifetime)
-          : closureLiveness(closureLiveness),
+          : closureLiveness(closureLiveness), lifetimeEnds(lifetimeEnds),
             origIsUnmodifiedDuringClosureLifetime(
                 origIsUnmodifiedDuringClosureLifetime) {}
 
@@ -1005,11 +1035,14 @@ static SILValue tryRewriteToPartialApplyStack(
                    origUse->getUser()->printInContext(llvm::dbgs());
                    llvm::dbgs() << "\n");
 
-        // If the user doesn't write to memory, then it's harmless.
-        if (!origUse->getUser()->mayWriteToMemory()) {
+        // If the user doesn't write to the original, then it's harmless.
+        if (!mayModifyAddress(origUse)) {
           return true;
         }
-        if (closureLiveness.isWithinBoundary(origUse->getUser())) {
+        // isWithinBoundary() excludes the closure's lifetime ends, but the
+        // closure is still alive there.
+        if (closureLiveness.isWithinBoundary(origUse->getUser()) ||
+            llvm::is_contained(lifetimeEnds, origUse->getUser())) {
           origIsUnmodifiedDuringClosureLifetime = false;
           LLVM_DEBUG(llvm::dbgs() << "-- original has other possibly writing "
                                      "use during closure lifetime\n";
@@ -1022,7 +1055,7 @@ static SILValue tryRewriteToPartialApplyStack(
     };
 
     OrigUnmodifiedDuringClosureLifetimeWalker origUseWalker(
-        closureLiveness, origIsUnmodifiedDuringClosureLifetime);
+        closureLiveness, lifetimeEnds, origIsUnmodifiedDuringClosureLifetime);
     switch (origUseWalker.walk(orig)) {
     case AddressUseKind::NonEscaping:
     case AddressUseKind::Dependent:
