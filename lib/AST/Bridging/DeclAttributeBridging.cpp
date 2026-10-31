@@ -589,6 +589,10 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
       SwiftNativeObjCRuntimeBaseAttr(name, atLoc, range, /*Implicit=*/false);
 }
 
+bool BridgedDiagnoseAttr_isKnownGroup(Identifier diagGroupName) {
+  return getDiagGroupIDByName(diagGroupName.str()).has_value();
+}
+
 BridgedDiagnoseAttr
 BridgedDiagnoseAttr_createParsed(BridgedASTContext cContext,
                              SourceLoc atLoc,

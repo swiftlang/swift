@@ -681,6 +681,14 @@ extension ASTGenVisitor {
         return .skip
       }
     } body: { caseNode in
+      // A `case` without its keyword is a recovery artifact, e.g. the stray
+      // `@MainActor` in `default @MainActor`. The C++ parser stops
+      // the case list there ("expected declaration") rather than forming a
+      // case, and a second, empty case that abuts the previous one breaks
+      // ASTScope's child ordering.
+      if case .case(let label) = caseNode.label, label.caseKeyword.presence == .missing {
+        return
+      }
       allBridgedCases.append(self.generate(switchCase: caseNode))
     }
 

@@ -335,6 +335,14 @@ extension ASTGenVisitor {
       fingerprint: fp.bridged
     )
 
+    // An extension is only valid at file scope. One that ended up elsewhere,
+    // e.g. through parser recovery, is diagnosed and marked invalid so that the
+    // type checker leaves it alone.
+    if !self.declContext.isModuleScopeContext {
+      self.diagnose(.decl_inner_scope, at: node.extensionKeyword)
+      decl.asDecl.setInvalid()
+    }
+
     return decl
   }
 }

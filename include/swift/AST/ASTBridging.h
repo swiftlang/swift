@@ -1317,6 +1317,11 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceRange range,
                                                    swift::Identifier name);
 
+/// Whether \p diagGroupName names a known diagnostic group. An unknown group
+/// must be diagnosed and the attribute dropped before calling
+/// BridgedDiagnoseAttr_createParsed.
+bool BridgedDiagnoseAttr_isKnownGroup(swift::Identifier diagGroupName);
+
 SWIFT_NAME("BridgedDiagnoseAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
 BridgedDiagnoseAttr
 BridgedDiagnoseAttr_createParsed(BridgedASTContext cContext,

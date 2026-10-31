@@ -2547,15 +2547,27 @@ extension ASTGenVisitor {
   ///   ```
   func generateDiagnoseAttr(attribute node: AttributeSyntax) -> BridgedDiagnoseAttr? {
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
+      var groupText = ""
       guard let diagGroupIdentifier: swift.Identifier =
           self.generateConsumingAttrOption(args: &args, label: nil, { expr in
             guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {
               return nil
             }
+            groupText = declRefExpr.baseName.text
             return self.generateIdentifier(declRefExpr.baseName)
           })
       else {
         return nil
+      }
+
+      // An unknown group is diagnosed, and the attribute dropped once the rest
+      // of its arguments have been checked, as in the C++ parser.
+      let groupIsKnown = BridgedDiagnoseAttr_isKnownGroup(diagGroupIdentifier)
+      if !groupIsKnown {
+        self.diagnose(
+          .attr_diagnose_unknown_diagnostic_group_identifier(groupText),
+          at: node.attributeName
+        )
       }
 
       guard let behavior: swift.WarningGroupBehavior =
@@ -2581,6 +2593,10 @@ extension ASTGenVisitor {
         reason = userSpecifiedReason
       } else {
         reason = allocateBridgedString("")
+      }
+
+      guard groupIsKnown else {
+        return nil
       }
 
       return .createParsed(
