@@ -113,6 +113,10 @@ extension ASTGenVisitor {
   }
 
   func generateDeclAttributes(attributeList node: AttributeListSyntax, handler: (BridgedDeclAttribute) -> Void) {
+    let outerExposureKinds = self.seenExposureKinds
+    self.seenExposureKinds = []
+    defer { self.seenExposureKinds = outerExposureKinds }
+
     visitIfConfigElements(node, of: AttributeSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -159,12 +163,14 @@ extension ASTGenVisitor {
       case .BackDeployed:
         return self.generateBackDeployedAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
       case .CDecl:
+        if attrName.first == UInt8(ascii: "_") { self.diagnoseNonLocalAttribute(node, attrName: attrName) }
         return handle(self.generateCDeclAttr(attribute: node)?.asDeclAttribute)
       case .COM:
         return handle(self.generateCOMAttr(attribute: node)?.asDeclAttribute)
       case .CxxDecl:
         return handle(self.generateCxxDeclAttr(attribute: node)?.asDeclAttribute)
       case .Derivative:
+        self.diagnoseNonLocalAttribute(node, attrName: attrName)
         return handle(self.generateDerivativeAttr(attribute: node)?.asDeclAttribute)
       case .Differentiable:
         return handle(self.generateDifferentiableAttr(attribute: node)?.asDeclAttribute)
@@ -179,6 +185,7 @@ extension ASTGenVisitor {
       case .Export:
         return handle(self.generateExportAttr(attribute: node)?.asDeclAttribute)
       case .Expose:
+        self.diagnoseNonLocalAttribute(node, attrName: attrName)
         return handle(self.generateExposeAttr(attribute: node)?.asDeclAttribute)
       case .Extern:
         return handle(self.generateExternAttr(attribute: node)?.asDeclAttribute)
@@ -217,6 +224,7 @@ extension ASTGenVisitor {
       case .Semantics:
         return handle(self.generateSemanticsAttr(attribute: node)?.asDeclAttribute)
       case .SILGenName:
+        self.diagnoseNonLocalAttribute(node, attrName: attrName)
         return handle(self.generateSILGenNameAttr(attribute: node)?.asDeclAttribute)
       case .Specialize:
         return handle(self.generateSpecializeAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
@@ -233,6 +241,7 @@ extension ASTGenVisitor {
       case .Target:
         return handle(self.generateTargetAttr(attribute: node)?.asDeclAttribute)
       case .Transpose:
+        self.diagnoseNonLocalAttribute(node, attrName: attrName)
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .TypeEraser:
         return handle(self.generateTypeEraserAttr(attribute: node)?.asDeclAttribute)
@@ -457,6 +466,13 @@ extension ASTGenVisitor {
     }
 
     return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
+  }
+
+  /// Diagnose an attribute that does not make sense in a local scope.
+  func diagnoseNonLocalAttribute(_ node: AttributeSyntax, attrName: SyntaxText) {
+    if self.declContext.isLocalContext {
+      self.diagnose(.attr_name_only_at_non_local_scope("@" + String(syntaxText: attrName)), at: node.attributeName)
+    }
   }
 
   /// The range of `node` from its `@` through its last token, excluding trivia.
@@ -1225,20 +1241,36 @@ extension ASTGenVisitor {
   func generateExposeAttr(attribute node: AttributeSyntax) -> BridgedExposeAttr? {
     // FIXME: SwiftParser should parse the argument as LabeledExprListArguments
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
-      // Exposure kind.
-      let kind: swift.ExposureKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
-        switch $0.rawText {
-        case "Cxx":
-          return .cxx
-        case "Wasn":
-          return .wasm
-        default:
+      // Exposure kind: 'Cxx', '!Cxx' or 'wasm'.
+      let optionLoc: Syntax = args.first.map { Syntax($0) } ?? node.rightParen.map { Syntax($0) } ?? Syntax(node.attributeName)
+      let kind: swift.ExposureKind? = self.generateConsumingAttrOption(args: &args, label: nil) { expr in
+        var option = expr
+        var isNegated = false
+        if let prefix = expr.as(PrefixOperatorExprSyntax.self), prefix.operator.text == "!" {
+          isNegated = true
+          option = prefix.expression
+        }
+        guard let declRef = option.as(DeclReferenceExprSyntax.self), declRef.argumentNames == nil else {
           return nil
+        }
+        switch (declRef.baseName.text, isNegated) {
+        case ("Cxx", false): return .cxx
+        case ("Cxx", true): return .notcxx
+        case ("wasm", false): return .wasm
+        default: return nil
         }
       }
       guard let kind else {
+        self.diagnose(.attr_expected_option_such_as("_expose", "Cxx"), at: optionLoc)
         return nil
       }
+
+      // A declaration cannot have two '@_expose' attributes with the same
+      // exposure kind.
+      if self.seenExposureKinds.contains(kind.rawValue) {
+        self.diagnose(.duplicate_attribute(false), at: node.attributeName)
+      }
+      self.seenExposureKinds.append(kind.rawValue)
 
       // Name.
       let name: BridgedStringRef?

@@ -20,7 +20,8 @@ endif()
 # enum, so the generated extensions cannot collide.
 set(_astgen_diagnostic_def_files
   DiagnosticsCommon
-  DiagnosticsParse)
+  DiagnosticsParse
+  DiagnosticsSema)
 
 set(_astgen_generated_diagnostics)
 foreach(def_file ${_astgen_diagnostic_def_files})

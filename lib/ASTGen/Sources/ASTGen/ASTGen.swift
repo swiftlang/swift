@@ -37,6 +37,10 @@ struct ASTGenVisitor {
 
   @Boxed private(set) var declContext: BridgedDeclContext
 
+  /// The exposure kinds of the `@_expose` attributes seen so far in the
+  /// attribute list being generated, to diagnose duplicates.
+  @Boxed var seenExposureKinds: [UInt8] = []
+
   let ctx: BridgedASTContext
 
   let configuredRegions: ConfiguredRegions
@@ -58,6 +62,13 @@ struct ASTGenVisitor {
   }
 
   func generate(sourceFile node: SourceFileSyntax) -> [BridgedASTNode] {
+    // A hashbang line is only allowed in the main file.
+    if let shebang = node.shebang, self.declContext.isModuleScopeContext,
+      !self.declContext.parentSourceFile.isScriptMode
+    {
+      self.diagnose(.lex_hashbang_not_allowed, at: shebang)
+    }
+
     // If not top-level, no need for 'TopLevelCodeDecl' treatment.
     if !self.declContext.isModuleScopeContext {
       return self.generate(codeBlockItemList: node.statements)
