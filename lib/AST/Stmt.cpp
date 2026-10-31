@@ -1007,6 +1007,31 @@ CaseStmt *findNextCaseStmt(
 
 }
 
+static bool isCatchAllPattern(const Pattern *pattern) {
+  switch (pattern->getKind()) {
+  case PatternKind::Any:
+    return true;
+  case PatternKind::Tuple: {
+    auto elements = cast<TuplePattern>(pattern)->getElements();
+    return !elements.empty() &&
+           llvm::all_of(elements, [&](const TuplePatternElt element) {
+             return isCatchAllPattern(element.getPattern());
+           });
+  }
+  case PatternKind::Paren:
+    return isCatchAllPattern(cast<ParenPattern>(pattern)->getSubPattern());
+  default:
+    return false;
+  }
+}
+
+bool CaseStmt::isCatchAll() {
+  return !isDefault() &&
+         llvm::all_of(getCaseLabelItems(), [](const CaseLabelItem &item) {
+           return !item.getGuardExpr() && isCatchAllPattern(item.getPattern());
+         });
+}
+
 CaseStmt *CaseStmt::findNextCaseStmt() const {
   auto parent = getParentStmt();
   if (!parent)
