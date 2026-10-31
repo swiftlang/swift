@@ -1,4 +1,7 @@
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -enable-experimental-feature DeriveConformancesViaMacros -load-plugin-library %swift-plugin-dir/%target-library-name(SwiftMacros)
+
+// REQUIRES: swift_feature_DeriveConformancesViaMacros
 
 // Structs with computed members should get synthesized conformance to Codable,
 // but their lazy and computed members should be skipped as part of the

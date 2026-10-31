@@ -120,7 +120,7 @@ public struct DeriveComparableMacro: DeclarationMacro {
           return false
           """
       } else {
-        stmtsInCase = getUnreachableStatement()
+        stmtsInCase = unreachableStatement
       }
 
       let lPat = getEnumElementPayloadPattern(caseInfo, varPrefix: "l")
@@ -128,19 +128,19 @@ public struct DeriveComparableMacro: DeclarationMacro {
 
       cases.append(
         """
-        case (\(lPat), \(rPat)): 
+        case (\(lPat), \(rPat)):
           \(stmtsInCase)
         """
       )
     }
 
     // A single-case enum's `(lhs, rhs)` switch is already exhaustive without a
-    // default. Otherwise, we handle different cases here and compare only the 
+    // default. Otherwise, we handle different cases here and compare only the
     // discriminants.
     if info.cases.count > 1 {
       cases.append(
         """
-        default: 
+        default:
           \(getDiscriminant(info, scrutinee: "lhs", discrName: "index_lhs"))
           \(getDiscriminant(info, scrutinee: "rhs", discrName: "index_rhs"))
           return index_lhs < index_rhs
