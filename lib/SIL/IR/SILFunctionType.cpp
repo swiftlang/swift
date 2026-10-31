@@ -3977,6 +3977,16 @@ getFRTResultConvention(const TypeLowering &tl, const clang::NamedDecl *decl,
   return importer::getOwnershipOfReturnedFRT(decl, ctx);
 }
 
+/// Shared constructor-result prologue. C++ constructors return `this`
+/// indirectly. Returns nullopt for non-constructor declarations, in which
+/// case the caller falls through to its next rule.
+static std::optional<ResultConvention>
+getCXXConstructorResultConvention(const clang::NamedDecl *decl) {
+  if (isa<clang::CXXConstructorDecl>(decl))
+    return ResultConvention::Indirect;
+  return std::nullopt;
+}
+
 /// Shared result logic for CF-typedef returns. `isPlusOneResult` is the
 /// caller-specific +1 inference: ObjC method family or C create rule.
 static ResultConvention
@@ -4353,9 +4363,8 @@ public:
     // C++ constructors return indirectly.
     // TODO: this may be different depending on the ABI, so we may have to
     // check with clang here.
-    if (isa<clang::CXXConstructorDecl>(TheDecl)) {
-      return ResultConvention::Indirect;
-    }
+    if (auto convention = getCXXConstructorResultConvention(TheDecl))
+      return convention.value();
 
     if (auto convention = getFRTResultConvention(tl, TheDecl, Ctx))
       return convention.value();
@@ -4418,24 +4427,23 @@ public:
     return super::getIndirectParameter(index, type, substTL);
   }
   ResultConvention getResult(const TypeLowering &resultTL) const override {
-    if (isa<clang::CXXConstructorDecl>(TheDecl)) {
-      // Represent the `this` pointer as an indirectly returned result.
-      // This gets us most of the way towards representing the ABI of a
-      // constructor correctly, but it's not guaranteed to be entirely correct.
-      // C++ constructor ABIs are complicated and can require passing additional
-      // "implicit" arguments that depend not only on the signature of the
-      // constructor but on the class on which it's defined (e.g. whether that
-      // class has a virtual base class).
-      // Effectively, we're making an assumption here that there are no implicit
-      // arguments and that the return type of the constructor ABI is void (and
-      // indeed we have no way to represent anything else here). If this assumed
-      // ABI doesn't match the actual ABI, we insert a thunk in IRGen. On some
-      // ABIs (e.g. Itanium x64), we get lucky and the ABI for a complete
-      // constructor call always matches the ABI we assume here. Even if the
-      // actual ABI doesn't match the assumed ABI, we try to get as close as
-      // possible to make it easy for LLVM to optimize away the thunk.
-      return ResultConvention::Indirect;
-    }
+    // Represent the `this` pointer as an indirectly returned result.
+    // This gets us most of the way towards representing the ABI of a
+    // constructor correctly, but it's not guaranteed to be entirely correct.
+    // C++ constructor ABIs are complicated and can require passing additional
+    // "implicit" arguments that depend not only on the signature of the
+    // constructor but on the class on which it's defined (e.g. whether that
+    // class has a virtual base class).
+    // Effectively, we're making an assumption here that there are no implicit
+    // arguments and that the return type of the constructor ABI is void (and
+    // indeed we have no way to represent anything else here). If this assumed
+    // ABI doesn't match the actual ABI, we insert a thunk in IRGen. On some
+    // ABIs (e.g. Itanium x64), we get lucky and the ABI for a complete
+    // constructor call always matches the ABI we assume here. Even if the
+    // actual ABI doesn't match the assumed ABI, we try to get as close as
+    // possible to make it easy for LLVM to optimize away the thunk.
+    if (auto convention = getCXXConstructorResultConvention(TheDecl))
+      return convention.value();
 
     if (auto convention = getFRTResultConvention(resultTL, TheDecl, Ctx))
       return convention.value();
