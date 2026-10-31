@@ -56,6 +56,10 @@ class CastOptimizer {
   /// that a cast will fail.
   std::function<void()> willFailAction;
 
+  /// Whether debug info must be preserved: this is set to true for
+  /// MandatoryConstantPropagation.
+  bool preserveDebugInfo = false;
+
 public:
   CastOptimizer(SILOptFunctionBuilder &FunctionBuilder,
                 SILBuilderContext *BuilderContext,
@@ -87,6 +91,8 @@ public:
                     [](SILInstruction *) {})
       : CastOptimizer(FunctionBuilder, BuilderContext, ReplaceValueUsesAction,
                       ReplaceInstUsesAction, EraseAction, []() {}, []() {}) {}
+
+  void setPreserveDebugInfo() { preserveDebugInfo = true; }
 
   /// Simplify checked_cast_br. It may change the control flow.
   SILInstruction *simplifyCheckedCastBranchInst(CheckedCastBranchInst *Inst);
