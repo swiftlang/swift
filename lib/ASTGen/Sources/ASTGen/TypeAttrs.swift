@@ -319,7 +319,11 @@ extension ASTGenVisitor {
         switch $0.rawText {
         case "any": return .dynamicIsolation
         default:
-          // TODO: Diagnose.
+          self.diagnose(
+            .attr_isolated_expected_kind,
+            at: $0,
+            fixIts: [.init(replace: self.generateCharSourceRange($0), with: "any")]
+          )
           return nil
         }
       }

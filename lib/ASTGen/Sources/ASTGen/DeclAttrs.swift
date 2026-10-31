@@ -1191,6 +1191,7 @@ extension ASTGenVisitor {
   func generateNonexhaustiveAttr(attribute node: AttributeSyntax) -> BridgedNonexhaustiveAttr? {
     let mode: BridgedNonexhaustiveMode? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["warn"],
       {
         switch $0.rawText {
         case "warn": return .warning
@@ -1213,6 +1214,7 @@ extension ASTGenVisitor {
   func generateExclusivityAttr(attribute node: AttributeSyntax) -> BridgedExclusivityAttr? {
     let mode: BridgedExclusivityAttrMode? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["checked", "unchecked"],
       {
         switch $0.rawText {
         case "checked": return .checked
@@ -1419,6 +1421,7 @@ extension ASTGenVisitor {
   func generateExportAttr(attribute node: AttributeSyntax) -> BridgedExportAttr? {
     let kind: swift.ExportKind? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["interface", "implementation"],
       {
         switch $0.rawText {
         case "interface": return .interface
@@ -1447,6 +1450,7 @@ extension ASTGenVisitor {
   func generateInlineAttr(attribute node: AttributeSyntax) -> BridgedInlineAttr? {
     let kind: swift.InlineKind? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["never", "always", "__always"],
       {
         switch $0.rawText {
         case "never": return .never
@@ -1811,6 +1815,7 @@ extension ASTGenVisitor {
   func generateNonSendableAttr(attribute node: AttributeSyntax) -> BridgedNonSendableAttr? {
     let kind: BridgedNonSendableKind? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["assumed"],
       {
         switch $0.rawText {
         case "_assumed": return .assumed
@@ -1834,6 +1839,7 @@ extension ASTGenVisitor {
   func generateNonisolatedAttr(attribute node: AttributeSyntax) -> BridgedNonisolatedAttr? {
     let modifier: swift.NonIsolatedModifier? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["unsafe", "nonsending"],
       {
         switch $0.rawText {
         case "unsafe": return .unsafe
@@ -1857,6 +1863,7 @@ extension ASTGenVisitor {
   func generateInheritActorContextAttr(attribute node: AttributeSyntax) -> BridgedInheritActorContextAttr? {
     let modifier: swift.InheritActorContextModifier? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["always"],
       {
         switch $0.rawText {
         case "always": return .always
@@ -1985,6 +1992,7 @@ extension ASTGenVisitor {
   func generateOptimizeAttr(attribute node: AttributeSyntax) -> BridgedOptimizeAttr? {
     let mode: BridgedOptimizationMode? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["speed", "size", "none"],
       {
         switch $0.rawText {
         case "speed": return .forSpeed
@@ -2532,10 +2540,30 @@ extension ASTGenVisitor {
   ///   @_spi(GroupName)
   ///   ```
   func generateSPIAccessControlAttr(attribute node: AttributeSyntax) -> BridgedSPIAccessControlAttr? {
+    let hasArguments = node.arguments != nil
     let spiName: Identifier? = self.generateSingleAttrOption(attribute: node) {
-      self.generateIdentifier($0)
+      (token: TokenSyntax) -> Identifier? in
+      // The name must be an identifier (or `_`); an operator, or the
+      // contextual keyword `set`, is not an SPI name. Note that `nil` here must
+      // be spelled `Optional.none`: `Identifier` itself expresses `nil`.
+      if token.text == "set" {
+        return Optional<Identifier>.none
+      }
+      switch token.tokenKind {
+      case .identifier, .wildcard, .keyword:
+        return self.generateIdentifier(token)
+      default:
+        return Optional<Identifier>.none
+      }
     }
     guard let spiName else {
+      if hasArguments {
+        // The C++ parser points just past the '('.
+        let loc = node.leftParen.map {
+          SourceLoc(at: $0.endPositionBeforeTrailingTrivia, in: self.base)
+        } ?? self.generateSourceLoc(node.attributeName)
+        self.diagnose(.attr_access_expected_spi_name, at: loc)
+      }
       return nil
     }
     return .createParsed(
@@ -2809,6 +2837,7 @@ extension ASTGenVisitor {
   func generateUnsafeAttr(attribute node: AttributeSyntax) -> BridgedUnsafeAttr? {
     let isAlways: Bool? = self.generateSingleAttrOption(
       attribute: node,
+      options: ["always"],
       {
         switch $0.rawText {
         case "always": return true
@@ -2988,6 +3017,7 @@ extension ASTGenVisitor {
   /// this emits diagnostics.
   func generateSingleAttrOption<Result>(
     attribute node: AttributeSyntax,
+    options: [String] = [],
     _ valueGeneratorFunction: (TokenSyntax) -> Result?,
     valueIfOmitted: Result? = nil
   ) -> Result? {
@@ -2999,11 +3029,32 @@ extension ASTGenVisitor {
       return nil
     }
 
+    let attrName = node.attributeName.trimmedDescription
+
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
-      self.generateConsumingPlainIdentifierAttrOption(
-        args: &args,
-        valueGeneratorFunction
-      )
+      // The identifier that was written, if the argument was one.
+      var written: TokenSyntax? = nil
+      let result = self.generateConsumingPlainIdentifierAttrOption(args: &args) { token in
+        written = token
+        return valueGeneratorFunction(token)
+      }
+
+      // Diagnose as the C++ parser's `parseSingleAttrOption` does, which
+      // points at the attribute name. Only attributes that list their options
+      // are diagnosed.
+      if !options.isEmpty {
+        if result == nil {
+          if let written {
+            self.diagnose(.attr_unknown_option(written.text, attrName), at: node.attributeName)
+          } else {
+            self.diagnose(.attr_expected_option_such_as(attrName, options[0]), at: node.attributeName)
+          }
+        } else if !args.isEmpty {
+          self.diagnose(.attr_expected_rparen(attrName, false), at: node.attributeName)
+          return nil
+        }
+      }
+      return result
     }
   }
 }
