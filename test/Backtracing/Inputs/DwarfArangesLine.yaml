@@ -1,0 +1,87 @@
+## A hand-crafted ELF object holding a DWARF v5 compile unit that is only
+## described by .debug_aranges (its root DIE has no DW_AT_low_pc, DW_AT_high_pc
+## or DW_AT_ranges), and which has a line number program.  We find the unit
+## using .debug_aranges without reading its root DIE, so we need to make sure
+## that we still read its DW_AT_stmt_list when looking up a source location --
+## see DwarfReaderLookups.swift.
+##
+## Layout:
+##   .debug_aranges: [0x1000, 0x1020) -> the CU at offset 0
+##   CU: DW_AT_stmt_list -> .debug_line offset 0
+##   Line table: 0x1000 line 42, 0x1010 line 50, 0x1020 end_sequence
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_abbrev:
+    - Table:
+        - Code:     0x01
+          Tag:      DW_TAG_compile_unit
+          Children: DW_CHILDREN_no
+          Attributes:
+            - Attribute: DW_AT_stmt_list
+              Form:      DW_FORM_sec_offset
+  debug_info:
+    - Version:  5
+      UnitType: DW_UT_compile
+      AddrSize: 8
+      Entries:
+        - AbbrCode: 0x01
+          Values:
+            - Value: 0x00            # DW_AT_stmt_list
+  debug_aranges:
+    - Version:     2
+      CuOffset:    0x0
+      AddressSize: 8
+      SegmentSelectorSize: 0
+      Descriptors:
+        - Address: 0x1000
+          Length:  0x20
+  debug_line:
+    - Version:           5
+      AddressSize:       8
+      SegmentSelectorSize: 0
+      MinInstLength:     1
+      MaxOpsPerInst:     1
+      DefaultIsStmt:     1
+      LineBase:          251
+      LineRange:         14
+      OpcodeBase:        13
+      StandardOpcodeLengths: [ 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1 ]
+      DirectoryEntryFormat:
+        - ContentType:     DW_LNCT_path
+          Form:            DW_FORM_string
+      Directories:
+        - - CStr: "/src"
+      FileNameEntryFormat:
+        - ContentType:     DW_LNCT_path
+          Form:            DW_FORM_string
+        - ContentType:     DW_LNCT_directory_index
+          Form:            DW_FORM_udata
+      FileNames:
+        - - CStr: "file.c"
+          - Value: 0
+        - - CStr: "file.c"
+          - Value: 0
+      Opcodes:
+        - Opcode:    DW_LNS_extended_op
+          ExtLen:    9
+          SubOpcode: DW_LNE_set_address
+          Data:      0x1000
+        - Opcode:    DW_LNS_advance_line
+          SData:     41
+        - Opcode:    DW_LNS_copy
+        - Opcode:    DW_LNS_advance_pc
+          Data:      0x10
+        - Opcode:    DW_LNS_advance_line
+          SData:     8
+        - Opcode:    DW_LNS_copy
+        - Opcode:    DW_LNS_advance_pc
+          Data:      0x10
+        - Opcode:    DW_LNS_extended_op
+          ExtLen:    1
+          SubOpcode: DW_LNE_end_sequence
