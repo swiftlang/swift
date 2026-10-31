@@ -857,6 +857,14 @@ namespace {
         SGF.B.createRefElementAddr(loc, base.getUnmanagedValue(),
                                    Field, SubstFieldType);
 
+      if (Field->getPointerAuthQualifier().isPresent() &&
+          SGF.getOptions().EnableImportPtrauthFieldFunctionPointers) {
+        result = enterAccessScope(SGF, loc, base, result, getTypeData(),
+                                  getAccessKind(), SILAccessEnforcement::Signed,
+                                  takeActorIsolation());
+        return ManagedValue::forFormalAccessedAddress(result, getAccessKind());
+      }
+
       // Avoid emitting access markers completely for non-accesses or immutable
       // declarations. Access marker verification is aware of these cases.
       if (!IsNonAccessing && !Field->isLet()) {
@@ -5988,8 +5996,20 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     // rvalue.
     SILValue ElementPtr = B.createStructElementAddr(loc, accessAddress, field);
 
-    result = emitLoad(loc, ElementPtr, abstractedTL,
-                      hasAbstractionChange ? SGFContext() : C, IsNotTake);
+    // Imported fields with a __ptrauth qualifier must be read through a
+    // signed access scope so that IRGen authenticates the stored value.
+    if (getOptions().EnableImportPtrauthFieldFunctionPointers &&
+        field->getPointerAuthQualifier().isPresent()) {
+      auto *signedAccess = B.createBeginAccess(
+          loc, ElementPtr, SILAccessKind::Read, SILAccessEnforcement::Signed,
+          /*noNestedConflict*/ false, /*fromBuiltin*/ false);
+      result = emitLoad(loc, signedAccess, abstractedTL, SGFContext(),
+                        IsNotTake);
+      B.createEndAccess(loc, signedAccess, /*aborted*/ false);
+    } else {
+      result = emitLoad(loc, ElementPtr, abstractedTL,
+                        hasAbstractionChange ? SGFContext() : C, IsNotTake);
+    }
     access.endAccess(*this);
   }
 
