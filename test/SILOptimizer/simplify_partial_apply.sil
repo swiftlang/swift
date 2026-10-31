@@ -416,3 +416,75 @@ bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
   %r = tuple()
   return %r : $()
 }
+
+sil @exactlyOnceBody : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+
+// Combining the call would require deleting the exactly-once closure, which
+// would lose its debug info, so the call is kept.
+//
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_with_debug_info :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [called_once]
+// CHECK:         debug_value [[CLOSURE]]
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:       } // end sil function 'test_exactly_once_closure_with_debug_info'
+sil [ossa] @test_exactly_once_closure_with_debug_info : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @exactlyOnceBody : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = partial_apply [called_once] %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  debug_value %2 : $@once @callee_owned () -> (), let, name "body"
+  %4 = apply %2() : $@once @callee_owned () -> ()
+  %5 = tuple ()
+  return %5 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_without_debug_info :
+// CHECK-NOT:     partial_apply
+// CHECK:         apply {{%.*}}({{%.*}}) : $@convention(thin)
+// CHECK-NOT:     partial_apply
+// CHECK:       } // end sil function 'test_exactly_once_closure_without_debug_info'
+sil [ossa] @test_exactly_once_closure_without_debug_info : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @exactlyOnceBody : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = partial_apply [called_once] %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %3 = apply %2() : $@once @callee_owned () -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+// The move_value keeps the on-stack exactly-once closure from being deleted.
+//
+// CHECK-LABEL: sil [ossa] @test_on_stack_exactly_once_closure_moved :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called_once]
+// CHECK:         [[MOVED:%.*]] = move_value [lexical] [[CLOSURE]]
+// CHECK:         apply [[MOVED]]()
+// CHECK:       } // end sil function 'test_on_stack_exactly_once_closure_moved'
+sil [ossa] @test_on_stack_exactly_once_closure_moved : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @exactlyOnceBody : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %2 = partial_apply [callee_guaranteed] [on_stack] [called_once] %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %3 = move_value [lexical] %2 : $@noescape @once @callee_guaranteed () -> ()
+  %4 = apply %3() : $@noescape @once @callee_guaranteed () -> ()
+  destroy_value %3 : $@noescape @once @callee_guaranteed () -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// A value depends on the on-stack exactly-once closure, which keeps it from
+// being deleted.
+//
+// CHECK-LABEL: sil [ossa] @test_on_stack_exactly_once_closure_is_dependence_base :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called_once]
+// CHECK:         mark_dependence [nonescaping] %1 : $Builtin.NativeObject on [[CLOSURE]]
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:       } // end sil function 'test_on_stack_exactly_once_closure_is_dependence_base'
+sil [ossa] @test_on_stack_exactly_once_closure_is_dependence_base : $@convention(thin) (@owned Builtin.NativeObject, @owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
+  %2 = function_ref @exactlyOnceBody : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %3 = partial_apply [callee_guaranteed] [on_stack] [called_once] %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %4 = mark_dependence [nonescaping] %1 : $Builtin.NativeObject on %3 : $@noescape @once @callee_guaranteed () -> ()
+  %5 = apply %3() : $@noescape @once @callee_guaranteed () -> ()
+  destroy_value %4 : $Builtin.NativeObject
+  destroy_value %3 : $@noescape @once @callee_guaranteed () -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
