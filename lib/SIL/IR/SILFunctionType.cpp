@@ -25,6 +25,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Identifier.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
@@ -3921,6 +3922,97 @@ static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
   return !tl.isTrivial() && type->isPointerType();
 }
 
+/// Which record results are +1 (owned).
+enum class OwnedRecordPolicy {
+  CXXRecordOnly,
+  AnyNonTrivialRecord,
+  AnyRecord,
+};
+
+static bool isOwnedRecordResult(clang::QualType resultType,
+                                OwnedRecordPolicy policy) {
+  const clang::Type *desugared = resultType->getUnqualifiedDesugaredType();
+  switch (policy) {
+  case OwnedRecordPolicy::CXXRecordOnly:
+    return desugared->getAsCXXRecordDecl() != nullptr;
+  case OwnedRecordPolicy::AnyNonTrivialRecord:
+    if (desugared->getAsCXXRecordDecl())
+      return true;
+    if (const clang::RecordDecl *record = desugared->getAsRecordDecl()) {
+      assert(!isa<clang::CXXRecordDecl>(record) &&
+             "CXX records handled above");
+      return record->isNonTrivialToPrimitiveCopy() ||
+             record->isNonTrivialToPrimitiveDestroy();
+    }
+    return false;
+  case OwnedRecordPolicy::AnyRecord:
+    return isa<clang::RecordType>(desugared);
+  }
+  llvm_unreachable("unhandled owned-record policy");
+}
+
+/// Shared trivial-result prologue. ObjC methods refine plain Unowned with
+/// inner-pointer cases; other C-like conventions pass no method.
+static ResultConvention
+getTrivialResultConvention(const TypeLowering &tl,
+                           const clang::ObjCMethodDecl *method = nullptr) {
+  if (method) {
+    if (method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
+      return ResultConvention::UnownedInnerPointer;
+    auto type = tl.getLoweredType();
+    if (type.unwrapOptionalType().getASTType()->isUnmanaged())
+      return ResultConvention::UnownedInnerPointer;
+  }
+  return ResultConvention::Unowned;
+}
+
+/// Shared foreign-reference-type query. Returns nullopt for non-FRT values
+/// and for FRT values with no explicit ownership, in which case the caller
+/// falls through to its next rule.
+static std::optional<ResultConvention>
+getFRTResultConvention(const TypeLowering &tl, const clang::NamedDecl *decl,
+                       ASTContext &ctx) {
+  if (!tl.getLoweredType().isForeignReferenceType())
+    return std::nullopt;
+  return importer::getOwnershipOfReturnedFRT(decl, ctx);
+}
+
+/// Shared constructor-result prologue. C++ constructors return `this`
+/// indirectly. Returns nullopt for non-constructor declarations, in which
+/// case the caller falls through to its next rule.
+static std::optional<ResultConvention>
+getCXXConstructorResultConvention(const clang::NamedDecl *decl) {
+  if (isa<clang::CXXConstructorDecl>(decl))
+    return ResultConvention::Indirect;
+  return std::nullopt;
+}
+
+/// Shared result logic for CF-typedef returns. `isPlusOneResult` is the
+/// caller-specific +1 inference: ObjC method family or C create rule.
+static ResultConvention
+getCFPointeeResultConvention(const TypeLowering &tl, ASTContext &ctx,
+                             const clang::NamedDecl *decl,
+                             bool isPlusOneResult) {
+  // Trust the explicit attributes.
+  if (decl->hasAttr<clang::CFReturnsRetainedAttr>())
+    return ResultConvention::Owned;
+  if (decl->hasAttr<clang::CFReturnsNotRetainedAttr>())
+    // Probably not actually autoreleased.
+    return ResultConvention::Autoreleased;
+
+  // Otherwise, infer +1 from the method family (ObjC) or the create rule (C).
+  if (isPlusOneResult)
+    return ResultConvention::Owned;
+
+  if (tl.getLoweredType().isForeignReferenceType()) {
+    if (auto convention = importer::getOwnershipOfReturnedFRT(decl, ctx))
+      return convention.value();
+    return ResultConvention::Unowned;
+  }
+
+  return ResultConvention::Autoreleased;
+}
+
 /// Given nothing but a formal C parameter type that's passed
 /// indirectly, deduce the convention for it.
 ///
@@ -4100,15 +4192,8 @@ public:
   ResultConvention getResult(const TypeLowering &tl) const override {
     // If we imported the result as something trivial, we need to
     // use one of the unowned conventions.
-    if (tl.isTrivial()) {
-      if (Method->hasAttr<clang::ObjCReturnsInnerPointerAttr>())
-        return ResultConvention::UnownedInnerPointer;
-
-      auto type = tl.getLoweredType();
-      if (type.unwrapOptionalType().getASTType()->isUnmanaged())
-        return ResultConvention::UnownedInnerPointer;
-      return ResultConvention::Unowned;
-    }
+    if (tl.isTrivial())
+      return getTrivialResultConvention(tl, Method);
 
     // Otherwise, the return type had better be a retainable object pointer.
     auto resultType = Method->getReturnType();
@@ -4128,22 +4213,8 @@ public:
     // change that, but that's an annoying change to make to Clang
     // right now.
     assert(isCFTypedef(tl, resultType));
-
-    // Trust the explicit attributes.
-    if (Method->hasAttr<clang::CFReturnsRetainedAttr>())
-      return ResultConvention::Owned;
-    if (Method->hasAttr<clang::CFReturnsNotRetainedAttr>())
-      return ResultConvention::Autoreleased;
-
-    // Otherwise, infer based on the method family.
-    if (isImplicitPlusOneCFResult())
-      return ResultConvention::Owned;
-
-    if (tl.getLoweredType().isForeignReferenceType())
-      return importer::getOwnershipOfReturnedFRT(Method, Ctx)
-          .value_or(ResultConvention::Unowned);
-
-    return ResultConvention::Autoreleased;
+    return getCFPointeeResultConvention(tl, Ctx, Method,
+                                        isImplicitPlusOneCFResult());
   }
 
   ParameterConvention
@@ -4234,14 +4305,13 @@ public:
 
   ResultConvention getResult(const TypeLowering &tl) const override {
     if (tl.isTrivial())
-      return ResultConvention::Unowned;
+      return getTrivialResultConvention(tl);
     if (FnType->getExtInfo().getProducesResult())
       return ResultConvention::Owned;
     if (tl.getLoweredType().isForeignReferenceType())
       return ResultConvention::Unowned;
-    if (FnType->getReturnType()
-            ->getUnqualifiedDesugaredType()
-            ->getAsCXXRecordDecl()) {
+    if (isOwnedRecordResult(FnType->getReturnType(),
+                            OwnedRecordPolicy::CXXRecordOnly)) {
       return ResultConvention::Owned;
     }
 
@@ -4293,34 +4363,22 @@ public:
     // C++ constructors return indirectly.
     // TODO: this may be different depending on the ABI, so we may have to
     // check with clang here.
-    if (isa<clang::CXXConstructorDecl>(TheDecl)) {
-      return ResultConvention::Indirect;
-    }
+    if (auto convention = getCXXConstructorResultConvention(TheDecl))
+      return convention.value();
 
-    if (tl.getLoweredType().isForeignReferenceType()) {
-      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl, Ctx))
-        return convention.value();
-    }
+    if (auto convention = getFRTResultConvention(tl, TheDecl, Ctx))
+      return convention.value();
 
     if (isCFTypedef(tl, TheDecl->getReturnType())) {
       // The CF attributes aren't represented in the type, so we need
-      // to check them here.
-      if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>()) {
-        return ResultConvention::Owned;
-      } else if (TheDecl->hasAttr<clang::CFReturnsNotRetainedAttr>()) {
-        // Probably not actually autoreleased.
-        return ResultConvention::Autoreleased;
-
-      // The CF Create/Copy rule only applies to functions that return
-      // a CF-runtime type; it does not apply to methods, and it does
-      // not apply to functions returning ObjC types.
-      } else if (clang::ento::coreFoundation::followsCreateRule(TheDecl)) {
-        return ResultConvention::Owned;
-      } else if (tl.getLoweredType().isForeignReferenceType()) {
-        return ResultConvention::Unowned;
-      } else {
-        return ResultConvention::Autoreleased;
-      }
+      // to check them here. The CF Create/Copy rule only applies to
+      // functions that return a CF-runtime type; it does not apply to
+      // methods, and it does not apply to functions returning ObjC types.
+      // (The FRT query above already returned when present, so the
+      // helper's query falls through to Unowned here, as before.)
+      return getCFPointeeResultConvention(
+          tl, Ctx, TheDecl,
+          clang::ento::coreFoundation::followsCreateRule(TheDecl));
     }
 
     // Otherwise, fall back on the ARC annotations, which are part
@@ -4369,32 +4427,30 @@ public:
     return super::getIndirectParameter(index, type, substTL);
   }
   ResultConvention getResult(const TypeLowering &resultTL) const override {
-    if (isa<clang::CXXConstructorDecl>(TheDecl)) {
-      // Represent the `this` pointer as an indirectly returned result.
-      // This gets us most of the way towards representing the ABI of a
-      // constructor correctly, but it's not guaranteed to be entirely correct.
-      // C++ constructor ABIs are complicated and can require passing additional
-      // "implicit" arguments that depend not only on the signature of the
-      // constructor but on the class on which it's defined (e.g. whether that
-      // class has a virtual base class).
-      // Effectively, we're making an assumption here that there are no implicit
-      // arguments and that the return type of the constructor ABI is void (and
-      // indeed we have no way to represent anything else here). If this assumed
-      // ABI doesn't match the actual ABI, we insert a thunk in IRGen. On some
-      // ABIs (e.g. Itanium x64), we get lucky and the ABI for a complete
-      // constructor call always matches the ABI we assume here. Even if the
-      // actual ABI doesn't match the assumed ABI, we try to get as close as
-      // possible to make it easy for LLVM to optimize away the thunk.
-      return ResultConvention::Indirect;
-    }
+    // Represent the `this` pointer as an indirectly returned result.
+    // This gets us most of the way towards representing the ABI of a
+    // constructor correctly, but it's not guaranteed to be entirely correct.
+    // C++ constructor ABIs are complicated and can require passing additional
+    // "implicit" arguments that depend not only on the signature of the
+    // constructor but on the class on which it's defined (e.g. whether that
+    // class has a virtual base class).
+    // Effectively, we're making an assumption here that there are no implicit
+    // arguments and that the return type of the constructor ABI is void (and
+    // indeed we have no way to represent anything else here). If this assumed
+    // ABI doesn't match the actual ABI, we insert a thunk in IRGen. On some
+    // ABIs (e.g. Itanium x64), we get lucky and the ABI for a complete
+    // constructor call always matches the ABI we assume here. Even if the
+    // actual ABI doesn't match the assumed ABI, we try to get as close as
+    // possible to make it easy for LLVM to optimize away the thunk.
+    if (auto convention = getCXXConstructorResultConvention(TheDecl))
+      return convention.value();
 
-    if (resultTL.getLoweredType().isForeignReferenceType()) {
-      if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl, Ctx))
-        return convention.value();
+    if (auto convention = getFRTResultConvention(resultTL, TheDecl, Ctx))
+      return convention.value();
 
-      if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
-        return ResultConvention::Owned;
-    }
+    if (resultTL.getLoweredType().isForeignReferenceType() &&
+        TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
+      return ResultConvention::Owned;
 
     return CFunctionTypeConventions::getResult(resultTL);
   }
@@ -4642,18 +4698,8 @@ public:
   }
 
   ResultConvention getResult(const TypeLowering &tl) const override {
-    switch (Family) {
-    case ObjCSelectorFamily::Alloc:
-    case ObjCSelectorFamily::Copy:
-    case ObjCSelectorFamily::Init:
-    case ObjCSelectorFamily::MutableCopy:
-    case ObjCSelectorFamily::New:
+    if (isPlusOneSelectorFamily(Family))
       return ResultConvention::Owned;
-
-    case ObjCSelectorFamily::None:
-      // Defaults below.
-      break;
-    }
 
     // Get the underlying AST type, potentially stripping off one level of
     // optionality while we do it.
