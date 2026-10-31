@@ -23,6 +23,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TY
     SWIFT_COMPILE_FLAGS
       ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
       -parse-stdlib
+      -Xfrontend -enable-sil-opaque-values
       -module-abi-name Swift
       -DSPAN_COMPATIBILITY_STUB
 
