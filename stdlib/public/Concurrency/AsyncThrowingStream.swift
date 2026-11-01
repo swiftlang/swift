@@ -388,11 +388,16 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       = .create(produce)
     context = _Context {
       return try await withTaskCancellationHandler {
-        guard let result = try await storage.value?() else {
+        do {
+          guard let result = try await storage.value?() else {
+            storage.value = nil
+            return nil
+          }
+          return result
+        } catch {
           storage.value = nil
-          return nil
+          throw error
         }
-        return result
       } onCancel: {
         storage.value = nil
       }
