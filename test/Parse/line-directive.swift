@@ -1,3 +1,8 @@
+// SwiftParser recovers differently from the C++ parser around malformed
+// directives and parses '#line' as a literal; the checks that matter are in
+// test/ASTGen/source_location_directive.swift.
+// UNSUPPORTED: parser_astgen
+
 // RUN: %target-typecheck-verify-swift
 // RUN: not %target-swift-frontend -c %s -diagnostic-style llvm >%t.txt 2>&1
 // RUN: %FileCheck --input-file %t.txt %s

@@ -56,8 +56,9 @@ extension ASTGenVisitor {
       return self.generate(missingDecl: node)?.asDecl
     case .operatorDecl(let node):
       return self.generate(operatorDecl: node)?.asDecl
-    case .poundSourceLocation:
-      // #sourceLocation directives are handled elsewhere, ignore.
+    case .poundSourceLocation(let node):
+      // The line table is built elsewhere; only check the directive here.
+      self.check(poundSourceLocation: node)
       return nil
     case .precedenceGroupDecl(let node):
       return self.generate(precedenceGroupDecl: node)?.asDecl
@@ -1930,5 +1931,26 @@ extension ExprSyntax {
     default:
       return false
     }
+  }
+}
+
+extension ASTGenVisitor {
+  /// Diagnose misuse of `#sourceLocation`, as the C++ parser does.
+  func check(poundSourceLocation node: PoundSourceLocationSyntax) {
+    let wasInEnvironment = self.inPoundSourceLocationEnvironment
+    self.inPoundSourceLocationEnvironment = false
+
+    guard let arguments = node.arguments else {
+      // `#sourceLocation()` closes the directive opened earlier.
+      if !wasInEnvironment, let next = node.rightParen.nextToken(viewMode: .sourceAccurate) {
+        self.diagnose(.unexpected_line_directive, at: next)
+      }
+      return
+    }
+    if let line = Int(arguments.lineNumber.text.filter { $0 != "_" }), line == 0 {
+      self.diagnose(.line_directive_line_zero, at: arguments.lineNumber)
+      return
+    }
+    self.inPoundSourceLocationEnvironment = true
   }
 }

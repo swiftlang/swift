@@ -77,7 +77,13 @@ extension ASTGenVisitor {
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool
   ) -> [BridgedAvailableAttr] {
+    self.availabilitySpecListIsInvalid = false
     let specs = self.generateAvailabilitySpecList(args: args, context: .availableAttr)
+    // As in the C++ parser, an invalid specification list drops the attribute.
+    if self.availabilitySpecListIsInvalid {
+      self.availabilitySpecListIsInvalid = false
+      return []
+    }
 
     var isFirst = true
     var result: [BridgedAvailableAttr] = []
@@ -322,6 +328,15 @@ extension ASTGenVisitor {
     let version = self.generate(versionTuple: node.platformVersion.version)
     let specs = self.generateAvailabilitySpecList(args: node.specs, context: .macro)
 
+    // A wildcard can only be the sole specification of a macro.
+    if specs.count > 1 {
+      for arg in node.specs {
+        if case .token(let tok) = arg.argument, tok.rawText == "*" {
+          self.diagnose(.attr_availability_wildcard_in_macro, at: tok)
+        }
+      }
+    }
+
     let specsBuffer = UnsafeMutableBufferPointer<BridgedAvailabilitySpec>.allocate(capacity: specs.count)
     _ = specsBuffer.initialize(from: specs)
 
@@ -375,6 +390,24 @@ extension ASTGenVisitor {
               result.append(spec)
             }
           }
+          return
+        }
+
+        // A macro name with a version it does not define is an error, not a
+        // domain for Sema to resolve.
+        if ctx.availabilityMacroMap.has(name: domainNode.rawText.bridged) {
+          self.availabilitySpecListIsInvalid = true
+          // A malformed version has already been diagnosed by the parser.
+          if versionNode != nil && version == nil {
+            return
+          }
+          self.diagnose(
+            .attr_availability_unknown_version(
+              versionNode?.trimmedDescription ?? "0",
+              String(syntaxText: domainNode.rawText)
+            ),
+            at: versionNode.map(Syntax.init) ?? Syntax(domainNode)
+          )
           return
         }
       }

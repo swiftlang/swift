@@ -45,6 +45,10 @@ struct ASTGenVisitor {
   /// specification dropped, so the condition is marked invalid.
   @Boxed var availabilitySpecListIsInvalid: Bool = false
 
+  /// Whether a `#sourceLocation(file:line:)` directive is open, so that a
+  /// parameterless `#sourceLocation()` has something to close.
+  @Boxed var inPoundSourceLocationEnvironment: Bool = false
+
   /// Whether the accessors being generated belong to a declaration that was
   /// already diagnosed as invalid, so they are marked invalid too.
   @Boxed var accessorsAreInvalid: Bool = false

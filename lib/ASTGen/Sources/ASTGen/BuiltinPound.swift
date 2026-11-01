@@ -46,6 +46,8 @@ extension ASTGenVisitor {
 
   /// Handle built in pound keywords.
   func maybeGenerateBuiltinPound(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> MaybeGenerated<BridgedASTNode> {
+    self.diagnoseLegacyLineDirective(node)
+
     let macroNameText = node.macroName.rawText;
 
     // '#file', '#line' etc.

@@ -29,7 +29,7 @@ public func composed() {}
 @available(macOS, deprecated: 50)
 public func onMacOSDeprecated() {}
 
-@available(_myProject, *) // expected-error {{expected declaration}}
+@available(_myProject, *) // expected-cparser-error {{expected declaration}}
 // expected-error @-1 {{reference to undefined version '0' for availability macro '_myProject'}}
 public func onMyProject() {}
 
@@ -39,15 +39,15 @@ public func onMyProjectV1() {}
 @available(_myProject 2.5, *)
 public func onMyProjectV2_5() {}
 
-@available(_myProject 3.0, *)// expected-error {{expected declaration}}
+@available(_myProject 3.0, *)// expected-cparser-error {{expected declaration}}
 // expected-error @-1 {{reference to undefined version '3.0' for availability macro '_myProject'}}
 public func onMyProjectV3() {}
 
-@available(_myProject 3_0, *)// expected-error {{expected declaration}}
-// expected-error @-1 {{expected version number}}
+@available(_myProject 3_0, *)// expected-cparser-error {{expected declaration}}
+// expected-cparser-error @-1 {{expected version number}} expected-astgen-error @-1 {{cannot parse version component code '3_0'}}
 public func brokenVersion() {}
 
-@available(_unknownMacro, *) // expected-error {{expected declaration}}
+@available(_unknownMacro, *) // expected-cparser-error {{expected declaration}} expected-astgen-warning {{cannot find availability domain '_unknownMacro'}}
 // expected-error @-1 {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
 public func unknownMacro() {}
 

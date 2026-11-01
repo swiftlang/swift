@@ -1532,3 +1532,27 @@ func findMaxAnonymousClosureParamUsage(closureExpr node: ClosureExprSyntax) -> I
 
 }
 
+extension ASTGenVisitor {
+  /// The C++ parser treats `#line 42 "file"` at the start of a line as a
+  /// directive, which was renamed to `#sourceLocation`; SwiftSyntax sees a
+  /// `#line` literal.
+  func diagnoseLegacyLineDirective(_ node: some FreestandingMacroExpansionSyntax) {
+    guard
+      node.macroName.text == "line",
+      node.parent?.is(CodeBlockItemSyntax.self) == true || node.parent?.is(MemberBlockItemSyntax.self) == true,
+      node.pound.leadingTrivia.contains(where: { $0.isNewline }) || node.pound.previousToken(viewMode: .sourceAccurate) == nil,
+      let next = node.pound.nextToken(viewMode: .sourceAccurate).flatMap({ $0.nextToken(viewMode: .sourceAccurate) }),
+      case .integerLiteral = next.tokenKind,
+      !next.leadingTrivia.contains(where: { $0.isNewline })
+    else {
+      return
+    }
+    // The legacy directive opens a '#sourceLocation' environment as well.
+    self.inPoundSourceLocationEnvironment = true
+    self.diagnose(
+      .line_directive_style_deprecated,
+      at: node.pound,
+      fixIts: [.init(replace: self.generateCharSourceRange(node.pound), with: "#sourceLocation")]
+    )
+  }
+}
