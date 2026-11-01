@@ -714,6 +714,21 @@ private:
     (void)insertion;
   }
 
+  /// Returns the block whose adjoint buffer map holds the adjoint of the result
+  /// \p origResult of the call \p fai in \p bb. With opaque values, the result
+  /// of a `try_apply` is an argument of its normal destination block, and its
+  /// adjoint buffer belongs to that block.
+  SILBasicBlock *getAdjointBufferBlock(FullApplySite fai, SILBasicBlock *bb,
+                                       SILValue origResult) {
+    if (getOriginal().hasLoweredAddresses())
+      return bb;
+    if (auto *tai = dyn_cast<TryApplyInst>(fai.getInstruction()))
+      if (auto *arg = dyn_cast<SILArgument>(origResult))
+        if (arg->getParent() == tai->getNormalBB())
+          return tai->getNormalBB();
+    return bb;
+  }
+
   /// Accumulates `rhsAddress` into the adjoint buffer corresponding to the
   /// original value.
   void addToAdjointBuffer(SILBasicBlock *origBB, SILValue originalValue,
@@ -1202,6 +1217,8 @@ public:
     unsigned firstYieldResultIndex = firstSemanticParamResultIdx +
       conv.getNumAutoDiffSemanticResultParameters();
 
+    unsigned seedIdx = 0;
+    SmallVector<std::pair<AllocStackInst *, bool>, 2> pullbackSeedTemporaries;
     for (auto resultIndex : applyInfo.config.resultIndices->getIndices()) {
       if (resultIndex >= firstYieldResultIndex)
         continue;
@@ -1221,9 +1238,25 @@ public:
                                             loc));
         break;
       case SILValueCategory::Address:
-        seed = getAdjointBuffer(bb, origResult);
+        seed = getAdjointBuffer(getAdjointBufferBlock(fai, bb, origResult),
+                                origResult);
         break;
       }
+      // The seed is an object, but the pullback takes it indirectly: with
+      // opaque values the original result is an object even where the
+      // callee returns it indirectly. Pass a copy in a temporary buffer.
+      auto seedParams = actualPullbackType->getParameters();
+      if (seed->getType().isObject() && seedIdx < seedParams.size() &&
+          seedParams[seedIdx].isFormalIndirect()) {
+        auto *tmpBuf = builder.createAllocStack(loc, seed->getType());
+        builder.emitStoreValueOperation(
+            loc, builder.emitCopyValueOperation(loc, seed), tmpBuf,
+            StoreOwnershipQualifier::Init);
+        pullbackSeedTemporaries.push_back(
+            {tmpBuf, seedParams[seedIdx].isConsumedInCallee()});
+        seed = tmpBuf;
+      }
+      ++seedIdx;
       args.push_back(seed);
     }
 
@@ -1285,7 +1318,16 @@ public:
         continue;
       auto tan = *allResultsIt++;
       if (tan->getType().isAddress()) {
-        addToAdjointBuffer(bb, origArg, tan, loc);
+        if (getTangentValueCategory(origArg) == SILValueCategory::Address) {
+          addToAdjointBuffer(bb, origArg, tan, loc);
+        } else {
+          // With opaque values, an argument passed indirectly is still an
+          // object, but the pullback returns its tangent in memory.
+          auto loaded = builder.emitLoadValueOperation(
+              loc, tan, LoadOwnershipQualifier::Copy);
+          recordTemporary(loaded);
+          addAdjointValue(bb, origArg, makeConcreteAdjointValue(loaded), loc);
+        }
       } else {
         if (origArg->getType().isAddress()) {
           auto *tmpBuf = builder.createAllocStack(loc, tan->getType());
@@ -1325,6 +1367,14 @@ public:
       if (unusedPullbackDirectResult->getType().isAddress())
         continue;
       builder.emitDestroyValueOperation(loc, unusedPullbackDirectResult);
+    }
+
+    // Destroy and deallocate the temporary seed buffers, which were allocated
+    // after the pullback indirect results.
+    for (auto &tmp : llvm::reverse(pullbackSeedTemporaries)) {
+      if (!tmp.second)
+        builder.emitDestroyAddrAndFold(loc, tmp.first);
+      builder.createDeallocStack(loc, tmp.first);
     }
 
     // Destroy and deallocate pullback indirect results.
@@ -1686,12 +1736,23 @@ public:
       auto adjBuf = getAdjointBuffer(bb, ti);
       // Accumulate adjoints for `tuple` operands, skipping the
       // non-`Differentiable` ones.
+      unsigned numDifferentiable = 0;
+      for (auto operand : ti->getOperandValues())
+        if (getTangentSpace(operand->getType().getASTType()))
+          ++numDifferentiable;
       unsigned adjIndex = 0;
       for (auto i : range(ti->getNumOperands())) {
         if (!getTangentSpace(ti->getOperand(i)->getType().getASTType()))
           continue;
-        auto adjBufElt =
-            builder.createTupleElementAddr(loc, adjBuf, adjIndex++);
+        // With opaque values, the tangent of a tuple with a single
+        // differentiable element is the tangent of that element, not a tuple.
+        bool tangentIsElement =
+            numDifferentiable == 1 && !getOriginal().hasLoweredAddresses();
+        SILValue adjBufElt = tangentIsElement
+                                 ? adjBuf
+                                 : SILValue(builder.createTupleElementAddr(
+                                       loc, adjBuf, adjIndex));
+        ++adjIndex;
         auto adjElt = getAdjointBuffer(bb, ti->getOperand(i));
         builder.emitInPlaceAdd(loc, adjElt, adjBufElt);
       }
@@ -1935,17 +1996,20 @@ public:
   ///   Original: y = move_value x
   ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
   void visitMoveValueInst(MoveValueInst *mvi) {
-    switch (getTangentValueCategory(mvi)) {
-    case SILValueCategory::Address:
-      LLVM_DEBUG(getADDebugStream() << "AutoDiff does not support move_value with "
-                 "SILValueCategory::Address");
+    // An object whose tangent is address-only (for example, with opaque
+    // values, a generic value) has an adjoint buffer. This is supported only
+    // with opaque values: otherwise such a `move_value` is rejected.
+    if (getOriginal().hasLoweredAddresses() &&
+        getTangentValueCategory(mvi) == SILValueCategory::Address) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "AutoDiff does not support move_value with "
+                    "SILValueCategory::Address");
       getContext().emitNondifferentiabilityError(
-        mvi, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+          mvi, getInvoker(), diag::autodiff_expression_not_differentiable_note);
       errorOccurred = true;
       return;
-    case SILValueCategory::Object:
-      visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
     }
+    visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
   }
 
   void visitEndInitLetRefInst(EndInitLetRefInst *eir) { visitValueOwnershipInst(eir); }
@@ -2006,6 +2070,64 @@ public:
     builder.emitDestroyAddrAndFold(uccai->getLoc(), castBuf);
     builder.createDeallocStack(uccai->getLoc(), castBuf);
     builder.emitZeroIntoBuffer(uccai->getLoc(), adjDest, IsInitialization);
+  }
+
+  /// Handle `unconditional_checked_cast` instruction, the object form of
+  /// `unconditional_checked_cast_addr` used with opaque values.
+  ///   Original: y = unconditional_checked_cast x
+  ///    Adjoint: adj[x] += unconditional_checked_cast adj[y]
+  void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *ucci) {
+    auto *bb = ucci->getParent();
+    auto loc = ucci->getLoc();
+    SILValue src = ucci->getOperand();
+    // The pullback is in lowered-address form, so cast through buffers.
+    SILValue adjDest;
+    AllocStackInst *adjDestTemp = nullptr;
+    switch (getTangentValueCategory(ucci)) {
+    case SILValueCategory::Object: {
+      auto adjCopy = builder.emitCopyValueOperation(
+          loc, materializeAdjointDirect(getAdjointValue(bb, ucci), loc));
+      adjDestTemp = builder.createAllocStack(loc, adjCopy->getType());
+      builder.emitStoreValueOperation(loc, adjCopy, adjDestTemp,
+                                      StoreOwnershipQualifier::Init);
+      adjDest = adjDestTemp;
+      break;
+    }
+    case SILValueCategory::Address:
+      adjDest = getAdjointBuffer(bb, ucci);
+      break;
+    }
+    auto srcTanType = getRemappedTangentType(src->getType());
+    auto *castBuf = builder.createAllocStack(loc, srcTanType);
+    builder.createUnconditionalCheckedCastAddr(
+        loc, ucci->getCheckedCastOptions(), adjDest,
+        adjDest->getType().getASTType(), castBuf, srcTanType.getASTType());
+    switch (getTangentValueCategory(src)) {
+    case SILValueCategory::Object: {
+      auto castValue = builder.emitLoadValueOperation(
+          loc, castBuf, LoadOwnershipQualifier::Take);
+      recordTemporary(castValue);
+      addAdjointValue(bb, src, makeConcreteAdjointValue(castValue), loc);
+      break;
+    }
+    case SILValueCategory::Address:
+      addToAdjointBuffer(bb, src, castBuf, loc);
+      builder.emitDestroyAddrAndFold(loc, castBuf);
+      break;
+    }
+    builder.createDeallocStack(loc, castBuf);
+    // The cast consumed the adjoint of the result: reset it.
+    switch (getTangentValueCategory(ucci)) {
+    case SILValueCategory::Object:
+      builder.createDeallocStack(loc, adjDestTemp);
+      setAdjointValue(
+          bb, ucci,
+          makeZeroAdjointValue(getRemappedTangentType(ucci->getType())));
+      break;
+    case SILValueCategory::Address:
+      builder.emitZeroIntoBuffer(loc, adjDest, IsInitialization);
+      break;
+    }
   }
 
   /// Handle `enum` instruction.
@@ -2590,7 +2712,16 @@ bool PullbackCloner::Implementation::run() {
 
     auto origResult = origFormalResults[resultIndex];
     auto *seed = pbParamArgs[seedIndex];
-    if (seed->getType().isAddress()) {
+    if (seed->getType().isAddress() &&
+        getTangentValueCategory(origResult) == SILValueCategory::Object) {
+      // With opaque values, the original result is an object even where the
+      // pullback takes its seed indirectly. Use the loaded seed as the adjoint.
+      auto loaded = builder.emitLoadValueOperation(
+          pbLoc, seed, LoadOwnershipQualifier::Copy);
+      recordTemporary(loaded);
+      addAdjointValue(originalExitBlock, origResult,
+                      makeConcreteAdjointValue(loaded), pbLoc);
+    } else if (seed->getType().isAddress()) {
       // If the seed argument is an `inout` parameter, assign it directly as
       // the adjoint buffer of the original result.
       auto seedParamInfo =
@@ -2788,16 +2919,36 @@ bool PullbackCloner::Implementation::run() {
 
   auto origParams = getOriginal().getArgumentsWithoutIndirectResults();
 
+  // The index of the pullback formal result corresponding to the next
+  // non-semantic-result parameter.
+  unsigned pullbackResultIndex = 0;
+
   // Materializes the return element corresponding to the parameter
   // `parameterIndex` into the `retElts` vector.
   auto addRetElt = [&](unsigned parameterIndex) -> void {
     auto origParam = origParams[parameterIndex];
+    bool returnedIndirectly =
+        pullbackResultIndex < pullback.getConventions().getResults().size() &&
+        pullback.getConventions().isSILIndirect(
+            pullback.getConventions().getResults()[pullbackResultIndex]);
+    if (!conv.getParameters()[parameterIndex].isAutoDiffSemanticResult())
+      ++pullbackResultIndex;
     switch (getTangentValueCategory(origParam)) {
     case SILValueCategory::Object: {
       auto pbVal = getAdjointValue(origEntry, origParam);
       auto val = materializeAdjointDirect(pbVal, pbLoc);
       auto newVal = builder.emitCopyValueOperation(pbLoc, val);
-      retElts.push_back(newVal);
+      if (returnedIndirectly) {
+        // With opaque values, the original parameter is an object even where
+        // the pullback returns its adjoint indirectly.
+        auto *tmp = createFunctionLocalAllocation(newVal->getType(), pbLoc);
+        builder.emitStoreValueOperation(pbLoc, newVal, tmp,
+                                        StoreOwnershipQualifier::Init);
+        indParamAdjoints.push_back(tmp);
+        outputsToInitialize.push_back(true);
+      } else {
+        retElts.push_back(newVal);
+      }
       break;
     }
     case SILValueCategory::Address: {
