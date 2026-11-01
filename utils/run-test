@@ -221,7 +221,20 @@ def main():
                     break
                 d = os.path.dirname(d)
             else:
-                error_exit("Can't infer swift build directory")
+                if args.unified:
+                    expected = os.path.join("tools", "swift", "test-%s" % host_target)
+                else:
+                    expected = "test-%s" % host_target
+                reason = ("'%s' does not exist" % paths[0]
+                          if not os.path.exists(paths[0])
+                          else "no parent directory of '%s' contains both "
+                               "CMakeCache.txt and %s/" % (paths[0], expected))
+                error_exit(
+                    "Can't infer swift build directory: %s. Check that the "
+                    "path matches the build directory that build-script "
+                    "created (its name depends on the build options, for "
+                    "example 'Ninja-RelWithDebInfoAssert+swift-DebugAssert' "
+                    "with --debug-swift), or pass --build-dir." % reason)
 
     # Ensure we have up to date test dependency
     if args.build != 'skip' and is_build_dir_xcode(build_dir):
