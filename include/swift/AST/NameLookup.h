@@ -37,6 +37,7 @@ class Type;
 class TypeDecl;
 class ValueDecl;
 struct SelfBounds;
+class RecomputableDecls;
 class NominalTypeDecl;
 namespace ast_scope {
 class ASTSourceFileScope;
@@ -640,26 +641,50 @@ struct InheritedNominalEntry : Located<NominalTypeDecl *> {
 /// list of "inherited" types.
 ///
 /// Add anything we find to the \c result vector. If we come across the
-/// AnyObject type, set \c anyObject true.
+/// AnyObject type, set \c anyObject true. If \p unresolved is non-null and
+/// the entry, or some component of it, does not resolve to any nominal type
+/// declaration, inverse or AnyObject, for example because it names a type
+/// declared in an extension that is not bound yet, or a typealias for one,
+/// set \c *unresolved true.
+/// When \p recomputable is null, an entry whose resolution ran into a cycle
+/// does not count as unresolved.
+/// If \p recomputable is non-null, split compositions and look through
+/// typealiases, reusing direct references from lookups that diagnose a cycle.
+/// Other components can still count as unresolved and be resolved again.
 void getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
     unsigned i, llvm::SmallVectorImpl<InheritedNominalEntry> &result,
-    InvertibleProtocolSet &inverses, bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject,
+    bool *unresolved = nullptr, RecomputableDecls *recomputable = nullptr);
 
 /// Retrieve the set of nominal type declarations that are directly
 /// "inherited" by the given declaration, looking through typealiases
 /// and splitting out the components of compositions.
 ///
-/// If we come across the AnyObject type, set \c anyObject true.
+/// If we come across the AnyObject type, set \c anyObject true. If
+/// \p anyUnresolved is non-null and some entry, or the right-hand side of some
+/// 'Self' constraint of a protocol, or some component of them, does not
+/// resolve to any nominal type declaration, inverse or AnyObject, set
+/// \c *anyUnresolved true.
+/// When \p recomputable is null, an entry or 'Self' constraint whose
+/// resolution ran into a cycle does not count as unresolved.
+/// If \p recomputable is non-null, split compositions and look through
+/// typealiases, reusing direct references from lookups that diagnose a cycle.
+/// Other components can still count as unresolved and be resolved again.
 SmallVector<InheritedNominalEntry, 4> getDirectlyInheritedNominalTypeDecls(
     llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
-    InvertibleProtocolSet &inverses, bool &anyObject);
+    InvertibleProtocolSet &inverses, bool &anyObject,
+    bool *anyUnresolved = nullptr, RecomputableDecls *recomputable = nullptr);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the where clause of the
 /// given protocol or protocol extension.
+/// If \p recomputable is non-null, split compositions and look through
+/// typealiases, reusing direct references from lookups that diagnose a cycle.
+/// Other components can still count as unresolved and be resolved again.
 SelfBounds getSelfBoundsFromWhereClause(
-    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl);
+    llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> decl,
+    RecomputableDecls *recomputable = nullptr);
 
 /// Retrieve the set of nominal type declarations that appear as the
 /// constraint type of any "Self" constraints in the generic signature of the
