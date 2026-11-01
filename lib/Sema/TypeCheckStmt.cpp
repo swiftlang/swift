@@ -297,13 +297,19 @@ namespace {
           CE->setDiscriminator(NextClosureDiscriminator++);
 
         // We need to walk into closure bodies with a new sequence.
-        SetLocalDiscriminators innerVisitor;
+        auto &ctx = CE->getASTContext();
+        SetLocalDiscriminators innerVisitor(ctx.getNextDiscriminator(CE));
         if (auto params = CE->getParameters()) {
           for (auto *param : *params) {
             innerVisitor.setLocalDiscriminator(param);
           }
         }
         CE->getBody()->walk(innerVisitor);
+
+        // Reserve the discriminators assigned in this closure's body so that
+        // lazily expanded macros do not reuse them.
+        ctx.setMaxAssignedDiscriminator(
+            CE, innerVisitor.maxAssignedDiscriminator());
 
         return Action::SkipNode(E);
       }
