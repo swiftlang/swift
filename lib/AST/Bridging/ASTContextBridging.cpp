@@ -42,6 +42,21 @@ BridgedStringRef BridgedASTContext_aliasForAliasedRealModuleName(
   return ctx.getRealModuleName(name, Option::aliasFromRealName).str();
 }
 
+bool BridgedASTContext_allowsDollarIdentifierDecls(BridgedASTContext cContext,
+                                                   SourceLoc loc,
+                                                   BridgedDeclContext cDC) {
+  auto &ctx = cContext.unbridged();
+  if (ctx.LangOpts.EnableDollarIdentifiers)
+    return true;
+  if (auto *sf = cDC.unbridged()->getParentSourceFile())
+    if (sf->Kind == SourceFileKind::Interface)
+      return true;
+  if (loc.isInvalid())
+    return false;
+  auto bufferID = ctx.SourceMgr.findBufferContainingLoc(loc);
+  return ctx.SourceMgr.getGeneratedSourceInfo(bufferID) != nullptr;
+}
+
 Identifier BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext,
                                                  size_t idx) {
   return cContext.unbridged().getDollarIdentifier(idx);

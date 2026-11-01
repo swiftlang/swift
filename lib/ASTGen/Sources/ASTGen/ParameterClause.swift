@@ -226,6 +226,14 @@ extension ASTGenVisitor {
       )
     }
 
+    if keywordArgumentlessContext != .closure {
+      for nameNode in [node.optionalFirstName, node.secondName] {
+        if let nameNode {
+          self.diagnoseDollarDeclName(nameNode)
+        }
+      }
+    }
+
     // Map the first name and second name to argument name and parameter name.
     // If we have both, use them. If we only have one, then use that as the
     // parameter name, inferring it as the argument name if we're allowed to.
@@ -461,6 +469,7 @@ extension ASTGenVisitor {
 
   func generate(accessorParameters node: AccessorParametersSyntax) -> BridgedParameterList {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
+    self.diagnoseDollarDeclName(node.name)
     let param = BridgedParamDecl.createParsed(
       self.ctx,
       declContext: self.declContext,

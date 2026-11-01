@@ -304,6 +304,7 @@ extension ASTGenVisitor {
       fatalError("invalid ownership")
     }
     let nameAndLoc = self.generateIdentifierAndSourceLoc(node.name)
+    self.diagnoseDollarDeclName(node.name)
     let equalLoc: SourceLoc
     let initExpr: BridgedExpr
     if let initializer = node.initializer {

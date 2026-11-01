@@ -57,6 +57,7 @@ extension ASTGenVisitor {
 
   func generate(identifierPattern node: IdentifierPatternSyntax) -> BridgedNamedPattern {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.identifier)
+    self.diagnoseDollarDeclName(node.identifier)
     return .createParsed(
       ctx,
       declContext: declContext,
@@ -89,6 +90,11 @@ extension ASTGenVisitor {
         subPattern: self.generate(pattern: firstElement.pattern),
         rParenLoc: self.generateSourceLoc(node.rightParen)
       ).asPattern
+    }
+    for element in node.elements {
+      if let label = element.label {
+        self.diagnoseDollarDeclName(label)
+      }
     }
     return BridgedTuplePattern.createParsed(
       self.ctx,

@@ -93,6 +93,7 @@ extension ASTGenVisitor {
     guard result.identifier != nil else {
       return nil
     }
+    self.diagnoseDollarDeclName(node)
     return result
   }
 
@@ -1988,5 +1989,20 @@ extension ASTGenVisitor {
       current = parent.parent
     }
     return false
+  }
+}
+
+extension ASTGenVisitor {
+  /// Diagnose a declaration named with the reserved '$' prefix.
+  func diagnoseDollarDeclName(_ token: TokenSyntax) {
+    // Backticks do not exempt a name.
+    let text = token.identifier?.name ?? token.text
+    guard text.count > 1, text.hasPrefix("$"), token.presence == .present else {
+      return
+    }
+    if self.ctx.allowsDollarIdentifierDecls(at: self.generateSourceLoc(token), in: self.declContext) {
+      return
+    }
+    self.diagnose(.dollar_identifier_decl(self.generateIdentifier(token)), at: token)
   }
 }

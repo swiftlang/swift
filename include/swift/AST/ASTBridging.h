@@ -275,6 +275,14 @@ BridgedStringRef
 BridgedASTContext_aliasForAliasedRealModuleName(BridgedASTContext cContext,
                                                 swift::Identifier name);
 
+/// Whether declarations named with a '$' prefix are allowed at \p loc: the
+/// language option is on, or the location is inside a macro expansion or a
+/// module interface.
+SWIFT_NAME("BridgedASTContext.allowsDollarIdentifierDecls(self:at:in:)")
+bool BridgedASTContext_allowsDollarIdentifierDecls(BridgedASTContext cContext,
+                                                   swift::SourceLoc loc,
+                                                   BridgedDeclContext cDC);
+
 SWIFT_NAME("BridgedASTContext.getDollarIdentifier(self:_:)")
 swift::Identifier
 BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);

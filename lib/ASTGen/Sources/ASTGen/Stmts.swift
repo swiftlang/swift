@@ -570,6 +570,7 @@ extension ASTGenVisitor {
 
   func generate(labeledStmt node: LabeledStmtSyntax) -> BridgedStmt {
     let (labelName, labelLoc) = self.generateIdentifierAndSourceLoc(node.label)
+    self.diagnoseDollarDeclName(node.label)
     let labelInfo = BridgedLabeledStmtInfo(name: labelName, loc: labelLoc)
     let labelNode = node.label
 

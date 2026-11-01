@@ -29,6 +29,7 @@ extension ASTGenVisitor {
 
   func generate(genericParameter node: GenericParameterSyntax) -> BridgedGenericTypeParamDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
+    self.diagnoseDollarDeclName(node.name)
 
     var genericParameterIndex: Int?
     for (index, sibling) in (node.parent?.as(GenericParameterListSyntax.self) ?? []).enumerated() {
