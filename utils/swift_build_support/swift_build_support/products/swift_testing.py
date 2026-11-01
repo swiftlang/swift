@@ -21,6 +21,9 @@ from . import swift
 from . import swift_testing_macros
 from .. import shell
 
+from ..host_specific_configuration \
+    import HostSpecificConfiguration
+
 
 class SwiftTesting(product.Product):
     @classmethod
@@ -43,22 +46,22 @@ class SwiftTesting(product.Product):
 
     def should_clean(self, host_target):
         # Workaround for 'swift-testing' not detecting compiler/stdlib changes.
-        return True
+        return not self.is_cross_compile_target(host_target)
 
     def should_build(self, host_target):
-        return True
+        return not self.is_cross_compile_target(host_target)
 
     def should_test(self, host_target):
         # TODO: Implement.
         return False
 
     def should_install(self, host_target):
-        return self.args.install_swift_testing
+        return self.args.install_swift_testing and not self.is_cross_compile_target(host_target)
 
-    def _cmake_product(self, host_target):
+    def _cmake_product(self, stdlib_target):
         build_root = os.path.dirname(self.build_dir)
         build_dir = os.path.join(
-            build_root, '%s-%s' % (self.product_name(), host_target))
+            build_root, '%s-%s' % (self.product_name(), stdlib_target))
 
         return SwiftTestingCMakeShim(
             args=self.args,
@@ -66,32 +69,85 @@ class SwiftTesting(product.Product):
             source_dir=self.source_dir,
             build_dir=build_dir)
 
-    def _for_each_host_target(self, base_target, body):
+    def _for_each_swifttesting_target(self, base_target, body):
         body(base_target)
 
         # For Darwin host, 'build' is only called for the builder.
-        # Manually iterate the cross compile hosts.
-        if self.has_cross_compile_hosts() and self.is_darwin_host(base_target):
-            for target in self.args.cross_compile_hosts:
-                body(target)
+        # Manually iterate the macos targets
+        if self.is_darwin_host(base_target):
+            config = HostSpecificConfiguration(base_target, self.args)
+            stdlib_build_targets = [
+                build_target.removeprefix("swift-stdlib-").removeprefix("swift-test-stdlib-")
+                for build_target in config.swift_stdlib_build_targets
+            ]
+            macos_targets = [
+                target for target in stdlib_build_targets
+                if target.startswith("macos") and target != base_target
+            ]
+            for macos_target in macos_targets:
+                body(macos_target)
 
     def _clean_with_cmake(self, host_target):
         self._cmake_product(host_target).clean(host_target)
 
     def clean(self, host_target):
-        self._for_each_host_target(host_target, self._clean_with_cmake)
+        self._for_each_swifttesting_target(host_target, self._clean_with_cmake)
 
     def _build_with_cmake(self, host_target):
         self._cmake_product(host_target).build(host_target)
 
     def build(self, host_target):
-        self._for_each_host_target(host_target, self._build_with_cmake)
-
-    def _install_with_cmake(self, host_target):
-        self._cmake_product(host_target).install(host_target)
+        self._for_each_swifttesting_target(host_target, self._build_with_cmake)
 
     def install(self, host_target):
-        self._for_each_host_target(host_target, self._install_with_cmake)
+        intermediate_destdirs = []
+
+        def _install_with_cmake(target):
+            intermediate_destdirs.append(self._cmake_product(target).install(target))
+
+        self._for_each_swifttesting_target(host_target, _install_with_cmake)
+
+        destdir = self.host_install_destdir(host_target)
+        # Assume all targets generates the same files
+        first_intermediate_destdir = intermediate_destdirs[0]
+        for root, dirs, files in os.walk(first_intermediate_destdir):
+            rel_path = os.path.relpath(root, first_intermediate_destdir)
+            dest_root = os.path.join(destdir, rel_path)
+
+            if not os.path.exists(dest_root):
+                shell.makedirs(dest_root)
+
+            for f in files:
+                file_rel_path = os.path.join(rel_path, f)
+                dest_file = os.path.join(destdir, file_rel_path)
+                src_file = os.path.join(first_intermediate_destdir, file_rel_path)
+
+                # Check if this is a binary that needs lipo
+                if len(intermediate_destdirs) > 1 and (f.endswith('.dylib') or f.endswith('.a')):
+                    lipo_cmd = ['lipo', '-create', '-output', dest_file]
+                    for intermediate_destdir in intermediate_destdirs:
+                        lipo_cmd.append(os.path.join(intermediate_destdir, file_rel_path))
+                    shell.call(lipo_cmd)
+                else:
+                    shell.copy(src_file, dest_file)
+
+            # For directories, we mostly care about .swiftmodule directories
+            for d in list(dirs):
+                if d.endswith('.swiftmodule'):
+                    module_rel_path = os.path.join(rel_path, d)
+                    dest_module_dir = os.path.join(destdir, module_rel_path)
+                    if not os.path.exists(dest_module_dir):
+                        shell.makedirs(dest_module_dir)
+
+                    # Copy all contents from all targets into this directory
+                    for intermediate_destdir in intermediate_destdirs:
+                        src_module_dir = os.path.join(intermediate_destdir, module_rel_path)
+                        if os.path.exists(src_module_dir):
+                            for item in os.listdir(src_module_dir):
+                                shell.copy(os.path.join(src_module_dir, item),
+                                           os.path.join(dest_module_dir, item))
+                    # We don't want os.walk to descend into .swiftmodule because we handled it
+                    dirs.remove(d)
 
 
 class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
@@ -130,10 +186,14 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
                               prefer_native_toolchain=True)
 
     def install(self, host_target):
-        install_destdir = self.host_install_destdir(host_target)
+        install_destdir = os.path.join(
+            os.path.dirname(self.build_dir), f'swifttesting-{host_target}-install')
+        shell.rmtree(install_destdir)
         install_prefix = install_destdir + self.args.install_prefix
 
         self.install_with_cmake(['install'], install_prefix)
+
+        return install_destdir
 
     @classmethod
     def is_build_script_impl_product(cls):
