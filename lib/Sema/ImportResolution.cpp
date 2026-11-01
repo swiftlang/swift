@@ -944,6 +944,10 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
       topLevelModule.get()->isResilient())
     return;
 
+  if ((!getImportDecl() || SF.Kind == SourceFileKind::Interface) &&
+      !getUnderlyingModule() && topLevelModule.get()->isSystemModule())
+    return;
+
   auto inFlight = ctx.Diags.diagnose(import.module.getModulePath().front().Loc,
                                      diag::module_not_compiled_with_library_evolution,
                                      targetName, importerName);
