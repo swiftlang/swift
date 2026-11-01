@@ -274,6 +274,11 @@ bool tryDeleteDeadClosure(SingleValueInstruction *closure,
                           InstModCallbacks callbacks = InstModCallbacks(),
                           bool needKeepArgsAlive = true);
 
+/// Returns true if tryDeleteDeadClosure() can delete \p closure once the
+/// users for which \p isRemoved returns true are gone.
+bool canDeleteDeadClosure(SingleValueInstruction *closure,
+                          function_ref<bool(SILInstruction *)> isRemoved);
+
 /// Given a SILValue argument to a partial apply \p Arg and the associated
 /// parameter info for that argument, perform the necessary cleanups to Arg when
 /// one is attempting to delete the partial apply.

@@ -18,12 +18,18 @@ extension PartialApplyInst : OnoneSimplifiable, SILCombineSimplifiable {
       return
     }
 
-    let optimizedApplyOfPartialApply = context.tryOptimizeApplyOfPartialApply(closure: self)
+    let keepForDebugInfo =
+      context.preserveDebugInfo && uses.contains(where: { $0.instruction is DebugValueInst })
+
+    // Combining the calls of an exactly-once closure requires deleting it, because destroying it
+    // traps, so keep the calls when keeping the closure for its debug info.
+    let optimizedApplyOfPartialApply = !(keepForDebugInfo && executionSemantics == .once) &&
+                                       context.tryOptimizeApplyOfPartialApply(closure: self)
     if optimizedApplyOfPartialApply {
       context.notifyInvalidatedStackNesting()
     }
 
-    if context.preserveDebugInfo && uses.contains(where: { $0.instruction is DebugValueInst }) {
+    if keepForDebugInfo {
       return
     }
 

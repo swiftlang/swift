@@ -1503,4 +1503,78 @@ bb5(%13 : @owned $any Error):
   unreachable
 }
 
+sil @closureFunction : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+sil @takeExactlyOnce : $@convention(thin) (@owned @once @callee_owned () -> ()) -> ()
+sil @takeAtMostOnce : $@convention(thin) (@owned @callable(once) @callee_owned () -> ()) -> ()
 
+// Combining the call wouldn't call the exactly-once closure, which then traps
+// when it's destroyed, because it can't be deleted while it's forwarded.
+//
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_called_and_forwarded :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [called_once]
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:         apply {{%.*}}([[CLOSURE]])
+// CHECK:       } // end sil function 'test_exactly_once_closure_called_and_forwarded'
+sil [ossa] @test_exactly_once_closure_called_and_forwarded : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int1) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Int1):
+  %2 = function_ref @closureFunction : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %3 = partial_apply [called_once] %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %5 = apply %3() : $@once @callee_owned () -> ()
+  br bb3
+
+bb2:
+  %7 = function_ref @takeExactlyOnce : $@convention(thin) (@owned @once @callee_owned () -> ()) -> ()
+  %8 = apply %7(%3) : $@convention(thin) (@owned @once @callee_owned () -> ()) -> ()
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Destroying an at-most-once closure doesn't trap, so its call is combined.
+//
+// CHECK-LABEL: sil [ossa] @test_at_most_once_closure_called_and_forwarded :
+// CHECK:         [[FN:%.*]] = function_ref @closureFunction
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [called_at_most_once] [[FN]]
+// CHECK:         apply [[FN]](%0)
+// CHECK:         apply {{%.*}}([[CLOSURE]])
+// CHECK:       } // end sil function 'test_at_most_once_closure_called_and_forwarded'
+sil [ossa] @test_at_most_once_closure_called_and_forwarded : $@convention(thin) (@owned Builtin.NativeObject, Builtin.Int1) -> () {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : $Builtin.Int1):
+  %2 = function_ref @closureFunction : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %3 = partial_apply [called_at_most_once] %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  cond_br %1, bb1, bb2
+
+bb1:
+  %5 = apply %3() : $@callable(once) @callee_owned () -> ()
+  br bb3
+
+bb2:
+  %7 = function_ref @takeAtMostOnce : $@convention(thin) (@owned @callable(once) @callee_owned () -> ()) -> ()
+  %8 = apply %7(%3) : $@convention(thin) (@owned @callable(once) @callee_owned () -> ()) -> ()
+  br bb3
+
+bb3:
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// The exactly-once closure is deleted after its only call is combined.
+//
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_only_called :
+// CHECK-NOT:     partial_apply
+// CHECK:         apply {{%.*}}(%0)
+// CHECK-NOT:     partial_apply
+// CHECK:       } // end sil function 'test_exactly_once_closure_only_called'
+sil [ossa] @test_exactly_once_closure_only_called : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %2 = function_ref @closureFunction : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %3 = partial_apply [called_once] %2(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %5 = apply %3() : $@once @callee_owned () -> ()
+  %6 = tuple ()
+  return %6 : $()
+}
