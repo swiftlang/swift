@@ -1754,6 +1754,21 @@ extension ASTGenVisitor {
       return nil
     }
 
+    // Only a module alias, not the real name it stands for, may be imported.
+    if let first = node.path.first {
+      let name = self.generateIdentifier(first.name)
+      let aliasRef = self.ctx.aliasForAliasedRealModuleName(name)
+      if aliasRef.count != 0 {
+        let aliasText = String(decoding: UnsafeBufferPointer(start: aliasRef.data, count: aliasRef.count), as: UTF8.self)
+        self.diagnose(
+          .expected_module_alias(name, self.ctx.getIdentifier(aliasRef)),
+          at: first.name,
+          fixIts: [.init(replace: self.generateCharSourceRange(first.name), with: aliasText)]
+        )
+        return nil
+      }
+    }
+
     let decl = BridgedImportDecl.createParsed(
       self.ctx,
       declContext: self.declContext,

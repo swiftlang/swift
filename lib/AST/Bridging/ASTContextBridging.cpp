@@ -33,6 +33,15 @@ Identifier BridgedASTContext__getIdentifier(BridgedASTContext cContext,
   return cContext.unbridged().getIdentifier(cStr.unbridged());
 }
 
+BridgedStringRef BridgedASTContext_aliasForAliasedRealModuleName(
+    BridgedASTContext cContext, Identifier name) {
+  auto &ctx = cContext.unbridged();
+  using Option = ASTContext::ModuleAliasLookupOption;
+  if (!ctx.getRealModuleName(name, Option::realNameFromAlias).empty())
+    return BridgedStringRef();
+  return ctx.getRealModuleName(name, Option::aliasFromRealName).str();
+}
+
 Identifier BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext,
                                                  size_t idx) {
   return cContext.unbridged().getDollarIdentifier(idx);

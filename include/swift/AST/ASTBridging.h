@@ -268,6 +268,13 @@ SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 swift::Identifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
                                                   BridgedStringRef cStr);
 
+/// If \p name is the real name of a module that was aliased with
+/// -module-alias, return the alias; otherwise return an empty string.
+SWIFT_NAME("BridgedASTContext.aliasForAliasedRealModuleName(self:_:)")
+BridgedStringRef
+BridgedASTContext_aliasForAliasedRealModuleName(BridgedASTContext cContext,
+                                                swift::Identifier name);
+
 SWIFT_NAME("BridgedASTContext.getDollarIdentifier(self:_:)")
 swift::Identifier
 BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);
