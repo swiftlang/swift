@@ -19,7 +19,8 @@ internal func _writeBackMutableSlice<C, Slice_>(
   C.Element == Slice_.Element,
   C.Index == Slice_.Index {
 
-  self_._failEarlyRangeCheck(bounds, bounds: self_.startIndex..<self_.endIndex)
+  unsafe self_._failEarlyRangeCheck(
+    bounds, bounds: Range(uncheckedBounds: (self_.startIndex, self_.endIndex)))
 
   // FIXME(performance): can we use
   // _withUnsafeMutableBufferPointerIfSupported?  Would that create inout
