@@ -8,10 +8,10 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t/typecheck.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -verify-additional-prefix modern-c-array-
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -verify-additional-prefix modern-c-array-
 // RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -o /dev/null
 
-// RUN: %target-swift-frontend -typecheck -verify %t/typecheck.swift -I %t/include -verify-additional-prefix legacy-c-array-
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -verify-additional-prefix legacy-c-array-
 // RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -o /dev/null
 
 // RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/availability.swift -I %t/include -enable-experimental-feature ModernImportedCArraysOnly
@@ -133,6 +133,27 @@ NS_ASSUME_NONNULL_BEGIN
 
 @interface OldAvailability ()
 @property (nonatomic, readwrite) int (*redeclaredRow)[4] OLD_AVAILABILITY;
+@end
+
+// The availability of a requirement of a protocol without availability is
+// inferred from its types, and that has to include the types of its modern
+// projection as well as InlineArray's.
+API_AVAILABLE(anyappleos(30.0))
+@interface FutureObject : NSObject
+@end
+
+// CHECK-LABEL: protocol InferredAvailability
+// CHECK: @available({{.*}}30.0{{.*}}, *)
+// CHECK-NEXT: func take(_ array: UnsafeMutablePointer<[4 of CInt]>?, future: FutureObject?)
+// CHECK: @available({{.*}}, *)
+// CHECK-NEXT: subscript(index: UInt) -> UnsafeMutablePointer<[4 of CInt]>
+@protocol InferredAvailability
+- (void)takeArray:(int (*_Nullable)[4])array future:(nullable FutureObject *)future;
+- (int (*)[4])objectAtIndexedSubscript:(NSUInteger)index;
+- (void)setObject:(int (*)[4])object atIndexedSubscript:(NSUInteger)index;
+@end
+
+@interface InferredAdopter : NSObject <InferredAvailability>
 @end
 
 // Parameters declared as arrays decay to pointers to arrays, however they are
@@ -388,6 +409,16 @@ func testOldAvailability(_ obj: OldAvailability) {
   // expected-error@-1 {{'subscript(_:)' is only available in}} expected-note@-1 {{add 'if #available' version check}}
   // expected-error@-2 {{setter for 'subscript(_:)' is only available in}} expected-note@-2 {{add 'if #available' version check}}
   // expected-error@-3 {{'row' is only available in}} expected-note@-3 {{add 'if #available' version check}}
+}
+
+func testInferredAvailability(_ adopter: InferredAdopter, _ existential: any InferredAvailability) {
+  // expected-note@-1 3 {{add '@available' attribute to enclosing global function}}
+  adopter.take(nil, future: nil)
+  // expected-error@-1 {{ 30.0 or newer}} expected-note@-1 {{add 'if #available' version check}}
+  existential.take(nil, future: nil)
+  // expected-error@-1 {{ 30.0 or newer}} expected-note@-1 {{add 'if #available' version check}}
+  _ = existential[0]
+  // expected-error@-1 {{'subscript(_:)' is only available in}} expected-note@-1 {{add 'if #available' version check}}
 }
 
 //--- codegen.swift

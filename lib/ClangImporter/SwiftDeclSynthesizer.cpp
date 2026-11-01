@@ -1027,17 +1027,16 @@ void SwiftDeclSynthesizer::makeStructRawValued(
 
     varMembers.push_back(patternBinding);
     varMembers.push_back(newVar);
-
-    if (isModern && needsCounterpart)
-      ImporterImpl.addInlineArrayAvailability(newVar);
     return newVar;
   });
+  // The floor depends on `var` having been registered as a modern projection.
+  ImporterImpl.applyAvailabilityFloor(var);
   VarDecl *storedVar = getDeclForCounterpartCArrayProjection(var);
 
   // Create constructors to initialize each projection's variable from a value
   // of its type.
   auto makeInit = [&](bool labeled) {
-    return ImporterImpl.forEachCArrayProjection(
+    auto *modernInit = ImporterImpl.forEachCArrayProjection(
         neededCounterpart,
         [&](CArrayProjection projection) -> ConstructorDecl * {
       // Hidden storage doesn't get initializers.
@@ -1060,12 +1059,11 @@ void SwiftDeclSynthesizer::makeStructRawValued(
       if (!ctorOptions.contains(ValueConstructorFlags::WantBody))
         ctor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
 
-      if (isModern && needsCounterpart)
-        ImporterImpl.addInlineArrayAvailability(ctor);
-
       structDecl->addMember(ctor);
       return ctor;
     });
+    ImporterImpl.applyAvailabilityFloor(modernInit);
+    return modernInit;
   };
 
   if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
@@ -1598,15 +1596,15 @@ void SwiftDeclSynthesizer::registerCArrayProjections(
   }
 
   // If we're using (computed) storage decls, register the accessors too.
-  if (counterpartVD) {
-    if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
-      auto counterpartASD = cast<AbstractStorageDecl>(counterpartVD);
+  if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
+    auto counterpartASD = cast_or_null<AbstractStorageDecl>(counterpartVD);
 
-      for (auto modernAD : modernASD->getAllAccessors()) {
-        auto counterpartAD =
-            counterpartASD->getAccessor(modernAD->getAccessorKind());
-        registerCArrayProjections(modernAD, counterpartAD);
-      }
+    for (auto modernAD : modernASD->getAllAccessors()) {
+      auto counterpartAD =
+          counterpartASD
+              ? counterpartASD->getAccessor(modernAD->getAccessorKind())
+              : nullptr;
+      registerCArrayProjections(modernAD, counterpartAD);
     }
   }
 

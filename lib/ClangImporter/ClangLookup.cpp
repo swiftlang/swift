@@ -1087,7 +1087,7 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
       synth.registerCArrayProjections(subscript, legacySubscript,
                                       /*addAlternate=*/false);
 
-      addInlineArrayAvailability(subscript);
+      applyAvailabilityFloor(subscript);
     }
 
     importSubscriptAttributes(subscript);

@@ -1394,10 +1394,15 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
-  /// Add an \c @available attribute with the minimum version to be able to
-  /// use \c InlineArray . Use this only for declarations that \em don't pass
-  /// through \c importAttributes() , or for which it doesn't do this.
-  void addInlineArrayAvailability(Decl *decl);
+  /// The availability that \p decl needs at a minimum, without considering any
+  /// availability attributes on its clang node. In many cases it returns
+  ///  \c isAlwaysAvailable() .
+  AvailabilityRange getAvailabilityFloor(Decl *decl);
+
+  /// Add an \c @available attribute with the version returned by
+  /// \c getAvailabilityFloor(). Use this only for declarations that \em don't
+  /// pass through \c importAttributes() .
+  void applyAvailabilityFloor(Decl *decl);
 
   Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                  llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);

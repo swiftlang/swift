@@ -609,14 +609,14 @@ static AvailableAttr *findAvailableAttrForPlatform(Decl *decl,
 
 /// Add an AvailableAttr to the declaration for the given
 /// version range.
-static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
-                                    ASTContext &C) {
+static void applyAvailableAttribute(Decl *decl, const AvailabilityRange &info) {
   // If the range is "all", this is the same as not having an available
   // attribute.
   if (info.isAlwaysAvailable())
     return;
 
   // A platform-versioned attribute needs a platform to attach the version to.
+  auto &C = decl->getASTContext();
   auto platform = targetPlatform(C.LangOpts);
   if (!platform)
     return;
@@ -628,31 +628,114 @@ static void applyAvailableAttribute(Decl *decl, AvailabilityRange &info,
   decl->addAttribute(AvAttr);
 }
 
-/// Synthesize availability attributes for protocol requirements
-/// based on availability of the types mentioned in the requirements.
-static void inferProtocolMemberAvailability(ClangImporter::Implementation &impl,
-                                            DeclContext *dc, Decl *member) {
-  // Don't synthesize attributes if there is already an
-  // availability annotation.
-  if (member->getAttrs().hasAttribute<AvailableAttr>())
-    return;
-
-  auto *valueDecl = dyn_cast<ValueDecl>(member);
-  if (!valueDecl)
-    return;
-
+/// The availability that the types mentioned in a protocol requirement (or
+/// a member mirroring one) require, limited by that of its context.
+static AvailabilityRange inferProtocolMemberRange(ValueDecl *member) {
   AvailabilityRange requiredRange =
-      AvailabilityInference::inferForType(valueDecl->getInterfaceType());
+      AvailabilityInference::inferForType(member->getInterfaceType());
 
-  ASTContext &C = impl.SwiftContext;
-
-  const Decl *innermostDecl = dc->getInnermostDeclarationDeclContext();
+  const Decl *innermostDecl =
+      member->getDeclContext()->getInnermostDeclarationDeclContext();
   AvailabilityRange containingDeclRange =
       AvailabilityInference::availableRange(innermostDecl);
 
   requiredRange.intersectWith(containingDeclRange);
+  return requiredRange;
+}
 
-  applyAvailableAttribute(valueDecl, requiredRange, C);
+/// Whether \p decl has an attribute that \c importAttributes() will turn into
+/// Swift availability.
+static bool hasClangAvailability(ClangImporter::Implementation &impl,
+                                 const clang::Decl *decl) {
+  if (!decl)
+    return false;
+
+  for (auto *attr : decl->attrs()) {
+    if (isa<clang::DomainAvailabilityAttr, clang::UnavailableAttr,
+            clang::DeprecatedAttr>(attr))
+      return true;
+    if (auto *avail = dyn_cast<clang::AvailabilityAttr>(attr)) {
+      auto platform = avail->getPlatform()->getName();
+      if (platform == "swift" ||
+            impl.platformAvailability.platformKindIfRelevant(platform))
+        return true;
+    }
+    if (auto *annotation = dyn_cast<clang::AnnotateAttr>(attr))
+      if (annotation->getAnnotation() == "swift1_unavailable")
+        return true;
+  }
+  return false;
+}
+
+/// Returns (a) the protocol \p decl originally came from (even if it's been
+/// mirrored) and (b) whether \p decl is mirrored (rather than the original).
+static llvm::PointerIntPair<ProtocolDecl *, 1, /*isMirror=*/bool>
+getProtocolInfo(ClangImporter::Implementation &impl, Decl *decl) {
+  // Find the protocol (if any) that `decl` originally came from.
+  auto *clangProto =
+      decl->getClangDecl()
+          ? dyn_cast<clang::ObjCProtocolDecl>(
+                decl->getClangDecl()->getDeclContext())
+          : nullptr;
+  if (!clangProto)
+    return { nullptr, false };
+
+  // If its current DeclContext is a protocol, `decl` is not a mirror.
+  if (auto *proto = dyn_cast<ProtocolDecl>(decl->getDeclContext()))
+    return { proto, false };
+
+  // Convert `clangProto` to a Swift protocol.
+  auto cached = impl.importDeclCached(clangProto, impl.CurrentVersion);
+  ASSERT(cached && *cached &&
+            "mirrored a protocol member without importing it");
+
+  return { castIgnoringCompatibilityAlias<ProtocolDecl>(*cached), true };
+}
+
+AvailabilityRange
+ClangImporter::Implementation::getAvailabilityFloor(Decl *decl) {
+  if (auto *accessor = dyn_cast<AccessorDecl>(decl))
+    decl = accessor->getStorage();
+
+  // Whether `decl` is a modern projection is only known once it's registered.
+  auto *clangDecl = dyn_cast_or_null<clang::NamedDecl>(decl->getClangDecl());
+  ASSERT((!clangDecl ||
+          getNeededCArrayCounterpart(clangDecl) == CArrayProjection::Modern ||
+          decl->getAttrs().hasAttribute<CArrayProjectionAttr>()) &&
+         "getAvailabilityFloor() before registerCArrayProjections()");
+
+  auto availability = AvailabilityRange::alwaysAvailable();
+
+  // If this is a modern projection, it must be no more available than
+  // `InlineArray`.
+  if (auto cArrayAttr = decl->getAttrs().getAttribute<CArrayProjectionAttr>()) {
+    if (cArrayAttr->getProjection() == CArrayProjection::Modern) {
+      availability.intersectWith(SwiftContext.getInlineArrayAvailability());
+    }
+  }
+
+  if (auto valueDecl = dyn_cast<ValueDecl>(decl)) {
+    auto protoInfo = getProtocolInfo(*this, valueDecl);
+    if (protoInfo.getPointer() &&
+            !hasClangAvailability(*this, valueDecl->getClangDecl())) {
+      // Hack to deal with ObjC protocols without availability annotation.
+      // If the protocol comes from clang and is not annotated and the protocol
+      // requirement itself is not annotated, then infer availability of the
+      // requirement based on its types. This makes it possible for a type to
+      // conform to an ObjC protocol that is missing annotations but whose
+      // requirements use types that are less available than the conforming
+      // type.
+      // FIXME: Arguably we should just always use inferForType() as a floor.
+      if (!protoInfo.getPointer()->getAttrs().hasAttribute<AvailableAttr>())
+        availability.intersectWith(inferProtocolMemberRange(valueDecl));
+      // A mirrored member should be no more available than its origin protocol.
+      else if (protoInfo.getInt())
+        availability.intersectWith(
+             AvailabilityInference::availableRange(protoInfo.getPointer()));
+    }
+  }
+
+  return availability;
 }
 
 /// Synthesizer callback for the error domain property getter.
@@ -3220,8 +3303,7 @@ namespace {
             return valueCtor;
           });
 
-          if (valueCtor->getAttrs().hasAttribute<CArrayProjectionAttr>())
-            Impl.addInlineArrayAvailability(valueCtor);
+          Impl.applyAvailabilityFloor(valueCtor);
         }
         // TODO: we have a problem lazily looking up members of an unnamed
         // record, so we add them here. To fix this `translateContext` needs to
@@ -3353,8 +3435,7 @@ namespace {
           return valueCtor;
         });
 
-        if (valueCtor->getAttrs().hasAttribute<CArrayProjectionAttr>())
-          Impl.addInlineArrayAvailability(valueCtor);
+        Impl.applyAvailabilityFloor(valueCtor);
       }
 
       if (isa<StructDecl>(result)) {
@@ -9178,13 +9259,6 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   subscript->setAccess(access);
   subscript->setSetterAccess(access);
 
-  // A modern subscript can only be used where InlineArray is available.
-  // (`importAttributes()` doesn't touch subscripts.)
-  if (getCArrayProjection() == CArrayProjection::Modern &&
-          getNeededCArrayCounterpart(getterObjCMethod) !=
-              CArrayProjection::Modern)
-    Impl.addInlineArrayAvailability(subscript);
-
   // Build the thunks.
   AccessorDecl *getterThunk = synthesizer.buildSubscriptGetterDecl(
       subscript, getter, elementTy, dc, getterIndex);
@@ -10573,15 +10647,8 @@ static void filterUsableVersionedAttrs(
   }
 }
 
-void ClangImporter::Implementation::addInlineArrayAvailability(Decl *decl) {
-  auto platform = targetPlatform(SwiftContext.LangOpts);
-  auto availability = SwiftContext.getInlineArrayAvailability();
-  if (!platform || !availability.hasMinimumVersion())
-    return;
-
-  decl->addAttribute(AvailableAttr::createPlatformVersioned(
-      SwiftContext, *platform, "", "", availability.getRawMinimumVersion(), {},
-      {}));
+void ClangImporter::Implementation::applyAvailabilityFloor(Decl *decl) {
+  applyAvailableAttribute(decl, getAvailabilityFloor(decl));
 }
 
 /// Import Clang attributes as Swift attributes.
@@ -10590,14 +10657,12 @@ void ClangImporter::Implementation::importAttributes(
     Decl *MappedDecl,
     const clang::ObjCContainerDecl *NewContext)
 {
-  ASSERT((getNeededCArrayCounterpart(ClangDecl) == CArrayProjection::Modern ||
-          MappedDecl->getAttrs().hasAttribute<CArrayProjectionAttr>()) &&
-         "importAttributes() before registerCArrayProjections()");
-
   // Subscripts are special-cased since there isn't a 1:1 mapping
   // from its accessor(s) to the subscript declaration.
-  if (isa<SubscriptDecl>(MappedDecl))
+  if (isa<SubscriptDecl>(MappedDecl)) {
+    applyAvailabilityFloor(MappedDecl);
     return;
+  }
 
   ASTContext &C = SwiftContext;
 
@@ -10610,18 +10675,16 @@ void ClangImporter::Implementation::importAttributes(
   if (auto func = dyn_cast<AbstractFunctionDecl>(MappedDecl))
     isAsync = func->hasAsync();
 
-  // If the declaration is imported as InlineArray, that limits its
-  // availability. Accessors inherit this from their storage, so we only apply
-  // it to the Clang availability they already have; we don't add any.
+  // Some declarations need a higher availability in Swift than they are
+  // declared to have in clang. Compute that minimum so we can apply it later.
+  AvailabilityRange minAvailability = getAvailabilityFloor(MappedDecl);
+
+  // If `false` at the end of the function, we need to synthesize an
+  // `@available` attribute for `minAvailability`. Accessors start `true`
+  // because they can inherit availability from their storage; other decls only
+  // set this to `true` if they apply `minAvailability` while importing a
+  // `clang::AvailabilityAttr`.
   bool hasMinAvailability = isa<AccessorDecl>(MappedDecl);
-  llvm::VersionTuple minAvailability;
-  if (auto cArrayAttr =
-        MappedDecl->getAttrs().getAttribute<CArrayProjectionAttr>())
-    if (cArrayAttr->getProjection() == CArrayProjection::Modern) {
-      auto availability = SwiftContext.getInlineArrayAvailability();
-      if (availability.hasMinimumVersion())
-        minAvailability = availability.getRawMinimumVersion();
-    }
 
   // Scan through Clang attributes and map them onto Swift
   // equivalents.
@@ -10731,8 +10794,9 @@ void ClangImporter::Implementation::importAttributes(
       llvm::VersionTuple introduced = avail->getIntroduced();
 
       // If there's a minAvailability, apply it to the introduced version now.
-      if (minAvailability) {
-        introduced = std::max(introduced, minAvailability);
+      if (minAvailability.hasMinimumVersion()) {
+        introduced = std::max(introduced,
+                              minAvailability.getRawMinimumVersion());
         hasMinAvailability = true;
       }
 
@@ -10901,12 +10965,8 @@ void ClangImporter::Implementation::importAttributes(
   }
 
   // If we have a min availability and haven't applied it yet, do so now.
-  if (minAvailability && !hasMinAvailability) {
-    if (auto platform = targetPlatform(SwiftContext.LangOpts)) {
-      MappedDecl->addAttribute(AvailableAttr::createPlatformVersioned(
-          SwiftContext, *platform, "", "",
-          minAvailability, {}, {}));
-    }
+  if (minAvailability.hasMinimumVersion() && !hasMinAvailability) {
+    applyAvailableAttribute(MappedDecl, minAvailability);
   }
 }
 
@@ -11014,9 +11074,7 @@ static void finalizeImportedDecl(ClangImporter::Implementation &impl,
     finalizeImportedDecl(impl, cast<clang::NamedDecl>(getter->getClangDecl()),
                          getter, finalized);
     if (finalized.insert(storage).second)
-      if (auto *attr = storage->getAttrs().getAttribute<CArrayProjectionAttr>())
-        if (attr->getProjection() == CArrayProjection::Modern)
-          impl.addInlineArrayAvailability(storage);
+      impl.applyAvailabilityFloor(storage);
   }
 }
 
@@ -11134,32 +11192,13 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
 
   // Finalize the imported declaration. This happens after the C array
   // projections are registered, which is what `importAttributes()` needs.
-  llvm::SmallPtrSet<Decl *, 4> finalized;
-  auto finalizeDecl = [&](Decl *result) {
-    if (finalized.count(result))
-      return;
-    finalizeImportedDecl(*this, ClangDecl, result, finalized);
-
-    // Hack to deal with Objective-C protocols without availability annotation.
-    // If the protocol comes from clang and is not annotated and the protocol
-    // requirement itself is not annotated, then infer availability of the
-    // requirement based on its types. This makes it possible for a type to
-    // conform to an Objective-C protocol that is missing annotations but whose
-    // requirements use types that are less available than the conforming type.
-    auto dc = result->getDeclContext();
-    auto *proto = dyn_cast<ProtocolDecl>(dc);
-    if (!proto || proto->getAttrs().hasAttribute<AvailableAttr>())
-      return;
-
-    inferProtocolMemberAvailability(*this, dc, result);
-  };
-
   // A legacy projection is finalized as an alternate of its modern projection.
   if (Result) {
-    finalizeDecl(Result);
+    llvm::SmallPtrSet<Decl *, 4> finalized;
+    finalizeImportedDecl(*this, ClangDecl, Result, finalized);
 
     for (auto alternate : getAlternateDecls(Result))
-      finalizeDecl(alternate);
+      finalizeImportedDecl(*this, ClangDecl, alternate, finalized);
   }
 
 #ifndef NDEBUG
@@ -11496,18 +11535,6 @@ ClangImporter::Implementation::importMirroredDecl(const clang::NamedDecl *decl,
 
       // Map the Clang attributes onto Swift attributes.
       finalizeImportedDecl(*this, decl, result, finalized);
-
-      if (proto->getAttrs().hasAttribute<AvailableAttr>()) {
-        if (!result->getAttrs().hasAttribute<AvailableAttr>()) {
-          AvailabilityRange protoRange =
-              AvailabilityInference::availableRange(proto);
-          applyAvailableAttribute(result, protoRange, SwiftContext);
-        }
-      } else {
-        // Infer the same availability for the mirrored declaration as
-        // we would for the protocol member it is mirroring.
-        inferProtocolMemberAvailability(*this, dc, result);
-      }
     };
 
     updateMirroredDecl(result);
