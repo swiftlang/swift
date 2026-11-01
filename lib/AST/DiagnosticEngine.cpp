@@ -1609,11 +1609,30 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
     }
   }
 
-  auto formatString =
-      getFormatStringForDiagnostic(diagnostic, includeDiagnosticName);
+  // A diagnostic downgraded until a future language mode is wrapped in a
+  // warning saying it will become an error. If it was upgraded back to an
+  // error (e.g. by -warnings-as-errors), that wrapper is misleading, so emit
+  // the wrapped diagnostic instead.
+  DiagID diagID = diagnostic.getID();
+  ArrayRef<DiagnosticArgument> formatArgs = diagnostic.getArgs();
+  StringRef formatString;
+  auto wrapped = diagnostic.getWrappedDiagnostic();
+  if (wrapped &&
+      (behavior == DiagnosticBehavior::Error ||
+       behavior == DiagnosticBehavior::Fatal) &&
+      (diagID == diag::error_in_a_future_swift_lang_mode.ID ||
+       diagID == diag::error_in_swift_lang_mode.ID)) {
+    diagID = wrapped.value()->ID;
+    formatArgs = wrapped.value()->FormatArgs;
+    formatString = getFormatStringForDiagnostic(Diagnostic(diagID, formatArgs),
+                                                includeDiagnosticName);
+  } else {
+    formatString =
+        getFormatStringForDiagnostic(diagnostic, includeDiagnosticName);
+  }
 
-  return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
-                        formatString, diagnostic.getArgs(), CategoryName,
+  return DiagnosticInfo(diagID, loc, toDiagnosticKind(behavior),
+                        formatString, formatArgs, CategoryName,
                         getDefaultDiagnosticLoc(),
                         /*child note info*/ {}, diagnostic.getRanges(), fixIts,
                         diagnostic.isChildNote());
