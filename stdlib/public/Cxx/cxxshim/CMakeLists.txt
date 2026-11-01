@@ -16,7 +16,7 @@ foreach(sdk ${SWIFT_SDKS})
   endif()
 
   set(outputs)
-  foreach(source libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h)
+  foreach(source libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h libcxxexceptionshim.h)
     add_custom_command(OUTPUT ${module_dir}/${source}
                        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
                        COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${source}" "${module_dir}/${source}"
@@ -52,16 +52,16 @@ foreach(sdk ${SWIFT_SDKS})
   list(APPEND libcxxshim_modulemap_target_list cxxshim-${sdk})
 
 
-  swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
+  swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h libcxxexceptionshim.h
                              DESTINATION "lib/swift/${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
                              COMPONENT compiler)
   if(SWIFT_BUILD_STATIC_STDLIB OR SWIFT_SDK_${sdk}_STATIC_ONLY)
-    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
+    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h libcxxexceptionshim.h
                                DESTINATION "lib/swift_static/${SWIFT_SDK_${sdk}_LIB_SUBDIR}"
                                COMPONENT compiler)
   endif()
   if(SWIFT_ENABLE_MACCATALYST AND "${sdk}" STREQUAL "OSX")
-    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
+    swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h libcxxexceptionshim.h
                                DESTINATION "lib/swift/${SWIFT_SDK_MACCATALYST_LIB_SUBDIR}"
                                COMPONENT compiler)
   endif()
@@ -72,7 +72,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_command(OUTPUT ${module_dir}
                      COMMAND ${CMAKE_COMMAND} "-E" "make_directory" "${module_dir}")
   set(outputs)
-  foreach(source libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h)
+  foreach(source libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h libcxxexceptionshim.h)
     add_custom_command(OUTPUT ${module_dir}/${source}
                        DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${source}
                        COMMAND ${CMAKE_COMMAND} "-E" "copy_if_different" "${CMAKE_CURRENT_SOURCE_DIR}/${source}" "${module_dir}/${source}"
@@ -83,7 +83,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
                     DEPENDS ${outputs}
                     COMMENT "Copying cxxshims to ${module_dir}")
   list(APPEND libcxxshim_modulemap_target_list cxxshim-embedded)
-  swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h
+  swift_install_in_component(FILES libcxxshim.modulemap libcxxshim.h libcxxstdlibshim.h libcxxexceptionshim.h
                              DESTINATION "lib/swift/embedded"
                              COMPONENT compiler)
 
