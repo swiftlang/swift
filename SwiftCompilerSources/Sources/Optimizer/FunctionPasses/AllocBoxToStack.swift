@@ -96,7 +96,7 @@ private func tryConvertBoxesToStack(in function: Function, isMandatory: Bool,
   var promotableBoxes = Array<(AllocBoxInst, Flags)>()
   var functionsToSpecialize = FunctionSpecializations(isMandatory: isMandatory)
 
-  findPromotableBoxes(in: function, &promotableBoxes, &functionsToSpecialize)
+  findPromotableBoxes(in: function, isMandatory: isMandatory, context, &promotableBoxes, &functionsToSpecialize)
 
   functionsToSpecialize.createSpecializedFunctions(context)
 
@@ -124,13 +124,16 @@ private func tryConvertBoxesToStack(in function: Function, isMandatory: Bool,
   return functionsToSpecialize
 }
 
-private func findPromotableBoxes(in function: Function,
+private func findPromotableBoxes(in function: Function, isMandatory: Bool, _ context: FunctionPassContext,
                                  _ promotableBoxes: inout Array<(AllocBoxInst, Flags)>,
                                  _ functionsToSpecialize: inout FunctionSpecializations
 ) {
+  // The mandatory pass makes the accesses of a promoted box static, and DiagnoseStaticExclusivity
+  // checks them after promotion. Only promote a box if that is equivalent to dynamic enforcement.
+  let accessSummary = isMandatory ? BoxAccessSummary(context) : nil
   for inst in function.instructions {
     if let allocBox = inst as? AllocBoxInst {
-      if let (promotableArgs, flags) = canPromote(allocBox: allocBox) {
+      if let (promotableArgs, flags) = canPromote(allocBox: allocBox, accessSummary) {
         promotableBoxes.append((allocBox, flags))
         functionsToSpecialize.add(promotableArguments: promotableArgs)
       }
@@ -138,9 +141,20 @@ private func findPromotableBoxes(in function: Function,
   }
 }
 
+/// Promotion is mandatory for noncopyable variables, because the move-only checker runs after
+/// MandatoryAllocBoxToStack and requires it.
+///
+/// FIXME: DiagnoseStaticExclusivity may then reject a conflict on a noncopyable variable that only
+/// happens on some paths (test/SILOptimizer/exclusivity_static_diagnostics_noncopyable_box.swift).
+/// Running the new move checker before MandatoryAllocBoxToStack would remove this exception.
+private func isNoncopyable(_ allocBox: AllocBoxInst) -> Bool {
+  allocBox.type.getBoxFields(in: allocBox.parentFunction)[0].isMoveOnly
+}
+
 private typealias Flags = (isLexical: Bool, isFromVarDecl: Bool)
 
-private func canPromote(allocBox: AllocBoxInst) -> (promotableArguments: [FunctionArgument], flags: Flags)? {
+private func canPromote(allocBox: AllocBoxInst, _ accessSummary: BoxAccessSummary?
+) -> (promotableArguments: [FunctionArgument], flags: Flags)? {
   // For simplicity we only support boxes with a single field. This is okay because SILGen only generates
   // such kind of boxes.
   guard allocBox.type.getBoxFields(in: allocBox.parentFunction).count == 1 else {
@@ -193,6 +207,13 @@ private func canPromote(allocBox: AllocBoxInst) -> (promotableArguments: [Functi
       default:
         return nil
       }
+    }
+  }
+  // In the mandatory pass, only promote a box if static checking of its accesses is equivalent to
+  // dynamic enforcement. If no function argument is promoted, the box's accesses are the same as before.
+  if !argumentsToPromote.isEmpty, !isNoncopyable(allocBox), let accessSummary {
+    if !accessSummary.isStaticallyCheckable(allocBox) {
+      return nil
     }
   }
   return (argumentsToPromote, flags)
