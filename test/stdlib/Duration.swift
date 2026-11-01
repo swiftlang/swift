@@ -152,6 +152,19 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(max64._high, 999_999_999)
     expectEqual(max64._low, .max - 999_999_999)
   }
+
+  suite.test("Duration / Duration is correctly rounded") {
+    // Converting attoseconds to Double before dividing rounds once the value
+    // needs more than 53 bits, so this used to return 2400.9999999999995.
+    expectEqual(Duration.seconds(2401) / .seconds(1), 2401)
+    for n in Int64(1) ... 10_000 {
+      expectEqual(Duration.seconds(n) / .seconds(1), Double(n))
+    }
+    expectEqual(Duration.milliseconds(2_401_500) / .seconds(1), 2401.5)
+    expectEqual(Duration.seconds(1) / .seconds(3), 1.0 / 3.0)
+    expectEqual(Duration.seconds(-2401) / .seconds(1), -2401)
+    expectEqual(Duration.seconds(2401) / .seconds(-1), -2401)
+  }
 }
  
 if #available(SwiftStdlib 6.0, *) {
@@ -276,6 +289,17 @@ if #available(SwiftStdlib 6.0, *) {
     expectEqual(max.attoseconds, .max)
     let min = Duration(_high: -9_223_372_036_854_775_808, low: 0)
     expectEqual(min.attoseconds, .min)
+  }
+
+  suite.test("Duration / Duration, extreme values") {
+    let min = Duration(attoseconds: .min)
+    let max = Duration(attoseconds: .max)
+    expectEqual(min / Duration(attoseconds: -1), 0x1p127)
+    expectEqual(min / Duration(attoseconds: 1), -0x1p127)
+    expectEqual(max / Duration(attoseconds: 1), 0x1p127)
+    expectEqual(Duration(attoseconds: 1) / min, -0x1p-127)
+    expectEqual(min / min, 1)
+    expectEqual(max / min, -1)
   }
 }
 
