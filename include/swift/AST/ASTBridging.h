@@ -2946,6 +2946,11 @@ BridgedSendingTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedTypeRepr base,
                                     swift::SourceLoc specifierLoc);
 
+SWIFT_NAME("BridgedYieldTypeRepr.createParsed(_:base:yieldLoc:specifier:)")
+BridgedYieldTypeRepr BridgedYieldTypeRepr_createParsed(
+    BridgedASTContext cContext, BridgedTypeRepr base, swift::SourceLoc yieldLoc,
+    BridgedParamSpecifier cSpecifier);
+
 SWIFT_NAME("BridgedNonisolatedNonsendingTypeRepr.createParsed(_:base:specifierLoc:)")
 BridgedNonisolatedNonsendingTypeRepr
 BridgedNonisolatedNonsendingTypeRepr_createParsed(BridgedASTContext cContext,

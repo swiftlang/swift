@@ -2488,6 +2488,10 @@ bool Traversal::visitLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitYieldTypeRepr(YieldTypeRepr *T) {
+  return doIt(T->getBase());
+}
+
 bool Traversal::visitGenericArgumentExprTypeRepr(
     GenericArgumentExprTypeRepr *T) {
   if (!Walker.shouldWalkIntoGenericArgumentExprTypeRepr())

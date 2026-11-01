@@ -4628,6 +4628,28 @@ void TypeChecker::checkParameterList(ParameterList *params,
 
 void TypeChecker::checkYieldList(YieldList *yields, AbstractFunctionDecl *AFD) {
   // TODO: Reject yields on non-coroutines
+  auto *FD = dyn_cast<FuncDecl>(AFD);
+  if (!FD || !FD->isSingleYieldFunction()) {
+    return;
+  }
+
+  auto &ctx = FD->getASTContext();
+  auto yieldLoc = yields->getSourceRange().Start;
+  if (!ctx.LangOpts.hasFeature(Feature::SingleYieldFunctions)) {
+    ctx.Diags.diagnose(yieldLoc, diag::single_yield_requires_feature);
+    return;
+  }
+
+  if (FD->isOperator()) {
+    ctx.Diags.diagnose(yieldLoc, diag::single_yield_operator);
+    return;
+  }
+
+  if (FD->hasAsync()) {
+    ctx.Diags.diagnose(FD->getAsyncLoc(), diag::single_yield_async_unsupported,
+                       FD->getAttrs().hasAttribute<ReasyncAttr>() ? "reasync"
+                                                                  : "async");
+  }
 }
 
 std::optional<unsigned>

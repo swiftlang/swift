@@ -9059,6 +9059,10 @@ public:
   void
   getYieldInterfaceTypes(SmallVectorImpl<AnyFunctionType::Yield> &yields) const;
 
+  bool isSingleYieldFunction() const;
+
+  AnyFunctionType::Yield getSingleYieldType() const;
+
   /// Returns the result interface type of this function if it has already been
   /// computed, otherwise `nullopt`. This should only be used for dumping.
   std::optional<Type> getCachedResultInterfaceType() const;

@@ -2746,6 +2746,21 @@ getStableSelfAccessKind(swift::SelfAccessKind MM) {
   llvm_unreachable("Unhandled StaticSpellingKind in switch.");
 }
 
+static serialization::YieldListKind getYieldListKind(const YieldList *yields) {
+  if (!yields) {
+    return serialization::YieldListKind::None;
+  }
+
+  switch (yields->getKind()) {
+  case swift::YieldListKind::YieldsClause:
+    return serialization::YieldListKind::YieldsClause;
+  case swift::YieldListKind::YieldResult:
+    return serialization::YieldListKind::YieldResult;
+  }
+
+  llvm_unreachable("Unhandled YieldListKind in switch.");
+}
+
 static uint8_t getRawStableMacroRole(swift::MacroRole context) {
   switch (context) {
 #define MACRO_ROLE(Name, Description) \
@@ -5146,6 +5161,7 @@ public:
                            fn->isUserAccessible(),
                            fn->isDistributedThunk(),
                            fn->hasSendingResult(),
+                           uint8_t(getYieldListKind(fn->getYields())),
                            nameComponentsAndDependencies);
 
     writeGenericParams(fn->getGenericParams());

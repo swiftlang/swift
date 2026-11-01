@@ -2340,6 +2340,9 @@ Type YieldsTypeRequest::evaluate(Evaluator &evaluator, FuncDecl *decl,
 
     TypeRepr *yieldTyRepr = YL->get(idx).getTypeRepr();
     assert(funcDecl->isCoroutine() && yieldTyRepr);
+    if (auto *yieldRepr = dyn_cast<YieldTypeRepr>(yieldTyRepr)) {
+      yieldTyRepr = yieldRepr->getBase();
+    }
 
     auto options = TypeResolutionOptions(TypeResolverContext::FunctionResult);
     if (funcDecl->isCoroutine())
