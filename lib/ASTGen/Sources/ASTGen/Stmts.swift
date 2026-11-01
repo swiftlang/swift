@@ -571,6 +571,7 @@ extension ASTGenVisitor {
   func generate(labeledStmt node: LabeledStmtSyntax) -> BridgedStmt {
     let (labelName, labelLoc) = self.generateIdentifierAndSourceLoc(node.label)
     let labelInfo = BridgedLabeledStmtInfo(name: labelName, loc: labelLoc)
+    let labelNode = node.label
 
     switch node.statement.as(StmtSyntaxEnum.self) {
     case .doStmt(let node):
@@ -587,7 +588,9 @@ extension ASTGenVisitor {
     case .forStmt(let node):
       return self.generate(forStmt: node, labelInfo: labelInfo).asStmt
     case .guardStmt(let node):
-      return self.generate(guardStmt: node, labelInfo: labelInfo).asStmt
+      // Labels are only valid on loops, 'if', 'switch' and 'do'.
+      self.diagnose(.invalid_label_on_stmt, at: labelNode)
+      return self.generate(guardStmt: node, labelInfo: nil).asStmt
     case .repeatStmt(let node):
       return self.generate(repeatStmt: node, labelInfo: labelInfo).asStmt
     case .whileStmt(let node):
@@ -596,9 +599,8 @@ extension ASTGenVisitor {
       break
     }
 
-    // Not a labeled statement.
-    // Should be unreachable as long as the node is parsed by 'SwiftParser'.
-    // FIXME: emit an error diagnostic.
+    // 'return', 'throw', 'defer', 'then' and the like cannot be labeled.
+    self.diagnose(.invalid_label_on_stmt, at: labelNode)
     return self.generate(stmt: node.statement)
   }
 
