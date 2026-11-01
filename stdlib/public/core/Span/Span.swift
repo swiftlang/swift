@@ -405,14 +405,25 @@ extension Span where Element: BitwiseCopyable {
   @export(implementation)
   @unsafe
   @_lifetime(copy bytes)
+  public init(_unsafeBytes bytes: RawSpan) {
+    if MemoryLayout<Element>.stride == 1 {
+      let span = unsafe Self(_unchecked: bytes._pointer, count: bytes._count)
+      self = unsafe _overrideLifetime(span, copying: bytes)
+    } else {
+      let rawBuffer = unsafe UnsafeRawBufferPointer(
+        start: bytes._pointer, count: bytes.byteCount
+      )
+      let span = unsafe Self(_unsafeBytes: rawBuffer)
+      self = unsafe _overrideLifetime(span, copying: bytes)
+    }
+  }
+
+  @available(*, deprecated, renamed: "init(_unsafeBytes:)")
+  @export(implementation)
+  @unsafe
+  @_lifetime(copy bytes)
   public init(_bytes bytes: consuming RawSpan) {
-    let rawBuffer = unsafe UnsafeRawBufferPointer(
-      start: bytes._pointer, count: bytes.byteCount
-    )
-    let span = unsafe Span(_unsafeBytes: rawBuffer)
-    // As a trivial value, 'rawBuffer' does not formally depend on the
-    // lifetime of 'bytes'. Make the dependence explicit.
-    self = unsafe _overrideLifetime(span, copying: bytes)
+    self = unsafe Self(_unsafeBytes: bytes)
   }
 
   /// View initialized raw memory as a typed span.
@@ -428,11 +439,7 @@ extension Span where Element: BitwiseCopyable {
   @export(implementation)
   @_lifetime(copy bytes)
   public init(viewing bytes: RawSpan) where Element: ConvertibleFromBytes {
-    let rawBuffer = unsafe UnsafeRawBufferPointer(
-      start: bytes._pointer, count: bytes.byteCount
-    )
-    let span = unsafe Span(_unsafeBytes: rawBuffer)
-    self = unsafe _overrideLifetime(span, copying: bytes)
+    self = unsafe Self(_unsafeBytes: bytes)
   }
 }
 
@@ -1021,22 +1028,6 @@ extension Span where Element: ~Copyable {
   @available(*, unavailable, renamed: "extracting(droppingLast:)")
   public func dropLast(_ k: Int = 1) -> Self {
     Builtin.unreachable()
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element == UInt8 {
-  /// View initialized raw memory as a span of bytes.
-  ///
-  /// - Parameters:
-  ///   - bytes: An existing `RawSpan`, which will define both this
-  ///            `Span`'s lifetime and the memory it represents.
-  @export(implementation)
-  @_lifetime(copy bytes)
-  public init(viewing bytes: RawSpan) {
-    let span = unsafe Self(_unchecked: bytes._pointer, count: bytes._count)
-    self = unsafe _overrideLifetime(span, copying: bytes)
   }
 }
 
