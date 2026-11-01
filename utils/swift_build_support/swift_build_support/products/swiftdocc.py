@@ -62,7 +62,7 @@ class SwiftDocC(product.Product):
             '--configuration', configuration,
             '--build-dir', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
-        ]
+        ] + self.swiftpm_caching_helper_args()
         if action != 'install':
             helper_cmd.extend([
                 # There might have been a Package.resolved created by other builds

@@ -77,6 +77,7 @@ class SwiftFoundationTests(product.Product):
         ]
         if self.args.verbose_build:
             cmd.append('--verbose')
+        cmd += self.swiftpm_caching_flags()
 
         # On amazon-linux2 the gold linker (version 1.14) crashes when linking
         # debug info. Workaround this issue by building without debug info.
