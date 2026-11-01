@@ -1431,8 +1431,8 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
 /// This utility finds a value or address that is the best-effort "root" of the chain of temporary lifetime-dependent
 /// values.
 ///
-/// This "looks through" projections: a property that is either visible as a stored property or access via
-/// unsafe[Mutable]Address.
+/// This "looks through" projections: a property that is either visible as a stored property, access via
+/// unsafe[Mutable]Address, or returned by a borrow accessor.
 ///
 ///     dependsOn(lvalue.field) // finds 'lvalue' when 'field' is a stored property
 ///
@@ -1584,6 +1584,11 @@ extension LifetimeDependenceUseDefAddressWalker {
       // mark_dependence.
       return addressIntroducer(beginAccess, access: access)
     }
+    // Skip the borrow accessor for an address projected from its result when 'self' is not an address. Treat it like a
+    // projection of 'self' rather than a separate variable, as with unsafe[Mutable]Address.
+    if let accessorSelf = address.guaranteedAddressBorrowAccessorSelf {
+      return walkUp(newLifetime: accessorSelf)
+    }
     // Continue walking for some kinds of access base.
     switch access.base {
     case .box, .global, .class, .tail, .pointer, .index, .unidentified:
@@ -1650,6 +1655,35 @@ private extension Value {
     default:
       return false
     }
+  }
+
+  // Recognize an address projected from the result of a borrow accessor whose 'self' is not an address:
+  // %adr = apply %borrowAccessor(%self) : $(...) -> @guaranteed_address T
+  // %proj = struct_element_addr %adr
+  var guaranteedAddressBorrowAccessorSelf: Value? {
+    guard type.isAddress else {
+      return nil
+    }
+    var walker = BorrowAccessorSelfWalker()
+    _ = walker.walkUp(address: self, path: UnusedWalkingPath())
+    return walker.accessorSelf
+  }
+}
+
+private struct BorrowAccessorSelfWalker : AddressUseDefWalker {
+  var accessorSelf: Value?
+
+  mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    if let apply = address as? ApplyInst, apply.hasGuaranteedAddressResult,
+       let selfArgument = apply.selfArgument, !selfArgument.type.isAddress {
+      accessorSelf = selfArgument
+      return .continueWalk
+    }
+    return walkUpDefault(address: address, path: path)
+  }
+
+  mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    return .continueWalk
   }
 }
 

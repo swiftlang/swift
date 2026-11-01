@@ -123,6 +123,22 @@ struct RichOuter {
   }
 }
 
+// rdar://191315943: SILGen borrows a noncopyable 'self' just for the borrow accessor call and copies the copyable
+// element into a temporary, so the dependence must root at 'self' rather than at that temporary borrow.
+struct TrivialElement {}
+
+struct ElementWrapper: ~Copyable {
+  let items: UniqueArray<TrivialElement>
+
+  // CHECK-LABEL: sil hidden [ossa] @$s4test14ElementWrapperV5firsts3RefVyAA07TrivialB0VGvg : $@convention(method) (@guaranteed ElementWrapper) -> @lifetime(borrow 0) @owned Ref<TrivialElement> {
+  // CHECK: bb0(%0 : @guaranteed $ElementWrapper):
+  // CHECK: mark_dependence_addr [unresolved] %{{.*}} on %0
+  // CHECK-LABEL: } // end sil function '$s4test14ElementWrapperV5firsts3RefVyAA07TrivialB0VGvg'
+  var first: Ref<TrivialElement> {
+    Ref(items[0])
+  }
+}
+
 // MARK: - Rejected
 
 // The base is a local: the accessor's result is only valid while that local is,
