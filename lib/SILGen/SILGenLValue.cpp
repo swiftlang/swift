@@ -3199,6 +3199,13 @@ public:
       }
     }
 
+    if (auto *tupleElement = dyn_cast<TupleElementExpr>(e)) {
+      if (tupleElement->getBase()->getType()->isNoncopyable() &&
+          SGF.findStorageReferenceExprForMoveOnly(
+              tupleElement, StorageReferenceOperationKind::Borrow))
+        return true;
+    }
+
     if (auto *le = dyn_cast<LoadExpr>(e)) {
       // Noncopyable type is obviously noncopyable.
       if (le->getType()->isNoncopyable()) {
@@ -3367,8 +3374,18 @@ public:
                                                         value);
   }
 
+  LValue visitTupleElementExpr(TupleElementExpr *e, SGFAccessKind accessKind,
+                               LValueOptions options) {
+    return SGL.visitTupleElementExpr(e, accessKind, options);
+  }
+
   LValue visitDeclRefExpr(DeclRefExpr *e, SGFAccessKind accessKind,
                           LValueOptions options) {
+    // Borrow the tuple in place. Passing through RValue would explode and
+    // reconstruct it, copying its noncopyable elements in the process.
+    if (e->getType()->is<TupleType>())
+      return SGL.visitDeclRefExpr(e, accessKind, options);
+
     if (accessKind == SGFAccessKind::BorrowedObjectRead) {
       auto rv = emitImmediateBaseValue(e);
       CanType formalType = getSubstFormalRValueType(e);
