@@ -1623,12 +1623,12 @@ function Invoke-VsDevShell([Hashtable] $Platform) {
 function Get-Dependencies {
   Record-OperationTime $BuildPlatform "Get-Dependencies" {
     function Write-Success([string] $Description) {
-      $HeavyCheckMark = @{
-        Object = [Char]0x2714
+      $SuccessTag = @{
+        Object = "[OK]"
         ForegroundColor = 'DarkGreen'
         NoNewLine = $true
       }
-      Write-Host @HeavyCheckMark
+      Write-Host @SuccessTag
       Write-Host " $Description"
     }
 
