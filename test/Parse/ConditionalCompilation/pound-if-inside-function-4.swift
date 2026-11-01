@@ -8,6 +8,6 @@ func foo() { // expected-note {{to match this opening '{'}}
   _ = 123
 #elseif !BLAH
 #else
-#else // expected-cparser-error{{further conditions after #else are unreachable}} expected-astgen-error{{expected '#endif' in conditional compilation block}} expected-astgen-error {{expected '}' to end function}}
+#else // expected-error{{further conditions after #else are unreachable}} expected-astgen-error{{expected '#endif' in conditional compilation block}} expected-astgen-error {{expected '}' to end function}}
 // expected-cparser-error@+2{{expected '}' at end of brace statement}}
 // expected-cparser-error@+1{{expected #else or #endif at end of conditional compilation block}}

@@ -28,6 +28,7 @@ extension ASTGenVisitor {
   /// Determine the active clause for the given #if, emitting any diagnostics
   /// produced due to the evaluation.
   func activeClause(in node: IfConfigDeclSyntax) -> IfConfigClauseSyntax? {
+    self.diagnoseClausesAfterElse(in: node)
     // Determine the active clause.
     return configuredRegions.activeClause(for: node)
   }
@@ -76,4 +77,21 @@ extension ASTGenVisitor {
   }
 }
 
-
+extension ASTGenVisitor {
+  /// Nothing can follow `#else`; the C++ parser complains at each clause that
+  /// does.
+  func diagnoseClausesAfterElse(in node: IfConfigDeclSyntax) {
+    guard self.diagnosedIfConfigs.insert(node.id).inserted else {
+      return
+    }
+    var sawElse = false
+    for clause in node.clauses {
+      if sawElse {
+        self.diagnose(.expected_close_after_else_directive, at: clause.poundKeyword)
+      }
+      if clause.poundKeyword.tokenKind == .poundElse {
+        sawElse = true
+      }
+    }
+  }
+}

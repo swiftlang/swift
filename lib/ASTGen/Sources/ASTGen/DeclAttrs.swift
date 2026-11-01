@@ -2973,14 +2973,101 @@ extension ASTGenVisitor {
   ///   @_unavailableFromAsync(message: "use fooBar(_:) instead")
   ///   ```
   func generateUnavailableFromAsyncAttr(attribute node: AttributeSyntax) -> BridgedUnavailableFromAsyncAttr? {
-
+    let attrName = "_unavailableFromAsync"
     var message: BridgedStringRef? = nil
-    if node.arguments != nil {
-      message = self.generateWithLabeledExprListArguments(attribute: node) { args in
-        self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "message")
+    if let arguments = node.arguments {
+      // Malformed syntax has already been diagnosed by the parser.
+      if arguments.hasError || node.rightParen == nil || node.rightParen?.presence == .missing
+        || node.unexpectedBetweenArgumentsAndRightParen != nil
+      {
+        return nil
       }
+      guard let args = arguments.as(LabeledExprListSyntax.self) else {
+        return nil
+      }
+      guard let arg = args.first else {
+        // `@_unavailableFromAsync()`: the message is missing.
+        if let rightParen = node.rightParen {
+          self.diagnose(
+            .attr_expected_string_literal(attrName),
+            at: rightParen,
+            fixIts: [
+              .init(
+                replace: self.generateCharSourceRange(
+                  start: rightParen.positionAfterSkippingLeadingTrivia,
+                  length: SourceLength(utf8Length: 0)
+                ),
+                with: "\"<#error message#>\""
+              )
+            ]
+          )
+        }
+        return nil
+      }
+
+      // `message="..."`: the user wrote '=' where ':' belongs.
+      if arg.label == nil, let sequence = arg.expression.as(SequenceExprSyntax.self),
+        sequence.elements.count == 3,
+        sequence.elements.first?.as(DeclReferenceExprSyntax.self)?.baseName.text == "message",
+        let assignment = sequence.elements.dropFirst().first?.as(AssignmentExprSyntax.self)
+      {
+        self.diagnose(
+          .replace_equal_with_colon_for_value,
+          at: assignment,
+          fixIts: [.init(replace: self.generateCharSourceRange(assignment), with: ": ")]
+        )
+        return nil
+      }
+
+      if let label = arg.label {
+        if label.rawText != "message" {
+          if label.rawText == "_" {
+            // The user wrote an explicitly omitted label (`_:`).
+            self.diagnose(
+              .attr_expected_label("message", attrName),
+              at: label,
+              fixIts: [.init(replace: self.generateCharSourceRange(label), with: "message")]
+            )
+          } else {
+            self.diagnose(
+              .attr_unknown_option(String(syntaxText: label.rawText), attrName),
+              at: label,
+              fixIts: [.init(replace: self.generateCharSourceRange(label), with: "message")]
+            )
+            return nil
+          }
+        }
+      } else {
+        self.diagnose(
+          .attr_expected_label("message", attrName),
+          at: arg.expression,
+          fixIts: [
+            .init(
+              replace: self.generateCharSourceRange(
+                start: arg.expression.positionAfterSkippingLeadingTrivia,
+                length: SourceLength(utf8Length: 0)
+              ),
+              with: "message: "
+            )
+          ]
+        )
+      }
+
+      let isStringLiteral = arg.expression.is(StringLiteralExprSyntax.self) || arg.expression.is(SimpleStringLiteralExprSyntax.self)
+      guard isStringLiteral else {
+        self.diagnose(
+          .attr_expected_string_literal(attrName),
+          at: arg.expression,
+          fixIts: [.init(replace: self.generateCharSourceRange(arg.expression), with: "\"<#error message#>\"")]
+        )
+        return nil
+      }
+      message = self.generateStringLiteralTextIfNotInterpolated(expr: arg.expression)
       guard message != nil else {
         return nil
+      }
+      if let extra = args.dropFirst().first {
+        self.diagnose(.extraneousArgumentsInAttribute(node, extra))
       }
     }
     return .createParsed(
