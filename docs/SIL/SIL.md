@@ -247,7 +247,7 @@ For the list of function attributes see [FunctionAttributes](FunctionAttributes.
 Optionally a function can define a list of effects, which describe effects,
 like memory effects or escaping effects for arguments. For details
 see the documentation in
-[Effects.swift](`SwiftCompilerSources/Sources/SIL/Effects.swift`).
+[Effects.swift](../../SwiftCompilerSources/Sources/SIL/Effects.swift).
 
 ```
 effects ::= '[' argument-name ':' argument-effect (',' argument-effect)*]'
