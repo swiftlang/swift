@@ -782,6 +782,29 @@ func _makeSwiftValue(_ value: Any) -> AnyObject {
   }
 }
 
+@_silgen_name("_swift_getSwiftValueForMetatype")
+internal func _getSwiftValue(forMetatype type: Any.Type) -> AnyObject?
+
+@_silgen_name("_swift_setSwiftValueForMetatype")
+internal func _setSwiftValue(
+  _ box: AnyObject, forMetatype type: Any.Type
+) -> AnyObject
+
+/// Box a metatype, reusing the same box every time the same metatype is
+/// bridged.
+///
+/// Without Objective-C interop metatypes are not objects, so they get boxed
+/// like any other value. A new box for every conversion would give one
+/// metatype a different object identity each time, whereas a class metatype
+/// keeps its identity when bridged on Objective-C platforms. Metatypes are
+/// never destroyed, so their boxes can be kept forever.
+internal func _makeSwiftValue(forMetatype type: Any.Type) -> AnyObject {
+  if let box = _getSwiftValue(forMetatype: type) {
+    return box
+  }
+  return _setSwiftValue(_makeSwiftValue(type), forMetatype: type)
+}
+
 /// Bridge an arbitrary value to an Objective-C object.
 ///
 /// - If `T` is a class type, it is always bridged verbatim, the function
@@ -822,6 +845,8 @@ public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
       result = unsafe unsafeBitCast(x, to: AnyObject.self)
     } else if let object = _bridgeToObjectiveCUsingProtocolIfPossible(source) {
       result = object
+    } else if let type = source as? Any.Type {
+      result = _makeSwiftValue(forMetatype: type)
     } else {
       result = _makeSwiftValue(source)
     }
