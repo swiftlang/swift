@@ -19,6 +19,7 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   CompilerBuildConfiguration.swift
   DeclAttrs.swift
   Decls.swift
+  DelayedBodies.swift
   Diagnostics.swift
   DiagnosticsBridge.swift
   EmbeddedSupport.swift

@@ -1582,6 +1582,20 @@ void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
 SWIFT_NAME("BridgedFuncDecl.setParsedBody(self:_:)")
 void BridgedFuncDecl_setParsedBody(BridgedFuncDecl decl, BridgedBraceStmt body);
 
+/// Record that the body of the function-like declaration \p decl spans
+/// \p range ('{' through '}') and will be built on demand.
+SWIFT_NAME("BridgedDecl.setBodyDelayed(self:range:hasNestedTypeDeclarations:)")
+void BridgedDecl_setBodyDelayed(BridgedDecl decl, swift::SourceRange range,
+                                bool hasNestedTypeDeclarations);
+
+SWIFT_NAME("BridgedDecl.setHasNestedTypeDeclarations(self:_:)")
+void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value);
+
+/// Provide the body built for a function-like declaration whose body was
+/// delayed with \c BridgedDecl_setBodyDelayed.
+SWIFT_NAME("BridgedDecl.setDelayedBodyParsed(self:_:)")
+void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body);
+
 SWIFT_NAME("BridgedDestructorDecl.setParsedBody(self:_:)")
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
                                          BridgedBraceStmt body);

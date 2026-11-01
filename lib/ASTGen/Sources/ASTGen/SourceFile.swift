@@ -45,6 +45,17 @@ public struct ExportedSourceFile {
   /// This is a cached value; access via configuredRegions(astContext:).
   var _configuredRegions: ConfiguredRegions? = nil
 
+  /// Whether placeholder errors are downgraded to warnings, as recorded when
+  /// the parser diagnostics were emitted, for the diagnostics of function
+  /// bodies that are built later.
+  var downgradePlaceholderErrorsToWarnings: Bool = false
+
+  /// The diagnostics split by whether they are inside a function body that is
+  /// built on demand.
+  ///
+  /// This is a cached value; access via heldBackDiagnostics(astContext:).
+  var _heldBackDiagnostics: HeldBackDiagnostics? = nil
+
   /// Warning group control regions for this source file
   ///
   /// This is a cached value; access via warningGroupControlRegionTree(astContext:)
@@ -222,7 +233,8 @@ public func emitParserDiagnostics(
   diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeMutablePointer<UInt8>,
   emitOnlyErrors: CInt,
-  downgradePlaceholderErrorsToWarnings: CInt
+  downgradePlaceholderErrorsToWarnings: CInt,
+  delayFunctionBodies: CInt
 ) -> CInt {
   return sourceFilePtr.withMemoryRebound(
     to: ExportedSourceFile.self,
@@ -230,8 +242,14 @@ public func emitParserDiagnostics(
   ) { sourceFile in
     var anyDiags = false
 
-    let sourceFileSyntax = sourceFile.pointee.syntax
-    let diags = ParseDiagnosticsGenerator.diagnostics(for: sourceFileSyntax)
+    sourceFile.pointee.downgradePlaceholderErrorsToWarnings = downgradePlaceholderErrorsToWarnings == 1
+    let diags: [Diagnostic]
+    if delayFunctionBodies != 0 {
+      // Diagnostics inside bodies built on demand wait for the body.
+      diags = sourceFile.pointee.heldBackDiagnostics(astContext: ctx).parserOutside
+    } else {
+      diags = ParseDiagnosticsGenerator.diagnostics(for: sourceFile.pointee.syntax)
+    }
 
     let diagnosticEngine = BridgedDiagnosticEngine(raw: diagEnginePtr)
     let configuredRegions = sourceFile.pointee.configuredRegions(astContext: ctx)
@@ -402,4 +420,38 @@ func freeVirtualFiles(
   }
   buffer.deinitialize()
   buffer.deallocate()
+}
+
+/// Parser and `#if` diagnostics split by whether they lie inside the body of a
+/// function that is built on demand.
+struct HeldBackDiagnostics {
+  /// Parser diagnostics outside any delayed body.
+  var parserOutside: [Diagnostic]
+  /// Parser diagnostics inside a delayed body, keyed by the offset of its `{`.
+  var parser: [Int: [Diagnostic]]
+  var ifConfigOutside: [Diagnostic]
+  var ifConfig: [Int: [Diagnostic]]
+}
+
+extension ExportedSourceFile {
+  mutating func heldBackDiagnostics(astContext: BridgedASTContext) -> HeldBackDiagnostics {
+    if let cached = self._heldBackDiagnostics {
+      return cached
+    }
+    let ranges = self.delayedBodyRanges()
+    let parserDiagnostics = ParseDiagnosticsGenerator.diagnostics(for: self.syntax)
+    let (parserOutside, parserInside) = partitionDiagnostics(parserDiagnostics, byDelayedBodies: ranges)
+    let (ifConfigOutside, ifConfigInside) = partitionDiagnostics(
+      self.configuredRegions(astContext: astContext).diagnostics,
+      byDelayedBodies: ranges
+    )
+    let result = HeldBackDiagnostics(
+      parserOutside: parserOutside,
+      parser: parserInside,
+      ifConfigOutside: ifConfigOutside,
+      ifConfig: ifConfigInside
+    )
+    self._heldBackDiagnostics = result
+    return result
+  }
 }

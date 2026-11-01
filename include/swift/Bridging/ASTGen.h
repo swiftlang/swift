@@ -74,17 +74,30 @@ int swift_ASTGen_roundTripCheck(void *_Nonnull sourceFile);
 
 /// Emit parser diagnostics for given source file.. Returns non-zero if any
 /// diagnostics were emitted.
+///
+/// When \p delayFunctionBodies is set, diagnostics inside function bodies that
+/// ASTGen will build on demand are held back until the body is built.
 int swift_ASTGen_emitParserDiagnostics(
     BridgedASTContext astContext,
     void *_Nonnull diagEngine, void *_Nonnull sourceFile, int emitOnlyErrors,
-    int downgradePlaceholderErrorsToWarnings);
+    int downgradePlaceholderErrorsToWarnings, int delayFunctionBodies);
 
 // Build AST nodes for the top-level entities in the syntax.
 void swift_ASTGen_buildTopLevelASTNodes(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
     BridgedDeclContext declContext, BridgedNullableDecl attachedDecl,
-    BridgedASTContext astContext, void *_Nonnull outputContext,
+    BridgedASTContext astContext, int delayFunctionBodies,
+    void *_Nonnull outputContext,
     void (*_Nonnull)(BridgedASTNode, void *_Nonnull));
+
+// Build the body of the function-like declaration \p decl, whose body was
+// delayed by `swift_ASTGen_buildTopLevelASTNodes`, and attach it.
+void swift_ASTGen_buildFunctionBody(BridgedDiagnosticEngine diagEngine,
+                                    void *_Nonnull sourceFile,
+                                    BridgedDecl decl,
+                                    BridgedDeclContext declContext,
+                                    BridgedASTContext astContext,
+                                    swift::SourceLoc bodyStart);
 
 BridgedFingerprint
 swift_ASTGen_getSourceFileFingerprint(void *_Nonnull sourceFile,
