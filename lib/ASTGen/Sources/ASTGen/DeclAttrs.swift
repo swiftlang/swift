@@ -74,7 +74,19 @@ extension ASTGenVisitor {
     // '@' attributes.
     self.generateDeclAttributes(attributeList: node.attributes, handler: addAttribute(_:))
 
+    var sawStatic = false
     func genStatic(node: DeclModifierSyntax, spelling: BridgedStaticSpelling) {
+      // Only the first 'static'/'class' modifier counts.
+      if sawStatic {
+        self.diagnose(
+          .decl_already_static(spelling),
+          at: node,
+          fixIts: [self.tidyRemovalFixIt(node)]
+        )
+        return
+      }
+      sawStatic = true
+
       // TODO: Diagnose duplicated attrs.
       // TODO: Diagnose if allowStatic is false.
       // TODO: Diagnose 'class' for non-class decls.
