@@ -33,7 +33,14 @@ extension ASTGenVisitor {
     case .editorPlaceholderDecl:
       fatalError("EditorPlaceholderDeclSyntax should not be used")
     case .enumCaseDecl(let node):
-      return self.generate(enumCaseDecl: node).asDecl
+      let decl = self.generate(enumCaseDecl: node)
+      // Only an enum can contain 'case' elements; the C++ parser builds no
+      // declaration for one anywhere else.
+      guard self.isDirectlyInEnumBody(node) else {
+        self.diagnose(.disallowed_enum_element, at: node.caseKeyword)
+        return nil
+      }
+      return decl.asDecl
     case .enumDecl(let node):
       return self.generate(enumDecl: node)?.asDecl
     case .extensionDecl(let node):
@@ -1967,5 +1974,19 @@ extension ASTGenVisitor {
       return
     }
     self.inPoundSourceLocationEnvironment = true
+  }
+}
+
+extension ASTGenVisitor {
+  /// Whether \p node is a member of an enum, possibly inside `#if`.
+  func isDirectlyInEnumBody(_ node: some SyntaxProtocol) -> Bool {
+    var current = node.parent
+    while let parent = current {
+      if let block = parent.as(MemberBlockSyntax.self) {
+        return block.parent?.is(EnumDeclSyntax.self) == true
+      }
+      current = parent.parent
+    }
+    return false
   }
 }
