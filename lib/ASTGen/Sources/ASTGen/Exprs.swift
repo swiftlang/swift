@@ -460,9 +460,9 @@ extension ASTGenVisitor {
       return
     }
     let text = String(syntaxText: SyntaxText(rebasing: written[1..<(written.count - 1)]))
-    // 'let', 'var' and 'inout' cannot be argument labels, so escaping them is
-    // required; and anything that is not a plain identifier needs the quotes.
-    guard text != "_", text != "let", text != "var", text != "inout",
+    // 'inout' cannot be an argument label, so escaping it is required, as is
+    // '_'; and anything that is not a plain identifier needs the quotes.
+    guard text != "_", text != "inout",
       let first = text.unicodeScalars.first, first == "_" || first.properties.isAlphabetic,
       text.unicodeScalars.allSatisfy({ $0 == "_" || $0.properties.isAlphabetic || ("0"..."9").contains($0) })
     else {

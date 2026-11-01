@@ -289,7 +289,11 @@ extension ASTGenVisitor {
             moduleSelector: nil,
             baseName: .init(identifier)
           )
-          let loc = BridgedDeclNameLoc.createParsed(self.generateSourceLoc(node.pattern))
+          // The reference sits at the end of the pattern: the last token of its
+          // type annotation, if it has one.
+          let refToken = node.typeAnnotation?.type.lastToken(viewMode: .sourceAccurate)
+          let loc = BridgedDeclNameLoc.createParsed(
+            refToken.map { self.generateSourceLoc($0) } ?? self.generateSourceLoc(node.pattern))
           initializer =
             BridgedUnresolvedDeclRefExpr.createParsed(
               self.ctx,

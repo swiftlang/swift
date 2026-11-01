@@ -262,8 +262,8 @@ extension ASTGenVisitor {
   func generate(arrayExpr node: ArrayExprSyntax) -> BridgedArrayExpr {
     let expressions = node.elements.lazy.map({ self.generate(expr: $0.expression) })
 
-    let commaLocations = node.elements.compactMap(in: self) {
-      self.generateSourceLoc($0.trailingComma)
+    let commaLocations = node.elements.compactMap(in: self) { element -> SourceLoc? in
+      element.trailingComma.map { self.generateSourceLoc($0) }
     }
 
     return .createParsed(
@@ -297,9 +297,10 @@ extension ASTGenVisitor {
       elements = elementNodes.lazy
         .map({ self.generate(dictionaryElement: $0).asExpr })
         .bridgedArray(in: self)
-      colonLocs = elementNodes.lazy
-        .map({ self.generateSourceLoc($0.colon) })
-        .bridgedArray(in: self)
+      // The locations of the commas between the elements.
+      colonLocs = elementNodes.compactMap(in: self) { element -> SourceLoc? in
+        element.trailingComma.map { self.generateSourceLoc($0) }
+      }
     }
     return .createParsed(
       self.ctx,

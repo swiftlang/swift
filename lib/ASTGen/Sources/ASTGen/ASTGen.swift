@@ -390,6 +390,9 @@ extension ASTGenVisitor {
       if arguments.arguments.isEmpty {
         bridgedLabels = BridgedArrayRef()
       } else {
+        for argument in arguments.arguments {
+          self.diagnoseUnnecessarilyEscapedLabel(argument.name)
+        }
         let labels = arguments.arguments.lazy.map {
           self.generateIdentifier($0.name)
         }

@@ -374,7 +374,7 @@ extension ASTGenVisitor {
         self.diagnose(
           .warn_attr_unsafe_removed(String(syntaxText: attrName)),
           at: node.atSign,
-          fixIts: [.init(remove: self.generateCharSourceRange(attribute: node))]
+          fixIts: [self.tidyRemovalFixIt(node)]
         )
         return
       case nil where attrName == "warn_unused_result":
@@ -383,7 +383,7 @@ extension ASTGenVisitor {
         self.diagnose(
           .attr_warn_unused_result_removed,
           at: node.atSign,
-          fixIts: [.init(remove: self.generateCharSourceRange(attribute: node))]
+          fixIts: [self.tidyRemovalFixIt(node)]
         )
         return
 
