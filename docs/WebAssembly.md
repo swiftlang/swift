@@ -17,6 +17,8 @@ available yet, specifically:
 one wouldn't want end users to download multi-megabyte binaries. This means that [Embedded Swift](https://docs.swift.org/embedded/documentation/embedded/)
 is commonly used when building for Wasm.
 
+Wasm is a target of the Swift compiler and features a [Swift SDK Build](https://github.com/swiftlang/swift/blob/main/docs/SwiftSDKBuild.md).
+
 ## Running Wasm stdlib tests
 
 If you're a compiler/stdlib engineer, this invocation builds LLVM, Swift, installs those together with necessary
