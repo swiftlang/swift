@@ -128,6 +128,8 @@ void registerDeclWithOpaqueResultType(SourceFile *SF, ArrayRef<Decl *> items) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
 namespace {
 bool shouldParseViaASTGen(SourceFile &SF);
+template <typename Bridged, typename Native>
+void appendToVector(Bridged cNode, void *vecPtr);
 } // namespace
 #endif
 
@@ -155,6 +157,31 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
     }
     return FingerprintAndMembers{fp, ctx.AllocateCopy(members)};
   }
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  SourceRange braces;
+  if (auto *ext = dyn_cast<ExtensionDecl>(idc))
+    braces = ext->getBraces();
+  else
+    braces = cast<NominalTypeDecl>(idc)->getBraces();
+
+  // An implicit declaration has no braces and no members written in source.
+  if (braces.isValid() && shouldParseViaASTGen(*sf)) {
+    // The members were left for ASTGen to build.
+    SmallVector<Decl *, 16> members;
+    auto *decl = const_cast<Decl *>(idc->getDecl());
+    auto fingerprint = swift_ASTGen_buildMembers(
+        &ctx.Diags, sf->getExportedSourceFile(), decl,
+        idc->getAsGenericContext(), ctx, braces.Start,
+        static_cast<SmallVectorImpl<Decl *> *>(&members),
+        appendToVector<BridgedDecl, Decl *>);
+
+    registerDeclWithOpaqueResultType(sf->getOutermostParentSourceFile(),
+                                     llvm::ArrayRef(members));
+    return FingerprintAndMembers{fingerprint.unbridged(),
+                                 ctx.AllocateCopy(llvm::ArrayRef(members))};
+  }
+#endif
 
   unsigned bufferID = sf->getBufferID();
 

@@ -242,6 +242,23 @@ void BridgedDecl_setBodyDelayed(BridgedDecl decl, SourceRange range,
   afd->setHasNestedTypeDeclarations(hasNestedTypeDeclarations);
 }
 
+void BridgedDecl_setMembersDelayed(BridgedDecl decl,
+                                   bool hasOperatorDeclarations,
+                                   bool hasNestedClassDeclarations,
+                                   bool hasDerivativeDeclarations) {
+  IterableDeclContext *idc;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl.unbridged()))
+    idc = nominal;
+  else
+    idc = cast<ExtensionDecl>(decl.unbridged());
+  if (hasOperatorDeclarations)
+    idc->setMaybeHasOperatorDeclarations();
+  if (hasNestedClassDeclarations)
+    idc->setMaybeHasNestedClassDeclarations();
+  if (hasDerivativeDeclarations)
+    idc->setMaybeHasDerivativeDeclarations();
+}
+
 void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value) {
   cast<AbstractFunctionDecl>(decl.unbridged())
       ->setHasNestedTypeDeclarations(value);
@@ -366,6 +383,7 @@ static void setParsedMembers(IterableDeclContext *IDC, BridgedArrayRef cMembers,
 
   IDC->setMaybeHasOperatorDeclarations();
   IDC->setMaybeHasNestedClassDeclarations();
+  IDC->setMaybeHasDerivativeDeclarations();
   // FIXME: Split requests. e.g. DeclMembersFingerprintRequest.
   ctx.evaluator.cacheOutput(ParseMembersRequest{IDC},
                             FingerprintAndMembers{fp, members});

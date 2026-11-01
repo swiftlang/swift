@@ -137,14 +137,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.asNominalTypeDecl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.asNominalTypeDecl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -168,14 +163,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -200,14 +190,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -232,14 +217,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -266,14 +246,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -335,14 +310,9 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     // An extension is only valid at file scope. One that ended up elsewhere,
     // e.g. through parser recovery, is diagnosed and marked invalid so that the
