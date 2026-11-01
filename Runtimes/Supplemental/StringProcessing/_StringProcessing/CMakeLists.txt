@@ -85,12 +85,14 @@ target_link_libraries(swift_StringProcessing PRIVATE
     swiftCore
     $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
+emit_swift_interface(swift_StringProcessing)
 install(TARGETS swift_StringProcessing
   ARCHIVE DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swift_StringProcessing)
-install_swift_interface(swift_StringProcessing)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT ${PROJECT_NAME}_development
+    DESTINATION "${${PROJECT_NAME}_INSTALL_SWIFTMODULEDIR}")
 
 generate_plist(swiftStringProcessing "${CMAKE_PROJECT_VERSION}" swift_StringProcessing)
 embed_manifest(swift_StringProcessing)

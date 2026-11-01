@@ -21,10 +21,12 @@ target_link_libraries(swiftWASILibc PRIVATE
 target_include_directories(swiftWASILibc INTERFACE
   "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
+emit_swift_interface(swiftWASILibc)
 install(TARGETS swiftWASILibc
   EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftWASILibc)
-install_swift_interface(swiftWASILibc)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT SwiftOverlay_development
+    DESTINATION "${SwiftOverlay_INSTALL_SWIFTMODULEDIR}")
