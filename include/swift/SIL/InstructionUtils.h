@@ -17,6 +17,8 @@
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/RuntimeEffect.h"
 #include "swift/SIL/SILModule.h"
+#include "llvm/ADT/PointerUnion.h"
+#include <optional>
 
 namespace swift {
 
@@ -167,6 +169,40 @@ bool isInstrumentation(SILInstruction *Instruction);
 /// Check that this is a partial apply of a reabstraction thunk and return the
 /// argument of the partial apply if it is.
 SILValue isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI);
+
+/// The source of an async-let initializer, after looking through function
+/// conversions and reabstraction thunks. A thin_to_thick_function has no captures.
+using AsyncLetSourceValue =
+    llvm::PointerUnion<PartialApplyInst *, ThinToThickFunctionInst *>;
+
+/// Find the initializer source from a closure value, or return std::nullopt if
+/// it is not recognized. The optional predicate is checked before stripping
+/// conversions, and again at each reabstraction thunk's captured source. This
+/// lets clients impose their own policy without changing structural discovery.
+std::optional<AsyncLetSourceValue> findAsyncLetPartialApplyFromStart(
+    SILValue value, function_ref<bool(SILValue)> acceptSource = nullptr);
+
+/// Find the initializer source from startAsyncLetWithLocalBuffer.
+std::optional<AsyncLetSourceValue> findAsyncLetPartialApplyFromStart(
+    BuiltinInst *start, function_ref<bool(SILValue)> acceptSource = nullptr);
+
+/// Find the initializer source from an async-let get call whose first argument
+/// is the startAsyncLetWithLocalBuffer result.
+std::optional<AsyncLetSourceValue> findAsyncLetPartialApplyFromGet(
+    ApplyInst *get, function_ref<bool(SILValue)> acceptSource = nullptr);
+
+/// Find the async-let start that uses this pointer_to_address's raw pointer as
+/// its result-buffer operand. This is not a general pointer-alias analysis.
+BuiltinInst *getAsyncLetStart(const PointerToAddressInst *address);
+
+/// Follow the unique reabstraction/conversion users of an async-let closure.
+/// Does not impose RegionAnalysis's Sendable or terminal-use policy.
+SILValue lookThroughAsyncLetClosureUsers(SILValue value);
+
+/// Resolve a start, wait, result buffer/pointer, or initializer-chain instruction
+/// to its async-let start. Inspects local use/def links, not the whole function.
+/// This query does not validate lifetime, ownership, or rewrite eligibility.
+BuiltinInst *getAsyncLetStart(SILInstruction *inst);
 
 /// Returns true if \p PAI is only used by an \c assign_or_init
 /// instruction as init or set function.

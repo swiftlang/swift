@@ -176,61 +176,71 @@ void LinearMapInfo::populateBranchingTraceDecl(SILBasicBlock *originalBB,
 }
 
 
-Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
-  SmallVector<SILValue, 4> allResults;
-  SmallVector<unsigned, 8> activeParamIndices;
-  SmallVector<unsigned, 8> activeResultIndices;
-  collectMinimalIndicesForFunctionCall(fai, config, activityInfo, allResults,
-                                       activeParamIndices, activeResultIndices);
-
-  // Check if there are any active results or arguments. If not, skip
-  // this instruction.
-  auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
-    return activityInfo.isActive(res, config);
-  });
-
-  bool hasActiveSemanticResultArgument = false;
-  bool hasActiveArguments = false;
-  // `getArgumentsWithoutIndirectResults()` skips the indirect results and the
-  // indirect error results, so the parameters start at
-  // `getSILArgIndexOfFirstParam()` in SIL argument order.
-  auto firstParamArgIdx = fai.getSubstCalleeConv().getSILArgIndexOfFirstParam();
-  for (auto argIdx : range(fai.getSubstCalleeConv().getNumParameters())) {
-    auto arg = fai.getArgumentsWithoutIndirectResults()[argIdx];
-    if (activityInfo.isActive(arg, config)) {
-      hasActiveArguments = true;
-      auto paramInfo = fai.getSubstCalleeConv().getParamInfoForSILArg(
-          firstParamArgIdx + argIdx);
-      if (paramInfo.isAutoDiffSemanticResult())
-        hasActiveSemanticResultArgument = true;
-    }
-  }
-  if (!hasActiveArguments)
-    return {};
-  if (!hasActiveResults && !hasActiveSemanticResultArgument)
-    return {};
-
-  // Compute differentiability parameters.
-  // - If the callee has `@differentiable` function type, use differentiation
-  //   parameters from the function type.
-  // - Otherwise, use the active parameters.
+Type LinearMapInfo::getLinearMapType(ADContext &context, ApplySite site) {
+  auto asyncLet = getAsyncLet(site.getInstruction());
+  bool isAsyncLet =
+      asyncLet && (asyncLet->isGet(site.getInstruction()) ||
+                   site.getInstruction() == asyncLet->getInitializer());
+  auto callee = isAsyncLet ? ApplySite(asyncLet->getInitializer()) : site;
+  auto origFnSubstTy = callee.getSubstCalleeType();
   IndexSubset *parameters;
-  auto origFnSubstTy = fai.getSubstCalleeType();
+  IndexSubset *results;
+  if (isAsyncLet) {
+    // A wait saves the initializer's pullback, not a derivative of the runtime
+    // wait. Querying the initializer itself supplies the same type for metadata.
+    parameters = asyncLet->getParameterIndices();
+    results = IndexSubset::get(original->getASTContext(),
+                              origFnSubstTy->getNumAutoDiffSemanticResults(),
+                              {0});
+  } else {
+    auto fai = site.asFullApplySite();
+    SmallVector<SILValue, 4> allResults;
+    SmallVector<unsigned, 8> activeParamIndices;
+    SmallVector<unsigned, 8> activeResultIndices;
+    collectMinimalIndicesForFunctionCall(fai, config, activityInfo, allResults,
+                                         activeParamIndices, activeResultIndices);
+
+    // Check if there are any active results or arguments. If not, skip
+    // this instruction.
+    auto hasActiveResults = llvm::any_of(allResults, [&](SILValue res) {
+      return activityInfo.isActive(res, config);
+    });
+
+    bool hasActiveSemanticResultArgument = false;
+    bool hasActiveArguments = false;
+    // `getArgumentsWithoutIndirectResults()` skips the indirect results and the
+    // indirect error results, so the parameters start at
+    // `getSILArgIndexOfFirstParam()` in SIL argument order.
+    auto firstParamArgIdx = fai.getSubstCalleeConv().getSILArgIndexOfFirstParam();
+    for (auto argIdx : range(fai.getSubstCalleeConv().getNumParameters())) {
+      auto arg = fai.getArgumentsWithoutIndirectResults()[argIdx];
+      if (activityInfo.isActive(arg, config)) {
+        hasActiveArguments = true;
+        auto paramInfo = fai.getSubstCalleeConv().getParamInfoForSILArg(
+            firstParamArgIdx + argIdx);
+        if (paramInfo.isAutoDiffSemanticResult())
+          hasActiveSemanticResultArgument = true;
+      }
+    }
+    if (!hasActiveArguments)
+      return {};
+    if (!hasActiveResults && !hasActiveSemanticResultArgument)
+      return {};
+
+    parameters = origFnSubstTy->isDifferentiable()
+                     ? origFnSubstTy->getDifferentiabilityParameterIndices()
+                     : IndexSubset::get(
+                           original->getASTContext(),
+                           fai.getArgumentsWithoutIndirectResults().size(),
+                           activeParamIndices);
+    results = IndexSubset::get(original->getASTContext(),
+                              origFnSubstTy->getNumAutoDiffSemanticResults(),
+                              activeResultIndices);
+  }
   auto remappedOrigFnSubstTy =
       remapTypeInDerivative(SILType::getPrimitiveObjectType(origFnSubstTy))
           .castTo<SILFunctionType>()
           ->getUnsubstitutedType(original->getModule());
-  if (remappedOrigFnSubstTy->isDifferentiable()) {
-    parameters = remappedOrigFnSubstTy->getDifferentiabilityParameterIndices();
-  } else {
-    parameters = IndexSubset::get(
-        original->getASTContext(),
-        fai.getArgumentsWithoutIndirectResults().size(), activeParamIndices);
-  }
-  // Compute differentiability results.
-  auto *results = IndexSubset::get(original->getASTContext(),
-                                   remappedOrigFnSubstTy->getNumAutoDiffSemanticResults(),
-                                   activeResultIndices);
   // Create autodiff indices for the `apply` instruction.
   AutoDiffConfig applyConfig(parameters, results);
 
@@ -260,7 +270,8 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
       } else if (resultIndex >= firstSemanticParamResultIdx) {
         auto semanticResultArgIdx = resultIndex - firstSemanticParamResultIdx;
         auto semanticResultArg =
-            *std::next(fai.getAutoDiffSemanticResultArguments().begin(),
+            *std::next(site.asFullApplySite()
+                           .getAutoDiffSemanticResultArguments().begin(),
                        semanticResultArgIdx);
         remappedResultType = semanticResultArg->getType();
       } else {
@@ -283,47 +294,35 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
               LookUpConformanceInModule())
           ->getUnsubstitutedType(original->getModule());
 
-  auto linearMapSILType = derivativeFnType->getAllResultsInterfaceType();
-  if (auto tupleType = linearMapSILType.getAs<TupleType>()) {
-    linearMapSILType = SILType::getPrimitiveObjectType(
-        tupleType.getElementType(tupleType->getElements().size() - 1));
-  }
-  if (auto fnTy = linearMapSILType.getAs<SILFunctionType>()) {
-    linearMapSILType = SILType::getPrimitiveObjectType(
-        fnTy->getUnsubstitutedType(original->getModule()));
-  }
-
-  // IRGen requires decls to have AST types (not `SILFunctionType`), so we
-  // convert the `SILFunctionType` of the linear map to a `FunctionType` with
-  // the same parameters and results.
-  auto silFnTy = linearMapSILType.castTo<SILFunctionType>();
+  auto linearMapSILType =
+      derivativeFnType->getResults().back().getSILStorageInterfaceType();
+  auto linearMapFnType = linearMapSILType.castTo<SILFunctionType>()
+                             ->getUnsubstitutedType(original->getModule());
+  // Both ordinary calls and child initializers use this same conversion.
   SmallVector<AnyFunctionType::Param, 8> params;
-  for (auto &param : silFnTy->getParameters()) {
+  for (auto &param : linearMapFnType->getParameters()) {
     ParameterTypeFlags flags;
     if (param.isAutoDiffSemanticResult())
       flags = flags.withInOut(true);
-
     params.push_back(
         AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
   }
-
   AnyFunctionType *astFnTy;
-  if (auto genSig = silFnTy->getSubstGenericSignature()) {
+  if (auto genSig = linearMapFnType->getSubstGenericSignature()) {
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     GenericFunctionType::ExtInfo info;
     astFnTy = GenericFunctionType::get(
         genSig, params, /* yields */ {},
-        silFnTy->getAllResultsInterfaceType().getASTType(), info);
+        linearMapFnType->getAllResultsInterfaceType().getASTType(), info);
   } else {
     FunctionType::ExtInfo info;
     astFnTy = FunctionType::get(
         params, /* yields */ {},
-        silFnTy->getAllResultsInterfaceType().getASTType(), info);
+        linearMapFnType->getAllResultsInterfaceType().getASTType(), info);
   }
-
   Type resultType =
       astFnTy->hasArchetype() ? astFnTy->mapTypeOutOfEnvironment() : astFnTy;
-  if (fai.getKind() == FullApplySiteKind::TryApplyInst)
+  if (site.getKind() == ApplySiteKind::TryApplyInst)
     resultType = resultType->wrapInOptionalType();
 
   return resultType;
@@ -453,6 +452,13 @@ void LinearMapInfo::generateDifferentiationDataStructures(
 /// 3. The instruction has both an active result (direct or indirect) and an
 ///    active argument.
 bool LinearMapInfo::shouldDifferentiateApplySite(FullApplySite applySite) {
+  if (auto a = getAsyncLet(applySite.getInstruction());
+      a && a->isGet(applySite.getInstruction())) {
+    assert(kind == AutoDiffLinearMapKind::Pullback);
+    // The get's () result is inactive. It checkpoints the selected child's
+    // pullback; selection is the PR's predicate on the start's raw buffer.
+    return shouldDifferentiateAsyncLet(a->start, activityInfo, config);
+  }
   // Function applications with an active inout argument should be
   // differentiated.
   for (auto inoutArg : applySite.getInoutArguments())
@@ -509,6 +515,11 @@ static bool shouldDifferentiateInjectEnumAddr(
 ///    ending, or destroying on an active operand.
 /// 5. The instruction creates an SSA copy of an active operand.
 bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
+  if (auto a = getAsyncLet(inst))
+    // These closures are replaced as part of the child computation. Their
+    // captured-input adjoints are produced by the saved child pullback.
+    if (a->isInitializerInstruction(inst))
+      return false;
   // A full apply site with an active argument and an active result (direct or
   // indirect) should be differentiated.
   if (FullApplySite::isa(inst))
@@ -565,12 +576,8 @@ bool LinearMapInfo::shouldDifferentiateInstruction(SILInstruction *inst) {
   // Should differentiate `startAsyncLetWithLocalBuffer` with
   // active result buffer
   if (auto *bi = dyn_cast<BuiltinInst>(inst);
-      bi &&
-      bi->getBuiltinKind() == BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
-    auto resultBuf = bi->getArguments().back();
-    if (activityInfo.isActive(resultBuf, config))
-      return true;
-  }
+      bi && shouldDifferentiateAsyncLet(bi, activityInfo, config))
+    return true;
 
   return false;
 }

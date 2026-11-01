@@ -19,6 +19,7 @@
 
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
@@ -412,24 +413,6 @@ void DifferentiableActivityInfo::propagateUseful(
     for (auto &op : inst->getAllOperands())
       setUsefulAndPropagateToOperands(op.get(), i);
   }
-}
-
-// Given a pointer_to_address instruction, return corresponding
-// startAsyncLetWithLocalBuffer provided that input instruction
-// is the address of the async let result buffer (so, the last operand)
-static BuiltinInst *getAsyncLetStart(const PointerToAddressInst *pta) {
-  for (auto use : pta->getOperand()->getUses()) {
-    auto *bi = dyn_cast<BuiltinInst>(use->getUser());
-    if (!bi)
-      continue;
-
-    if (bi->getBuiltinKind() ==
-            BuiltinValueKind::StartAsyncLetWithLocalBuffer &&
-        use->getOperandNumber() == bi->getNumOperands() - 1)
-      return bi;
-  }
-
-  return nullptr;
 }
 
 void DifferentiableActivityInfo::propagateUsefulThroughAddress(
