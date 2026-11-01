@@ -14,7 +14,7 @@
 ///
 /// These values can be set (initialized) exactly once, but read many
 /// times.
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 @frozen
 @_staticExclusiveOnly
 @safe
@@ -22,7 +22,7 @@ public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   @usableFromInline
   let storage: Atomic<Unmanaged<Instance>?>
 
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @inlinable
   public init() {
     unsafe storage = Atomic<Unmanaged<Instance>?>(nil)
@@ -36,7 +36,7 @@ public struct AtomicLazyReference<Instance: AnyObject>: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension AtomicLazyReference {
   /// Atomically initializes this reference if its current value is nil, then
   /// returns the initialized value. If this reference is already initialized,
@@ -67,7 +67,7 @@ extension AtomicLazyReference {
   /// - Returns: The value of `Instance` that was successfully stored within the
   ///   lazy reference. This may or may not be the same value of `Instance` that
   ///   was passed to this function.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public func storeIfNil(_ desired: consuming Instance) -> Instance {
     let desiredUnmanaged = unsafe Unmanaged.passRetained(desired)
     let (exchanged, current) = unsafe storage.compareExchange(
@@ -93,12 +93,12 @@ extension AtomicLazyReference {
   ///
   /// - Returns: A value of `Instance` if the lazy reference was written to, or
   ///   `nil` if it has not been written to yet.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public func load() -> Instance? {
     let value = unsafe storage.load(ordering: .acquiring)
     return unsafe value?.takeUnretainedValue()
   }
 }
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension AtomicLazyReference: @unchecked Sendable where Instance: Sendable {}

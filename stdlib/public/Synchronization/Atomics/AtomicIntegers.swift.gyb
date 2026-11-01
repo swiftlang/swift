@@ -28,22 +28,22 @@ import Builtin
 #if _hasAtomicBitWidth(_${bits})
 %  end
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension ${intType}: AtomicRepresentable {
   /// The storage representation type that `Self` encodes to and decodes from
   /// which is a suitable type when used in atomic operations.
 %   if intType == "Int" or intType == "UInt":
 #if _pointerBitWidth(_64)
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias AtomicRepresentation = _Atomic64BitStorage
 #elseif _pointerBitWidth(_32)
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias AtomicRepresentation = _Atomic32BitStorage
 #else
 #error("Unsupported platform")
 #endif
 %   else:
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   public typealias AtomicRepresentation = ${intStorage}
 %   end
 
@@ -57,7 +57,7 @@ extension ${intType}: AtomicRepresentable {
   /// - Parameter value: A valid instance of `Self` that's about to be destroyed
   ///   to encode an instance of its `AtomicRepresentation`.
   /// - Returns: The newly encoded `AtomicRepresentation` storage.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @export(implementation)
   @_transparent
   public static func encodeAtomicRepresentation(
@@ -76,7 +76,7 @@ extension ${intType}: AtomicRepresentable {
   /// - Parameter storage: The storage representation for `Self` that's used
   ///   within atomic operations.
   /// - Returns: The newly decoded logical type `Self`.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @export(implementation)
   @_transparent
   public static func decodeAtomicRepresentation(
@@ -90,7 +90,7 @@ extension ${intType}: AtomicRepresentable {
 // ${intType} atomic operations
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.0, *)
+@available(StdlibDeploymentTarget 6.0, *)
 extension Atomic where Value == ${intType} {
 % for (name, builtinName, op, doc) in integerOperations:
   /// Perform an atomic ${doc} operation and return the old and new value,
@@ -105,7 +105,7 @@ extension Atomic where Value == ${intType} {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple containing the original value before the operation and
   ///   the new value after the operation.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @export(implementation)
@@ -172,7 +172,7 @@ extension Atomic where Value == ${intType} {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple containing the original value before the operation and
   ///   the new value after the operation.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @export(implementation)
@@ -216,7 +216,7 @@ extension Atomic where Value == ${intType} {
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple containing the original value before the operation and
   ///   the new value after the operation.
-  @available(SwiftStdlib 6.0, *)
+  @available(StdlibDeploymentTarget 6.0, *)
   @discardableResult
   @_semantics("atomics.requires_constant_orderings")
   @export(implementation)
