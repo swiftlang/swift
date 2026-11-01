@@ -1588,6 +1588,14 @@ SWIFT_NAME("BridgedDecl.setBodyDelayed(self:range:hasNestedTypeDeclarations:)")
 void BridgedDecl_setBodyDelayed(BridgedDecl decl, swift::SourceRange range,
                                 bool hasNestedTypeDeclarations);
 
+/// Record that the members of the nominal type or extension \p decl will be
+/// built on demand, and what its body is known to contain.
+SWIFT_NAME("BridgedDecl.setMembersDelayed(self:hasOperatorDeclarations:hasNestedClassDeclarations:hasDerivativeDeclarations:)")
+void BridgedDecl_setMembersDelayed(BridgedDecl decl,
+                                   bool hasOperatorDeclarations,
+                                   bool hasNestedClassDeclarations,
+                                   bool hasDerivativeDeclarations);
+
 SWIFT_NAME("BridgedDecl.setHasNestedTypeDeclarations(self:_:)")
 void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value);
 

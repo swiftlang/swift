@@ -90,6 +90,16 @@ void swift_ASTGen_buildTopLevelASTNodes(
     void *_Nonnull outputContext,
     void (*_Nonnull)(BridgedASTNode, void *_Nonnull));
 
+// Build the members of the nominal type or extension \p decl, whose members
+// were delayed by `swift_ASTGen_buildTopLevelASTNodes`, and pass each to the
+// callback. Returns the fingerprint of the members.
+BridgedFingerprint swift_ASTGen_buildMembers(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedDecl decl, BridgedDeclContext declContext,
+    BridgedASTContext astContext, swift::SourceLoc bodyStart,
+    void *_Nonnull outputContext,
+    void (*_Nonnull)(BridgedDecl, void *_Nonnull));
+
 // Build the body of the function-like declaration \p decl, whose body was
 // delayed by `swift_ASTGen_buildTopLevelASTNodes`, and attach it.
 void swift_ASTGen_buildFunctionBody(BridgedDiagnosticEngine diagEngine,

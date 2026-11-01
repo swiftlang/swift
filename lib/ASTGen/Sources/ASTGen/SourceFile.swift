@@ -438,12 +438,12 @@ extension ExportedSourceFile {
     if let cached = self._heldBackDiagnostics {
       return cached
     }
-    let ranges = self.delayedBodyRanges()
+    let ranges = self.delayedRegions()
     let parserDiagnostics = ParseDiagnosticsGenerator.diagnostics(for: self.syntax)
-    let (parserOutside, parserInside) = partitionDiagnostics(parserDiagnostics, byDelayedBodies: ranges)
+    let (parserOutside, parserInside) = partitionDiagnostics(parserDiagnostics, byDelayedRegions: ranges)
     let (ifConfigOutside, ifConfigInside) = partitionDiagnostics(
       self.configuredRegions(astContext: astContext).diagnostics,
-      byDelayedBodies: ranges
+      byDelayedRegions: ranges
     )
     let result = HeldBackDiagnostics(
       parserOutside: parserOutside,
