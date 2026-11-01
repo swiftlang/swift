@@ -20,7 +20,7 @@ from typing import Any, Dict, Hashable, Optional, List, Tuple, Union
 
 from .cli_arguments import CliArguments
 from .git_command import Git, GitException, is_any_repository_locked, is_commit_hash
-from .retry import exponential_retry
+from .retry import NonRetryableFailures, exponential_retry, is_retryable
 from .runner_arguments import AdditionalSwiftSourcesArguments, UpdateArguments
 from .parallel_runner import ParallelRunner
 from .commands import status
@@ -1127,6 +1127,20 @@ def full_target_name(repo_path: Path, remote: str, target: str) -> str:
     return target
 
 
+def _has_retryable_failure(results: List[Any]) -> bool:
+    """Returns whether any failure in ParallelRunner results might be fixed by
+    retrying. Results are interpreted the same way as in
+    ``ParallelRunner.check_results``."""
+    for result in results:
+        if result is None:
+            continue
+        if isinstance(result, tuple) and len(result) == 3 and result[1] == 0:
+            continue
+        if not isinstance(result, BaseException) or is_retryable(result):
+            return True
+    return False
+
+
 def skip_list_for_platform(config: Dict[str, Any], all_repos: bool) -> List[str]:
     """Computes a list of repositories to skip when updating or cloning, if not
     overridden by `--all-repositories` CLI argument.
@@ -1265,9 +1279,18 @@ def main() -> int:
         fail_count = 0
         fail_count += ParallelRunner.check_results(clone_results, "CLONE")
         fail_count += ParallelRunner.check_results(update_results, "UPDATE")
+        # Each repository has already been retried on its own, so running the
+        # whole checkout again only helps if some failure might be transient.
+        if fail_count > 0 and not _has_retryable_failure(
+            (clone_results or []) + (update_results or [])
+        ):
+            raise NonRetryableFailures(fail_count)
         return fail_count
 
-    fail_count = do_checkout()
+    try:
+        fail_count = do_checkout()
+    except NonRetryableFailures as e:
+        fail_count = e.fail_count
     if fail_count > 0:
         print("update-checkout failed, fix errors and try again")
     elif not args.dump_hashes and not args.dump_hashes_config:
