@@ -4,13 +4,13 @@
 
 | Swift  | LLVM Project
 | ------ | ------------
-| main   | swift/main
+| main   | the current `stable/*` branch (for example, `stable/23.x`)
 
 `main` is the place for active development on Swift. If you're just working on Swift, that's where you'll spend most of your time.
 
-LLVM Project repo automatically merge changes from the latest release branch (see below) into `swift/main`. This generally means `swift/main` is just an alias for the latest release branch. If you want to do Swift-related development on LLVM projects, see "The Upstream Branches" below.
+In the LLVM Project repo, Swift's `main` branch is paired with a periodic stabilization branch named `stable/*`. The paired branch changes over time, so check the `main` scheme in [`update-checkout-config.json`](https://github.com/swiftlang/swift/blob/main/utils/update_checkout/update-checkout-config.json) for the current one. If you want to do Swift-related development on LLVM projects, see "The Upstream Branches" below and LLVM Project's [branching scheme](https://github.com/swiftlang/llvm-project/blob/next/apple-docs/AppleBranchingScheme.md) document.
 
-To switch from one set of branches to another, you can use `utils/update-checkout` in the Swift repository with the `--scheme` option. You can use any of the branch names as the argument to `--scheme`: in this case, either `main` or `swift/main`.
+To switch from one set of branches to another, you can use `utils/update-checkout` in the Swift repository with the `--scheme` option. You can use the Swift branch name or any of its aliases as the argument to `--scheme`: in this case, `main`.
 
   [release manager]: https://swift.org/blog/5-2-release-process/
   [lldb]: http://lldb.llvm.org
@@ -31,13 +31,13 @@ Note that these branches come not from the "development" branches (above), but t
 
 | Swift       | LLVM Project
 | ----------- | -----------------
-| next        | swift/next
+| next        | next
 
-`swift/next` is a branch for LLVM that includes all changes necessary to support Swift. Changes from llvm.org's main branch are automatically merged in. Why isn't this just `swift/main`? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
+LLVM Project's `next` branch includes all changes necessary to support Swift. Changes from llvm.org's main branch are merged in by a gated automerger. Why isn't Swift's `main` paired with this branch? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
 
-If you are making changes to LLVM to support Swift, you'll probably need to work on them in `swift/main` to test them against Swift itself, but they should be committed to `swift/next`, and cherry-picked to the current release branch (`swift/release/x.y`) if needed. Remember, the release branches are automerged into `swift/main` on a regular basis.
+If you are making changes to LLVM to support Swift, you'll probably need to work on them in the `stable/*` branch paired with Swift's `main` to test them against Swift itself. Changes made to a stabilization branch are cherry-picked to `next`, and to the current release branch (`swift/release/x.y`) if needed.
 
-(If you're making changes to LLVM Project that *aren't* about Swift, they should generally be made on llvm.org instead, then cherry-picked to the active release branch or `swift/main`.)
+(If you're making changes to LLVM Project that *aren't* about Swift, they should generally be made on llvm.org instead, then cherry-picked to the active `stable/*` or release branch.)
 
 `next` is an effort to keep Swift building with the latest LLVM changes. Ideally when LLVM changes, no Swift updates are needed, but that isn't always the case. In these situations, any adjustments can go into Swift's `next` branch. Changes from Swift's `main` are automatically merged into `next` as well.
 
@@ -50,7 +50,7 @@ If you are making changes to LLVM to support Swift, you'll probably need to work
 swift/utils/update-checkout --scheme [branch]
 ```
 
-You can use any of the branch names as the argument to `--scheme`, such as `main` or `swift/main`. See `update-checkout --help` for more options.
+You can use any of the branch names as the argument to `--scheme`, such as `main` or `next`. See `update-checkout --help` for more options.
 
 ## Committing
 
@@ -62,18 +62,18 @@ You can use any of the branch names as the argument to `--scheme`, such as `main
   
      - New commits go to `main` in the upstream [llvm-project](https://github.com/llvm/llvm-project).
 
-     - Then cherry-pick these commits to an appropriate, `swift/main` aligned `apple/stable/*` branch in Apple's fork of [llvm-project](https://github.com/apple/llvm-project). Please see [Apple's branching scheme](https://github.com/apple/llvm-project/blob/apple/main/apple-docs/AppleBranchingScheme.md) document to determine which `apple/stable/*` branch you should cherry-pick to.
+     - Then cherry-pick these commits to the `stable/*` branch paired with Swift's `main` in [swiftlang/llvm-project](https://github.com/swiftlang/llvm-project). Please see the [branching scheme](https://github.com/swiftlang/llvm-project/blob/next/apple-docs/AppleBranchingScheme.md) document for details.
   
-     Note that **no new changes should be submitted directly to `apple/main`**. We are actively working on eliminating the differences from upstream LLVM.
+     Note that **no new changes should be submitted directly to `next`** unless they are related to upstreaming or are needed because of existing differences from upstream LLVM. We are actively working on eliminating the differences from upstream LLVM.
 
   2) Changes that depend on Swift (this only applies to LLDB)
-     - New commits go to `swift/main` (_not_ an `apple/stable/*` branch, as these shouldn't contain changes that depend on Swift).
+     - New commits go to the `stable/*` branch paired with Swift's `main`.
 
-     - Then cherry-pick these commits to `swift/next`.
+     - Then cherry-pick these commits to `next`.
 
      - If necessary, cherry-pick to the release branch (`swift/release/x.y`), following the appropriate release process. (Usually this means filling out a standard template, finding someone to review your code if that hasn't already happened, and getting approval from that repo's *release manager.)*
 
-  In the long term we want to eliminate the differences from upstream LLVM for these changes as well, but for now there is no concrete plan. So, submitting to `swift/next` continues to be allowed.
+  In the long term we want to eliminate the differences from upstream LLVM for these changes as well, but for now there is no concrete plan.
 
 ## Automerging
 
@@ -83,8 +83,7 @@ Some branches are *automerged* into other branches, to keep them in sync. This i
 - `main` is automerged into `next`
 
 ### LLVM Project
-- `swift/release/x.y` (the *latest* release branch) is automerged into `swift/main`
-- llvm.org's `main` is automerged into `swift/next`
+- llvm.org's `main` is automerged into `next`, through a gated automerger that tests changes before merging them
 - llvm.org's release branch *may* be automerged into `swift/release/x.y`, if they are in sync
 
 
