@@ -66,10 +66,8 @@ extension ASTGenVisitor {
     case .actorDecl(let decl):
       trailingWhere = decl.genericWhereClause
       insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
-    case .typeAliasDecl(let decl):
-      trailingWhere = decl.genericWhereClause
-      insertAfter = node.lastToken(viewMode: .sourceAccurate)
     default:
+      // Other declarations, typealiases included, do not get this diagnostic.
       return
     }
 
