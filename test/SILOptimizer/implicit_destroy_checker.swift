@@ -269,9 +269,10 @@ func consumedByEscapingClosure() {
 } // expected-note {{path exits here without a consume}}
 
 func consumedByLocalFunction() {
-  let nd = make() // expected-error {{'nd' is not consumed on all paths}}
+  let nd = make() // expected-error {{non-'Copyable' 'nd' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+  // expected-error@-1 {{'nd' is not consumed on all paths}}
   func local() {
-    nd.finish() // expected-error {{non-'Copyable' 'nd' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+    nd.finish() // expected-note {{consumed here}}
   }
   local()
 } // expected-note {{path exits here without a consume}}
