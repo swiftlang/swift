@@ -168,6 +168,17 @@ class TestConstants(unittest.TestCase):
             os.path.join(constants.PROJECT_PATH, "build"),
         )
 
+    def test_get_swift_build_root_no_source_root(self):
+        self.assertIsNone(constants._get_swift_build_root(None))
+
+    def test_get_swift_build_root_no_source_root_env_var(self):
+        env = {"SWIFT_BUILD_ROOT": _TEST_BUILD_ROOT}
+
+        self.assertEqual(
+            constants._get_swift_build_root(None, env=env),
+            _TEST_BUILD_ROOT,
+        )
+
     # ----------------------------------------------------------------------------------
     # _get_swift_repo_name
 
