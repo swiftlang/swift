@@ -2937,6 +2937,7 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
   // Swift compiler to pass in a temporary copy to prevent dangling.
   auto paramContext = param->getDeclContext();
   if (!param->getType().isNull() && param->getType()->isLValueReferenceType() &&
+      classifyCxxReferenceParameter(param->getType()) &&
       !swiftParamTy->isForeignReferenceType() &&
       !(isa<clang::FunctionDecl>(paramContext) &&
         cast<clang::FunctionDecl>(paramContext)->isOverloadedOperator()) &&
