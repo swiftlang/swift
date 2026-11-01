@@ -2022,6 +2022,13 @@ void BridgedAbstractStorageDecl_setAccessors(
 // MARK: AccessorDecl
 //===----------------------------------------------------------------------===//
 
+/// The location of the accessor of the given kind that \p storage already has,
+/// or an invalid location if it has none.
+SWIFT_NAME("BridgedAbstractStorageDecl.accessorLoc(self:_:)")
+swift::SourceLoc
+BridgedAbstractStorageDecl_getAccessorLoc(BridgedAbstractStorageDecl storage,
+                                          swift::AccessorKind kind);
+
 SWIFT_NAME("BridgedAccessorDecl.setParsedBody(self:_:)")
 void BridgedAccessorDecl_setParsedBody(BridgedAccessorDecl decl,
                                        BridgedBraceStmt body);
@@ -3040,6 +3047,12 @@ BridgedCompileTimeLiteralTypeRepr
 BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
                                                BridgedTypeRepr base,
                                                swift::SourceLoc specifierLoc);
+
+SWIFT_NAME("BridgedConstValueTypeRepr.createParsed(_:base:atLoc:)")
+BridgedConstValueTypeRepr
+BridgedConstValueTypeRepr_createParsed(BridgedASTContext cContext,
+                                       BridgedTypeRepr base,
+                                       swift::SourceLoc atLoc);
 
 SWIFT_NAME("BridgedDeclRefTypeRepr.createParsed(_:base:name:nameLoc:"
            "genericArguments:angleRange:)")

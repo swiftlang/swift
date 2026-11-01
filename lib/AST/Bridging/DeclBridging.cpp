@@ -710,6 +710,14 @@ void BridgedAbstractStorageDecl_setAccessors(
 // MARK: AccessorDecl
 //===----------------------------------------------------------------------===//
 
+SourceLoc
+BridgedAbstractStorageDecl_getAccessorLoc(BridgedAbstractStorageDecl storage,
+                                          AccessorKind kind) {
+  if (auto *accessor = storage.unbridged()->getAccessor(kind))
+    return accessor->getLoc();
+  return SourceLoc();
+}
+
 void BridgedAccessorDecl_setParsedBody(BridgedAccessorDecl decl,
                                        BridgedBraceStmt body) {
   decl.unbridged()->setBody(body.unbridged(),

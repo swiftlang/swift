@@ -313,6 +313,18 @@ extension ASTGenVisitor {
       type = self.applyParameterTypeModifiers(node.modifiers, to: base)
     }
 
+    // A `@const` parameter is a const value in its type, as well as an attribute.
+    if let base = type, attrs.hasAttribute(.ConstVal),
+      let constAttribute = node.optionalAttributes?.lazy.compactMap({ $0.as(AttributeSyntax.self) })
+        .first(where: { $0.attributeName.trimmedDescription == "const" })
+    {
+      type = BridgedConstValueTypeRepr.createParsed(
+        self.ctx,
+        base: base,
+        atLoc: self.generateSourceLoc(constAttribute.atSign)
+      ).asTypeRepr
+    }
+
     let initContext: BridgedDefaultArgumentInitializer?
     let initExpr: BridgedExpr?
     if let defaultValue = node.defaultValue {

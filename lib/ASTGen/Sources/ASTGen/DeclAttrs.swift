@@ -1885,12 +1885,13 @@ extension ASTGenVisitor {
         // TODO: Diagnose.
         return nil
       }
-      guard role.isSupported(in: self.ctx) else {
+      if !role.isSupported(in: self.ctx) {
+        // The C++ parser reports it but still builds the attribute, so the
+        // macro does not also complain about having no roles.
         self.diagnose(
           .macro_experimental(roleToken!.text, ""),
           at: roleToken!
         )
-        return nil
       }
       if role.isAttached != isAttached {
         // TODO: Diagnose.

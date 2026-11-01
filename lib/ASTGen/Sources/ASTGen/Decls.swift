@@ -510,6 +510,14 @@ extension ASTGenVisitor {
         at: node.accessorSpecifier
       )
     }
+    // 'borrow' and 'mutate' only make sense in a type.
+    if (kind == .borrow || kind == .mutate), !self.declContext.isTypeContext {
+      self.diagnose(
+        .borrow_mutate_accessor_not_supported_in_decl(
+          String(bridged: kind.diagnosticName(article: true, underscored: false))),
+        at: node.accessorSpecifier
+      )
+    }
     // Only a 'get' accessor may be effectful. For any other kind, diagnose each
     // specifier and drop it: an AccessorDecl that is both non-'get' and 'async'
     // violates an AccessorDecl invariant and would trip an assertion.
@@ -988,6 +996,7 @@ extension ASTGenVisitor {
 
       } else {
         self.diagnose(.getset_nontrivial_pattern, at: binding.pattern)
+        self.patternBindingIsInvalid = true
       }
     }
     return BridgedPatternBindingEntry(
@@ -1085,7 +1094,13 @@ extension ASTGenVisitor {
       topLevelDecl = nil
     }
 
-    guard let entries = self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl) else {
+    // A declaration nested in an initializer has its own flag.
+    let outerBindingIsInvalid = self.patternBindingIsInvalid
+    self.patternBindingIsInvalid = false
+    let generatedEntries = self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl)
+    let bindingIsInvalid = self.patternBindingIsInvalid
+    self.patternBindingIsInvalid = outerBindingIsInvalid
+    guard let entries = generatedEntries else {
       // No bindings with valid SourceLocs. A PatternBindingDecl generated from this would have an invalid SourceRange,
       // violating availability checker invariants. Drop the PBD instead.
       return nil
@@ -1127,6 +1142,9 @@ extension ASTGenVisitor {
       introducer: introducer,
       entries: entries
     )
+    if bindingIsInvalid {
+      decl.asDecl.setInvalid()
+    }
     if let topLevelDecl {
       let range = self.generateImplicitBraceRange(node)
       let body = BridgedBraceStmt.createImplicit(
@@ -1211,6 +1229,26 @@ extension ASTGenVisitor {
         self.diagnoseDuplicateAccessor(elem, kind: kind, previous: previous, isSubscript: false)
       } else {
         firstOfKind[kind] = elem
+        // An accessor the storage was already written with is the first of its
+        // kind, and what a macro-provided one duplicates.
+        let existing = storage.accessorLoc(kind)
+        if existing.isValid {
+          let underscored = self.ctx.langOpts.hasFeature(.CoroutineAccessors)
+          self.diagnose(
+            .duplicate_accessor(
+              0,
+              String(bridged: kind.diagnosticName(article: true, underscored: underscored))
+            ),
+            at: elem.accessorSpecifier
+          )
+          self.diagnose(
+            .previous_accessor(
+              String(bridged: kind.diagnosticName(article: false, underscored: underscored)),
+              true
+            ),
+            at: existing
+          )
+        }
       }
       if let accessor = self.generate(accessorDecl: elem, kind: kind, for: storage) {
         accessors.append(accessor)

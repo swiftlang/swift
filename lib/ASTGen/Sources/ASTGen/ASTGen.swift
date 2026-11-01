@@ -52,6 +52,10 @@ struct ASTGenVisitor {
   /// parameterless `#sourceLocation()` has something to close.
   @Boxed var inPoundSourceLocationEnvironment: Bool = false
 
+  /// Set when a pattern binding was diagnosed as malformed while its entries
+  /// were generated, so the declaration is marked invalid.
+  @Boxed var patternBindingIsInvalid: Bool = false
+
   /// Whether the accessors being generated belong to a declaration that was
   /// already diagnosed as invalid, so they are marked invalid too.
   @Boxed var accessorsAreInvalid: Bool = false

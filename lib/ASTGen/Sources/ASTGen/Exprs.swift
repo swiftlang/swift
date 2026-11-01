@@ -1290,7 +1290,8 @@ extension ASTGenVisitor {
   func generate(tupleExpr node: TupleExprSyntax) -> BridgedExpr {
     if node.elements.count == 1,
        let first = node.elements.first,
-       first.label == nil,
+       // An explicitly omitted label, `(_: 3)`, leaves a parenthesized expression.
+       first.label == nil || first.label?.rawTokenKind == .wildcard,
        !first.expression.is(PackExpansionExprSyntax.self) {
       return BridgedParenExpr.createParsed(
         self.ctx,
