@@ -19,4 +19,5 @@ add_swift_macro_library(ObservationMacros
     SwiftSyntaxBuilder
     SwiftSyntax
     SwiftSyntaxMacros
+    SwiftOperators
 )
