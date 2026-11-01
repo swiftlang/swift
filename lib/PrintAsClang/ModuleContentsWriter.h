@@ -59,11 +59,10 @@ struct EmittedClangHeaderDependencyInfo {
 /// Prints the declarations of \p M to \p os in C++ language mode.
 ///
 /// \returns Dependencies required by this module.
-EmittedClangHeaderDependencyInfo
-printModuleContentsAsCxx(raw_ostream &os, ModuleDecl &M,
-                         SwiftToClangInteropContext &interopContext,
-                         AccessLevel minAccess, bool requiresExposedAttribute,
-                         llvm::StringSet<> &exposedModules);
+EmittedClangHeaderDependencyInfo printModuleContentsAsCxx(
+    raw_ostream &os, ModuleDecl &M, SwiftToClangInteropContext &interopContext,
+    AccessLevel minAccess, bool requiresExposedAttribute,
+    llvm::StringSet<> &exposedModules, bool useClangDeploymentTarget = false);
 
 } // end namespace swift
 
