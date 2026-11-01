@@ -2976,8 +2976,20 @@ void PrintAST::printAccessors(const AbstractStorageDecl *ASD,
       accessorsToPrint.push_back(Accessor);
   };
 
-  if (ASD->hasInitAccessor())
-    AddAccessorToPrint(AccessorKind::Init);
+  if (ASD->hasInitAccessor()) {
+    // An init accessor's '@storageRestrictions' names the stored properties
+    // it initializes and accesses, so only print it if they are printed too.
+    // For example, a '@usableFromInline' property's init accessor is
+    // '@usableFromInline', but the private storage of a resilient type isn't
+    // printed. Clients can only use the init accessor from an '@inlinable'
+    // initializer of a fixed-layout type, whose stored properties are printed.
+    auto *initAccessor = ASD->getAccessor(AccessorKind::Init);
+    auto isPrinted = [&](VarDecl *property) { return shouldPrint(property); };
+    if (initAccessor &&
+        llvm::all_of(initAccessor->getInitializedProperties(), isPrinted) &&
+        llvm::all_of(initAccessor->getAccessedProperties(), isPrinted))
+      AddAccessorToPrint(AccessorKind::Init);
+  }
 
   if (PrintAbstract) {
     AddAccessorToPrint(AccessorKind::Get);
