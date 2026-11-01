@@ -42,6 +42,7 @@
 // CHECK-NEXT: SWIFT_EXTERN ptrdiff_t $s8Generics11GenericPairV12computedPropSivg(struct swift_interop_passStub_Generics_[[PTRPTRENC]] _self, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // _
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics11GenericPairV11computedVarxvg(SWIFT_INDIRECT_RESULT void * _Nonnull, struct swift_interop_passStub_Generics_[[PTRPTRENC]] _self, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // _
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics11GenericPairV11computedVarxvs(const void * _Nonnull newValue, void * _Nonnull , SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // _
+// CHECK-NEXT: SWIFT_EXTERN ptrdiff_t $s8Generics11GenericPairV16_getTypeMetadataSiyF(struct swift_interop_passStub_Generics_[[PTRPTRENC]] _self, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // _getTypeMetadata()
 // CHECK-NEXT: struct Generics_GenericPair {
 // CHECK-NEXT:   _Alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT: };
