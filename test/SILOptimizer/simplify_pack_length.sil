@@ -1,0 +1,55 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=pack_length | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+struct A {}
+struct B {}
+
+// CHECK-LABEL: sil @simplify_length_0 : $@convention(thin) () -> Builtin.Word {
+// CHECK:         integer_literal $Builtin.Word, 0
+// CHECK-LABEL: } // end sil function 'simplify_length_0'
+sil @simplify_length_0 : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{}
+  return %len
+}
+
+// CHECK-LABEL: sil @simplify_length_1 : $@convention(thin) () -> Builtin.Word {
+// CHECK:         integer_literal $Builtin.Word, 1
+// CHECK-LABEL: } // end sil function 'simplify_length_1'
+sil @simplify_length_1 : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{A}
+  return %len
+}
+
+// CHECK-LABEL: sil @simplify_length_2 : $@convention(thin) () -> Builtin.Word {
+// CHECK:         integer_literal $Builtin.Word, 2
+// CHECK-LABEL: } // end sil function 'simplify_length_2'
+sil @simplify_length_2 : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{A, B}
+  return %len
+}
+
+// CHECK-LABEL: sil @simplify_length_empty_tuples : $@convention(thin) () -> Builtin.Word {
+// CHECK:         integer_literal $Builtin.Word, 2
+// CHECK-LABEL: } // end sil function 'simplify_length_empty_tuples'
+sil @simplify_length_empty_tuples : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{(), ()}
+  return %len
+}
+
+// CHECK-LABEL: sil @dont_simplify_with_expansion : $@convention(thin) <each T> () -> Builtin.Word {
+// CHECK:         pack_length $Pack{repeat each T}
+// CHECK-LABEL: } // end sil function 'dont_simplify_with_expansion'
+sil @dont_simplify_with_expansion : $@convention(thin) <each T> () -> Builtin.Word {
+bb0:
+  %len = pack_length $Pack{repeat each T}
+  return %len
+}

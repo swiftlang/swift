@@ -1479,23 +1479,6 @@ SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtrac
   return eraseInstFromFunction(*DFEI);
 }
 
-// Simplify `pack_length` with constant-length pack.
-//
-// Before:
-// %len = pack_length $Pack{Int, String, Float}
-//
-// After:
-// %len = integer_literal Builtin.Word, 3
-SILInstruction *SILCombiner::visitPackLengthInst(PackLengthInst *PLI) {
-  auto PackTy = PLI->getPackType();
-  if (!PackTy->containsPackExpansionType()) {
-    return Builder.createIntegerLiteral(PLI->getLoc(), PLI->getType(),
-                                        PackTy->getNumElements());
-  }
-
-  return nullptr;
-}
-
 // Simplify `pack_element_get` where the index is a `dynamic_pack_index` with
 // a constant operand.
 //

@@ -349,6 +349,17 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       }
     }
 
+    if context.options.enableEmbeddedSwift {
+      if context.unrollPackLoops(in: function) {
+        changed = true
+      }
+
+      // Eliminate @pack_element types here to allow any applies that use them to be specialized.
+      if tryEliminateOpenedPackElementTypes(in: function, context) {
+        changed = true
+      }
+    }
+
     _ = context.specializeApplies(in: function, isMandatory: true)
 
     removeUnusedMetatypeInstructions(in: function, context)

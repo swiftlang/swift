@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-feature Embedded -embedded-swift-diagnostics -I %test-resource-dir/embedded %s -o /dev/null
+// RUN: %target-sil-opt -enable-experimental-feature Embedded -embedded-swift-diagnostics -I %test-resource-dir/embedded -verify %s -o /dev/null
 
 // REQUIRES: swift_feature_Embedded
 
@@ -24,3 +24,10 @@ bb2:
   return %0
 }
 
+sil [ossa] @tuple_pack_elements : $@convention(thin) (@in_guaranteed (MyStruct, MyStruct)) -> () {
+bb0(%0 : $*(MyStruct, MyStruct)):
+  %zero = scalar_pack_index 0 of $Pack{MyStruct, MyStruct}
+  %addr = tuple_pack_element_addr %zero of %0 as $*MyStruct // expected-error{{variadic generic expansions in tuples not available in embedded Swift}}
+  %res = tuple ()
+  return %res
+}
