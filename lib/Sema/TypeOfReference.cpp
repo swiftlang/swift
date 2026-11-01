@@ -938,7 +938,11 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs,
     }
 
     auto *paramDecl = paramList->get(i);
-    if (!paramDecl->hasAttachedPropertyWrapper() && !argLabel.hasDollarPrefix()) {
+    auto isProjectedValueArg = argLabel.hasDollarPrefix() &&
+        (paramDecl->getArgumentName() != argLabel ||
+         paramDecl->hasImplicitPropertyWrapper());
+
+    if (!paramDecl->hasAttachedPropertyWrapper() && !isProjectedValueArg) {
       adjustedParamTypes.push_back(paramTypes[i]);
       continue;
     }
