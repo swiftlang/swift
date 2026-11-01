@@ -4,11 +4,6 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/structs.h -Wno-unused-private-field -Wno-unused-function)
 
-// CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
-// CHECK: namespace _impl {
-
-// CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
-
 // CHECK: class SWIFT_SYMBOL("s:7Structs18StructWithIntFieldV") StructWithIntField;
 // CHECK-NEXT: } // end namespace
 
@@ -19,6 +14,10 @@
 // CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
+
+// CHECK: #undef SWIFT_SYMBOL
+// CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
+// CHECK: namespace _impl {
 
 // CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
 
