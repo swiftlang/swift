@@ -5,6 +5,28 @@
 
 ## Swift (next)
 
+* C++ interop: Swift functions, methods, initializers and throwing accessors
+  marked with `throws` can now be exposed to C++ via the experimental
+  `GenerateBindingsForThrowingFunctionsInCXX` feature, which is now available
+  in production compilers. The C++ code that includes the generated header
+  opts into the bindings by defining the
+  `SWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR` macro. A thrown Swift error is
+  rethrown to C++ as a `swift::Error` exception (or returned as
+  `swift::Expected<T>` when C++ exceptions are disabled). `swift::Error` now
+  derives from `std::exception` and its `what()` method returns the result of
+  `String(describing:)` for the thrown error value. Explicit `throws(any Error)`
+  uses the same bindings as untyped `throws`. Concrete typed throws and
+  `throws(Never)` cannot be exposed yet, and the bindings are not supported yet
+  on Windows and on arm64e.
+
+  ```c++
+  try {
+    auto value = Module::throwingFunction();
+  } catch (const std::exception &error) {
+    printf("failed: %s\n", error.what());
+  }
+  ```
+
 * [SE-0478][]:
   Introduced file-level default declarations for `nonisolated`, `@MainActor`,
   `@available`, and `@diagnose`. A `default` declaration applies to all
