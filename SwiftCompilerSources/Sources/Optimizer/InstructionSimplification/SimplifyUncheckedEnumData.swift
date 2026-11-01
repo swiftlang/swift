@@ -23,3 +23,13 @@ extension UncheckedEnumDataInst : OnoneSimplifiable, SILCombineSimplifiable {
     context.tryReplaceRedundantInstructionPair(first: enumInst, second: self, with: enumInst.payload!)
   }
 }
+
+extension UncheckedEnumDataInst : DebugReconstructionBlockSimplifiable {
+  /// Folds `unchecked_enum_data undef` to `undef`, and fold `unchecked_enum_data(enum(x)) -> x`
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    simplify(context)
+  }
+}

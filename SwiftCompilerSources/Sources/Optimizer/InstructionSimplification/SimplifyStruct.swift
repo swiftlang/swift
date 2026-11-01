@@ -185,3 +185,12 @@ extension SingleValueInstruction {
     use.set(to: delayedAggregate, context)
   }
 }
+
+extension StructInst : DebugReconstructionBlockSimplifiable {
+  /// Just folds an all-undef struct to undef.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if !operands.isEmpty && operands.allSatisfy({ $0.value is Undef }) {
+      replaceWithUndef(context)
+    }
+  }
+}
