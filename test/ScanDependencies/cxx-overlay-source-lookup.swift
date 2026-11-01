@@ -12,10 +12,10 @@
 // CHECK-NEXT: client.swift
 // CHECK-NEXT: ],
 // CHECK: "directDependencies": [
-// CHECK-DAG: "swift": "Swift"
-// CHECK-DAG: "swift": "SwiftOnoneSupport"
-// CHECK-DAG: "swift": "Cxx"
-// CHECK-DAG: "swift": "CxxStdlib"
+// CHECK-DAG: "swift{{(PrebuiltExternal)?}}": "Swift"
+// CHECK-DAG: "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
+// CHECK-DAG: "swift{{(PrebuiltExternal)?}}": "Cxx"
+// CHECK-DAG: "swift{{(PrebuiltExternal)?}}": "CxxStdlib"
 // CHECK-DAG: "clang": "CxxShim"
 // CHECK-DAG: "clang": "Foo"
 // CHECK: ],

@@ -18,8 +18,7 @@ struct S: P {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9witnesses21testMainActorDispatch1tyx_tYaAA1PRzlF : $@convention(thin) @async <T where T : P> (@in_guaranteed T) -> ()
-// CHECK: [[MAIN_ACTOR_TYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[MAIN_ACTOR:%.*]] = apply {{.*}}([[MAIN_ACTOR_TYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // CHECK-NEXT: [[BORROWED_MAIN_ACTOR:%.*]] = begin_borrow [[MAIN_ACTOR]]
 // CHECK-NEXT: hop_to_executor [[BORROWED_MAIN_ACTOR]]
 // CHECK-NEXT: [[MAIN_ACTOR_COPY:%.*]] = copy_value [[BORROWED_MAIN_ACTOR]]
@@ -87,8 +86,7 @@ actor Test {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s9witnesses14testDirectCall1syAA1SV_tYaF : $@convention(thin) @async (S) -> ()
-// CHECK: [[MAIN_ACTOR_TYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[MAIN_ACTOR:%.*]] = apply {{.*}}([[MAIN_ACTOR_TYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\] .*}}
 // CHECK-NEXT: [[BORROWED_MAIN_ACTOR:%.*]] = begin_borrow [[MAIN_ACTOR]]
 // CHECK-NEXT: hop_to_executor [[BORROWED_MAIN_ACTOR]]
 // CHECK-NEXT: [[MAIN_ACTOR_COPY:%.*]] = copy_value [[BORROWED_MAIN_ACTOR]]

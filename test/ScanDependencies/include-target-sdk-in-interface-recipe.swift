@@ -1,8 +1,11 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface %s -o %t/deps.json -target-sdk-version 15.0 -target-sdk-name macosx15.0.test_name
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface %s -o %t/deps.json -I %S/Inputs/Swift -target-sdk-version 15.0 -target-sdk-name macosx15.0.test_name
 
 // Check the contents of the JSON output
 // RUN: %validate-json %t/deps.json | %FileCheck %s
+
+// E is built from its textual interface, so the output has an interface build recipe.
+import E
 
 func foo() { print(1) }
 

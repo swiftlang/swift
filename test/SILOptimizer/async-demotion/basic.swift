@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-experimental-async-demotion -target %target-swift-5.1-abi-triple -module-name main -O -emit-sil -primary-file %s | %FileCheck %s --implicit-check-not hop_to_executor
+// RUN: %target-swift-frontend -enable-experimental-async-demotion -target %target-swift-5.1-abi-triple -module-name main -O -emit-sil -primary-file %s | %FileCheck %s --implicit-check-not hop_to_executor --check-prefixes=CHECK,%if swift_stdlib_library_evolution %{CHECK-EVO%} %else %{CHECK-NOEVO%}
 
 // REQUIRES: concurrency
 
@@ -7,7 +7,7 @@
 // CHECK: hop_to_executor
 // CHECK: hop_to_executor
 // CHECK: hop_to_executor
-// CHECK: hop_to_executor
+// CHECK-EVO: hop_to_executor
 
 @MainActor func mainActorFn() {}
 

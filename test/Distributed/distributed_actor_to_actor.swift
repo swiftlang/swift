@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -Xllvm -sil-print-types -emit-sil -o - | %FileCheck %s -check-prefix=CHECK-SIL
 
-// RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -emit-ir -o - | %FileCheck %s -check-prefix=CHECK-IR
+// RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -emit-ir -o - | %FileCheck %s -check-prefix=CHECK-IR -check-prefix=%if swift_stdlib_library_evolution %{CHECK-IR-EVO%} %else %{CHECK-IR-NOEVO%}
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
@@ -13,11 +13,14 @@ import Distributed
 // Protocol conformance descriptor:
 //   - extension of DistributedActor
 //   - flags, which includes a specific bit + conditional conformance
-//   - witness for unownedExecutor
+//   - witness for unownedExecutor (in the witness table pattern if Actor is
+//     not resilient)
+// CHECK-IR-NOEVO: @"$sxScA11DistributedWp" = {{.*}}[ptr @"$sxScA11DistributedMc", ptr @"$sxScA11DistributedScA15unownedExecutorScevgTW"]
 // CHECK-IR: @"$sxScA11DistributedMc" = linkonce_odr hidden constant
 // CHECK-IR-SAME: $s11Distributed0A5ActorPAAEMXE
-// CHECK-IR-SAME: i32 459080
-// CHECK-IR-SAME: $sxScA11DistributedScA15unownedExecutorScevgTW
+// CHECK-IR-EVO-SAME: i32 459080
+// CHECK-IR-EVO-SAME: $sxScA11DistributedScA15unownedExecutorScevgTW
+// CHECK-IR-NOEVO-SAME: i32 393544
 
 // Make sure there is no runtime record of the protocol descriptor.
 // CHECK-IR-NOT: $sxScA11DistributedHc

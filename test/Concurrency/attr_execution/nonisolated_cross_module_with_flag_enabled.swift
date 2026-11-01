@@ -102,7 +102,7 @@ import A
 
 // CHECK-LABEL: sil hidden @$s6Client4test1ty1A4TestC_tYaF : $@convention(thin) @async (@guaranteed Test) -> ()
 // CHECK: bb0([[SELF:%.*]] : $Test):
-// CHECK:  [[MAIN_ACTOR_EXISTENTIAL:%.*]] = init_existential_ref %4 : $MainActor : $MainActor, $any Actor
+// CHECK:  [[MAIN_ACTOR_EXISTENTIAL:%.*]] = init_existential_ref {{%[0-9]+}} : $MainActor : $MainActor, $any Actor
 // CHECK:  [[ANY_ACTOR:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[MAIN_ACTOR_EXISTENTIAL]]
 // CHECK:  [[ANY_ACTOR_CAST:%.*]] = unchecked_bitwise_cast [[ANY_ACTOR]] to $Builtin.ImplicitActor
 // CHECK:  [[TEST_METHOD:%.*]] = function_ref @$s1A4TestC4testyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed Test) -> ()
