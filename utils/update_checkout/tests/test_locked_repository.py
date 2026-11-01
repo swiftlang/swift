@@ -22,6 +22,7 @@ def _update_arguments_with_fake_path(repo_name: str, path: Path) -> UpdateArgume
         stash=False,
         cross_repos_pr={},
         skip_history=False,
+        skip_tags=False,
         partial_clone=False,
         output_prefix="",
         verbose=False,

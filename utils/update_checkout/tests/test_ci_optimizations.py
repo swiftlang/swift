@@ -327,3 +327,59 @@ class ShallowUpdateTestCase(scheme_mock.SchemeMockTestCase):
                 remote_tip,
                 f"'{repo}' HEAD should equal origin/main after shallow update",
             )
+
+
+class SkipTagsUpdateTestCase(scheme_mock.SchemeMockTestCase):
+    """update_single_repository must honor --skip-tags when fetching."""
+
+    _NEW_FILE = "ci_tag_file.txt"
+    _NEW_TAG = "ci-test-tag"
+
+    def _push_new_commits_and_tag(self):
+        _add_commit_to_repos(
+            self.local_path,
+            self.repo_names,
+            self._NEW_FILE,
+            "added by CI skip-tags test",
+        )
+        for repo_name in self.repo_names:
+            local_repo = os.path.join(self.local_path, repo_name)
+            scheme_mock.call_quietly(["git", "tag", self._NEW_TAG], cwd=local_repo)
+            scheme_mock.call_quietly(
+                ["git", "push", "origin", self._NEW_TAG], cwd=local_repo
+            )
+
+    def _assert_no_tags(self, message):
+        for repo in self.repo_names:
+            repo_path = os.path.join(self.source_root, repo)
+            tags = self.call(["git", "tag", "--list"], cwd=repo_path).strip()
+            self.assertEqual(tags, "", f"'{repo}' {message}")
+
+    def _run_update(self, extra_args):
+        base_cmd = [
+            self.update_checkout_path,
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+            "--scheme",
+            "main",
+            "--skip-tags",
+            "--reset-to-remote",
+        ] + extra_args
+
+        self.call(base_cmd + ["--clone"])
+        self._push_new_commits_and_tag()
+        self.call(base_cmd)
+
+    def test_update_with_skip_tags_fetches_no_tags(self):
+        """An update run with --skip-tags must not fetch any tags."""
+        self._run_update([])
+        self._assert_no_tags("should have no tags after update with --skip-tags")
+
+    def test_update_with_skip_tags_and_skip_history_fetches_no_tags(self):
+        """--skip-tags must also prevent tags that git would auto-follow."""
+        self._run_update(["--skip-history"])
+        self._assert_no_tags(
+            "should have no tags after update with --skip-tags --skip-history"
+        )
