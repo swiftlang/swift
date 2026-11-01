@@ -21,3 +21,13 @@ extension StructExtractInst : OnoneSimplifiable, SILCombineSimplifiable {
                                                with: structInst.operands[fieldIndex].value)
   }
 }
+
+extension StructExtractInst : DebugReconstructionBlockSimplifiable {
+  /// Folds `struct_extract undef` to `undef`, and fold `struct_extract(struct(x)) -> x`
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    simplify(context)
+  }
+}
