@@ -71,6 +71,8 @@ add_swift_target_library(swiftCxxStdlib STATIC NO_LINK_NAME IS_STDLIB IS_SWIFT_O
     # module
     -disable-upcoming-feature MemberImportVisibility
 
+    -Xfrontend -enable-sil-opaque-values
+
     SWIFT_COMPILE_FLAGS_LINUX
     ${SWIFT_SDK_LINUX_CXX_OVERLAY_SWIFT_COMPILE_FLAGS}
 
