@@ -66,3 +66,30 @@ func writeArrayField(_ s: inout StructWithPlainAndArrayFields,
   s.small = a
 }
 #endif
+
+// Test that we handle memberwise inits with pointers to C arrays.
+
+// LEGACY-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo24StructWithPointerToArrayV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Optional<UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>>, Int32, @thin StructWithPointerToArray.Type) -> StructWithPointerToArray
+// MODERN-LABEL: sil shared [transparent] [serialized]{{ \[available 26.0.0\] | }}[ossa] @$sSo24StructWithPointerToArrayV{{[_0-9a-zA-Z$]*}}fC : $@convention(method) (Optional<UnsafeMutablePointer<InlineArray<4, Int32>>>, Int32, @thin StructWithPointerToArray.Type) -> StructWithPointerToArray
+#if hasFeature(ModernImportedCArrays)
+func usePointerToArrayInit(
+    _ p: UnsafeMutablePointer<InlineArray<4, CInt>>?
+) -> StructWithPointerToArray {
+  return StructWithPointerToArray(small: p, plain: 1)
+}
+#else
+func usePointerToArrayInit(
+    _ p: UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>?
+) -> StructWithPointerToArray {
+  return StructWithPointerToArray(small: p, plain: 1)
+}
+#endif
+
+// MODERN-LABEL: sil shared [transparent] [serialized]{{ \[available 26.0.0\] | }}[ossa] @$sSo28StructWithPointerToHugeArrayV{{[_0-9a-zA-Z$]*}}fC : $@convention(method) (Optional<UnsafeMutablePointer<InlineArray<5000, Int32>>>, Int32, @thin StructWithPointerToHugeArray.Type) -> StructWithPointerToHugeArray
+#if hasFeature(ModernImportedCArrays)
+func usePointerToHugeArrayInit(
+    _ p: UnsafeMutablePointer<InlineArray<5000, CInt>>?
+) -> StructWithPointerToHugeArray {
+  return StructWithPointerToHugeArray(huge: p, plain: 1)
+}
+#endif

@@ -439,6 +439,16 @@ struct StructWithArrayTypedefField {
   SmallArrayTypedef small;
 };
 
+struct StructWithPointerToArray {
+  int (*small)[4];
+  int plain;
+};
+
+struct StructWithPointerToHugeArray {
+  int (*huge)[5000];
+  int plain;
+};
+
 struct StructWithHugeArrayTypedefField {
   HugeArrayTypedef huge;
 };

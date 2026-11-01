@@ -353,46 +353,12 @@ static SubstitutionMap getSubstitutionsForPropertyInitializer(
   return SubstitutionMap();
 }
 
-static bool bitcastFromInlineArrayIsValid(Type storedTy, Type modernTy) {
-  // If the field is not an inline array, don't bitcast.
-  auto modernCount = modernTy->getInlineArrayCount();
-  if (!modernCount)
-    return false;
-  auto modernElemTy = modernTy->getInlineArrayElementType();
-
-  if (auto fixedArrayStoredTy = storedTy->getAs<BuiltinFixedArrayType>()) {
-    auto storedCount = fixedArrayStoredTy->getSize()->getAs<IntegerType>();
-
-    if (!storedCount
-            || !APInt::isSameValue(storedCount->getValue(), *modernCount))
-      return false;
-
-    auto paramElemTy = fixedArrayStoredTy->getElementType();
-    return modernElemTy->isEqual(paramElemTy)
-              || bitcastFromInlineArrayIsValid(paramElemTy, modernElemTy);
-  }
-
-  // Collect the element types from the parameter.
-  SmallVector<Type, 8> storedElemTypes;
-  if (auto tupleStoredTy = storedTy->getAs<TupleType>()) {
-    for (auto &tupleElem : tupleStoredTy->getElements())
-      storedElemTypes.push_back(tupleElem.getType());
-  } else {
-    // The param not being a tuple is only valid if the array is single-element.
-    storedElemTypes.push_back(storedTy);
-  }
-
-  // If they are not the same size, don't bitcast.
-  if (storedElemTypes.size() != modernCount->getLimitedValue())
-    return false;
-
-  // If any element in the param is different from the field, don't bitcast.
-  for (auto storedElemType : storedElemTypes)
-    if (!modernElemTy->isEqual(storedElemType) &&
-          !bitcastFromInlineArrayIsValid(storedElemType, modernElemTy))
-      return false;
-
-  return true;
+/// Returns the C array projection of \p decl, or \c std::nullopt if it doesn't
+/// have any C arrays.
+static std::optional<CArrayProjection> getCArrayProjection(Decl *decl) {
+  if (auto cArrayAttr = decl->getAttrs().getAttribute<CArrayProjectionAttr>())
+    return cArrayAttr->getProjection();
+  return std::nullopt;
 }
 
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
@@ -461,6 +427,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   auto subs = getSubstitutionsForPropertyInitializer(decl, decl);
 
+  auto ctorProjection = getCArrayProjection(ctor);
   auto convertArgumentForField = [&](VarDecl *field, SILType fieldTy,
                                      RValue &&arg) -> RValue {
     // If the stored property has an attached result builder and its
@@ -476,13 +443,11 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       }
     }
 
-    // If the argument is an InlineArray and the field is a C array projection,
-    // bitcast it to the type of the field.
-    if (field->getAttrs().hasAttribute<CArrayProjectionAttr>() &&
-            arg.getType()->getInlineArrayElementType()) {
-      ASSERT(bitcastFromInlineArrayIsValid(fieldTy.getASTType(),
-                                           arg.getType()));
-
+    // If the C array projection of this field does not match the projection of
+    // the constructor, bitcast away the resulting type mismatch.
+    if (ctorProjection &&
+          getCArrayProjection(field).value_or(*ctorProjection)
+              != ctorProjection) {
       auto argValue = std::move(arg).getAsSingleValue(SGF, Loc);
 
       // InlineArrays too large to be loadable are passed by address.
