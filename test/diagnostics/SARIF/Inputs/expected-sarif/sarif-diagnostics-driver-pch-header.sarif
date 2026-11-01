@@ -1,0 +1,57 @@
+{
+  "$schema" : "https://docs.oasis-open.org/sarif/sarif/v2.1.0/errata01/os/schemas/sarif-schema-2.1.0.json",
+  "runs" : [
+    {
+      "artifacts" : [
+        {
+          "location" : {
+            "uri" : "file://TMP_DIR/header.h"
+          },
+          "roles" : [
+
+          ],
+          "sourceLanguage" : "swift"
+        }
+      ],
+      "columnKind" : "utf16CodeUnits",
+      "results" : [
+        {
+          "locations" : [
+            {
+              "physicalLocation" : {
+                "artifactLocation" : {
+                  "index" : 0
+                },
+                "region" : {
+                  "endColumn" : 3,
+                  "endLine" : 1,
+                  "startColumn" : 2,
+                  "startLine" : 1
+                }
+              }
+            }
+          ],
+          "message" : {
+            "text" : "\"warning from the bridging header\""
+          },
+          "ruleId" : "warning_from_clang",
+          "ruleIndex" : 0
+        }
+      ],
+      "tool" : {
+        "driver" : {
+          "informationUri" : "https://swift.org",
+          "name" : "Swift Compiler",
+          "organization" : "Swift Project",
+          "rules" : [
+            {
+              "id" : "warning_from_clang"
+            }
+          ],
+          "version" : "SWIFT_VERSION"
+        }
+      }
+    }
+  ],
+  "version" : "2.1.0"
+}
