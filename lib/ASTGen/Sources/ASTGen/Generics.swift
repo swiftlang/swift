@@ -17,8 +17,87 @@ import ASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
+  /// Diagnose a 'where' clause written inside the angle brackets, which is
+  /// obsolete, with fix-its that move it to follow the declaration.
+  func diagnoseWhereInGenericParameterClause(_ node: GenericParameterClauseSyntax) {
+    guard let whereClause = node.genericWhereClause,
+      let lastParam = node.parameters.last,
+      node.rightAngle.presence == .present
+    else {
+      return
+    }
+
+    // Everything between the last parameter and the closing bracket moves.
+    let lastToken = lastParam.trailingComma?.previousToken(viewMode: .sourceAccurate) ?? lastParam.lastToken(viewMode: .sourceAccurate)
+    guard let lastToken else { return }
+    let removeStart = lastToken.endPositionBeforeTrailingTrivia
+    let removeEnd = node.rightAngle.positionAfterSkippingLeadingTrivia
+    let removeRange = self.generateCharSourceRange(
+      start: removeStart,
+      length: SourceLength(utf8Length: removeEnd.utf8Offset - removeStart.utf8Offset)
+    )
+    let movedText = String(
+      decoding: self.base[removeStart.utf8Offset..<removeEnd.utf8Offset],
+      as: UTF8.self
+    )
+
+    // The declaration's own 'where' clause, if any, absorbs the requirements.
+    let trailingWhere: GenericWhereClauseSyntax?
+    let insertAfter: TokenSyntax?
+    switch node.parent?.as(SyntaxEnum.self) {
+    case .functionDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = decl.signature.lastToken(viewMode: .sourceAccurate)
+    case .initializerDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = decl.signature.lastToken(viewMode: .sourceAccurate)
+    case .subscriptDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = decl.returnClause.lastToken(viewMode: .sourceAccurate)
+    case .structDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
+    case .classDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
+    case .enumDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
+    case .actorDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
+    case .typeAliasDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = node.lastToken(viewMode: .sourceAccurate)
+    default:
+      return
+    }
+
+    var fixIts = [CompilerDiagnosticFixIt(remove: removeRange)]
+    if let trailingWhere {
+      fixIts.append(
+        .init(
+          replace: self.generateCharSourceRange(trailingWhere.whereKeyword),
+          with: whereClause.trimmedDescription + ","
+        )
+      )
+    } else if let insertAfter {
+      fixIts.append(
+        .init(
+          replace: self.generateCharSourceRange(
+            start: insertAfter.endPositionBeforeTrailingTrivia,
+            length: SourceLength(utf8Length: 0)
+          ),
+          with: movedText
+        )
+      )
+    }
+    self.diagnose(.where_inside_brackets, at: whereClause.whereKeyword, fixIts: fixIts)
+  }
+
   func generate(genericParameterClause node: GenericParameterClauseSyntax) -> BridgedGenericParamList {
-    .createParsed(
+    self.diagnoseWhereInGenericParameterClause(node)
+    return .createParsed(
       self.ctx,
       leftAngleLoc: self.generateSourceLoc(node.leftAngle),
       parameters: node.parameters.lazy.map(self.generate).bridgedArray(in: self),
