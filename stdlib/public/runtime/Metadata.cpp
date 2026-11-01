@@ -6146,6 +6146,31 @@ public:
 
 } // end anonymous namespace
 
+bool swift::_isRepeatedGeneralizationRequirement(
+    const ExtendedExistentialTypeShape *shape,
+    const GenericRequirementDescriptor &req) {
+  if (req.getKind() != GenericRequirementKind::Protocol ||
+      !shape->hasGeneralizationSignature())
+    return false;
+
+  // Names containing symbolic references can't be compared by content because
+  // their relative offsets depend on their address, but within a shape they
+  // share a single deduplicated string.
+  auto param = req.getParam();
+  bool hasSymbolicRef =
+      llvm::any_of(param, [](char c) { return c > 0 && c < 0x20; });
+
+  for (auto &genReq : shape->getGeneralizationSignature().getRequirements()) {
+    if (genReq.getKind() != GenericRequirementKind::Protocol ||
+        genReq.getProtocol().getRawData() != req.getProtocol().getRawData())
+      continue;
+    if (genReq.Param.get() == req.Param.get() ||
+        (!hasSymbolicRef && genReq.getParam() == param))
+      return true;
+  }
+  return false;
+}
+
 const ValueWitnessTable *
 ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   auto shape = key.Shape;
@@ -6178,6 +6203,13 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   // case that the requirement signature includes a pack parameter?
   unsigned wtableStorageSizeInWords =
     sigSizeInWords - shape->ReqSigHeader.NumParams;
+  for (auto &req : llvm::ArrayRef<GenericRequirementDescriptor>(
+           shape->getReqSigRequirements(),
+           shape->getNumReqSigRequirements())) {
+    if (req.getFlags().hasKeyArgument() &&
+        _isRepeatedGeneralizationRequirement(shape, req))
+      --wtableStorageSizeInWords;
+  }
 
   using SpecialKind = ExtendedExistentialTypeShape::SpecialKind;
   switch (shape->Flags.getSpecialKind()) {
