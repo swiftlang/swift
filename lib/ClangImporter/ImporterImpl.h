@@ -2501,7 +2501,7 @@ bool anySubobjectTypeSatisfies(
     const clang::RecordDecl *decl,
     llvm::function_ref<bool(clang::QualType)> pred);
 
-bool isViewType(const clang::CXXRecordDecl *decl);
+bool isViewType(clang::Sema &sema, const clang::CXXRecordDecl *decl);
 
 /// Determine whether \p type is a "direct view": a pointer or reference to a
 /// self-contained pointee, or a record (including a class template
