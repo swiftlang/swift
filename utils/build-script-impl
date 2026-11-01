@@ -197,6 +197,7 @@ KNOWN_SETTINGS=(
     lldb-configure-tests                          "1"               "if set, will make sure we configure LLDB's test target without running the tests"
 
     ## LLVM Options
+    llvm-source-dirname                           "llvm-project"    "The name of the llvm-project source directory"
     llvm-enable-lto                               ""                "Must be set to one of 'thin' or 'full'"
     llvm-enable-modules                           "0"               "enable building llvm using modules"
     llvm-enable-index-store                       "1"               "enable '-index-store-path' when compiling LLVM/Clang and Swift host tools (gated on the host compiler accepting the flag)"
@@ -1297,9 +1298,9 @@ function host_has_darwin_symbols() {
 #
 NINJA_SOURCE_DIR="${WORKSPACE}/ninja"
 SWIFT_SOURCE_DIR="${WORKSPACE}/${SWIFT_SOURCE_DIRNAME}"
-LLVM_SOURCE_DIR="${WORKSPACE}/llvm-project/llvm"
+LLVM_SOURCE_DIR="${WORKSPACE}/${LLVM_SOURCE_DIRNAME}/llvm"
 CMARK_SOURCE_DIR="${WORKSPACE}/cmark"
-LLDB_SOURCE_DIR="${WORKSPACE}/llvm-project/lldb"
+LLDB_SOURCE_DIR="${WORKSPACE}/${LLVM_SOURCE_DIRNAME}/lldb"
 LLBUILD_SOURCE_DIR="${WORKSPACE}/llbuild"
 STRESSTEST_PACKAGE_DIR="${WORKSPACE}/swift-stress-tester"
 XCTEST_SOURCE_DIR="${WORKSPACE}/swift-corelibs-xctest"
@@ -1310,7 +1311,7 @@ FOUNDATION_SWIFTFOUNDATION_SOURCE_DIR="${WORKSPACE}/swift-foundation"
 FOUNDATION_SWIFTFOUNDATIONICU_SOURCE_DIR="${WORKSPACE}/swift-foundation-icu"
 LIBDISPATCH_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
 LIBDISPATCH_STATIC_SOURCE_DIR="${WORKSPACE}/swift-corelibs-libdispatch"
-LIBCXX_SOURCE_DIR="${WORKSPACE}/llvm-project/runtimes"
+LIBCXX_SOURCE_DIR="${WORKSPACE}/${LLVM_SOURCE_DIRNAME}/runtimes"
 SWIFT_COLLECTIONS_SOURCE_DIR="${WORKSPACE}/swift-collections"
 SWIFT_PATH_TO_STRING_PROCESSING_SOURCE="${WORKSPACE}/swift-experimental-string-processing"
 SWIFTSYNTAX_SOURCE_DIR="${WORKSPACE}/swift-syntax"

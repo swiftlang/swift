@@ -241,7 +241,8 @@ class WASISysroot(product.Product):
             args=self.args,
             toolchain=self.toolchain,
             runtimes_source_dir=os.path.join(
-                os.path.dirname(self.source_dir), 'llvm-project', 'runtimes'),
+                os.path.dirname(self.source_dir), self.llvm_source_dirname,
+                'runtimes'),
             runtimes_build_dir=runtimes_build_dir,
             install_path=WASISysroot.sysroot_install_path(
                 build_root, target_triple),
@@ -259,7 +260,8 @@ class WASISysroot(product.Product):
             args=self.args,
             toolchain=self.toolchain,
             compiler_rt_source_dir=os.path.join(
-                os.path.dirname(self.source_dir), 'llvm-project', 'compiler-rt'),
+                os.path.dirname(self.source_dir), self.llvm_source_dirname,
+                'compiler-rt'),
             compiler_rt_build_dir=compiler_rt_build_dir,
             install_path=WASISysroot.resource_dir_install_path(
                 build_root, target_triple),
@@ -294,7 +296,8 @@ class WASISysroot(product.Product):
                                     sysroot_install_path, cc_path, cxx_path,
                                     ar_path, ranlib_path, c_flags, cxx_flags):
         compiler_rt_source_dir = os.path.join(
-            os.path.dirname(self.source_dir), 'llvm-project', 'compiler-rt')
+            os.path.dirname(self.source_dir), self.llvm_source_dirname,
+            'compiler-rt')
         compiler_rt = cmake_product.CMakeProduct(
             args=self.args,
             toolchain=self.toolchain,
