@@ -148,7 +148,7 @@ func viaProperty(_ s: Synthesized) -> View { return s.property }
 // CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_borrowsSelf{{.*}}] {{.*}} : $@convention(cxx_method) (@in_guaranteed Derived) -> @lifetime(borrow address_for_deps 0) @owned View
 // CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_independent{{.*}}] {{.*}} : $@convention(cxx_method) (@in_guaranteed Derived) -> @lifetime(immortal) @owned View
 // CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_both{{.*}}] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Derived) -> @lifetime(copy 0, borrow address_for_deps 1) @owned View
-// CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_captureInto{{.*}}] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, View, @in_guaranteed Derived) -> ()
+// CHECK-DAG: sil {{.*}}[clang Derived.__synthesizedBaseCall_captureInto{{.*}}] {{.*}} : $@convention(cxx_method) (@lifetime(copy 0, copy 1) @inout View, View, @in_guaranteed Derived) -> ()
 // CHECK-DAG: sil {{.*}}[clang Ref.pick] {{.*}} : $@convention(cxx_method) (View, View, Ref) -> @lifetime(copy 0) @owned View
 
 //--- escapes.swift

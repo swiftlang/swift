@@ -74,6 +74,12 @@ struct Stash {
   void handOut(View &out) const [[clang::lifetime_capture_by(out)]];
 };
 
+struct Captured {
+  int data;
+  // expected-note@+1 {{Swift cannot represent a parameter capturing 'self' in an initializer}}
+  Captured(View &out) [[clang::lifetime_capture_by(out)]];
+};
+
 //--- test.swift
 import Life
 
@@ -114,4 +120,10 @@ func capturedEscapable(_ o: Owner, _ v: View, _ s: Stash) {
   s.handOut(&out) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
   // expected-note@-1 {{reference to unsafe instance method 'handOut'}}
   captureRefInto(o, &out)
+}
+
+func capturedByConstructor(_ v: View) {
+  var out = v
+  _ = Captured(&out) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe initializer 'init(_:)'}}
 }
