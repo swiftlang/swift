@@ -1409,6 +1409,21 @@ static void resolveImplicitLinkLibraries(const CompilerInstance &instance,
   cache.updateDependency(mainModuleID, mainModuleDepInfo);
 }
 
+/// The file system through which Clang reads its inputs, for recording and
+/// validating their status. It layers ClangImporter's overlay files over the
+/// base file system, without the scanning service's shared cache in front.
+/// With -scanner-cas-fs, Clang reads a CAS tree instead, which the source
+/// manager's file system already reflects.
+static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+makeClangInputFileSystem(SwiftDependencyScanningService &service,
+                         CompilerInstance &instance) {
+  if (!instance.getInvocation()
+           .getCASOptions()
+           .DepscanCASFileSystemRootID.empty())
+    return instance.getSourceMgr().getFileSystem();
+  return service.makeClangScanningFileSystem();
+}
+
 static llvm::ErrorOr<swiftscan_dependency_graph_t>
 performModuleScanImpl(
     SwiftDependencyScanningService &service, CompilerInstance *instance,
@@ -1443,7 +1458,8 @@ performModuleScanImpl(
       incremental::validateInterModuleDependenciesCache(
           mainModuleID, cache, instance->getSharedCASInstance(),
           instance->getSharedCacheInstance(), serializedCacheTimeStamp,
-          *instance->getSourceMgr().getFileSystem(), ctx.Diags,
+          *instance->getSourceMgr().getFileSystem(),
+          *makeClangInputFileSystem(service, *instance), ctx.Diags,
           [&](StringRef dir) { return service.isDirectoryInvalidated(dir); },
           opts.EmitDependencyScannerCacheRemarks);
     }
@@ -1493,6 +1509,11 @@ performModuleScanImpl(
   // is specified
   if (opts.SerializeDependencyScannerCache) {
     auto savePath = opts.SerializedDependencyScannerCachePath;
+    incremental::recordInputFileStatuses(
+        cache, *instance->getSourceMgr().getFileSystem(),
+        *makeClangInputFileSystem(service, *instance), [&](StringRef path) {
+          return service.getClangScannerCachedStatus(path);
+        });
     module_dependency_cache_serialization::writeInterModuleDependenciesCache(
         ctx.Diags, instance->getOutputBackend(), savePath, cache);
     if (opts.EmitDependencyScannerCacheRemarks)
@@ -1655,23 +1676,147 @@ llvm::ErrorOr<swiftscan_import_set_t> swift::dependencies::performModulePrescan(
   return result;
 }
 
+/// Invoke \p callback on each input file of \p moduleInfo that incremental
+/// scanning validates, along with whether Clang read it, until \p callback
+/// returns false.
+///
+/// \returns false if \p callback returned false.
+static bool forEachValidatedInputFile(
+    const ModuleDependencyInfo &moduleInfo,
+    llvm::function_ref<bool(StringRef, bool readByClang)> callback) {
+  // Interface file for Swift textual modules
+  if (const auto *textualModuleDetails = moduleInfo.getAsSwiftInterfaceModule())
+    if (!callback(textualModuleDetails->swiftInterfaceFile,
+                  /*readByClang=*/false))
+      return false;
+
+  if (const auto *binaryModuleDetails = moduleInfo.getAsSwiftBinaryModule()) {
+    // Binary module file for Swift binary-only modules
+    if (!callback(binaryModuleDetails->compiledModulePath,
+                  /*readByClang=*/false))
+      return false;
+
+    // Interface file the binary module was built from, if any
+    const auto &definingInterface =
+        binaryModuleDetails->definingModuleInterfacePath;
+    if (!definingInterface.empty() &&
+        definingInterface != binaryModuleDetails->compiledModulePath &&
+        !callback(definingInterface, /*readByClang=*/false))
+      return false;
+  }
+
+  // Header input source files (bridging header etc.)
+  for (const auto &headerInput : moduleInfo.getHeaderInputSourceFiles())
+    if (!callback(headerInput, /*readByClang=*/true))
+      return false;
+
+  // Macro plugin libraries and executables
+  for (const auto &macroDep : moduleInfo.getMacroDependencies())
+    for (const auto *pluginPath :
+         {&macroDep.second.LibraryPath, &macroDep.second.ExecutablePath})
+      if (!pluginPath->empty() && !callback(*pluginPath, /*readByClang=*/false))
+        return false;
+
+  // Header/modulemap source files for a Clang dependency
+  if (const auto *clangModuleDetails = moduleInfo.getAsClangModule())
+    for (const auto &fileInput : clangModuleDetails->fileDependencies)
+      if (!callback(fileInput, /*readByClang=*/true))
+        return false;
+
+  return true;
+}
+
+/// Invoke \p callback on each input file of each module in \p cache.
+static void forEachInputFileInCache(
+    const ModuleDependenciesCache &cache,
+    llvm::function_ref<void(StringRef, bool readByClang)> callback) {
+  for (auto kind = ModuleDependencyKind::FirstKind;
+       kind != ModuleDependencyKind::LastKind; ++kind)
+    for (const auto &entry : cache.getDependenciesMap(kind))
+      forEachValidatedInputFile(entry.second,
+                                [&](StringRef inputPath, bool readByClang) {
+                                  callback(inputPath, readByClang);
+                                  return true;
+                                });
+}
+
+void swift::dependencies::incremental::recordInputFileStatuses(
+    ModuleDependenciesCache &cache, llvm::vfs::FileSystem &fs,
+    llvm::vfs::FileSystem &clangFS,
+    llvm::function_ref<std::optional<llvm::vfs::Status>(StringRef)>
+        getClangScannerStatus) {
+  // This includes the main module's inputs: it is always re-scanned, but its
+  // inputs are validated like any other module's before it is dropped.
+  const auto &knownStatuses = cache.getInputFileStatuses();
+  llvm::StringMap<ScannerInputFileStatus> statuses;
+  forEachInputFileInCache(cache, [&](StringRef inputPath, bool readByClang) {
+    if (statuses.contains(inputPath))
+      return;
+    // An input of a module reused from the prior scan keeps its prior status,
+    // which validation (if enabled) confirmed. Any other input is one this
+    // scan just read.
+    auto knownStatus = knownStatuses.find(inputPath);
+    if (knownStatus != knownStatuses.end()) {
+      statuses[inputPath] = knownStatus->second;
+      return;
+    }
+    // Clang's shared cache holds the status Clang saw when it read the file,
+    // which may predate this scan if the scanning service is long-lived.
+    if (readByClang) {
+      if (auto status = getClangScannerStatus(inputPath)) {
+        statuses[inputPath] = ScannerInputFileStatus::fromStatus(*status);
+        return;
+      }
+    }
+    // An input that cannot be found now gets no record, so the next scan
+    // treats it as modified.
+    if (auto status = (readByClang ? clangFS : fs).status(inputPath))
+      statuses[inputPath] = ScannerInputFileStatus::fromStatus(*status);
+  });
+  cache.setInputFileStatuses(std::move(statuses));
+}
+
 void swift::dependencies::incremental::validateInterModuleDependenciesCache(
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags,
+    llvm::vfs::FileSystem &clangFS, DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
     bool emitRemarks) {
   ModuleDependencyIDSet visited;
   ModuleDependencyIDSet modulesRequiringRescan;
   outOfDateModuleScan(rootModuleID, cache, cas, actionCache, cacheTimeStamp, fs,
-                      diags, isDirectoryInvalidated, emitRemarks, visited,
-                      modulesRequiringRescan);
+                      clangFS, diags, isDirectoryInvalidated, emitRemarks,
+                      visited, modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
   // Regardless of invalidation, always re-scan main module.
   cache.removeDependency(rootModuleID);
+
+  // Modules that are no longer reachable from the main module were not
+  // validated, so they must not be carried over either.
+  std::vector<ModuleDependencyID> unreachableModules;
+  for (auto kind = ModuleDependencyKind::FirstKind;
+       kind != ModuleDependencyKind::LastKind; ++kind)
+    for (const auto &entry : cache.getDependenciesMap(kind)) {
+      ModuleDependencyID moduleID = {entry.getKey().str(), kind};
+      if (!visited.count(moduleID))
+        unreachableModules.push_back(moduleID);
+    }
+  for (const auto &moduleID : unreachableModules)
+    cache.removeDependency(moduleID);
+
+  // Every remaining module was validated, so the recorded status of each of
+  // its inputs is also the status this validation observed. Drop the rest.
+  const auto &priorStatuses = cache.getInputFileStatuses();
+  llvm::StringMap<ScannerInputFileStatus> validatedStatuses;
+  forEachInputFileInCache(cache, [&](StringRef inputPath, bool) {
+    auto priorStatus = priorStatuses.find(inputPath);
+    if (priorStatus != priorStatuses.end())
+      validatedStatuses[inputPath] = priorStatus->second;
+  });
+  cache.setInputFileStatuses(std::move(validatedStatuses));
 }
 
 void swift::dependencies::incremental::outOfDateModuleScan(
@@ -1679,7 +1824,7 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags,
+    llvm::vfs::FileSystem &clangFS, DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
     bool emitRemarks, ModuleDependencyIDSet &visited,
     ModuleDependencyIDSet &modulesRequiringRescan) {
@@ -1689,8 +1834,8 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     // If we have not already visited this module, recurse.
     if (visited.find(depID) == visited.end())
       outOfDateModuleScan(depID, cache, cas, actionCache, cacheTimeStamp, fs,
-                          diags, isDirectoryInvalidated, emitRemarks, visited,
-                          modulesRequiringRescan);
+                          clangFS, diags, isDirectoryInvalidated, emitRemarks,
+                          visited, modulesRequiringRescan);
 
     // Even if we're not revisiting a dependency, we must check if it's
     // already known to be out of date.
@@ -1704,8 +1849,8 @@ void swift::dependencies::incremental::outOfDateModuleScan(
                      moduleID.ModuleName);
     modulesRequiringRescan.insert(moduleID);
   } else if (!verifyModuleDependencyUpToDate(
-                 moduleID, cache, cas, actionCache, cacheTimeStamp, fs, diags,
-                 isDirectoryInvalidated, emitRemarks))
+                 moduleID, cache, cas, actionCache, cacheTimeStamp, fs, clangFS,
+                 diags, isDirectoryInvalidated, emitRemarks))
     modulesRequiringRescan.insert(moduleID);
 
   visited.insert(moduleID);
@@ -1716,21 +1861,24 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
     std::shared_ptr<llvm::cas::ObjectStore> cas,
     std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
-    DiagnosticEngine &diags,
+    llvm::vfs::FileSystem &clangFS, DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
     bool emitRemarks) {
   const auto &moduleInfo = cache.findKnownDependency(moduleID);
-  auto verifyInputOlderThanCacheTimeStamp = [&cacheTimeStamp, &fs, &diags,
-                                             emitRemarks](StringRef moduleName,
-                                                          StringRef inputPath) {
-    llvm::sys::TimePoint<> inputModTime = llvm::sys::TimePoint<>::max();
-    if (auto Status = fs.status(inputPath))
-      inputModTime = Status->getLastModificationTime();
-    if (inputModTime > cacheTimeStamp) {
+  // An input is up-to-date if it is not newer than the prior scan and has the
+  // same size and modification time as when the prior scan observed it. The
+  // latter catches an edit that leaves an older modification time.
+  auto verifyInputUpToDate = [&](StringRef inputPath, bool readByClang) {
+    auto status = (readByClang ? clangFS : fs).status(inputPath);
+    const auto &priorStatuses = cache.getInputFileStatuses();
+    auto priorStatus = priorStatuses.find(inputPath);
+    if (!status || status->getLastModificationTime() > cacheTimeStamp ||
+        priorStatus == priorStatuses.end() ||
+        ScannerInputFileStatus::fromStatus(*status) != priorStatus->second) {
       if (emitRemarks)
         diags.diagnose(SourceLoc(),
-                       diag::remark_scanner_stale_result_invalidate, moduleName,
-                       inputPath);
+                       diag::remark_scanner_stale_result_invalidate,
+                       moduleID.ModuleName, inputPath);
       return false;
     }
     return true;
@@ -1805,34 +1953,11 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
       return false;
   }
 
-  // Check interface file for Swift textual modules
-  if (const auto &textualModuleDetails = moduleInfo.getAsSwiftInterfaceModule())
-    if (!verifyInputOlderThanCacheTimeStamp(
-            moduleID.ModuleName, textualModuleDetails->swiftInterfaceFile))
-      return false;
+  // Check input files
+  if (!forEachValidatedInputFile(moduleInfo, verifyInputUpToDate))
+    return false;
 
-  // Check binary module file for Swift binary-only modules
-  if (const auto &binaryModuleDetails = moduleInfo.getAsSwiftBinaryModule())
-    if (!verifyInputOlderThanCacheTimeStamp(
-            moduleID.ModuleName, binaryModuleDetails->compiledModulePath))
-      return false;
-
-  // Check header input source files (bridging header etc.)
-  for (const auto &headerInput : moduleInfo.getHeaderInputSourceFiles())
-    if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, headerInput))
-      return false;
-
-  // Auxiliary files
-  for (const auto &auxInput : moduleInfo.getAuxiliaryFiles())
-    if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, auxInput))
-      return false;
-
-  // Check header/modulemap source files for a Clang dependency
   if (const auto &clangModuleDetails = moduleInfo.getAsClangModule()) {
-    for (const auto &fileInput : clangModuleDetails->fileDependencies)
-      if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, fileInput))
-        return false;
-
     // Check whether any directory dependency was invalidated
     for (const auto &dir : clangModuleDetails->directoryDependencies) {
       if (isDirectoryInvalidated(dir)) {
