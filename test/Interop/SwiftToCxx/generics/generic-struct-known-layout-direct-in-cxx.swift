@@ -17,6 +17,7 @@
 // CHECK-EMPTY:
 // CHECK-NEXT: static SWIFT_C_INLINE_THUNK struct swift_interop_passStub_Generics_[[PTRPTRENC]] swift_interop_passDirect_Generics_[[PTRPTRENC]](const char * _Nonnull value) {
 // CHECK-NEXT:  struct swift_interop_passStub_Generics_[[PTRPTRENC]] result;
+// CHECK-NEXT:  memset(&result, 0, sizeof(result));
 // CHECK-NEXT:  memcpy(&result._1, value
 // CHECK-NEXT:  memcpy(&result._2, value
 // CHECK-NEXT:  return result;
