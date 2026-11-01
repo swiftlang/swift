@@ -7,6 +7,7 @@
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}cxx20.swift \
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
+// RUN:   -disable-availability-checking \
 // RUN:   -strict-memory-safety \
 // RUN:   -Xcc -std=c++20 \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}iter.h
