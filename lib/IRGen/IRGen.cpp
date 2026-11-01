@@ -77,6 +77,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/Mutex.h"
+#include "llvm/Support/SipHash.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include "llvm/Support/VirtualOutputConfig.h"
 #include "llvm/Target/TargetMachine.h"
@@ -1042,10 +1043,12 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
                       SpecialPointerAuthDiscriminators::ValueWitnessTable);
   opts.ProtocolWitnesses =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  // Associated type and associated conformance witnesses are data pointers:
+  // a mangled name or metadata, and a witness table.
   opts.ProtocolAssociatedTypeAccessFunctions =
-    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolAssociatedTypeWitnessTableAccessFunctions =
-    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftClassMethods =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftClassMethodPointers =
@@ -1074,6 +1077,19 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
       PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
   opts.ProtocolConformanceDescriptorsAsArguments =
       PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);
+
+  opts.ProtocolRequirementDescriptors = PointerAuthSchema(
+      dataKey, /*address*/ true, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::ProtocolRequirement);
+  opts.ClassMethodDescriptors = PointerAuthSchema(
+      dataKey, /*address*/ true, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::ClassMethodDescriptor);
+  // The runtime in this repository does not authenticate these pointers, so
+  // check that the discriminators are the hashes of their names.
+  assert(SpecialPointerAuthDiscriminators::ProtocolRequirement ==
+             llvm::getPointerAuthStableSipHash("ProtocolRequirement") &&
+         SpecialPointerAuthDiscriminators::ClassMethodDescriptor ==
+             llvm::getPointerAuthStableSipHash("ClassMethodDescriptor"));
 
   opts.ProtocolDescriptorsAsArguments =
       PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);

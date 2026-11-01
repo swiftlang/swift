@@ -9,11 +9,11 @@ import Foundation
 import objc_generics
 
 // CHECK-LABEL: @"OBJC_METACLASS_$__TtC27objc_generic_class_metadata8Subclass" = hidden global %objc_class
-// CHECK:         ptr @"OBJC_METACLASS_$_NSObject"
-// CHECK:         ptr @"OBJC_METACLASS_$_GenericClass"
+// CHECK:         ptr @"OBJC_METACLASS_$_NSObject{{(\.ptrauth)?}}"
+// CHECK:         ptr @"OBJC_METACLASS_$_GenericClass{{(\.ptrauth)?}}"
 // CHECK-LABEL: @"$s27objc_generic_class_metadata8SubclassCMf" = internal global
-// CHECK:         ptr @"OBJC_METACLASS_$__TtC27objc_generic_class_metadata8Subclass"
-// CHECK:         ptr @"OBJC_CLASS_$_GenericClass"
+// CHECK:         ptr @"OBJC_METACLASS_$__TtC27objc_generic_class_metadata8Subclass{{(\.ptrauth)?}}"
+// CHECK:         ptr @"OBJC_CLASS_$_GenericClass{{(\.ptrauth)?}}"
 class Subclass: GenericClass<NSString> {}
 
 sil_vtable Subclass {}

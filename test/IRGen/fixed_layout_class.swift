@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class -I %t %S/../Inputs/resilient_class.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/fixed_layout_class.swiftmodule -module-name=fixed_layout_class -I %t %S/../Inputs/fixed_layout_class.swift
-// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime -DINT=i%target-ptrsize
+// RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution %t/class_resilience.swift | %FileCheck %t/class_resilience.swift --check-prefix=CHECK --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK-%target-runtime --check-prefix=CHECK-%target-ptrauth -DINT=i%target-ptrsize
 // RUN: %target-swift-frontend -I %t -emit-ir -enable-library-evolution -O %t/class_resilience.swift
 
 // This tests @_fixed_layout classes in resilient modules.
@@ -38,6 +38,7 @@ public func useGenericRootClassProperty<A>(_ o: GenericOutsideParent<A>) {
   // CHECK: [[BASE:%.*]] = load [[INT]], ptr @"$s18fixed_layout_class20GenericOutsideParentCMo"
 
   // CHECK: [[METADATA:%.*]] = load ptr, ptr %0
+  // CHECK-ptrauth: [[METADATA:%.*]] = inttoptr i64 {{%.*}} to ptr
 
   // CHECK: [[BASE:%.*]] = load [[INT]], ptr @"$s18fixed_layout_class20GenericOutsideParentCMo"
   // CHECK: [[FIELD_OFFSET_OFFSET:%.*]] = add [[INT]] [[BASE]], {{4|8}}
@@ -65,6 +66,7 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
   // CHECK: [[BASE:%.*]] = load [[INT]], ptr @"$s18fixed_layout_class19GenericOutsideChildCMo"
 
   // CHECK: [[METADATA:%.*]] = load ptr, ptr %0
+  // CHECK-ptrauth: [[METADATA:%.*]] = inttoptr i64 {{%.*}} to ptr
 
   // CHECK: [[BASE:%.*]] = load [[INT]], ptr @"$s18fixed_layout_class20GenericOutsideParentCMo"
   // CHECK: [[FIELD_OFFSET_OFFSET:%.*]] = add [[INT]] [[BASE]], {{4|8}}
@@ -74,6 +76,7 @@ public func useGenericSubclassProperty<A>(_ o: GenericOutsideChild<A>) {
   let a = o.property
 
   // CHECK: [[METADATA:%.*]] = load ptr, ptr %0
+  // CHECK-ptrauth: [[METADATA:%.*]] = inttoptr i64 {{%.*}} to ptr
 
   // CHECK: [[BASE:%.*]] = load [[INT]], ptr @"$s18fixed_layout_class19GenericOutsideChildCMo"
   // CHECK: [[FIELD_OFFSET_OFFSET:%.*]] = add [[INT]] [[BASE]], {{4|8}}

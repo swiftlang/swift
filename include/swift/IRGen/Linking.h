@@ -1753,6 +1753,9 @@ public:
     return getKind() == Kind::DynamicallyReplaceableFunctionKey ||
       getKind() == Kind::OpaqueTypeDescriptorAccessorKey;
   }
+  bool isProtocolConformanceDescriptor() const {
+    return getKind() == Kind::ProtocolConformanceDescriptor;
+  }
   bool isOpaqueTypeDescriptorAccessor() const {
     return getKind() == Kind::OpaqueTypeDescriptorAccessor ||
            getKind() == Kind::OpaqueTypeDescriptorAccessorImpl ||
@@ -1769,7 +1772,14 @@ public:
     return SecondaryPointer != nullptr;
   }
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
+  bool isValueWitnessTable() const {
+    return getKind() == Kind::ValueWitnessTable;
+  }
   bool isContextDescriptor() const;
+  /// Whether this is the descriptor of a requirement of a protocol.
+  bool isProtocolRequirementDescriptor() const;
+  /// Whether this is the descriptor of a method of a class.
+  bool isClassMethodDescriptor() const;
   CanType getType() const {
     assert(isTypeKind(getKind()));
     return CanType(reinterpret_cast<TypeBase*>(Pointer));

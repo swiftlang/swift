@@ -171,7 +171,7 @@ sil hidden_external @takingQAndS : $@convention(thin) <τ_0_0 where  τ_0_0 : Q>
 // CHECK:   [[CONTEXT0:%.*]] = call noalias ptr @swift_allocObject
 
 // CHECK:   [[WITNESS_ADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr [[CONTEXT0]], i32 0, i32 {{(1|2)}}
-// CHECK:   [[WITNESS:%.*]] = call ptr @swift_getWitnessTable(ptr @"$s23partial_apply_forwarder12BaseProducerVyxGAA1QAAMc", ptr [[BPTY]], ptr undef)
+// CHECK:   [[WITNESS:%.*]] = call ptr @swift_getWitnessTable(ptr @"$s23partial_apply_forwarder12BaseProducerVyxGAA1QAAMc{{(\.ptrauth(\.[0-9]+)?)?}}", ptr [[BPTY]], ptr undef)
 // CHECK:   store ptr [[WITNESS]], ptr [[WITNESS_ADDR]]
 
 // CHECK:   [[SADDR:%.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted,{{.*}} %T23partial_apply_forwarder1SV, ptr }>, ptr [[CONTEXT0]], i32 0, i32 {{(2|3)}}

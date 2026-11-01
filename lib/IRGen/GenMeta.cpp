@@ -4160,6 +4160,16 @@ createSingletonInitializationMetadataAccessFunction(IRGenModule &IGM,
 
     llvm::Value *descriptor =
       IGF.IGM.getAddrOfTypeContextDescriptor(typeDecl, RequireMetadata);
+
+    // Sign the descriptor.
+    auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
+    if (schema) {
+      auto authInfo = PointerAuthInfo::emit(
+          IGF, schema, nullptr,
+          PointerAuthEntity::Special::TypeDescriptorAsArgument);
+      descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+    }
+
     auto responsePair =
         IGF.Builder.CreateCall(IGF.IGM.getGetSingletonMetadataFunctionPointer(),
                                {request.get(IGF), descriptor});
@@ -4470,11 +4480,15 @@ namespace {
                     "class metadata kind is non-zero?");
 
       if (IGM.ObjCInterop) {
-        // Get the metaclass pointer as an intptr_t.
         auto metaclass = asImpl().getAddrOfMetaclassObject(NotForDefinition);
-        auto flags =
-          llvm::ConstantExpr::getPtrToInt(metaclass, IGM.MetadataKindTy);
-        B.add(flags);
+        if (auto &schema = IGM.getOptions().PointerAuth.ObjCIsaPointers) {
+          B.addSignedPointer(metaclass, schema, PointerAuthEntity());
+        } else {
+          // Get the metaclass pointer as an intptr_t.
+          auto flags =
+              llvm::ConstantExpr::getPtrToInt(metaclass, IGM.MetadataKindTy);
+          B.add(flags);
+        }
       } else {
         // On non-objc platforms just fill it with a null, there
         // is no Objective-C metaclass.
@@ -4538,9 +4552,11 @@ namespace {
         // We have to do getAddrOfObjCClass ourselves here because
         // the ObjC runtime base needs to be ObjC-mangled but isn't
         // actually imported from a clang module.
-        B.add(IGM.getAddrOfObjCClass(
+        B.addSignedPointer(IGM.getAddrOfObjCClass(
                                IGM.getObjCRuntimeBaseForSwiftRootClass(Target),
-                               NotForDefinition));
+                               NotForDefinition),
+                           IGM.getOptions().PointerAuth.ObjCSuperPointers,
+                           PointerAuthEntity());
         return;
       }
 
@@ -4548,7 +4564,9 @@ namespace {
       // lead to shouldAddNullSuperclass returning true above.
       auto metadata = asImpl().getSuperclassMetadata(superclass);
       assert(metadata);
-      B.add(metadata);
+      B.addSignedPointer(metadata,
+                         IGM.getOptions().PointerAuth.ObjCSuperPointers,
+                         PointerAuthEntity());
     }
 
     llvm::Constant *emitLayoutString() {
@@ -4750,10 +4768,10 @@ namespace {
           IGM.IntPtrTy, asImpl().getClassDataPointerHasSwiftMetadataBits());
 
       // Emit data + bit.
-      data = llvm::ConstantExpr::getPtrToInt(data, IGM.IntPtrTy);
-      data = llvm::ConstantExpr::getAdd(data, bit);
+      data = llvm::ConstantExpr::getGetElementPtr(IGM.Int8Ty, data, bit);
 
-      B.add(data);
+      B.addSignedPointer(data, IGM.getOptions().PointerAuth.ObjCClassROPointers,
+                         PointerAuthEntity());
     }
 
     void addDefaultActorStorageFieldOffset() {
@@ -5210,7 +5228,8 @@ namespace {
       // isa
       ClassDecl *rootClass = getRootClassForMetaclass(IGM, Target);
       auto isa = IGM.getAddrOfMetaclassObject(rootClass, NotForDefinition);
-      B.add(isa);
+      B.addSignedPointer(isa, IGM.getOptions().PointerAuth.ObjCIsaPointers,
+                         PointerAuthEntity());
       // super, which is dependent if the superclass is generic
       B.addNullPointer(IGM.ObjCClassPtrTy);
       // cache
@@ -5230,15 +5249,6 @@ namespace {
                                       llvm::Value *descriptor,
                                       llvm::Value *arguments,
                                       llvm::Value *templatePointer) {
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
-
       auto metadata = IGF.Builder.CreateCall(
           getLayoutString() ?
             IGM.getAllocateGenericClassMetadataWithLayoutStringFunctionPointer() :
@@ -6222,15 +6232,6 @@ namespace {
       auto extraSize = getExtraDataSize(layout);
       auto extraSizeV = IGM.getSize(extraSize);
 
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
-
       if (layoutStringsEnabled(IGM)) {
         auto *call = IGF.Builder.CreateCall(
             IGM.getAllocateGenericValueMetadataWithLayoutStringFunctionPointer(),
@@ -6983,15 +6984,6 @@ namespace {
       auto &layout = IGM.getMetadataLayout(Target);
       auto extraSize = getExtraDataSize(layout);
       auto extraSizeV = IGM.getSize(extraSize);
-
-      // Sign the descriptor.
-      auto schema = IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments;
-      if (schema) {
-        auto authInfo = PointerAuthInfo::emit(
-            IGF, schema, nullptr,
-            PointerAuthEntity::Special::TypeDescriptorAsArgument);
-        descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
-      }
 
       if (layoutStringsEnabled(IGM)) {
         auto *call = IGF.Builder.CreateCall(
