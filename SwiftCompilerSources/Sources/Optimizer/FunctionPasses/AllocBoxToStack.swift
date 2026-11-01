@@ -84,7 +84,10 @@ let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
 
   /// This is needed because box-promotion is mandatory for non-copyable types. Without removing the
   /// original, un-specialized versions of closures we risk getting false errors in diagnostic passes.
-  eraseIfDead(functions: originalsOfSpecializedFunctions.functions, moduleContext)
+  /// At -Onone, closures and local functions are kept for the debugger. Erase them anyway, so that
+  /// diagnostics don't differ between -Onone and -O.
+  eraseIfDead(functions: originalsOfSpecializedFunctions.functions, moduleContext,
+              ignoringDebuggerPreservation: true)
 }
 
 /// Converts all non-escaping `alloc_box` to `alloc_stack` and specializes called functions if a
@@ -96,7 +99,7 @@ private func tryConvertBoxesToStack(in function: Function, isMandatory: Bool,
   var promotableBoxes = Array<(AllocBoxInst, Flags)>()
   var functionsToSpecialize = FunctionSpecializations(isMandatory: isMandatory)
 
-  findPromotableBoxes(in: function, &promotableBoxes, &functionsToSpecialize)
+  findPromotableBoxes(in: function, isMandatory: isMandatory, context, &promotableBoxes, &functionsToSpecialize)
 
   functionsToSpecialize.createSpecializedFunctions(context)
 
@@ -124,13 +127,16 @@ private func tryConvertBoxesToStack(in function: Function, isMandatory: Bool,
   return functionsToSpecialize
 }
 
-private func findPromotableBoxes(in function: Function,
+private func findPromotableBoxes(in function: Function, isMandatory: Bool, _ context: FunctionPassContext,
                                  _ promotableBoxes: inout Array<(AllocBoxInst, Flags)>,
                                  _ functionsToSpecialize: inout FunctionSpecializations
 ) {
+  // The mandatory pass makes the accesses of a promoted box static, and DiagnoseStaticExclusivity
+  // checks them after promotion. Only promote a box if that is equivalent to dynamic enforcement.
+  let accessSummary = isMandatory ? BoxAccessSummary(context) : nil
   for inst in function.instructions {
     if let allocBox = inst as? AllocBoxInst {
-      if let (promotableArgs, flags) = canPromote(allocBox: allocBox) {
+      if let (promotableArgs, flags) = canPromote(allocBox: allocBox, accessSummary) {
         promotableBoxes.append((allocBox, flags))
         functionsToSpecialize.add(promotableArguments: promotableArgs)
       }
@@ -138,9 +144,20 @@ private func findPromotableBoxes(in function: Function,
   }
 }
 
+/// Promotion is mandatory for noncopyable variables, because the move-only checker runs after
+/// MandatoryAllocBoxToStack and requires it.
+///
+/// FIXME: DiagnoseStaticExclusivity may then reject a conflict on a noncopyable variable that only
+/// happens on some paths (test/SILOptimizer/exclusivity_static_diagnostics_noncopyable_box.swift).
+/// Running the new move checker before MandatoryAllocBoxToStack would remove this exception.
+private func isNoncopyable(_ allocBox: AllocBoxInst) -> Bool {
+  allocBox.type.getBoxFields(in: allocBox.parentFunction)[0].isMoveOnly
+}
+
 private typealias Flags = (isLexical: Bool, isFromVarDecl: Bool)
 
-private func canPromote(allocBox: AllocBoxInst) -> (promotableArguments: [FunctionArgument], flags: Flags)? {
+private func canPromote(allocBox: AllocBoxInst, _ accessSummary: BoxAccessSummary?
+) -> (promotableArguments: [FunctionArgument], flags: Flags)? {
   // For simplicity we only support boxes with a single field. This is okay because SILGen only generates
   // such kind of boxes.
   guard allocBox.type.getBoxFields(in: allocBox.parentFunction).count == 1 else {
@@ -193,6 +210,13 @@ private func canPromote(allocBox: AllocBoxInst) -> (promotableArguments: [Functi
       default:
         return nil
       }
+    }
+  }
+  // In the mandatory pass, only promote a box if static checking of its accesses is equivalent to
+  // dynamic enforcement. If no function argument is promoted, the box's accesses are the same as before.
+  if !argumentsToPromote.isEmpty, !isNoncopyable(allocBox), let accessSummary {
+    if !accessSummary.isStaticallyCheckable(allocBox) {
+      return nil
     }
   }
   return (argumentsToPromote, flags)
@@ -481,13 +505,16 @@ private extension ApplySite {
        callee.isDefinition,
        callee.canBeInlinedIntoCaller(withSerializedKind: parentFunction.serializedKind)
     {
-      if self is FullApplySite,
-         // If the function is inlined later, there is no point in specializing it.
-         !callee.shouldOptimize || callee.inlineStrategy == .heuristicAlways ||
-         callee.inlineStrategy == .always
-      {
-        return nil
-      }
+      // Always specialize the callee, regardless of the optimization mode or inlining strategy
+      // (`shouldOptimize`, `inlineStrategy`).
+      //
+      // This is extra work if the callee will be inlined later anyway. We do it to signify to
+      // downstream diagnostics (DiagnoseStaticExclusivity) that the argument was already assumed
+      // to be non-escaping: the specialized function takes the captured address as
+      // `@inout_aliasable`.
+      //
+      // This must not depend on optimization options. SIL in the diagnostic pipeline cannot
+      // deviate based on -O options, otherwise diagnostics would differ between -Onone and -O.
       return callee
     }
     return nil
