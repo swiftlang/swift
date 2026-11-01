@@ -148,7 +148,39 @@ where Element: AdditiveArithmetic & Differentiable {
     precondition(
       lhs.base.count == rhs.base.count,
       "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
-    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(+))
+    let count = lhs.base.count
+    return lhs.base.withUnsafeBufferPointer { l in
+      rhs.base.withUnsafeBufferPointer { r in
+        Array.DifferentiableView(Array<Element>(unsafeUninitializedCapacity: count) { buffer, initializedCount in
+          for i in 0..<count {
+            buffer.initializeElement(at: i, to: l[i] + r[i])
+          }
+          initializedCount = count
+        })
+      }
+    }
+  }
+  
+  @inlinable
+  public static func +=(
+    lhs: inout Array.DifferentiableView,
+    rhs: Array.DifferentiableView
+  ) {
+    if rhs.base.count == 0 { return }
+    if lhs.base.count == 0 {
+      lhs = rhs
+      return
+    }
+    precondition(
+      lhs.base.count == rhs.base.count,
+      "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
+    rhs.base.withUnsafeBufferPointer { r in
+      lhs.base.withUnsafeMutableBufferPointer { l in
+        for i in 0 ..< l.count {
+          l[i] += r[i]
+        }
+      }
+    }
   }
 
   @inlinable
@@ -157,7 +189,15 @@ where Element: AdditiveArithmetic & Differentiable {
     rhs: Array.DifferentiableView
   ) -> Array.DifferentiableView {
     if lhs.base.count == 0 {
-      return Array.DifferentiableView(rhs.base.map { .zero - $0 })
+      let count = rhs.base.count
+      return rhs.base.withUnsafeBufferPointer { r in
+        Array.DifferentiableView(Array<Element>(unsafeUninitializedCapacity: count) { buffer, initializedCount in
+          for i in 0..<count {
+            buffer.initializeElement(at: i, to: .zero - r[i])
+          }
+          initializedCount = count
+        })
+      }
     }
     if rhs.base.count == 0 {
       return lhs
@@ -165,7 +205,47 @@ where Element: AdditiveArithmetic & Differentiable {
     precondition(
       lhs.base.count == rhs.base.count,
       "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
-    return Array.DifferentiableView(zip(lhs.base, rhs.base).map(-))
+    let count = lhs.base.count
+    return lhs.base.withUnsafeBufferPointer { l in
+      rhs.base.withUnsafeBufferPointer { r in
+        Array.DifferentiableView(Array<Element>(unsafeUninitializedCapacity: count) { buffer, initializedCount in
+          for i in 0..<count {
+            buffer.initializeElement(at: i, to: l[i] - r[i])
+          }
+          initializedCount = count
+        })
+      }
+    }
+  }
+  
+  @inlinable
+  public static func -=(
+    lhs: inout Array.DifferentiableView,
+    rhs: Array.DifferentiableView
+  ) {
+    if rhs.base.count == 0 { return }
+    if lhs.base.count == 0 {
+      let count = rhs.base.count
+      lhs = rhs.base.withUnsafeBufferPointer { r in
+        Array.DifferentiableView(Array<Element>(unsafeUninitializedCapacity: count) { buffer, initializedCount in
+          for i in 0..<count {
+            buffer.initializeElement(at: i, to: .zero - r[i])
+          }
+          initializedCount = count
+        })
+      }
+      return
+    }
+    precondition(
+      lhs.base.count == rhs.base.count,
+      "Count mismatch: \(lhs.base.count) and \(rhs.base.count)")
+    rhs.base.withUnsafeBufferPointer { r in
+      lhs.base.withUnsafeMutableBufferPointer { l in
+        for i in 0 ..< l.count {
+          l[i] -= r[i]
+        }
+      }
+    }
   }
 
   @inlinable
