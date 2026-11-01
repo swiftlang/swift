@@ -1,0 +1,78 @@
+// RUN: %target-sil-opt %s -test-runner -o /dev/null \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature AddressableTypes \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_AddressableTypes
+
+// Memory effects of applies on an address which is captured by a value with a scoped borrow
+// dependence on it (`@lifetime(borrow address_for_deps N)`).
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+@_addressableForDependencies
+struct Addressable {
+  @_hasStorage var a: Int
+}
+
+struct NE : ~Escapable {}
+
+sil @borrow_addressable : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @mutate_addressable : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+sil [readnone] @readnone_fn : $@convention(thin) () -> ()
+
+// Both applies may read %1 (the second one only through %4), but not write it.
+// An apply which doesn't read memory at all doesn't get a read effect.
+
+// CHECK-LABEL: @read_through_borrowed_capture
+// CHECK:        %5 = apply %4(%1) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+// CHECK-NEXT:   %1 = alloc_stack $Addressable{{.*}}
+// CHECK-NEXT:  r=1,w=0
+// CHECK:        %7 = apply %6(%5) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Addressable{{.*}}
+// CHECK-NEXT:  r=1,w=0
+// CHECK:        %9 = apply %8() : $@convention(thin) () -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Addressable{{.*}}
+// CHECK-NEXT:  r=0,w=0
+sil @read_through_borrowed_capture : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "memory_effects"
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to %2 : $*Int
+  %3 = function_ref @borrow_addressable : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%1) : $@convention(thin) (@in_guaranteed Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NE) -> ()
+  %7 = function_ref @readnone_fn : $@convention(thin) () -> ()
+  %8 = apply %7() : $@convention(thin) () -> ()
+  dealloc_stack %1 : $*Addressable
+  %r = tuple ()
+  return %r : $()
+}
+
+// A value which depends on an `@inout` argument (like a `MutableSpan`) may write to it.
+
+// CHECK-LABEL: @write_through_inout_capture
+// CHECK:        %7 = apply %6(%5) : $@convention(thin) (@guaranteed NE) -> ()
+// CHECK-NEXT:   %1 = alloc_stack $Addressable{{.*}}
+// CHECK-NEXT:  r=1,w=1
+sil @write_through_inout_capture : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "memory_effects"
+  %1 = alloc_stack $Addressable
+  %2 = struct_element_addr %1 : $*Addressable, #Addressable.a
+  store %0 to %2 : $*Int
+  %3 = function_ref @mutate_addressable : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = apply %3(%1) : $@convention(thin) (@inout Addressable) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = function_ref @use_ne : $@convention(thin) (@guaranteed NE) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NE) -> ()
+  dealloc_stack %1 : $*Addressable
+  %r = tuple ()
+  return %r : $()
+}

@@ -153,6 +153,11 @@ protocol EscapeVisitor {
   /// Called during the UseDef walk for each definition
   mutating func visitDef(def: Value, path: EscapePath) -> DefResult
 
+  /// Called during the DefUse walk for an `@in_guaranteed` address argument of an apply, which is
+  /// only captured by the apply's result. `.ignore` doesn't follow the result, which can read the
+  /// address but not write it.
+  mutating func visitBorrowedAddressableCapture(operand: Operand, path: EscapePath) -> UseResult
+
   /// If true, the traversals follow values with trivial types.
   var followTrivialTypes: Bool { get }
 
@@ -167,6 +172,10 @@ extension EscapeVisitor {
 
   mutating func visitDef(def: Value, path: EscapePath) -> DefResult {
     return .continueWalkUp
+  }
+
+  mutating func visitBorrowedAddressableCapture(operand: Operand, path: EscapePath) -> UseResult {
+    return .continueWalk
   }
 
   var followTrivialTypes: Bool { false }
@@ -677,6 +686,19 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
                 !hasAddressResult(apply) {
         // No result or argument depends on the argument's address.
         return .continueWalk
+      } else if !hasAddressResult(apply),
+                onlyResultDependsOnAddress(of: apply, argOp: argOp) {
+        // The address is only captured by the result. Constructing a mutable address from an
+        // `@in_guaranteed` argument is undefined behavior (except for `@_rawLayout` types, which
+        // are not handled here), so the result can only read it.
+        switch visitor.visitBorrowedAddressableCapture(operand: argOp, path: path) {
+        case .continueWalk:
+          break
+        case .ignore:
+          return .continueWalk
+        case .abort:
+          return .abortWalk
+        }
       }
     }
 
@@ -722,6 +744,27 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
     guard let fas = apply as? FullApplySite else { return false }
     let convention = fas.functionConvention
     return convention.hasAddressResult
+  }
+
+  /// True if `argOp` is `@in_guaranteed` and only `apply`'s result depends on its address.
+  /// Checks the convention, because a `.scope` dependence can also be an inout dependence.
+  private func onlyResultDependsOnAddress(of apply: ApplySite, argOp: Operand) -> Bool {
+    guard apply.convention(of: argOp) == .indirectInGuaranteed else {
+      return false
+    }
+
+    for targetOperand in apply.argumentOperands {
+      guard !targetOperand.value.isEscapable else {
+        continue
+      }
+      if let dep = apply.parameterDependence(target: targetOperand, source: argOp), dep.isAddressable(for: argOp.value) {
+        return false
+      }
+    }
+    guard let resultDep = apply.resultDependence(on: argOp) else {
+      return false
+    }
+    return resultDep.isAddressable(for: argOp.value)
   }
 
   private mutating func indirectResultEscapes(of beginApply: BeginApplyInst, path: Path) -> Bool {
