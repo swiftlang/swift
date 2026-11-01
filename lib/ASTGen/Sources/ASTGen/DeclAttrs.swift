@@ -835,7 +835,31 @@ extension ASTGenVisitor {
     // The optional identifier argument is the C++ function name the importer
     // matches against.
     var name: BridgedStringRef = ""
-    if node.arguments != nil {
+    if let arguments = node.arguments {
+      // A C++ operator name written without backticks is not a valid argument.
+      if arguments.trimmedDescription.hasPrefix("operator"),
+        !arguments.trimmedDescription.hasPrefix("operator:")
+      {
+        self.diagnose(.attr_cxx_operator_name_backticks("cxx"), at: node.attributeName)
+        return nil
+      }
+      // The name is a single bare identifier: not empty, not a string literal,
+      // not labeled, and not a keyword.
+      let isPlainName: Bool = {
+        guard let list = arguments.as(LabeledExprListSyntax.self), list.count == 1,
+          let first = list.first, first.label == nil,
+          let reference = first.expression.as(DeclReferenceExprSyntax.self),
+          reference.argumentNames == nil,
+          reference.baseName.rawTokenKind == .identifier
+        else {
+          return false
+        }
+        return true
+      }()
+      guard isPlainName else {
+        self.diagnose(.attr_expected_cxx_name("cxx"), at: node.attributeName)
+        return nil
+      }
       guard let parsed = self.generateWithLabeledExprListArguments(attribute: node, { args in
         self.generateConsumingPlainIdentifierAttrOption(args: &args) { (token) -> BridgedStringRef? in
           var text = token.rawText
