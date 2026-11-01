@@ -11,7 +11,6 @@
 # ----------------------------------------------------------------------------
 
 import os
-import shutil
 
 from . import product
 from . import swiftpm
@@ -56,7 +55,7 @@ class WasmKit(product.Product):
         install_destdir = self.host_install_destdir(host_target)
         build_toolchain_path = install_destdir + self.args.install_prefix + '/bin'
         bin_path = run_swift_build(host_target, self, 'wasmkit-cli', set_installation_rpath=True)
-        shutil.copy(bin_path, build_toolchain_path + '/wasmkit')
+        shell.copy(bin_path, build_toolchain_path + '/wasmkit')
 
     def build(self, host_target):
         bin_path = run_swift_build(host_target, self, 'wasmkit-cli')
