@@ -341,6 +341,7 @@ extension LazySequenceProtocol {
 }
 
 extension LazyFilterSequence {
+  @inlinable // lazy-performance
   @available(swift, introduced: 5)
   public __consuming func filter(
     _ isIncluded: @escaping (Element) -> Bool
