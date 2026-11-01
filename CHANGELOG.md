@@ -5,6 +5,21 @@
 
 ## Swift (next)
 
+* [#88082][]:
+
+  Forward references to top-level script variables with storage are now
+  diagnosed as errors, matching the behavior for local variables:
+
+  ```swift
+  print(x) // error: use of global variable 'x' before its declaration
+  let x = 0
+  ```
+
+  Previously this would have accessed uninitialized memory. Such variables must
+  now be declared before their use. This change only affects script mode
+  (e.g `main.swift`), it does not apply to regular global variables, which
+  continue to be initialized lazily.
+
 * [SE-0478][]:
   Introduced file-level default declarations for `nonisolated`, `@MainActor`,
   `@available`, and `@diagnose`. A `default` declaration applies to all
@@ -11383,4 +11398,5 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [#70065]: <https://github.com/apple/swift/pull/70065>
 [#71075]: <https://github.com/apple/swift/pull/71075>
 [#78389]: <https://github.com/swiftlang/swift/pull/78389>
+[#88082]: <https://github.com/swiftlang/swift/pull/88082>
 [swift-syntax]: https://github.com/apple/swift-syntax
