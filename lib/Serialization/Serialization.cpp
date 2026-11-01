@@ -7648,10 +7648,15 @@ bool Serializer::scheduleHiddenTypeLayoutSerialization(const Decl *D) {
 
 void Serializer::handleHiddenTypeLayoutRequirement(
     const HiddenTypeLayoutRequirement &requirement) {
+  // FIXME: Opaque representations only need a name that can replace an
+  // unresolved XREF. Use the existing abstract layout representation until
+  // the module format has a name-only hidden declaration.
   if (!scheduleHiddenTypeLayoutSerialization(requirement.LayoutDecl) ||
       !Options.EnableHiddenTypeLayoutSerializationRemarks)
     return;
 
+  unsigned isOpaqueRepresentation =
+      requirement.Kind == HiddenTypeRepresentationKind::Opaque;
   auto *abiExposedLeaf = requirement.LayoutAffectingStorage->getDeclContext()
                              ->getSelfNominalTypeDecl();
   assert(abiExposedLeaf);
@@ -7663,21 +7668,21 @@ void Serializer::handleHiddenTypeLayoutRequirement(
         requirement.LayoutAffectingStorage->getLoc(),
         diag::serialization_scheduled_implementation_only_hidden_type_layout,
         requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
+        requirement.LayoutAffectingStorage, isOpaqueRepresentation);
     break;
   case HiddenTypeLayoutOrigin::InternalBridgingHeader:
     diags.diagnose(
         requirement.LayoutAffectingStorage->getLoc(),
         diag::serialization_scheduled_internal_bridging_header_hidden_type_layout,
         requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
+        requirement.LayoutAffectingStorage, isOpaqueRepresentation);
     break;
   case HiddenTypeLayoutOrigin::RecoveredHiddenType:
     diags.diagnose(
         requirement.LayoutAffectingStorage->getLoc(),
         diag::serialization_scheduled_recovered_hidden_type_layout,
         requirement.HiddenType, abiExposedLeaf,
-        requirement.LayoutAffectingStorage);
+        requirement.LayoutAffectingStorage, isOpaqueRepresentation);
     break;
   }
 

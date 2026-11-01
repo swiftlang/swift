@@ -896,19 +896,22 @@ REMARK(serialization_skipped_invalid_type_unknown_name,none,
        ())
 REMARK(serialization_scheduled_implementation_only_hidden_type_layout,none,
        "serializing abstract layout for hidden type %0 because its defining "
-       "module was imported with '@_implementationOnly' and it contributes "
-       "to the ABI-exposed layout of %kind1 through %kind2",
-       (Type, const ValueDecl *, const ValueDecl *))
+       "module was imported with '@_implementationOnly' and it "
+       "%select{contributes to|is referenced by a type in}3 the ABI-exposed "
+       "layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *, unsigned))
 REMARK(serialization_scheduled_internal_bridging_header_hidden_type_layout,none,
        "serializing abstract layout for hidden type %0 because it was "
-       "imported through '-internal-import-bridging-header' and contributes "
-       "to the ABI-exposed layout of %kind1 through %kind2",
-       (Type, const ValueDecl *, const ValueDecl *))
+       "imported through '-internal-import-bridging-header' and "
+       "%select{contributes to|is referenced by a type in}3 the ABI-exposed "
+       "layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *, unsigned))
 REMARK(serialization_scheduled_recovered_hidden_type_layout,none,
        "serializing abstract layout for hidden type %0 because it was "
-       "recovered from a hidden type representation and contributes to the "
-       "ABI-exposed layout of %kind1 through %kind2",
-       (Type, const ValueDecl *, const ValueDecl *))
+       "recovered from a hidden type representation and "
+       "%select{contributes to|is referenced by a type in}3 the ABI-exposed "
+       "layout of %kind1 through %kind2",
+       (Type, const ValueDecl *, const ValueDecl *, unsigned))
 NOTE(serialization_hidden_type_layout_abi_exposure,none,
      "layout of %kind0 is ABI-exposed through %kind1",
      (const ValueDecl *, const ValueDecl *))
