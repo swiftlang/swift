@@ -98,7 +98,7 @@ if not "%DEBUG_INFO%"=="" set "DebugInfoArg=-DebugInfo"
 call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
-powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
+powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build-multi.ps1 ^
   %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
