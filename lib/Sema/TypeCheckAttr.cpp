@@ -6737,6 +6737,16 @@ DynamicallyReplacedDeclRequest::evaluate(Evaluator &evaluator,
     return decl;
   }
 
+  // A replacement declared in a local context, such as a local function, is
+  // diagnosed by the attribute checker; there is nothing to look up.
+  auto *dc = VD->getDeclContext();
+  if (auto *AD = dyn_cast<AccessorDecl>(VD))
+    dc = AD->getStorage()->getDeclContext();
+  if (isa<TopLevelCodeDecl>(dc))
+    dc = dc->getParent();
+  if (!dc->isModuleScopeContext() && !dc->isTypeContext())
+    return nullptr;
+
   auto &Ctx = VD->getASTContext();
   DeclNameRefWithLoc nameWithLoc{attr->getReplacedFunctionName(),
                                  attr->getReplacedFunctionNameLoc(),
