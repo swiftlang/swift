@@ -5807,7 +5807,21 @@ void PrintAST::visitSubscriptExpr(SubscriptExpr *expr) {
 }
 
 void PrintAST::visitEnumIsCaseExpr(EnumIsCaseExpr *expr) {
-  visit(expr->getSubExpr());
+  Expr *sub = expr->getSubExpr();
+  // The type checker lowers some `x is T` checks (optional-depth mismatch or
+  // collection downcast) into an implicit `x as? T` matched against `.some`;
+  // strip the implicit wrappers to print the original operand.
+  if (auto *evaluation = dyn_cast<OptionalEvaluationExpr>(sub))
+    sub = evaluation->getSubExpr();
+  if (auto *cast = dyn_cast<ConditionalCheckedCastExpr>(sub))
+    if (cast->isImplicit())
+      sub = cast->getSubExpr();
+  while (auto *bind = dyn_cast<BindOptionalExpr>(sub)) {
+    if (!bind->isImplicit())
+      break;
+    sub = bind->getSubExpr();
+  }
+  visit(sub);
   Printer << " is ";
   printTypeLoc(expr->getCaseTypeRepr());
 }
@@ -5883,6 +5897,16 @@ void PrintAST::visitBridgeToObjCExpr(BridgeToObjCExpr *expr) {
 void PrintAST::visitObjCSelectorExpr(ObjCSelectorExpr *expr) {
   Printer << "#selector";
   Printer << "(";
+  switch (expr->getSelectorKind()) {
+  case ObjCSelectorExpr::Method:
+    break;
+  case ObjCSelectorExpr::Getter:
+    Printer << "getter: ";
+    break;
+  case ObjCSelectorExpr::Setter:
+    Printer << "setter: ";
+    break;
+  }
   visit(expr->getSubExpr());
   Printer << ")";
 }
@@ -5895,7 +5919,15 @@ void PrintAST::visitPostfixUnaryExpr(PostfixUnaryExpr *expr) {
 void PrintAST::visitTupleElementExpr(TupleElementExpr *expr) {
   visit(expr->getBase());
   Printer << ".";
-  Printer << expr->getFieldNumber();
+  // Prefer the label when the element has one; the type checker has already
+  // resolved the access to an index.
+  auto baseTy = expr->getBase()->getType();
+  auto *tupleTy =
+      baseTy ? baseTy->getWithoutSpecifierType()->getAs<TupleType>() : nullptr;
+  if (tupleTy && tupleTy->getElement(expr->getFieldNumber()).hasName())
+    Printer << tupleTy->getElement(expr->getFieldNumber()).getName().str();
+  else
+    Printer << expr->getFieldNumber();
 }
 
 void PrintAST::visitDerivedToBaseExpr(DerivedToBaseExpr *expr) {
