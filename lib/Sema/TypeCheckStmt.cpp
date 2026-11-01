@@ -380,7 +380,9 @@ namespace {
           // If there is a projection variable, give it a local discriminator.
           if (auxVars.projectionVar && auxVars.projectionVar != var) {
             if (var->hasLocalDiscriminator() &&
-                var->getName() == auxVars.projectionVar->getName()) {
+                var->getName() == auxVars.projectionVar->getName() &&
+                auxVars.projectionVar->getRawLocalDiscriminator() ==
+                    ValueDecl::InvalidDiscriminator) {
               auxVars.projectionVar->setLocalDiscriminator(
                   var->getRawLocalDiscriminator());
             } else {
@@ -393,7 +395,9 @@ namespace {
           if (auxVars.localWrappedValueVar &&
               auxVars.localWrappedValueVar != var) {
             if (var->hasLocalDiscriminator() &&
-                var->getName() == auxVars.localWrappedValueVar->getName()) {
+                var->getName() == auxVars.localWrappedValueVar->getName() &&
+                auxVars.localWrappedValueVar->getRawLocalDiscriminator() ==
+                    ValueDecl::InvalidDiscriminator) {
               auxVars.localWrappedValueVar->setLocalDiscriminator(
                   var->getRawLocalDiscriminator());
             } else {
