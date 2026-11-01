@@ -26,14 +26,14 @@ public func testDeadClosureCycle(a: Apply, x: inout Int) {
   }
 }
 
-// The order of the top-level SCOPE nodes is sensitive to the module's
-// function list ordering. It may change. The important thing is that:
+// The graph and order are dumped once per closure group. The important things
+// are:
 //
 // - the closure scope graph has the same shape
 // - the localFunc is marked CYCLE_HEAD
 // - the RPO function order does not change
 
-// testRecursiveClosure scopes:
+// testRecursiveClosure's group:
 //
 // CHECK: SCOPE: testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF'
 // CHECK:     CLOSURE: localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
@@ -41,38 +41,27 @@ public func testDeadClosureCycle(a: Apply, x: inout Int) {
 // CHECK:     CLOSURE: closure #1 in localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
 // CHECK: SCOPE: closure #1 in localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
 // CHECK:     CLOSURE: localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
-
-// testDeadClosureCycle scopes:
-//
-// CHECK: SCOPE: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
-// CHECK:     CLOSURE: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
-// CHECK: SCOPE: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
-// CHECK:     CLOSURE: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
-
-// testRecursiveClosure closures:
-//
 // CHECK: CLOSURE: localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
 // CHECK:     SCOPE: testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF'
 // CHECK:     SCOPE: closure #1 in localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
 // CHECK: CLOSURE: closure #1 in localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
 // CHECK:     SCOPE: localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
+// CHECK: RPO function order:
+// CHECK: testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF'
+// CHECK: CYCLE HEAD: localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
+// CHECK: closure #1 in localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
 
-// testDeadClosureCycle closures:
+// testDeadClosureCycle's group. No root reaches the dead cycle, so its
+// localFunc is a DFS root of its own:
 //
+// CHECK: SCOPE: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
+// CHECK:     CLOSURE: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
+// CHECK: SCOPE: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
+// CHECK:     CLOSURE: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
 // CHECK: CLOSURE: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
 // CHECK:     SCOPE: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
 // CHECK: CLOSURE: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
 // CHECK:     SCOPE: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
-
 // CHECK: RPO function order:
-
-// CHECK: main 'main'
-// CHECK: testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF'
-// CHECK: CYCLE HEAD: localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
-// CHECK: closure #1 in localFunc #1 (b:) in testRecursiveClosure(a:x:) '$s4main20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'
-// CHECK: Int.init(_builtinIntegerLiteral:) '$sSi22_builtinIntegerLiteralSiBI_tcfC'
-// CHECK: static Int.+= infix(_:_:) '$sSi2peoiyySiz_SitFZ'
-
-// CHECK: testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF'
 // CHECK: CYCLE HEAD: localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
 // CHECK: closure #1 in localFunc #1 (b:) in testDeadClosureCycle(a:x:) '$s4main20testDeadClosureCycle1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tFyAaE_pcfU_'

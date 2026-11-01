@@ -37,3 +37,12 @@ void PrettyStackTraceSILModuleTransform::print(llvm::raw_ostream &out) const {
   out << "While running pass #" << PassNumber
       << " SILModuleTransform \"" << SMT->getID() << "\".\n";
 }
+
+void PrettyStackTraceSILClosureGroupTransform::print(
+    llvm::raw_ostream &out) const {
+  out << "While running pass #" << PassNumber << " SILClosureGroupTransform \""
+      << T->getID() << "\"";
+  if (FirstMember)
+    out << " on the group of '" << FirstMember->getName() << "'";
+  out << ".\n";
+}

@@ -1,0 +1,371 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+// Closure groups in schedule order (ClosureGroupSchedule.h). Each member is
+// printed with its closure component's leader in brackets.
+
+sil_stage raw
+
+import Builtin
+
+// CHECK-LABEL: begin running test 1 of 1 on ia_parent: closure_group_schedule
+
+// A directly applied closure.
+// CHECK-NEXT: group 0
+// CHECK-NEXT:   [ia_callee] ia_callee
+// CHECK-NEXT:   [ia_callee] ia_parent
+
+// Nested closures, through partial_apply.
+// CHECK-NEXT: group 1
+// CHECK-NEXT:   [nested_inner] nested_inner
+// CHECK-NEXT:   [nested_inner] nested_mid
+// CHECK-NEXT:   [nested_inner] nested_outer
+
+// A closure shared by two roots joins them.
+// CHECK-NEXT: group 2
+// CHECK-NEXT:   [shared_closure] shared_closure
+// CHECK-NEXT:   [shared_closure] shared_root1
+// CHECK-NEXT:   [shared_closure] shared_root2
+
+// A box passed to a callee is a capture edge, even with a direct apply.
+// CHECK-NEXT: group 3
+// CHECK-NEXT:   [box_callee] box_callee
+// CHECK-NEXT:   [box_callee] box_parent
+
+// Mutual recursion without closures: two components, one group.
+// CHECK-NEXT: group 4
+// CHECK-NEXT:   [mutual_2] mutual_2
+// CHECK-NEXT:   [mutual_1] mutual_1
+
+// A cycle between two components with no cycle between functions: one group.
+// CHECK-NEXT: group 5
+// CHECK-NEXT:   [compcyc_p2] compcyc_p2
+// CHECK-NEXT:   [compcyc_c1] compcyc_c1
+// CHECK-NEXT:   [compcyc_c1] compcyc_p1
+// CHECK-NEXT:   [compcyc_p2] compcyc_c2
+
+// Callees come before callers.
+// CHECK-NEXT: group 6
+// CHECK-NEXT:   [order_leaf] order_leaf
+// CHECK-NEXT: group 7
+// CHECK-NEXT:   [order_caller] order_caller
+
+// Depth-first order: a group comes right after its callees. depth_closure's
+// component waits for depth_leaf, and depth_other, which nothing calls, comes
+// after both.
+// CHECK-NEXT: group 8
+// CHECK-NEXT:   [depth_leaf] depth_leaf
+// CHECK-NEXT: group 9
+// CHECK-NEXT:   [depth_closure] depth_closure
+// CHECK-NEXT:   [depth_closure] depth_parent
+// CHECK-NEXT: group 10
+// CHECK-NEXT:   [depth_other] depth_other
+
+// A by-value capture marked @closureCapture is a closure link.
+// CHECK-NEXT: group 11
+// CHECK-NEXT:   [cap_closure] cap_closure
+// CHECK-NEXT:   [cap_closure] cap_parent
+
+// A thunk is never a closure link, but capture edges join a shared thunk that
+// receives a box with every function that passes it one.
+// CHECK-NEXT: group 12
+// CHECK-NEXT:   [thunk_shared] thunk_shared
+// CHECK-NEXT:   [thunk_shared] thunk_user1
+// CHECK-NEXT:   [thunk_shared] thunk_user2
+
+// A capture passed through a dynamic_function_ref is a capture edge.
+// CHECK-NEXT: group 13
+// CHECK-NEXT:   [dyn_closure] dyn_closure
+// CHECK-NEXT:   [dyn_closure] dyn_parent
+// CHECK-NEXT: end running test 1 of 1 on ia_parent: closure_group_schedule
+
+//===----------------------------------------------------------------------===//
+// A directly applied closure with an @inout_aliasable parameter
+//===----------------------------------------------------------------------===//
+
+sil @ia_callee : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @ia_parent : $@convention(thin) () -> () {
+bb0:
+  specify_test "closure_group_schedule"
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @ia_callee : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %a = apply %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Nested non-escaping closures
+//===----------------------------------------------------------------------===//
+
+sil @nested_inner : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @nested_mid : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %f = function_ref @nested_inner : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %c = apply %pa() : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @nested_outer : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @nested_mid : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %c = apply %pa() : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A closure shared by two roots, as with a @backDeployed function's fallback
+//===----------------------------------------------------------------------===//
+
+sil @shared_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @shared_root1 : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @shared_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %a = apply %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @shared_root2 : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @shared_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %a = apply %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A box passed to a callee is a capture edge, even with a direct apply
+//===----------------------------------------------------------------------===//
+
+sil @box_callee : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () {
+bb0(%0 : ${ var Builtin.Int64 }):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @box_parent : $@convention(thin) () -> () {
+bb0:
+  %b = alloc_box ${ var Builtin.Int64 }
+  %f = function_ref @box_callee : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  %a = apply %f(%b) : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  strong_release %b : ${ var Builtin.Int64 }
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Mutual recursion without closures: two components, one group
+//===----------------------------------------------------------------------===//
+
+sil @mutual_1 : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @mutual_2 : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @mutual_2 : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @mutual_1 : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A cycle between two components with no cycle between functions: each
+// parent's closure calls the other parent.
+//===----------------------------------------------------------------------===//
+
+sil @compcyc_c1 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %f = function_ref @compcyc_p2 : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @compcyc_p1 : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @compcyc_c1 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @compcyc_c2 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %f = function_ref @compcyc_p1 : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @compcyc_p2 : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @compcyc_c2 : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Callees come before callers
+//===----------------------------------------------------------------------===//
+
+sil @order_caller : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @order_leaf : $@convention(thin) () -> ()
+  %a = apply %f() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @order_leaf : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// Depth-first order: the component {depth_closure, depth_parent} comes first in
+// bottom-up order but calls depth_leaf, which comes later.
+//===----------------------------------------------------------------------===//
+
+sil @depth_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @depth_other : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @depth_leaf : $@convention(thin) () -> () {
+bb0:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @depth_parent : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = function_ref @depth_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %pa : $@noescape @callee_guaranteed () -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %g = function_ref @depth_leaf : $@convention(thin) () -> ()
+  %a = apply %g() : $@convention(thin) () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A by-value capture: marked @closureCapture, with no capture convention
+//===----------------------------------------------------------------------===//
+
+sil @cap_closure : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : @closureCapture $Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @cap_parent : $@convention(thin) () -> () {
+bb0:
+  %i = integer_literal $Builtin.Int64, 1
+  %f = function_ref @cap_closure : $@convention(thin) (Builtin.Int64) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%i) : $@convention(thin) (Builtin.Int64) -> ()
+  strong_release %pa : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A thunk that receives a box joins the functions that pass it one
+//===----------------------------------------------------------------------===//
+
+sil [thunk] @thunk_shared : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () {
+bb0(%0 : ${ var Builtin.Int64 }):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @thunk_user1 : $@convention(thin) () -> () {
+bb0:
+  %b = alloc_box ${ var Builtin.Int64 }
+  %f = function_ref @thunk_shared : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  %a = apply %f(%b) : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  strong_release %b : ${ var Builtin.Int64 }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @thunk_user2 : $@convention(thin) () -> () {
+bb0:
+  %b = alloc_box ${ var Builtin.Int64 }
+  %f = function_ref @thunk_shared : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  %a = apply %f(%b) : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> ()
+  strong_release %b : ${ var Builtin.Int64 }
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// A dynamic_function_ref callee is a capture edge like a function_ref callee
+//===----------------------------------------------------------------------===//
+
+sil [dynamically_replacable] @dyn_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> () {
+bb0(%0 : $*Builtin.Int64):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @dyn_parent : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Builtin.Int64
+  %f = dynamic_function_ref @dyn_closure : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %a = apply %f(%s) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  dealloc_stack %s : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
