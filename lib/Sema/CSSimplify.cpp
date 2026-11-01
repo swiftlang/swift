@@ -5719,6 +5719,9 @@ bool ConstraintSystem::repairFailures(
                         });
   };
 
+  if (hasConversionOrRestriction(ConversionRestrictionKind::TuplePack))
+    return false;
+
   auto hasAnyRestriction = [&]() {
     return llvm::any_of(conversionsOrFixes,
                         [](const RestrictionOrFix &correction) {
@@ -7349,11 +7352,7 @@ bool ConstraintSystem::repairFailures(
 
 static bool isTupleWithUnresolvedPackExpansion(Type type) {
   if (auto *tuple = type->getAs<TupleType>()) {
-    return llvm::any_of(tuple->getElements(), [&](const TupleTypeElt &elt) {
-      if (auto typeVar = elt.getType()->getAs<TypeVariableType>())
-        return typeVar->getImpl().isPackExpansion();
-      return false;
-    });
+    return tuple->hasTypeVariable() && containsPackExpansionType(tuple);
   }
   return false;
 }
@@ -7684,6 +7683,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     return formUnsolvedResult();
   }
 
+  llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
+
   // If the original type on one side consisted of a tuple type with
   // unresolved pack expansion(s), let's make sure that both sides are
   // tuples to enable proper pack matching for situations like:
@@ -7700,9 +7701,14 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // that under substitution that element would disappear and the type
   // would be just `(Int)`.
   //
+  // Record this tuple pack match as a candidate rather than applying it
+  // immediately, so conversions of the entire result, such as optional
+  // injection, can be considered as alternatives.
+  //
   // Notable exceptions here are: `Any` which doesn't require wrapping and
   // would be handled by an existential promotion in cases where it's allowed,
-  // and `Optional<T>` which would be handled by optional injection.
+  // and `Optional<T>` with an unresolved object type, which would be handled
+  // by optional injection.
   //
   // This logic is intended for concrete types, so `PackExpansionType` must be
   // avoided to not tuple-wrap pack arguments.
@@ -7711,8 +7717,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   // them. If they
   //  are valid wrapping targets, they will be tuple-wrapped after the lvalue is
   //  converted.
+  //
+  // Also check the fixed types: a type variable can be bound to a tuple with
+  // an unresolved pack expansion, for example when matching the root and value
+  // of an identity key path to its contextual type.
+  // Recognize actual pack expansion types as well as pack expansion type
+  // variables, but only while the tuple contains type variables.
   if (isTupleWithUnresolvedPackExpansion(origType1) ||
-      isTupleWithUnresolvedPackExpansion(origType2)) {
+      isTupleWithUnresolvedPackExpansion(origType2) ||
+      isTupleWithUnresolvedPackExpansion(type1) ||
+      isTupleWithUnresolvedPackExpansion(type2)) {
     auto isTypeVariableWrappedInOptional = [](Type type) {
       if (type->getOptionalObjectType()) {
         return type->lookThroughAllOptionalTypes()->isTypeVariableOrMember();
@@ -7728,12 +7742,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         !isTypeVariableWrappedInOptional(desugar2) &&
         !desugar1->isAny() &&
         !desugar2->isAny()) {
-      return matchTypes(
-          desugar1->is<TupleType>() ? type1
-                                    : TupleType::get({type1}, getASTContext()),
-          desugar2->is<TupleType>() ? type2
-                                    : TupleType::get({type2}, getASTContext()),
-          kind, flags, locator);
+      conversionsOrFixes.push_back(ConversionRestrictionKind::TuplePack);
     }
   }
 
@@ -7759,8 +7768,6 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // util pack expansion type variables are bound.
     return formUnsolvedResult(/*useOriginalTypes=*/true);
   }
-
-  llvm::SmallVector<RestrictionOrFix, 4> conversionsOrFixes;
 
   // Decompose parallel structure.
   TypeMatchOptions subflags =
@@ -15057,6 +15064,14 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   //   T_i $< U_i ===> (T_i...) $< (U_i...)
   case ConversionRestrictionKind::DeepEquality:
     return matchDeepEqualityTypes(type1, type2, locator);
+
+  case ConversionRestrictionKind::TuplePack:
+    return matchTypes(
+        type1->is<TupleType>() ? type1
+                               : TupleType::get({type1}, getASTContext()),
+        type2->is<TupleType>() ? type2
+                               : TupleType::get({type2}, getASTContext()),
+        matchKind, flags, locator);
 
   case ConversionRestrictionKind::Superclass: {
     addContextualScore();
