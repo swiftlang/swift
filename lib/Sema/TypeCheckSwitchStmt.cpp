@@ -1208,10 +1208,6 @@ namespace {
               theEnum->getAttrs().hasAttribute<NonexhaustiveAttr>();
         }
 
-        auto diag =
-            DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
-                        subjectType, shouldIncludeFutureVersionComment);
-
         auto languageModeForError = [&theEnum]() -> LanguageMode {
           if (theEnum) {
             // Presence of `@nonexhaustive(warn)` pushes the warning farther,
@@ -1225,7 +1221,19 @@ namespace {
           return LanguageMode::v6;
         };
 
-        diag.warnUntilLanguageMode(languageModeForError());
+        if (defaultCase) {
+          hasEmittedUnnecessaryDefaultDiagnostic = true;
+          DE.diagnose(startLoc,
+                      diag::exhaustive_switch_replace_default_with_unknown,
+                      subjectType, shouldIncludeFutureVersionComment)
+              .fixItInsert(defaultCase->getStartLoc(), "@unknown ")
+              .warnUntilLanguageMode(languageModeForError());
+        } else {
+          auto diag =
+              DE.diagnose(startLoc, diag::non_exhaustive_switch_unknown_only,
+                          subjectType, shouldIncludeFutureVersionComment);
+          diag.warnUntilLanguageMode(languageModeForError());
+        }
 
         mainDiagType.reset();
         break;
