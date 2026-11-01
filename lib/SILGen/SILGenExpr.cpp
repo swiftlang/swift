@@ -4993,6 +4993,11 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
         return false;
       }
 
+      // Declarations imported from Clang never have property descriptors.
+      if (baseDecl->hasClangNode()) {
+        return false;
+      }
+
       // Always-emit-into-client properties can't reliably refer to a property
       // descriptor that may not exist in older versions of their home dylib.
       // Their definition is also always entirely visible to clients so it isn't

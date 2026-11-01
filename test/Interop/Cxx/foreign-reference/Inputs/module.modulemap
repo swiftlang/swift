@@ -8,6 +8,11 @@ module POD {
   requires cplusplus
 }
 
+module PtrAuthFieldFRT {
+  header "ptrauth-field-frt.h"
+  requires cplusplus
+}
+
 module MoveOnly {
   header "move-only.h"
   requires cplusplus
