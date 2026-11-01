@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -36,6 +36,14 @@ func genericComparisons<T>(
   gt: a .>  b,
   ge: a .>= b
 )}
+
+func genericReplacements<T>(
+  _ a: T, _ b: T, _ m: SIMDMask<T.MaskStorage>
+) -> (vector: T, scalar: T) where T: SIMD {
+  let v = a.replacing(with: b, where: m)
+  let s = a.replacing(with: b[0], where: m)
+  return (v, s)
+}
 
 %for (Scalar, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
 % for n in [2,3,4,8,16,32,64]:
@@ -73,6 +81,32 @@ ${Scalar}x${n}_TestSuite.test("comparisons") {
   expectEqual(le, a .<= b)
   expectEqual(gt, a .>  b)
   expectEqual(ge, a .>= b)
+%  if bits == 16:
+  }
+%  end
+}
+
+${Scalar}x${n}_TestSuite.test("replace") {
+%  if bits == 16:
+  if #available(SwiftStdlib 5.3, *) {
+%  end
+  let a = ${Vector}.random(in: -1 ..< 1)
+  let b = ${Vector}.random(in: -1 ..< 1)
+  let m = SIMDMask<${Vector}.MaskStorage>.random()
+  let (vector, scalar) = genericReplacements(a, b, m)
+  expectEqual(vector, a.replacing(with: b, where: m))
+  expectEqual(scalar, a.replacing(with: b[0], where: m))
+
+  var c = a
+  c.replace(with: b, where: m)
+  expectEqual(vector, c)
+
+  var d = a
+  d.replace(with: b[0], where: m)
+  expectEqual(scalar, d)
+
+  expectEqual(b, a.replacing(with: b, where: SIMDMask(repeating: true)))
+  expectEqual(a, a.replacing(with: b, where: SIMDMask(repeating: false)))
 %  if bits == 16:
   }
 %  end
