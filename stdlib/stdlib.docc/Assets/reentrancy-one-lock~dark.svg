@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Two calls to price(for:) on PriceCache, which holds one AsyncMutex around the whole method. The call for ACME takes the lock and keeps it while it fetches. The call for MSFT, an unrelated symbol, waits for the lock until the ACME call finishes, and only then fetches." font-family="Helvetica, Arial, sans-serif">
+<defs>
+<pattern id="hatch-c1" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#D84005" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#F78461" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c2" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#0070C9" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#85D0EA" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c3" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#00867D" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#58C9AF" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-neutral" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#666666" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#B2B2B2" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#B2B2B2"/></marker>
+</defs>
+<text x="24" y="233.0" font-size="18" font-weight="bold" fill="#F78461">Call 1</text>
+<text x="24" y="255.0" font-size="16" fill="#B2B2B2">"ACME"</text>
+<rect x="200" y="192.0" width="570" height="88" rx="6" fill="#333333"/>
+<rect x="200.0" y="192.0" width="48.9" height="88" rx="6" fill="#D84005"/>
+<rect x="248.9" y="192.0" width="195.4" height="88" fill="url(#hatch-c1)"/>
+<text x="346.6" y="242.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#F2F2F2">fetch</text>
+<rect x="444.3" y="192.0" width="48.9" height="88" rx="6" fill="#D84005"/>
+<text x="24" y="361.0" font-size="18" font-weight="bold" fill="#85D0EA">Call 2</text>
+<text x="24" y="383.0" font-size="16" fill="#B2B2B2">"MSFT"</text>
+<rect x="200" y="320.0" width="570" height="88" rx="6" fill="#333333"/>
+<rect x="241.7" y="321.0" width="250.4" height="86" rx="6" fill="none" stroke="#85D0EA" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="366.9" y="370.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#F2F2F2">waits for lock</text>
+<rect x="493.1" y="320.0" width="48.9" height="88" rx="6" fill="#0070C9"/>
+<rect x="542.0" y="320.0" width="179.1" height="88" fill="url(#hatch-c2)"/>
+<text x="631.6" y="370.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#F2F2F2">fetch</text>
+<rect x="721.1" y="320.0" width="48.9" height="88" rx="6" fill="#0070C9"/>
+<line x1="493.1" y1="174.0" x2="493.1" y2="408.0" stroke="#B2B2B2" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="493.1" y="166.0" text-anchor="middle" font-size="18" font-weight="bold" fill="#B2B2B2">Lock released</text>
+<line x1="200" y1="438.0" x2="770" y2="438.0" stroke="#B2B2B2" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="770" y="462.0" text-anchor="end" font-size="16" fill="#B2B2B2">time</text>
+<rect x="24" y="551" width="28" height="20" rx="4" fill="#666666"/>
+<text x="62" y="566" font-size="16" fill="#B2B2B2">Running on the actor</text>
+<rect x="277.20000000000005" y="551" width="28" height="20" rx="4" fill="url(#hatch-neutral)"/>
+<text x="315.20000000000005" y="566" font-size="16" fill="#B2B2B2">Suspended</text>
+<rect x="432.84000000000003" y="552" width="26" height="18" rx="4" fill="none" stroke="#666666" stroke-width="2" stroke-dasharray="5 4"/>
+<text x="469.84000000000003" y="566" font-size="16" fill="#B2B2B2">Waiting for the lock</text>
+</svg>

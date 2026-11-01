@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Two calls to image(for:) on the same ImageLoader actor, for IDs 1234 and 5678. Call 1 runs, then suspends while its download is in flight. Call 2 reenters the actor during that suspension, runs, and starts its own download. Each call later resumes and finishes." font-family="Helvetica, Arial, sans-serif">
+<defs>
+<pattern id="hatch-c1" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#D84005" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#F78461" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c2" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#0070C9" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#85D0EA" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c3" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#00867D" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#58C9AF" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-neutral" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#666666" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#B2B2B2" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#B2B2B2"/></marker>
+</defs>
+<text x="24" y="233.0" font-size="18" font-weight="bold" fill="#F78461">Call 1</text>
+<text x="24" y="255.0" font-size="16" fill="#B2B2B2">"1234"</text>
+<rect x="200" y="192.0" width="570" height="88" rx="6" fill="#333333"/>
+<rect x="200.0" y="192.0" width="81.4" height="88" rx="6" fill="#D84005"/>
+<rect x="281.4" y="192.0" width="244.3" height="88" fill="url(#hatch-c1)"/>
+<text x="403.6" y="242.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#F2F2F2">download</text>
+<rect x="525.7" y="192.0" width="81.4" height="88" rx="6" fill="#D84005"/>
+<text x="24" y="361.0" font-size="18" font-weight="bold" fill="#85D0EA">Call 2</text>
+<text x="24" y="383.0" font-size="16" fill="#B2B2B2">"5678"</text>
+<rect x="200" y="320.0" width="570" height="88" rx="6" fill="#333333"/>
+<rect x="330.3" y="320.0" width="81.4" height="88" rx="6" fill="#0070C9"/>
+<rect x="411.7" y="320.0" width="244.3" height="88" fill="url(#hatch-c2)"/>
+<text x="533.9" y="370.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#F2F2F2">download</text>
+<rect x="656.0" y="320.0" width="81.4" height="88" rx="6" fill="#0070C9"/>
+<line x1="330.3" y1="174.0" x2="330.3" y2="408.0" stroke="#B2B2B2" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="330.3" y="166.0" text-anchor="middle" font-size="18" font-weight="bold" fill="#B2B2B2">Call 2 reenters</text>
+<line x1="200" y1="438.0" x2="770" y2="438.0" stroke="#B2B2B2" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="770" y="462.0" text-anchor="end" font-size="16" fill="#B2B2B2">time</text>
+<rect x="24" y="551" width="28" height="20" rx="4" fill="#666666"/>
+<text x="62" y="566" font-size="16" fill="#B2B2B2">Running on the actor</text>
+<rect x="277.20000000000005" y="551" width="28" height="20" rx="4" fill="url(#hatch-neutral)"/>
+<text x="315.20000000000005" y="566" font-size="16" fill="#B2B2B2">Suspended</text>
+</svg>
