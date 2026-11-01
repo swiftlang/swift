@@ -22,3 +22,22 @@ func testOP1(_ oc1: OC1, ao: AnyObject) {
   // Extension of @objc protocol does not have @objc members.
   ao.extOP1a!() // expected-error{{value of type 'AnyObject' has no member 'extOP1a'; did you mean 'reqOP1a'?}}
 }
+
+// Do not offer to add @objc to a witness in a protocol extension because
+// Objective-C cannot represent members of protocol extensions.
+@objc protocol ObjCProtocolWithExtensionWitnesses {
+  func method() // expected-note {{requirement 'method()' declared here}}
+  var property: Int { get } // expected-note {{requirement 'property' declared here}}
+  subscript(index: Int) -> Int { get } // expected-note {{requirement 'subscript(_:)' declared here}}
+}
+
+extension ObjCProtocolWithExtensionWitnesses {
+  func method() {} // expected-note {{members of protocol extensions cannot be exposed to Objective-C}}
+  var property: Int { 0 } // expected-note {{members of protocol extensions cannot be exposed to Objective-C}}
+  subscript(index: Int) -> Int { index } // expected-note {{members of protocol extensions cannot be exposed to Objective-C}}
+}
+
+class UsesExtensionWitnesses: ObjCProtocolWithExtensionWitnesses {}
+// expected-error@-1 {{non-'@objc' method 'method()' does not satisfy requirement of '@objc' protocol 'ObjCProtocolWithExtensionWitnesses'}}
+// expected-error@-2 {{non-'@objc' property 'property' does not satisfy requirement of '@objc' protocol 'ObjCProtocolWithExtensionWitnesses'}}
+// expected-error@-3 {{non-'@objc' subscript does not satisfy requirement of '@objc' protocol 'ObjCProtocolWithExtensionWitnesses'}}
