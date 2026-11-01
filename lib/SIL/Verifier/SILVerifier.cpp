@@ -507,7 +507,8 @@ void verifyKeyPathComponent(SILModule &M,
   switch (auto kind = component.getKind()) {
   case KeyPathPatternComponent::Kind::StoredProperty: {
     auto property = component.getStoredPropertyDecl();
-    if (expansion == ResilienceExpansion::Minimal) {
+    if (expansion == ResilienceExpansion::Minimal &&
+        !M.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       require(property->getEffectiveAccess() >= AccessLevel::Package,
               "Key path in serialized function cannot reference non-public "
               "property");
