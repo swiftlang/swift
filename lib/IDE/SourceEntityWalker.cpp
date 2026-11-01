@@ -516,12 +516,19 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         auto *decl = component.getDeclRef().getDecl();
         auto loc = component.getLoc();
         SourceRange range(loc, loc);
+        // A `subscript(dynamicMember:)` reference synthesized for a dynamic
+        // member lookup has implicit arguments, and is implicit like the
+        // `SubscriptExpr` built for one.
+        bool isImplicit = component.getKind() ==
+                              KeyPathExpr::Component::Kind::Subscript &&
+                          component.getArgs() &&
+                          component.getArgs()->isImplicit();
         auto Continue = passReference(
             decl, component.getComponentType(), loc, range,
             ReferenceMetaData((isa<SubscriptDecl>(decl)
                                    ? SemaReferenceKind::SubscriptRef
                                    : SemaReferenceKind::DeclMemberRef),
-                              OpAccess));
+                              OpAccess, isImplicit));
         if (!Continue)
           return Action::Stop();
         break;
