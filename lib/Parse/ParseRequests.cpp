@@ -125,6 +125,12 @@ void registerDeclWithOpaqueResultType(SourceFile *SF, ArrayRef<Decl *> items) {
 
 } // namespace
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+namespace {
+bool shouldParseViaASTGen(SourceFile &SF);
+} // namespace
+#endif
+
 FingerprintAndMembers
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
@@ -211,6 +217,22 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
       }
       assert(sf && "Could not find source file containing parsed body");
     }
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    if (shouldParseViaASTGen(*sf)) {
+      // The body was left for ASTGen to build.
+      auto &ctx = afd->getASTContext();
+      swift_ASTGen_buildFunctionBody(&ctx.Diags, sf->getExportedSourceFile(),
+                                     afd, afd, ctx,
+                                     afd->getBodySourceRange().Start);
+      assert(afd->getBodyKind() == BodyKind::Parsed &&
+             "ASTGen did not build the delayed body");
+      auto result = afd->BodyAndFP;
+      registerDeclWithOpaqueResultType(afd->getOutermostParentSourceFile(),
+                                       result.getBody()->getElements());
+      return result;
+    }
+#endif
 
     Parser parser(bufferID, *sf, /*SIL*/ nullptr);
     auto result = parser.parseAbstractFunctionBodyDelayed(afd);
@@ -395,18 +417,28 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   // regions cache.
   swift_ASTGen_evaluateConfiguredRegionsForDiagnostics(Ctx, exportedSourceFile);
 
+  // Function bodies are built on demand when the source file allows delayed
+  // parsing, as in the C++ parser. The on-demand request has to emit the
+  // diagnostics directly, and it knows nothing about the generated source
+  // information needed by macro expansions, so keep those eager.
+  bool delayFunctionBodies = SF.hasDelayedBodyParsing() &&
+                             !suppressedDiagQueue && !genInfo &&
+                             !SM.hasIDEInspectionTargetBuffer();
+
   // Emit parser diagnostics.
   if (!suppressedDiagQueue) {
     (void)swift_ASTGen_emitParserDiagnostics(
         Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
         /*downgradePlaceholderErrorsToWarnings=*/langOpts.Playground ||
-            langOpts.WarnOnEditorPlaceholder);
+            langOpts.WarnOnEditorPlaceholder,
+        delayFunctionBodies);
   }
 
   // Generate AST nodes.
   SmallVector<ASTNode, 8> items;
   swift_ASTGen_buildTopLevelASTNodes(
       &Diags, exportedSourceFile, declContext, attachedDecl, Ctx,
+      delayFunctionBodies,
       static_cast<SmallVectorImpl<ASTNode> *>(&items),
       appendToVector<BridgedASTNode, ASTNode>);
 

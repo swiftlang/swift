@@ -60,6 +60,10 @@ struct ASTGenVisitor {
 
   let configuredRegions: ConfiguredRegions
 
+  /// Whether the bodies of eligible functions are built on demand rather than
+  /// as part of generating the declaration; see `DelayedBodies.swift`.
+  let delayFunctionBodies: Bool
+
   fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(initialSlabSize: 256)
 
   init(
@@ -67,13 +71,15 @@ struct ASTGenVisitor {
     sourceBuffer: UnsafeBufferPointer<UInt8>,
     declContext: BridgedDeclContext,
     astContext: BridgedASTContext,
-    configuredRegions: ConfiguredRegions
+    configuredRegions: ConfiguredRegions,
+    delayFunctionBodies: Bool = false
   ) {
     self.diagnosticEngine = diagnosticEngine
     self.base = sourceBuffer
     self.declContext = declContext
     self.ctx = astContext
     self.configuredRegions = configuredRegions
+    self.delayFunctionBodies = delayFunctionBodies
   }
 
   func generate(sourceFile node: SourceFileSyntax) -> [BridgedASTNode] {
@@ -666,6 +672,7 @@ public func buildTopLevelASTNodes(
   dc: BridgedDeclContext,
   attachedDecl: BridgedNullableDecl,
   ctx: BridgedASTContext,
+  delayFunctionBodies: CInt,
   outputContext: UnsafeMutableRawPointer,
   callback: @convention(c) (BridgedASTNode, UnsafeMutableRawPointer) -> Void
 ) {
@@ -675,7 +682,8 @@ public func buildTopLevelASTNodes(
     sourceBuffer: sourceFile.pointee.buffer,
     declContext: dc,
     astContext: ctx,
-    configuredRegions: sourceFile.pointee.configuredRegions(astContext: ctx)
+    configuredRegions: sourceFile.pointee.configuredRegions(astContext: ctx),
+    delayFunctionBodies: delayFunctionBodies != 0
   )
 
   // A generated buffer is never a script-mode main file, whatever the enclosing
@@ -726,6 +734,13 @@ public func buildTopLevelASTNodes(
     fatalError("invalid syntax for a source file")
   }
 
-  // Diagnose any errors from evaluating #ifs.
-  visitor.diagnoseAll(visitor.configuredRegions.diagnostics)
+  // Diagnose any errors from evaluating #ifs. Those inside a body that is built
+  // on demand are held back until the body is.
+  if delayFunctionBodies != 0 {
+    visitor.diagnoseAll(
+      sourceFile.pointee.heldBackDiagnostics(astContext: ctx).ifConfigOutside
+    )
+  } else {
+    visitor.diagnoseAll(visitor.configuredRegions.diagnostics)
+  }
 }

@@ -235,6 +235,23 @@ void BridgedDecl_setHasTopLevelLocalContextCaptures(BridgedDecl decl) {
     fn->setHasTopLevelLocalContextCaptures();
 }
 
+void BridgedDecl_setBodyDelayed(BridgedDecl decl, SourceRange range,
+                                bool hasNestedTypeDeclarations) {
+  auto *afd = cast<AbstractFunctionDecl>(decl.unbridged());
+  afd->setBodyDelayed(range);
+  afd->setHasNestedTypeDeclarations(hasNestedTypeDeclarations);
+}
+
+void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setHasNestedTypeDeclarations(value);
+}
+
+void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setBody(body.unbridged(), AbstractFunctionDecl::BodyKind::Parsed);
+}
+
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
                                          BridgedBraceStmt body) {
   decl.unbridged()->setBody(body.unbridged(), FuncDecl::BodyKind::Parsed);
