@@ -965,6 +965,16 @@ extension ASTGenVisitor {
     }
 
     let dotLoc = self.generateSourceLoc(node.period)
+
+    // `x.` with no member name: the parser has diagnosed it, and there is no
+    // name to look up.
+    if node.declName.baseName.presence == .missing {
+      return BridgedErrorExpr.create(
+        self.ctx,
+        loc: self.generateSourceRange(start: node.base?.firstToken(viewMode: .sourceAccurate) ?? node.period, end: node.period)
+      ).asExpr
+    }
+
     let nameAndLoc = generateDeclNameRef(declReferenceExpr: node.declName)
 
     if let baseExpr {

@@ -34,6 +34,15 @@ extension ASTGenVisitor {
     case .expressionPattern(let node):
       return self.generate(expressionPattern: node).asPattern
     case .identifierPattern(let node):
+      // A name the parser could not make out, e.g. the keyword in `let self`,
+      // has been diagnosed; binding it would only add noise about an unused
+      // variable with no name.
+      if node.identifier.presence == .missing {
+        return BridgedAnyPattern.createParsed(
+          self.ctx,
+          loc: node.unexpectedBeforeIdentifier.map { self.generateSourceLoc($0) } ?? self.generateSourceLoc(node.identifier)
+        ).asPattern
+      }
       return self.generate(identifierPattern: node).asPattern
     case .isTypePattern(let node):
       return self.generate(isTypePattern: node).asPattern
