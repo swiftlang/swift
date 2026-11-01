@@ -94,3 +94,78 @@ bb0(%0 : $*F, %1 : $Builtin.RawPointer):
   %6 = tuple ()
   return %6 : $()
 }
+
+sil @get_int : $@convention(thin) () -> Int
+
+// The init_enum_data_addr can be in another block than the store, and memory
+// can be written in between.
+// CHECK-LABEL: sil [ossa] @init_in_other_block
+// CHECK:       bb0(%0 : $*E):
+// CHECK-NOT:     init_enum_data_addr
+// CHECK:       bb1:
+// CHECK:         [[I:%.*]] = apply
+// CHECK-NEXT:    [[E:%.*]] = enum $E, #E.A!enumelt, [[I]] : $Int
+// CHECK-NEXT:    store [[E]] to [init] %0 : $*E
+// CHECK-NOT:     inject_enum_addr
+// CHECK:       } // end sil function 'init_in_other_block'
+sil [ossa] @init_in_other_block : $@convention(thin) () -> @out E {
+bb0(%0 : $*E):
+  %1 = init_enum_data_addr %0 : $*E, #E.A!enumelt
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = function_ref @get_int : $@convention(thin) () -> Int
+  %4 = apply %3() : $@convention(thin) () -> Int
+  store %4 to [trivial] %1 : $*Int
+  inject_enum_addr %0 : $*E, #E.A!enumelt
+  %7 = tuple ()
+  return %7 : $()
+
+bb2:
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @nontrivial_init_in_other_block
+// CHECK:       bb1:
+// CHECK:         [[E:%.*]] = enum $E, #E.B!enumelt, %1 : $AnyObject
+// CHECK-NEXT:    store [[E]] to [init] %0 : $*E
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value [dead_end] %1
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'nontrivial_init_in_other_block'
+sil [ossa] @nontrivial_init_in_other_block : $@convention(thin) (@owned AnyObject) -> @out E {
+bb0(%0 : $*E, %1 : @owned $AnyObject):
+  %2 = init_enum_data_addr %0 : $*E, #E.B!enumelt
+  cond_br undef, bb1, bb2
+
+bb1:
+  store %1 to [init] %2 : $*AnyObject
+  inject_enum_addr %0 : $*E, #E.B!enumelt
+  %6 = tuple ()
+  return %6 : $()
+
+bb2:
+  destroy_value [dead_end] %1 : $AnyObject
+  unreachable
+}
+
+// An end_borrow between the store and the inject_enum_addr doesn't prevent the fold.
+// CHECK-LABEL: sil [ossa] @end_borrow_between_store_and_inject
+// CHECK:         [[B:%.*]] = begin_borrow %1
+// CHECK:         [[C:%.*]] = copy_value [[B]]
+// CHECK-NEXT:    [[E:%.*]] = enum $E, #E.B!enumelt, [[C]] : $AnyObject
+// CHECK-NEXT:    store [[E]] to [init] %0 : $*E
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NOT:     inject_enum_addr
+// CHECK:       } // end sil function 'end_borrow_between_store_and_inject'
+sil [ossa] @end_borrow_between_store_and_inject : $@convention(thin) (@guaranteed AnyObject) -> @out E {
+bb0(%0 : $*E, %1 : @guaranteed $AnyObject):
+  %2 = init_enum_data_addr %0 : $*E, #E.B!enumelt
+  %3 = begin_borrow %1 : $AnyObject
+  %4 = copy_value %3 : $AnyObject
+  store %4 to [init] %2 : $*AnyObject
+  end_borrow %3 : $AnyObject
+  inject_enum_addr %0 : $*E, #E.B!enumelt
+  %8 = tuple ()
+  return %8 : $()
+}
