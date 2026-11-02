@@ -2,7 +2,8 @@
 // RUN: -emit-sil -target %target-swift-5.1-abi-triple \
 // RUN: -enable-experimental-feature OnceFunctions \
 // RUN: -swift-version 6 \
-// RUN: -verify
+// RUN: -verify -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-swift-frontend %s -emit-sil -target %target-swift-5.1-abi-triple -enable-experimental-feature OnceFunctions -verify -swift-version future -verify-additional-prefix future- %}
 
 // REQUIRES: swift_feature_OnceFunctions
 // REQUIRES: concurrency
@@ -236,7 +237,8 @@ struct MergeAcrossGlobalActors {
     let a = mainField! // expected-note {{'a' is exposed to main actor-isolated code}}
     let b = customField! // expected-note {{'b' is exposed to global actor 'CustomActor'-isolated code}}
     _ = CalledAtMostOnceAsyncTask { @concurrent in
-      // expected-warning@-1 {{executing operation could allow for references between values exposed to global actor 'CustomActor'-isolated code and main actor-isolated code risking data races; this will be an error in a future Swift language mode}}
+      // expected-swift6-warning@-1 {{executing operation could allow for references between values exposed to global actor 'CustomActor'-isolated code and main actor-isolated code risking data races; this will be an error in a future Swift language mode}}
+      // expected-future-error@-2 {{executing operation could allow for references between values exposed to global actor 'CustomActor'-isolated code and main actor-isolated code risking data races}}
       _ = a
       _ = b
     }

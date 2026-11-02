@@ -1,6 +1,8 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted- -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted- -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete- -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -swift-version 6 -verify-additional-prefix swift6plus- -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -swift-version future -verify-additional-prefix swift6plus- -verify-additional-prefix future- %}
 
 // REQUIRES: concurrency
 
@@ -26,49 +28,69 @@ struct X {
 @MainActor func onMainActor() { }
 
 func testInAsync(x: X, plainClosure: () -> Void) async { // expected-note 2{{parameter 'plainClosure' is implicitly non-Sendable}}
-  let _: Int = unsafelySendableClosure // expected-error{{type '(@Sendable () -> Void) -> ()'}}
-  let _: Int = unsafelyMainActorClosure // expected-error{{type '(@MainActor () -> Void) -> ()'}}
-  let _: Int = unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = x.unsafelyDoEverythingClosure // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = X.unsafelyDoEverythingClosure // expected-error{{type '(X) -> (@MainActor @Sendable () -> Void) -> ()'}}
-  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+// expected-swift6plus-note@-1 {{parameter 'plainClosure' is implicitly non-Sendable}}
+  let _: Int = unsafelySendableClosure // expected-swift5-error{{type '(@Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-1 {{cannot convert value of type '@Sendable (@Sendable () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = unsafelyMainActorClosure // expected-swift5-error{{type '(@MainActor () -> Void) -> ()'}}
+  // expected-swift6plus-error@-1 {{cannot convert value of type '@Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = unsafelyDoEverythingClosure // expected-swift5-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-1 {{cannot convert value of type '@Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = x.unsafelyDoEverythingClosure // expected-swift5-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-1 {{cannot convert value of type '@Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = X.unsafelyDoEverythingClosure // expected-swift5-error{{type '(X) -> (@MainActor @Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-1 {{cannot convert value of type '@Sendable (X) -> @Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-swift5-error{{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-1 {{cannot convert value of type '@Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
 
   let _: Int = x.sendableVar // expected-error{{type '@Sendable () -> Void'}}
-  let _: Int = x.mainActorVar // expected-error{{type '@MainActor () -> Void'}}
+  let _: Int = x.mainActorVar // expected-swift5-error{{type '@MainActor () -> Void'}}
+  // expected-swift6plus-error@-1 {{cannot convert value of type '@MainActor @Sendable () -> Void' to specified type 'Int'}}
 
   let _: Int = x[{ onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
   let _: Int = X[statically: { onMainActor() }] // expected-error{{type '@Sendable () -> Void'}}
 
   unsafelySendableClosure(plainClosure) // expected-warning {{passing non-Sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
   unsafelyMainActorClosure(plainClosure)
+  // expected-swift6plus-warning@-1 {{passing non-Sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
   unsafelyDoEverythingClosure(plainClosure) // expected-warning {{passing non-Sendable parameter 'plainClosure' to function expecting a '@Sendable' closure}}
 }
 
 func testElsewhere(x: X) {
   let _: Int = unsafelySendableClosure // expected-minimal-targeted-error {{type '(() -> Void) -> ()'}}
   // expected-complete-error @-1 {{type '(@Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable (@Sendable () -> Void) -> ()' to specified type 'Int'}}
   let _: Int = unsafelyMainActorClosure // expected-minimal-targeted-error {{type '(() -> Void) -> ()'}}
   // expected-complete-error @-1 {{type '(@MainActor () -> Void) -> ()'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
   let _: Int = unsafelyDoEverythingClosure // expected-minimal-targeted-error {{type '(() -> Void) -> ()'}}
   // expected-complete-error @-1 {{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
   let _: Int = x.unsafelyDoEverythingClosure // expected-minimal-targeted-error{{type '(() -> Void) -> ()'}}
   // expected-complete-error @-1 {{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
   let _: Int = X.unsafelyDoEverythingClosure // expected-minimal-targeted-error{{type '(X) -> (() -> Void) -> ()'}}
   // expected-complete-error @-1 {{type '(X) -> (@MainActor @Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable (X) -> @Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
   let _: Int = (X.unsafelyDoEverythingClosure)(x) // expected-minimal-targeted-error{{type '(() -> Void) -> ()'}}
   // expected-complete-error @-1 {{type '(@MainActor @Sendable () -> Void) -> ()'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable (@MainActor @Sendable () -> Void) -> ()' to specified type 'Int'}}
   let _: Int = x.sendableVar // expected-minimal-targeted-error {{type '() -> Void'}}
   // expected-complete-error @-1 {{type '@Sendable () -> Void'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable () -> Void' to specified type 'Int'}}
   let _: Int = x.mainActorVar // expected-minimal-targeted-error {{type '() -> Void'}}
   // expected-complete-error @-1 {{type '@MainActor () -> Void'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@MainActor @Sendable () -> Void' to specified type 'Int'}}
   let _: Int = x[{ onMainActor() }] // expected-minimal-targeted-error {{type '() -> Void'}}
   // expected-complete-error @-1 {{type '@Sendable () -> Void'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable () -> Void' to specified type 'Int'}}
   let _: Int = X[statically: { onMainActor() }] // expected-minimal-targeted-error {{type '() -> Void'}}
   // expected-complete-error @-1 {{type '@Sendable () -> Void'}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable () -> Void' to specified type 'Int'}}
 }
 
 @MainActor @preconcurrency func onMainActorAlways() { }
 // expected-complete-note @-1 {{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
+// expected-swift6plus-note@-2 {{calls to global function 'onMainActorAlways()' from outside of its actor context are implicitly asynchronous}}
 
 @preconcurrency @MainActor class MyModelClass {
 
@@ -76,10 +98,12 @@ func testElsewhere(x: X) {
 
   func f() { }
   // expected-complete-note @-1 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
+  // expected-swift6plus-note@-2 {{calls to instance method 'f()' from outside of its actor context are implicitly asynchronous}}
 }
 
 func testCalls(x: X) {
   // expected-complete-note @-1 2{{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
+  // expected-swift6plus-note@-2 2 {{add '@MainActor' to make global function 'testCalls(x:)' part of global actor 'MainActor'}}
   unsafelyMainActorClosure {
     onMainActor()
   }
@@ -98,24 +122,30 @@ func testCalls(x: X) {
 
   onMainActorAlways() // okay with minimal/targeted concurrency. Not ok with complete.
   // expected-complete-warning @-1 {{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
+  // expected-swift6plus-warning@-2 {{call to main actor-isolated global function 'onMainActorAlways()' in a synchronous nonisolated context}}
 
   // Ok with minimal/targeted concurrency, Not ok with complete.
   let _: () -> Void = onMainActorAlways // expected-complete-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
+  // expected-swift6plus-error@-1 {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
   let c = MyModelClass()
 
   // okay with minimal/targeted... an error with complete.
   c.f() // expected-complete-warning {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  // expected-swift6plus-warning@-1 {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
 }
 
 func testCallsWithAsync() async {
-  onMainActorAlways() // expected-warning{{main actor-isolated global function 'onMainActorAlways()' cannot be called from outside of the actor}} {{3-3=await }}
+  onMainActorAlways() // expected-swift5-warning{{main actor-isolated global function 'onMainActorAlways()' cannot be called from outside of the actor}} {{3-3=await }}
+  // expected-swift6plus-error@-1 {{main actor-isolated global function 'onMainActorAlways()' cannot be called from outside of the actor}}
 
-  let _: () -> Void = onMainActorAlways // expected-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
+  let _: () -> Void = onMainActorAlways // expected-swift5-warning {{converting function value of type '@MainActor () -> ()' to '() -> Void' loses global actor 'MainActor'}}
+  // expected-swift6plus-error@-1 {{converting function value of type '@MainActor @Sendable () -> ()' to '() -> Void' loses global actor 'MainActor'}}
 
   let c = MyModelClass() // expected-minimal-targeted-warning{{main actor-isolated initializer 'init()' cannot be called from outside of the actor}} {{11-11=await }}
 
-  c.f() // expected-warning{{main actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{3-3=await }}
+  c.f() // expected-swift5-warning{{main actor-isolated instance method 'f()' cannot be called from outside of the actor}} {{3-3=await }}
+  // expected-swift6plus-error@-1 {{main actor-isolated instance method 'f()' cannot be called from outside of the actor}}
 }
 
 // ---------------------------------------------------------------------------
@@ -126,17 +156,21 @@ protocol Q: P { }
 
 class NS { } // expected-note{{class 'NS' does not conform to the 'Sendable' protocol}}
 // expected-complete-note @-1 2{{class 'NS' does not conform to the 'Sendable' protocol}}
+// expected-swift6plus-note@-2 2 {{class 'NS' does not conform to the 'Sendable' protocol}}
 
 struct S1: P {
   var ns: NS // expected-complete-warning {{stored property 'ns' of 'Sendable'-conforming struct 'S1' has non-Sendable type 'NS'}}
+  // expected-swift6plus-warning@-1 {{stored property 'ns' of 'Sendable'-conforming struct 'S1' has non-Sendable type 'NS'}}
 }
 
 struct S2: Q {
   var ns: NS // expected-complete-warning {{stored property 'ns' of 'Sendable'-conforming struct 'S2' has non-Sendable type 'NS'}}
+  // expected-swift6plus-warning@-1 {{stored property 'ns' of 'Sendable'-conforming struct 'S2' has non-Sendable type 'NS'}}
 }
 
 struct S3: Q, Sendable {
-  var ns: NS // expected-warning{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-Sendable type 'NS'}}
+  var ns: NS // expected-swift5-warning{{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-Sendable type 'NS'}}
+  // expected-swift6plus-error@-1 {{stored property 'ns' of 'Sendable'-conforming struct 'S3' has non-Sendable type 'NS'}}
 }
 
 // ---------------------------------------------------------------------------
@@ -170,10 +204,12 @@ func testStringPlacement() {
   let fn1 = StringPlacement.position(before: "Test")
   let _: Int = fn1   // expected-minimal-targeted-error{{cannot convert value of type '([String]) -> Int' to specified type 'Int'}}
   // expected-complete-error @-1 {{type 'StringPlacement.StringPosition' (aka '@Sendable (Array<String>) -> Int')}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type 'StringPlacement.StringPosition' (aka '@Sendable (Array<String>) -> Int') to specified type 'Int'}}
 
   let fn2 = StringPlacement.position(before:)
   let _: Int = fn2 // expected-minimal-targeted-error{{cannot convert value of type '(String) -> ([String]) -> Int' to specified type 'Int'}}
   // expected-complete-error @-1 {{type '(String) -> StringPlacement.StringPosition' (aka '(String) -> @Sendable (Array<String>) -> Int')}}
+  // expected-swift6plus-error@-2 {{cannot convert value of type '@Sendable (String) -> StringPlacement.StringPosition' (aka '@Sendable (String) -> @Sendable (Array<String>) -> Int') to specified type 'Int'}}
 }
 
 // @preconcurrency in an outer closure
@@ -190,16 +226,22 @@ class EventLoop {
 }
 
 class C { // expected-complete-note {{'C' does not conform to the 'Sendable' protocol}}
+// expected-swift6plus-note@-1 {{class 'C' does not conform to the 'Sendable' protocol}}
   var ev: EventLoop? = nil
 
   func test(i: Int) {
     func doNext() { // expected-complete-warning {{concurrently-executed local function 'doNext()' must be marked as '@Sendable'}}
+    // expected-swift6plus-warning@-1 {{concurrently-executed local function 'doNext()' must be marked as '@Sendable'}}
       doPreconcurrency {
         self.ev?.scheduleTask(deadline: i, doNext)
         // expected-complete-warning @-1 {{capture of 'self' with non-Sendable type 'C' in a '@Sendable' closure}}
         // expected-complete-warning @-2 {{converting non-Sendable function value to '@Sendable () throws -> ()' may introduce data races}}
         // expected-complete-warning @-3 {{capture of 'doNext()' with non-Sendable type '() -> ()' in a '@Sendable' closure}}
         // expected-complete-note @-4 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+        // expected-swift6plus-warning@-5 {{capture of 'self' with non-Sendable type 'C' in a '@Sendable' closure}}
+        // expected-swift6plus-warning@-6 {{converting non-Sendable function value to '@Sendable () throws -> ()' may introduce data races}}
+        // expected-swift6plus-warning@-7 {{capture of 'doNext()' with non-Sendable type '() -> ()' in a '@Sendable' closure}}
+        // expected-swift6plus-note@-8 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         return
       }
     }
@@ -222,7 +264,8 @@ nonisolated func blah() {
 
 @concurrent func bleh() async {
   InferMainActorPreconcurrency.predatesConcurrency()
-  // expected-warning@-1 {{main actor-isolated static method 'predatesConcurrency()' cannot be called from outside of the actor; this is an error in the Swift 6 language mode}}
+  // expected-swift5-warning@-1 {{main actor-isolated static method 'predatesConcurrency()' cannot be called from outside of the actor; this is an error in the Swift 6 language mode}}
+  // expected-swift6plus-error@-2 {{main actor-isolated static method 'predatesConcurrency()' cannot be called from outside of the actor}}
 }
 
 protocol NotIsolated {
@@ -233,10 +276,16 @@ protocol NotIsolated {
 extension MainActorPreconcurrency: NotIsolated {
   // expected-complete-note@-1{{turn data races into runtime errors with '@preconcurrency'}}{{36-36=@preconcurrency }}
   // expected-complete-note@-2{{isolate this conformance to the main actor with '@MainActor'}}
+  // expected-swift6-error@-3 {{conformance of 'MainActorPreconcurrency' to protocol 'NotIsolated' crosses into main actor-isolated code and can cause data races}}
+  // expected-swift6-note@-4 {{turn data races into runtime errors with '@preconcurrency'}}
+  // expected-swift6-note@-5 {{isolate this conformance to the main actor with '@MainActor'}}
   func requirement() {}
   // expected-complete-note@-1 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
   // expected-complete-note@-2 {{mark instance method 'requirement()' 'nonisolated'}}{{3-3=nonisolated }}
   // expected-complete-note@-3 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
+  // expected-swift6plus-note@-4 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
+  // expected-swift6-note@-5 {{main actor-isolated instance method 'requirement()' cannot satisfy nonisolated requirement}}
+  // expected-swift6-note@-6 {{mark instance method 'requirement()' 'nonisolated'}}
 
 
   class Nested {
@@ -244,10 +293,12 @@ extension MainActorPreconcurrency: NotIsolated {
 
     func test() {
     // expected-complete-note@-1 {{add '@MainActor' to make instance method 'test()' part of global actor 'MainActor'}}
+    // expected-swift6plus-note@-2 {{add '@MainActor' to make instance method 'test()' part of global actor 'MainActor'}}
 
       if let c {
         c.requirement()
         // expected-complete-warning@-1 {{call to main actor-isolated instance method 'requirement()' in a synchronous nonisolated context}}
+        // expected-swift6plus-warning@-2 {{call to main actor-isolated instance method 'requirement()' in a synchronous nonisolated context}}
       }
     }
   }
@@ -292,40 +343,47 @@ do {
 
   class Test : Base {
     override var test1: [Any]? {
-      // expected-warning@-1 {{declaration 'test1' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift5-warning@-1 {{declaration 'test1' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift6plus-error@-2 {{declaration 'test1' has a type with different sendability from any potential overrides}}
       get { nil }
       set { }
     }
 
     override var test2: [String: [Int: Any]] {
-      // expected-warning@-1 {{declaration 'test2' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift5-warning@-1 {{declaration 'test2' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift6plus-error@-2 {{declaration 'test2' has a type with different sendability from any potential overrides}}
       get { [:] }
       set {}
     }
 
     override var test3: Any {
-      // expected-warning@-1 {{declaration 'test3' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift5-warning@-1 {{declaration 'test3' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift6plus-error@-2 {{declaration 'test3' has a type with different sendability from any potential overrides}}
       get { 42 }
       set { }
     }
 
     override var test4: (((any Sendable)?) -> Void)? {
-      // expected-warning@-1 {{declaration 'test4' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift5-warning@-1 {{declaration 'test4' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift6plus-error@-2 {{declaration 'test4' has a type with different sendability from any potential overrides}}
       nil
     }
 
     override var test5: (() -> Void)? {
-      // expected-warning@-1 {{declaration 'test5' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift5-warning@-1 {{declaration 'test5' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift6plus-error@-2 {{declaration 'test5' has a type with different global actor isolation from any potential overrides}}
       nil
     }
 
     override var test6: (() -> Void)? {
-      // expected-error@-1 {{property 'test6' with type '(() -> Void)?' cannot override a property with type '(@MainActor () -> Void)?'}}
+      // expected-swift5-error@-1 {{property 'test6' with type '(() -> Void)?' cannot override a property with type '(@MainActor () -> Void)?'}}
+      // expected-swift6plus-error@-2 {{property 'test6' with type '(() -> Void)?' cannot override a property with type '(@MainActor @Sendable () -> Void)?'}}
       nil
     }
 
     override func test7(_: (() -> Void)?) {
-      // expected-warning@-1 {{declaration 'test7' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift5-warning@-1 {{declaration 'test7' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
+      // expected-swift6plus-error@-2 {{declaration 'test7' has a type with different global actor isolation from any potential overrides}}
     }
   }
 }
@@ -366,16 +424,21 @@ func testSendableMetatypeDowngrades() {
   func acceptsSendableMetatypeStrict<T: SendableMetatype>(_: T.Type) {}
 
   func test<T>(t: T.Type) { // expected-complete-note 2 {{consider making generic parameter 'T' conform to the 'SendableMetatype' protocol}} {{14-14=: SendableMetatype}}
+  // expected-swift6plus-note@-1 2 {{consider making generic parameter 'T' conform to the 'SendableMetatype' protocol}}
     acceptsSendableMetatype(t)
     // expected-complete-warning@-1 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+    // expected-swift6plus-warning@-2 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
     acceptsSendableMetatypeStrict(t)
     // expected-complete-warning@-1 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
+    // expected-swift6plus-error@-2 {{type 'T' does not conform to the 'SendableMetatype' protocol}}
   }
 }
 
 do {
   func test(@_inheritActorContext _: @Sendable () -> Void) async {
-    // expected-warning@-1 {{'@_inheritActorContext' only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+    // expected-swift5-warning@-1 {{'@_inheritActorContext' only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+    // expected-future-error@-2 {{'@_inheritActorContext' only applies to '@isolated(any)' parameters or parameters with asynchronous function types}}
+    // expected-swift6-warning@-3 {{'@_inheritActorContext' only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
   }
 
   @MainActor
