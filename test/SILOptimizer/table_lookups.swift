@@ -150,43 +150,36 @@ public func lookupLocalArray(_ i: Int) -> UInt8 {
   localArrayTable[i & 15]
 }
 
-// Not free: the client calls the addressor of the other module's global.
-// An InlineArray of more than 4096 elements is address-only, and its global becomes statically
-// initialized only after cross-module optimization. So at that point, its addressor still has
-// the one-time initialization and isn't serialized.
+// Free, like lookupInlineArray, although an InlineArray of more than 4096 elements is address-only.
 // CHECK-LABEL: define {{.*}} @"$s6Client21lookupHugeInlineArrayys5UInt8VSiF"(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[T:%.*]] = {{.*}}call swiftcc ptr @"$s6Tables20hugeInlineArrayTables0cD0Vy$4096_s5UInt8VGvau"()
 // CHECK-NEXT:    [[I:%.*]] = and [[INT]] %0, 4095
-// CHECK-NEXT:    [[P:%.*]] = getelementptr inbounds nuw i8, ptr [[T]], [[INT]] [[I]]
+// CHECK-NEXT:    [[P:%.*]] = getelementptr inbounds nuw i8, ptr @"$s6Tables20hugeInlineArrayTables0cD0Vy$4096_s5UInt8VGvp", [[INT]] [[I]]
 // CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[P]], align 1
 // CHECK-NEXT:    ret i8 [[V]]
 // CHECK-NEXT:  }
 // CHECK-ASM-LABEL: <{{_?}}$s6Client21lookupHugeInlineArrayys5UInt8VSiF>:
-// CHECK-ASM:         {{ (bl|blr|blx|call|callq|jal|jalr|brasl) }}
+// CHECK-ASM-NOT:     {{ (bl|blr|blx|call|callq|jal|jalr|brasl) }}
 public func lookupHugeInlineArray(_ i: Int) -> UInt8 {
   hugeInlineArrayTable[i & 4095]
 }
 
-// Not free: the client calls the addressor of the other module's global, then loads the
-// array's buffer and its count, and checks the index against the count.
-// An Array global becomes statically initialized only after cross-module optimization.
-// So at that point, its addressor still has the one-time initialization and isn't serialized.
+// Free (Almost), like lookupLocalArray: the client reads the other module's array object directly.
 // CHECK-LABEL: define {{.*}} @"$s6Client11lookupArrayys5UInt8VSiF"(
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[G:%.*]] = {{.*}}call swiftcc ptr @"$s6Tables10arrayTableSays5UInt8VGvau"()
-// CHECK-NEXT:    [[B:%.*]] = load ptr, ptr [[G]]
 // CHECK-NEXT:    [[I:%.*]] = and [[INT]] %0, 15
-// CHECK-NEXT:    [[CP:%.*]] = getelementptr inbounds nuw i8, ptr [[B]], [[INT]] {{[0-9]+}}
-// CHECK-NEXT:    [[C:%.*]] = load [[INT]], ptr [[CP]]
-// CHECK-NEXT:    [[OK:%.*]] = icmp {{.*}} [[INT]] [[I]], [[C]]
-// CHECK-NEXT:    br i1 [[OK]],
-// CHECK:         [[E:%.*]] = getelementptr inbounds nuw i8, ptr [[B]], [[INT]] {{[0-9]+}}
-// CHECK-NEXT:    [[P:%.*]] = getelementptr inbounds nuw i8, ptr [[E]], [[INT]] [[I]]
+// CHECK-NEXT:    [[P:%.*]] = getelementptr inbounds nuw i8, ptr getelementptr inbounds nuw (i8, ptr @"$s6Tables10arrayTable_WZTv_{{r?}}", [[INT]] {{[0-9]+}}), [[INT]] [[I]]
 // CHECK-NEXT:    [[V:%.*]] = load i8, ptr [[P]], align 1
 // CHECK-NEXT:    ret i8 [[V]]
+// CHECK-NEXT:  }
 // CHECK-ASM-LABEL: <{{_?}}$s6Client11lookupArrayys5UInt8VSiF>:
-// CHECK-ASM:         {{ (bl|blr|blx|call|callq|jal|jalr|brasl) }}
+// CHECK-ASM-NOT:     {{ (bl|blr|blx|call|callq|jal|jalr|brasl) }}
+// CHECK-ASM-ARM64:   add x[[P:[0-9]+]], x{{[0-9]+}}, x{{[0-9]+}}
+// CHECK-ASM-ARM64-NEXT: ldrb w0, [x[[P]], #0x{{[0-9a-f]+}}]
 public func lookupArray(_ i: Int) -> UInt8 {
   arrayTable[i & 15]
 }
+
+// Ends the CHECK-ASM-NOT range of the last lookup.
+// CHECK-ASM-LABEL: <{{_?}}$s6Client12endOfLookupsyyF>:
+public func endOfLookups() {}

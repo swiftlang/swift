@@ -54,15 +54,30 @@ import SIL
 ///
 let objectOutliner = FunctionPass(name: "object-outliner") {
   (function: Function, context: FunctionPassContext) in
+  outlineObjects(in: function, onlyImmutableObjects: false, context)
+}
 
+/// Outlines immutable objects, e.g. arrays, only in global initializers. This runs before
+/// serialization, so that other modules can access the statically initialized globals directly.
+let globalInitObjectOutliner = FunctionPass(name: "global-init-object-outliner") {
+  (function: Function, context: FunctionPassContext) in
+  if function.isGlobalInitOnceFunction && outlineObjects(in: function, onlyImmutableObjects: true, context) {
+    // Remove the dead initialization code, which would prevent InitializeStaticGlobals.
+    simplify(function: function, context)
+  }
+}
+
+@discardableResult
+private func outlineObjects(in function: Function, onlyImmutableObjects: Bool,
+                            _ context: FunctionPassContext) -> Bool {
   // Since Swift 5.1 global objects have immortal ref counts. And that's required for global objects.
   guard function.isSwift51RuntimeAvailable else {
-    return
+    return false
   }
 
   if function.linkage.isExternal {
     // Don't outline objects in external functions because this would "duplicate" singletons.
-    return
+    return false
   }
 
   var allocRefs = Stack<AllocRefInstBase>(context)
@@ -71,22 +86,26 @@ let objectOutliner = FunctionPass(name: "object-outliner") {
   allocRefs.append(contentsOf: function.instructions.lazy.compactMap { $0 as? AllocRefInstBase })
 
   // Try multiple iterations to handle multi-dimensional arrays.
+  var outlined = false
   var changed: Bool
   repeat {
     changed = false
     for ari in allocRefs where !ari.isDeleted {
       if !context.continueWithNextSubpassRun(for: ari) {
-        return
+        return outlined
       }
-      if let globalValue = optimizeObjectAllocation(allocRef: ari, context) {
+      if let globalValue = optimizeObjectAllocation(allocRef: ari, onlyImmutableObjects: onlyImmutableObjects, context) {
         optimizeFindStringCall(stringArray: globalValue, context)
         changed = true
+        outlined = true
       }
     }
   } while changed
+  return outlined
 }
 
-private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: FunctionPassContext) -> GlobalValueInst? {
+private func optimizeObjectAllocation(allocRef: AllocRefInstBase, onlyImmutableObjects: Bool,
+                                      _ context: FunctionPassContext) -> GlobalValueInst? {
   if !allocRef.fieldsKnownStatically {
     return nil
   }
@@ -99,6 +118,10 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
     // initialization.
     canStoreToGlobal: allocRef.tailAllocatedCounts.count == 0)
   else {
+    return nil
+  }
+
+  if onlyImmutableObjects && !(endOfInitInst is EndCOWMutationInst) {
     return nil
   }
 

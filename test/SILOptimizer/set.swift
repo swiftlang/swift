@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -sil-verify-all -module-name=test -Xllvm -sil-disable-pass=function-signature-opts -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend  -parse-as-library -primary-file %s -Osize -sil-verify-all -module-name=test -Xllvm -sil-disable-pass=function-signature-opts -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -parse-as-library -primary-file %s -O -sil-verify-all -module-name=test -emit-sil | %FileCheck %s --check-prefix=CHECK-GLOBAL
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // Test optimal code generation for creating empty sets.
@@ -29,3 +30,20 @@ public func createNonEmptySet() -> Set<Int> {
     return [1, 2, 3]
 }
 
+public final class Element: Hashable {
+  public static func == (lhs: Element, rhs: Element) -> Bool { lhs === rhs }
+  public func hash(into hasher: inout Hasher) {}
+}
+
+// The global initializer passes the array literal to the set's initializer, so the array's
+// semantic calls must not be inlined early.
+// CHECK-GLOBAL-LABEL: sil private [global_init_once_fn] @$s4test8emptySet_WZ :
+// CHECK-GLOBAL-NOT:     apply
+// CHECK-GLOBAL:         global_addr @_swiftEmptySetSingleton
+// CHECK-GLOBAL-NOT:     apply
+// CHECK-GLOBAL:       } // end sil function '$s4test8emptySet_WZ'
+let emptySet: Set<Element> = []
+
+public func getEmptySet() -> Set<Element> {
+  emptySet
+}

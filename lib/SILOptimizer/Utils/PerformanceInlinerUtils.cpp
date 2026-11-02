@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
@@ -745,6 +746,62 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
   return true;
 }
 
+/// Returns true if \p AI initializes the array which a global initializer
+/// stores to its global.
+///
+/// Such semantic calls don't need to be preserved for later optimizations.
+/// Inlining them early lets the global be statically initialized before
+/// serialization, so that other modules can access it directly.
+static bool isArrayInitializationInGlobalInit(FullApplySite AI) {
+  SILFunction *initFn = AI.getFunction();
+  auto *apply = dyn_cast<ApplyInst>(AI.getInstruction());
+  if (!apply || !initFn->isGlobalInitOnceFunction())
+    return false;
+
+  SILGlobalVariable *global = getVariableOfStaticInitializer(initFn);
+  if (!global)
+    return false;
+
+  SILValue initValue;
+  for (SILInstruction &inst : initFn->front()) {
+    if (auto *store = dyn_cast<StoreInst>(&inst)) {
+      auto *globalAddr = dyn_cast<GlobalAddrInst>(store->getDest());
+      if (globalAddr && globalAddr->getReferencedGlobal() == global)
+        initValue = store->getSrc();
+    }
+  }
+  if (!initValue)
+    return false;
+
+  ArraySemanticsCall arrayCall(apply);
+  switch (arrayCall.getKind()) {
+  case ArrayCallKind::kArrayUninitialized: {
+    ArraySemanticsCall finalize(initValue, semantics::ARRAY_FINALIZE_INTRINSIC);
+    return finalize && finalize.getInstruction()->getArgument(0) ==
+                           arrayCall.getArrayValue();
+  }
+  case ArrayCallKind::kArrayFinalizeIntrinsic: {
+    // The array initialization must be inlined first, because it's only
+    // recognized with this finalize call. It's either `array.uninitialized` or
+    // `array.uninitialized_intrinsic`, which contains `array.uninitialized`.
+    SILInstruction *tuple = apply->getArgument(0)->getDefiningInstruction();
+    bool isUninitializedArray =
+        isa_and_nonnull<DestructureTupleInst, TupleExtractInst>(tuple) &&
+        ArraySemanticsCall(tuple->getOperand(0), semantics::ARRAY_UNINITIALIZED,
+                           /*matchPartialName=*/true);
+    return initValue == apply && !isUninitializedArray;
+  }
+  case ArrayCallKind::kEndMutation: {
+    // The inlined finalize call loads the array from the `_endMutation` self
+    // argument.
+    auto *load = dyn_cast<LoadInst>(initValue);
+    return load && load->getOperand() == apply->getSelfArgument();
+  }
+  default:
+    return false;
+  }
+}
+
 // Returns the callee of an apply_inst if it is basically inlinable.
 SILFunction *swift::getEligibleFunction(FullApplySite AI,
                                         InlineSelection WhatToInline,
@@ -773,7 +830,8 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
 
   // Don't inline functions that are marked with the @_semantics or @_effects
   // attribute if the inliner is asked not to inline them.
-  if (Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) {
+  if ((Callee->hasSemanticsAttrs() || Callee->hasEffectsKind()) &&
+      !isArrayInitializationInGlobalInit(AI)) {
     if (WhatToInline >= InlineSelection::NoSemanticsAndEffects) {
       // TODO: for stable optimization of semantics, prevent inlining whenever
       // isOptimizableSemanticFunction(Callee) is true.

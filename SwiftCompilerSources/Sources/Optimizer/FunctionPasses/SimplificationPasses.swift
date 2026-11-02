@@ -49,7 +49,10 @@ let ononeSimplificationPass = FunctionPass(name: "onone-simplification") {
 
 let simplificationPass = FunctionPass(name: "simplification") {
   (function: Function, context: FunctionPassContext) in
+  simplify(function: function, context)
+}
 
+func simplify(function: Function, _ context: FunctionPassContext) {
   runSimplification(on: function, context, preserveDebugInfo: false) {
     if let forwardingInst = $0 as? ForwardingInstruction {
       forwardingInst.simplifyForwardingInstruction($1)
