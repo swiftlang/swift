@@ -6,6 +6,12 @@
 // RUN: %FileCheck %s --check-prefix=CHECK-PUBLIC < %t/Foo.swiftinterface
 // RUN: %FileCheck %s --check-prefix=CHECK-PRIVATE < %t/Foo.private.swiftinterface
 
+// The public interface prints `@_spi_available` overrides as unavailable, but
+// it must still build in a language mode that rejects unavailable overrides.
+// RUN: %if swift7 %{ %target-swift-emit-module-interfaces(%t/Foo7.swiftinterface, %t/Foo7.private.swiftinterface) -parse-as-library %s -module-name Foo -library-level api -swift-version 7 %}
+// RUN: %if swift7 %{ %target-swift-frontend -compile-module-from-interface %t/Foo7.swiftinterface -o %t/Foo7.public.swiftmodule -module-name Foo %}
+// RUN: %if swift7 %{ %target-swift-frontend -compile-module-from-interface %t/Foo7.private.swiftinterface -o %t/Foo7.private.swiftmodule -module-name Foo %}
+
 @_spi_available(macOS 10.10, tvOS 14.0, *)
 @available(iOS 8.0, *)
 public class SPIClass {}
@@ -18,6 +24,24 @@ public class SPIClass {}
 
 // CHECK-PRIVATE: @_spi_available(macOS, introduced: 10.10)
 // CHECK-PRIVATE: @_spi_available(tvOS, introduced: 14.0)
+
+open class SPIOverrideBase {
+  public init() {}
+  open func method() {}
+}
+
+open class SPIOverrideDerived: SPIOverrideBase {
+  @_spi_available(macOS 10.9, *)
+  open override func method() {}
+}
+
+// CHECK-PUBLIC:      open class SPIOverrideDerived
+// CHECK-PUBLIC:      @available(macOS, unavailable)
+// CHECK-PUBLIC-NEXT: override open func method()
+
+// CHECK-PRIVATE:      open class SPIOverrideDerived
+// CHECK-PRIVATE:      @_spi_available(macOS, introduced: 10.9)
+// CHECK-PRIVATE-NEXT: override open func method()
 
 @_spi_available(macOS 10.15, *)
 @frozen public struct SPIFrozenStruct: Hashable {

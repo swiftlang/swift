@@ -3997,7 +3997,7 @@ NOTE(suggest_removing_override, none,
      "remove 'override' modifier to declare a new %0",
      (DeclBaseName))
 
-ERROR(override_unavailable, none,
+GROUPED_ERROR(override_unavailable, UnavailableOverride, none,
       "cannot override %base0 with a declaration that is marked unavailable",
       (ValueDecl *))
 

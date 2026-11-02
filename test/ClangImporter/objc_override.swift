@@ -86,6 +86,7 @@ class SomeCellSub5 : SomeCell {
 class SomeCellSub6 : SomeCell {
   @available(*, unavailable)
   @objc override init(string: String) {
+    // expected-warning@-1 {{cannot override 'init' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}
     super.init(string: string)
   }
 }

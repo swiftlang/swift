@@ -99,35 +99,40 @@ func testAvailableOverrideOfUnavailableDecl() {
 
 func testUnavailableOverrideOfAvailableDecl() {
   class Base {
-    func availableMethod() {}
-    init(x: Int) {}
-    required init(requiredX: Int) {}
-    subscript (i: Int) -> Int { return i }
-    var availableComputedProperty: Int {
+    func availableMethod() {} // expected-note {{overridden declaration is here}}
+    init(x: Int) {} // expected-note {{overridden declaration is here}}
+    required init(requiredX: Int) {} // expected-note {{overridden declaration is here}}
+    subscript (i: Int) -> Int { return i } // expected-note {{overridden declaration is here}}
+    var availableComputedProperty: Int { // expected-note {{overridden declaration is here}}
       get { 0 }
       set {}
     }
     var computedPropertyWithUnavailableSetterOverride: Int {
       get { 0 }
-      set {}
+      set {} // expected-note {{overridden declaration is here}}
     }
   }
 
   class Overrides: Base {
     @available(*, unavailable)
     override func availableMethod() {}
+    // expected-warning@-1 {{cannot override 'availableMethod' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}{{117:1-118:1=}}{{group-name=UnavailableOverride}}
 
     @available(*, unavailable)
     override init(x: Int) {}
+    // expected-warning@-1 {{cannot override 'init' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}{{121:1-122:1=}}
 
     @available(*, unavailable)
     required init(requiredX: Int) {}
+    // expected-warning@-1 {{cannot override 'init' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}{{125:1-126:1=}}
 
     @available(*, unavailable)
     override subscript (i: Int) -> Int { return i }
+    // expected-warning@-1 {{cannot override 'subscript' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}{{129:1-130:1=}}
 
     @available(*, unavailable)
     override var availableComputedProperty: Int {
+      // expected-warning@-1 {{cannot override 'availableComputedProperty' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}{{133:1-134:1=}}
       get { 1 }
       set {}
     }
@@ -136,6 +141,7 @@ func testUnavailableOverrideOfAvailableDecl() {
       get { 0 }
       @available(*, unavailable)
       set {}
+      // expected-warning@-1 {{cannot override setter for 'computedPropertyWithUnavailableSetterOverride' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}{{142:1-143:1=}}
     }
   }
 }
@@ -257,6 +263,8 @@ func testImplicitSuperInit() {
 }
 
 func testUnavailableInSwiftOverrides() {
+  // Overrides may be unavailable in different Swift language modes than the
+  // declarations they override.
   class Base {
     func availableMethod() {}
   }

@@ -135,6 +135,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:temporary-pointers>
 - <doc:non-sendable-superclass>
 - <doc:unavailable-sendable-conformance>
+- <doc:unavailable-override>
 - <doc:opaque-type-inference>
 - <doc:region-isolation-unknown-pattern>
 - <doc:unknown-warning-group>
