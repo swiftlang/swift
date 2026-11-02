@@ -754,6 +754,7 @@ function Add-TimingData {
     [Hashtable] $Platform,
     [Parameter(Mandatory)]
     [string] $BuildStep,
+    [string] $Variant = "",
     [PSCustomObject] $Parent = $null
   )
 
@@ -761,6 +762,7 @@ function Add-TimingData {
     Arch = $Platform.Architecture.LLVMName
     Platform = $Platform.OS.ToString()
     "Build Step" = $BuildStep
+    Variant = $Variant
     Start = $BuildStopwatch.Elapsed
     "Elapsed Time" = [TimeSpan]::Zero
     CPU = 0
@@ -784,7 +786,8 @@ function Record-OperationTime {
     [Parameter(Mandatory)]
     [string] $BuildStep,
     [Parameter(Mandatory)]
-    [ScriptBlock] $ScriptBlock
+    [ScriptBlock] $ScriptBlock,
+    [string] $SummaryVariant = ""
   )
   if (!$RecordTimings) {
     & $ScriptBlock
@@ -793,7 +796,7 @@ function Record-OperationTime {
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
   $StartTimes = Get-ProcessorTimes
-  $TimingEntry = Add-TimingData $Platform $BuildStep $script:CurrentOperation
+  $TimingEntry = Add-TimingData $Platform $BuildStep -Variant $SummaryVariant -Parent $script:CurrentOperation
   $script:CurrentOperation = $TimingEntry
 
   try {
@@ -831,6 +834,7 @@ function Flatten-TimingEntry {
 
   [PSCustomObject]@{
     "Build Step" = "$Indent$($Entry.'Build Step')"
+    Variant = $Entry.Variant
     Platform = $Entry.Platform
     Arch = $Entry.Arch
     "Elapsed Time" = $FormattedTime
@@ -886,6 +890,7 @@ function Write-Summary {
   $FormattedTotalTime = "{0:hh\:mm\:ss\.ff}" -f $TotalTime
   $TotalRow = [PSCustomObject]@{
     "Build Step" = "TOTAL"
+    Variant = ""
     Platform = ""
     Arch = ""
     "Elapsed Time" = $FormattedTotalTime
@@ -1043,7 +1048,10 @@ function Invoke-BuildStep {
     }
   }
 
-  Record-OperationTime $Platform $Name {
+  $SummaryVariant = $SplatArgs["SummaryVariant"]
+  $SplatArgs.Remove("SummaryVariant")
+
+  Record-OperationTime $Platform $Name -SummaryVariant $SummaryVariant {
     & $Name $Platform @SplatArgs
   }
 }
@@ -6070,12 +6078,12 @@ if ($Toolchain) {
   Invoke-BuildStep Build-BuildTools $BuildPlatform
 
   # ── Early Swift Driver ────────────────────────────────────────────────────
-  Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver
+  Invoke-BuildStep Build-SQLite $BuildPlatform -CCompiler $Compilers.Host.C -Phase EarlySwiftDriver -SummaryVariant "EarlySwiftDriver"
   Invoke-BuildStep Build-EarlySwiftDriver $BuildPlatform
 
   # ── Stage1 Compiler ───────────────────────────────────────────────────────
-  Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap"
-  Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers @{
+  Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Bootstrap" -SummaryVariant "Bootstrap"
+  Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage1Compilers -SummaryVariant "Stage1/Asserts" @{
     CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage1-$($BuildPlatform.Architecture.LLVMName).cmake";
     Assembler       = $Assemblers.Host;
     CCompiler       = $Compilers.Host.C;
@@ -6098,7 +6106,7 @@ if ($Toolchain) {
     SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
   }
 
-  Invoke-BuildStep Build-SDK $HostPlatform -Context @{
+  Invoke-BuildStep Build-SDK $HostPlatform -SummaryVariant "Dynamic" -Context @{
     SDKIdentifier        = $HostPlatform.OS.ToString();
     Variant              = "Dynamic";
     Compilers            = $Compilers.Stage1;
@@ -6109,8 +6117,8 @@ if ($Toolchain) {
 
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
-  Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler"
-  Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
+  Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
+  Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers -SummaryVariant "Stage2/Asserts" @{
     Assembler       = $Assemblers.Stage1;
     CCompiler       = $Compilers.Stage1.C;
     CXXCompiler     = $Compilers.Stage1.CXX;
@@ -6118,7 +6126,7 @@ if ($Toolchain) {
     SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
     DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
   }
-  Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts"
+  Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts" -SummaryVariant "Asserts"
   Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
 
   # ── Stage2 Compiler Runtimes ──────────────────────────────────────────────
@@ -6234,7 +6242,7 @@ if ($Toolchain) {
 
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
   if ($IncludeNoAsserts) {
-    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers @{
+    Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers -SummaryVariant "Stage2/NoAsserts" @{
       Assembler       = $Assemblers.Stage1;
       CCompiler       = $Compilers.Stage1.C;
       CXXCompiler     = $Compilers.Stage1.CXX;
@@ -6258,18 +6266,18 @@ if ($Toolchain) {
     #   /NS: Do not write file sizes
     #   /NP: Do not show progress indicator
     & robocopy $HostPlatform.ToolchainInstallRoot $HostPlatform.NoAssertsToolchainInstallRoot /E /XC /XN /XO /NS /NC /NFL /NDL /NJH
-    Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts"
+    Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "NoAsserts" -SummaryVariant "NoAsserts"
   }
 
   if ($HostPlatform.OS -eq [OS]::Windows) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
     }
     if ($IncludeNoAsserts) {
-      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "NoAsserts" @{
         ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
         RuntimeLocation = $HostRuntimeBin;
       }
@@ -6287,7 +6295,7 @@ if ($Windows) {
   $SDKROOT = Get-SwiftSDK -OS Windows
   foreach ($Build in $WindowsSDKBuilds) {
     if ($Build.LinkModes.contains("dynamic")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
+      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Dynamic" -Context @{
         SDKIdentifier        = "Windows";
         Variant              = "Dynamic";
         Compilers            = $Compilers.Stage1;
@@ -6298,7 +6306,7 @@ if ($Windows) {
     }
 
     if ($Build.LinkModes.contains("static")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
+      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Static" -Context @{
         SDKIdentifier        = "Windows";
         Variant              = "Static";
         Compilers            = $Compilers.Stage1;
@@ -6345,12 +6353,12 @@ if ($Windows) {
   if ($Toolchain -and $RebuiltHostDynamicRuntime) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
     }
     if ($IncludeNoAsserts) {
-      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+      Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "NoAsserts" @{
         ToolchainRoot   = $HostPlatform.NoAssertsToolchainInstallRoot;
         RuntimeLocation = $HostRuntimeBin;
       }
@@ -6364,7 +6372,7 @@ if ($Android) {
   $SDKROOT = Get-SwiftSDK -OS Android
   foreach ($Build in $AndroidSDKBuilds) {
     if ($Build.LinkModes.contains("dynamic")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
+      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Dynamic" -Context @{
         SDKIdentifier        = "Android";
         Variant              = "Dynamic";
         Compilers            = $Compilers.Stage1;
@@ -6375,7 +6383,7 @@ if ($Android) {
     }
 
     if ($Build.LinkModes.contains("static")) {
-      Invoke-BuildStep Build-SDK $Build -Context @{
+      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Static" -Context @{
         SDKIdentifier        = "Android";
         Variant              = "Static";
         Compilers            = $Compilers.Stage1;
@@ -6437,7 +6445,7 @@ if (-not $IsCrossCompiling) {
   if (-not $Toolchain -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
-    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
+    Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
       ToolchainRoot   = $HostPlatform.ToolchainInstallRoot;
       RuntimeLocation = $HostRuntimeBin;
     }
