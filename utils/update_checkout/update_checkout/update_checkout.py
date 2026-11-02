@@ -303,6 +303,19 @@ def get_branch_for_repo(
     return repo_branch, cross_repo
 
 
+def fetch_tag_args(pool_args: UpdateArguments, need_tags: bool = True) -> List[str]:
+    """Return the tag options for a 'git fetch' in update_single_repository.
+
+    With '--skip-tags', this is '--no-tags' rather than nothing, because git
+    otherwise still fetches tags that point into the fetched history.
+    Otherwise it is '--tags' when the fetch needs tags, and nothing when it
+    doesn't.
+    """
+    if pool_args.skip_tags:
+        return ["--no-tags"]
+    return ["--tags"] if need_tags else []
+
+
 def update_single_repository(pool_args: UpdateArguments):
     verbose = pool_args.verbose
     repo_name = pool_args.repo_name
@@ -316,16 +329,13 @@ def update_single_repository(pool_args: UpdateArguments):
         if verbose:
             print(f"{prefix}Updating '{repo_path}'")
 
-        fetch_extra_args = []
+        # Options for every 'git fetch' below that limit how much history
+        # and how many blobs are downloaded.
+        fetch_history_args = []
         if pool_args.skip_history:
-            fetch_extra_args.extend(["--depth", "1"])
+            fetch_history_args.extend(["--depth", "1"])
         if pool_args.partial_clone:
-            fetch_extra_args.extend(["--filter", "blob:none"])
-
-        # With '--skip-tags', pass '--no-tags' rather than just omitting
-        # '--tags', because git otherwise still fetches tags that point into
-        # the fetched history.
-        fetch_tags = ["--no-tags"] if pool_args.skip_tags else ["--tags"]
+            fetch_history_args.extend(["--filter", "blob:none"])
 
         cross_repo = False
         checkout_target = None
@@ -408,7 +418,7 @@ def update_single_repository(pool_args: UpdateArguments):
                             f"+refs/tags/{checkout_target}"
                             f":refs/tags/{checkout_target}",
                         ]
-                        + fetch_extra_args,
+                        + fetch_history_args,
                         echo=verbose,
                         prefix=prefix,
                     )
@@ -419,13 +429,13 @@ def update_single_repository(pool_args: UpdateArguments):
                             "fetch",
                             "--recurse-submodules=yes",
                         ]
-                        + fetch_tags
+                        + fetch_tag_args(pool_args)
                         + [
                             "origin",
                             f"+refs/heads/{checkout_target}"
                             f":refs/remotes/origin/{checkout_target}",
                         ]
-                        + fetch_extra_args,
+                        + fetch_history_args,
                         echo=verbose,
                         prefix=prefix,
                     )
@@ -452,8 +462,8 @@ def update_single_repository(pool_args: UpdateArguments):
                     Git.run(
                         repo_path,
                         ["fetch", "--recurse-submodules=yes"]
-                        + fetch_tags
-                        + fetch_extra_args,
+                        + fetch_tag_args(pool_args)
+                        + fetch_history_args,
                         echo=verbose,
                         prefix=prefix,
                     )
@@ -479,12 +489,11 @@ def update_single_repository(pool_args: UpdateArguments):
         # which branch was checked out during the fetch. Without history, the
         # tags are not needed, and fetching each of them at depth 1 takes
         # minutes in the larger repositories.
-        final_fetch_tags = fetch_tags
-        if pool_args.skip_history and not pool_args.skip_tags:
-            final_fetch_tags = []
         Git.run(
             repo_path,
-            ["fetch", "--recurse-submodules=yes"] + final_fetch_tags + fetch_extra_args,
+            ["fetch", "--recurse-submodules=yes"]
+            + fetch_tag_args(pool_args, need_tags=not pool_args.skip_history)
+            + fetch_history_args,
             echo=verbose,
             prefix=prefix,
         )
