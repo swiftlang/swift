@@ -157,7 +157,7 @@ func f010_PAndS_cases() {
 // Init of Empty protocol + Builtin.NativeObject enum (including opaque tuples as a return value)
 // ---
 // implicit closure #2 (Swift.EmptyP, Swift.String) -> Swift.PAndSEnum in implicit closure #1 (Swift.PAndSEnum.Type) -> (Swift.EmptyP, Swift.String) -> Swift.PAndSEnum in Swift.f010_PAndS_cases() -> ()
-// CHECK-LABEL: sil private [ossa] [opaque] @$ss16f010_PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_ : $@convention(thin) (@in_guaranteed any EmptyP, @guaranteed String, @thin PAndSEnum.Type) -> @out PAndSEnum {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$ss16f010_PAndS_casesyyFs0B5SEnumOs6EmptyP_p_SStcACmcfu_ACsAD_p_SStcfu0_ : $@convention(thin) (@in_guaranteed any EmptyP, @guaranteed String, @thin PAndSEnum.Type) -> @out PAndSEnum {
 // CHECK: bb0([[ARG0:%.*]] : @guaranteed $any EmptyP, [[ARG1:%.*]] : @guaranteed $String, [[ARG2:%.*]] : @closureCapture $@thin PAndSEnum.Type):
 // CHECK:   [[COPY0:%.*]] = copy_value [[ARG0]]
 // CHECK:   [[COPY1:%.*]] = copy_value [[ARG1]]

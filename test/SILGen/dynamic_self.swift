@@ -376,7 +376,7 @@ class Derived : Base {
     _ = super.property
     _ = super[]
   }
-  // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7DerivedC9superCallyyFACycfu_ : $@convention(thin) (@guaranteed Derived) -> @owned Derived
+  // CHECK-LABEL: sil private [closure] [ossa] @$s12dynamic_self7DerivedC9superCallyyFACycfu_ : $@convention(thin) (@guaranteed Derived) -> @owned Derived
   // CHECK: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
   // CHECK: end sil function '$s12dynamic_self7DerivedC9superCallyyFACycfu_'
 
@@ -391,7 +391,7 @@ class Derived : Base {
     _ = super.staticProperty
     _ = super[]
   }
-  // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7DerivedC15superCallStaticyyFZACycfu_ : $@convention(thin) (@thick Derived.Type) -> @owned Derived
+  // CHECK-LABEL: sil private [closure] [ossa] @$s12dynamic_self7DerivedC15superCallStaticyyFZACycfu_ : $@convention(thin) (@thick Derived.Type) -> @owned Derived
   // CHECK: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
   // CHECK: end sil function '$s12dynamic_self7DerivedC15superCallStaticyyFZACycfu_'
 
@@ -406,7 +406,7 @@ class Derived : Base {
     _ = super[]
     return super.property
   }
-  // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyFACXDycfu_ : $@convention(thin) (@guaranteed Derived) -> @owned Derived
+  // CHECK-LABEL: sil private [closure] [ossa] @$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyFACXDycfu_ : $@convention(thin) (@guaranteed Derived) -> @owned Derived
   // CHECK: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
   // CHECK: end sil function '$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyFACXDycfu_'
 
@@ -421,7 +421,7 @@ class Derived : Base {
     _ = super[]
     return super.staticProperty
   }
-  // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZACXDycfu_ : $@convention(thin) (@thick @dynamic_self Derived.Type) -> @owned Derived
+  // CHECK-LABEL: sil private [closure] [ossa] @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZACXDycfu_ : $@convention(thin) (@thick @dynamic_self Derived.Type) -> @owned Derived
   // CHECK: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
   // CHECK: end sil function '$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZACXDycfu_'
 }
@@ -429,20 +429,20 @@ class Derived : Base {
 class Generic<T> {
   // Examples where we have to add a special argument to capture Self's metadata
   func t1() -> Self {
-    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7GenericC2t1ACyxGXDyFAEXDSgycfU_ : $@convention(thin) <T> (@guaranteed <τ_0_0> { var @sil_weak Optional<Generic<τ_0_0>> } <T>, @thick @dynamic_self Generic<T>.Type) -> @owned Optional<Generic<T>>
+    // CHECK-LABEL: sil private [closure] [ossa] @$s12dynamic_self7GenericC2t1ACyxGXDyFAEXDSgycfU_ : $@convention(thin) <T> (@guaranteed <τ_0_0> { var @sil_weak Optional<Generic<τ_0_0>> } <T>, @thick @dynamic_self Generic<T>.Type) -> @owned Optional<Generic<T>>
     _ = {[weak self] in self }
     return self
   }
 
   func t2() -> Self {
-    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7GenericC2t2ACyxGXDyFAEXD_AEXDtycfU_ : $@convention(thin) <T> (@guaranteed (Generic<T>, Generic<T>), @thick @dynamic_self Generic<T>.Type) -> (@owned Generic<T>, @owned Generic<T>)
+    // CHECK-LABEL: sil private [closure] [ossa] @$s12dynamic_self7GenericC2t2ACyxGXDyFAEXD_AEXDtycfU_ : $@convention(thin) <T> (@guaranteed (Generic<T>, Generic<T>), @thick @dynamic_self Generic<T>.Type) -> (@owned Generic<T>, @owned Generic<T>)
     let selves = (self, self)
     _ = { selves }
     return self
   }
 
   func t3() -> Self {
-    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@guaranteed @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T> 
+    // CHECK-LABEL: sil private [closure] [ossa] @$s12dynamic_self7GenericC2t3ACyxGXDyFAEXDycfU_ : $@convention(thin) <T> (@guaranteed @sil_unowned Generic<T>, @thick @dynamic_self Generic<T>.Type) -> @owned Generic<T> 
     _ = {[unowned self] in self }
     return self
   }
@@ -523,7 +523,7 @@ public class CaptureTwoValuesTest {
       _ = Self.self
     }
 
-    // CHECK-LABEL: sil private [ossa] @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZyycfU_ : $@convention(thin) (@guaranteed CaptureTwoValuesTest, @guaranteed CaptureTwoValuesTest) -> () {
+    // CHECK-LABEL: sil private [closure] [ossa] @$s12dynamic_self20CaptureTwoValuesTestC08capturesdE0yyFZyycfU_ : $@convention(thin) (@guaranteed CaptureTwoValuesTest, @guaranteed CaptureTwoValuesTest) -> () {
   }
 }
 

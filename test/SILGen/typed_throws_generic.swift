@@ -209,7 +209,7 @@ func reabstractClosureAsNonthrowing() -> Int {
   // CHECK: [[ERROR_BB]]:
   // CHECK-NEXT: unreachable
 
-  // CHECK-LABEL: sil private [ossa] @$s20typed_throws_generic30reabstractClosureAsNonthrowingSiyFSiyXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Int>
+  // CHECK-LABEL: sil private [closure] [ossa] @$s20typed_throws_generic30reabstractClosureAsNonthrowingSiyFSiyXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1> () -> (@out τ_0_1, @error_indirect τ_0_0) for <Never, Int>
 }
 
 func reabstractClosureAsThrowing(b: Bool) throws -> Int {
@@ -259,7 +259,7 @@ extension Collection {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s20typed_throws_generic9forcedMapySayq_GSayxGr0_lFq_xXEfU_ : $@convention(thin) <T, U> (@in_guaranteed T) -> (@out U, @error_indirect Never)
+// CHECK-LABEL: sil private [closure] [ossa] @$s20typed_throws_generic9forcedMapySayq_GSayxGr0_lFq_xXEfU_ : $@convention(thin) <T, U> (@in_guaranteed T) -> (@out U, @error_indirect Never)
 func forcedMap<T, U>(_ source: [T]) -> [U] {
   // CHECK: bb0(%0 : $*U, %1 : $*Never, %2 : $*T)
   return source.typedMap { $0 as! U }
@@ -362,7 +362,7 @@ public func withUnsafeRawBuffer<T, E>(
   fatalError("boom")
 }
 
-// CHECK-LABEL: sil private [ossa] @$s20typed_throws_generic16withUnsafeBufferyxySryxGq_YKXEq_YKs5ErrorR_r0_lFySwq_YKXEfU_ : $@convention(thin) <T, E where E : Error> (UnsafeMutableRawBufferPointer, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (UnsafeMutableBufferPointer<τ_0_0>) -> @error_indirect τ_0_1 for <T, E>) -> @error_indirect E {
+// CHECK-LABEL: sil private [closure] [ossa] @$s20typed_throws_generic16withUnsafeBufferyxySryxGq_YKXEq_YKs5ErrorR_r0_lFySwq_YKXEfU_ : $@convention(thin) <T, E where E : Error> (UnsafeMutableRawBufferPointer, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (UnsafeMutableBufferPointer<τ_0_0>) -> @error_indirect τ_0_1 for <T, E>) -> @error_indirect E {
 // CHECK: try_apply{{.*}}@error_indirect τ_0_1 for <T, E>
 public func withUnsafeBuffer<T, E>(
     _ body: (UnsafeMutableBufferPointer<T>) throws(E) -> Void

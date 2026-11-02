@@ -108,7 +108,7 @@ public protocol Apply {
     func apply(_ body: (Apply) -> ())
 }
 
-// CHECK-LABEL: sil private @$s28access_enforcement_selection20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF : $@convention(thin) (@in_guaranteed any Apply, @inout_aliasable Int) -> () {
+// CHECK-LABEL: sil private [closure] @$s28access_enforcement_selection20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF : $@convention(thin) (@in_guaranteed any Apply, @inout_aliasable Int) -> () {
 // CHECK: bb0(%0 : $*any Apply, %1 : @closureCapture $*Int):
 // CHECK:   begin_access [modify] [static] %1 : $*Int
 // CHECK-LABEL: } // end sil function '$s28access_enforcement_selection20testRecursiveClosure1a1xyAA5Apply_p_SiztF9localFuncL_1byAaE_p_tF'
@@ -123,7 +123,7 @@ public func testRecursiveClosure(a: Apply, x: inout Int) {
     a.apply(localFunc)
 }
 
-// CHECK-LABEL: sil private @$s28access_enforcement_selection25testRecursiveLocalCapture1iys5Int64Vz_tF6local2L_yyF : $@convention(thin) (@inout_aliasable Int64) -> () {
+// CHECK-LABEL: sil private [closure] @$s28access_enforcement_selection25testRecursiveLocalCapture1iys5Int64Vz_tF6local2L_yyF : $@convention(thin) (@inout_aliasable Int64) -> () {
 // CHECK: begin_access [modify] [static] %0 : $*Int64
 // CHECK-LABEL: } // end sil function '$s28access_enforcement_selection25testRecursiveLocalCapture1iys5Int64Vz_tF6local2L_yyF'
 func testRecursiveLocalCapture(i: inout Int64) {

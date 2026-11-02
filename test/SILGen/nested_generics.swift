@@ -46,7 +46,7 @@ struct Lunch<T : Pizza> where T.Topping : CuredMeat {
 // CHECK-LABEL: sil hidden [ossa] @$s15nested_generics5LunchV6DinnerV15coolCombination1t1uy7ToppingQz_AA4DeliC7MustardOyAA6PepperV_GtF : $@convention(method) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard> (@in_guaranteed T.Topping, Deli<Pepper>.Mustard, @in_guaranteed Lunch<T>.Dinner<U>) -> ()
 
 // CHECK-LABEL: // nestedGeneric #1 <A><A1><A2, B2 where A: nested_generics.Pizza, A1: nested_generics.HotDog, A.Topping: nested_generics.CuredMeat, A1.Condiment == nested_generics.Deli<nested_generics.Pepper>.Mustard>(x: A2, y: B2) -> (A2, B2) in nested_generics.Lunch.Dinner.coolCombination(t: A.Topping, u: nested_generics.Deli<nested_generics.Pepper>.Mustard) -> ()
-// CHECK-LABEL: sil private [ossa] @$s15nested_generics5LunchV6DinnerV15coolCombination1t1uy7ToppingQz_AA4DeliC7MustardOyAA6PepperV_GtF0A7GenericL_1x1yqd0___qd0_0_tqd0___qd0_0_tAA5PizzaRzAA6HotDogRd__AA9CuredMeatAJRQAQ9CondimentRtd__r__0_lF : $@convention(thin) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard><X, Y> (@in_guaranteed X, @in_guaranteed Y) -> (@out X, @out Y)
+// CHECK-LABEL: sil private [closure] [ossa] @$s15nested_generics5LunchV6DinnerV15coolCombination1t1uy7ToppingQz_AA4DeliC7MustardOyAA6PepperV_GtF0A7GenericL_1x1yqd0___qd0_0_tqd0___qd0_0_tAA5PizzaRzAA6HotDogRd__AA9CuredMeatAJRQAQ9CondimentRtd__r__0_lF : $@convention(thin) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard><X, Y> (@in_guaranteed X, @in_guaranteed Y) -> (@out X, @out Y)
 
 // CHECK-LABEL: // nested_generics.Lunch.Dinner.init(firstCourse: A, secondCourse: Swift.Optional<A1>, leftovers: A, transformation: (A) -> A1) -> nested_generics.Lunch<A>.Dinner<A1>
 // CHECK-LABEL: sil hidden [ossa] @$s15nested_generics5LunchV6DinnerV11firstCourse06secondF09leftovers14transformationAEyx_qd__Gx_qd__Sgxqd__xctcfC : $@convention(method) <T where T : Pizza, T.Topping : CuredMeat><U where U : HotDog, U.Condiment == Deli<Pepper>.Mustard> (@owned T, @in Optional<U>, @owned T, @owned @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 : AnyObject> (@guaranteed τ_0_0) -> @out τ_0_1 for <T, U>, @thin Lunch<T>.Dinner<U>.Type) -> @out Lunch<T>.Dinner<U>
@@ -181,7 +181,7 @@ func eatDinnerConcrete(d: inout Lunch<Pizzas<Pepper>.NewYork>.Dinner<HotDogs.Ame
 // CHECK-LABEL: sil shared [transparent] [serialized] [reabstraction_thunk] [ossa] @$s15nested_generics6PizzasV7NewYorkCyAA6PepperV_GAA7HotDogsC8AmericanVIeggr_AhLIeggd_TR : $@convention(thin) (@guaranteed Pizzas<Pepper>.NewYork, @guaranteed @callee_guaranteed (@guaranteed Pizzas<Pepper>.NewYork) -> @out HotDogs.American) -> HotDogs.American
 
 // CHECK-LABEL: // closure #1 (nested_generics.Pizzas<nested_generics.Pepper>.NewYork) -> nested_generics.HotDogs.American in nested_generics.calls() -> ()
-// CHECK-LABEL: sil private [ossa] @$s15nested_generics5callsyyFAA7HotDogsC8AmericanVAA6PizzasV7NewYorkCyAA6PepperV_GcfU_ :
+// CHECK-LABEL: sil private [closure] [ossa] @$s15nested_generics5callsyyFAA7HotDogsC8AmericanVAA6PizzasV7NewYorkCyAA6PepperV_GcfU_ :
 
 func calls() {
 

@@ -305,7 +305,7 @@ func triggerUseLazyTestAutoclosure() {
   // CHECK: function_ref @$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ :
 
   // And the implicit closure calls computeInt()
-  // CHECK: sil private [transparent] [ossa] {{(\[opaque\] )?}}@$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ :
+  // CHECK: sil private [transparent] [closure] [ossa] {{(\[opaque\] )?}}@$s17property_wrappers29triggerUseLazyTestAutoclosureyyFSiycfu_ :
   // CHECK: // function_ref computeInt()
   // CHECK: function_ref @$s17property_wrappers10computeIntSiyF : $@convention(thin) () -> Int
 }

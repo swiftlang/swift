@@ -400,7 +400,7 @@ extension Collection {
 }
 
 extension Array where Element == Int {
-  // CHECK-LABEL: sil private [ossa] [opaque] @$sSa20opaque_values_silgenSiRszlE20incrementEachElementSaySiGyFS2iXEfU_ : {{.*}} {
+  // CHECK-LABEL: sil private [closure] [ossa] [opaque] @$sSa20opaque_values_silgenSiRszlE20incrementEachElementSaySiGyFS2iXEfU_ : {{.*}} {
   // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : $Int):
   // CHECK-LABEL: } // end sil function '$sSa20opaque_values_silgenSiRszlE20incrementEachElementSaySiGyFS2iXEfU_'
   func incrementEachElement() -> [Int] {
@@ -410,7 +410,7 @@ extension Array where Element == Int {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> Int {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_ : $@convention(thin) (@inout_aliasable Int) -> Int {
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22anon_read_only_captureyS2iFSiyXEfU_'
 func anon_read_only_capture(_ x: Int) -> Int {
   var x = x
@@ -418,7 +418,7 @@ func anon_read_only_capture(_ x: Int) -> Int {
 }
 
 
-// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_ : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <()> {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_ : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <()> {
 // CHECK-NOT: bb1 
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen22testEmptyReturnClosureyyFyycyKXEfu_yycfU_'
 func testEmptyReturnClosure() {
@@ -649,7 +649,7 @@ func copyableBorrowingSwitchNested<T>(_ o: CopyableOuter<T>) -> T? {
 
 // Verify exit block arguments are ordered correctly.
 // 
-// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int49condition5valueSi_S2ix_xttSb_xtlFSi_S2ix_xttyXEfU_ : {{.*}} {
 // CHECK:         br [[EPILOG:bb[0-9]+]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
 // CHECK:         br [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
 // CHECK:       [[EPILOG]]({{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : $Int, {{%[^,]+}} : @owned $Value, {{%[^,]+}} : @owned $Value):
@@ -669,7 +669,7 @@ func duplicate_with_int4<Value>(condition: Bool, value: Value) -> (Int, Int, Int
 }
 
 // Verify tuple rebuilding.
-// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_ : {{.*}} {
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)
 // CHECK:         return [[RETVAL]] : $(Value, Value)
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate15valuex_xtx_tlFx_xtyXEfU_'
@@ -679,7 +679,7 @@ func duplicate1<Value>(value: Value) -> (Value, Value) {
       (value, value)
   }
 }
-// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_ : {{.*}} {
 // CHECK:         [[RETVAL:%[^,]+]] = tuple $(one: Value, two: Value) ({{%[^,]+}}, {{%[^,]+}})   
 // CHECK:         return [[RETVAL]] : $(one: Value, two: Value)           
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen10duplicate25valuex3one_x3twotx_tlFxAD_xAEtyXEfU_'
@@ -689,7 +689,7 @@ func duplicate2<Value>(value: Value) -> (one: Value, two: Value) {
       (one: value, two: value)
   }
 }
-// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_ : {{.*}} {
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value, {{%[^,]+}} : $Int)
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function '$s20opaque_values_silgen19duplicate_with_int15valuex_xSitx_tlFx_xSityXEfU_'
@@ -700,7 +700,7 @@ func duplicate_with_int1<Value>(value: Value) -> (Value, Value, Int) {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int25valuex_xt_Sitx_tlFx_xt_SityXEfU_ : {{.*}} {
 // CHECK:         [[INNER:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Value)           
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ([[INNER]] : $(Value, Value), {{%[^,]+}} : $Int)    
 // CHECK:         return [[RETVAL]]
@@ -711,7 +711,7 @@ func duplicate_with_int2<Value>(value: Value) -> ((Value, Value), Int) {
     ((value, value), 42)
   }
 }
-// CHECK-LABEL: sil private [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ : {{.*}} {
+// CHECK-LABEL: sil private [closure] [ossa] [opaque] @$s20opaque_values_silgen19duplicate_with_int35valueSi_x_x_x_SitxttSitx_tlFSi_x_x_x_SitxttSityXEfU_ : {{.*}} {
 // CHECK:         [[INNERMOST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, {{%[^,]+}} : $Int)           
 // CHECK:         [[INNERMIDDLE:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMOST]] : $(Value, Int), {{%[^,]+}} : $Value) 
 // CHECK:         [[INNERLEAST:%[^,]+]] = tuple ({{%[^,]+}} : $Value, [[INNERMIDDLE]] : $(Value, (Value, Int), Value)) 

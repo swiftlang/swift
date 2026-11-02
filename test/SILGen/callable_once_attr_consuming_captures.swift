@@ -103,7 +103,7 @@ func testConsumingInitParamConsumesCapture(_ r: consuming Resource) {
 // CHECK:  partial_apply {{.*}}([[R_VALUE]]) : $@convention(thin) (@owned Resource) -> ()
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures38testConsumingMethodCallConsumesCaptureyyAA8ResourceVnF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures38testConsumingMethodCallConsumesCaptureyyAA8ResourceVnFyyXOofU_ : $@convention(thin) (@owned Resource) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures38testConsumingMethodCallConsumesCaptureyyAA8ResourceVnFyyXOofU_ : $@convention(thin) (@owned Resource) -> () {
 // CHECK: bb0([[R_CAPTURE:%.*]] : @closureCapture @owned $Resource):
 // CHECK:  [[R_STACK:%.*]] = alloc_stack $Resource, var, name "r"
 // CHECK:  [[R_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R_STACK]] : $*Resource
@@ -166,7 +166,7 @@ func testBorrowingUsesDoNotConsumeCapture(_ r: borrowing Resource) {
 // CHECK:  partial_apply {{.*}}([[BORROWED_ARG_COPY]], [[CONSUMED_VALUE]]) : $@convention(thin) (@guaranteed Resource, @owned Resource) -> ()
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures38testMixedConsumingAndBorrowingCapturesyyAA8ResourceVn_ADtF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures38testMixedConsumingAndBorrowingCapturesyyAA8ResourceVn_ADtFyyXOofU_ : $@convention(thin) (@guaranteed Resource, @owned Resource) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures38testMixedConsumingAndBorrowingCapturesyyAA8ResourceVn_ADtFyyXOofU_ : $@convention(thin) (@guaranteed Resource, @owned Resource) -> () {
 // CHECK: bb0([[BORROWED_CAPTURE:%.*]] : @closureCapture @guaranteed $Resource, [[CONSUMED_CAPTURE:%.*]] : @closureCapture @owned $Resource):
 func testMixedConsumingAndBorrowingCaptures(_ consumed: consuming Resource, _ borrowed: borrowing Resource) {
   let g = { @callable(once) in
@@ -190,7 +190,7 @@ func testMixedConsumingAndBorrowingCaptures(_ consumed: consuming Resource, _ bo
 // CHECK:  partial_apply [called_at_most_once] [[CLOSURE_H]]({{.*}}, [[R2_VALUE]]) : $@convention(thin) (@guaranteed C, @owned Resource) -> ()
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOofU_ : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOofU_ : $@convention(thin) (@guaranteed { var S }, @owned Resource) -> () {
 // CHECK: bb0([[S_CAPTURE:%.*]] : @closureCapture @guaranteed ${ var S }, [[R1_CAPTURE:%.*]] : @closureCapture @owned $Resource):
 // CHECK:  [[S_PROJ:%.*]] = project_box [[S_CAPTURE]] : ${ var S }, 0
 // CHECK:  [[R1_STACK:%.*]] = alloc_stack $Resource, var, name "r1"
@@ -207,7 +207,7 @@ func testMixedConsumingAndBorrowingCaptures(_ consumed: consuming Resource, _ bo
 // CHECK:  end_access [[S_ACCESS]] : $*S
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOofU_'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOofU0_ : $@convention(thin) (@guaranteed C, @owned Resource) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures27tesReassignmentOfProperties2r12r2yAA8ResourceVn_AFntFyyXOofU0_ : $@convention(thin) (@guaranteed C, @owned Resource) -> () {
 // CHECK: bb0([[C_CAPTURE:%.*]] : @closureCapture @guaranteed $C, [[R2_CAPTURE:%.*]] : @closureCapture @owned $Resource):
 // CHECK:  [[R2_STACK:%.*]] = alloc_stack $Resource, var, name "r2"
 // CHECK:  [[R2_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[R2_STACK]] : $*Resource
@@ -250,7 +250,7 @@ func tesReassignmentOfProperties(r1: consuming Resource, r2: consuming Resource)
 // CHECK:  partial_apply {{.*}}([[BOX_VALUE]]) : $@convention(thin) (@owned Box) -> ()
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures34testConsumingGetterConsumesCaptureyyAA3BoxVnF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures34testConsumingGetterConsumesCaptureyyAA3BoxVnFyyXOofU_ : $@convention(thin) (@owned Box) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures34testConsumingGetterConsumesCaptureyyAA3BoxVnFyyXOofU_ : $@convention(thin) (@owned Box) -> () {
 // CHECK: bb0([[BOX_CAPTURE:%.*]] : @closureCapture @owned $Box):
 // CHECK:  [[BOX_STACK:%.*]] = alloc_stack $Box, var, name "box"
 // CHECK:  [[BOX_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[BOX_STACK]] : $*Box
@@ -283,7 +283,7 @@ func testConsumingGetterConsumesCapture(_ box: consuming Box) {
 // CHECK:  partial_apply {{.*}}([[SLOT_VALUE]], [[R_VALUE]]) : $@convention(thin) (@owned Slot, @owned Resource) -> ()
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures34testConsumingSetterConsumesCaptureyyAA4SlotVn_AA8ResourceVntF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures34testConsumingSetterConsumesCaptureyyAA4SlotVn_AA8ResourceVntFyyXOofU_ : $@convention(thin) (@owned Slot, @owned Resource) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures34testConsumingSetterConsumesCaptureyyAA4SlotVn_AA8ResourceVntFyyXOofU_ : $@convention(thin) (@owned Slot, @owned Resource) -> () {
 // CHECK: bb0([[SLOT_CAPTURE:%.*]] : @closureCapture @owned $Slot, [[R_CAPTURE:%.*]] : @closureCapture @owned $Resource):
 // CHECK:  [[SLOT_STACK:%.*]] = alloc_stack $Slot, var, name "slot"
 // CHECK:  [[SLOT_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[SLOT_STACK]] : $*Slot
@@ -322,7 +322,7 @@ protocol Usable: ~Copyable {
 // CHECK:  partial_apply [called_at_most_once] {{.*}}<T>([[T_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> ()
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlFyyXOofU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures40testGenericConsumingCaptureIsAddressOnlyyyxnAA6UsableRzRi_zlFyyXOofU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> () {
 // CHECK: bb0([[T_CAPTURE:%.*]] : @closureCapture $*T):
 // CHECK:  [[T_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T_CAPTURE]] : $*T
 // CHECK:  [[T_DEINIT_ACCESS:%.*]] = begin_access [deinit] [unknown] [[T_ADDR]] : $*T
@@ -349,7 +349,7 @@ struct UsableResource: ~Copyable, Usable {
 // CHECK:  apply [[CLOSURE]]([[X_VALUE]]) : $@convention(thin) (@owned Resource) -> @owned Resource
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures16testIdentityCastyAA8ResourceVADnF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures16testIdentityCastyAA8ResourceVADnFADyXEfU_ : $@convention(thin) (@owned Resource) -> @owned Resource {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures16testIdentityCastyAA8ResourceVADnFADyXEfU_ : $@convention(thin) (@owned Resource) -> @owned Resource {
 // CHECK: bb0([[X_CAPTURE:%.*]] : @closureCapture @owned $Resource):
 // CHECK:  [[X_STACK:%.*]] = alloc_stack $Resource, var, name "x"
 // CHECK:  [[X_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[X_STACK]] : $*Resource
@@ -374,7 +374,7 @@ func testIdentityCast(_ x: consuming Resource) -> Resource {
 // CHECK:  partial_apply [called_at_most_once] [[CLOSURE]]([[C_VALUE]]) : $@convention(thin) (@owned UsableResource) -> @out any Usable & ~Copyable
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnFAA0J0_pRi_s_XPyXOofU_ : $@convention(thin) (@owned UsableResource) -> @out any Usable & ~Copyable {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures24testEraseConsumesCaptureyyAA14UsableResourceVnFAA0J0_pRi_s_XPyXOofU_ : $@convention(thin) (@owned UsableResource) -> @out any Usable & ~Copyable {
 // CHECK: bb0([[RET:%.*]] : $*any Usable & ~Copyable, [[C_CAPTURE:%.*]] : @closureCapture @owned $UsableResource):
 // CHECK:  [[C_STACK:%.*]] = alloc_stack $UsableResource, var, name "c"
 // CHECK:  [[C_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[C_STACK]] : $*UsableResource
@@ -403,7 +403,7 @@ func testEraseConsumesCapture(_ c: consuming UsableResource) {
 // CHECK:  partial_apply [called_at_most_once] [[CLOSURE]]<T>([[V_STACK]]) : $@convention(thin) <{{.*}}> (@in {{.*}}) -> @out any Usable & ~Copyable
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlFAaC_pRi_s_XPyXOofU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> @out any Usable & ~Copyable {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures31testGenericEraseConsumesCaptureyyxnAA6UsableRzRi_zlFAaC_pRi_s_XPyXOofU_ : $@convention(thin) <T where T : Usable, T : ~Copyable> (@in T) -> @out any Usable & ~Copyable {
 // CHECK: bb0([[RET:%.*]] : $*any Usable & ~Copyable, [[V_CAPTURE:%.*]] : @closureCapture $*T):
 // CHECK:  [[V_ADDR:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[V_CAPTURE]] : $*T
 // CHECK:  [[V_READ_ACCESS:%.*]] = begin_access [read] [unknown] [[V_ADDR]] : $*T
@@ -429,7 +429,7 @@ func calledAtMostOnce(_ fn: @callable(once) () -> Void) { fn() }
 // CHECK:  {{%.*}} = convert_escape_to_noescape [[PA]] : $@callable(once) @callee_owned () -> () to $@noescape @callable(once) @callee_owned () -> ()
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVFyyXEfU_ : $@convention(thin) (@guaranteed Resource) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures42testBorrowingParameterCaptureIsNotConsumedyyAA8ResourceVFyyXEfU_ : $@convention(thin) (@guaranteed Resource) -> () {
 // CHECK: bb0([[R_CAPTURE:%.*]] : @closureCapture @guaranteed $Resource):
 // CHECK:  [[R_COPY:%.*]] = copy_value [[R_CAPTURE]] : $Resource
 // CHECK:  [[R_MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_COPY]] : $Resource
@@ -457,7 +457,7 @@ func testBorrowingParameterCaptureIsNotConsumed(_ r: borrowing Resource) {
 // CHECK: {{%.*}} = convert_escape_to_noescape [[PA]] : $@callable(once) @callee_owned () -> () to $@noescape @callable(once) @callee_owned () -> ()
 // CHECK: } // end sil function '$s37callable_once_attr_consuming_captures32testLocalLetCaptureIsNotConsumedyyF'
 
-// CHECK-LABEL: sil private [ossa] @$s37callable_once_attr_consuming_captures32testLocalLetCaptureIsNotConsumedyyFyyXEfU_ : $@convention(thin) (@guaranteed Resource) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s37callable_once_attr_consuming_captures32testLocalLetCaptureIsNotConsumedyyFyyXEfU_ : $@convention(thin) (@guaranteed Resource) -> () {
 // CHECK: bb0([[R_CAPTURE:%.*]] : @closureCapture @guaranteed $Resource):
 // CHECK:  [[R_COPY:%.*]] = copy_value [[R_CAPTURE]] : $Resource
 // CHECK:  [[R_MARKED:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[R_COPY]] : $Resource

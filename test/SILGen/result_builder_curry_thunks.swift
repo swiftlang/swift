@@ -28,7 +28,7 @@ class Outer {
   }
 }
 
-// CHECK-LABEL: sil private [ossa] @$s27result_builder_curry_thunks5OuterC5InnerV5buildAA7HandlerVvgyycAEcfu_ : $@convention(thin) (Outer.Inner) -> @owned @callee_guaranteed () -> ()
-// CHECK-LABEL: sil private [ossa] @$s27result_builder_curry_thunks5OuterC5InnerV5buildAA7HandlerVvgyycAEcfu_yycfu0_ : $@convention(thin) (Outer.Inner) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s27result_builder_curry_thunks5OuterC5InnerV5buildAA7HandlerVvgyycAEcfu_ : $@convention(thin) (Outer.Inner) -> @owned @callee_guaranteed () -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s27result_builder_curry_thunks5OuterC5InnerV5buildAA7HandlerVvgyycAEcfu_yycfu0_ : $@convention(thin) (Outer.Inner) -> ()
 // CHECK-LABEL: sil private [ossa] @$s27result_builder_curry_thunks5OuterC5InnerV7handler33_{{.*}} : $@convention(method) (Outer.Inner) -> ()
-// CHECK-LABEL: sil private [ossa] @$s27result_builder_curry_thunks5OuterC5InnerV5buildAA7HandlerVvgyycAEcfu1_ : $@convention(thin) (Outer.Inner) -> @owned @callee_guaranteed () -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s27result_builder_curry_thunks5OuterC5InnerV5buildAA7HandlerVvgyycAEcfu1_ : $@convention(thin) (Outer.Inner) -> @owned @callee_guaranteed () -> ()

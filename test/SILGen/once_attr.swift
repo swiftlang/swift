@@ -39,7 +39,7 @@ func makeCaptureless() -> @once () -> Void {
 // CHECK:   return [[RESULT]] : $@once @callee_owned () -> ()
 // CHECK: } // end sil function '$s9once_attr13makeCapturingyyyXOyyXOnF'
 
-// CHECK-LABEL: sil private [ossa] @$s9once_attr13makeCapturingyyyXOyyXOnFyyXOfU_ : $@convention(thin) (@owned @once @callee_owned () -> ()) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s9once_attr13makeCapturingyyyXOyyXOnFyyXOfU_ : $@convention(thin) (@owned @once @callee_owned () -> ()) -> () {
 // CHECK: bb0({{%.*}} : @closureCapture @owned $@once @callee_owned () -> ()):
 // CHECK: } // end sil function '$s9once_attr13makeCapturingyyyXOyyXOnFyyXOfU_'
 func makeCapturing(_ f: @escaping @once () -> Void) -> @once () -> Void {

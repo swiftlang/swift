@@ -18,7 +18,7 @@ func callerTest() async {}
 struct Test {
   // CHECK-LABEL: // closure #1 in variable initialization expression of Test.x
   // CHECK: // Isolation: nonisolated(nonsending)
-  // CHECK: sil private [ossa] @$s14attr_execution4TestV1xyyYaYCcvpfiyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  // CHECK: sil private [closure] [ossa] @$s14attr_execution4TestV1xyyYaYCcvpfiyyYaYCcfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
   var x: () async -> Void = {}
 
   // CHECK-LABEL: // Test.test()
@@ -75,7 +75,7 @@ func takesClosure(fn: () async -> Void) {
 
 // CHECK-LABEL: // closure #1 in testClosure()
 // CHECK: // Isolation: nonisolated(nonsending)
-// CHECK: sil private [ossa] @$s14attr_execution11testClosureyyFyyYaYCXEfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// CHECK: sil private [closure] [ossa] @$s14attr_execution11testClosureyyFyyYaYCXEfU_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
 func testClosure() {
   takesClosure {
   }

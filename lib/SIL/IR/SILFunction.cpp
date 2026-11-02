@@ -309,6 +309,7 @@ void SILFunction::init(
   this->HasOwnership = true,
   this->WasDeserializedCanonical = false;
   this->IsWithoutActuallyEscapingThunk = false;
+  this->IsClosure = false;
   this->OptMode = unsigned(OptimizationMode::NotSet);
   this->perfConstraints = PerformanceConstraints::None;
   this->EffectsKindAttr = unsigned(E);
@@ -446,6 +447,7 @@ void SILFunction::createSnapshot(int id) {
   newSnapshot->CodeGenModel = CodeGenModel;
   newSnapshot->HasOwnership = HasOwnership;
   newSnapshot->IsWithoutActuallyEscapingThunk = IsWithoutActuallyEscapingThunk;
+  newSnapshot->IsClosure = IsClosure;
   newSnapshot->OptMode = OptMode;
   newSnapshot->copyEffects(this);
   newSnapshot->HasLoweredAddresses = HasLoweredAddresses;

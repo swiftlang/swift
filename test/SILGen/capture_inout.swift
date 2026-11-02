@@ -9,7 +9,7 @@ typealias Int = Builtin.Int64
 // CHECK:   [[FUNC:%.*]] = function_ref [[CLOSURE:@.*]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
 // CHECK:   apply [[FUNC]]([[X_INOUT]])
 // CHECK: }
-// CHECK: sil private [ossa] [[CLOSURE]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
+// CHECK: sil private [closure] [ossa] [[CLOSURE]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
 func localFoo(x: inout Int) {
   func bar() -> Int {
     return x
@@ -23,7 +23,7 @@ func localFoo(x: inout Int) {
 // CHECK:   [[FUNC:%.*]] = function_ref [[CLOSURE:@.*]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
 // CHECK:   apply [[FUNC]]([[X_INOUT]])
 // CHECK: }
-// CHECK: sil private [ossa] [[CLOSURE]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
+// CHECK: sil private [closure] [ossa] [[CLOSURE]] : $@convention(thin) (@inout_aliasable Builtin.Int64) -> Builtin.Int64
 func anonFoo(x: inout Int) {
   { return x }()
 }

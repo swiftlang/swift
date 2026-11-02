@@ -3871,6 +3871,8 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   case IsDistributedThunk: OS << "[distributed_thunk] "; break;
   case IsDistributedProxyAdapterThunk: OS << "[distributed_proxy_adapter_thunk] "; break;
   }
+  if (isClosure())
+    OS << "[closure] ";
   if (isDynamicallyReplaceable()) {
     OS << "[dynamically_replacable] ";
   }

@@ -21,7 +21,7 @@ func testModuleMethodWithSendable(any: Any) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s14preconcurrency30testInstanceMethodWithSendable1c3anyyAA1CC_yptF : $@convention(thin) (@guaranteed C, @in_guaranteed Any) -> () {
 func testInstanceMethodWithSendable(c: C, any: Any) {
-  // CHECK-LABEL: sil private [ossa] @$s14preconcurrency30testInstanceMethodWithSendable1c3anyyAA1CC_yptFyypcAFcfu_yypcfu0_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s14preconcurrency30testInstanceMethodWithSendable1c3anyyAA1CC_yptFyypcAFcfu_yypcfu0_
   // CHECK: class_method %1 : $C, #C.f : (C) -> (any Sendable) -> ()
   let _ = c.f
   let _ = C.f

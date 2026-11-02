@@ -460,10 +460,10 @@ func defer_test1() {
   // CHECK: [[C1:%.*]] = function_ref @$s10statements11defer_test1yyF6
   // CHECK: apply [[C1]]
 }
-// CHECK: sil private [ossa] @$s10statements11defer_test1yyF6
+// CHECK: sil private [closure] [ossa] @$s10statements11defer_test1yyF6
 // CHECK: function_ref @{{.*}}callee1yyF
 
-// CHECK: sil private [ossa] @$s10statements11defer_test1yyF6
+// CHECK: sil private [closure] [ossa] @$s10statements11defer_test1yyF6
 // CHECK: function_ref @{{.*}}callee2yyF
 
 // CHECK-LABEL: sil hidden [ossa] @$s10statements11defer_test2yySbF
@@ -517,9 +517,9 @@ func defer_in_generic<T>(_ x: T) {
 
 // CHECK-LABEL: sil hidden [ossa] @$s10statements017defer_in_closure_C8_genericyyxlF : $@convention(thin) <T> (@in_guaranteed T) -> ()
 func defer_in_closure_in_generic<T>(_ x: T) {
-  // CHECK-LABEL: sil private [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_ : $@convention(thin) <T> () -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_ : $@convention(thin) <T> () -> ()
   _ = {
-    // CHECK-LABEL: sil private [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
+    // CHECK-LABEL: sil private [closure] [ossa] @$s10statements017defer_in_closure_C8_genericyyxlFyycfU_6$deferL_yylF : $@convention(thin) <T> () -> ()
     defer { generic_callee_1(T.self) } // expected-warning {{'defer' statement at end of scope always executes immediately}}{{5-10=do}}
   }
 }

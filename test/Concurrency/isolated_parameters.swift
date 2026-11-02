@@ -370,12 +370,12 @@ func testLocalFunctionAndAutoclosure() {
 
     // CHECK: // implicit closure #1 in test #1 (isolation:) in testLocalFunctionAndAutoclosure()
     // CHECK: // Isolation: actor_instance. name: 'isolation'
-    // CHECK: sil private [transparent] @$s19isolated_parameters31testLocalFunctionAndAutoclosureyyF0C0L_9isolationyScA_pSgYi_tYaFyyXEfu_ : $@convention(thin) (Int, @sil_isolated @guaranteed Optional<any Actor>) -> ()
+    // CHECK: sil private [transparent] [closure] @$s19isolated_parameters31testLocalFunctionAndAutoclosureyyF0C0L_9isolationyScA_pSgYi_tYaFyyXEfu_ : $@convention(thin) (Int, @sil_isolated @guaranteed Optional<any Actor>) -> ()
     check(local()) // Ok
 
     // CHECK: // closure #1 in test #1 (isolation:) in testLocalFunctionAndAutoclosure()
     // CHECK: // Isolation: actor_instance. name: 'isolation'
-    // CHECK: sil private @$s19isolated_parameters31testLocalFunctionAndAutoclosureyyF0C0L_9isolationyScA_pSgYi_tYaFyyXEfU_ : $@convention(thin) (Int, @sil_isolated @guaranteed Optional<any Actor>) -> ()
+    // CHECK: sil private [closure] @$s19isolated_parameters31testLocalFunctionAndAutoclosureyyF0C0L_9isolationyScA_pSgYi_tYaFyyXEfU_ : $@convention(thin) (Int, @sil_isolated @guaranteed Optional<any Actor>) -> ()
     checkWithClosure { local() } // Ok
   }
 }

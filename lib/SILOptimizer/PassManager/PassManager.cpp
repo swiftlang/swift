@@ -1689,6 +1689,7 @@ createEmptyFunction(StringRef name,
       fromFn->getEffectsKind(), nullptr, fromFn->getDebugScope());
 
   newF->inheritDerivedFrom(fromFn);
+  newF->setIsClosure(fromFn->isClosure());
 
   return newF;
 }

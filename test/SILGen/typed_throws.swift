@@ -224,7 +224,7 @@ func forceTryErased() {
 func takesClosureThrowingConcrete(_ body: () throws(MyError) -> ()) throws(MyError) {
 }
 
-// CHECK-LABEL: sil private [ossa] @$s12typed_throws30passesClosureWithReabstraction5countySi_tFyyXEfU_ : $@convention(thin) () -> @error MyError
+// CHECK-LABEL: sil private [closure] [ossa] @$s12typed_throws30passesClosureWithReabstraction5countySi_tFyyXEfU_ : $@convention(thin) () -> @error MyError
 // CHECK: bb0:
 // CHECK-NEXT: debug_value undef : $MyError, var, name "$error", argno 1
 func passesClosureWithReabstraction(count: Int) {
@@ -234,7 +234,7 @@ func passesClosureWithReabstraction(count: Int) {
 func takesClosureThrowingConcreteAndRethrows(_ body: () throws(MyError) -> ()) rethrows {
 }
 
-// CHECK-LABEL: sil private [ossa] @$s12typed_throws42passesClosureWithReabstractionToRethrowing5countySi_tFyyXEfU_ : $@convention(thin) () -> @error MyError {
+// CHECK-LABEL: sil private [closure] [ossa] @$s12typed_throws42passesClosureWithReabstractionToRethrowing5countySi_tFyyXEfU_ : $@convention(thin) () -> @error MyError {
 // CHECK: bb0:
 // CHECK-NEXT:  debug_value undef : $MyError, var, name "$error", argno 1
 func passesClosureWithReabstractionToRethrowing(count: Int) {
@@ -292,7 +292,7 @@ enum MyResult<Success, Failure: Error> {
 }
 
 func formerReabstractionCrash() {
-  // CHECK-LABEL: sil private [ossa] @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGyXEfU_ : $@convention(thin) () -> @owned MyResult<String, any Error> {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGyXEfU_ : $@convention(thin) () -> @owned MyResult<String, any Error> {
   // CHECK: function_ref @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGyXEfU_SSyXEfU_ : $@convention(thin) () -> @owned String
   // CHECK-NEXT: thin_to_thick_function
   // CHECK-NEXT: // function_ref thunk
@@ -305,7 +305,7 @@ func formerReabstractionCrash() {
   // Note: the same code without the result type annotation produces a different
   // solution in the type checker now, where the closure returns an optional.
 
-  // CHECK-LABEL: sil private [ossa] @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGSgyXEfU0_ : $@convention(thin) () -> @owned Optional<MyResult<String, any Error>> {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s12typed_throws24formerReabstractionCrashyyFAA8MyResultOySSs5Error_pGSgyXEfU0_ : $@convention(thin) () -> @owned Optional<MyResult<String, any Error>> {
   let _: MyResult<String, Error>? = {
     return MyResult{"hello"}
   }()
@@ -392,7 +392,7 @@ func testErasureWithOverloading() {
   func simple(_: () throws -> Void) {}
   func simple<E>(_: () throws(E) -> Void) {}
 
-  // CHECK-LABEL: sil private [ossa] @$s12typed_throws26testErasureWithOverloadingyyF0C0L_2fnyyyxYKXE_ts5ErrorRzlF
+  // CHECK-LABEL: sil private [closure] [ossa] @$s12typed_throws26testErasureWithOverloadingyyF0C0L_2fnyyyxYKXE_ts5ErrorRzlF
   // CHECK: [[SIMPLE_WITH_TYPED_THROWS:%.*]] = function_ref @$s12typed_throws26testErasureWithOverloadingyyF6simpleL0_yyyyxYKXEs5ErrorRzlF
   // CHECK: apply [[SIMPLE_WITH_TYPED_THROWS]]<E>(%0)
   // CHECK: } // end sil function '$s12typed_throws26testErasureWithOverloadingyyF0C0L_2fnyyyxYKXE_ts5ErrorRzlF'
@@ -438,9 +438,9 @@ func testOverloadingWithConcreteErrorType() throws {
     init() throws {}
   }
 
-  // CHECK-LABEL: sil private [ossa] @$s12typed_throws36testOverloadingWithConcreteErrorTypeyyKFyyKXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <any Error>
+  // CHECK-LABEL: sil private [closure] [ossa] @$s12typed_throws36testOverloadingWithConcreteErrorTypeyyKFyyKXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <any Error>
   try test {
-    // CHECK-LABEL: sil private [ossa] @$s12typed_throws36testOverloadingWithConcreteErrorTypeyyKFyyKXEfU_AaByyKF1QL_VyKXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Q>
+    // CHECK-LABEL: sil private [closure] [ossa] @$s12typed_throws36testOverloadingWithConcreteErrorTypeyyKFyyKXEfU_AaByyKF1QL_VyKXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <Q>
     _ = try S {
       try Q() // Ok
     }

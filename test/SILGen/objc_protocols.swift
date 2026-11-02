@@ -56,25 +56,25 @@ func objc_generic_partial_apply<T : NSRuncing>(_ x: T) {
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlF'
 
 
-// CHECK: sil private [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned @callee_guaranteed () -> @owned NSObject {
+// CHECK: sil private [closure] [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned @callee_guaranteed () -> @owned NSObject {
 // CHECK: function_ref @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_AEycfu0_ : $@convention(thin) <τ_0_0 where τ_0_0 : NSRuncing> (@guaranteed τ_0_0) -> @owned NSObject
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_'
 
-// CHECK: sil private [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_AEycfu0_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned NSObject {
+// CHECK: sil private [closure] [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_AEycfu0_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned NSObject {
 // CHECK: objc_method %0 : $T, #NSRuncing.runce!foreign : <Self where Self : NSRuncing> (Self) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu_AEycfu0_'
 
 
-// CHECK: sil private [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned @callee_guaranteed () -> @owned NSObject
+// CHECK: sil private [closure] [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned @callee_guaranteed () -> @owned NSObject
 // CHECK: function_ref @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_AEycfu2_ : $@convention(thin) <τ_0_0 where τ_0_0 : NSRuncing> (@guaranteed τ_0_0) -> @owned NSObject
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_'
 
-// CHECK: sil private [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_AEycfu2_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned NSObject
+// CHECK: sil private [closure] [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_AEycfu2_ : $@convention(thin) <T where T : NSRuncing> (@guaranteed T) -> @owned NSObject
 // CHECK: objc_method %0 : $T, #NSRuncing.runce!foreign : <Self where Self : NSRuncing> (Self) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (τ_0_0) -> @autoreleased NSObject
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycxcfu1_AEycfu2_'
 
 
-// CHECK-LABEL: sil private [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycfu3_ : $@convention(thin) <T where T : NSRuncing> (@thick T.Type) -> @owned NSObject
+// CHECK-LABEL: sil private [closure] [ossa] @$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycfu3_ : $@convention(thin) <T where T : NSRuncing> (@thick T.Type) -> @owned NSObject
 // CHECK: objc_method %2 : $@objc_metatype T.Type, #NSRuncing.mince!foreign : <Self where Self : NSRuncing> (Self.Type) -> () -> NSObject, $@convention(objc_method) <τ_0_0 where τ_0_0 : NSRuncing> (@objc_metatype τ_0_0.Type) -> @autoreleased NSObject
 // CHECK: } // end sil function '$s14objc_protocols0A22_generic_partial_applyyyxAA9NSRuncingRzlFSo8NSObjectCycfu3_'
 

@@ -29,9 +29,9 @@ func extensionMethodCurrying(_ x: Foo) {
   _ = x.kay
 }
 
-// CHECK-LABEL: sil private [ossa] @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_ : $@convention(thin) (@guaranteed Foo) -> @owned @callee_guaranteed () -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_ : $@convention(thin) (@guaranteed Foo) -> @owned @callee_guaranteed () -> () {
 // CHECK: function_ref @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Foo) -> ()
 
-// CHECK-LABEL: sil private [ossa] @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Foo) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s15extensions_objc23extensionMethodCurryingyyAA3FooCFyycADcfu_yycfu0_ : $@convention(thin) (@guaranteed Foo) -> () {
 // CHECK: objc_method %0 : $Foo, #Foo.kay!foreign : (Foo) -> () -> (), $@convention(objc_method) (Foo) -> ()
 

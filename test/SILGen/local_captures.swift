@@ -7,16 +7,16 @@
 // CHECK-LABEL: sil hidden [ossa] @$s14local_captures10globalfuncyycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
 func globalfunc() -> () -> () {
 
-	// CHECK-LABEL: sil private [ossa] @$s14local_captures10globalfuncyycyF0A4FuncL_yyF : $@convention(thin) () -> ()
+	// CHECK-LABEL: sil private [closure] [ossa] @$s14local_captures10globalfuncyycyF0A4FuncL_yyF : $@convention(thin) () -> ()
 	func localFunc() {
 	}
 
-	// CHECK-LABEL: sil private [ossa] @$s14local_captures10globalfuncyycyF6callitL_yyF : $@convention(thin) () -> ()
+	// CHECK-LABEL: sil private [closure] [ossa] @$s14local_captures10globalfuncyycyF6callitL_yyF : $@convention(thin) () -> ()
 	func callit() {
 		localFunc()
 	}
 
-	// CHECK-LABEL: sil private [ossa] @$s14local_captures10globalfuncyycyF5getitL_yycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+	// CHECK-LABEL: sil private [closure] [ossa] @$s14local_captures10globalfuncyycyF5getitL_yycyF : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
 	func getit() -> () -> () {
 		return localFunc
 	}

@@ -500,7 +500,7 @@ func testAutoclosureInStaticMethod() {
 
     // This is the first implicit closure. We close over self here.
     //
-    // CHECK-C-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_S2SYaKYCcSo10SlowServerCcfu_ : $@convention(thin) (@guaranteed SlowServer) -> @owned @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String) -> (@owned String, @error any Error) {
+    // CHECK-C-LABEL: sil private [closure] [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_S2SYaKYCcSo10SlowServerCcfu_ : $@convention(thin) (@guaranteed SlowServer) -> @owned @caller_isolated @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String) -> (@owned String, @error any Error) {
     // CHECK: bb0([[SELF:%.*]] :
     //
     // Close over self and return it.
@@ -513,8 +513,8 @@ func testAutoclosureInStaticMethod() {
     // CHECK-NN: } // end sil function '$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKYCXEtYaFZfA0_S2SYaKYCcSo10SlowServerCcfu_' 
 
     // The second closure. In this function we actually perform the objective-c call.
-    // CHECK-C-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_S2SYaKYCcSo10SlowServerCcfu_S2SYaKYCcfu0_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String, @guaranteed SlowServer) -> (@owned String, @error any Error) {
-    // CHECK-NN-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKYCXEtYaFZfA0_S2SYaKYCcSo10SlowServerCcfu_S2SYaKYCcfu0_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String, @guaranteed SlowServer) -> (@owned String, @error any Error) {
+    // CHECK-C-LABEL: sil private [closure] [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_S2SYaKYCcSo10SlowServerCcfu_S2SYaKYCcfu0_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String, @guaranteed SlowServer) -> (@owned String, @error any Error) {
+    // CHECK-NN-LABEL: sil private [closure] [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C8getValue2id11valueForKeySSSgSS_S2SYaKYCXEtYaFZfA0_S2SYaKYCcSo10SlowServerCcfu_S2SYaKYCcfu0_ : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed String, @guaranteed SlowServer) -> (@owned String, @error any Error) {
     // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor, [[ARG:%.*]] : @guaranteed $String, [[CAPTURE:%.*]] : @closureCapture @guaranteed $SlowServer):
     //
     // Hop to the actor
@@ -624,8 +624,8 @@ func testAutoclosureInStaticMethod() {
 
     // This is the first implicit closure. We close over self here.
     //
-    // CHECK-C-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_S2SYaKScMYccSo10SlowServerCcfu_ : $@convention(thin) (@guaranteed SlowServer) -> @owned @async @callee_guaranteed (@guaranteed String) -> (@owned String, @error any Error) {
-    // CHECK-NN-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKYCXEtYaFZfA0_S2SYaKScMYccSo10SlowServerCcfu_ : $@convention(thin) (@guaranteed SlowServer) -> @owned @async @callee_guaranteed (@guaranteed String) -> (@owned String, @error any Error) {
+    // CHECK-C-LABEL: sil private [closure] [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_S2SYaKScMYccSo10SlowServerCcfu_ : $@convention(thin) (@guaranteed SlowServer) -> @owned @async @callee_guaranteed (@guaranteed String) -> (@owned String, @error any Error) {
+    // CHECK-NN-LABEL: sil private [closure] [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKYCXEtYaFZfA0_S2SYaKScMYccSo10SlowServerCcfu_ : $@convention(thin) (@guaranteed SlowServer) -> @owned @async @callee_guaranteed (@guaranteed String) -> (@owned String, @error any Error) {
     // CHECK: bb0([[SELF:%.*]] :
     //
     // Close over self and return it.
@@ -641,8 +641,8 @@ func testAutoclosureInStaticMethod() {
     //
     // It is main actor isolated.
     //
-    // CHECK-C-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_S2SYaKScMYccSo10SlowServerCcfu_S2SYaKScMYccfu0_ : $@convention(thin) @async (@guaranteed String, @guaranteed SlowServer) -> (@owned String, @error any Error) {
-    // CHECK-NN-LABEL: sil private [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKYCXEtYaFZfA0_S2SYaKScMYccSo10SlowServerCcfu_S2SYaKScMYccfu0_ : $@convention(thin) @async (@guaranteed String, @guaranteed SlowServer) -> (@owned String, @error any Error) {
+    // CHECK-C-LABEL: sil private [closure] [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKXEtYaFZfA0_S2SYaKScMYccSo10SlowServerCcfu_S2SYaKScMYccfu0_ : $@convention(thin) @async (@guaranteed String, @guaranteed SlowServer) -> (@owned String, @error any Error) {
+    // CHECK-NN-LABEL: sil private [closure] [ossa] @$s21objc_async_from_swift29testAutoclosureInStaticMethodyyF9TestKlassL_C17getMainActorValue2id11valueForKeySSSgSS_S2SYaKYCXEtYaFZfA0_S2SYaKScMYccSo10SlowServerCcfu_S2SYaKScMYccfu0_ : $@convention(thin) @async (@guaranteed String, @guaranteed SlowServer) -> (@owned String, @error any Error) {
     // CHECK: bb0([[ARG:%.*]] : @guaranteed $String, [[CAPTURE:%.*]] : @closureCapture @guaranteed $SlowServer):
     //
     // CHECK:   [[ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor

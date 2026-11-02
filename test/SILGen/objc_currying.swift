@@ -20,7 +20,7 @@ func curry_pod(_ x: CurryTest) -> (Int) -> Int {
 // CHECK:         return [[FN]]
 // CHECK: } // end sil function '$s13objc_currying9curry_podyS2icSo9CurryTestCF'
 
-// CHECK: sil private [ossa] @$s13objc_currying9curry_podyS2icSo9CurryTestCFS2icADcfu_S2icfu0_ : $@convention(thin) (Int, @guaranteed CurryTest) -> Int
+// CHECK: sil private [closure] [ossa] @$s13objc_currying9curry_podyS2icSo9CurryTestCFS2icADcfu_S2icfu0_ : $@convention(thin) (Int, @guaranteed CurryTest) -> Int
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @closureCapture @guaranteed $CurryTest):
 // CHECK:   [[METHOD:%.*]] = objc_method [[ARG2]] : $CurryTest, #CurryTest.pod!foreign
 // CHECK:   [[RESULT:%.*]] = apply [[METHOD]]([[ARG1]], [[ARG2]])
@@ -38,7 +38,7 @@ func curry_bridged(_ x: CurryTest) -> (String?) -> String? {
 // CHECK:   return [[FN]]
 // CHECK: } // end sil function '$s13objc_currying13curry_bridgedySSSgACcSo9CurryTestCF'
 
-// CHECK: sil private [ossa] @$s13objc_currying13curry_bridgedySSSgACcSo9CurryTestCFA2CcAEcfu_A2Ccfu0_ : $@convention(thin) (@guaranteed Optional<String>, @guaranteed CurryTest) -> @owned Optional<String>
+// CHECK: sil private [closure] [ossa] @$s13objc_currying13curry_bridgedySSSgACcSo9CurryTestCFA2CcAEcfu_A2Ccfu0_ : $@convention(thin) (@guaranteed Optional<String>, @guaranteed CurryTest) -> @owned Optional<String>
 // CHECK: bb0([[OPT_STRING:%.*]] : @guaranteed $Optional<String>, [[SELF:%.*]] : @closureCapture @guaranteed $CurryTest):
 // CHECK:   [[COPY_OPT_STRING:%.*]] = copy_value [[OPT_STRING]]
 // CHECK:   switch_enum [[COPY_OPT_STRING]] : $Optional<String>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]],
@@ -89,7 +89,7 @@ func curry_returnsInnerPointer(_ x: CurryTest) -> () -> UnsafeMutableRawPointer?
 // CHECK:   return [[FN]]
 // CHECK: } // end sil function '$s13objc_currying25curry_returnsInnerPointerySvSgycSo9CurryTestCF'
 
-// CHECK: sil private [ossa] @$s13objc_currying25curry_returnsInnerPointerySvSgycSo9CurryTestCFACycAEcfu_ACycfu0_ : $@convention(thin) (@guaranteed CurryTest) -> Optional<UnsafeMutableRawPointer>
+// CHECK: sil private [closure] [ossa] @$s13objc_currying25curry_returnsInnerPointerySvSgycSo9CurryTestCFACycAEcfu_ACycfu0_ : $@convention(thin) (@guaranteed CurryTest) -> Optional<UnsafeMutableRawPointer>
 // CHECK:  bb0([[ARG1:%.*]] : @closureCapture @guaranteed $CurryTest):
 // CHECK:   [[METHOD:%.*]] = objc_method [[ARG1]] : $CurryTest, #CurryTest.returnsInnerPointer!foreign
 // CHECK:   [[ARG1_COPY:%.*]] = copy_value [[ARG1]]
@@ -194,6 +194,6 @@ func curry_initializer() -> (Int) -> Gizmo? {
 
 // CHECK-LABEL: sil shared [serialized] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfC : $@convention(method) (Int, @thick Gizmo.Type) -> @owned Optional<Gizmo> {
 
-// CHECK-LABEL: sil private [ossa] @$s13objc_currying17curry_initializerSo5GizmoCSgSicyFAESicfu_ : $@convention(thin) (Int) -> @owned Optional<Gizmo> {
+// CHECK-LABEL: sil private [closure] [ossa] @$s13objc_currying17curry_initializerSo5GizmoCSgSicyFAESicfu_ : $@convention(thin) (Int) -> @owned Optional<Gizmo> {
 
 // CHECK-LABEL: sil shared [serialized] [thunk] [ossa] @$sSo5GizmoC7bellsOnABSgSi_tcfcTO : $@convention(method) (Int, @owned Gizmo) -> @owned Optional<Gizmo> {

@@ -46,6 +46,20 @@ sil-function-attribute ::= '[without_actually_escaping]'
 
 The function is a thunk for closures which are not actually escaping.
 
+### Closures
+
+```
+sil-function-attribute ::= '[closure]'
+```
+
+The function is a closure: SILGen created it for a closure expression or an
+autoclosure, or for a declaration in a local context, such as a local function,
+a local accessor, a `defer` body, or a local wrapped variable's initializers. A
+script's top-level function that captures a local of the top-level code is a
+closure too. The functions that reference a closure are its scopes, and a
+closure group keeps a closure with its scopes. A pass that clones a function to
+replace it, such as a specialization, keeps the attribute.
+
 ### Dynamically replaceable functions
 
 ```

@@ -10,7 +10,7 @@ func callee(_ ns: NotSendable) {}
 
 actor MyActor {
   func isolatedToSelf(ns: NotSendable) {
-    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation7MyActorC14isolatedToSelf2nsyAA11NotSendableC_tF08implicitH7CaptureL_yyYaF : $@convention(thin) @async (@guaranteed NotSendable, @sil_isolated @guaranteed MyActor) -> () {
+    // CHECK-LABEL: sil private [closure] [ossa] @$s24local_function_isolation7MyActorC14isolatedToSelf2nsyAA11NotSendableC_tF08implicitH7CaptureL_yyYaF : $@convention(thin) @async (@guaranteed NotSendable, @sil_isolated @guaranteed MyActor) -> () {
     func implicitSelfCapture() async {
 
       // CHECK: [[COPY:%.*]] = copy_value %1 : $MyActor
@@ -35,7 +35,7 @@ actor MyActor {
 }
 
 func f(isolation: isolated MyActor, ns: NotSendable) {
-  // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation1f0C02nsyAA7MyActorCYi_AA11NotSendableCtF23implicitIsolatedCaptureL_yyYaF : $@convention(thin) @async (@guaranteed NotSendable, @sil_isolated @guaranteed MyActor) -> () {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s24local_function_isolation1f0C02nsyAA7MyActorCYi_AA11NotSendableCtF23implicitIsolatedCaptureL_yyYaF : $@convention(thin) @async (@guaranteed NotSendable, @sil_isolated @guaranteed MyActor) -> () {
   func implicitIsolatedCapture() async {
 
     // CHECK: [[COPY:%.*]] = copy_value %1 : $MyActor
@@ -63,7 +63,7 @@ actor GenericActor<K> {
   var i: Int = 0
   func outerFunc() async {
     func accessSelf() async -> Int {
-      // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation12GenericActorC9outerFuncyyYaF10accessSelfL_SiyYalF : $@convention(thin) @async <K> (@sil_isolated @guaranteed GenericActor<K>) -> Int {
+      // CHECK-LABEL: sil private [closure] [ossa] @$s24local_function_isolation12GenericActorC9outerFuncyyYaF10accessSelfL_SiyYalF : $@convention(thin) @async <K> (@sil_isolated @guaranteed GenericActor<K>) -> Int {
       return 0
     }
     await print(accessSelf())
@@ -73,7 +73,7 @@ actor GenericActor<K> {
 // Make sure defer doesn't capture anything.
 actor DeferInsideInitActor {
   init(foo: ()) async throws {
-    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation20DeferInsideInitActorC3fooACyt_tYaKcfc6$deferL_yyF : $@convention(thin) () -> () {
+    // CHECK-LABEL: sil private [closure] [ossa] @$s24local_function_isolation20DeferInsideInitActorC3fooACyt_tYaKcfc6$deferL_yyF : $@convention(thin) () -> () {
     defer {}
     self.init()
   }
@@ -89,7 +89,7 @@ final class AsyncDeferInGlobalActorClosure {
       MainActor.assertIsolated("Inside task")
       // CHECK-LABEL: // $defer #1 () in closure #1 in AsyncDeferInGlobalActorClosure.run()
       // CHECK-NEXT: // Isolation: global_actor. type: MainActor
-      // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation30AsyncDeferInGlobalActorClosureC3runyyFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async () -> () {
+      // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation30AsyncDeferInGlobalActorClosureC3runyyFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async () -> () {
       // CHECK-NEXT: bb0:
 
       // We must not randomly hop off:
@@ -115,9 +115,9 @@ final class AsyncDeferInGlobalActorClosure {
 
 actor NestedAsyncInSyncActor {
   public func outer() async {
-    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation22NestedAsyncInSyncActorC5outeryyYaF6middleL_yyF : $@convention(thin) (@sil_isolated @guaranteed NestedAsyncInSyncActor) -> () {
+    // CHECK-LABEL: sil private [closure] [ossa] @$s24local_function_isolation22NestedAsyncInSyncActorC5outeryyYaF6middleL_yyF : $@convention(thin) (@sil_isolated @guaranteed NestedAsyncInSyncActor) -> () {
     func middle() {
-      // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation22NestedAsyncInSyncActorC5outeryyYaF6middleL_yyF5innerL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed NestedAsyncInSyncActor) -> () {
+      // CHECK-LABEL: sil private [closure] [ossa] @$s24local_function_isolation22NestedAsyncInSyncActorC5outeryyYaF6middleL_yyF5innerL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed NestedAsyncInSyncActor) -> () {
       func inner() async {}
       _ = inner
     }
@@ -127,9 +127,9 @@ actor NestedAsyncInSyncActor {
 
 // CHECK-LABEL: sil hidden [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
 func outerFunction(_ a: any Actor) async {
-  // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF : $@convention(thin) @async (@guaranteed any Actor) -> () {
   func middleFunction(_ isolated: any Actor) async {
-    // CHECK-LABEL: sil private [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF05innerE0L_yyYaF : $@convention(thin) @async () -> () {
+    // CHECK-LABEL: sil private [closure] [ossa] @$s24local_function_isolation13outerFunctionyyScA_pYaF06middleE0L_yyScA_pYaF05innerE0L_yyYaF : $@convention(thin) @async () -> () {
     func innerFunction() async {}
   }
 
@@ -141,7 +141,7 @@ actor AsyncDeferActor {
   func foo() async {
     // CHECK-LABEL: // $defer #1 () in AsyncDeferActor.foo()
     // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation15AsyncDeferActorC3fooyyYaF6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed AsyncDeferActor) -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation15AsyncDeferActorC3fooyyYaF6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed AsyncDeferActor) -> () {
     // CHECK-NEXT: // %0 "self"
     // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $AsyncDeferActor):
     defer {
@@ -161,7 +161,7 @@ actor AsyncDeferInActorInstanceClosure {
       self.assertIsolated("Inside task")
       // CHECK-LABEL: // $defer #1 () in closure #1 in AsyncDeferInActorInstanceClosure.run()
       // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
-      // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation32AsyncDeferInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed AsyncDeferInActorInstanceClosure) -> () {
+      // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation32AsyncDeferInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed AsyncDeferInActorInstanceClosure) -> () {
       // CHECK-NEXT: // %0 "self"
       // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $AsyncDeferInActorInstanceClosure):
       // CHECK-NEXT: debug_value %0 : $AsyncDeferInActorInstanceClosure, let, name "self", argno 1
@@ -192,7 +192,7 @@ func asyncDeferInCapturedIsolatedParamClosure(isolated: isolated any Actor) asyn
     isolated.assertIsolated("Inside closure")
     // CHECK-LABEL: // $defer #1 () in closure #1 in asyncDeferInCapturedIsolatedParamClosure(isolated:)
     // CHECK-NEXT: // Isolation: actor_instance. name: 'isolated'
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation40asyncDeferInCapturedIsolatedParamClosure8isolatedyScA_pYi_tYaFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed any Actor) -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation40asyncDeferInCapturedIsolatedParamClosure8isolatedyScA_pYi_tYaFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed any Actor) -> () {
     // CHECK-NEXT: // %0 "isolated"
     // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $any Actor):
     // CHECK-NEXT: debug_value %0 : $any Actor, let, name "isolated", argno 1
@@ -222,10 +222,10 @@ final class NestedAsyncDeferInGlobalActorClosure {
   func run() {
     // CHECK-LABEL: // $defer #1 () in closure #1 in NestedAsyncDeferInGlobalActorClosure.run()
     // CHECK-NEXT: // Isolation: global_actor. type: MainActor
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation36NestedAsyncDeferInGlobalActorClosureC3runyyFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async () -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation36NestedAsyncDeferInGlobalActorClosureC3runyyFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async () -> () {
     // CHECK-NESTED-LABEL: // $defer #1 () in $defer #1 () in closure #1 in NestedAsyncDeferInGlobalActorClosure.run()
     // CHECK-NESTED-NEXT: // Isolation: global_actor. type: MainActor
-    // CHECK-NESTED-NEXT: sil private [ossa] @$s24local_function_isolation36NestedAsyncDeferInGlobalActorClosureC3runyyFyyYacfU_6$deferL_yyYaFAEL_yyYaF : $@convention(thin) @async () -> () {
+    // CHECK-NESTED-NEXT: sil private [closure] [ossa] @$s24local_function_isolation36NestedAsyncDeferInGlobalActorClosureC3runyyFyyYacfU_6$deferL_yyYaFAEL_yyYaF : $@convention(thin) @async () -> () {
     Task {
       defer {
         defer {
@@ -243,7 +243,7 @@ actor NestedAsyncDeferInActorInstanceClosure {
   func run() {
     // CHECK-LABEL: // $defer #1 () in closure #1 in NestedAsyncDeferInActorInstanceClosure.run()
     // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation38NestedAsyncDeferInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed NestedAsyncDeferInActorInstanceClosure) -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation38NestedAsyncDeferInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed NestedAsyncDeferInActorInstanceClosure) -> () {
     // CHECK-NEXT: // %0 "self"
     // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $NestedAsyncDeferInActorInstanceClosure):
     // CHECK-NEXT: debug_value %0 : $NestedAsyncDeferInActorInstanceClosure, let, name "self", argno 1
@@ -252,7 +252,7 @@ actor NestedAsyncDeferInActorInstanceClosure {
     // CHECK-NEXT: hop_to_executor %3 : $NestedAsyncDeferInActorInstanceClosure
     // CHECK-NESTED-LABEL: // $defer #1 () in $defer #1 () in closure #1 in NestedAsyncDeferInActorInstanceClosure.run()
     // CHECK-NESTED-NEXT: // Isolation: actor_instance. name: 'self'
-    // CHECK-NESTED-NEXT: sil private [ossa] @$s24local_function_isolation38NestedAsyncDeferInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyYaFAEL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed NestedAsyncDeferInActorInstanceClosure) -> () {
+    // CHECK-NESTED-NEXT: sil private [closure] [ossa] @$s24local_function_isolation38NestedAsyncDeferInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyYaFAEL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed NestedAsyncDeferInActorInstanceClosure) -> () {
     // CHECK-NESTED-NEXT: // %0 "self"
     // CHECK-NESTED-NEXT: bb0(%0 : @closureCapture @guaranteed $NestedAsyncDeferInActorInstanceClosure):
     // CHECK-NESTED-NEXT: debug_value %0 : $NestedAsyncDeferInActorInstanceClosure, let, name "self", argno 1
@@ -278,7 +278,7 @@ actor SyncDeferIsolationInActorInstanceClosure {
   func run() {
     // CHECK-LABEL: // $defer #1 () in closure #1 in SyncDeferIsolationInActorInstanceClosure.run()
     // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation40SyncDeferIsolationInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyF : $@convention(thin) (@sil_isolated @guaranteed SyncDeferIsolationInActorInstanceClosure) -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation40SyncDeferIsolationInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyF : $@convention(thin) (@sil_isolated @guaranteed SyncDeferIsolationInActorInstanceClosure) -> () {
     // CHECK-NEXT: // %0 "self"
     // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $SyncDeferIsolationInActorInstanceClosure):
     Task {
@@ -297,12 +297,12 @@ actor NestedSyncDeferIsolationInActorInstanceClosure {
   func run() {
     // CHECK-LABEL: // $defer #1 () in closure #1 in NestedSyncDeferIsolationInActorInstanceClosure.run()
     // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation46NestedSyncDeferIsolationInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyF : $@convention(thin) (@sil_isolated @guaranteed NestedSyncDeferIsolationInActorInstanceClosure) -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation46NestedSyncDeferIsolationInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyF : $@convention(thin) (@sil_isolated @guaranteed NestedSyncDeferIsolationInActorInstanceClosure) -> () {
     // CHECK-NEXT: // %0 "self"
     // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $NestedSyncDeferIsolationInActorInstanceClosure):
     // CHECK-NESTED-LABEL: // $defer #1 () in $defer #1 () in closure #1 in NestedSyncDeferIsolationInActorInstanceClosure.run()
     // CHECK-NESTED-NEXT: // Isolation: actor_instance. name: 'self'
-    // CHECK-NESTED-NEXT: sil private [ossa] @$s24local_function_isolation46NestedSyncDeferIsolationInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyFAEL_yyF : $@convention(thin) (@sil_isolated @guaranteed NestedSyncDeferIsolationInActorInstanceClosure) -> () {
+    // CHECK-NESTED-NEXT: sil private [closure] [ossa] @$s24local_function_isolation46NestedSyncDeferIsolationInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyFAEL_yyF : $@convention(thin) (@sil_isolated @guaranteed NestedSyncDeferIsolationInActorInstanceClosure) -> () {
     // CHECK-NESTED-NEXT: // %0 "self"
     // CHECK-NESTED-NEXT: bb0(%0 : @closureCapture @guaranteed $NestedSyncDeferIsolationInActorInstanceClosure):
     Task {
@@ -324,7 +324,7 @@ actor PlainSyncDeferInActorInstanceClosure {
   func run() {
     // CHECK-LABEL: // $defer #1 () in closure #1 in PlainSyncDeferInActorInstanceClosure.run()
     // CHECK-NEXT: // Isolation: actor_instance. name: 'self'
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation36PlainSyncDeferInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyF : $@convention(thin) () -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation36PlainSyncDeferInActorInstanceClosureC3runyyFyyYacfU_6$deferL_yyF : $@convention(thin) () -> () {
     // CHECK-NEXT: bb0:
     Task {
       self.assertIsolated("Inside task")
@@ -340,7 +340,7 @@ nonisolated(nonsending) func asyncDeferInNonsendingClosure() async {
   let closure: nonisolated(nonsending) () async -> Void = {
     // CHECK-LABEL: // $defer #1 () in closure #1 in asyncDeferInNonsendingClosure()
     // CHECK-NEXT: // Isolation: nonisolated(nonsending)
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation29asyncDeferInNonsendingClosureyyYaFyyYaYCcfU_6$deferL_yyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation29asyncDeferInNonsendingClosureyyYaFyyYaYCcfU_6$deferL_yyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
     // CHECK: bb0(%0 : @guaranteed $Builtin.ImplicitActor):
     // CHECK-NEXT: hop_to_executor %0 : $Builtin.ImplicitActor
     // CHECK: } // end sil function '$s24local_function_isolation29asyncDeferInNonsendingClosureyyYaFyyYaYCcfU_6$deferL_yyYaF'
@@ -355,7 +355,7 @@ func asyncDeferInIsolatedAnyClosure() async {
     // The closure captures no isolation, so it and its defer are @concurrent
     // CHECK-LABEL: // $defer #1 () in closure #1 in asyncDeferInIsolatedAnyClosure()
     // CHECK-NEXT: // Isolation: @concurrent
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation30asyncDeferInIsolatedAnyClosureyyYaFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async () -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation30asyncDeferInIsolatedAnyClosureyyYaFyyYacfU_6$deferL_yyYaF : $@convention(thin) @async () -> () {
     // CHECK-NEXT: bb0:
     // CHECK-NEXT: %0 = enum $Optional<any Actor>, #Optional.none!enumelt
     // CHECK-NEXT: hop_to_executor %0 : $Optional<any Actor>
@@ -371,7 +371,7 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
 
   // CHECK-LABEL: // $defer #1 () in testAsyncDeferIsolatedParam(isolated:)
   // CHECK-NEXT: // Isolation: actor_instance. name: 'isolated'
-  // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaF6$deferL_yyYaF : $@convention(thin) @async (Int, @sil_isolated @guaranteed Optional<any Actor>) -> () {
+  // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaF6$deferL_yyYaF : $@convention(thin) @async (Int, @sil_isolated @guaranteed Optional<any Actor>) -> () {
   // CHECK-NEXT: // %0 "x"
   // CHECK-NEXT: // %1 "isolated"
   // CHECK-NEXT: bb0(%0 : @closureCapture $Int, %1 : @closureCapture @guaranteed $Optional<any Actor>):
@@ -397,7 +397,7 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
 
     // CHECK-LABEL: // $defer #1 () in closure #1 in testAsyncDeferIsolatedParam(isolated:)
     // CHECK-NEXT: // Isolation: global_actor. type: MainActor
-    // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_6$deferL_yyYaF : $@convention(thin) @async (Int) -> () {
+    // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_6$deferL_yyYaF : $@convention(thin) @async (Int) -> () {
     // CHECK-NEXT: // %0 "z"
     // CHECK-NEXT: bb0(%0 : @closureCapture $Int):
     // CHECK-NEXT: debug_value %0 : $Int, let, name "z", argno 1
@@ -422,7 +422,7 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
       let y: Int = 0
       // CHECK-LABEL: // $defer #1 () in inner #1 (isolated:) in closure #1 in testAsyncDeferIsolatedParam(isolated:)
       // CHECK-NEXT: // Isolation: actor_instance. name: 'isolated'
-      // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_5innerL_ACyADYi_tYaF6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed Optional<any Actor>, Int) -> () {
+      // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_5innerL_ACyADYi_tYaF6$deferL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed Optional<any Actor>, Int) -> () {
       // CHECK-NEXT: // %0 "isolated"
       // CHECK-NEXT: // %1 "y"
       // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $Optional<any Actor>, %1 : @closureCapture $Int):
@@ -440,7 +440,7 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
 
         // CHECK-LABEL: // $defer #1 () in $defer #1 () in inner #1 (isolated:) in closure #1 in testAsyncDeferIsolatedParam(isolated:)
         // CHECK-NEXT: // Isolation: actor_instance. name: 'isolated'
-        // CHECK-NEXT: sil private [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_5innerL_ACyADYi_tYaF6$deferL_yyYaFAFL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed Optional<any Actor>) -> () {
+        // CHECK-NEXT: sil private [closure] [ossa] @$s24local_function_isolation27testAsyncDeferIsolatedParam8isolatedyScA_pSgYi_tYaFyyYaScMYccfU_5innerL_ACyADYi_tYaF6$deferL_yyYaFAFL_yyYaF : $@convention(thin) @async (@sil_isolated @guaranteed Optional<any Actor>) -> () {
         // CHECK-NEXT: // %0 "isolated"
         // CHECK-NEXT: bb0(%0 : @closureCapture @guaranteed $Optional<any Actor>):
         // CHECK-NEXT: debug_value %0 : $Optional<any Actor>, let, name "isolated", argno 1

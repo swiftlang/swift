@@ -48,7 +48,7 @@ func dynamicIsolation(isolation: isolated (any Actor)? = nil, _ body: () async t
 func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
   // CHECK: // closure #1 in testConcurrentIsolation<A>(_:body:)
   // CHECK: // Isolation: @concurrent
-  // CHECK-LABEL: sil private @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
+  // CHECK-LABEL: sil private [closure] @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK:   [[ASYNC_TEST:%.*]] = function_ref @$s37nonisolated_nonsending_specialization9asyncTestyyyyYaXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
   // CHECK:   apply [[ASYNC_TEST]]([[BODY]]) : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
@@ -59,7 +59,7 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
 
   // CHECK: // closure #2 in testConcurrentIsolation<A>(_:body:)
   // CHECK: // Isolation: @concurrent
-  // CHECK-LABEL: sil private @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU0_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
+  // CHECK-LABEL: sil private [closure] @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU0_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK-NOT: hop_to_executor {{.*}}
   // CHECK:   [[SYNC_TEST:%.*]] = function_ref @$s37nonisolated_nonsending_specialization8syncTestyyyyYaXEF : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
@@ -71,7 +71,7 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
 
   // CHECK: // closure #3 in testConcurrentIsolation<A>(_:body:)
   // CHECK: // Isolation: @concurrent
-  // CHECK-LABEL: sil private @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFySiYaXEfU1_ : $@convention(thin) @async @substituted <τ_0_0> (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error for <Int> {
+  // CHECK-LABEL: sil private [closure] @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFySiYaXEfU1_ : $@convention(thin) @async @substituted <τ_0_0> (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error for <Int> {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[V:%.*]] : $*Int, [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK-NOT: hop_to_executor {{.*}}
   // CHECK:   [[ASYNC_TEST:%.*]] = function_ref @$s37nonisolated_nonsending_specialization9asyncTestyyyyYaXEYaF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
@@ -83,7 +83,7 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
 
   // CHECK: // closure #4 in testConcurrentIsolation<A>(_:body:)
   // CHECK: // Isolation: @concurrent
-  // CHECK-LABEL: sil private @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyt_tYaKXEfU2_ : $@convention(thin) @async @substituted <τ_0_0> (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error for <()> {
+  // CHECK-LABEL: sil private [closure] @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyt_tYaKXEfU2_ : $@convention(thin) @async @substituted <τ_0_0> (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error for <()> {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[V:%.*]] : $*(), [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK-NOT: hop_to_executor {{.*}}
   // CHECK:   [[THROWING_TEST:%.*]] = function_ref @$s37nonisolated_nonsending_specialization12throwingTestyyyyYaXEYaKF : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error
@@ -95,7 +95,7 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
 
   // CHECK: // closure #5 in testConcurrentIsolation<A>(_:body:)
   // CHECK: // Isolation: @concurrent
-  // CHECK-LABEL: sil private @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFySi_SSxt_tYaXEfU3_ : $@convention(thin) @async <U> (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed (Int, String, U), @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
+  // CHECK-LABEL: sil private [closure] @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFySi_SSxt_tYaXEfU3_ : $@convention(thin) @async <U> (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed (Int, String, U), @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[V:%.*]] : $*(Int, String, U), [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK-NOT: hop_to_executor {{.*}}
   // CHECK:   [[SYNC_TEST:%.*]] = function_ref @$s37nonisolated_nonsending_specialization8syncTestyyyyYaXEF : $@convention(thin) (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> ()
@@ -107,7 +107,7 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
 
   // CHECK: // closure #6 in testConcurrentIsolation<A>(_:body:)
   // CHECK: // Isolation: @concurrent
-  // CHECK-LABEL: sil private @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU4_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
+  // CHECK-LABEL: sil private [closure] @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU4_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK:   [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
   // CHECK-NOT: hop_to_executor {{.*}}
@@ -128,7 +128,7 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
 
   // CHECK: // closure #7 in testConcurrentIsolation<A>(_:body:)
   // CHECK: // Isolation: @concurrent
-  // CHECK: sil private @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU5_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
+  // CHECK: sil private [closure] @$s37nonisolated_nonsending_specialization23testConcurrentIsolation_4bodyyx_yyYaXEtYalFyyYaXEfU5_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK:   [[ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
   // CHECK-NOT: hop_to_executor {{.*}}
@@ -155,7 +155,7 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
 @MainActor func testMainActorIsolation(body: () async -> Void) async {
   // CHECK: // closure #1 in testMainActorIsolation(body:)
   // CHECK: // Isolation: global_actor. type: MainActor
-  // CHECK: sil private @$s37nonisolated_nonsending_specialization22testMainActorIsolation4bodyyyyYaXE_tYaFyyYaXEfU_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
+  // CHECK: sil private [closure] @$s37nonisolated_nonsending_specialization22testMainActorIsolation4bodyyyyYaXE_tYaFyyYaXEfU_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> () {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK-NOT: hop_to_executor {{.*}}
   // CHECK:   [[MAIN_ACTOR:%.*]] = apply [[MAIN_ACTOR_REF:%.*]]({{.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
@@ -185,7 +185,7 @@ func testConcurrentIsolation<U>(_: U, body: () async -> Void) async {
 func testDynamicIsolation(isolation: isolated (any Actor)?, body: () async -> Void) async {
   // CHECK: // closure #1 in testDynamicIsolation(isolation:body:)
   // CHECK: // Isolation: actor_instance. name: 'isolation'
-  // CHECK: sil private @$s37nonisolated_nonsending_specialization20testDynamicIsolation9isolation4bodyyScA_pSgYi_yyYaXEtYaFyyt_tYaKXEfU_ : $@convention(thin) @async @substituted <τ_0_0> (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, @sil_isolated @guaranteed Optional<any Actor>, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error for <()> {
+  // CHECK: sil private [closure] @$s37nonisolated_nonsending_specialization20testDynamicIsolation9isolation4bodyyScA_pSgYi_yyYaXEtYaFyyt_tYaKXEfU_ : $@convention(thin) @async @substituted <τ_0_0> (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, @sil_isolated @guaranteed Optional<any Actor>, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error for <()> {
   // CHECK: bb0([[IGNORED_ISOLATION:%.*]] : $Builtin.ImplicitActor, [[V:%.*]] : $*(), [[DYNAMIC_ISOLATION:%.*]] : @closureCapture $Optional<any Actor>, [[BODY:%.*]] : @closureCapture $@noescape @async @callee_guaranteed () -> ()):
   // CHECK-NOT: hop_to_executor {{.*}}
   // CHECK:   [[THUNK:%.*]] = function_ref @$sIgH_s5Error_pIegHzo_TR : $@convention(thin) @async (@guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error
@@ -208,7 +208,7 @@ func testDynamicIsolation(isolation: isolated (any Actor)?, body: () async -> Vo
 func testReabstraction(body: () async -> Void) async throws {
   // CHECK: // closure #1 in testReabstraction(body:)
   // CHECK: // Isolation: @concurrent
-  // CHECK: sil private @$s37nonisolated_nonsending_specialization17testReabstraction4bodyyyyYaXE_tYaKFyyYaKXEfU_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
+  // CHECK: sil private [closure] @$s37nonisolated_nonsending_specialization17testReabstraction4bodyyyyYaXE_tYaKFyyYaKXEfU_ : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @async @callee_guaranteed () -> ()) -> @error any Error {
   // CHECK: bb0({{.*}} : $Builtin.ImplicitActor, {{.*}}):
   // CHECK: [[GENERIC:%.*]] = enum $Optional<any Actor>, #Optional.none!enumelt
   //
