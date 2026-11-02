@@ -8,7 +8,6 @@
 // expectations are checked against both.
 
 // RUN: %target-typecheck-verify-swift -parse-as-library \
-// RUN:   -verify-additional-prefix astgen- \
 // RUN:   -enable-experimental-feature ParserASTGen
 // RUN: %target-typecheck-verify-swift -parse-as-library
 
@@ -26,19 +25,12 @@ for _ in 0..<1 { } // expected-error {{statements are not allowed at the top lev
 
 // diag::getset_nontrivial_pattern
 //
-// The ASTGen-only expectations below are a pre-existing difference in how ASTGen
-// recovers from a non-trivial pattern with accessors -- unrelated to which
-// diagnostic definition is used, and tracked as part of the error-recovery work.
-// The shared diagnostic itself matches the C++ parser exactly.
 var (a, b): (Int, Int) { (0, 0) }
 // expected-error@-1 {{getter/setter can only be defined for a single variable}}
-// expected-astgen-error@-2 {{global 'var' declaration requires an initializer expression or an explicitly stated getter}}
-// expected-astgen-note@-3 {{add an initializer to silence this error}}
 
 struct S {
   static var _: Int { 0 }
   // expected-error@-1 {{getter/setter can only be defined for a single variable}}
-  // expected-astgen-error@-2 {{property declaration does not bind any variables}}
 }
 
 // diag::attr_expected_lparen -- exercises string and boolean diagnostic
