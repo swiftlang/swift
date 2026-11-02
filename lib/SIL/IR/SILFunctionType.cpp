@@ -3915,9 +3915,10 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 //                          Foreign SILFunctionTypes
 //===----------------------------------------------------------------------===//
 
-static bool isCFTypedef(const TypeLowering &tl, clang::QualType type) {
-  // If we imported a C pointer type as a non-trivial type, it was
-  // a foreign class type.
+/// Whether a C pointer type was imported as a Swift class reference: either a
+/// CF type or a pointer to a C++ foreign reference type.
+static bool isPointerImportedAsClass(const TypeLowering &tl,
+                                     clang::QualType type) {
   return !tl.isTrivial() && type->isPointerType();
 }
 
@@ -4112,7 +4113,8 @@ public:
 
     // Otherwise, the return type had better be a retainable object pointer.
     auto resultType = Method->getReturnType();
-    assert(resultType->isObjCRetainableType() || isCFTypedef(tl, resultType));
+    assert(resultType->isObjCRetainableType() ||
+           isPointerImportedAsClass(tl, resultType));
 
     // If it's retainable for the purposes of ObjC ARC, we can trust
     // the presence of ns_returns_retained, because Clang will add
@@ -4127,7 +4129,7 @@ public:
     // we can't just trust getMethodFamily().  We should really just
     // change that, but that's an annoying change to make to Clang
     // right now.
-    assert(isCFTypedef(tl, resultType));
+    assert(isPointerImportedAsClass(tl, resultType));
 
     // Trust the explicit attributes.
     if (Method->hasAttr<clang::CFReturnsRetainedAttr>())
@@ -4302,7 +4304,7 @@ public:
         return convention.value();
     }
 
-    if (isCFTypedef(tl, TheDecl->getReturnType())) {
+    if (isPointerImportedAsClass(tl, TheDecl->getReturnType())) {
       // The CF attributes aren't represented in the type, so we need
       // to check them here.
       if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>()) {
@@ -4391,10 +4393,11 @@ public:
     if (resultTL.getLoweredType().isForeignReferenceType()) {
       if (auto convention = importer::getOwnershipOfReturnedFRT(TheDecl, Ctx))
         return convention.value();
-
-      if (TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
-        return ResultConvention::Owned;
     }
+
+    if (isPointerImportedAsClass(resultTL, TheDecl->getReturnType()) &&
+        TheDecl->hasAttr<clang::CFReturnsRetainedAttr>())
+      return ResultConvention::Owned;
 
     return CFunctionTypeConventions::getResult(resultTL);
   }
