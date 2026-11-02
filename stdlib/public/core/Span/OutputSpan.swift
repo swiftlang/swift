@@ -523,6 +523,14 @@ extension OutputSpan {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
+  /// Append every element of the source buffer.
+  ///
+  /// Every element of the source buffer must be initialized.
+  /// Callers must ensure that the free capacity of `self` is at least
+  /// as large as the buffer's element count.
+  ///
+  /// - Parameter source: A buffer of initialized elements to move to the end
+  ///     of this span.
   @export(implementation)
   @_lifetime(self: copy self)
   internal mutating func _append(
@@ -531,7 +539,6 @@ extension OutputSpan where Element: ~Copyable {
     guard source.count > 0 else { return }
     unsafe self.withUnsafeMutableBufferPointer { dst, dstCount in
       let dstEnd = dstCount + source.count
-      precondition(dstEnd <= dst.count, "OutputSpan capacity overflow")
       unsafe dst
         .extracting(unchecked: Range(uncheckedBounds: (dstCount, dstEnd)))
         ._moveInitializeAll(fromContentsOf: source)
@@ -543,6 +550,7 @@ extension OutputSpan where Element: ~Copyable {
   @_lifetime(self: copy self)
   @_lifetime(source: copy source)
   internal mutating func _append(moving source: inout OutputSpan<Element>) {
+    _precondition(source.count <= freeCapacity, "OutputSpan capacity overflow")
     unsafe source.withUnsafeMutableBufferPointer { src, srcCount in
       let range = unsafe Range(uncheckedBounds: (0, srcCount))
       let items = unsafe src.extracting(unchecked: range)
@@ -555,12 +563,19 @@ extension OutputSpan where Element: ~Copyable {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: Copyable {
+  /// Append a copy of every element of the source buffer.
+  ///
+  /// Every element of the source buffer must be initialized.
+  /// Callers must ensure that the free capacity of `self` is at least
+  /// as large as the buffer's element count.
+  ///
+  /// - Parameter source: A buffer of initialized elements to copy to the end
+  ///     of this span.
   @export(implementation)
   @_lifetime(self: copy self)
   internal mutating func _append(copying source: UnsafeBufferPointer<Element>) {
     unsafe self.withUnsafeMutableBufferPointer { dst, dstCount in
       let dstEnd = dstCount + source.count
-      precondition(dstEnd <= dst.count, "OutputSpan capacity overflow")
       unsafe dst
         .extracting(unchecked: Range(uncheckedBounds: (dstCount, dstEnd)))
         ._initializeAll(fromContentsOf: source)
@@ -571,6 +586,7 @@ extension OutputSpan where Element: Copyable {
   @export(implementation)
   @_lifetime(self: copy self)
   internal mutating func _append(copying source: Span<Element>) {
+    _precondition(source.count <= freeCapacity, "OutputSpan capacity overflow")
     source.withUnsafeBufferPointer { buffer in
       unsafe self._append(copying: buffer)
     }

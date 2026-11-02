@@ -138,6 +138,7 @@ extension _RigidArray where Element: ~Copyable {
     at index: Int
   ) {
     insert(addingCount: items.count, at: index) { target in
+      _internalInvariant(target.freeCapacity >= items.count)
       unsafe target._append(moving: items)
     }
   }
@@ -201,6 +202,7 @@ extension _RigidArray where Element: Copyable {
   ) {
     guard newElements.count > 0 else { return }
     self.insert(addingCount: newElements.count, at: index) { target in
+      _internalInvariant(target.freeCapacity >= newElements.count)
       unsafe target._append(copying: newElements)
     }
   }
