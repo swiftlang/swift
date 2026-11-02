@@ -1,0 +1,87 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -diagnostic-constant-propagation %s | %FileCheck %s --check-prefixes=CHECK,DIAG
+// RUN: %target-sil-opt -enable-sil-verify-all -performance-constant-propagation %s | %FileCheck %s --check-prefixes=CHECK,PERF
+
+// The mandatory cast optimizer keeps a cast into the storage of a debug
+// variable, even if the variable is never read, as it must still be available
+// in LLDB. As a mandatory pass, it behaves the same at all optimization levels.
+// Performance passes remove the cast and mark the variable as optimized out.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol P {}
+extension Int : P {}
+
+// The variable is kept for diagnostics but optimized out in the performance pass.
+
+// CHECK-LABEL: sil @unconditional_var :
+// CHECK:       bb0([[UV_SRC:%[0-9]+]] : $*Int):
+// CHECK-NEXT:    [[UV_S:%[0-9]+]] = alloc_stack $any P, let, name "s"
+// DIAG-NEXT:     [[UV_PAYLOAD:%[0-9]+]] = init_existential_addr [[UV_S]], $Int
+// DIAG-NEXT:     copy_addr [take] [[UV_SRC]] to [init] [[UV_PAYLOAD]]
+// DIAG-NEXT:     destroy_addr [[UV_S]]
+// PERF-NEXT:     destroy_addr [[UV_SRC]]
+// PERF-NEXT:     debug_value undef : $*any P, let, name "s", expr op_deref
+// CHECK-NEXT:    dealloc_stack [[UV_S]]
+// CHECK-LABEL: } // end sil function 'unconditional_var'
+sil @unconditional_var : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = alloc_stack $any P, let, name "s"
+  unconditional_checked_cast_addr Int in %0 : $*Int to any P in %1 : $*any P
+  destroy_addr %1 : $*any P
+  dealloc_stack %1 : $*any P
+  %r = tuple ()
+  return %r : $()
+}
+
+// The cast is optimized out in both modes, as there are no variables attached to it.
+
+// CHECK-LABEL: sil @unconditional_temp :
+// CHECK:       bb0([[UT_SRC:%[0-9]+]] : $*Int):
+// CHECK-NEXT:    [[UT_S:%[0-9]+]] = alloc_stack $any P
+// CHECK-NEXT:    destroy_addr [[UT_SRC]]
+// CHECK-NEXT:    dealloc_stack [[UT_S]]
+// CHECK-LABEL: } // end sil function 'unconditional_temp'
+sil @unconditional_temp : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = alloc_stack $any P
+  unconditional_checked_cast_addr Int in %0 : $*Int to any P in %1 : $*any P
+  destroy_addr %1 : $*any P
+  dealloc_stack %1 : $*any P
+  %r = tuple ()
+  return %r : $()
+}
+
+// The branching checked casts behave the same as unchecked casts.
+
+// CHECK-LABEL: sil @branch_var :
+// CHECK:       bb0([[BV_SRC:%[0-9]+]] : $*Int):
+// CHECK-NEXT:    [[BV_S:%[0-9]+]] = alloc_stack $any P, let, name "s"
+// DIAG-NEXT:     unconditional_checked_cast_addr Int in [[BV_SRC]] to any P in [[BV_S]]
+// PERF-NEXT:     debug_value undef : $*any P, let, name "s", expr op_deref
+// CHECK-NEXT:    br bb1
+// CHECK:       bb1:
+// DIAG-NEXT:     destroy_addr [[BV_S]]
+// CHECK-NEXT:    dealloc_stack [[BV_S]]
+// CHECK-NEXT:    br bb2
+// CHECK-LABEL: } // end sil function 'branch_var'
+sil @branch_var : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = alloc_stack $any P, let, name "s"
+  checked_cast_addr_br take_always Int in %0 : $*Int to any P in %1 : $*any P, bb1, bb2
+
+bb1:
+  destroy_addr %1 : $*any P
+  dealloc_stack %1 : $*any P
+  br bb3
+
+bb2:
+  dealloc_stack %1 : $*any P
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
