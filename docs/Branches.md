@@ -75,6 +75,8 @@ You can use any of the branch names as the argument to `--scheme`, such as `main
 
   In the long term we want to eliminate the differences from upstream LLVM for these changes as well, but for now there is no concrete plan.
 
+  Use `git cherry-pick -x` for all of these cherry-picks, so that each cherry-picked commit's message records the hash of the original commit.
+
 ## Automerging
 
 Some branches are *automerged* into other branches, to keep them in sync. This is just a process that runs `git merge` at a regular interval. These are run by Apple and are either on a "frequent" (sub-hourly) or nightly schedule.
