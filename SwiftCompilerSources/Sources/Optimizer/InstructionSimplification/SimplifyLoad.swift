@@ -455,6 +455,10 @@ private extension Value {
           return false
         }
       }
+      if value is GlobalValueInst && function.isAnySerialized {
+        // A serialized function must not reference the private global of an outlined object.
+        return false
+      }
       for op in value.definingInstruction!.operands {
         if handled.insert(ObjectIdentifier(op.value)).inserted {
           worklist.push(op.value)

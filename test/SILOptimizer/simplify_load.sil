@@ -43,6 +43,10 @@ struct GenStruct<T> {
   let t: T
 }
 
+struct BHolder {
+  let b: B
+}
+
 struct EmptyNC : ~Copyable {
 }
 
@@ -67,6 +71,11 @@ sil_global @gc_var : $D = {
   %2 = integer_literal $Builtin.Int64, 2
   %3 = integer_literal $Builtin.Int64, 3
   %initval = object $D (%0, %1, [tail_elems] %2, %3)
+}
+
+sil_global [serialized] [let] @gb_holder : $BHolder = {
+  %0 = global_value @gb_obj : $B
+  %initval = struct $BHolder (%0 : $B)
 }
 
 sil [global_init_once_fn] @init_gb : $@convention(c) () -> () {
@@ -224,6 +233,30 @@ bb0(%0 : $Builtin.RawPointer):
   %3 = global_addr @gb2 : $*(B, Int64) depends_on %2
   %4 = load %3 : $*(B, Int64)
   return %4 : $(B, Int64)
+}
+
+// CHECK-LABEL: sil @load_global_with_object_reference :
+// CHECK:         [[O:%.*]] = global_value @gb_obj
+// CHECK-NEXT:    [[H:%.*]] = struct $BHolder ([[O]] : $B)
+// CHECK-NEXT:    return [[H]]
+// CHECK:       } // end sil function 'load_global_with_object_reference'
+sil @load_global_with_object_reference : $@convention(thin) () -> BHolder {
+bb0:
+  %0 = global_addr @gb_holder : $*BHolder
+  %1 = load %0 : $*BHolder
+  return %1 : $BHolder
+}
+
+// A serialized function must not reference the private global of the object.
+// CHECK-LABEL: sil [serialized] @dont_load_global_with_object_reference_in_serialized_function :
+// CHECK-NOT:     global_value
+// CHECK:         load
+// CHECK:       } // end sil function 'dont_load_global_with_object_reference_in_serialized_function'
+sil [serialized] @dont_load_global_with_object_reference_in_serialized_function : $@convention(thin) () -> BHolder {
+bb0:
+  %0 = global_addr @gb_holder : $*BHolder
+  %1 = load %0 : $*BHolder
+  return %1 : $BHolder
 }
 
 sil private [global_init_once_fn] @init_global_pointer : $@convention(c) (Builtin.RawPointer) -> () {
