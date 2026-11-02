@@ -50,7 +50,8 @@ SyntacticElementTarget::SyntacticElementTarget(
   expression.initialization.patternBindingIndex = 0;
 }
 
-void SyntacticElementTarget::maybeApplyPropertyWrapper() {
+void SyntacticElementTarget::maybeApplyPropertyWrapper(
+    Type backingStorageType) {
   assert(getExprContextualTypePurpose() == CTP_Initialization);
 
   VarDecl *singleVar;
@@ -69,7 +70,6 @@ void SyntacticElementTarget::maybeApplyPropertyWrapper() {
 
   // If the outermost property wrapper is directly initialized, form the
   // call.
-  auto &ctx = singleVar->getASTContext();
   auto outermostWrapperAttr = wrapperAttrs.front();
   Expr *backingInitializer;
   if (Expr *initializer = expression.expression) {
@@ -78,8 +78,8 @@ void SyntacticElementTarget::maybeApplyPropertyWrapper() {
     }
     // Form init(wrappedValue:) call(s).
     Expr *wrappedInitializer = buildPropertyWrapperInitCall(
-        singleVar, Type(), initializer, PropertyWrapperInitKind::WrappedValue,
-        [&](ApplyExpr *innermostInit) {
+        singleVar, backingStorageType, initializer,
+        PropertyWrapperInitKind::WrappedValue, [&](ApplyExpr *innermostInit) {
           expression.propertyWrapper.innermostWrappedValueInit = innermostInit;
         });
     if (!wrappedInitializer)
@@ -87,30 +87,9 @@ void SyntacticElementTarget::maybeApplyPropertyWrapper() {
 
     backingInitializer = wrappedInitializer;
   } else {
-    Type outermostWrapperType = singleVar->getAttachedPropertyWrapperType(0);
-    if (!outermostWrapperType)
+    backingInitializer = buildPropertyWrapperAttributeInitCall(singleVar);
+    if (!backingInitializer)
       return;
-
-    bool isImplicit = false;
-
-    // Retrieve the outermost wrapper argument. If there isn't one, we're
-    // performing default initialization.
-    auto outermostArgs = outermostWrapperAttr->getArgs();
-    if (!outermostArgs) {
-      SourceLoc fakeParenLoc = outermostWrapperAttr->getRange().End;
-      outermostArgs =
-          ArgumentList::createImplicit(ctx, fakeParenLoc, {}, fakeParenLoc);
-      isImplicit = true;
-    }
-
-    SourceLoc typeLoc;
-    if (auto *repr = outermostWrapperAttr->getTypeRepr()) {
-      typeLoc = repr->getLoc();
-    }
-    auto typeExpr =
-        TypeExpr::createImplicitHack(typeLoc, outermostWrapperType, ctx);
-    backingInitializer = CallExpr::create(ctx, typeExpr, outermostArgs,
-                                          /*implicit*/ isImplicit);
   }
   wrapperAttrs[0]->setSemanticInit(backingInitializer);
 
@@ -183,7 +162,8 @@ SyntacticElementTarget SyntacticElementTarget::forReturn(ReturnStmt *returnStmt,
 }
 
 SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
-    VarDecl *wrappedVar, DeclContext *dc, Expr *initializer) {
+    VarDecl *wrappedVar, DeclContext *dc, Expr *initializer,
+    Type backingStorageType) {
   SyntacticElementTarget target(initializer, dc, CTP_Initialization,
                                 wrappedVar->getTypeInContext(),
                                 /*isDiscarded=*/false);
@@ -194,7 +174,7 @@ SyntacticElementTarget SyntacticElementTarget::forPropertyWrapperInitializer(
     target.expression.initialization.patternBindingIndex = index;
     target.expression.pattern = patternBinding->getPattern(index);
   }
-  target.maybeApplyPropertyWrapper();
+  target.maybeApplyPropertyWrapper(backingStorageType);
   return target;
 }
 
