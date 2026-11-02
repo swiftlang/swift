@@ -50,6 +50,10 @@ final class Klass {
 
 class C {}
 
+class RawSpanBox {
+  @_hasStorage var span: RawSpan
+}
+
 struct S {
   let c: C
 }
@@ -2819,4 +2823,111 @@ bb0(%0 : @guaranteed $C):
   destroy_value %2
   %6 = tuple ()
   return %6
+}
+
+// rdar://190060113
+//
+// The lifetime of the copy ends in a `destructure_struct` with only trivial results, so there is no
+// `destroy_value`. The borrow scope of the source must still cover this use. The test fails in the SIL
+// verifier ("Found outside of lifetime use?!") if the use ends up after the `end_borrow`.
+//
+// CHECK-LABEL: sil [ossa] @copy_ends_in_trivial_destructure :
+// CHECK:         [[B:%.*]] = load_borrow %0
+// CHECK-NOT:     copy_value
+// CHECK:         destructure_struct [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'copy_ends_in_trivial_destructure'
+sil [ossa] @copy_ends_in_trivial_destructure : $@convention(thin) (@in_guaranteed RawSpan) -> Int {
+bb0(%0 : $*RawSpan):
+  %1 = load_borrow %0 : $*RawSpan
+  %2 = copy_value %1 : $RawSpan
+  end_borrow %1 : $RawSpan
+  (%3, %4) = destructure_struct %2 : $RawSpan
+  return %4 : $Int
+}
+
+// Same hole as above, but the lifetime of the copy ends in an `unchecked_enum_data` which extracts a trivial
+// payload out of a non-trivial enum.
+//
+// CHECK-LABEL: sil [ossa] @copy_ends_in_trivial_enum_data :
+// CHECK:         [[B:%.*]] = load_borrow %0
+// CHECK-NOT:     copy_value
+// CHECK:         unchecked_enum_data [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'copy_ends_in_trivial_enum_data'
+sil [ossa] @copy_ends_in_trivial_enum_data : $@convention(thin) (@in_guaranteed MultiPayload) -> MyInt {
+bb0(%0 : $*MultiPayload):
+  %1 = load_borrow %0 : $*MultiPayload
+  %2 = copy_value %1 : $MultiPayload
+  end_borrow %1 : $MultiPayload
+  %3 = unchecked_enum_data %2 : $MultiPayload, #MultiPayload.b!enumelt
+  return %3 : $MyInt
+}
+
+// The lifetime of the copy ends in a `switch_enum` whose non-payload successor has no destroy. The borrow
+// scope of the source must cover the `switch_enum`.
+//
+// CHECK-LABEL: sil [ossa] @copy_ends_in_switch_enum_none_case :
+// CHECK:         [[B:%.*]] = load_borrow %0
+// CHECK-NOT:     copy_value
+// CHECK:         switch_enum [[B]]
+// CHECK:       bb1({{.*}} : @guaranteed $Klass):
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK:       } // end sil function 'copy_ends_in_switch_enum_none_case'
+sil [ossa] @copy_ends_in_switch_enum_none_case : $@convention(thin) (@in_guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : $*FakeOptional<Klass>):
+  %1 = load_borrow %0 : $*FakeOptional<Klass>
+  %2 = copy_value %1 : $FakeOptional<Klass>
+  end_borrow %1 : $FakeOptional<Klass>
+  switch_enum %2 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%4 : @owned $Klass):
+  destroy_value %4 : $Klass
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The lifetime of the loaded value ends in a `destructure_struct` with only trivial results. The borrow scope
+// of the base reference must be extended over the `destructure_struct`.
+//
+// CHECK-LABEL: sil [ossa] @load_copy_ends_in_trivial_destructure :
+// CHECK:         [[BB:%.*]] = begin_borrow %0
+// CHECK:         [[LB:%.*]] = load_borrow
+// CHECK-NEXT:    destructure_struct [[LB]]
+// CHECK-NEXT:    end_borrow [[LB]]
+// CHECK-NEXT:    end_borrow [[BB]]
+// CHECK:       } // end sil function 'load_copy_ends_in_trivial_destructure'
+sil [ossa] @load_copy_ends_in_trivial_destructure : $@convention(thin) (@owned RawSpanBox) -> Int {
+bb0(%0 : @owned $RawSpanBox):
+  %1 = begin_borrow %0 : $RawSpanBox
+  %2 = ref_element_addr %1 : $RawSpanBox, #RawSpanBox.span
+  %3 = load [copy] %2 : $*RawSpan
+  end_borrow %1 : $RawSpanBox
+  (%4, %5) = destructure_struct %3 : $RawSpan
+  destroy_value %0 : $RawSpanBox
+  return %5 : $Int
+}
+
+// A write to the loaded address before a trivial `destructure_struct` must prevent the `load_borrow`
+// conversion, even though there is no destroy.
+//
+// CHECK-LABEL: sil [ossa] @load_copy_trivial_destructure_after_write :
+// CHECK:         load [copy]
+// CHECK-NOT:     load_borrow
+// CHECK:       } // end sil function 'load_copy_trivial_destructure_after_write'
+sil [ossa] @load_copy_trivial_destructure_after_write : $@convention(thin) (@inout MultiPayload, MyInt) -> MyInt {
+bb0(%0 : $*MultiPayload, %1 : $MyInt):
+  %2 = load [copy] %0 : $*MultiPayload
+  %3 = enum $MultiPayload, #MultiPayload.b!enumelt, %1 : $MyInt
+  store %3 to [assign] %0 : $*MultiPayload
+  %5 = unchecked_enum_data %2 : $MultiPayload, #MultiPayload.b!enumelt
+  return %5 : $MyInt
 }
