@@ -549,9 +549,24 @@ public:
   }
   void setImplicit(bool Implicit = true);
 
+  /// Specifies which expressions \c getReferencedDecl() looks through when an
+  /// expression forwards the reference of a sub-expression, such as an
+  /// implicit conversion, `try`, or `&`.
+  enum class ReferencedDeclLookThrough {
+    /// Look through every expression that forwards a reference.
+    All,
+    /// Look through every expression that forwards a reference, except
+    /// parentheses.
+    AllExceptParens,
+    /// Don't look through any expressions, and return a reference only if this
+    /// expression holds it directly.
+    None,
+  };
+
   /// Retrieves the declaration that is being referenced by this
   /// expression, if any.
-  ConcreteDeclRef getReferencedDecl(bool stopAtParenExpr = false) const;
+  ConcreteDeclRef getReferencedDecl(ReferencedDeclLookThrough lookThrough =
+                                        ReferencedDeclLookThrough::All) const;
 
   /// Determine whether this expression is 'super', possibly converted to
   /// a base class.

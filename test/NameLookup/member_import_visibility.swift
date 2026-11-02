@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_MemberImportVisibility
 
 import members_C
-// expected-member-visibility-note 33{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 37{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -196,12 +196,23 @@ func testLeadingDotSyntax() {
   takesP(.zAmbiguous)
 }
 
+func takesInoutBool(_ b: inout Bool) { }
+
+func testReferencesThroughForwardingExpressions(x: X) {
+  var x = x
+  _ = x.settablePropXinB // expected-member-visibility-error{{property 'settablePropXinB' is not available due to missing import of defining module 'members_B'}}
+  _ = (x.propXinB) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  let _: Bool? = x.propXinB // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesInoutBool(&x.settablePropXinB) // expected-member-visibility-error{{property 'settablePropXinB' is not available due to missing import of defining module 'members_B'}}
+  _ = x.optionalPropXinB! // expected-member-visibility-error{{property 'optionalPropXinB' is not available due to missing import of defining module 'members_B'}}
+}
+
 func testChainedDynamicMemberLookup() {
   var d = DynamicMemberLookupInA()
   d.propInB = .zInB
   // expected-member-visibility-error@-1{{subscript 'subscript(dynamicMember:)' is not available due to missing import of defining module 'members_B'}}
   // expected-member-visibility-error@-2{{property 'propInB' is not available due to missing import of defining module 'members_B'}}
-  // expected-member-visibility-error@-3 2 {{static property 'zInB' is not available due to missing import of defining module 'members_B'}}
+  // expected-member-visibility-error@-3{{static property 'zInB' is not available due to missing import of defining module 'members_B'}}
 
   _ = \DynamicMemberLookupInA.propInB
   // expected-member-visibility-error@-1{{subscript 'subscript(dynamicMember:)' is not available due to missing import of defining module 'members_B'}}

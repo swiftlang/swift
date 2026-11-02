@@ -10,6 +10,8 @@ extension X {
 
   public var propXinB: Bool { return true }
   package var propXinB_package: Bool { return true }
+  public var settablePropXinB: Bool { get { true } set { } }
+  public var optionalPropXinB: Bool? { return nil }
 
   public func shadowedByMemberOnXinB() { }
   public static func shadowedByStaticMemberOnXinB() { }
