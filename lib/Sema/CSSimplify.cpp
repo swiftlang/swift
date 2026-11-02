@@ -11227,8 +11227,11 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // might not be applicable), and we are looking for members in a type with
   // the @dynamicMemberLookup attribute, then we resolve a reference to a
   // `subscript(dynamicMember:...)` method and pass the member name as a string
-  // parameter.
-  if (constraintKind == ConstraintKind::ValueMember &&
+  // parameter. This includes implicit member expressions like `.foo`, which
+  // look up into the metatype of the contextual type, so they can find a
+  // static `subscript(dynamicMember:...)` just like `T.foo` does.
+  if ((constraintKind == ConstraintKind::ValueMember ||
+       constraintKind == ConstraintKind::UnresolvedValueMember) &&
       memberName.isSimpleName() && !memberName.isSpecial() &&
       instanceTy->hasDynamicMemberLookupAttribute()) {
     const auto &candidates = result.ViableCandidates;
