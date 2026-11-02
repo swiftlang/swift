@@ -38,6 +38,10 @@ let readOnlyGlobalVariablesPass = ModulePass(name: "read-only-global-variables")
     if !g.isDefinedExternally,
        !g.isPossiblyUsedExternally,
        !g.isLet,
+       // Raw-layout storage may be mutated even for let-variables.
+       !g.isOrContainsRawLayout,
+       // An object can be written via `global_value`, which is not checked here.
+       !(g.staticInitValue is ObjectInst),
        !writtenGlobals.contains(g) {
       g.setIsLet(to: true, moduleContext)
     }

@@ -167,6 +167,10 @@ public:
     return getLoweredTypeInContext(context).castTo<SILFunctionType>();
   }
 
+  /// Does the storage contain raw layout, which may be mutated even if this is
+  /// a 'let' property?
+  bool isOrContainsRawLayout() const;
+
   void unsafeSetLoweredType(SILType newType) { LoweredType = newType; }
   void unsafeAppend(SILInstruction *i) { StaticInitializerBlock.push_back(i); }
   void unsafeRemove(SILInstruction *i, SILModule &mod) {

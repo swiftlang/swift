@@ -726,6 +726,7 @@ struct BridgedGlobalVar {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef getName() const;
   BRIDGED_INLINE bool isLet() const;
   BRIDGED_INLINE void setLet(bool value) const;
+  BRIDGED_INLINE bool isOrContainsRawLayout() const;
   BRIDGED_INLINE bool markedAsUsed() const;
   BRIDGED_INLINE void setMarkedAsUsed(bool value) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getType() const;

@@ -4,6 +4,10 @@
 import Builtin
 import Swift
 
+class C {
+  @_hasStorage var x: Builtin.Int64
+}
+
 // CHECK-LABEL: sil_global private [let] @read_only_var : $Int32 = {
 sil_global private @read_only_var : $Int32 = {
   %0 = integer_literal $Builtin.Int32, 27
@@ -48,3 +52,17 @@ bb0(%0 : $Int32):
   return %r : $()
 }
 
+// CHECK-LABEL: sil_global private @written_object : $C = {
+sil_global private @written_object : $C = {
+  %0 = integer_literal $Builtin.Int64, 27
+  %initval = object $C (%0 : $Builtin.Int64)
+}
+
+sil @write_object : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = global_value @written_object : $C
+  %2 = ref_element_addr %1 : $C, #C.x
+  store %0 to %2 : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}

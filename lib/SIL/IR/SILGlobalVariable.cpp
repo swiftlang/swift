@@ -63,7 +63,7 @@ DeclContext *SILGlobalVariable::getDeclContext() const {
   return nullptr;
 }
 
-static bool isGlobalLet(SILModule &mod, VarDecl *decl, SILType type) {
+static bool isGlobalLet(VarDecl *decl, const SILGlobalVariable &global) {
   if (!decl)
     return false;
 
@@ -72,13 +72,17 @@ static bool isGlobalLet(SILModule &mod, VarDecl *decl, SILType type) {
 
   // Raw-layout storage may be mutated even for let-variables. Therefore don't
   // treat such variables as `let` in SIL.
-  auto teCtxt = TypeExpansionContext::maximal(mod.getSwiftModule(),
-                                              mod.isWholeModule());
-  auto typeProps = mod.Types.getTypeProperties(type, teCtxt);
-  if (typeProps.isOrContainsRawLayout())
+  if (global.isOrContainsRawLayout())
     return false;
 
   return true;
+}
+
+bool SILGlobalVariable::isOrContainsRawLayout() const {
+  auto teCtxt = TypeExpansionContext::maximal(Module.getSwiftModule(),
+                                              Module.isWholeModule());
+  return Module.Types.getTypeProperties(LoweredType, teCtxt)
+      .isOrContainsRawLayout();
 }
 
 SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
@@ -92,7 +96,7 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
       VDecl(Decl) {
   setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
-  setLet(isGlobalLet(Module, Decl, LoweredType));
+  setLet(isGlobalLet(Decl, *this));
   setMarkedAsUsed(Decl && (Decl->getAttrs().hasAttribute<UsedAttr>() ||
                            getWasmExposeAttr()));
   if (Decl) {
