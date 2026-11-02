@@ -1524,23 +1524,33 @@ extension ASTGenVisitor {
   ///   @section(default)
   ///   ```
   func generateSectionAttr(attribute node: AttributeSyntax) -> BridgedSectionAttr? {
-    guard let arg = node.arguments?.as(SectionAttributeArgumentSyntax.self) else {
-      self.diagnoseExpectedAttributeArguments(node)
-      return nil
-    }
-
     let isDefault: Bool
     let name: BridgedStringRef
-    switch arg.section {
-    case .defaultKeyword:
-      isDefault = true
-      name = ""
-    case .expression(let expr):
-      guard let sectionName = self.generateStringLiteralTextIfNotInterpolated(expr: expr) else {
+    if let arg = node.arguments?.as(SectionAttributeArgumentSyntax.self) {
+      switch arg.section {
+      case .defaultKeyword:
+        isDefault = true
+        name = ""
+      case .expression(let expr):
+        guard let sectionName = self.generateStringLiteralTextIfNotInterpolated(expr: expr) else {
+          return nil
+        }
+        isDefault = false
+        name = sectionName
+      }
+    } else if let list = node.arguments?.as(LabeledExprListSyntax.self),
+      list.count == 1, let first = list.first, first.label == nil
+    {
+      // The historical spelling '@_section' isn't known to swift-syntax, so
+      // its arguments arrive as a generic expression list.
+      guard let sectionName = self.generateStringLiteralTextIfNotInterpolated(expr: first.expression) else {
         return nil
       }
       isDefault = false
       name = sectionName
+    } else {
+      self.diagnoseExpectedAttributeArguments(node)
+      return nil
     }
 
     return .createParsed(
