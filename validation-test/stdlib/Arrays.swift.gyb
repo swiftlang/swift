@@ -289,6 +289,42 @@ ArrayTestSuite.test("${array_type}<TestValueTy>/subscript(_: Range<Int>)/COW")
   expectEqual(90, a[0][8].value)
 }
 
+func make${array_type}OfTracked() -> ${array_type}<LifetimeTracked> {
+% if array_type == 'ArraySlice':
+  // The slice has a nonzero `startIndex`.
+  return Array((0..<8).map { LifetimeTracked($0) })[2..<7]
+% else:
+  return ${array_type}((2..<7).map { LifetimeTracked($0) })
+% end
+}
+
+ArrayTestSuite.test("${array_type}/swapAt(_:_:)") {
+  var a = make${array_type}OfTracked()
+  let s = a.startIndex
+  expectEqual([2, 3, 4, 5, 6], a.map { $0.value })
+
+  a.swapAt(s, s + 4)
+  expectEqual([6, 3, 4, 5, 2], a.map { $0.value })
+
+  a.swapAt(s + 3, s + 1)
+  expectEqual([6, 5, 4, 3, 2], a.map { $0.value })
+
+  a.swapAt(s + 2, s + 2)
+  expectEqual([6, 5, 4, 3, 2], a.map { $0.value })
+  expectEqual(s, a.startIndex)
+}
+
+ArrayTestSuite.test("${array_type}/swapAt(_:_:)/COW") {
+  var a = make${array_type}OfTracked()
+  let s = a.startIndex
+  let b = a
+
+  a.swapAt(s, s + 4)
+  expectEqual([6, 3, 4, 5, 2], a.map { $0.value })
+  expectEqual([2, 3, 4, 5, 6], b.map { $0.value })
+  expectEqual(s, a.startIndex)
+}
+
 % end
 
 ArrayTestSuite.test("sizeof") {
