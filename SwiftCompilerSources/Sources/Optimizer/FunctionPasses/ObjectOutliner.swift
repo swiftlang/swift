@@ -466,6 +466,14 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       worklist.pushIfNotVisited(usersOf: refCast)
     case let moveValue as MoveValueInst:
       worklist.pushIfNotVisited(usersOf: moveValue)
+    case let beginBorrow as BeginBorrowInst
+           where beginBorrow.endInstructions.allSatisfy({ $0 is EndBorrowInst }):
+      // The `global_value` has no ownership and doesn't need to be borrowed.
+      for endBorrow in Array(beginBorrow.endInstructions) {
+        context.erase(instruction: endBorrow)
+      }
+      worklist.pushIfNotVisited(usersOf: beginBorrow)
+      beginBorrow.replace(with: beginBorrow.borrowedValue, context)
     case let deallocRef as DeallocRefInst:
       if deallocRef.parentFunction.hasOwnership {
         Builder(before: deallocRef, context).createEndLifetime(of: deallocRef.operand.value)
