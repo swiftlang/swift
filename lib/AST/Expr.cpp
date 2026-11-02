@@ -2583,9 +2583,10 @@ Type KeyPathExpr::getValueType() const {
 
 KeyPathExpr::Component KeyPathExpr::Component::forSubscript(
     ASTContext &ctx, ConcreteDeclRef subscript, ArgumentList *argList,
-    Type elementType, ArrayRef<ProtocolConformanceRef> indexHashables) {
+    Type elementType, ArrayRef<ProtocolConformanceRef> indexHashables,
+    SourceLoc loc) {
   return Component(subscript, argList, indexHashables, Kind::Subscript,
-                   elementType, argList->getLParenLoc());
+                   elementType, loc);
 }
 
 KeyPathExpr::Component

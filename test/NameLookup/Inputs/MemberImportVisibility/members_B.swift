@@ -99,3 +99,11 @@ public struct EquatableInB: Equatable {
     false
   }
 }
+
+public struct DynamicMemberAttributesInB {
+  public var propInB: Z { Z() }
+}
+
+extension DynamicMemberScopesInA {
+  public subscript<T>(dynamicMember keyPath: KeyPath<DynamicMemberAttributesInB, T>) -> T { fatalError() }
+}

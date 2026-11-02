@@ -6999,7 +6999,10 @@ static void diagnoseImplicitForceUnwrap(const Expr *E, const DeclContext *DC) {
             force->isForceOfImplicitlyUnwrappedOptional())
           diagnoseForce(force);
       } else if (auto *keyPath = dyn_cast<KeyPathExpr>(E)) {
-        diagnoseKeyPath(keyPath);
+        // A force in an implicit key path, such as the argument of a
+        // `subscript(dynamicMember:)` reference, can't be written explicitly.
+        if (!keyPath->isImplicit())
+          diagnoseKeyPath(keyPath);
       }
 
       return Action::Continue(E);

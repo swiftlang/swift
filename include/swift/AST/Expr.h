@@ -6117,7 +6117,8 @@ public:
     static Component
     forSubscript(ASTContext &ctx, ConcreteDeclRef subscript,
                  ArgumentList *argList, Type elementType,
-                 ArrayRef<ProtocolConformanceRef> indexHashables);
+                 ArrayRef<ProtocolConformanceRef> indexHashables,
+                 SourceLoc loc);
 
     /// Create an optional-forcing `!` component.
     static Component forOptionalForce(Type forcedType, SourceLoc bangLoc) {

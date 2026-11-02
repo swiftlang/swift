@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_MemberImportVisibility
 
 import members_C
-// expected-member-visibility-note 27{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 33{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -194,6 +194,18 @@ func testLeadingDotSyntax() {
   takesP(.zInB) // expected-member-visibility-error{{static property 'zInB' is not available due to missing import of defining module 'members_B'}}
   takesP(.zInC)
   takesP(.zAmbiguous)
+}
+
+func testChainedDynamicMemberLookup() {
+  var d = DynamicMemberLookupInA()
+  d.propInB = .zInB
+  // expected-member-visibility-error@-1{{subscript 'subscript(dynamicMember:)' is not available due to missing import of defining module 'members_B'}}
+  // expected-member-visibility-error@-2{{property 'propInB' is not available due to missing import of defining module 'members_B'}}
+  // expected-member-visibility-error@-3 2 {{static property 'zInB' is not available due to missing import of defining module 'members_B'}}
+
+  _ = \DynamicMemberLookupInA.propInB
+  // expected-member-visibility-error@-1{{subscript 'subscript(dynamicMember:)' is not available due to missing import of defining module 'members_B'}}
+  // expected-member-visibility-error@-2{{property 'propInB' is not available due to missing import of defining module 'members_B'}}
 }
 
 func testConformanceMember(_ h1: HasEquatableMembers, _ h2: HasEquatableMembers) {
