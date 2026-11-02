@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckType.h"
+#include "swift/AST/Ownership.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ASTVisitor.h"
@@ -1816,6 +1817,26 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
 
     if (params[i].isInOut())
       param->setSpecifier(ParamDecl::Specifier::InOut);
+    
+    // For noncopyable parameters, the parameter always needs an ownership
+    // specifier.
+    if (!params[i].getParameterType()->isCopyable()) {
+      switch (params[i].getValueOwnership()) {
+      case ValueOwnership::Default:
+        // Not valid for a noncopyable parameter to lack an ownership
+        // specifier, but we have to gracefully handle invalid code.
+        break;
+      case ValueOwnership::InOut:
+        // Handled above.
+        break;
+      case ValueOwnership::Shared:
+        param->setSpecifier(ParamDecl::Specifier::Borrowing);
+        break;
+      case ValueOwnership::Owned:
+        param->setSpecifier(ParamDecl::Specifier::Consuming);
+        break;
+      }
+    }
 
     param->setInterfaceType(
         params[i].getParameterType()->mapTypeOutOfEnvironment());
