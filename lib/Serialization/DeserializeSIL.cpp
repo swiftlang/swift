@@ -2707,7 +2707,8 @@ llvm::Error SILDeserializer::readSILInstruction(
     // Find the global variable.
     SILGlobalVariable *g = getGlobalForReference(Name);
     assert(g && "Can't deserialize global variable");
-    SILType expectedType = g->getLoweredTypeInContext(TypeExpansionContext(*Fn));
+    SILType expectedType =
+        g->getLoweredTypeInContext(Builder.getTypeExpansionContext());
     assert(expectedType == getSILType(Ty, (SILValueCategory)TyCategory, Fn) &&
            "Type of a global variable does not match GlobalAddr.");
     (void)Ty;
@@ -4170,14 +4171,13 @@ llvm::Error SILDeserializer::readSILInstruction(
   case SILInstructionKind::UncheckedRefCastInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
-    auto *urc = Builder.createUncheckedRefCast(
+    ResultInst = Builder.createUncheckedRefCast(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,
             getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
-    urc->setForwardingOwnershipKind(decodeValueOwnership(Attr));
-    ResultInst = urc;
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        decodeValueOwnership(Attr));
     break;
   }
   case SILInstructionKind::UncheckedRefCastAddrInst: {
