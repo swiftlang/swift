@@ -55,7 +55,7 @@ func grouped() async -> [(Key, Result<Int, Error>)] {
 struct Main {
   static func main() async {
     let results = await grouped()
-    print(results.map { $0.0 }) // CHECK: [a, b, c]
+    print(results.map { $0.0.rawValue }) // CHECK: [0, 1, 2]
     print(results.map { try? $0.1.get() }) // CHECK: [Optional(0), nil, Optional(20)]
     print("done") // CHECK: done
   }
