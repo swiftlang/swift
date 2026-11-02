@@ -51,33 +51,12 @@
 #define SWIFT_SILOPTIMIZER_ANALYSIS_CLOSURESCOPE_H
 
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 
 namespace swift {
-
-/// Return true if this function is known to be non-escaping.
-///
-/// This must only return true if the closure was also deemed non-escaping in
-/// Sema. Sema will eventually guarantee non-reentrance.
-///
-/// This must always return true for any closure with @inout_aliasable parameter
-/// conventions, because passes like AccessEnforcementSelection assume that
-/// convention only applies to non-escaping closures.
-///
-/// (Hence, SILGen may only use @inout_aliasable for closures that Sema deems
-/// non-escaping.)
-///
-/// This may conservatively return false for any non-escaping closures that
-/// don't happen to use @inout_aliasable.
-inline bool isNonEscapingClosure(CanSILFunctionType funcTy) {
-  auto isInoutAliasable = [](SILParameterInfo paramInfo) {
-    return paramInfo.getConvention()
-    == ParameterConvention::Indirect_InoutAliasable;
-  };
-  return llvm::any_of(funcTy->getParameters(), isInoutAliasable);
-}
 
 class ClosureGraph;
 

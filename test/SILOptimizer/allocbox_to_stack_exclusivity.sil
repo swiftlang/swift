@@ -1,0 +1,955 @@
+// RUN: %target-sil-opt -sil-print-types %s -mandatory-allocbox-to-stack | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+// MandatoryAllocBoxToStack makes the accesses of a promoted box static, and
+// DiagnoseStaticExclusivity treats its captures as non-escaping. It only
+// promotes a box if, at every call that can access the box:
+// 1. the box is accessed during the call either on all paths or on no paths,
+//    and
+// 2. the box doesn't reach the call through two captures.
+// rdar://179406916
+//
+// Callers are named for the expected result (promoted_* / not_promoted_*).
+// Callees are named for what they do with the box (callee_*).
+
+sil @noreturn_func : $@convention(thin) () -> Never
+sil @throwing_func : $@convention(thin) () -> @error any Error
+
+// -----------------------------------------------------------------------------
+// Condition 1: the box is accessed on all paths or on no paths during the call.
+
+// Modifies on one path.
+sil [ossa] @callee_may_modify : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  cond_br %0, bb1, bb2
+bb1:
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Modifies on every path.
+sil [ossa] @callee_must_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %addr = project_box %0 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// Modifies on both arms of a branch.
+sil [ossa] @callee_modify_both_arms : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  cond_br %0, bb1, bb2
+bb1:
+  %w1 = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w1 : $*Builtin.Int32
+  end_access %w1 : $*Builtin.Int32
+  br bb3
+bb2:
+  %w2 = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w2 : $*Builtin.Int32
+  end_access %w2 : $*Builtin.Int32
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Modifies on one arm; the other arm is unreachable.
+sil [ossa] @callee_modify_else_unreachable : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  cond_br %0, bb1, bb2
+bb1:
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+bb2:
+  unreachable
+}
+
+// Modifies on one arm; the other arm calls a function that never returns. Before
+// NoReturnFolding, the call need not be followed by unreachable.
+sil [ossa] @callee_modify_else_noreturn : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  cond_br %0, bb1, bb2
+bb1:
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  br bb3
+bb2:
+  %f = function_ref @noreturn_func : $@convention(thin) () -> Never
+  %n = apply %f() : $@convention(thin) () -> Never
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Modifies on one arm; the other arm loops and then traps. (A loop with no exit
+// at all isn't valid SIL; the summary treats it like a trap.)
+sil [ossa] @callee_modify_else_loop_then_trap : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  cond_br %0, bb1, bb2
+bb1:
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+bb2:
+  br bb3
+bb3:
+  cond_br %0, bb4, bb5
+bb4:
+  br bb3
+bb5:
+  unreachable
+}
+
+// Only reads.
+sil [ossa] @callee_read_only : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %read = begin_access [read] [dynamic] %addr : $*Builtin.Int32
+  %v = load [trivial] %read : $*Builtin.Int32
+  end_access %read : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+}
+
+// Reads on every path, modifies on one path.
+sil [ossa] @callee_read_all_modify_some : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %read = begin_access [read] [dynamic] %addr : $*Builtin.Int32
+  %v = load [trivial] %read : $*Builtin.Int32
+  end_access %read : $*Builtin.Int32
+  cond_br %0, bb1, bb2
+bb1:
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %v to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Modifies on every path, and forwards the box to a callee that only modifies it on
+// some paths.
+sil [ossa] @callee_forwards_to_may_modify : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  %f = function_ref @callee_may_modify : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %a = apply %f(%0, %1) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Modifies on every path, and forwards the box to itself on some paths.
+sil [ossa] @callee_recursive : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  cond_br %0, bb1, bb2
+bb1:
+  %f = function_ref @callee_recursive : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %a = apply %f(%0, %1) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// Modifies after a call that may throw.
+sil [ossa] @callee_throws_before_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> @error any Error {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %f = function_ref @throwing_func : $@convention(thin) () -> @error any Error
+  try_apply %f() : $@convention(thin) () -> @error any Error, normal bb1, error bb2
+bb1(%n : $()):
+  %addr = project_box %0 : ${ var Builtin.Int32 }, 0
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  %r = tuple ()
+  return %r : $()
+bb2(%e : @owned $any Error):
+  throw %e : $any Error
+}
+
+// The callee may modify the box while a read is in progress. Only dynamic
+// enforcement can check it.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_may_modify_during_read :
+// CHECK:         alloc_box
+// CHECK:         begin_access [read] [dynamic]
+// CHECK-LABEL: } // end sil function 'not_promoted_may_modify_during_read'
+sil [ossa] @not_promoted_may_modify_during_read : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_may_modify : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %access = begin_access [read] [dynamic] %addr : $*Builtin.Int32
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  end_access %access : $*Builtin.Int32
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee always modifies the box while a read is in progress.
+// DiagnoseStaticExclusivity reports the conflict.
+//
+// CHECK-LABEL: sil [ossa] @promoted_must_modify_during_read :
+// CHECK-NOT:     alloc_box
+// CHECK:         begin_access [read] [static]
+// CHECK-LABEL: } // end sil function 'promoted_must_modify_during_read'
+sil [ossa] @promoted_must_modify_during_read : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_must_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %access = begin_access [read] [dynamic] %addr : $*Builtin.Int32
+  %call = apply %f(%box) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  end_access %access : $*Builtin.Int32
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee only modifies the box on some paths. No access is in progress at the
+// call, but promotion doesn't depend on the accesses that enclose a call.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_may_modify_without_access :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_may_modify_without_access'
+sil [ossa] @not_promoted_may_modify_without_access : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_may_modify : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee modifies on both arms of a branch.
+//
+// CHECK-LABEL: sil [ossa] @promoted_modify_both_arms :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promoted_modify_both_arms'
+sil [ossa] @promoted_modify_both_arms : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_modify_both_arms : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A path that ends in unreachable doesn't count.
+//
+// CHECK-LABEL: sil [ossa] @promoted_modify_else_unreachable :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promoted_modify_else_unreachable'
+sil [ossa] @promoted_modify_else_unreachable : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_modify_else_unreachable : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A path that calls a function that never returns doesn't count.
+//
+// CHECK-LABEL: sil [ossa] @promoted_modify_else_noreturn :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promoted_modify_else_noreturn'
+sil [ossa] @promoted_modify_else_noreturn : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_modify_else_noreturn : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A path that loops and then traps doesn't count.
+//
+// CHECK-LABEL: sil [ossa] @promoted_modify_else_loop_then_trap :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promoted_modify_else_loop_then_trap'
+sil [ossa] @promoted_modify_else_loop_then_trap : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_modify_else_loop_then_trap : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee only reads. A read in progress can't conflict.
+//
+// CHECK-LABEL: sil [ossa] @promoted_read_only_during_read :
+// CHECK-NOT:     alloc_box
+// CHECK:         begin_access [read] [static]
+// CHECK-LABEL: } // end sil function 'promoted_read_only_during_read'
+sil [ossa] @promoted_read_only_during_read : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_read_only : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %access = begin_access [read] [dynamic] %addr : $*Builtin.Int32
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  end_access %access : $*Builtin.Int32
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee reads on every path. A modify in progress always conflicts, and
+// DiagnoseStaticExclusivity reports it.
+//
+// CHECK-LABEL: sil [ossa] @promoted_read_only_during_modify :
+// CHECK-NOT:     alloc_box
+// CHECK:         begin_access [modify] [static]
+// CHECK-LABEL: } // end sil function 'promoted_read_only_during_modify'
+sil [ossa] @promoted_read_only_during_modify : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_read_only : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %access = begin_access [modify] [dynamic] %addr : $*Builtin.Int32
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  end_access %access : $*Builtin.Int32
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A read on every path doesn't decide a conflict with a read in progress, so a
+// modify on some paths is undecided.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_read_all_modify_some :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_read_all_modify_some'
+sil [ossa] @not_promoted_read_all_modify_some : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_read_all_modify_some : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee modifies on all paths, but the call it forwards the box to is
+// undecided. An access in the callee may be in progress at that call.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_forwards_to_may_modify :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_forwards_to_may_modify'
+sil [ossa] @not_promoted_forwards_to_may_modify : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_forwards_to_may_modify : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// A recursive callee can't be summarized.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_recursive :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_recursive'
+sil [ossa] @not_promoted_recursive : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_recursive : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee throws, without modifying, on the error path.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_throws_before_modify :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_throws_before_modify'
+sil [ossa] @not_promoted_throws_before_modify : $@convention(thin) () -> @error any Error {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_throws_before_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> @error any Error
+  try_apply %f(%box) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> @error any Error, normal bb1, error bb2
+bb1(%n : $()):
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+bb2(%e : @owned $any Error):
+  destroy_value %box : ${ var Builtin.Int32 }
+  throw %e : $any Error
+}
+
+// -----------------------------------------------------------------------------
+// Closures that capture the box. DiagnoseStaticExclusivity treats a closure
+// argument as accessed at the call, whether or not the callee calls it, so its
+// accesses happen on all paths only if the callee calls it on all paths.
+
+// Calls the closure on every path.
+sil [ossa] @callee_calls_closure : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @guaranteed $@callee_guaranteed () -> ()):
+  %c = apply %1() : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// Calls the closure on one path.
+sil [ossa] @callee_may_call_closure : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @guaranteed $@callee_guaranteed () -> ()):
+  cond_br %0, bb1, bb2
+bb1:
+  %c = apply %1() : $@callee_guaranteed () -> ()
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// A closure that modifies the box on every path is called directly.
+//
+// CHECK-LABEL: sil [ossa] @promoted_closure_called :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promoted_closure_called'
+sil [ossa] @promoted_closure_called : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %cf = function_ref @callee_must_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %copy = copy_value %box : ${ var Builtin.Int32 }
+  %closure = partial_apply [callee_guaranteed] %cf(%copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %c = apply %closure() : $@callee_guaranteed () -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The closure is passed to a callee that calls it on every path.
+//
+// CHECK-LABEL: sil [ossa] @promoted_closure_argument_always_called :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promoted_closure_argument_always_called'
+sil [ossa] @promoted_closure_argument_always_called : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %cf = function_ref @callee_must_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %copy = copy_value %box : ${ var Builtin.Int32 }
+  %closure = partial_apply [callee_guaranteed] %cf(%copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %f = function_ref @callee_calls_closure : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %c = apply %f(%0, %closure) : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The closure is passed to a callee that only calls it on some paths.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_closure_argument_may_be_called :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_closure_argument_may_be_called'
+sil [ossa] @not_promoted_closure_argument_may_be_called : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %cf = function_ref @callee_must_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %copy = copy_value %box : ${ var Builtin.Int32 }
+  %closure = partial_apply [callee_guaranteed] %cf(%copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %f = function_ref @callee_may_call_closure : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %c = apply %f(%0, %closure) : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee forms a closure that captures its box argument and calls it. The closure modifies the
+// box on every path, so the callee does too.
+sil [ossa] @callee_forms_closure_and_calls : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %cf = function_ref @callee_must_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %copy = copy_value %0 : ${ var Builtin.Int32 }
+  %closure = partial_apply [callee_guaranteed] %cf(%copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %c = apply %closure() : $@callee_guaranteed () -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @promoted_callee_forms_closure_called :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promoted_callee_forms_closure_called'
+sil [ossa] @promoted_callee_forms_closure_called : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_forms_closure_and_calls : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%box) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee forms a closure that captures its box argument and passes it to a callee that only
+// calls it on some paths.
+sil [ossa] @callee_forms_closure_may_call : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %cf = function_ref @callee_must_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %copy = copy_value %1 : ${ var Builtin.Int32 }
+  %closure = partial_apply [callee_guaranteed] %cf(%copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %f = function_ref @callee_may_call_closure : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %c = apply %f(%0, %closure) : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @not_promoted_callee_forms_closure_may_be_called :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_callee_forms_closure_may_be_called'
+sil [ossa] @not_promoted_callee_forms_closure_may_be_called : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_forms_closure_may_call : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The closure is passed to a callee that never calls it.
+sil [ossa] @callee_ignores_closure : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @guaranteed $@callee_guaranteed () -> ()):
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @not_promoted_closure_argument_never_called :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_closure_argument_never_called'
+sil [ossa] @not_promoted_closure_argument_never_called : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %cf = function_ref @callee_must_modify : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %copy = copy_value %box : ${ var Builtin.Int32 }
+  %closure = partial_apply [callee_guaranteed] %cf(%copy) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %f = function_ref @callee_ignores_closure : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> ()
+  %c = apply %f(%0, %closure) : $@convention(thin) (Builtin.Int1, @guaranteed @callee_guaranteed () -> ()) -> ()
+  destroy_value %closure : $@callee_guaranteed () -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// -----------------------------------------------------------------------------
+// Condition 2: the box doesn't reach a call through two captures.
+// DiagnoseStaticExclusivity can't check accesses through two arguments of a
+// call against each other.
+
+sil [ossa] @callee_takes_box_twice : $@convention(thin) (@guaranteed { var Builtin.Int32 }, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int32 }, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @callee_takes_closure_and_box : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : @guaranteed $@noescape @callee_guaranteed () -> (), %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @closure_captures_address : $@convention(thin) (@inout_aliasable Builtin.Int32) -> () {
+bb0(%0 : @closureCapture $*Builtin.Int32):
+  %r = tuple ()
+  return %r : $()
+}
+
+// The box is passed twice.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_box_passed_twice :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_box_passed_twice'
+sil [ossa] @not_promoted_box_passed_twice : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_takes_box_twice : $@convention(thin) (@guaranteed { var Builtin.Int32 }, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%box, %box) : $@convention(thin) (@guaranteed { var Builtin.Int32 }, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The box is passed along with a non-escaping closure that captures its address.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_box_and_address_capture :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_box_and_address_capture'
+sil [ossa] @not_promoted_box_and_address_capture : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %cf = function_ref @closure_captures_address : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %cf(%addr) : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+  %f = function_ref @callee_takes_closure_and_box : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%pa, %box) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %pa : $@noescape @callee_guaranteed () -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The same, with the closure capturing a projection of the box's address.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_box_and_forwarded_address_capture :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_box_and_forwarded_address_capture'
+sil [ossa] @not_promoted_box_and_forwarded_address_capture : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %cast = unchecked_addr_cast %addr : $*Builtin.Int32 to $*Builtin.Int32
+  %cf = function_ref @closure_captures_address : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %cf(%cast) : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+  %f = function_ref @callee_takes_closure_and_box : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%pa, %box) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %pa : $@noescape @callee_guaranteed () -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The conditions hold inside callees too, through BoxAccessSummary.
+
+sil [ossa] @callee_passes_box_twice : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %f = function_ref @callee_takes_box_twice : $@convention(thin) (@guaranteed { var Builtin.Int32 }, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %0) : $@convention(thin) (@guaranteed { var Builtin.Int32 }, @guaranteed { var Builtin.Int32 }) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// The box is passed once, but the callee passes it twice to another call.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_callee_passes_box_twice :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_callee_passes_box_twice'
+sil [ossa] @not_promoted_callee_passes_box_twice : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_passes_box_twice : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%box) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @callee_passes_box_and_address_capture : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %addr = project_box %0 : ${ var Builtin.Int32 }, 0
+  %cf = function_ref @closure_captures_address : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %cf(%addr) : $@convention(thin) (@inout_aliasable Builtin.Int32) -> ()
+  %f = function_ref @callee_takes_closure_and_box : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%pa, %0) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %pa : $@noescape @callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// The callee passes its box along with a non-escaping closure that captures its address.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_callee_passes_box_and_address_capture :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_callee_passes_box_and_address_capture'
+sil [ossa] @not_promoted_callee_passes_box_and_address_capture : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_passes_box_and_address_capture : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%box) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @closure_captures_box : $@convention(thin) (@owned { var Builtin.Int32 }) -> () {
+bb0(%0 : @closureCapture @owned ${ var Builtin.Int32 }):
+  destroy_value %0 : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @callee_takes_box_closure_and_box : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : @guaranteed $@callee_guaranteed () -> (), %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %r = tuple ()
+  return %r : $()
+}
+
+// A closure that captures the box is passed along with the box.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_closure_and_box :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_closure_and_box'
+sil [ossa] @not_promoted_closure_and_box : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %cf = function_ref @closure_captures_box : $@convention(thin) (@owned { var Builtin.Int32 }) -> ()
+  %copy = copy_value %box : ${ var Builtin.Int32 }
+  %pa = partial_apply [callee_guaranteed] %cf(%copy) : $@convention(thin) (@owned { var Builtin.Int32 }) -> ()
+  %f = function_ref @callee_takes_box_closure_and_box : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%pa, %box) : $@convention(thin) (@guaranteed @callee_guaranteed () -> (), @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %pa : $@callee_guaranteed () -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// -----------------------------------------------------------------------------
+// Uses of the box's projection that forward or escape its address. Every use is
+// classified: an access through a forwarded address is still an access, and a
+// use that can't be tracked prevents promotion.
+
+// Modifies on one path, through a cast of the projection.
+sil [ossa] @callee_may_modify_through_cast : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  cond_br %0, bb1, bb2
+bb1:
+  %addr = project_box %1 : ${ var Builtin.Int32 }, 0
+  %cast = unchecked_addr_cast %addr : $*Builtin.Int32 to $*Builtin.Int32
+  %13 = integer_literal $Builtin.Int32, 13
+  %w = begin_access [modify] [dynamic] %cast : $*Builtin.Int32
+  store %13 to [trivial] %w : $*Builtin.Int32
+  end_access %w : $*Builtin.Int32
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// The access through the cast is seen, so the callee is undecided.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_may_modify_through_cast :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_may_modify_through_cast'
+sil [ossa] @not_promoted_may_modify_through_cast : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %f = function_ref @callee_may_modify_through_cast : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @box_callee_no_access : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int32 }):
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// The box's address escapes as a pointer, which can't be tracked. The box is passed to a callee, so
+// its accesses are checked and it isn't promoted.
+//
+// CHECK-LABEL: sil [ossa] @not_promoted_address_to_pointer :
+// CHECK:         alloc_box
+// CHECK-LABEL: } // end sil function 'not_promoted_address_to_pointer'
+sil [ossa] @not_promoted_address_to_pointer : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %ptr = address_to_pointer %addr : $*Builtin.Int32 to $Builtin.RawPointer
+  %f = function_ref @box_callee_no_access : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  apply %f(%box) : $@convention(thin) (@guaranteed { var Builtin.Int32 }) -> ()
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The box is not passed to any function, so no accesses of the box are checked statically, and it is
+// promoted whatever its projection is used for.
+//
+// CHECK-LABEL: sil [ossa] @promote_address_to_pointer_no_callee :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promote_address_to_pointer_no_callee'
+sil [ossa] @promote_address_to_pointer_no_callee : $@convention(thin) () -> () {
+bb0:
+  %box = alloc_box ${ var Builtin.Int32 }
+  %addr = project_box %box : ${ var Builtin.Int32 }, 0
+  %42 = integer_literal $Builtin.Int32, 42
+  store %42 to [trivial] %addr : $*Builtin.Int32
+  %ptr = address_to_pointer %addr : $*Builtin.Int32 to $Builtin.RawPointer
+  destroy_value %box : ${ var Builtin.Int32 }
+  %r = tuple ()
+  return %r : $()
+}
+
+// -----------------------------------------------------------------------------
+// Promotion is mandatory for noncopyable variables, because the move-only
+// checker runs after MandatoryAllocBoxToStack and requires it. See the FIXME in
+// exclusivity_static_diagnostics_noncopyable_box.swift.
+
+struct NC: ~Copyable {
+  var i: Builtin.Int32
+}
+
+sil [ossa] @nc_callee_may_modify : $@convention(thin) (Builtin.Int1, @guaranteed { var NC }) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @closureCapture @guaranteed ${ var NC }):
+  cond_br %0, bb1, bb2
+bb1:
+  %addr = project_box %1 : ${ var NC }, 0
+  %w = begin_access [modify] [dynamic] %addr : $*NC
+  end_access %w : $*NC
+  br bb3
+bb2:
+  br bb3
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @promoted_noncopyable_may_modify :
+// CHECK-NOT:     alloc_box
+// CHECK-LABEL: } // end sil function 'promoted_noncopyable_may_modify'
+sil [ossa] @promoted_noncopyable_may_modify : $@convention(thin) (Builtin.Int1, @owned NC) -> () {
+bb0(%0 : $Builtin.Int1, %1 : @owned $NC):
+  %box = alloc_box ${ var NC }
+  %addr = project_box %box : ${ var NC }, 0
+  store %1 to [init] %addr : $*NC
+  %f = function_ref @nc_callee_may_modify : $@convention(thin) (Builtin.Int1, @guaranteed { var NC }) -> ()
+  %access = begin_access [read] [dynamic] %addr : $*NC
+  %call = apply %f(%0, %box) : $@convention(thin) (Builtin.Int1, @guaranteed { var NC }) -> ()
+  end_access %access : $*NC
+  destroy_value %box : ${ var NC }
+  %r = tuple ()
+  return %r : $()
+}
