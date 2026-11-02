@@ -3201,15 +3201,29 @@ extension ASTGenVisitor {
     return self.generateSourceRange(start: firstNameTok, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
 
+  /// The source text between a string literal's quotes, exactly as written.
+  ///
+  /// The C++ parser stores attribute strings this way and cooks them when they
+  /// are printed or used, so a multi-line literal keeps its first newline and
+  /// the indentation before the closing quotes, and an escape stays an escape.
+  private func rawStringLiteralContent(open: TokenSyntax, close: TokenSyntax) -> BridgedStringRef {
+    let start = open.endPositionBeforeTrailingTrivia.utf8Offset
+    let end = close.positionAfterSkippingLeadingTrivia.utf8Offset
+    return SyntaxText(
+      baseAddress: self.base.baseAddress! + start,
+      count: max(end - start, 0)
+    ).bridged
+  }
+
   func generateStringLiteralTextIfNotInterpolated(expr node: some ExprSyntaxProtocol) -> BridgedStringRef? {
-    if let segments = node.as(SimpleStringLiteralExprSyntax.self)?.segments {
-      return extractRawText(segments).bridged
-    } else if let segments = node.as(StringLiteralExprSyntax.self)?.segments {
-      guard segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }) else {
+    if let literal = node.as(SimpleStringLiteralExprSyntax.self) {
+      return rawStringLiteralContent(open: literal.openingQuote, close: literal.closingQuote)
+    } else if let literal = node.as(StringLiteralExprSyntax.self) {
+      guard literal.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }) else {
         self.diagnose(.forbiddenInterpolatedStringArgument(node))
         return nil
       }
-      return extractRawText(segments).bridged
+      return rawStringLiteralContent(open: literal.openingQuote, close: literal.closingQuote)
     }
     self.diagnose(.expectedStringLiteralArgument(node))
     return nil
