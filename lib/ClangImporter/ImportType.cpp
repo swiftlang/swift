@@ -952,6 +952,13 @@ namespace {
 
       Type mappedType = decl->getDeclaredInterfaceType();
 
+      // A typedef imported as a member of an Objective-C protocol is a
+      // typealias sugared on the protocol's 'Self', which is not available
+      // wherever the typedef is used, so use its underlying type instead.
+      if (auto *typeAlias = dyn_cast<TypeAliasDecl>(decl))
+        if (typeAlias->getDeclContext()->getSelfProtocolDecl())
+          mappedType = typeAlias->getUnderlyingType();
+
       if (getSwiftNewtypeAttr(type->getDecl(), Impl.CurrentVersion)) {
         auto underlying = Visit(type->getDecl()->getUnderlyingType());
         switch (underlying.Hint) {
