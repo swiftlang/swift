@@ -139,10 +139,12 @@ struct BridgedOptimizerUtilities {
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
   typedef void (* _Nonnull UpdateLifetimeValuesFn)(BridgedContext, BridgedArrayRef, BridgedArrayRef);
+  typedef bool (* _Nonnull QueryFunctionFn)(BridgedContext, BridgedFunction);
 
   static void registerLifetimeCompletion(UpdateLifetimeFunctionFn completeAllLifetimesFn,
                                          UpdateLifetimeValuesFn completeLifetimeFn);
   static void registerControlFlowUtils(UpdateFunctionFn breakInfiniteLoopsFn);
+  static void registerGlobalInitUtils(QueryFunctionFn isFoldableGlobalObjectInitializerFn);
 };
 
 struct BridgedLoopTree {
