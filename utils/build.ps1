@@ -137,6 +137,11 @@ Build and include the no-assert toolchain variant in the output.
 .PARAMETER Summary
 Display a build time summary at the end of the build. Helpful for performance analysis.
 
+.PARAMETER Trace
+Write the build timings to build-timings.json in the Stage directory (or BinaryCache
+if Stage is empty) in the Chrome Trace Event format, which can be viewed in
+https://ui.perfetto.dev or chrome://tracing.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -235,7 +240,8 @@ param
   [ValidateSet("debug", "release")]
   [string] $FoundationTestConfiguration = "debug",
 
-  [switch] $Summary
+  [switch] $Summary,
+  [switch] $Trace
 )
 
 ## Prepare the build environment.
@@ -722,8 +728,9 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 $CurrentOperation = $null
 $BuildStopwatch = [Diagnostics.Stopwatch]::StartNew()
+$RecordTimings = $Summary -or $Trace
 
-if ($Summary) {
+if ($RecordTimings) {
   Add-Type -Namespace Win32 -Name Kernel32 -MemberDefinition @"
 [DllImport("kernel32.dll")]
 public static extern bool GetSystemTimes(out long lpIdleTime, out long lpKernelTime, out long lpUserTime);
@@ -738,7 +745,7 @@ function Get-ProcessorTimes {
   return @{ Busy = $KernelTime + $UserTime - $IdleTime; Idle = $IdleTime }
 }
 
-$BuildStartProcessorTimes = if ($Summary) { Get-ProcessorTimes } else { $null }
+$BuildStartProcessorTimes = if ($RecordTimings) { Get-ProcessorTimes } else { $null }
 
 function Add-TimingData {
   param
@@ -754,6 +761,7 @@ function Add-TimingData {
     Arch = $Platform.Architecture.LLVMName
     Platform = $Platform.OS.ToString()
     "Build Step" = $BuildStep
+    Start = $BuildStopwatch.Elapsed
     "Elapsed Time" = [TimeSpan]::Zero
     CPU = 0
     Parent = $Parent
@@ -778,7 +786,7 @@ function Record-OperationTime {
     [Parameter(Mandatory)]
     [ScriptBlock] $ScriptBlock
   )
-  if (!$Summary) {
+  if (!$RecordTimings) {
     & $ScriptBlock
     return
   }
@@ -887,6 +895,33 @@ function Write-Summary {
   }
 
   @($Result) + $TotalRow | Format-Table -AutoSize
+}
+
+# Writes the timing data in the Chrome Trace Event format, which can be loaded
+# in https://ui.perfetto.dev or chrome://tracing to view the build timeline.
+function Write-TimingTrace([string] $Path) {
+  $Events = foreach ($Entry in $TimingData) {
+    [ordered]@{
+      name = $Entry."Build Step"
+      cat = "$($Entry.Platform) $($Entry.Arch)"
+      ph = "X"
+      # Timestamps are in microseconds, TimeSpan ticks are 100ns.
+      ts = [long]($Entry.Start.Ticks / 10)
+      dur = [long]($Entry."Elapsed Time".Ticks / 10)
+      pid = 0
+      tid = 0
+      args = [ordered]@{
+        Platform = $Entry.Platform
+        Arch = $Entry.Arch
+        CPU = [math]::Round($Entry.CPU, 2)
+      }
+    }
+  }
+
+  New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
+  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = @($Events) })
+  [IO.File]::WriteAllText($Path, $Json)
+  Write-Host "Build timeline written to $Path" -ForegroundColor Cyan
 }
 
 function Get-AndroidNDK {
@@ -6498,5 +6533,10 @@ if ($IncludeSBoM) {
 } finally {
   if ($Summary) {
     Write-Summary
+  }
+  if ($Trace) {
+    # Stage the trace with the other CI artifacts so that it can be downloaded.
+    $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
+    Write-TimingTrace "$TimingTraceDir\build-timings.json"
   }
 }
