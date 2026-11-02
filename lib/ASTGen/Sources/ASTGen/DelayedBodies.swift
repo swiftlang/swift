@@ -22,6 +22,7 @@
 import ASTBridging
 import SwiftDiagnostics
 import SwiftIfConfig
+@_spi(ExperimentalLanguageFeatures) import SwiftParser
 import SwiftParserDiagnostics
 @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
@@ -302,6 +303,8 @@ extension ASTGenVisitor {
     self.withDeclContext(declContext) {
       setParsed(self.generate(codeBlock: body))
     }
+    decl.setBodyFingerprint(
+      FingerprintVisitor.fingerprint(ofBody: body, configuredRegions: self.configuredRegions).bridged)
   }
 }
 
@@ -329,6 +332,8 @@ extension ASTGenVisitor {
       accessor.setParsedBody(
         self.generateImplicitGetterBody(items, leftBrace: leftBrace, rightBrace: rightBrace))
     }
+    accessor.asDecl.setBodyFingerprint(
+      FingerprintVisitor.fingerprint(ofBody: block, configuredRegions: self.configuredRegions).bridged)
   }
 
   func generateImplicitGetterBody(
@@ -377,8 +382,13 @@ public func buildFunctionBody(
   let held = sourceFile.pointee.heldBackDiagnostics(astContext: ctx)
   emitHeldBackParserDiagnostics(held.parser[offset], from: sourceFile, to: diagEngine)
 
+  let fingerprint = FingerprintVisitor.fingerprint(
+    ofBody: bodyNode,
+    configuredRegions: visitor.configuredRegions
+  ).bridged
+
   if let body = bodyNode.as(CodeBlockSyntax.self) {
-    decl.setDelayedBodyParsed(visitor.generate(codeBlock: body))
+    decl.setDelayedBodyParsed(visitor.generate(codeBlock: body), fingerprint: fingerprint)
   } else if let block = bodyNode.as(AccessorBlockSyntax.self),
     case .getter(let items) = block.accessors
   {
@@ -386,7 +396,8 @@ public func buildFunctionBody(
       visitor.generateImplicitGetterBody(
         items,
         leftBrace: visitor.generateSourceLoc(block.leftBrace),
-        rightBrace: visitor.generateSourceLoc(block.rightBrace)))
+        rightBrace: visitor.generateSourceLoc(block.rightBrace)),
+      fingerprint: fingerprint)
   } else {
     preconditionFailure("delayed function body is not a code block")
   }
@@ -394,6 +405,65 @@ public func buildFunctionBody(
   if let configDiagnostics = held.ifConfig[offset] {
     visitor.diagnoseAll(configDiagnostics)
   }
+}
+
+/// Build the body of a function-like declaration from the text of its
+/// replacement body, which lives in a buffer of its own.
+///
+/// \p bodyText starts at the `{` of the body and ends where the body does. The
+/// diagnostics of the body come from parsing it, since the syntax tree of
+/// \p sourceFilePtr holds the body it replaces.
+@_cdecl("swift_ASTGen_buildReplacementFunctionBody")
+public func buildReplacementFunctionBody(
+  diagEngine: BridgedDiagnosticEngine,
+  sourceFilePtr: UnsafeMutableRawPointer,
+  decl: BridgedDecl,
+  declContext: BridgedDeclContext,
+  ctx: BridgedASTContext,
+  bodyText: BridgedStringRef
+) {
+  let originalFile = sourceFilePtr.assumingMemoryBound(to: ExportedSourceFile.self)
+  let buffer = UnsafeBufferPointer(start: bodyText.data, count: bodyText.count)
+
+  var parser = Parser(
+    buffer,
+    swiftVersion: Parser.SwiftVersion(from: ctx),
+    languageFeatures: Parser.LanguageFeatures(from: ctx)
+  )
+  let body = CodeBlockSyntax.parse(from: &parser)
+
+  var bodyFile = ExportedSourceFile(
+    buffer: buffer,
+    moduleName: originalFile.pointee.moduleName,
+    fileName: originalFile.pointee.fileName,
+    syntax: Syntax(body),
+    generatedKind: .replacedFunctionBody
+  )
+  bodyFile.downgradePlaceholderErrorsToWarnings = originalFile.pointee.downgradePlaceholderErrorsToWarnings
+  let configuredRegions = bodyFile.configuredRegions(astContext: ctx)
+
+  let visitor = ASTGenVisitor(
+    diagnosticEngine: diagEngine,
+    sourceBuffer: buffer,
+    declContext: declContext,
+    astContext: ctx,
+    configuredRegions: configuredRegions
+  )
+
+  // The parser's diagnostics come first, as they would have in the source.
+  let parserDiagnostics = ParseDiagnosticsGenerator.diagnostics(for: body).filter {
+    configuredRegions.isActive($0.node) != .unparsed
+  }
+  withUnsafeMutablePointer(to: &bodyFile) {
+    emitHeldBackParserDiagnostics(parserDiagnostics, from: $0, to: diagEngine)
+  }
+
+  decl.setDelayedBodyParsed(
+    visitor.generate(codeBlock: body),
+    fingerprint: FingerprintVisitor.fingerprint(ofBody: body, configuredRegions: configuredRegions).bridged
+  )
+
+  visitor.diagnoseAll(configuredRegions.diagnostics)
 }
 
 private func emitHeldBackParserDiagnostics(

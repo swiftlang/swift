@@ -8555,6 +8555,12 @@ public:
     BodyAndFP.setFingerprint(fp);
   }
 
+  /// Record the fingerprint of the tokens of the parsed body, for a body whose
+  /// parsed form has already been provided.
+  void setBodyFingerprint(std::optional<Fingerprint> fp) {
+    BodyAndFP.setFingerprint(fp);
+  }
+
   /// Was there a nested type declaration detected when parsing this
   /// function was skipped?
   bool hasNestedTypeDeclarations() const {

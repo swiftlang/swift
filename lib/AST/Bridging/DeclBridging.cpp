@@ -264,9 +264,16 @@ void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value) {
       ->setHasNestedTypeDeclarations(value);
 }
 
-void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body) {
+void BridgedDecl_setBodyFingerprint(BridgedDecl decl,
+                                    BridgedFingerprint fingerprint) {
   cast<AbstractFunctionDecl>(decl.unbridged())
-      ->setBody(body.unbridged(), AbstractFunctionDecl::BodyKind::Parsed);
+      ->setBodyFingerprint(fingerprint.unbridged());
+}
+
+void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body,
+                                      BridgedFingerprint fingerprint) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setBodyParsed(body.unbridged(), fingerprint.unbridged());
 }
 
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,

@@ -53,6 +53,22 @@ final class FingerprintVisitor: SyntaxVisitor {
     Fingerprint(core: hasher.finalize())
   }
 
+  /// Whether to hash the tokens of function bodies and other code blocks,
+  /// rather than skipping them as part of a declaration's own fingerprint.
+  var includesBodies = false
+
+  /// The fingerprint of a function body: a hash of the tokens the C++ parser
+  /// would have consumed for it, i.e., those in active `#if` clauses.
+  static func fingerprint(
+    ofBody body: some SyntaxProtocol,
+    configuredRegions: ConfiguredRegions
+  ) -> Fingerprint {
+    let visitor = FingerprintVisitor(configuredRegions: configuredRegions)
+    visitor.includesBodies = true
+    visitor.walk(body)
+    return visitor.finalize()
+  }
+
   override func visit(_ token: TokenSyntax) -> SyntaxVisitorContinueKind {
     // Collect all token texts.
     hasher.combine(text: token.rawText)
@@ -65,14 +81,15 @@ final class FingerprintVisitor: SyntaxVisitor {
   var root: MemberBlockSyntax?
 
   override func visit(_ node: MemberBlockSyntax) -> SyntaxVisitorContinueKind {
-    // Skip nested nominal decl / extension member blocks.
-    return node == root ? .visitChildren : .skipChildren
+    // Skip nested nominal decl / extension member blocks, unless hashing a
+    // body, which covers the local types declared inside it.
+    return includesBodies || node == root ? .visitChildren : .skipChildren
   }
 
   override func visit(_ node: AccessorBlockSyntax) -> SyntaxVisitorContinueKind {
     // The statements of an implicit getter (`var p: Int { return 0 }`) are a
     // function body just like a `CodeBlockSyntax`, but are not wrapped in one.
-    if case .getter = node.accessors {
+    if case .getter = node.accessors, !includesBodies {
       hasher.combine(text: node.leftBrace.rawText)
       hasher.combine(text: node.rightBrace.rawText)
       return .skipChildren
@@ -84,7 +101,7 @@ final class FingerprintVisitor: SyntaxVisitor {
     // Skip function bodies.
     // FIXME: Don't skip closure bodies or other control flow statement blocks.
     //        E.g. 'var val = { if condition { "foo" } else { "bar" } }()'
-    return .skipChildren
+    return includesBodies ? .visitChildren : .skipChildren
   }
 
   override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
