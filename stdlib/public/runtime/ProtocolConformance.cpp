@@ -1096,7 +1096,7 @@ getContextDescriptor(const Metadata *conformingType) {
   auto *existentialType = dyn_cast<ExistentialTypeMetadata>(conformingType);
   if (existentialType == nullptr ||
       existentialType->getProtocols().size() != 1 ||
-      existentialType->getSuperclassConstraint() != nullptr)
+      existentialType->isClassBounded())
     return {nullptr, {}};
 
   auto proto = existentialType->getProtocols()[0];
