@@ -46,6 +46,12 @@ extension ASTGenVisitor {
 
   /// Handle built in pound keywords.
   func maybeGenerateBuiltinPound(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> MaybeGenerated<BridgedASTNode> {
+    // '#Module::name' is always a macro expansion, even if 'name' matches a
+    // builtin pound keyword (e.g., '#Testing::sourceLocation').
+    if node.moduleSelector != nil {
+      return .ignored
+    }
+
     self.diagnoseLegacyLineDirective(node)
 
     let macroNameText = node.macroName.rawText;
