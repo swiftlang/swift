@@ -5963,11 +5963,12 @@ public:
                                 VisitedConformances &visited, Label label) {
     // A recursive conformance shouldn't have its contents printed, or there's
     // infinite recursion. (This also avoids printing things that occur multiple
-    // times in a conformance hierarchy.) We also don't print the details in the
-    // parsable (JSON) output because it is far too much information when it is
-    // rendered as part of every declref that contains such a conformance.
-    auto shouldPrintDetails =
-        visited.insert(conformance).second && !Writer.isParsable();
+    // times in a conformance hierarchy.) For normal conformances, we also don't
+    // print witness details in the parsable (JSON) output because it is far too
+    // much information when rendered as part of every declref that contains
+    // such a conformance.
+    auto isFirstVisit = visited.insert(conformance).second;
+    auto shouldPrintDetails = isFirstVisit && !Writer.isParsable();
 
     auto printCommon = [&](StringRef kind) {
       printHead(kind, ASTNodeColor, label);
@@ -5994,8 +5995,8 @@ public:
                      Label::always("module"));
           printFoot();
         }, Label::always("context"));
-      } else {
-        printFlag(!shouldPrintDetails, "<details printed above>");
+      } else if (!Writer.isParsable()) {
+        printFlag(!isFirstVisit, "<details printed above>");
       }
     };
 
@@ -6092,7 +6093,7 @@ public:
       case ProtocolConformanceKind::Inherited: {
         auto conf = cast<InheritedProtocolConformance>(conformance);
         printCommon("inherited_conformance");
-        if (!shouldPrintDetails)
+        if (!isFirstVisit)
           break;
 
         printRec(conf->getInheritedConformance(), visited,
@@ -6103,22 +6104,24 @@ public:
       case ProtocolConformanceKind::Specialized: {
         auto conf = cast<SpecializedProtocolConformance>(conformance);
         printCommon("specialized_conformance");
-        if (!shouldPrintDetails)
+        if (!isFirstVisit)
           break;
 
         printRec(conf->getSubstitutionMap(),
                  SubstitutionMap::DumpStyle::Full, visited,
                  Label::optional("substitutions"));
-        if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
-          printList(*condReqs, [&](auto subReq, Label label) {
-            printRec(subReq, label);
-          }, Label::optional("conditional_reqs"));
-        } else {
-          printRecArbitrary([&](Label label) {
-            printHead("<conditional requirements unable to be computed>",
-                      ASTNodeColor, label);
-            printFoot();
-          }, Label::optional("conditional_reqs"));
+        if (!Writer.isParsable()) {
+          if (auto condReqs = conf->getConditionalRequirementsIfAvailableOrCached(/*computeIfPossible=*/false)) {
+            printList(*condReqs, [&](auto subReq, Label label) {
+              printRec(subReq, label);
+            }, Label::optional("conditional_reqs"));
+          } else {
+            printRecArbitrary([&](Label label) {
+              printHead("<conditional requirements unable to be computed>",
+                        ASTNodeColor, label);
+              printFoot();
+            }, Label::optional("conditional_reqs"));
+          }
         }
         printRec(conf->getGenericConformance(), visited,
                  Label::optional("generic_conformance"));
