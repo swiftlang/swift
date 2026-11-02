@@ -65,6 +65,13 @@ LangOptions::LangOptions() {
   disableFeature(Feature::ExtensionMacros);
 #endif
 
+  // Parse with the swift-syntax parser and ASTGen by default, if requested when
+  // the compiler was built. `-disable-experimental-feature ParserASTGen` turns
+  // it back off.
+#if SWIFT_BUILD_SWIFT_SYNTAX && defined(SWIFT_ENABLE_ASTGEN_BY_DEFAULT)
+  enableFeature(Feature::ParserASTGen);
+#endif
+
   // Enable any playground options that are enabled by default.
 #define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
   if (DefaultOn) \
