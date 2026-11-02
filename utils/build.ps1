@@ -721,6 +721,7 @@ $WindowsSDKBuilds = @($WindowsSDKArchitectures | ForEach-Object {
 
 $TimingData = New-Object System.Collections.Generic.List[System.Object]
 $CurrentOperation = $null
+$BuildStopwatch = [Diagnostics.Stopwatch]::StartNew()
 
 if ($Summary) {
   Add-Type -Namespace Win32 -Name Kernel32 -MemberDefinition @"
@@ -736,6 +737,8 @@ function Get-ProcessorTimes {
   # The kernel time includes the idle time.
   return @{ Busy = $KernelTime + $UserTime - $IdleTime; Idle = $IdleTime }
 }
+
+$BuildStartProcessorTimes = if ($Summary) { Get-ProcessorTimes } else { $null }
 
 function Add-TimingData {
   param
@@ -810,12 +813,20 @@ function Flatten-TimingEntry {
   $Indent = "  " * $Depth
   $Percentage = [math]::Round(($Entry."Elapsed Time".TotalSeconds / $TotalTime.TotalSeconds) * 100, 1)
   $FormattedTime = "{0:hh\:mm\:ss\.ff}" -f $Entry."Elapsed Time"
+  # Time spent in the step itself rather than in its children (configuring,
+  # installing, copying files, ...). Only meaningful for steps with children.
+  $FormattedSelfTime = ""
+  if ($Entry.Children) {
+    $ChildrenTicks = ($Entry.Children | ForEach-Object { $_."Elapsed Time".Ticks } | Measure-Object -Sum).Sum
+    $FormattedSelfTime = "{0:hh\:mm\:ss\.ff}" -f ($Entry."Elapsed Time" - [TimeSpan]::FromTicks($ChildrenTicks))
+  }
 
   [PSCustomObject]@{
     "Build Step" = "$Indent$($Entry.'Build Step')"
     Platform = $Entry.Platform
     Arch = $Entry.Arch
     "Elapsed Time" = $FormattedTime
+    Self = $FormattedSelfTime
     "%" = "$Percentage%"
     CPU = "$([math]::Round($Entry.CPU * 100))%"
   }
@@ -829,16 +840,37 @@ function Flatten-TimingEntry {
 function Write-Summary {
   Write-Host "Summary:" -ForegroundColor Cyan
 
-  $TotalTime = [TimeSpan]::Zero
-  $BusySeconds = 0
-  foreach ($Entry in $TimingData) {
-    if (-not $Entry.Parent) {
-      $TotalTime = $TotalTime.Add($Entry."Elapsed Time")
-      $BusySeconds += $Entry.CPU * $Entry."Elapsed Time".TotalSeconds
+  $TotalTime = $BuildStopwatch.Elapsed
+  $EndTimes = Get-ProcessorTimes
+  $BusyTime = $EndTimes.Busy - $BuildStartProcessorTimes.Busy
+  $AllTime = $BusyTime + $EndTimes.Idle - $BuildStartProcessorTimes.Idle
+  $TotalCPU = if ($AllTime -gt 0) { $BusyTime / $AllTime } else { 0 }
+
+  $TrackedTime = [TimeSpan]::Zero
+  $TrackedBusySeconds = 0
+  $RootEntries = @($TimingData | Where-Object { -not $_.Parent })
+  foreach ($Entry in $RootEntries) {
+    $TrackedTime = $TrackedTime.Add($Entry."Elapsed Time")
+    $TrackedBusySeconds += $Entry.CPU * $Entry."Elapsed Time".TotalSeconds
+  }
+
+  # Account for the time spent outside of any recorded build step.
+  $UntrackedTime = $TotalTime - $TrackedTime
+  if ($UntrackedTime -gt [TimeSpan]::Zero) {
+    $UntrackedBusySeconds = $TotalCPU * $TotalTime.TotalSeconds - $TrackedBusySeconds
+    $RootEntries += [PSCustomObject]@{
+      Arch = ""
+      Platform = ""
+      "Build Step" = "(untracked)"
+      Variant = ""
+      "Elapsed Time" = $UntrackedTime
+      CPU = [math]::Max(0, [math]::Min(1, $UntrackedBusySeconds / $UntrackedTime.TotalSeconds))
+      Parent = $null
+      Children = @()
     }
   }
 
-  $RootEntries = $TimingData | Where-Object { -not $_.Parent } | Sort-Object -Descending -Property "Elapsed Time"
+  $RootEntries = $RootEntries | Sort-Object -Descending -Property "Elapsed Time"
   $Result = foreach ($RootEntry in $RootEntries) {
     Flatten-TimingEntry $RootEntry $TotalTime
   }
@@ -849,8 +881,9 @@ function Write-Summary {
     Platform = ""
     Arch = ""
     "Elapsed Time" = $FormattedTotalTime
+    Self = ""
     "%" = "100.0%"
-    CPU = "$([math]::Round($BusySeconds / $TotalTime.TotalSeconds * 100))%"
+    CPU = "$([math]::Round($TotalCPU * 100))%"
   }
 
   @($Result) + $TotalRow | Format-Table -AutoSize
