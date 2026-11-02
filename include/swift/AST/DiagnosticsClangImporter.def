@@ -283,13 +283,13 @@ NOTE(cxx_unknown_escapability_conditional_argument, none,
      (bool, StringRef))
 NOTE(cxx_unknown_escapability_cannot_derive, none,
      "this type has unknown escapability: Swift cannot infer it from the type's "
-     "members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE",
+     "members; annotate the type with SWIFT_SELF_CONTAINED or SWIFT_VIEW",
      ())
 NOTE(cxx_unknown_escapability_nonescapable_member, none,
      "this type has unknown escapability: %select{it holds a non-'Escapable' "
      "type|its member '%1' is non-'Escapable'}0, but it provides its own copy, "
      "move or destruction, so Swift cannot tell whether it is a view; annotate "
-     "it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE", (bool, StringRef))
+     "it with SWIFT_SELF_CONTAINED or SWIFT_VIEW", (bool, StringRef))
 NOTE(cxx_unknown_escapability_pointer, none,
      "this type has unknown escapability: %select{it holds|its member '%1' is}0 "
      "a pointer or reference, and Swift cannot tell whether it owns what it "

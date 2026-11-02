@@ -30,7 +30,7 @@ module Esc {
 #include <memory>
 
 // Not copyable and polymorphic, so escapability cannot be derived from members.
-// expected-note@+1 4 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 4 {{this type has unknown escapability: Swift cannot infer it from the type's members; annotate the type with SWIFT_SELF_CONTAINED or SWIFT_VIEW}}
 struct Polymorphic {
   virtual ~Polymorphic() {}
   Polymorphic(const Polymorphic &) = delete;
@@ -61,6 +61,27 @@ struct SWIFT_ESCAPABLE Annotated {
 
 inline std::shared_ptr<Annotated> makeAnnotated() { return nullptr; }
 
+// SWIFT_SELF_CONTAINED also carries import_owned, which cannot apply to a type
+// that is neither copyable nor movable. Its escapability still applies, so it
+// is not diagnosed as ignored.
+struct SWIFT_SELF_CONTAINED SelfContained {
+  virtual ~SelfContained() {}
+  SelfContained(const SelfContained &) = delete;
+  SelfContained() {}
+};
+
+inline std::shared_ptr<SelfContained> makeSelfContained() { return nullptr; }
+
+// A bare import_owned has no effect on such a type, so it is diagnosed.
+// expected-warning@+1 {{'import_owned' Swift attribute ignored on type 'OwnedOnly': type is not copyable or destructible}}
+struct __attribute__((swift_attr("import_owned"))) OwnedOnly {
+  virtual ~OwnedOnly() {}
+  OwnedOnly(const OwnedOnly &) = delete;
+  OwnedOnly() {}
+};
+
+inline std::shared_ptr<OwnedOnly> makeOwnedOnly() { return nullptr; }
+
 struct SWIFT_NONESCAPABLE View {
   const int *p;
 };
@@ -79,7 +100,7 @@ struct Buffer {
 // A record that provides its own destruction, so its non-escapable member
 // cannot settle it. Reaching it through a container keeps it imported, and the
 // chain ends on the record the user can annotate.
-// expected-note@+1 2 {{this type has unknown escapability: its member 'v' is non-'Escapable', but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: its member 'v' is non-'Escapable', but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_SELF_CONTAINED or SWIFT_VIEW}}
 struct DtorWithView {
   View v;
   ~DtorWithView();
@@ -92,7 +113,7 @@ struct HoldsView {
 // The non-escapable type sits below the record that demoted it, so the note
 // blames the record without naming a member of it: 'v' belongs to HoldsView,
 // and HoldsView is plainly non-escapable rather than unknown.
-// expected-note@+1 2 {{this type has unknown escapability: it holds a non-'Escapable' type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: it holds a non-'Escapable' type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_SELF_CONTAINED or SWIFT_VIEW}}
 struct DtorWrapsHoldsView {
   HoldsView h;
 
@@ -102,7 +123,7 @@ struct DtorWrapsHoldsView {
 // The non-escapable type arrives as a conditional template argument, which
 // records no member to name, so the note still has to blame this record rather
 // than the Buffer it came through.
-// expected-note@+1 2 {{this type has unknown escapability: it holds a non-'Escapable' type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_ESCAPABLE or SWIFT_NONESCAPABLE}}
+// expected-note@+1 2 {{this type has unknown escapability: it holds a non-'Escapable' type, but it provides its own copy, move or destruction, so Swift cannot tell whether it is a view; annotate it with SWIFT_SELF_CONTAINED or SWIFT_VIEW}}
 struct DtorWithBufferOfView {
   Buffer<View> b;
 
@@ -150,6 +171,13 @@ func pointerMember() {
 func annotatedArgument() {
   let p = makeAnnotated()
   _ = p
+  let s = makeSelfContained()
+  _ = s
+}
+
+func ownedOnlyArgument() {
+  let p = unsafe makeOwnedOnly()
+  _ = unsafe p
 }
 
 func nonEscapableMember() {
