@@ -2547,6 +2547,13 @@ bool IRGenModule::canMakeStaticObjectReadOnly(SILType objectType) {
   return true;
 }
 
+bool IRGenModule::isReadOnlyStaticObject(SILGlobalVariable *var) {
+  if (!var->isDefinition())
+    return var->isReadOnlyStaticObject();
+
+  return canMakeStaticObjectReadOnly(var->getLoweredType());
+}
+
 ClassDecl *IRGenModule::getStaticArrayStorageDecl() {
   SmallVector<ValueDecl *, 1> results;
   Context.lookupInSwiftModule("__StaticArrayStorage", results);

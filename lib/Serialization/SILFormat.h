@@ -336,6 +336,7 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration.
     BCFixed<1>,          // Is this a let variable.
     BCFixed<1>,          // Is this marked as "used".
+    BCFixed<1>,          // Is this a read-only static object.
     BCFixed<2>,          // code generation model
     BCVBR<8>,            // # of trailing records
     TypeIDField,

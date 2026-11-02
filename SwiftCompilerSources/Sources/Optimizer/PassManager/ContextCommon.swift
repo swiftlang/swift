@@ -42,8 +42,8 @@ extension Context {
     bridgedPassContext.enableWMORequiredDiagnostics()
   }
 
-  func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
-    bridgedPassContext.canMakeStaticObjectReadOnly(objectType.bridged)
+  func isReadOnlyStaticObject(_ global: GlobalVariable) -> Bool {
+    bridgedPassContext.isReadOnlyStaticObject(global.bridged)
   }
 
   /// True if the current compilation is in whole-module mode, i.e. the SIL of all source files

@@ -92,8 +92,8 @@ SILGlobalVariable::SILGlobalVariable(SILModule &Module, SILLinkage Linkage,
                                      VarDecl *Decl)
     : SwiftObjectHeader(registeredMetatype), Module(Module), Name(Name),
       LoweredType(LoweredType), Location(Loc.value_or(SILLocation::invalid())),
-      Linkage(unsigned(Linkage)), HasLocation(Loc.has_value()), CodeGenModel(0),
-      VDecl(Decl) {
+      Linkage(unsigned(Linkage)), IsReadOnlyStaticObject(false),
+      HasLocation(Loc.has_value()), CodeGenModel(0), VDecl(Decl) {
   setSerializedKind(serializedKind);
   IsDeclaration = isAvailableExternally(Linkage);
   setLet(isGlobalLet(Decl, *this));

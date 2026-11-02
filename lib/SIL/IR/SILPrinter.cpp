@@ -4094,6 +4094,9 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (markedAsUsed())
     OS << "[used] ";
 
+  if (isReadOnlyStaticObject())
+    OS << "[readonly_static_object] ";
+
   if (auto cgModel = codeGenerationModel()) {
     switch (*cgModel) {
     case CodeGenerationModel::Interface:

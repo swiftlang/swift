@@ -94,6 +94,11 @@ private:
   /// added to the llvm.used list.
   unsigned IsUsed : 1;
 
+  /// Whether this statically initialized object is emitted as a read-only
+  /// static object. The module which defines the object decides this. Clients
+  /// must not recompute it, because it determines the symbol name and layout.
+  unsigned IsReadOnlyStaticObject : 1;
+
   /// Whether or not this is a declaration.
   unsigned IsDeclaration : 1;
 
@@ -225,6 +230,11 @@ public:
   /// Is this an immutable 'let' property?
   bool isLet() const { return IsLet; }
   void setLet(bool isLet) { IsLet = isLet; }
+
+  /// Is this statically initialized object emitted as a read-only static
+  /// object? See IRGenModule::canMakeStaticObjectReadOnly.
+  bool isReadOnlyStaticObject() const { return IsReadOnlyStaticObject; }
+  void setReadOnlyStaticObject(bool value) { IsReadOnlyStaticObject = value; }
 
   /// Determine the explicit code generation model for this global variable.
   std::optional<CodeGenerationModel> codeGenerationModel() const;

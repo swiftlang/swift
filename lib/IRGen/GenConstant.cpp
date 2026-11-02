@@ -416,8 +416,8 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
     Address addr = IGM.getAddrOfSILGlobalVariable(var, ti, NotForDefinition);
     return addr.getAddress();
   } else if (auto *gVal = dyn_cast<GlobalValueInst>(operand)) {
-    assert(IGM.canMakeStaticObjectReadOnly(gVal->getType()));
     SILGlobalVariable *var = gVal->getReferencedGlobal();
+    assert(IGM.isReadOnlyStaticObject(var));
     auto &ti = IGM.getTypeInfo(var->getLoweredType());
     auto expansion = IGM.getResilienceExpansionForLayout(var);
     assert(ti.isFixedSize(expansion));

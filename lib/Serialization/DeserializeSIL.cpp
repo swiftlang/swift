@@ -4668,11 +4668,11 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
   DeclID dID;
   ModuleID parentModuleID;
   unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed,
-      codeGenerationModel;
+      IsReadOnlyStaticObject, codeGenerationModel;
   unsigned numTrailingRecords;
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
                                  IsDeclaration, IsLet, IsUsed,
-                                 codeGenerationModel,
+                                 IsReadOnlyStaticObject, codeGenerationModel,
                                  numTrailingRecords, TyID, dID,
                                  parentModuleID);
   if (TyID == 0) {
@@ -4719,6 +4719,7 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
       std::nullopt, globalDecl);
   v->setLet(IsLet);
   v->setMarkedAsUsed(IsUsed);
+  v->setReadOnlyStaticObject(IsReadOnlyStaticObject);
   if (codeGenerationModel) {
     v->setCodeGenerationModel(
         static_cast<CodeGenerationModel>(codeGenerationModel - 1));

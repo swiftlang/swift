@@ -1063,6 +1063,11 @@ public:
   
   bool canMakeStaticObjectReadOnly(SILType objectType);
 
+  /// Returns true if the statically initialized object \p var is a read-only
+  /// static object. For an object which is only declared in this module, this
+  /// is the decision of the module which defines it.
+  bool isReadOnlyStaticObject(SILGlobalVariable *var);
+
   ClassDecl *getStaticArrayStorageDecl();
 
 #define FEATURE(N, V)                                           \
