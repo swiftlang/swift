@@ -3444,8 +3444,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Specialize: {
       auto abbrCode = S.DeclTypeAbbrCodes[SpecializeDeclAttrLayout::Code];
       auto attr = cast<AbstractSpecializeAttr>(DA);
-      auto *VD = cast<ValueDecl>(D);
-      auto *targetFunDecl = attr->getTargetFunctionDecl(VD);
+      // On an extension, it has no target.
+      auto *VD = dyn_cast<ValueDecl>(D);
+      auto *targetFunDecl = VD ? attr->getTargetFunctionDecl(VD) : nullptr;
 
       SmallVector<IdentifierID, 4> pieces;
 
@@ -3466,7 +3467,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           S.Out, S.ScratchRecord, abbrCode, (unsigned)attr->isPublic(),
           (unsigned)attr->isExported(),
           (unsigned)attr->getSpecializationKind(),
-          S.addGenericSignatureRef(attr->getSpecializedSignature(VD)),
+          S.addGenericSignatureRef(attr->getSpecializedSignature(D)),
           S.addDeclRef(targetFunDecl), numSPIGroups, numAvailabilityAttrs,
           pieces);
       for (auto availAttr : attr->getAvailableAttrs()) {
@@ -4142,6 +4143,10 @@ private:
         continue;
 
       DeclID memberID = S.addDeclRef(member);
+      // It names another module's member instead of declaring one, so it's
+      // serialized (for its specializations) but isn't a member.
+      if (SpecializedAttr::isSpecializationDeclaration(member))
+        continue;
       memberIDs.push_back(memberID);
 
       if (auto VD = dyn_cast<ValueDecl>(member)) {
@@ -7737,8 +7742,11 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
       if (auto VD = dyn_cast<ValueDecl>(D)) {
         if (!VD->hasName())
           continue;
-        topLevelDecls[VD->getBaseName()]
-          .push_back({ getKindForTable(D), addDeclRef(D) });
+        auto id = addDeclRef(D);
+        // It names another module's declaration instead of declaring one, so
+        // it's serialized (for its specializations) but can't be looked up.
+        if (!SpecializedAttr::isSpecializationDeclaration(VD))
+          topLevelDecls[VD->getBaseName()].push_back({getKindForTable(D), id});
       } else if (auto ED = dyn_cast<ExtensionDecl>(D)) {
         const NominalTypeDecl *extendedNominal = ED->getExtendedNominal();
         if (extendedNominal) {

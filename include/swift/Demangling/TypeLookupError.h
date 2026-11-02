@@ -59,6 +59,13 @@ public:
 
     /// Destroy the context pointer. The return value is ignored.
     DestroyContext,
+
+    /// Return non-NULL if the error reports a construct the runtime doesn't
+    /// support, such as a SIL box type, rather than a lookup that could have
+    /// succeeded generally, but failed due to something like a specific type
+    /// or protocol conformance not being present. IsUnsupported errors don't
+    /// get logged as failures.
+    IsUnsupported,
   };
 
   /// The callback used to respond to the commands. The parameters are:
@@ -120,14 +127,29 @@ public:
     return *this;
   }
 
-  /// Construct a TypeLookupError that just returns a constant C string.
+  /// Construct a TypeLookupError that just returns a constant C string, with
+  /// isUnsupported returning false.
   TypeLookupError(const char *str) {
     Context = const_cast<char *>(str);
     Fn = [](void *context, Command command, void *param) -> void * {
+      // When querying IsUnsupported, we say no.
+      if (command == Command::IsUnsupported)
+        return nullptr;
       // The context pointer is the string and works for both copying the string
       // and copying the context. Other commands don't need to do anything.
       return context;
     };
+  }
+
+  /// Construct a TypeLookupError for a construct the runtime doesn't support,
+  /// which returns a constant C string.
+  static TypeLookupError unsupported(const char *str) {
+    return TypeLookupError(
+        const_cast<char *>(str),
+        [](void *context, Command command, void *param) -> void * {
+          // The non-NULL context pointer also answers IsUnsupported.
+          return context;
+        });
   }
 
   /// Construct a TypeLookupError that wraps a function returning a string. The
@@ -149,6 +171,8 @@ public:
       case Command::DestroyContext:
         delete castContext;
         return nullptr;
+      case Command::IsUnsupported:
+        return nullptr;
       }
       llvm_unreachable("unhandled command!");
     };
@@ -165,6 +189,13 @@ public:
   /// Free an error string previously obtained from `copyErrorString`.
   void freeErrorString(char *str) const {
     Fn(Context, Command::DestroyErrorString, str);
+  }
+
+  /// Whether the error reports a construct the runtime doesn't support, rather
+  /// than a lookup that could have succeeded if the necessary types,
+  /// conformances, etc. were present.
+  bool isUnsupported() const {
+    return Fn(Context, Command::IsUnsupported, nullptr) != nullptr;
   }
 };
 

@@ -1837,4 +1837,65 @@ public:
 
 void SILGenModule::visitExtensionDecl(ExtensionDecl *ed) {
   SILGenExtension(*this).emitExtension(ed);
+
+  // For '@specialized(exported: true, ...)' on an extension of another
+  // module's type, record the specialized types, e.g. 'Box<Int>', which this
+  // module owns, and prepare the exported specialized bodies of its members.
+  // 1. The specialized types, if any.
+  auto *nominal = ed->getExtendedNominal();
+  SmallVector<CanType, 2> types;
+  SpecializedAttr::getExportedTypeSpecializations(ed, types);
+  if (types.empty())
+    return;
+  // 2. Record that this module owns them, only in Embedded Swift.
+  if (getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    for (auto type : types)
+      M.addExportedTypeSpecialization(type);
+  // 3. The members of the type, declared in its module.
+  SmallVector<Decl *, 16> members(nominal->getMembers().begin(),
+                                  nominal->getMembers().end());
+  for (auto *extension : nominal->getExtensions())
+    if (extension->getModuleContext() == nominal->getModuleContext())
+      llvm::append_range(members, extension->getMembers());
+  // 4. Prepare an entry point for these types, skipping those whose bodies
+  // aren't available (as clients do, see SILFunctionBuilder).
+  auto prepare = [&](SILDeclRef constant) {
+    auto *member = constant.getAbstractFunctionDecl();
+    // Not one that is concrete already, e.g. in 'extension Box where T == Int':
+    // the type's module defines its only body.
+    auto memberSig = member->getGenericSignature();
+    if (!memberSig || llvm::all_of(memberSig.getGenericParams(), [&](auto param) {
+          return memberSig->isConcreteType(param);
+        }))
+      return;
+    SmallVector<SpecializedAttr::TypeLevelSpecialization, 2> sigs;
+    SpecializedAttr::getTypeLevelSpecializations(member, sigs);
+    for (auto [sig, exported, module] : sigs)
+      // Only those of this extension's types, e.g. not of another module's.
+      if (exported && module == ed->getModuleContext() &&
+          llvm::is_contained(types, sig.getReducedType(
+                                        nominal->getDeclaredInterfaceType())))
+        (void)prepareExportedSpecialization(constant, sig);
+  };
+  // 5. Each member's entry points.
+  for (auto *member : members) {
+    if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
+      // Accessors of properties and subscripts.
+      for (auto *accessor : storage->getAllAccessors())
+        prepare(SILDeclRef(accessor));
+    } else if (auto *ctor = dyn_cast<ConstructorDecl>(member)) {
+      // Every initializer, + designated class init.
+      prepare(SILDeclRef(ctor, SILDeclRef::Kind::Allocator));
+      if (isa<ClassDecl>(nominal) && ctor->isDesignatedInit())
+        prepare(SILDeclRef(ctor, SILDeclRef::Kind::Initializer));
+    } else if (auto *dtor = dyn_cast<DestructorDecl>(member)) {
+      // Deinit, + class destroyer.
+      prepare(SILDeclRef(dtor, SILDeclRef::Kind::Deallocator));
+      if (isa<ClassDecl>(nominal))
+        prepare(SILDeclRef(dtor, SILDeclRef::Kind::Destroyer));
+    } else if (isa<FuncDecl>(member)) {
+      // Functions.
+      prepare(SILDeclRef(cast<FuncDecl>(member)));
+    }
+  }
 }

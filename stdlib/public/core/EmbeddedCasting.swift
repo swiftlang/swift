@@ -12,7 +12,7 @@
 
 import SwiftShims
 
-struct DynamicCastFlags {
+fileprivate struct DynamicCastFlags {
   static let Default           = UInt(bitPattern: 0x0)
   static let Unconditional     = UInt(bitPattern: 0x1)
   static let TakeOnSuccess     = UInt(bitPattern: 0x2)
@@ -175,19 +175,27 @@ private enum DynamicCastResult {
   /// The cast succeeded by taking from the source. The source is now
   /// uninitialized.
   case successViaTake
+
+  /// The cast would succeed. Only returned for a test (a nil destination);
+  /// nothing was produced and the source is unchanged.
+  case testSuccess
 }
 
 /// Attempt to perform a dynamic cast from src to dst, where we have information
-/// about the metadata for each.
+/// about the metadata for each.  If `dst` is nil, then this only checks
+/// whether the cast would succeed without producing any result.
 private func tryCast(
-  dst: UnsafeMutableRawPointer,
+  dst: UnsafeMutableRawPointer?,
   dstMetadata: UnsafeRawPointer,
-  src: UnsafeRawPointer,
+  src: UnsafeMutableRawPointer,
   srcMetadata: UnsafeRawPointer,
   takeOnSuccess: Bool,
 ) -> DynamicCastResult {
   // If types match exactly, the cast succeeds. We just move/copy the data.
   if unsafe srcMetadata == dstMetadata {
+    guard let dst = unsafe dst else {
+      return .testSuccess
+    }
     switch takeOnSuccess {
     case true:
       unsafe _swift_embedded_metadata_initialize_with_take(
@@ -222,7 +230,7 @@ private func tryCast(
     return unsafe tryCast(
       dst: dst,
       dstMetadata: dstMetadata,
-      src: srcInner,
+      src: UnsafeMutableRawPointer(mutating: srcInner),
       srcMetadata: srcInnerMetadata,
       takeOnSuccess: takeOnSuccess && src == srcInner
     )
@@ -240,6 +248,9 @@ private func tryCast(
       targetMetadata: dstMetadata
     ) else {
       return .failure
+    }
+    guard let dst = unsafe dst else {
+      return .testSuccess
     }
 
     // Success! Write the resulting object into the destination.
@@ -267,10 +278,10 @@ private func tryCast(
 
 @c
 public func swift_dynamicCast(
-  _ dest: Builtin.RawPointer, /* points to a concrete type */
-  _ src: Builtin.RawPointer, /* points to an existential or class */
-  _ srcMetadata: Builtin.RawPointer,
-  _ dstMetadata: Builtin.RawPointer,
+  _ dest: UnsafeMutableRawPointer?, /* points to a concrete type */
+  _ src: UnsafeMutableRawPointer, /* points to an existential or class */
+  _ srcMetadata: UnsafeRawPointer,
+  _ dstMetadata: UnsafeRawPointer,
   _ flags: UInt
 ) -> Bool {
 
@@ -279,13 +290,20 @@ public func swift_dynamicCast(
   let isDestroyOnFailure : Bool =
     (flags & DynamicCastFlags.DestroyOnFailure) != 0
 
-  let castResult = unsafe tryCast(
-    dst: UnsafeMutableRawPointer(dest),
-    dstMetadata: UnsafeRawPointer(dstMetadata),
-    src: UnsafeRawPointer(src),
-    srcMetadata: UnsafeRawPointer(srcMetadata),
-    takeOnSuccess: isTakeOnSuccess
-  )
+  // A nil destination means "test only" to tryCast(), so ensure we pass a
+  // non-nil one. The address of a zero-sized type may be null.
+  var zeroSizedScratch: UInt = 0
+  let castResult = withUnsafeMutablePointer(to: &zeroSizedScratch) {
+    scratch in
+    let dst = unsafe dest ?? UnsafeMutableRawPointer(scratch)
+    return unsafe tryCast(
+      dst: dst,
+      dstMetadata: dstMetadata,
+      src: src,
+      srcMetadata: srcMetadata,
+      takeOnSuccess: isTakeOnSuccess
+    )
+  }
 
   switch castResult {
   case .failure:
@@ -294,10 +312,7 @@ public func swift_dynamicCast(
     }
 
     if isDestroyOnFailure {
-      unsafe _swift_embedded_metadata_destroy(
-        UnsafeRawPointer(srcMetadata),
-        UnsafeMutableRawPointer(src)
-      )
+      unsafe _swift_embedded_metadata_destroy(srcMetadata, src)
     }
 
     return false
@@ -316,6 +331,41 @@ public func swift_dynamicCast(
 
   case .successViaTake:
     return true
+
+  case .testSuccess:
+    // Unreachable: the destination is non-nil by the time tryCast() sees it,
+    // and only a nil destination asks for a test.
+    fatalError("swift_dynamicCast: a cast with a destination reported a test")
+  }
+}
+
+/// Answer whether a cast of src to dstMetadata would succeed, as for
+/// swift_dynamicCast, but without producing a result: src is only read, and
+/// is left as it was whatever the answer.
+@c
+public func swift_dynamicCastTest(
+  _ src: UnsafeRawPointer, /* points to an existential or class */
+  _ srcMetadata: UnsafeRawPointer,
+  _ dstMetadata: UnsafeRawPointer,
+  _ flags: UInt
+) -> Bool {
+  // Take/destroy flags are meaningless for a test, and there is no value for
+  // an unconditional cast to produce.
+  let castResult = unsafe tryCast(
+    dst: nil,
+    dstMetadata: dstMetadata,
+    src: UnsafeMutableRawPointer(mutating: src),
+    srcMetadata: srcMetadata,
+    takeOnSuccess: false
+  )
+
+  switch castResult {
+  case .failure:
+    return false
+  case .testSuccess:
+    return true
+  case .successViaCopy, .successViaTake:
+    fatalError("swift_dynamicCastTest: a test produced a value")
   }
 }
 
@@ -339,8 +389,13 @@ public func swift_dynamicCastClass(
 }
 
 @c
-public func swift_dynamicCastClassUnconditional(object: UnsafeMutableRawPointer, targetMetadata: UnsafeRawPointer,
-    file: UnsafePointer<CChar>, line: CUnsignedInt, column: CUnsignedInt) -> UnsafeRawPointer {
+public func swift_dynamicCastClassUnconditional(
+    object: UnsafeMutableRawPointer,
+    targetMetadata: UnsafeRawPointer,
+    file: UnsafePointer<CChar>,
+    line: CUnsignedInt,
+    column: CUnsignedInt
+) -> UnsafeRawPointer {
   guard let result = unsafe swift_dynamicCastClass(object: object, targetMetadata: targetMetadata) else {
     fatalError("failed cast")
   }

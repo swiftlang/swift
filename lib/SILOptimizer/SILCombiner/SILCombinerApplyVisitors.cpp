@@ -99,6 +99,41 @@ SILCombiner::legacyVisitPartialApplyInst(PartialApplyInst *pai) {
   return nullptr;
 }
 
+/// If \p callee is a conversion that an apply looks through to find a
+/// convert_function, returns the converted value. Otherwise, returns a null
+/// value.
+static SILValue lookThroughCalleeConversion(SILValue callee) {
+  if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee))
+    return cee->getOperand();
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(callee))
+    return mdi->getValue();
+  if (auto *cvi = dyn_cast<CopyValueInst>(callee))
+    return cvi->getOperand();
+  return SILValue();
+}
+
+/// Returns true if \p AI is the only non-debug user of \p CFI and of each
+/// conversion between \p CFI and the callee of \p AI.
+static bool isOnlyUsedByApply(ConvertFunctionInst *CFI, FullApplySite AI) {
+  for (SILValue value = AI.getCallee(); value && hasOneNonDebugUse(value);
+       value = lookThroughCalleeConversion(value)) {
+    if (value == CFI)
+      return true;
+  }
+  return false;
+}
+
+/// Returns true if \p pai consumes a noncopyable argument, either as a value
+/// or as an address that the closure's context owns.
+static bool consumesNoncopyableArgument(PartialApplyInst *pai) {
+  ApplySite site(pai);
+  return llvm::any_of(pai->getArgumentOperands(), [&](Operand &argOp) {
+    return (argOp.isConsuming() ||
+            site.hasContextOwnedAddressArgument(argOp)) &&
+           argOp.get()->getType().isMoveOnly();
+  });
+}
+
 SILInstruction *
 SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
                                                 ConvertFunctionInst *CFI) {
@@ -126,6 +161,22 @@ SILCombiner::optimizeApplyOfConvertFunctionInst(FullApplySite AI,
   if (!ConvertCalleeTy->hasErrorResult() && isa<TryApplyInst>(AI)) {
     assert(SubstCalleeTy->hasErrorResult());
     return nullptr;
+  }
+
+  // The new apply uses the closure directly, but the convert_function still
+  // consumes it unless the old apply is the only user of each conversion
+  // between them, so that they're deleted along with the old apply. Later
+  // combines fix that up, but not when the new apply consumes a closure that
+  // the conversions make noncopyable, because they forward its ownership, or
+  // when the closure consumes a noncopyable argument, because combining the
+  // new apply with the partial_apply has to copy it.
+  if (AI.getFunction()->hasOwnership() && !isOnlyUsedByApply(CFI, AI)) {
+    if (auto *pai = dyn_cast<PartialApplyInst>(funcOper)) {
+      if ((ConvertCalleeTy->isCalleeConsumed() &&
+           CFI->getType().isMoveOnly()) ||
+          consumesNoncopyableArgument(pai))
+        return nullptr;
+    }
   }
 
   // Ok, we can now perform our transformation. Grab AI's operands and the
@@ -1659,17 +1710,8 @@ SILInstruction *SILCombiner::legacyVisitApplyInst(ApplyInst *AI) {
     return nullptr;
 
   SILValue callee = AI->getCallee();
-  for (;;) {
-    if (auto *cee = dyn_cast<ConvertEscapeToNoEscapeInst>(callee)) {
-      callee = cee->getOperand();
-    } else if (auto *mdi = dyn_cast<MarkDependenceInst>(callee)) {
-      callee = mdi->getValue();
-    } else if (auto *cvi = dyn_cast<CopyValueInst>(callee)) {
-      callee = cvi->getOperand();
-    } else {
-      break;
-    }
-  }
+  while (SILValue converted = lookThroughCalleeConversion(callee))
+    callee = converted;
   if (auto *CFI = dyn_cast<ConvertFunctionInst>(callee))
     return optimizeApplyOfConvertFunctionInst(AI, CFI);
 

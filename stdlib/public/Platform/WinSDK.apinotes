@@ -349,6 +349,8 @@ Globals:
   Type: DWORD
 - Name: ES_MULTILINE
   Type: DWORD
+- Name: EVENTLOG_ERROR_TYPE
+  Type: WORD
 - Name: EVENT_ALL_ACCESS
   Type: DWORD
 - Name: EVENT_MODIFY_STATE

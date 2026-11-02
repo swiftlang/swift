@@ -196,9 +196,9 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
     llvm_unreachable("hidden layout declarations are not diagnostic entities");
 
   case DeclKind::TypeAlias:
-    return cast<TypeAliasDecl>(this)->getGenericParams()
-             ? DescriptiveDeclKind::GenericTypeAlias
-             : DescriptiveDeclKind::TypeAlias;
+    return cast<TypeAliasDecl>(this)->hasParsedGenericParamList()
+               ? DescriptiveDeclKind::GenericTypeAlias
+               : DescriptiveDeclKind::TypeAlias;
 
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()

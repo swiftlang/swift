@@ -361,6 +361,8 @@ WARNING(unreachable_code_after_stmt,none,
         "be executed", (unsigned))
 WARNING(unreachable_case,none,
         "%select{case|default}0 will never be executed", (bool))
+NOTE(default_after_catchall,none,
+     "a 'default' case is equivalent to a catch-all case; remove one", ())
 WARNING(switch_on_a_constant,none,
         "switch condition evaluates to a constant", ())
 NOTE(unreachable_code_note,none, "will never be executed", ())
@@ -494,6 +496,11 @@ ERROR(cannot_prespecialize,none,
 ERROR(missing_prespecialization,none,
       "Pre-specialized function %0 missing in SwiftOnoneSupport module",
       (StringRef))
+ERROR(specialized_declaration_body_unavailable,none,
+      "cannot export a specialization of %0, %select{whose body isn't "
+      "available to this module unless it's '@inlinable' or its module is "
+      "built with cross-module optimization|which can't be specialized, e.g. "
+      "because it's 'dynamic' or '@_optimize(none)'}1", (DeclName, bool))
 
 // Arithmetic diagnostics.
 ERROR(integer_conversion_overflow,none,

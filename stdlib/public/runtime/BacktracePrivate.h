@@ -108,7 +108,11 @@ enum class OutputTo {
   Auto = -1,
   Stdout = 0,
   Stderr = 2,
-  File = 3
+  File = 3,
+#ifdef _WIN32
+  Console = 4,
+  EventLog = 5,
+#endif
 };
 
 enum class Symbolication {

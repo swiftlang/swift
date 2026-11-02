@@ -1937,6 +1937,11 @@ IsImplicitlyUnwrappedOptionalRequest::evaluate(Evaluator &evaluator,
 Type
 UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                 TypeAliasDecl *typeAlias) const {
+  auto errorResult = [&]() -> Type {
+    typeAlias->setInvalid();
+    return ErrorType::get(typeAlias->getASTContext());
+  };
+
   TypeResolutionOptions options((typeAlias->getGenericParams()
                                      ? TypeResolverContext::GenericTypeAliasDecl
                                      : TypeResolverContext::TypeAliasDecl));
@@ -1946,10 +1951,8 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   // This can happen when code completion is attempted inside
   // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
   auto *underlyingRepr = typeAlias->getUnderlyingTypeRepr();
-  if (!underlyingRepr) {
-    typeAlias->setInvalid();
-    return ErrorType::get(typeAlias->getASTContext());
-  }
+  if (!underlyingRepr)
+    return errorResult();
 
   const auto result =
       TypeResolution::forInterface(typeAlias, options,
@@ -1958,19 +1961,56 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
                                    /*packElementOpener*/ nullptr)
           .resolveType(underlyingRepr);
 
+  if (result->hasError())
+    return errorResult();
+
   auto &ctx = typeAlias->getASTContext();
-  if (result->hasError()) {
-    typeAlias->setInvalid();
-    return ErrorType::get(ctx);
-  }
   if (ctx.LangOpts.hasFeature(Feature::ScopeRestrictions) &&
       hasScopeUnsaturatedType(result)) {
     ctx.Diags.diagnose(underlyingRepr->getStartLoc(),
                        diag::scoped_nonescapable_in_typealias);
-    typeAlias->setInvalid();
-    return ErrorType::get(ctx);
+    return errorResult();
   }
   return result;
+}
+
+Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
+                                     TypeAliasDecl *typeAlias) const {
+  auto errorResult = [&]() -> Type {
+    typeAlias->setInvalid();
+    return ErrorType::get(typeAlias->getASTContext());
+  };
+
+  TypeResolutionOptions options((typeAlias->hasParsedGenericParamList()
+                                     ? TypeResolverContext::GenericTypeAliasDecl
+                                     : TypeResolverContext::TypeAliasDecl));
+
+  auto underlyingTypeRepr = typeAlias->getUnderlyingTypeRepr();
+
+  // This can happen when code completion is attempted inside
+  // of typealias underlying type e.g. `typealias F = () -> Int#^TOK^#`
+  if (!underlyingTypeRepr)
+    return errorResult();
+
+  auto result = TypeResolution::forStructural(typeAlias, options,
+                                              /*unboundTyOpener*/ nullptr,
+                                              /*placeholderHandler*/ nullptr,
+                                              /*packElementOpener*/ nullptr)
+                    .resolveType(underlyingTypeRepr);
+
+  Type parent;
+  auto parentDC = typeAlias->getDeclContext();
+  if (parentDC->isTypeContext())
+    parent = parentDC->getSelfInterfaceType();
+
+  SmallVector<Type, 2> genericArgs;
+  if (auto *params = typeAlias->getGenericParams()) {
+    for (auto *param : *params) {
+      genericArgs.push_back(param->getDeclaredInterfaceType());
+    }
+  }
+
+  return TypeAliasType::get(typeAlias, parent, genericArgs, result);
 }
 
 /// Bind the given function declaration, which declares an operator, to the

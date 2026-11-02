@@ -53,3 +53,18 @@ TEST(TypeLookupError, Copying) {
   ASSERT_STREQ(str, "0 1 2 3 4 5 6 7 8 9");
   extractedError.freeErrorString(str);
 }
+
+TEST(TypeLookupError, Unsupported) {
+  auto unsupported = TypeLookupError::unsupported("not supported");
+  ASSERT_TRUE(unsupported.isUnsupported());
+  char *str = unsupported.copyErrorString();
+  ASSERT_STREQ(str, "not supported");
+  unsupported.freeErrorString(str);
+
+  auto copy = unsupported;
+  ASSERT_TRUE(copy.isUnsupported());
+
+  ASSERT_FALSE(TypeLookupError("constant").isUnsupported());
+  auto formatted = TYPE_LOOKUP_ERROR_FMT("%d", 42);
+  ASSERT_FALSE(formatted.isUnsupported());
+}

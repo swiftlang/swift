@@ -25,6 +25,23 @@ public func testSwap(_ a: inout [String], _ i: Int, _ j: Int) {
   a.swapAt(i, j)
 }
 
+// CHECK-LABEL: sil @$s4test0A19SwapContiguousArrayyys0cD0VySSGz_S2itF :
+// CHECK-NOT:     swapAt
+// CHECK-NOT:     retain
+// CHECK-NOT:     release
+// CHECK:       } // end sil function '$s4test0A19SwapContiguousArrayyys0cD0VySSGz_S2itF'
+public func testSwapContiguousArray(_ a: inout ContiguousArray<String>, _ i: Int, _ j: Int) {
+  a.swapAt(i, j)
+}
+
+// CHECK-LABEL: sil @$s4test0A14SwapArraySliceyys0cD0VySSGz_S2itF :
+// CHECK-NOT:     swapAt
+// CHECK-NOT:     retain
+// CHECK:       } // end sil function '$s4test0A14SwapArraySliceyys0cD0VySSGz_S2itF'
+public func testSwapArraySlice(_ a: inout ArraySlice<String>, _ i: Int, _ j: Int) {
+  a.swapAt(i, j)
+}
+
 // CHECK-LABEL: sil @$s4test0A14SwapViaWitnessyySaySSGz_S2itF :
 // CHECK-NOT:     retain
 // CHECK-NOT:     release

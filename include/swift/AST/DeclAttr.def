@@ -908,7 +908,7 @@ SIMPLE_DECL_ATTR(concurrent, Concurrent,
 // Unused '171': Used to be `@preEnumExtensibility`
 
 DECL_ATTR(specialized, Specialized,
-  OnConstructor | OnFunc | OnAccessor | OnStruct | OnEnum | OnClass,
+  OnConstructor | OnFunc | OnAccessor | OnStruct | OnEnum | OnClass | OnExtension,
   AllowMultipleAttributes | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   172)
 

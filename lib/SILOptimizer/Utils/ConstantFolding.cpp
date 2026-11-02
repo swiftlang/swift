@@ -1841,6 +1841,8 @@ ConstantFolder::processWorkList() {
                           WorkList.remove(I);
                           I->eraseFromParent();
                         });
+  if (EnableDiagnostics)
+    CastOpt.setPreserveDebugInfo();
 
   auto callbacks =
       InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {

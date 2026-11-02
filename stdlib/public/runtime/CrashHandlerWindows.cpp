@@ -158,7 +158,8 @@ LONG handleException(EXCEPTION_POINTERS *ExceptionInfo) {
 
 LONG reallyHandleException(EXCEPTION_POINTERS *ExceptionInfo) {
   HANDLE hOutput;
-  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
+  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr
+      || _swift_backtraceSettings.outputTo == OutputTo::Console)
     hOutput = GetStdHandle(STD_ERROR_HANDLE);
   else
     hOutput = GetStdHandle(STD_OUTPUT_HANDLE);

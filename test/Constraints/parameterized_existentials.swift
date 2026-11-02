@@ -64,3 +64,11 @@ final class P2Class<T> {}
 func makeP2<T>() -> any P2<T> {
   P2Class<T>() // expected-error {{return expression of type 'P2Class<T>' does not conform to 'P2'}}
 }
+
+struct Conformer<A>: P {
+  init(_ x: A) {}
+  func f() -> A {}
+}
+// Make sure we don't emit a bogus "cannot convert value of type '_.A' to specified type 'Int'"
+let _: any P<Int> = Conformer(undefined)
+// expected-error@-1 {{cannot find 'undefined' in scope}}

@@ -205,6 +205,8 @@ function(add_swift_compiler_modules_library name)
   # under `include/swift`. These are either located next to the compiler (in case of open source toolchains) or
   # in the SDK (in case a Swift compiler from Xcode)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
+  # The host toolchain's lib/ when it's added to the search paths below.
+  set(host_toolchain_lib_dir "")
 
   if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
     list(APPEND swift_compile_options "-static")
@@ -253,10 +255,26 @@ function(add_swift_compiler_modules_library name)
     string(STRIP "${swiftly_dir}" swiftly_dir)
 
     list(APPEND sdk_option "-I" "${swiftly_dir}/usr/lib" "-I" "${swiftly_dir}/usr/lib")
+    set(host_toolchain_lib_dir "${swiftly_dir}/usr/lib")
   elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "EMSCRIPTEN")
     list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/lib")
   else()
     list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+    set(host_toolchain_lib_dir "${swift_exec_bin_dir}/../lib")
+  endif()
+
+  # Subdirectory search over the host toolchain's lib/ finds the SwiftShims
+  # parent module maps in both swift/ and swift_static/ and redefines the
+  # module. Toolchains that have the parent module map don't need the search;
+  # older ones still rely on it. Darwin's driver already disables it.
+  if(NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND
+     host_toolchain_lib_dir AND
+     EXISTS "${host_toolchain_lib_dir}/swift/module.modulemap")
+    swift_supports_compiler_arguments(SWIFT_SUPPORTS_NO_MODULEMAP_SUBDIR_SEARCH
+      -Xcc -fno-modulemap-allow-subdirectory-search)
+    if(SWIFT_SUPPORTS_NO_MODULEMAP_SUBDIR_SEARCH)
+      list(APPEND swift_compile_options "-Xcc" "-fno-modulemap-allow-subdirectory-search")
+    endif()
   endif()
 
   set(all_obj_files)

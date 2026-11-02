@@ -1687,9 +1687,8 @@ void IRGenerator::noteUseOfClassMetadata(CanType classType) {
 /// Whether another module owns \p type's metadata.
 static bool isExportedTypeSpecializationOfOtherModule(IRGenerator &IRGen,
                                                       CanType type) {
-  auto *nominal = type->getAnyNominal();
-  return nominal && nominal->getParentModule() != IRGen.SIL.getSwiftModule() &&
-         SpecializedAttr::isExportedTypeSpecialization(type);
+  auto *owner = SpecializedAttr::getExportedTypeSpecializationOwner(type);
+  return owner && owner != IRGen.SIL.getSwiftModule();
 }
 
 void IRGenerator::noteUseOfSpecializedClassMetadata(CanType classType) {
@@ -2501,6 +2500,16 @@ static IRLinkage getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
   llvm_unreachable("bad SIL linkage");
 }
 
+/// Weak, so that two modules that export the same specialization of another
+/// module's function or type link without errors.
+static void makeWeakIfExportedSpecialization(IRLinkage &IRL,
+                                             const LinkEntity &entity,
+                                             ModuleDecl *swiftModule) {
+  if (IRL.Linkage == llvm::GlobalValue::ExternalLinkage &&
+      entity.isWeakExportedSpecialization(swiftModule))
+    IRL.Linkage = llvm::GlobalValue::WeakODRLinkage;
+}
+
 /// Given that we're going to define a global value but already have a
 /// forward-declaration of it, update its linkage.
 void irgen::updateLinkageForDefinition(IRGenModule &IGM,
@@ -2521,6 +2530,7 @@ void irgen::updateLinkageForDefinition(IRGenModule &IGM,
                    linkInfo, entity.getLinkage(ForDefinition), ForDefinition,
                    weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
                    entity.privateMeansPrivate());
+  makeWeakIfExportedSpecialization(IRL, entity, IGM.getSwiftModule());
   ApplyIRLinkage(IRL).to(global);
 
   LinkInfo link = LinkInfo::get(IGM, entity, ForDefinition);
@@ -2593,6 +2603,8 @@ LinkInfo LinkInfo::get(const UniversalLinkageInfo &linkInfo,
       result.Name, linkInfo, linkage, isDefinition,
       weakImported, isKnownLocal, entity.hasNonUniqueDefinition(),
       entity.privateMeansPrivate());
+  if (isDefinition)
+    makeWeakIfExportedSpecialization(result.IRL, entity, swiftModule);
   result.ForDefinition = isDefinition;
   return result;
 }

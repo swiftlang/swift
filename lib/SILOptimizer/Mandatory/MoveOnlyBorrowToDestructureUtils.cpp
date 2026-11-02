@@ -1128,19 +1128,16 @@ static void insertEndBorrowsForNonConsumingUse(Operand *op,
                                "    ";
                op->getUser()->print(llvm::dbgs()));
     // End the borrow where the original borrow of the subject was ended.
-    // TODO: handle if the switch isn't directly on a borrow?
-    auto beginBorrow = cast<BeginBorrowInst>(op->get());
-    // FIXME: ignoring the visitScopeEndingUses result ignores unknown uses.
-    BorrowingOperand(&beginBorrow->getOperandRef())
-      .visitScopeEndingUses([&](Operand *endScope) -> bool {
-        auto *endScopeInst = endScope->getUser();
-        LLVM_DEBUG(llvm::dbgs() << "       ";
-                   endScopeInst->print(llvm::dbgs()));
-        SILBuilderWithScope endBuilder(endScopeInst);
-        endBuilder.createEndBorrow(getSafeLoc(endScopeInst),
-                                   borrow);
-        return true;
-      });
+    auto borrowedValue = getSingleBorrowIntroducingValue(op->get());
+    // FIXME: ignoring the visitLocalScopeEndingUses result ignores unknown
+    // uses.
+    borrowedValue.visitLocalScopeEndingUses([&](Operand *endScope) -> bool {
+      auto *endScopeInst = endScope->getUser();
+      LLVM_DEBUG(llvm::dbgs() << "       "; endScopeInst->print(llvm::dbgs()));
+      SILBuilderWithScope endBuilder(endScopeInst);
+      endBuilder.createEndBorrow(getSafeLoc(endScopeInst), borrow);
+      return true;
+    });
   } else {
     auto *nextInst = op->getUser()->getNextInstruction();
     LLVM_DEBUG(llvm::dbgs() << "    -- Ending borrow after momentary use at: ";
@@ -1368,7 +1365,12 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 operand.getOperandOwnership() == OperandOwnership::TrivialUse) {
               SILBuilderWithScope endBuilder(inst);
               endBuilder.createEndBorrow(getSafeLoc(inst), borrow);
-              goto update_operand;
+            } else if (operand.getOperandOwnership() ==
+                       OperandOwnership::GuaranteedForwarding) {
+              // For guaranteed forwarding terminators, the borrow must be
+              // extended to outlive transitive uses of the forwarded values, so
+              // call insertEndBorrowsForNonConsumingUse as normal.
+              insertEndBorrowsForNonConsumingUse(&operand, borrow);
             } else {
               // Otherwise, put the end_borrow.
               for (auto *succBlock : ti->getSuccessorBlocks()) {
@@ -1376,12 +1378,11 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 SILBuilderWithScope endBuilder(nextInst);
                 endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
               }
-              goto update_operand;
             }
+          } else {
+            insertEndBorrowsForNonConsumingUse(&operand, borrow);
           }
 
-          insertEndBorrowsForNonConsumingUse(&operand, borrow);
-update_operand:
           // We update the operand after placing end_borrows, since we might
           // need the original operand's lifetime to correctly delineate the
           // new lifetime, such as if there is an InteriorPointerOperand.

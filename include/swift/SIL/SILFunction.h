@@ -167,6 +167,8 @@ public:
     return spiGroup;
   }
 
+  /// The module where the attribute is written, whether or not it has an SPI
+  /// group.
   const ModuleDecl *getSPIModule() const {
     return spiModule;
   }
@@ -1122,6 +1124,13 @@ public:
   /// deserialize it. The defining module owns the only definition, so clients
   /// reference it instead of emitting their own.
   bool isExportedSpecialization() const;
+
+  /// Whether this function, another module's, has a body from which this
+  /// module can create the exported specialized bodies that a '@specialized'
+  /// declaration without a body or extension asks for (see EagerSpecializer).
+  /// The exporting module and its clients share this predicate, so that
+  /// clients only use the bodies the exporting module created.
+  bool hasBodyForImportedSpecialization() const;
 
   /// Get the DeclContext of this function.
   DeclContext *getDeclContext() const { return DeclCtxt; }

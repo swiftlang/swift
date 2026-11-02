@@ -4022,10 +4022,11 @@ public:
 };
 
 class AllowInlineArrayLiteralCountMismatch final : public ConstraintFix {
-  unsigned lhsCount, rhsCount;
+  IntegerType *lhsCount;
+  unsigned rhsCount;
 
-  AllowInlineArrayLiteralCountMismatch(ConstraintSystem &cs, unsigned lhsCount,
-                                       unsigned rhsCount,
+  AllowInlineArrayLiteralCountMismatch(ConstraintSystem &cs,
+                                       IntegerType *lhsCount, unsigned rhsCount,
                                        ConstraintLocator *locator)
       : ConstraintFix(cs, FixKind::AllowInlineArrayLiteralCountMismatch,
                       locator),
@@ -4039,7 +4040,7 @@ public:
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
   static AllowInlineArrayLiteralCountMismatch *
-  create(ConstraintSystem &cs, unsigned lhsCount, unsigned rhsCount,
+  create(ConstraintSystem &cs, IntegerType *lhsCount, unsigned rhsCount,
          ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {

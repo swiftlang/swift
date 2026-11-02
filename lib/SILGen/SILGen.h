@@ -305,6 +305,22 @@ public:
   /// added to the current SILModule.
   void emitFunction(FuncDecl *fd);
 
+  /// For \p fd, a '@specialized' declaration without a body, prepares the
+  /// exported specialized bodies of the imported function it names: one per
+  /// exported attribute and entry point. Reports an error if one of them can't
+  /// be created.
+  void prepareSpecializationDeclaration(AbstractFunctionDecl *fd);
+
+  /// Prepares this module to create the exported specialized body of
+  /// \p constant, an entry point of an imported function, for
+  /// \p specializedSig, as a declaration without a body or an extension asks
+  /// for: loads its serialized body, makes sure it carries the request as a SIL
+  /// attribute, and records that this module creates the body. The
+  /// EagerSpecializer then creates it. Returns false if there's no body that
+  /// may be specialized.
+  bool prepareExportedSpecialization(SILDeclRef constant,
+                                     GenericSignature specializedSig);
+
   /// Emits the function definition for a given SILDeclRef.
   void emitFunctionDefinition(SILDeclRef constant, SILFunction *f);
 

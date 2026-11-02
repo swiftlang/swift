@@ -76,16 +76,20 @@ extension CxxSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
   @export(implementation)
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
-    unsafe precondition(unsafeBufferPointer.baseAddress != nil, 
-                  "UnsafeBufferPointer should not point to nil")
-    unsafe self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
+    guard let baseAddress = unsafeBufferPointer.baseAddress else {
+      self.init()
+      return
+    }
+    unsafe self.init(baseAddress, Size(unsafeBufferPointer.count))
   }
 
   @export(implementation)
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
-                  "UnsafeMutableBufferPointer should not point to nil")
-    unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+    guard let baseAddress = unsafeMutableBufferPointer.baseAddress else {
+      self.init()
+      return
+    }
+    unsafe self.init(baseAddress, Size(unsafeMutableBufferPointer.count))
   }
 
   @available(SwiftCompatibilitySpan 5.0, *)
@@ -149,9 +153,11 @@ extension CxxMutableSpan where Element: ~Copyable {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
   @export(implementation)
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    unsafe precondition(unsafeMutableBufferPointer.baseAddress != nil, 
-                  "UnsafeMutableBufferPointer should not point to nil")
-    unsafe self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
+    guard let baseAddress = unsafeMutableBufferPointer.baseAddress else {
+      self.init()
+      return
+    }
+    unsafe self.init(baseAddress, Size(unsafeMutableBufferPointer.count))
   }
 
   @available(SwiftCompatibilitySpan 5.0, *)

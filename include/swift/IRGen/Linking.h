@@ -1861,6 +1861,13 @@ public:
   /// definitions (e.g., with @used).
   bool hasNonUniqueDefinition() const;
 
+  /// Whether this is an exported specialized body of another module's
+  /// function, or the metadata, value witness table or a witness table of an
+  /// exported specialization of another module's type, e.g. 'Box<Int>', that
+  /// \p swiftModule owns. Other modules may export the same one, so its
+  /// definition is weak.
+  bool isWeakExportedSpecialization(const ModuleDecl *swiftModule) const;
+
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD
 

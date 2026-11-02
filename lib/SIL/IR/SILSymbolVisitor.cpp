@@ -471,6 +471,12 @@ public:
   }
 
   void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+    // A '@specialized' declaration without a body has no symbol of its own,
+    // and the specialized bodies it exports are weak: other modules can export
+    // them too, so they aren't part of this module's interface.
+    if (SpecializedAttr::isSpecializationDeclaration(AFD))
+      return;
+
     // Add exported prespecialized symbols.
     for (auto *attr : AFD->getAttrs().getAttributes<AbstractSpecializeAttr>()) {
       if (!attr->isExported())
@@ -486,6 +492,26 @@ public:
                     /*ignoreLinkage=*/true);
       } else {
         addFunction(SILDeclRef(AFD, erasedSignature), /*ignoreLinkage=*/true);
+      }
+    }
+    // And those that '@specialized' on its type gives it.
+    SmallVector<SpecializedAttr::TypeLevelSpecialization, 2> typeLevelSigs;
+    SpecializedAttr::getTypeLevelSpecializations(AFD, typeLevelSigs);
+    for (auto [sig, exported, module] : typeLevelSigs) {
+      if (!exported || module != AFD->getModuleContext())
+        continue;
+      SILDeclRef constant(AFD, sig);
+      addFunction(constant, /*ignoreLinkage=*/true);
+      // A class's designated initializer and deinit have a second entry point.
+      if (AFD->getDeclContext()->getSelfClassDecl()) {
+        auto *ctor = dyn_cast<ConstructorDecl>(AFD);
+        if (ctor && ctor->isDesignatedInit())
+          constant.kind = SILDeclRef::Kind::Initializer;
+        else if (isa<DestructorDecl>(AFD))
+          constant.kind = SILDeclRef::Kind::Destroyer;
+        else
+          continue;
+        addFunction(constant, /*ignoreLinkage=*/true);
       }
     }
 

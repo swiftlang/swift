@@ -276,8 +276,8 @@ void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
       // The conformance of the specialization, e.g. 'Box<Int>: P'.
       auto specialized =
           lookupConformance(type, conformance->getProtocol());
-      // Only if it exists and its type's module, i.e. this module, owns its
-      // witness table (isExportedConformanceSpecialization).
+      // Only if it exists and its type's specialization's owner, i.e. this
+      // module, owns its witness table (isExportedConformanceSpecialization).
       if (specialized.isConcrete() &&
           SpecializedAttr::isExportedConformanceSpecialization(
               specialized.getConcrete())) {

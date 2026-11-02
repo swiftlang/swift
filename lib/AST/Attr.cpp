@@ -28,6 +28,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
@@ -3074,9 +3075,55 @@ static bool isEmittedIntoClient(const Decl *decl) {
          parent->isAlwaysEmittedIntoClient();
 }
 
+void SpecializedAttr::getModulesWithUsedSpecializations(
+    const ModuleDecl *module, SmallVectorImpl<ModuleDecl *> &result) {
+  // All its own imports, then their public ones.
+  SmallVector<ImportedModule, 32> stack;
+  module->getImportedModules(stack, ModuleDecl::getImportFilterLocal());
+  llvm::SmallPtrSet<ModuleDecl *, 32> visited;
+  while (!stack.empty()) {
+    auto *next = stack.pop_back_val().importedModule;
+    if (next == module || !visited.insert(next).second)
+      continue;
+    result.push_back(next);
+    next->getImportedModules(stack, {ModuleDecl::ImportFilterKind::Exported,
+                                     ModuleDecl::ImportFilterKind::Default});
+  }
+}
+
+/// Whether the module being compiled takes the exported '@specialized'
+/// extensions of \p module into account: only if it is that module or links
+/// it (see getModulesWithUsedSpecializations).
+static bool usesSpecializationsOf(const ModuleDecl *module) {
+  auto *main = module->getASTContext().MainModule;
+  if (!main || module == main)
+    return true;
+  SmallVector<ModuleDecl *, 32> modules;
+  SpecializedAttr::getModulesWithUsedSpecializations(main, modules);
+  return llvm::is_contained(modules, module);
+}
+
+/// The '@specialized' attributes that specialize \p nominal, each with the
+/// declaration it is on: the type's own, and the exported ones on extensions of
+/// it in other modules that the module being compiled uses.
+static SmallVector<std::pair<const Decl *, const SpecializedAttr *>, 2>
+getTypeSpecializedAttrs(const NominalTypeDecl *nominal) {
+  SmallVector<std::pair<const Decl *, const SpecializedAttr *>, 2> result;
+  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>())
+    result.push_back({nominal, attr});
+  for (auto *extension :
+       const_cast<NominalTypeDecl *>(nominal)->getExtensions())
+    if (extension->getModuleContext() != nominal->getModuleContext())
+      for (auto *attr : extension->getAttrs().getAttributes<SpecializedAttr>())
+        if (attr->isExported() &&
+            usesSpecializationsOf(extension->getModuleContext()))
+          result.push_back({extension, attr});
+  return result;
+}
+
 void SpecializedAttr::getTypeLevelSpecializations(
     const AbstractFunctionDecl *member,
-    SmallVectorImpl<std::pair<GenericSignature, bool>> &result) {
+    SmallVectorImpl<TypeLevelSpecialization> &result) {
   // Only members declared in the type's own module.
   auto *nominal = member->getDeclContext()->getSelfNominalTypeDecl();
   if (!nominal || nominal->getModuleContext() != member->getModuleContext())
@@ -3096,8 +3143,8 @@ void SpecializedAttr::getTypeLevelSpecializations(
       member->getFormalAccessScope().isPublic() &&
       !isEmittedIntoClient(member) &&
       !(accessor && isEmittedIntoClient(accessor->getStorage()));
-  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>()) {
-    auto typeSpecializedSig = attr->getSpecializedSignature(nominal);
+  for (auto [attrDecl, attr] : getTypeSpecializedAttrs(nominal)) {
+    auto typeSpecializedSig = attr->getSpecializedSignature(attrDecl);
     if (!typeSpecializedSig)
       continue;
     // An exported specialization only for a member clients can use.
@@ -3125,14 +3172,17 @@ void SpecializedAttr::getTypeLevelSpecializations(
           return sig->isConcreteType(param);
         }))
       continue;
-    result.push_back({sig, attr->isExported()});
+    result.push_back({sig, attr->isExported(), attrDecl->getModuleContext()});
   }
 }
 
 void SpecializedAttr::getExportedTypeSpecializations(
-    const NominalTypeDecl *nominal, SmallVectorImpl<CanType> &result) {
-  for (auto *attr : nominal->getAttrs().getAttributes<SpecializedAttr>()) {
-    auto sig = attr->getSpecializedSignature(nominal);
+    const Decl *decl, SmallVectorImpl<CanType> &result) {
+  auto *nominal = decl->getAsGenericContext()->getSelfNominalTypeDecl();
+  if (!nominal)
+    return;
+  for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>()) {
+    auto sig = attr->getSpecializedSignature(decl);
     if (!attr->isExported() || !sig)
       continue;
     // Reduce 'Box<T>' to the specialized type, e.g. 'Box<Int>'; only fully
@@ -3143,14 +3193,20 @@ void SpecializedAttr::getExportedTypeSpecializations(
   }
 }
 
-bool SpecializedAttr::isExportedTypeSpecialization(CanType type) {
+ModuleDecl *SpecializedAttr::getExportedTypeSpecializationOwner(CanType type) {
+  // Only in Embedded Swift does a module own generic metadata. Otherwise the
+  // runtime instantiates it.
   auto *nominal = type->getAnyNominal();
   if (!nominal || !nominal->isGenericContext() ||
-      !nominal->getAttrs().hasAttribute<SpecializedAttr>())
-    return false;
-  SmallVector<CanType, 2> types;
-  getExportedTypeSpecializations(nominal, types);
-  return llvm::is_contained(types, type);
+      !nominal->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return nullptr;
+  for (auto [attrDecl, attr] : getTypeSpecializedAttrs(nominal)) {
+    SmallVector<CanType, 2> types;
+    getExportedTypeSpecializations(attrDecl, types);
+    if (llvm::is_contained(types, type))
+      return attrDecl->getModuleContext();
+  }
+  return nullptr;
 }
 
 bool SpecializedAttr::isExportedConformanceSpecialization(
@@ -3164,21 +3220,47 @@ bool SpecializedAttr::isExportedConformanceSpecialization(
     return false;
   auto type = specialized->getType()->getCanonicalType();
   auto *generic = specialized->getGenericConformance();
-  // Only conformances declared in the type's own module.
-  if (generic->getDeclContext()->getParentModule() !=
-      type->getAnyNominal()->getParentModule())
+  auto *owner = getExportedTypeSpecializationOwner(type);
+  if (!owner)
+    return false;
+  // Only conformances declared in the type's module or in the owner, e.g. one
+  // with an exported '@specialized' extension of the type.
+  auto *module = generic->getDeclContext()->getParentModule();
+  if (module != type->getAnyNominal()->getParentModule() && module != owner)
     return false;
   // A conformance emitted into clients isn't the library's.
   if (generic->getExplicitCodeGenerationModel() ==
       CodeGenerationModel::Implementation)
     return false;
-  if (!isExportedTypeSpecialization(type))
-    return false;
+  // An unavailable one, e.g. '@_unavailableInEmbedded', has no witness table.
+  if (auto *decl = generic->getDeclContext()->getAsDecl())
+    if (decl->isUnavailable())
+      return false;
   // A conditional conformance needs requirements the type satisfies.
   if (checkRequirements(specialized->getConditionalRequirements()) !=
       CheckRequirementsResult::Success)
     return false;
   return true;
+}
+
+/// Identifies a '@specialized' declaration without a body, which exports a
+/// specialization of an imported module's function (see the declaration).
+bool SpecializedAttr::isSpecializationDeclaration(const Decl *decl) {
+  auto *func = dyn_cast<AbstractFunctionDecl>(decl);
+  // Also with an invalid '@specialized', e.g. one naming nothing. A body macro
+  // (a custom attribute) adds the body later.
+  if (!func || isa<AccessorDecl>(func) || func->hasBody() ||
+      !func->getAttrs().hasAttribute<SpecializedAttr>(/*AllowInvalid=*/true) ||
+      func->getAttrs().hasAttribute<CustomAttr>())
+    return false;
+  // A free function, or a member in an extension of another module's type.
+  auto *dc = func->getDeclContext();
+  if (!dc->isModuleScopeContext() && !isa<ExtensionDecl>(dc))
+    return false;
+  // Declarations in module interfaces and SIL files have no bodies anyway.
+  auto *file = dc->getParentSourceFile();
+  return file && (file->Kind == SourceFileKind::Library ||
+                  file->Kind == SourceFileKind::Main);
 }
 
 GenericSignature

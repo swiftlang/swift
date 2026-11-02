@@ -1585,6 +1585,18 @@ public:
     SILValue(V).verifyOwnership(DEBlocks.get());
   }
 
+  void checkType(SILType silTy) {
+    // Make sure we don't have any types that should be eliminated by the
+    // type-checker.
+    auto ty = silTy.getASTType();
+    require(!ty->hasPlaceholder(), "placeholders should not appear in SIL");
+    require(!ty->hasUnboundGenericType(),
+            "unbound generics should not appear in SIL");
+    require(!ty->hasTypeVariableOrHole(),
+            "solver-allocated types should not appear in SIL");
+    require(!ty->hasJoinOrMeet(), "join and meets should not appear in SIL");
+  }
+
   void checkSILInstruction(SILInstruction *I) {
     const SILBasicBlock *BB = I->getParent();
     require(BB, "Instruction with null parent");
@@ -1603,6 +1615,8 @@ public:
 
     // Verify that all of our uses are in this function.
     for (auto result : I->getResults()) {
+      // Verify the result types.
+      checkType(result->getType());
       for (Operand *use : result->getUses()) {
         auto user = use->getUser();
         require(user, "instruction user is null?");

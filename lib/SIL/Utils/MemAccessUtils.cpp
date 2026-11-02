@@ -2538,15 +2538,11 @@ static void visitApplyAccesses(ApplySite apply,
       visitor(&oper);
       continue;
     }
-    auto fnType = oper.get()->getType().getAs<SILFunctionType>();
-    if (!fnType || !fnType->isNoEscape())
-      continue;
-
-    // When @noescape function closures are passed as arguments, their
+    // When non-escaping function closures are passed as arguments, their
     // arguments are considered accessed at the call site.
     TinyPtrVector<PartialApplyInst *> partialApplies;
-    findClosuresForFunctionValue(oper.get(), partialApplies);
-    // Recursively visit @noescape function closure arguments.
+    findNonEscapingClosuresForFunctionValue(oper.get(), partialApplies);
+    // Recursively visit non-escaping function closure arguments.
     for (auto *PAI : partialApplies)
       visitApplyAccesses(PAI, visitor);
   }

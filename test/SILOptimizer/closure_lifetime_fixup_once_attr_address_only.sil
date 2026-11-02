@@ -100,3 +100,146 @@ bb0(%0 : $*NoncopyableValue<T>, %1 : $*NoncopyableValue<T>):
   %10 = tuple ()
   return %10
 }
+
+sil [ossa] @borrowing_closure : $@convention(thin) <T> (@in_guaranteed CopyableValue<T>) -> ()
+
+// The closure borrows a copy of a value that is destroyed before the closure
+// is called, so it has to keep borrowing the copy.
+//
+// CHECK-LABEL: sil [ossa] @test_original_destroyed_during_closure_lifetime :
+// CHECK:         [[ORIG:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK:         [[COPY:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK:         copy_addr [[ORIG]] to [init] [[COPY]]
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}<T>([[COPY]])
+// CHECK:         destroy_addr [[ORIG]]
+// CHECK:         apply
+// CHECK:         destroy_addr [[COPY]]
+// CHECK:       } // end sil function 'test_original_destroyed_during_closure_lifetime'
+sil [ossa] @test_original_destroyed_during_closure_lifetime : $@convention(thin) <T> (@in CopyableValue<T>) -> () {
+bb0(%0 : $*CopyableValue<T>):
+  %1 = alloc_stack $CopyableValue<T>
+  copy_addr [take] %0 to [init] %1
+  %3 = function_ref @borrowing_closure : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %4 = alloc_stack $CopyableValue<T>
+  copy_addr %1 to [init] %4
+  %6 = partial_apply [called_once] %3<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %7 = convert_escape_to_noescape %6 to $@noescape @once @callee_owned () -> ()
+  dealloc_stack %4
+  destroy_addr %1
+  dealloc_stack %1
+  %11 = function_ref @use_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  %12 = apply %11(%7) : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  %13 = tuple ()
+  return %13
+}
+
+// The value outlives the closure, so the closure can borrow it directly.
+//
+// CHECK-LABEL: sil [ossa] @test_original_destroyed_after_closure_lifetime :
+// CHECK:         [[ORIG:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [on_stack] [called_once] {{%.*}}<T>([[ORIG]])
+// CHECK:         apply
+// CHECK:         destroy_addr [[ORIG]]
+// CHECK:       } // end sil function 'test_original_destroyed_after_closure_lifetime'
+sil [ossa] @test_original_destroyed_after_closure_lifetime : $@convention(thin) <T> (@in CopyableValue<T>) -> () {
+bb0(%0 : $*CopyableValue<T>):
+  %1 = alloc_stack $CopyableValue<T>
+  copy_addr [take] %0 to [init] %1
+  %3 = function_ref @borrowing_closure : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %4 = alloc_stack $CopyableValue<T>
+  copy_addr %1 to [init] %4
+  %6 = partial_apply [called_once] %3<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %7 = convert_escape_to_noescape %6 to $@noescape @once @callee_owned () -> ()
+  dealloc_stack %4
+  %9 = function_ref @use_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  %10 = apply %9(%7) : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %13 = tuple ()
+  return %13
+}
+
+sil [ossa] @use_called_exactly_once_and_inout : $@convention(thin) <T> (@owned @noescape @once @callee_owned () -> (), @inout CopyableValue<T>) -> ()
+sil [ossa] @read_value : $@convention(thin) <T> (@in_guaranteed CopyableValue<T>) -> ()
+
+// The apply that ends the closure's lifetime also modifies the value.
+//
+// CHECK-LABEL: sil [ossa] @test_original_modified_by_closure_lifetime_end :
+// CHECK:         [[ORIG:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK:         [[COPY:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK:         copy_addr [[ORIG]] to [init] [[COPY]]
+// CHECK:         partial_apply [on_stack] [called_once] {{%.*}}<T>([[COPY]])
+// CHECK:       } // end sil function 'test_original_modified_by_closure_lifetime_end'
+sil [ossa] @test_original_modified_by_closure_lifetime_end : $@convention(thin) <T> (@in CopyableValue<T>) -> () {
+bb0(%0 : $*CopyableValue<T>):
+  %1 = alloc_stack $CopyableValue<T>
+  copy_addr [take] %0 to [init] %1
+  %3 = function_ref @borrowing_closure : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %4 = alloc_stack $CopyableValue<T>
+  copy_addr %1 to [init] %4
+  %6 = partial_apply [called_once] %3<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %7 = convert_escape_to_noescape %6 to $@noescape @once @callee_owned () -> ()
+  dealloc_stack %4
+  %9 = function_ref @use_called_exactly_once_and_inout : $@convention(thin) <τ_0_0> (@owned @noescape @once @callee_owned () -> (), @inout CopyableValue<τ_0_0>) -> ()
+  %10 = apply %9<T>(%7, %1) : $@convention(thin) <τ_0_0> (@owned @noescape @once @callee_owned () -> (), @inout CopyableValue<τ_0_0>) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %13 = tuple ()
+  return %13
+}
+
+// An escaping closure takes the value while the closure is alive.
+//
+// CHECK-LABEL: sil [ossa] @test_original_taken_by_escaping_closure :
+// CHECK:         [[ORIG:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK:         [[COPY:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK:         copy_addr [[ORIG]] to [init] [[COPY]]
+// CHECK:         partial_apply [on_stack] [called_once] {{%.*}}<T>([[COPY]])
+// CHECK:       } // end sil function 'test_original_taken_by_escaping_closure'
+sil [ossa] @test_original_taken_by_escaping_closure : $@convention(thin) <T> (@in CopyableValue<T>) -> () {
+bb0(%0 : $*CopyableValue<T>):
+  %1 = alloc_stack $CopyableValue<T>
+  copy_addr [take] %0 to [init] %1
+  %3 = function_ref @borrowing_closure : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %4 = alloc_stack $CopyableValue<T>
+  copy_addr %1 to [init] %4
+  %6 = partial_apply [called_once] %3<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %7 = convert_escape_to_noescape %6 to $@noescape @once @callee_owned () -> ()
+  dealloc_stack %4
+  %9 = partial_apply [callee_guaranteed] %3<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  destroy_value %9
+  %11 = function_ref @use_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  %12 = apply %11(%7) : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  dealloc_stack %1
+  %14 = tuple ()
+  return %14
+}
+
+// Reading the value while the closure is alive doesn't modify it, so the
+// closure can borrow it directly.
+//
+// CHECK-LABEL: sil [ossa] @test_original_read_during_closure_lifetime :
+// CHECK:         [[ORIG:%.*]] = alloc_stack $CopyableValue<T>
+// CHECK-NOT:     alloc_stack
+// CHECK:         partial_apply [on_stack] [called_once] {{%.*}}<T>([[ORIG]])
+// CHECK:       } // end sil function 'test_original_read_during_closure_lifetime'
+sil [ossa] @test_original_read_during_closure_lifetime : $@convention(thin) <T> (@in CopyableValue<T>) -> () {
+bb0(%0 : $*CopyableValue<T>):
+  %1 = alloc_stack $CopyableValue<T>
+  copy_addr [take] %0 to [init] %1
+  %3 = function_ref @borrowing_closure : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %4 = alloc_stack $CopyableValue<T>
+  copy_addr %1 to [init] %4
+  %6 = partial_apply [called_once] %3<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %7 = convert_escape_to_noescape %6 to $@noescape @once @callee_owned () -> ()
+  dealloc_stack %4
+  %9 = function_ref @read_value : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %10 = apply %9<T>(%1) : $@convention(thin) <τ_0_0> (@in_guaranteed CopyableValue<τ_0_0>) -> ()
+  %11 = function_ref @use_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  %12 = apply %11(%7) : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %15 = tuple ()
+  return %15
+}

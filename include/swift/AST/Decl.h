@@ -1799,6 +1799,9 @@ public:
   /// extensions, protocols and certain type aliases.
   GenericParamList *getParsedGenericParams() const;
 
+  /// Whether this context has generic parameters written in source.
+  bool hasParsedGenericParamList() const { return getParsedGenericParams(); }
+
   /// Determine whether this context has generic parameters
   /// of its own.
   ///

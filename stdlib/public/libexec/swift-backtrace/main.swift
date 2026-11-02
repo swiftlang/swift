@@ -59,6 +59,10 @@ internal struct SwiftBacktrace {
     case stdout
     case stderr
     case file
+    #if os(Windows)
+    case console
+    case eventLog
+    #endif
   }
 
   enum Symbolication {
@@ -115,7 +119,18 @@ internal struct SwiftBacktrace {
 
   static var outputStream: CFileStream? = nil
 
+  #if os(Windows)
+  static var eventLogText: String? = nil
+  #endif
+
   static func write(_ string: String, flush: Bool = false) {
+    #if os(Windows)
+    // we are collating the output to a string for writing at the
+    // end into the event log
+    eventLogText?.append(string)
+    guard eventLogText == nil else { return }
+    #endif
+
     precondition(outputStream != nil, "Output stream must be set before calling write")
     var stream = outputStream!
 
@@ -126,6 +141,13 @@ internal struct SwiftBacktrace {
   }
 
   static func writeln(_ string: String, flush: Bool = false) {
+    #if os(Windows)
+    // we are collating the output to a string for writing at the
+    // end into the event log
+    eventLogText?.append(string + "\n")
+    guard eventLogText == nil else { return }
+    #endif
+
     precondition(outputStream != nil, "Output stream must be set before calling writeln")
     var stream = outputStream!
 
@@ -192,6 +214,14 @@ Generate a backtrace for the parent process.
                         Alternatively, you may specify a file path here.  If
                         the path points to a directory, a unique filename will
                         be generated automatically.
+
+                        On Windows, you can specify "eventlog", which writes
+                        the backtrace to the Application event log.
+                        If a console is not present (e.g. UI code), the runtime
+                        will default to "eventlog", and will suppress creation
+                        of a new window for "stderror" or "stdout" output.
+                        On Windows, you may also specify "console", which
+                        behaves like "stderr" but allows creation of a window.
 
 --format <format>       Set the output format.  Options are "text" and "json";
                         the default is "text".
@@ -392,6 +422,12 @@ Generate a backtrace for the parent process.
               args.outputTo = .stdout
             case "stderr":
               args.outputTo = .stderr
+            #if os(Windows)
+            case "console":
+              args.outputTo = .console
+            case "eventlog":
+              args.outputTo = .eventLog
+            #endif
             default:
               args.outputTo = .file
               args.outputPath = v
@@ -591,6 +627,14 @@ Generate a backtrace for the parent process.
         outputStream = standardOutput
       case .stderr:
         outputStream = standardError
+      #if os(Windows)
+      case .console:
+        outputStream = standardError
+      case .eventLog:
+        outputStream = standardError
+        eventLogText = ""
+        args.interactive = false
+      #endif
       case .file:
         if isDir(args.outputPath) {
           // If the output path is a directory, generate a filename
@@ -746,6 +790,15 @@ Generate a backtrace for the parent process.
         backtraceFormatter.writeCrashLog(now: now.iso8601)
     }
 
+    #if os(Windows)
+    if let eventLogText,
+       backtracerEventLog?.report(eventLogText) != true {
+      print("swift-backtrace: unable to write to the event log; "
+              + "writing the backtrace here instead", to: &standardError)
+      print(eventLogText, terminator: "", to: &standardError)
+    }
+    #endif
+
     #if os(anyAppleOS)
     // On Darwin, if Developer Mode is turned off, or we can't tell if it's
     // on or not, disable interactivity
@@ -781,6 +834,18 @@ Generate a backtrace for the parent process.
         }
       }
     }
+
+    #if os(Windows)
+    // If the console was created just for us, keep it open so that the
+    // backtrace can be read.
+    if args.outputTo == .console && !args.interactive {
+      var pid: DWORD = 0
+      if GetConsoleProcessList(&pid, 1) == 1 {
+        _ = waitForKey("Press any key to close this window",
+                       timeout: args.timeout)
+      }
+    }
+    #endif
   }
 
   // Parse the command line arguments; we can't use swift-argument-parser

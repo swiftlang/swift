@@ -5,7 +5,7 @@
 
 // REQUIRES: swift_feature_NondeinitableTypes
 
-// CHECK:      #if compiler(>=5.3) && $NondeinitableTypes
+// CHECK:      #if compiler(>=5.3) && $DeinitableProtocol && $NondeinitableTypes
 // CHECK-NEXT: @frozen public struct ND : ~Swift::Copyable, ~Swift::Deinitable {
 @frozen
 public struct ND: ~Copyable, ~Deinitable {
@@ -16,7 +16,7 @@ public struct ND: ~Copyable, ~Deinitable {
   }
 }
 
-// CHECK:      #if compiler(>=5.3) && $NondeinitableTypes
+// CHECK:      #if compiler(>=5.3) && $DeinitableProtocol && $NondeinitableTypes
 // CHECK-NEXT: public func borrowNondeinitable<T>(_ t: borrowing T) where T : ~Copyable, T : ~Deinitable
 public func borrowNondeinitable<T: ~Copyable & ~Deinitable>(_ t: borrowing T) {}
 
@@ -24,9 +24,15 @@ public func borrowNondeinitable<T: ~Copyable & ~Deinitable>(_ t: borrowing T) {}
 public func borrowNoncopyable<T: ~Copyable>(_ t: borrowing T) {}
 
 // CHECK:      #if compiler(>=5.3) && $NondeinitableTypes
+// CHECK-NEXT: #if compiler(>=5.3) && $DeinitableProtocol
 // CHECK-NEXT: public protocol HasNondeinitable {
 // CHECK-NEXT:   associatedtype A : ~Copyable, ~Deinitable
 // CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: public protocol HasNondeinitable {
+// CHECK-NEXT:   associatedtype A : ~Copyable
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
 // CHECK-NEXT: #endif
 public protocol HasNondeinitable {
   associatedtype A: ~Copyable, ~Deinitable
@@ -59,7 +65,7 @@ extension NoncopyableBox: Copyable where T: Copyable {}
 // CHECK:      public func borrowSomeNoncopyable(_: borrowing some ~Copyable)
 public func borrowSomeNoncopyable(_: borrowing some ~Copyable) {}
 
-// CHECK:      #if compiler(>=5.3) && $NondeinitableTypes
+// CHECK:      #if compiler(>=5.3) && $DeinitableProtocol && $NondeinitableTypes
 // CHECK-NEXT: public struct Box<T> : ~Swift::Copyable, ~Swift::Deinitable where T : ~Copyable, T : ~Deinitable {
 public struct Box<T: ~Copyable & ~Deinitable>: ~Copyable, ~Deinitable {
   public var value: T
@@ -67,6 +73,6 @@ public struct Box<T: ~Copyable & ~Deinitable>: ~Copyable, ~Deinitable {
 
 // The implicit `Sendable` conformance of a `~Deinitable` type needs the
 // feature, too.
-// CHECK:      #if compiler(>=5.3) && $NondeinitableTypes
+// CHECK:      #if compiler(>=5.3) && $DeinitableProtocol && $NondeinitableTypes
 // CHECK-NEXT: extension DeinitableLib::ND : Swift::Sendable {}
 // CHECK-NEXT: #endif

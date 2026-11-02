@@ -835,6 +835,405 @@ func testUndefinedTypeInPattern(_ x: Int) {
   }
 }
 
+// https://github.com/swiftlang/swift/issues/93263
+func testPlaceholderAndUnbound() {
+  protocol P<T> {
+    associatedtype T
+  }
+  enum E<T>: P { // expected-note 6{{'T' declared as parameter to type 'E'}}
+    case x
+  }
+  func testConcrete(_ e: E<Int>, _ nested: E<E<Int>>) {
+    // FIXME: These should all be inferrable.
+    switch e {
+    case E<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case E.x: ()
+    }
+    switch nested {
+    case E<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case E.x: ()
+    case E<E>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case E<E<_>>.x: () // expected-error {{type placeholder not allowed here}}
+    }
+
+    if case E<_>.x = e {} // expected-error {{type placeholder not allowed here}}
+    if case E.x = e {}
+    if case E<_>.x = nested {} // expected-error {{type placeholder not allowed here}}
+    if case E.x = nested {}
+    if case E<E>.x = nested {} // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case E<E<_>>.x = nested {} // expected-error {{type placeholder not allowed here}}
+
+    _ = { switch e { case E<_>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch e { case E.x: () } }
+    _ = { switch nested { case E<_>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch nested { case E.x: () } }
+    _ = { switch nested { case E<E<_>>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch nested { case E<E>.x: () } } // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+  }
+
+  func testAny(_ any: Any) {
+    switch any {
+    case E<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case E.x: () // expected-error {{generic enum type 'E' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case E<E>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case E<E<_>>.x: () // expected-error {{type placeholder not allowed here}}
+    case E<Int>.x: ()
+    case E<E<Int>>.x: ()
+    default: ()
+    }
+
+    if case E<_>.x = any {} // expected-error {{type placeholder not allowed here}}
+    if case E.x = any {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case E<E>.x = any {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case E<E<_>>.x = any {} // expected-error {{type placeholder not allowed here}}
+    if case E<Int>.x = any {}
+    if case E<E<Int>>.x = any {}
+
+    _ = { switch any { case E<_>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch any { case E.x: () } } // expected-error {{generic parameter 'T' could not be inferred}}
+    _ = { switch any { case E<E<_>>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch any { case E<E>.x: () } } // expected-error {{generic parameter 'T' could not be inferred}}
+    _ = { switch any { case E<Int>.x: (); default: () } }
+    _ = { switch any { case E<E<Int>>.x: (); default: () } }
+  }
+
+  func testParameterizedExistential(_ p: any P<Int>) {
+    // FIXME: These should be all inferrable except the E<E<...>> case.
+    switch p {
+    case E<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case E.x: () // expected-error {{generic enum type 'E' is ambiguous without explicit generic parameters when matching value of type 'any P<Int>'}}
+    case E<E>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'any P<Int>'}}
+    case E<E<_>>.x: () // expected-error {{type placeholder not allowed here}}
+    case E<Int>.x: ()
+    case E<E<Int>>.x: ()
+    }
+
+    if case E<_>.x = p {} // expected-error {{type placeholder not allowed here}}
+    if case E.x = p {} // expected-error {{generic enum type 'E' is ambiguous without explicit generic parameters when matching value of type 'any P<Int>'}}
+    if case E<E>.x = p {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case E<E<_>>.x = p {} // expected-error {{type placeholder not allowed here}}
+    if case E<Int>.x = p {}
+    if case E<E<Int>>.x = p {} // expected-error {{pattern of type 'E<Int>' cannot match 'Int'}}
+
+    _ = { switch p { case E<_>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch p { case E.x: () } } // expected-error {{generic enum type 'E' is ambiguous without explicit generic parameters when matching value of type 'any P<Int>'}}
+    _ = { switch p { case E<E<_>>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch p { case E<E>.x: () } } // expected-error {{generic parameter 'T' could not be inferred}} expected-error {{pattern of type 'E<T>' cannot match 'Int'}}
+    _ = { switch p { case E<Int>.x: (); default: () } }
+    _ = { switch p { case E<E<Int>>.x: (); default: () } } // expected-error {{pattern of type 'E<Int>' cannot match 'Int'}}
+  }
+
+  struct Outer<T> {
+    // expected-note@-1 4{{'T' declared as parameter to type 'Outer'}}
+    // expected-note@-2 {{arguments to generic parameter 'T' ('Int' and 'String') are expected to be equal}}
+    // expected-note@-3 3{{arguments to generic parameter 'T' ('String' and 'Int') are expected to be equal}}
+    enum Inner { case x }
+    enum GenericInner<U> { case x } // expected-note 2{{'U' declared as parameter to type 'Outer.GenericInner'}}
+  }
+
+  func testNestedAny(_ a: Any) {
+    switch a {
+    case Outer.Inner.x: () // expected-error {{generic enum type 'Outer.Inner' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case Outer<_>.Inner.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer.GenericInner<Int>.x: () // expected-error {{generic enum type 'Outer.GenericInner<Int>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case Outer<Int>.GenericInner.x: () // expected-error {{generic enum type 'Outer<Int>.GenericInner' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case Outer<Int>.GenericInner<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer<Int>.Inner.x: ()
+    case Outer<Int>.GenericInner<Int>.x: ()
+    }
+
+    if case Outer.Inner.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case Outer<_>.Inner.x = a {} // expected-error {{type placeholder not allowed here}}
+    if case Outer.GenericInner<Int>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case Outer<Int>.GenericInner.x = a {} // expected-error {{generic parameter 'U' could not be inferred}}
+    if case Outer<Int>.GenericInner<_>.x = a {} // expected-error {{type placeholder not allowed here}}
+    if case Outer<Int>.Inner.x = a {}
+    if case Outer<Int>.GenericInner<Int>.x = a {}
+
+    _ = { switch a { case Outer.Inner.x: () } }
+    // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+    _ = { switch a { case Outer<_>.Inner.x: () } }
+    // expected-error@-1 {{type placeholder not allowed here}}
+    _ = { switch a { case Outer.GenericInner<Int>.x: () } }
+    // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+    _ = { switch a { case Outer<Int>.GenericInner.x: () } }
+    // expected-error@-1 {{generic parameter 'U' could not be inferred}}
+    _ = { switch a { case Outer<Int>.GenericInner<_>.x: () } }
+    // expected-error@-1 {{type placeholder not allowed here}}
+    _ = { switch a { case Outer<Int>.Inner.x: (); default: () } }
+    _ = { switch a { case Outer<Int>.GenericInner<Int>.x: (); default: () } }
+  }
+
+  func testNestedConcrete(_ a: Outer<Int>.Inner, _ b: Outer<Int>.GenericInner<String>) {
+    // FIXME: The unbound parent case should work here.
+    switch a {
+    case Outer.Inner.x: () // expected-error {{generic enum type 'Outer.Inner' is ambiguous without explicit generic parameters when matching value of type 'Outer<Int>.Inner'}}
+    case Outer<_>.Inner.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer<Int>.Inner.x: ()
+    case Outer<String>.Inner.x: () // expected-error {{pattern of type 'Outer<String>.Inner' cannot match 'Outer<Int>.Inner'}}
+    }
+
+    switch b {
+    case Outer<String>.GenericInner.x: () // FIXME: This should be rejected
+    case Outer<Int>.GenericInner.x: ()
+    case Outer<String>.GenericInner<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer.GenericInner.x: ()
+    case Outer<_>.GenericInner<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer<_>.GenericInner.x: () // expected-error {{type placeholder not allowed here}}
+    }
+
+    if case Outer.Inner.x = a {} // expected-error {{generic enum type 'Outer.Inner' is ambiguous without explicit generic parameters when matching value of type 'Outer<Int>.Inner'}}
+    if case Outer<_>.Inner.x = a {} // expected-error {{type placeholder not allowed here}}
+    if case Outer<Int>.Inner.x = a {}
+    if case Outer<String>.Inner.x = a {} // expected-error {{cannot convert parent type 'Outer<Int>' to expected type 'Outer<String>'}}
+
+    if case Outer<String>.GenericInner.x = b {} // expected-error {{cannot convert parent type 'Outer<String>' to expected type 'Outer<Int>'}}
+    if case Outer<Int>.GenericInner.x = b {}
+    if case Outer<String>.GenericInner<_>.x = b {} // expected-error {{type placeholder not allowed here}}
+    if case Outer.GenericInner.x = b {}
+    if case Outer<_>.GenericInner<_>.x = b {} // expected-error {{type placeholder not allowed here}}
+    if case Outer<_>.GenericInner.x = b {} // expected-error {{type placeholder not allowed here}}
+
+    _ = { switch a { case Outer.Inner.x: () } } // expected-error {{generic enum type 'Outer.Inner' is ambiguous without explicit generic parameters when matching value of type 'Outer<Int>.Inner'}}
+    _ = { switch a { case Outer<_>.Inner.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch a { case Outer<Int>.Inner.x: () } }
+    _ = { switch a { case Outer<String>.Inner.x: () } } // expected-error {{cannot convert parent type 'Outer<String>' to expected type 'Outer<Int>'}}
+
+    _ = { switch b { case Outer<String>.GenericInner.x: () } } // expected-error {{cannot convert parent type 'Outer<String>' to expected type 'Outer<Int>'}}
+    _ = { switch b { case Outer<Int>.GenericInner.x: () } }
+    _ = { switch b { case Outer<String>.GenericInner<_>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch b { case Outer.GenericInner.x: () } }
+    _ = { switch b { case Outer<_>.GenericInner<_>.x: () } } // expected-error {{type placeholder not allowed here}}
+    _ = { switch b { case Outer<_>.GenericInner.x: () } } // expected-error {{type placeholder not allowed here}}
+  }
+}
+
+func testGenericAliases() {
+  enum E<T> { case x } // expected-note {{arguments to generic parameter 'T'}} expected-note 6{{'T' declared as parameter to type 'E'}}
+  struct Outer<T> { // expected-note 4{{'T' declared as parameter to type 'Outer}}
+    typealias GenericAlias<U> = E<U> // expected-note 2{{'U' declared as parameter to type 'Outer.GenericAlias'}}
+    typealias PassthroughAlias = E
+  }
+  typealias GenericAlias<T> = E<T> // expected-note 5{{'T' declared as parameter to type 'GenericAlias'}}
+  typealias PassthroughAlias = E
+  typealias IntE = E<Int>
+
+  func testConcrete(_ e: E<E<Int>>) {
+    // FIXME: These should be inferrable
+    switch e {
+    case E<GenericAlias>.x: () // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case E<PassthroughAlias>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case GenericAlias<IntE>.x: ()
+    case GenericAlias<E<String>>.x: () // expected-error {{pattern of type 'GenericAlias<E<String>>' (aka 'E<E<String>>') cannot match 'E<E<Int>>'}}
+    case PassthroughAlias<IntE>.x: ()
+    case PassthroughAlias<PassthroughAlias>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case PassthroughAlias<GenericAlias>.x: () // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case GenericAlias<PassthroughAlias>.x: () // expected-error {{generic enum type 'GenericAlias<E>' (aka 'E<E>') is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case GenericAlias<GenericAlias>.x: () // expected-error {{generic enum type 'GenericAlias<GenericAlias>' (aka 'E<GenericAlias>') is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case Outer<Int>.GenericAlias<IntE>.x: ()
+    case Outer<GenericAlias>.PassthroughAlias<IntE>.x: ()
+    case Outer<PassthroughAlias>.GenericAlias<IntE>.x: ()
+
+    case Outer<_>.GenericAlias<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer<_>.PassthroughAlias<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer.GenericAlias<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer.PassthroughAlias<_>.x: () // expected-error {{type placeholder not allowed here}}
+
+    case Outer.GenericAlias.x: () // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify}}
+    case Outer.PassthroughAlias.x: ()
+
+    case Outer.GenericAlias<IntE>.x: ()
+    case Outer.PassthroughAlias<IntE>.x: ()
+    case Outer.PassthroughAlias<PassthroughAlias>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case Outer.PassthroughAlias<GenericAlias>.x: () // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case Outer.GenericAlias<PassthroughAlias>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    case Outer.GenericAlias<GenericAlias>.x: () // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    }
+
+    if case E<GenericAlias>.x = e {} // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case E<PassthroughAlias>.x = e {} // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case GenericAlias<IntE>.x = e {}
+    if case GenericAlias<E<String>>.x = e {} // expected-error {{cannot assign value of type 'E<E<Int>>' to type 'GenericAlias<E<String>>' (aka 'E<E<String>>')}}
+    if case PassthroughAlias<IntE>.x = e {}
+    if case PassthroughAlias<PassthroughAlias>.x = e {} // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case PassthroughAlias<GenericAlias>.x = e {} // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case GenericAlias<PassthroughAlias>.x = e {} // expected-error {{generic enum type 'GenericAlias<E>' (aka 'E<E>') is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case GenericAlias<GenericAlias>.x = e {} // expected-error {{generic enum type 'GenericAlias<GenericAlias>' (aka 'E<GenericAlias>') is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case Outer<Int>.GenericAlias<IntE>.x = e {}
+    if case Outer<GenericAlias>.PassthroughAlias<IntE>.x = e {}
+    if case Outer<PassthroughAlias>.GenericAlias<IntE>.x = e {}
+
+    if case Outer<_>.GenericAlias<_>.x = e {} // expected-error {{type placeholder not allowed here}}
+    if case Outer<_>.PassthroughAlias<_>.x = e {} // expected-error {{type placeholder not allowed here}}
+    if case Outer.GenericAlias<_>.x = e {} // expected-error {{type placeholder not allowed here}}
+    if case Outer.PassthroughAlias<_>.x = e {} // expected-error {{type placeholder not allowed here}}
+
+    if case Outer.GenericAlias.x = e {} // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify}}
+    if case Outer.PassthroughAlias.x = e {}
+
+    if case Outer.GenericAlias<IntE>.x = e {}
+    if case Outer.PassthroughAlias<IntE>.x = e {}
+    if case Outer.PassthroughAlias<PassthroughAlias>.x = e {} // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case Outer.PassthroughAlias<GenericAlias>.x = e {} // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case Outer.GenericAlias<PassthroughAlias>.x = e {} // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+    if case Outer.GenericAlias<GenericAlias>.x = e {} // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'E<E<Int>>'}}
+  }
+
+  func testAny(_ a: Any) {
+    switch a {
+    case E<GenericAlias>.x: () // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case E<PassthroughAlias>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case GenericAlias<IntE>.x: ()
+    case GenericAlias<E<String>>.x: ()
+    case PassthroughAlias<IntE>.x: ()
+    case PassthroughAlias<PassthroughAlias>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case PassthroughAlias<GenericAlias>.x: () // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case GenericAlias<PassthroughAlias>.x: () // expected-error {{generic enum type 'GenericAlias<E>' (aka 'E<E>') is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case GenericAlias<GenericAlias>.x: () // expected-error {{generic enum type 'GenericAlias<GenericAlias>' (aka 'E<GenericAlias>') is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case Outer<Int>.GenericAlias<IntE>.x: ()
+    case Outer<GenericAlias>.PassthroughAlias<IntE>.x: ()
+    case Outer<PassthroughAlias>.GenericAlias<IntE>.x: ()
+
+    case Outer<_>.GenericAlias<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer<_>.PassthroughAlias<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer.GenericAlias<_>.x: () // expected-error {{type placeholder not allowed here}}
+    case Outer.PassthroughAlias<_>.x: () // expected-error {{type placeholder not allowed here}}
+
+    case Outer.GenericAlias.x: ()
+      // expected-error@-1 {{generic parameter 'T' could not be inferred}} expected-note@-1 {{explicitly specify}}
+      // expected-error@-2 {{generic parameter 'U' could not be inferred}} expected-note@-2 {{explicitly specify}}
+      // expected-error@-3 {{expression pattern of type 'E<U>' cannot match values of type 'Any'}}
+    case Outer.PassthroughAlias.x: ()
+      // expected-error@-1 {{generic enum type 'E' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+
+    case Outer.GenericAlias<IntE>.x: ()
+    case Outer.PassthroughAlias<IntE>.x: ()
+    case Outer.PassthroughAlias<PassthroughAlias>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case Outer.PassthroughAlias<GenericAlias>.x: () // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case Outer.GenericAlias<PassthroughAlias>.x: () // expected-error {{generic enum type 'E<E>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    case Outer.GenericAlias<GenericAlias>.x: () // expected-error {{generic enum type 'E<GenericAlias>' is ambiguous without explicit generic parameters when matching value of type 'Any'}}
+    }
+
+    if case E<GenericAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case E<PassthroughAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case GenericAlias<IntE>.x = a {}
+    if case GenericAlias<E<String>>.x = a {}
+    if case PassthroughAlias<IntE>.x = a {}
+    if case PassthroughAlias<PassthroughAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case PassthroughAlias<GenericAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case GenericAlias<PassthroughAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case GenericAlias<GenericAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case Outer<Int>.GenericAlias<IntE>.x = a {}
+    if case Outer<GenericAlias>.PassthroughAlias<IntE>.x = a {}
+    if case Outer<PassthroughAlias>.GenericAlias<IntE>.x = a {}
+
+    if case Outer<_>.GenericAlias<_>.x = a {} // expected-error {{type placeholder not allowed here}}
+    if case Outer<_>.PassthroughAlias<_>.x = a {} // expected-error {{type placeholder not allowed here}}
+    if case Outer.GenericAlias<_>.x = a {} // expected-error {{type placeholder not allowed here}}
+    if case Outer.PassthroughAlias<_>.x = a {} // expected-error {{type placeholder not allowed here}}
+
+    if case Outer.GenericAlias.x = a {}
+    // expected-error@-1 {{generic parameter 'T' could not be inferred}} expected-note@-1 {{explicitly specify}}
+    // expected-error@-2 {{generic parameter 'U' could not be inferred}} expected-note@-2 {{explicitly specify}}
+    // expected-error@-3 {{expression pattern of type 'E<U>' cannot match values of type 'Any'}}
+    if case Outer.PassthroughAlias.x = a {}
+    // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+
+    if case Outer.GenericAlias<IntE>.x = a {}
+    if case Outer.PassthroughAlias<IntE>.x = a {}
+    if case Outer.PassthroughAlias<PassthroughAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case Outer.PassthroughAlias<GenericAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case Outer.GenericAlias<PassthroughAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+    if case Outer.GenericAlias<GenericAlias>.x = a {} // expected-error {{generic parameter 'T' could not be inferred}}
+  }
+}
+
+func testDeprecated() {
+  enum E<T> { case x }
+
+  @available(*, deprecated)
+  enum Deprecated { case x, y(Int) }
+
+  enum Outer {
+    @available(*, deprecated)
+    enum Inner { case x }
+  }
+
+  // expected-warning@+2 {{'Deprecated' is deprecated}}
+  // expected-warning@+1 {{'Inner' is deprecated}}
+  func foo(_ a: Deprecated, _ b: Outer.Inner) {
+    // Make sure we only emit these warnings once.
+    switch a {
+    case Deprecated.x: () // expected-warning {{'Deprecated' is deprecated}}
+    case Deprecated.y(let i): _ = i // expected-warning {{'Deprecated' is deprecated}}
+    }
+    switch b {
+    case Outer.Inner.x: () // expected-warning {{'Inner' is deprecated}}
+    }
+    if case Deprecated.x = a {} // expected-warning {{'Deprecated' is deprecated}}
+    if case Deprecated.y(let i) = a { _ = i } // expected-warning {{'Deprecated' is deprecated}}
+    if case Outer.Inner.x = b {} // expected-warning {{'Inner' is deprecated}}
+    _ = {
+      switch a {
+      case Deprecated.x: return 0 // expected-warning {{'Deprecated' is deprecated}}
+      case Deprecated.y(let i): return i // expected-warning {{'Deprecated' is deprecated}}
+      }
+      switch b {
+      case Outer.Inner.x: () // expected-warning {{'Inner' is deprecated}}
+      }
+    }
+  }
+}
+
+func testPatternConformances() {
+  enum E<T> { case x }
+
+  enum WithHashable<T: Hashable> { case x }
+  struct NotHashable {}
+  protocol Q {}
+
+  // FIXME: These diagnostics should only be emitted once.
+  func foo(_ any: Any) {
+    switch any {
+    case WithHashable<NotHashable>.x: () // expected-error 2 {{type 'NotHashable' does not conform to protocol 'Hashable'}}
+    case E<UnsafePointer<Void>>.x: () // expected-warning 2 {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
+    case E<any (any Q)>.x: () // expected-error 2 {{redundant 'any' in type 'any any Q'}}
+    case E<(a: Int)>.x: () // expected-error 2 {{cannot create a single-element tuple with an element label}}
+    case E<(a: Int, a: Int)>.x: () // expected-error 2 {{cannot create a tuple with a duplicate element label}}
+    }
+
+    if case WithHashable<NotHashable>.x = any {} // expected-error 2 {{type 'NotHashable' does not conform to protocol 'Hashable'}}
+    if case E<UnsafePointer<Void>>.x = any {} // expected-warning 2 {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
+    if case E<any (any Q)>.x = any {} // expected-error 2 {{redundant 'any' in type 'any any Q'}}
+    if case E<(a: Int)>.x = any {} // expected-error 2 {{cannot create a single-element tuple with an element label}}
+    if case E<(a: Int, a: Int)>.x = any {} // expected-error 2 {{cannot create a tuple with a duplicate element label}}
+
+    _ = { switch any { case WithHashable<NotHashable>.x: () } }
+    // expected-error@-1 2 {{type 'NotHashable' does not conform to protocol 'Hashable'}}
+    _ = { switch any { case E<UnsafePointer<Void>>.x: (); default: () } }
+    // expected-warning@-1 2 {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}
+    _ = { switch any { case E<any (any Q)>.x: (); default: () } }
+    // expected-error@-1 2 {{redundant 'any' in type 'any any Q'}}
+    _ = { switch any { case E<(a: Int)>.x: (); default: () } }
+    // expected-error@-1 2 {{cannot create a single-element tuple with an element label}}
+    _ = { switch any { case E<(a: Int, a: Int)>.x: (); default: () } }
+    // expected-error@-1 2 {{cannot create a tuple with a duplicate element label}}
+  }
+}
+
+enum SelfPattern<T> {
+  case x
+  func foo() {
+    // FIXME: We should only emit a single diagnostic here.
+    switch self {
+    case Self<Int>.x: break
+      // expected-error@-1 2{{cannot specialize 'Self'}}
+      // expected-note@-2 2{{did you mean to explicitly reference 'SelfPattern' instead?}}
+    default: break
+    }
+  }
+}
+
 func testUndefinedInClosureVar() {
   // Make sure we don't produce "unable to infer closure type without a type annotation"
   _ = {

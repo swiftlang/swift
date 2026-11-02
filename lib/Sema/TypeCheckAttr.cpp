@@ -3804,14 +3804,179 @@ static Type getNonPublicSpecializedType(Decl *D, SpecializedAttr *attr) {
   return nonPublic;
 }
 
+/// Why \p D is emitted into its clients, as an argument of
+/// 'specialized_attr_exported_emitted_into_client', if it is. The library
+/// can't own the specialized body of such code.
+static std::optional<unsigned> getEmittedIntoClientReason(const Decl *D) {
+  if (D->getAttrs().hasAttribute<TransparentAttr>())
+    return /*@_transparent*/ 2;
+  if (D->getExplicitCodeGenerationModel() ==
+      CodeGenerationModel::Implementation) {
+    // An accessor can take '@_alwaysEmitIntoClient' from its storage.
+    auto *accessor = dyn_cast<AccessorDecl>(D);
+    bool alwaysEmitIntoClient =
+        D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
+        (accessor && accessor->getStorage()
+                         ->getAttrs()
+                         .hasAttribute<AlwaysEmitIntoClientAttr>());
+    return alwaysEmitIntoClient ? /*@_alwaysEmitIntoClient*/ 1
+                                : /*@export(implementation)*/ 0;
+  }
+  if (D->getModuleContext()->codeGenerationModel() ==
+      CodeGenerationModel::Implementation)
+    return /*implementation code generation model*/ 3;
+  return std::nullopt;
+}
+
+/// Finds another '@specialized' declaration without a body in \p VD's module,
+/// with the same name and type, that comes before \p VD, if any. Used for the
+/// "repeated" error.
+static ValueDecl *findEarlierSpecializationDeclaration(ValueDecl *VD) {
+  SmallVector<Decl *, 32> topLevelDecls, decls;
+  VD->getModuleContext()->getTopLevelDecls(topLevelDecls);
+  for (auto *decl : topLevelDecls) {
+    decls.push_back(decl);
+    if (auto *extension = dyn_cast<ExtensionDecl>(decl))
+      llvm::append_range(decls, extension->getMembers());
+  }
+  for (auto *decl : decls) {
+    if (decl == VD)
+      return nullptr;
+    auto *other = dyn_cast<ValueDecl>(decl);
+    if (other && other->getName() == VD->getName() &&
+        SpecializedAttr::isSpecializationDeclaration(other) &&
+        other->getInterfaceType()->isEqual(VD->getInterfaceType()))
+      return other;
+  }
+  return nullptr;
+}
+
+/// The module that already exports \p attr's specialization of \p target, if
+/// it is visible: \p target's module, a module with an exported '@specialized'
+/// extension of \p target's type, or a module that \p D's module links.
+/// Used for the "already exports" error.
+static ModuleDecl *findOtherExporter(Decl *D, ValueDecl *target,
+                                     SpecializedAttr *attr) {
+  auto sig = attr->getSpecializedSignature(D).getCanonicalSignature();
+  auto exports = [&](Decl *decl, const AbstractSpecializeAttr *other) {
+    return other->isExported() &&
+           other->getSpecializedSignature(decl).getCanonicalSignature() == sig;
+  };
+  // Also '@_specialize(exported: true)'.
+  for (auto *other : target->getAttrs().getAttributes<AbstractSpecializeAttr>())
+    if (exports(target, other))
+      return target->getModuleContext();
+  // A member also gets the specializations of its type, e.g. from
+  // '@specialized(exported: true, where T == Int) extension Lib.Box {}'.
+  if (auto *member = dyn_cast<AbstractFunctionDecl>(target)) {
+    SmallVector<SpecializedAttr::TypeLevelSpecialization, 2> typeLevelSigs;
+    SpecializedAttr::getTypeLevelSpecializations(member, typeLevelSigs);
+    for (auto [typeLevelSig, exported, module] : typeLevelSigs)
+      if (exported && typeLevelSig.getCanonicalSignature() == sig)
+        return const_cast<ModuleDecl *>(module);
+  }
+
+  SmallVector<ModuleDecl *, 8> modules;
+  SpecializedAttr::getModulesWithUsedSpecializations(D->getModuleContext(),
+                                                     modules);
+  for (auto *module : modules) {
+    SmallVector<Decl *, 8> decls;
+    module->getExportedPrespecializations(decls);
+    for (auto *decl : decls)
+      for (auto *other : decl->getAttrs().getAttributes<SpecializedAttr>())
+        if (other->getTargetFunctionDecl(cast<ValueDecl>(decl)) == target &&
+            exports(decl, other))
+          return module;
+  }
+  return nullptr;
+}
+
 /// Type check that a set of requirements provided by @_specialize/@specialize.
 /// Store the set of requirements in the attribute.
 void AttributeChecker::visitSpecializedAttr(SpecializedAttr *attr) {
-  // On a type, '@specialized' is experimental.
-  if (isa<NominalTypeDecl>(D) && !attr->isExported() &&
+  auto invalid = [&](auto diagnostic, auto... args) {
+    diagnose(attr->getLocation(), diagnostic, args...);
+    attr->setInvalid();
+  };
+
+  // Not exported, a declaration without a body or an extension is accepted but
+  // has no effect: this module can't add a fast path to another module's body.
+  bool exported = attr->isExported();
+
+  // 1. On an extension, it specializes another module's type, whose
+  // specialization this module exports.
+  if (auto *extension = dyn_cast<ExtensionDecl>(D)) {
+    auto *nominal = extension->getExtendedNominal();
+    if (!nominal)
+      return attr->setInvalid();
+    // 1a. The experimental feature.
+    if (!Ctx.LangOpts.hasFeature(Feature::ExtendedSpecializedAttribute))
+      return invalid(diag::specialized_attr_declaration_experimental,
+                     /*extension=*/true);
+    // 1b. A generic type of another module, if exported public and without
+    // library evolution.
+    if (isa<ProtocolDecl>(nominal) || !nominal->isGenericContext())
+      return invalid(diag::specialized_attr_extension_not_generic);
+    if (exported && D->getModuleContext()->isResilient())
+      return invalid(diag::specialized_attr_exported_library_evolution);
+    if (nominal->getModuleContext() == D->getModuleContext())
+      return invalid(diag::specialized_attr_extension_local,
+                     nominal->getName());
+    if (exported && !nominal->getFormalAccessScope().isPublic())
+      return invalid(diag::specialized_attr_exported_not_public);
+    // 1c. The whole type, e.g. not 'extension Box where T: Equatable' or
+    // 'extension Box<Int>', with no members or conformances of its own.
+    if (!extension->getGenericSignature()->isEqual(
+            nominal->getGenericSignature()))
+      return invalid(diag::specialized_attr_extension_constrained);
+    if (llvm::any_of(extension->getMembers(), [](Decl *member) {
+          return !SpecializedAttr::isSpecializationDeclaration(member);
+        }))
+      return invalid(diag::specialized_attr_extension_member);
+    if (!extension->getInherited().empty())
+      return invalid(diag::specialized_attr_extension_conformance);
+    // 1d. The 'where' clause, with public types if exported.
+    if (exported)
+      if (auto type = getNonPublicSpecializedType(D, attr))
+        return invalid(diag::specialized_attr_exported_not_public_type, type);
+    visitAbstractSpecializeAttr(attr);
+    auto sig = attr->getSpecializedSignature(D);
+    if (!exported || attr->isInvalid() || !sig)
+      return;
+    // 1e. Only one module exports a specialization: the type's module, or one
+    // with such an extension.
+    auto type = sig.getReducedType(nominal->getDeclaredInterfaceType());
+    auto exports = [&](const Decl *decl) {
+      SmallVector<CanType, 2> types;
+      SpecializedAttr::getExportedTypeSpecializations(decl, types);
+      return llvm::is_contained(types, type);
+    };
+    const Decl *exporter = exports(nominal) ? nominal : nullptr;
+    for (auto *other : nominal->getExtensions())
+      if (!exporter && other != extension && exports(other))
+        exporter = other;
+    if (exporter)
+      invalid(diag::specialized_attr_declaration_already_exported,
+              exporter->getModuleContext()->getName(), nominal->getName());
+    return;
+  }
+
+  // 2. A declaration without a body names an imported declaration, whose
+  // specialization this module exports. It needs the experimental feature.
+  bool isDeclaration = SpecializedAttr::isSpecializationDeclaration(D);
+  if (isDeclaration &&
+      !Ctx.LangOpts.hasFeature(Feature::ExtendedSpecializedAttribute))
+    return invalid(diag::specialized_attr_declaration_experimental,
+                   /*extension=*/false);
+
+  // 3. On a type, '@specialized' is experimental. Exported, it needs a
+  // declaration that clients can use and whose specialization this module can
+  // own.
+  if (isa<NominalTypeDecl>(D) && !exported &&
       !Ctx.LangOpts.hasFeature(Feature::ExtendedSpecializedAttribute))
     diagnose(attr->getLocation(), diag::specialized_attr_type_experimental);
-  if (attr->isExported()) {
+  bool canExport = false;
+  if (exported) {
     if (!Ctx.LangOpts.hasFeature(Feature::ExtendedSpecializedAttribute))
       diagnose(attr->getLocation(),
                diag::specialized_attr_exported_experimental);
@@ -3824,39 +3989,57 @@ void AttributeChecker::visitSpecializedAttr(SpecializedAttr *attr) {
     else if (auto type = getNonPublicSpecializedType(D, attr))
       diagnose(attr->getLocation(),
                diag::specialized_attr_exported_not_public_type, type);
-    // The library can't own the specialized body of code that is emitted
-    // into its clients.
-    else if (D->getAttrs().hasAttribute<TransparentAttr>())
+    else if (auto reason = getEmittedIntoClientReason(D))
       diagnose(attr->getLocation(),
-               diag::specialized_attr_exported_emitted_into_client,
-               /*@_transparent*/ 2);
-    else if (D->getExplicitCodeGenerationModel() ==
-             CodeGenerationModel::Implementation) {
-      // An accessor can take '@_alwaysEmitIntoClient' from its storage.
-      auto *accessor = dyn_cast<AccessorDecl>(D);
-      bool alwaysEmitIntoClient =
-          D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>() ||
-          (accessor && accessor->getStorage()
-                           ->getAttrs()
-                           .hasAttribute<AlwaysEmitIntoClientAttr>());
-      diagnose(attr->getLocation(),
-               diag::specialized_attr_exported_emitted_into_client,
-               alwaysEmitIntoClient ? /*@_alwaysEmitIntoClient*/ 1
-                                    : /*@export(implementation)*/ 0);
-    }
-    else if (D->getModuleContext()->codeGenerationModel() ==
-             CodeGenerationModel::Implementation)
-      diagnose(attr->getLocation(),
-               diag::specialized_attr_exported_emitted_into_client,
-               /*implementation code generation model*/ 3);
+               diag::specialized_attr_exported_emitted_into_client, *reason);
+    else
+      canExport = true;
   }
+
+  // 4. A declaration without a body needs a target in an imported module,
+  // named by one declaration. If exported, the target can't be emitted into
+  // clients, and no other module may export the same specialization.
+  if (isDeclaration) {
+    auto *VD = cast<ValueDecl>(D);
+    // The target request reports when there is no target.
+    auto *target =
+        canExport || !exported ? attr->getTargetFunctionDecl(VD) : nullptr;
+    if (!target)
+      return attr->setInvalid();
+    if (target->getModuleContext() == D->getModuleContext())
+      return invalid(diag::specialized_attr_declaration_local,
+                     target->getName());
+    if (auto reason =
+            exported ? getEmittedIntoClientReason(target) : std::nullopt)
+      return invalid(diag::specialized_attr_exported_emitted_into_client,
+                     *reason);
+    // One declaration carries all the specializations of the function it
+    // names, so a repeat is reported once, for one of its attributes.
+    if (auto *earlier = findEarlierSpecializationDeclaration(VD)) {
+      if (attr == D->getAttrs().getAttribute<SpecializedAttr>(
+                      /*AllowInvalid=*/true)) {
+        diagnose(attr->getLocation(),
+                 diag::specialized_attr_declaration_repeated, VD->getName());
+        diagnose(earlier, diag::decl_declared_here, earlier);
+      }
+      return attr->setInvalid();
+    }
+    if (auto *exporter =
+            exported ? findOtherExporter(D, target, attr) : nullptr)
+      return invalid(diag::specialized_attr_declaration_already_exported,
+                     exporter->getName(), target->getName());
+  }
+  // 5. The 'where' clause.
   visitAbstractSpecializeAttr(attr);
 }
 void AttributeChecker::visitSpecializeAttr(SpecializeAttr *attr) {
   visitAbstractSpecializeAttr(attr);
 }
 void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr) {
-  auto *VD = cast<ValueDecl>(D);
+  // An extension specializes the type it extends.
+  auto *VD = dyn_cast<ValueDecl>(D);
+  if (auto *extension = dyn_cast<ExtensionDecl>(D))
+    VD = extension->getExtendedNominal();
   auto genericSig = D->getAsGenericContext()->getGenericSignature();
   auto *trailingWhereClause = attr->getTrailingWhereClause();
 
@@ -3880,7 +4063,7 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
     // Only generic functions are permitted to have trailing where clauses.
     diagnose(attr->getLocation(),
              diag::specialize_attr_nongeneric_trailing_where, VD->getName(),
-             attr->isPublic(), isa<NominalTypeDecl>(D))
+             attr->isPublic(), isa<NominalTypeDecl>(VD))
         .highlight(trailingWhereClause->getSourceRange());
     return;
   }
@@ -3946,7 +4129,8 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
   attr->setTypeErasedParams(typeErasedParams);
 
   // Check the target function if there is one.
-  attr->getTargetFunctionDecl(cast<ValueDecl>(D));
+  if (auto *VD = dyn_cast<ValueDecl>(D))
+    attr->getTargetFunctionDecl(VD);
 
   return specializedSig;
 }
@@ -6588,6 +6772,20 @@ SpecializeAttrTargetDeclRequest::evaluate(Evaluator &evaluator,
   DeclNameRefWithLoc targetFunctionName{attr->getTargetFunctionName(),
                                         attr->getTargetFunctionNameLoc(),
                                         std::nullopt};
+  // A '@specialized' declaration without a body names the imported
+  // declaration with its own name and type.
+  if (!targetFunctionName.Name && isa<SpecializedAttr>(attr) &&
+      SpecializedAttr::isSpecializationDeclaration(vd)) {
+    auto *target = findTargetFunction(
+        DeclNameRefWithLoc{DeclNameRef(vd->getName()),
+                           DeclNameLoc(vd->getNameLoc()), std::nullopt},
+        cast<AbstractFunctionDecl>(vd), attr, /*diags*/ nullptr);
+    if (!target)
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::specialized_attr_declaration_not_found,
+                         vd->getName(), vd->getInterfaceType());
+    return target;
+  }
   if (!targetFunctionName.Name)
     return nullptr;
 

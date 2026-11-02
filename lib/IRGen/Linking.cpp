@@ -649,19 +649,15 @@ static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
   return false;
 }
 
-/// Whether the type's module owns \p ty's metadata, in Embedded Swift.
+/// Whether a module owns \p ty's metadata, in Embedded Swift.
 static bool isEmbeddedExportedTypeSpecialization(CanType ty) {
-  return ty->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
-         SpecializedAttr::isExportedTypeSpecialization(ty);
+  return SpecializedAttr::getExportedTypeSpecializationOwner(ty);
 }
 
-/// Whether the type's module owns \p conformance's witness table, in Embedded
-/// Swift.
+/// Whether a module owns \p conformance's witness table, in Embedded Swift.
 static bool isEmbeddedExportedConformanceSpecialization(
     const ProtocolConformance *conformance) {
-  return conformance->getDeclContext()->getASTContext().LangOpts.hasFeature(
-             Feature::Embedded) &&
-         SpecializedAttr::isExportedConformanceSpecialization(conformance);
+  return SpecializedAttr::isExportedConformanceSpecialization(conformance);
 }
 
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
@@ -693,7 +689,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ValueWitnessTable: {
     auto type = getType();
 
-    // Unique: defined by the type's module, external elsewhere.
+    // Unique: defined by the owning module, external elsewhere.
     if (isEmbeddedExportedTypeSpecialization(type))
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
 
@@ -743,7 +739,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata: {
-      // Unique: defined by the type's module, external elsewhere.
+      // Unique: defined by the owning module, external elsewhere.
       if (isEmbeddedExportedTypeSpecialization(getType()))
         return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
 
@@ -932,7 +928,7 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
                          forDefinition);
 
   case Kind::ProtocolWitnessTable:
-    // Unique: defined by the type's module, external elsewhere.
+    // Unique: defined by the owning module, external elsewhere.
     if (isEmbeddedExportedConformanceSpecialization(getProtocolConformance()))
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
     LLVM_FALLTHROUGH;
@@ -1863,6 +1859,48 @@ bool LinkEntity::isAlwaysSharedLinkage() const {
   }
 }
 
+/// A specialization of another module's function or type that this module
+/// exports, which other modules may export too.
+bool LinkEntity::isWeakExportedSpecialization(
+    const ModuleDecl *swiftModule) const {
+  // An entity for an AST declaration, e.g. a method descriptor, is never one.
+  if (isDeclKind(getKind()))
+    return false;
+  // Created in this module, as a '@specialized' declaration without a body or
+  // extension asks for.
+  if (hasSILFunction()) {
+    auto *f = getSILFunction();
+    return f->isSpecialization() &&
+           f->getModule().createsExportedSpecializationOfImportedFunction(
+               f->getName());
+  }
+  CanType type;
+  switch (getKind()) {
+  // Like hasNonUniqueDefinition: an async or coroutine function pointer is
+  // defined like its function.
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+    return getUnderlyingEntityForCoroFunctionPointer()
+        .isWeakExportedSpecialization(swiftModule);
+  case Kind::TypeMetadata:
+  case Kind::ValueWitnessTable:
+    type = getType();
+    break;
+  case Kind::ProtocolWitnessTable:
+    type = getProtocolConformance()->getType()->getCanonicalType();
+    break;
+  default:
+    return false;
+  }
+  return SpecializedAttr::getExportedTypeSpecializationOwner(type) ==
+             swiftModule &&
+         type->getAnyNominal()->getModuleContext() != swiftModule;
+}
+
 bool LinkEntity::hasNonUniqueDefinition() const {
   if (isDeclKind(getKind())) {
     auto decl = getDecl();
@@ -1894,8 +1932,8 @@ bool LinkEntity::hasNonUniqueDefinition() const {
       getKind() == Kind::ValueWitnessTable) {
     // For a nominal type, check its declaration.
     CanType type = getType();
-    // Not linkonce_odr: a single strong definition in the type's module, not
-    // one per separately linked library.
+    // Not linkonce_odr: a single definition in the owning module, not one per
+    // separately linked library.
     if (isEmbeddedExportedTypeSpecialization(type))
       return false;
     if (auto nominal = type->getAnyNominal()) {
@@ -1910,8 +1948,8 @@ bool LinkEntity::hasNonUniqueDefinition() const {
   // definitions (so they get linkonce_odr linkage) unless the underlying
   // conformance was explicitly marked @export(interface).
   if (getKind() == Kind::ProtocolWitnessTable) {
-    // Not linkonce_odr: a single strong definition in the type's module, not
-    // one per separately linked library.
+    // Not linkonce_odr: a single definition in the owning module, not one per
+    // separately linked library.
     if (isEmbeddedExportedConformanceSpecialization(getProtocolConformance()))
       return false;
     if (auto context = getDeclContextForEmission()) {

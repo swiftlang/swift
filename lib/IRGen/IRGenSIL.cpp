@@ -1772,6 +1772,26 @@ public:
                                         SILBasicBlock &_entry,
                                         Explosion &_allParamValues)
       : SyncEntryPointArgumentEmission(_IGF, _entry, _allParamValues){};
+
+  bool requiresIndirectResult(SILType retType) override {
+    return SyncEntryPointArgumentEmission::requiresIndirectResult(retType);
+  }
+  llvm::Value *getIndirectResultForFormallyDirectResult() override {
+    return SyncEntryPointArgumentEmission::
+        getIndirectResultForFormallyDirectResult();
+  }
+  llvm::Value *getIndirectResult(unsigned index) override {
+    return SyncEntryPointArgumentEmission::getIndirectResult(index);
+  }
+  llvm::Value *
+  getNextPolymorphicParameter(GenericRequirement &requirement) override {
+    return SyncEntryPointArgumentEmission::getNextPolymorphicParameter(
+        requirement);
+  }
+  llvm::Value *getNextPolymorphicParameterAsMetadata() override {
+    return SyncEntryPointArgumentEmission::
+        getNextPolymorphicParameterAsMetadata();
+  }
 };
 
 class SyncNativeCCEntryPointArgumentEmission final
@@ -1782,6 +1802,26 @@ public:
                                          SILBasicBlock &_entry,
                                          Explosion &_allParamValues)
       : SyncEntryPointArgumentEmission(_IGF, _entry, _allParamValues){};
+
+  bool requiresIndirectResult(SILType retType) override {
+    return SyncEntryPointArgumentEmission::requiresIndirectResult(retType);
+  }
+  llvm::Value *getIndirectResultForFormallyDirectResult() override {
+    return SyncEntryPointArgumentEmission::
+        getIndirectResultForFormallyDirectResult();
+  }
+  llvm::Value *getIndirectResult(unsigned index) override {
+    return SyncEntryPointArgumentEmission::getIndirectResult(index);
+  }
+  llvm::Value *
+  getNextPolymorphicParameter(GenericRequirement &requirement) override {
+    return SyncEntryPointArgumentEmission::getNextPolymorphicParameter(
+        requirement);
+  }
+  llvm::Value *getNextPolymorphicParameterAsMetadata() override {
+    return SyncEntryPointArgumentEmission::
+        getNextPolymorphicParameterAsMetadata();
+  }
 
   llvm::Value *getCallerErrorResultArgument() override {
     return allParamValues.takeLast();
@@ -1807,13 +1847,6 @@ public:
   llvm::Value *getCoroutineAllocator() override {
     return allParamValues.claimNext();
   }
-
-public:
-  using SyncEntryPointArgumentEmission::requiresIndirectResult;
-  using SyncEntryPointArgumentEmission::getIndirectResultForFormallyDirectResult;
-  using SyncEntryPointArgumentEmission::getIndirectResult;
-  using SyncEntryPointArgumentEmission::getNextPolymorphicParameterAsMetadata;
-  using SyncEntryPointArgumentEmission::getNextPolymorphicParameter;
 };
 
 class AsyncNativeCCEntryPointArgumentEmission final
