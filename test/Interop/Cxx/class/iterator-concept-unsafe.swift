@@ -3,11 +3,10 @@
 
 // From C++20 on, a type that declares only 'iterator_concept' is an iterator
 // ([iterator.traits]), so a method returning one does not keep the storage it
-// points into alive and is imported under the unsafe spelling.
+// points into alive and is imported as '@unsafe(always)'.
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}cxx20.swift \
 // RUN:   -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
-// RUN:   -disable-availability-checking \
 // RUN:   -strict-memory-safety \
 // RUN:   -Xcc -std=c++20 \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}iter.h
@@ -41,8 +40,8 @@ struct HasIter {
 import IterConcept
 
 func useIterator(_ h: HasIter) {
-  _ = h.__getUnsafe() // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1 {{reference to unsafe instance method '__getUnsafe()'}}
+  _ = h.get() // expected-error {{expression uses constructs that are very hard to use correctly and must be marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'get()'}}
 }
 
 //--- cxx17.swift
