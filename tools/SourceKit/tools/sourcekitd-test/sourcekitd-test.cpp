@@ -1417,7 +1417,14 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
                            TestOptions *InitOpts) {
   bool KeepResponseAlive = false;
   bool IsError = sourcekitd_response_is_error(Resp);
-  if (IsError) {
+  if (IsError && Opts.AllowErrorResponse) {
+    // An allowed error response is an expected result of the request, so print
+    // it to stdout in order with the other responses.
+    char *Desc = sourcekitd_response_description_copy(Resp);
+    llvm::outs() << Desc << '\n';
+    free(Desc);
+
+  } else if (IsError) {
     sourcekitd_response_description_dump(Resp);
 
   } else if (!Opts.PrintResponse) {
@@ -1671,7 +1678,7 @@ static bool handleResponse(sourcekitd_response_t Resp, const TestOptions &Opts,
 
   if (!KeepResponseAlive)
     sourcekitd_response_dispose(Resp);
-  return IsError;
+  return IsError && !Opts.AllowErrorResponse;
 }
 
 sourcekitd_variant_t LatestSemaAnnotations = {{0,0,0}};

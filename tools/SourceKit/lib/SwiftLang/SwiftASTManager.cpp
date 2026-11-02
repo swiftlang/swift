@@ -315,8 +315,9 @@ class ASTBuildOperation
   /// \c DependencyStamps).
   llvm::sys::Mutex DependencyStampsMtx;
 
-  /// \c DependencyStamps contains the stamps of all module dependencies needed
-  /// for the AST build. These stamps are only known after the AST is built.
+  /// \c DependencyStamps contains the stamps of the VFS overlay files and all
+  /// module dependencies needed for the AST build. The module dependency
+  /// stamps are only known after the AST is built.
   /// Before the AST has been built, we thus assume that all dependency stamps
   /// match. This seems to be a reasonable assumption since the dependencies
   /// shouldn't change (much) in the time between an \c ASTBuildOperation is
@@ -1144,6 +1145,17 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
   Invocation.getLangOptions().CollectParsedToken = true;
   Invocation.getLangOptions().IsForSourceKit = true;
   CompIns.getSourceMgr().setFileSystem(FileSystem);
+
+  // Record the VFS overlay files before setup, so that changing, creating, or
+  // removing one of them invalidates this operation, even if setup fails
+  // because an overlay is missing or malformed.
+  {
+    llvm::sys::ScopedLock L(DependencyStampsMtx);
+    for (auto &Filename : Invocation.getSearchPathOptions().VFSOverlayFiles) {
+      DependencyStamps.push_back(std::make_pair(
+          Filename, ASTManager->Impl.getBufferStamp(Filename, FileSystem)));
+    }
+  }
 
   if (CompIns.setup(Invocation, Error)) {
     LOG_WARN_FUNC("Compilation setup failed!!!");
