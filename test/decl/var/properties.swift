@@ -1235,6 +1235,27 @@ class r24314506 {  // expected-error {{class 'r24314506' has no initializers}}
   var myDict: [String: AnyObject]  // expected-note {{stored property 'myDict' without initial value prevents synthesized initializers}} {{34-34= = [:]}}
 }
 
+struct Circular {
+  var self1 = self1
+  // expected-note@-1 {{through reference here}}
+  // expected-error@-2 {{circular reference}}
+
+  var self2 : Int = self2 // expected-error {{cannot use instance member 'self2' within property initializer; property initializers run before 'self' is available}}
+  var (self3) : Int = self3 // expected-error {{cannot use instance member 'self3' within property initializer; property initializers run before 'self' is available}}
+  var (self4) : Int = self4 // expected-error {{cannot use instance member 'self4' within property initializer; property initializers run before 'self' is available}}
+
+  var self5 = self5 + self5
+  // expected-note@-1 {{through reference here}}
+  // expected-error@-2 {{circular reference}}
+
+  var self6 = !self6
+  // expected-note@-1 {{through reference here}}
+  // expected-error@-2 {{circular reference}}
+
+  var (self7a, self7b) = (self7b, self7a)
+  // expected-note@-1 {{through reference here}}
+  // expected-error@-2 {{circular reference}}
+}
 
 // https://github.com/apple/swift/issues/46478
 // Generic type is not inferenced from its initial value for properties with
