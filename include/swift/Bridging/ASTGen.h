@@ -109,6 +109,16 @@ void swift_ASTGen_buildFunctionBody(BridgedDiagnosticEngine diagEngine,
                                     BridgedASTContext astContext,
                                     swift::SourceLoc bodyStart);
 
+// Build the body of the function-like declaration \p decl from \p bodyText, the
+// text of its replacement body, beginning at the `{`, and attach it. This is for
+// a body that lives in a buffer of its own rather than in the syntax tree of
+// \p sourceFile, such as the replacement for an edited body in an incremental
+// recompile.
+void swift_ASTGen_buildReplacementFunctionBody(
+    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
+    BridgedDecl decl, BridgedDeclContext declContext,
+    BridgedASTContext astContext, BridgedStringRef bodyText);
+
 BridgedFingerprint
 swift_ASTGen_getSourceFileFingerprint(void *_Nonnull sourceFile,
                                       BridgedASTContext astContext);

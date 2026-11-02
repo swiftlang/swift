@@ -1596,13 +1596,23 @@ void BridgedDecl_setMembersDelayed(BridgedDecl decl,
                                    bool hasNestedClassDeclarations,
                                    bool hasDerivativeDeclarations);
 
+/// Record the fingerprint of the tokens of the body of a function-like
+/// declaration whose body was built eagerly. Incremental recompilation compares
+/// these to find the bodies that changed.
+SWIFT_NAME("BridgedDecl.setBodyFingerprint(self:_:)")
+void BridgedDecl_setBodyFingerprint(BridgedDecl decl,
+                                    BridgedFingerprint fingerprint);
+
 SWIFT_NAME("BridgedDecl.setHasNestedTypeDeclarations(self:_:)")
 void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value);
 
 /// Provide the body built for a function-like declaration whose body was
-/// delayed with \c BridgedDecl_setBodyDelayed.
-SWIFT_NAME("BridgedDecl.setDelayedBodyParsed(self:_:)")
-void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body);
+/// delayed with \c BridgedDecl_setBodyDelayed. \p fingerprint hashes the
+/// tokens of the body, which incremental recompilation compares to find the
+/// bodies that changed.
+SWIFT_NAME("BridgedDecl.setDelayedBodyParsed(self:_:fingerprint:)")
+void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body,
+                                      BridgedFingerprint fingerprint);
 
 SWIFT_NAME("BridgedDestructorDecl.setParsedBody(self:_:)")
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,

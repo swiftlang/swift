@@ -247,8 +247,26 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
 
 #if SWIFT_BUILD_SWIFT_SYNTAX
     if (shouldParseViaASTGen(*sf)) {
-      // The body was left for ASTGen to build.
       auto &ctx = afd->getASTContext();
+      if (bufferID != sf->getBufferID()) {
+        // The body lives in a buffer of its own, such as the replacement for an
+        // edited body in SourceKit's incremental recompile, rather than in the
+        // syntax tree ASTGen holds for the file. Build it from its own text.
+        SourceLoc bodyStart = afd->getBodySourceRange().Start;
+        StringRef text = sourceMgr.getEntireTextForBuffer(bufferID);
+        text = text.substr(sourceMgr.getLocOffsetInBuffer(bodyStart, bufferID));
+        swift_ASTGen_buildReplacementFunctionBody(
+            &ctx.Diags, sf->getExportedSourceFile(), afd, afd, ctx,
+            BridgedStringRef(text));
+        assert(afd->getBodyKind() == BodyKind::Parsed &&
+               "ASTGen did not build the replacement body");
+        auto result = afd->BodyAndFP;
+        registerDeclWithOpaqueResultType(afd->getOutermostParentSourceFile(),
+                                         result.getBody()->getElements());
+        return result;
+      }
+
+      // The body was left for ASTGen to build.
       swift_ASTGen_buildFunctionBody(&ctx.Diags, sf->getExportedSourceFile(),
                                      afd, afd, ctx,
                                      afd->getBodySourceRange().Start);
