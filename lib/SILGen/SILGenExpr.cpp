@@ -7814,10 +7814,12 @@ RValue RValueEmitter::visitCurrentContextIsolationExpr(
   if (isolation == ActorIsolation::ActorInstance) {
     auto ctor = dyn_cast<ConstructorDecl>(SGF.FunctionDC);
     if (ctor && ctor->isDesignatedInit() &&
-        isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
+        isolation.getActorInstance() == ctor->getImplicitSelfDecl() &&
+        E->getType()->getCanonicalType() ==
+            SILType::getOpaqueIsolationType(SGF.getASTContext()).getASTType()) {
       // If we are in an actor initializer that is isolated to self, the
       // current isolation is flow-sensitive; use that instead of the
-      // synthesized expression.
+      // synthesized expression if #isolation has type `(any Actor)?`.
       auto isolationValue =
         SGF.emitFlowSensitiveSelfIsolation(E, isolation);
       return RValue(SGF, E, isolationValue);
