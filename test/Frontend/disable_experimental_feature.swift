@@ -2,6 +2,7 @@
 // RUN: not %target-swift-frontend -typecheck %s -enable-experimental-feature ParserASTGen 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: asserts
 
 // `-disable-experimental-feature` turns a feature off, including one that was
