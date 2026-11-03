@@ -348,3 +348,8 @@ func usePlaceholderDecls(
   _ = testPlaceholderFn1(0)
   _ = testPlaceholderFn2()
 }
+
+// Allow placeholder types in closure return positions
+let closureRet1 = { (x: Int) -> _ in x + 1 }
+let closureRet2 = { (x: _) -> _ in x + 1 }
+let closureRet3 = { () -> _ in 42 }
