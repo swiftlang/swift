@@ -18,14 +18,16 @@
 
 namespace swift {
 
-/// Whether a C++ record decl contains a type member named "iterator_category",
-/// a heuristic we use to determine whether that record type is an iterator.
+/// Whether a C++ record decl contains a type member named "iterator_category"
+/// (or, from C++20 on, "iterator_concept"), a heuristic we use to determine
+/// whether that record type is an iterator.
 ///
-/// This function returns true if there is exactly one public type member named
-/// "iterator_category", but does not look for inherited members. Note that, as
+/// This function returns true if there is exactly one public type member with
+/// one of those names, but does not look for inherited members. Note that, as
 /// a result of these limitations, it may return false even if that record type
 /// is usable as an iterator.
-bool hasIteratorCategory(const clang::CXXRecordDecl *clangDecl);
+bool hasIteratorCategoryOrIteratorConcept(
+    const clang::CXXRecordDecl *clangDecl);
 
 bool isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl);
 

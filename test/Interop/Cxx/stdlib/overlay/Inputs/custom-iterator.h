@@ -1646,4 +1646,48 @@ template <> struct std::iterator_traits<InputCategoryContiguousConceptLegacyPtr>
 
 #endif // __cplusplus >= 202002L
 
+// MARK: Types that declare only iterator_concept
+
+/// From C++20 on, a type that declares 'iterator_concept' is an iterator.
+/// Before C++20 the typedef has no meaning and this is an ordinary value type.
+struct HasOnlyIteratorConcept {
+private:
+  int value;
+
+public:
+  using iterator_concept = std::input_iterator_tag;
+  using value_type = int;
+  using pointer = int *;
+  using reference = const int &;
+  using difference_type = int;
+
+  HasOnlyIteratorConcept(int value) : value(value) {}
+  HasOnlyIteratorConcept(const HasOnlyIteratorConcept &other) = default;
+
+  const int &operator*() const { return value; }
+
+  HasOnlyIteratorConcept &operator++() {
+    value++;
+    return *this;
+  }
+  HasOnlyIteratorConcept operator++(int) {
+    auto tmp = HasOnlyIteratorConcept(value);
+    value++;
+    return tmp;
+  }
+
+  bool operator==(const HasOnlyIteratorConcept &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const HasOnlyIteratorConcept &other) const {
+    return value != other.value;
+  }
+};
+
+/// Whether 'get()' returns an iterator depends on the C++ standard in use.
+struct ReturnsOnlyIteratorConcept {
+  int value;
+  HasOnlyIteratorConcept get() const { return HasOnlyIteratorConcept(value); }
+};
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_CUSTOM_ITERATOR_H

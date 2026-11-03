@@ -625,4 +625,14 @@ func check(it: InputCategoryContiguousConceptLegacyPtr) {
   checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
+func check(it: HasOnlyIteratorConcept) {
+  checkInput(it)
+  checkRandomAccess(it)         // expected-cpp20-error {{requires}}
+  checkContiguous(it)           // expected-cpp20-error {{requires}}
+  checkMutableInput(it)         // expected-cpp20-error {{requires}}
+  checkMutableRandomAccess(it)  // expected-cpp20-error {{requires}}
+  checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
+}
+
 #endif // CPP20
