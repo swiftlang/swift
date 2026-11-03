@@ -722,6 +722,9 @@ extension MutableSpan {
   ///
   /// `source` must have exactly as many elements as this span.
   ///
+  /// - Note: When `Element: BitwiseCopyable`, this function lowers
+  ///     to LLVM's `memcpy` primitive.
+  ///
   /// - Parameter source: The elements to copy into this span.
   @export(implementation)
   @_lifetime(self: copy self)
@@ -736,7 +739,7 @@ extension MutableSpan {
     }
   }
 
-  /// Overwrites the elements within a range of indices by copying
+  /// Overwrites every element within a range of indices by copying
   /// the elements of the source.
   ///
   /// `source` must have exactly as many elements as `subrange`.
@@ -754,7 +757,7 @@ extension MutableSpan {
     span.updateAll(copying: source)
   }
 
-  /// Overwrites the elements within a range of indices by copying
+  /// Overwrites every element within a range of indices by copying
   /// the elements of the source.
   ///
   /// `source` must have exactly as many elements as `subrange`.
@@ -856,8 +859,8 @@ extension MutableSpan {
   ///   - index: The index at which to start copying. It must be a valid
   ///      index of this span, or equal to its `count`. On return, it is
   ///      updated to the index after the last element updated.
-  ///   - source: An iterator over the elements to copy into this span. On
-  ///      return, it is positioned after the last element copied.
+  ///   - source: An iterator over the elements to copy into this span.
+  ///      On normal return, it is positioned after the last element copied.
   /// - Throws: Any error thrown while reading from `source`.
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
@@ -911,7 +914,7 @@ extension MutableSpan where Element: ~Copyable {
     }
   }
 
-  /// Overwrites the elements within a range of indices by moving
+  /// Overwrites every element within a range of indices by moving
   /// the elements from the source.
   ///
   /// `source` must have exactly as many initialized elements as `subrange`.
@@ -931,7 +934,7 @@ extension MutableSpan where Element: ~Copyable {
     span.updateAll(moving: &source)
   }
 
-  /// Overwrites the elements within a range of indices by moving
+  /// Overwrites every element within a range of indices by moving
   /// the elements from the source.
   ///
   /// `source` must have exactly as many initialized elements as `subrange`.

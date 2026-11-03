@@ -805,7 +805,7 @@ extension MutableRawSpan {
     unsafe _start().copyMemory(from: source._start(), byteCount: byteCount)
   }
 
-  /// Overwrites the bytes within a range of offsets by copying
+  /// Overwrites every byte within a range of offsets by copying
   /// the bytes of the source.
   ///
   /// `source` must have exactly as many bytes as `subrange`.
@@ -823,7 +823,7 @@ extension MutableRawSpan {
     span.updateAll(copying: source)
   }
 
-  /// Overwrites the bytes within a range of offsets by copying
+  /// Overwrites every byte within a range of offsets by copying
   /// the bytes of the source.
   ///
   /// `source` must have exactly as many bytes as `subrange`.
@@ -871,7 +871,7 @@ extension MutableRawSpan {
     source.removeAll()
   }
 
-  /// Overwrites the bytes within a range of offsets by moving
+  /// Overwrites every byte within a range of offsets by moving
   /// the bytes from the source.
   ///
   /// `source` must have exactly as many initialized bytes as `subrange`.
@@ -891,7 +891,7 @@ extension MutableRawSpan {
     span.updateAll(moving: &source)
   }
 
-  /// Overwrites the bytes within a range of offsets by moving
+  /// Overwrites every byte within a range of offsets by moving
   /// the bytes from the source.
   ///
   /// `source` must have exactly as many initialized bytes as `subrange`.
@@ -996,8 +996,8 @@ extension MutableRawSpan {
   ///   - byteOffset: The offset at which to start copying. It must be a valid
   ///      offset into this span, or equal to its `byteCount`. On return, it
   ///      is updated to the offset after the last byte updated.
-  ///   - source: An iterator over the bytes to copy into this span. On
-  ///      return, it is positioned after the last byte copied.
+  ///   - source: An iterator over the bytes to copy into this span.
+  ///      On normal return, it is positioned after the last byte copied.
   /// - Throws: Any error thrown while reading from `source`.
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
