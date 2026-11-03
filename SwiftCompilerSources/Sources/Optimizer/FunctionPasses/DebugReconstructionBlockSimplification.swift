@@ -111,7 +111,7 @@ func simplifyDebugReconstructionBlock(of debugValue: DebugValueInst, _ context: 
     }
     // Then run the C++ simplifications.
     if !instruction.isDeleted, let svi = instruction as? SingleValueInstruction,
-       let simplified = simplifyCtxt.simplify(instruction: svi), simplified != svi,
+       let simplified = simplifyCtxt.legacySimplify(instruction: svi), simplified != svi,
        // Skip if it would break self-containedness, although simplification should never return
        // a value outside of the block.
        simplified is Undef || simplified.parentBlock == debugBB {

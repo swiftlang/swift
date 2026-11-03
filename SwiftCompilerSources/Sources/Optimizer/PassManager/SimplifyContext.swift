@@ -24,7 +24,7 @@ struct SimplifyContext : MutatingContext {
 
   /// Returns an existing value which `instruction` can be replaced with, using the C++
   /// instruction simplifications. This function makes no changes.
-  func simplify(instruction: SingleValueInstruction) -> Value? {
+  func legacySimplify(instruction: SingleValueInstruction) -> Value? {
     bridgedPassContext.simplifyInstruction(instruction.bridged).value
   }
 }
