@@ -25,6 +25,13 @@ if(POLICY CMP0077)
   cmake_policy(SET CMP0077 NEW)
 endif()
 
+# Enable Swift_COMPILATION_MODE property.
+set(CMP0157_IS_NEW FALSE)
+if(POLICY CMP0157)
+  cmake_policy(SET CMP0157 NEW)
+  set(CMP0157_IS_NEW TRUE)
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
