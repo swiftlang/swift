@@ -485,8 +485,8 @@ private struct Resolver {
 
     // Compose this use's transfer to get the demand above it.
     current[event.range].mutatingEach {
-      $0.subtract(event.kind.kills)
-      $0.formUnion(event.kind.gens)
+      $0.subtract(event.kind.demandKill)
+      $0.formUnion(event.kind.demandGen)
     }
   }
 
@@ -862,7 +862,7 @@ private struct Resolver {
           controlVar.update(range, initialized: false, before: kind.inst)
         case .root:
           break  // Initialized upon creation.
-        case .use, .unknown:
+        case .use, .liveness:
           break
         }
       }
@@ -936,7 +936,7 @@ private struct Resolver {
       }
 
       // Add any extra uses specific to this root.
-      root.extraLivenessUses.forEach { addUse(.unknown($0.instruction), indices.wholeRange) }
+      root.extraLivenessUses.forEach { addUse(.liveness($0.instruction), indices.wholeRange) }
 
       // Ensure correct order within each block
       for blk in uses.keys {
@@ -972,7 +972,7 @@ private struct Resolver {
         case .trivial:
           // We cannot meaningfully transform `load [trivial]` into a take or copy, as it currently has no ownership.
           // Treat it as a generic use.
-          addUse(.unknown(load), range)
+          addUse(.liveness(load), range)
         }
       case let store as StoringInstruction where store.destination == address.value:
         addUse(.def(address), range)
@@ -984,7 +984,7 @@ private struct Resolver {
         case .indirectIn:
           addUse(.take(address, .own), range)
         default:
-          addUse(.unknown(address.instruction), range)
+          addUse(.liveness(address.instruction), range)
         }
 
       case let tac as TupleAddrConstructorInst where tac.destinationOperand == address:
@@ -1005,7 +1005,7 @@ private struct Resolver {
         // skip
         break
       default:
-        addUse(.unknown(address.instruction), range)
+        addUse(.liveness(address.instruction), range)
       }
       return .continueWalk
     }
@@ -1136,7 +1136,7 @@ private struct Resolver {
       case take(Operand, Demand)        // The demand summarizes the kinds of users of this operand's instruction.
       case def(Operand)
       case end(Operand)       // An instruction representing the point at which the operand's lifetime has ended.
-      case unknown(Instruction)
+      case liveness(Instruction)       // A non-specific liveness use.
 
       var inst: Instruction {
         switch self {
@@ -1145,23 +1145,23 @@ private struct Resolver {
         case let .take(op, _): op.instruction
         case let .def(op): op.instruction
         case let .end(op): op.instruction
-        case let .unknown(inst): inst
+        case let .liveness(inst): inst
         }
       }
 
       // What is the ownership demanded by this use?
-      var gens: Demand {
+      var demandGen: Demand {
         switch self {
         case let .use(_, dem): dem
         case let .take(_, dem): dem
         case .def, .root: .nothing
         case .end: .nothing  // Demand analysis ignores lifetime ends.
-        case .unknown: .all  // to be safe
+        case .liveness: .all
         }
       }
 
       // What ownership does this use satisfy?
-      var kills: Demand {
+      var demandKill: Demand {
         switch self {
         case .def: .all
         case let .root(r) where r.startsInitialized: .all // A root that starts initialized is a def.
@@ -1176,7 +1176,7 @@ private struct Resolver {
         case let .root(r) where r.startsInitialized: .yes  // A root that starts initialized is a def.
         case .root, .take, .end: .no    // these leave the operand uninitialized.
         case .use: .unknown       // doesn't change the state
-        case .unknown: .unknown   // TODO: conservatively handle once .unknown is removed
+        case .liveness: .unknown
         }
       }
 
@@ -1184,7 +1184,7 @@ private struct Resolver {
       var availKill: Availability {
         switch self {
         case .def, .root, .take, .end: .partial    // Overwites all availability.
-        case .use, .unknown: .unknown
+        case .use, .liveness: .unknown
         }
       }
 
@@ -1196,7 +1196,7 @@ private struct Resolver {
         case .root: "root"
         case .def: "def"
         case .end: "end"
-        case .unknown: "UNKNOWN"
+        case .liveness: "liveness"
         }
 
         return name + " | \(inst)"
@@ -1239,9 +1239,9 @@ private struct Resolver {
       // Scan backwards over the uses within this block to compute its 'gen' bits, so that entry = gen ∪ (exit \ kill).
       for (use, range) in events.list.reversed() {
         demand[range].mutatingEach {
-          $0.gen.subtract(use.kills)     // a def above wipes demand generated below it
-          $0.gen.formUnion(use.gens)     // this use's own demand survives to the top
-          $0.kill.formUnion(use.kills)
+          $0.gen.subtract(use.demandKill)     // a def above wipes demand generated below it
+          $0.gen.formUnion(use.demandGen)     // this use's own demand survives to the top
+          $0.kill.formUnion(use.demandKill)
           $0.entry = $0.gen
         }
       }
