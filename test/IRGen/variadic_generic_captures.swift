@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s -DINT=i%target-ptrsize
+// UNSUPPORTED: CPU=wasm32
 
 public func takesNoEscape(_: () -> ()) {}
 

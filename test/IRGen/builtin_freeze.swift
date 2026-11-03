@@ -27,30 +27,30 @@ func yum() -> Int32 {
 }
 // CHECK: }
 
-func fptosi(_ x: SIMD2<Float>) -> SIMD2<Int32> {
-  let maybePoison = Builtin.fptosi_Vec2xFPIEEE32_Vec2xInt32(x._storage._value)
-  var result = SIMD2<Int32>()
+func fptosi(_ x: SIMD4<Float>) -> SIMD4<Int32> {
+  let maybePoison = Builtin.fptosi_Vec4xFPIEEE32_Vec4xInt32(x._storage._value)
+  var result = SIMD4<Int32>()
   result._storage._value = maybePoison
   return result
-  // CHECK: fptosi <2 x float> %{{.+}} to <2 x i32>
+  // CHECK: fptosi <4 x float> %{{.+}} to <4 x i32>
 }
 
-func fptosiWithFreeze(_ x: SIMD2<Float>) -> SIMD2<Int32> {
-  let maybePoison = Builtin.fptosi_Vec2xFPIEEE32_Vec2xInt32(x._storage._value)
-  let frozen = Builtin.freeze_Vec2xInt32(maybePoison)
-  var result = SIMD2<Int32>()
+func fptosiWithFreeze(_ x: SIMD4<Float>) -> SIMD4<Int32> {
+  let maybePoison = Builtin.fptosi_Vec4xFPIEEE32_Vec4xInt32(x._storage._value)
+  let frozen = Builtin.freeze_Vec4xInt32(maybePoison)
+  var result = SIMD4<Int32>()
   result._storage._value = frozen
   return result
-  // CHECK: fptosi <2 x float> %{{.+}} to <2 x i32>
-  // CHECK-NEXT: freeze <2 x i32> %{{.+}}
+  // CHECK: fptosi <4 x float> %{{.+}} to <4 x i32>
+  // CHECK-NEXT: freeze <4 x i32> %{{.+}}
 }
 
-func doubleYuck(_ x: SIMD2<Float>) -> SIMD2<Int32> {
-  fptosi(SIMD2<Float>(repeating: 0x1.0p32))
+func doubleYuck(_ x: SIMD4<Float>) -> SIMD4<Int32> {
+  fptosi(SIMD4<Float>(repeating: 0x1.0p32))
   // CHECK: poison
 }
 
-func DoubleYum(_ x: SIMD2<Float>) -> SIMD2<Int32> {
-  fptosiWithFreeze(SIMD2<Float>(repeating: 0x1.0p32))
+func DoubleYum(_ x: SIMD4<Float>) -> SIMD4<Int32> {
+  fptosiWithFreeze(SIMD4<Float>(repeating: 0x1.0p32))
   // CHECK-NOT: poison
 }

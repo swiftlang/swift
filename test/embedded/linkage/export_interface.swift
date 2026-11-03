@@ -43,7 +43,7 @@ private func throughPrivate() -> [Int] {
 // LIBRARY-IR-NOT: unnecessary
 public func unnecessary() -> Int { 5 }
 
-// LIBRARY-IR: define linkonce_odr hidden swiftcc { ptr, ptr } @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
+// LIBRARY-IR: define linkonce_odr hidden swiftcc {{{ ptr, ptr }|void}} @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
 
 // LIBRARY-SIL: sil [export_interface] @$e7Library5helloSaySiGyF
 // LIBRARY-SIL: sil @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
@@ -76,5 +76,5 @@ struct Main {
   }
 }
 
-// APPLICATION-IR: define linkonce_odr hidden swiftcc { ptr, ptr } @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
+// APPLICATION-IR: define linkonce_odr hidden swiftcc {{{ ptr, ptr }|void}} @"$es27_allocateUninitializedArrayySayxG_BptBwlFSi_Tg5"
 
