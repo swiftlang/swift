@@ -38,3 +38,20 @@ public struct HasUsableFromInlinePrivateSetProperty {
     readPointer(self.bytes)  // OK
   }
 }
+
+// A setter that is itself '@usableFromInline' is referenceable from inlinable
+// code.
+public struct HasUsableFromInlineSetProperty {
+  @usableFromInline
+  internal var _a: Int = 0
+
+  public internal(set) var a: Int {
+    get { _a }
+    @usableFromInline set { _a = newValue }
+  }
+
+  @inlinable
+  public mutating func update() {
+    a = 1 // no error
+  }
+}
