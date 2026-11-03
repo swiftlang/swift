@@ -7852,7 +7852,9 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
     // as well. This isn't always true for copyable bases so be less aggressive
     // in that case.
     if (base.getType().isMoveOnly()) {
-      base = base.formalAccessBorrow(SGF, loc);
+      if (!selfParam.isConsumedInCaller()) {
+        base = base.formalAccessBorrow(SGF, loc);
+      }
     } else {
       base = base.formalAccessCopy(SGF, loc);
     }
