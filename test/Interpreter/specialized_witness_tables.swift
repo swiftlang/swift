@@ -81,10 +81,12 @@ protocol Copies {
 
 protocol Named {
   func name() -> String
+  static func staticName() -> String
 }
 
 extension Named {
   func name() -> String { "\(type(of: self))" }
+  static func staticName() -> String { "\(Self.self)" }
 }
 
 class Base<T>: Copies, Named {
@@ -229,8 +231,15 @@ print(makeCondGeneric().g(true))
 print(type(of: makeBaseCopies().copy()))
 // CHECK: Sub
 print(makeBaseNamed().name())
+// CHECK: Sub
+print(type(of: makeBaseNamed()).staticName())
+// CHECK: Sub
+let subNamed: any Named = Sub()
+print(type(of: subNamed).staticName())
 // CHECK: SBox<Int>
 print(makeSBoxNamed().name())
+// CHECK: SBox<Int>
+print(type(of: makeSBoxNamed()).staticName())
 // CHECK: Loop<Int>(4)
 print(callNext(makeLoop()))
 // CHECK: FinalBox<Int>
