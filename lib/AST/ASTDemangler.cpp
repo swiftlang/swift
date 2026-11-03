@@ -792,10 +792,14 @@ Type ASTBuilder::createImplFunctionType(
     representation = SILFunctionTypeRepresentation::ObjCMethod;
     break;
   case ImplFunctionRepresentation::WitnessMethod:
-    representation = SILFunctionTypeRepresentation::WitnessMethod;
-    break;
+    // The mangling doesn't record the protocol conformance that a
+    // witness_method function type requires.
+    return Type();
   case ImplFunctionRepresentation::Closure:
     representation = SILFunctionTypeRepresentation::Closure;
+    break;
+  case ImplFunctionRepresentation::COMMethod:
+    representation = SILFunctionTypeRepresentation::COMMethod;
     break;
   }
 
