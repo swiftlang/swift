@@ -110,7 +110,8 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %TestArg% ^
   %SBoMArg% ^
   %DebugInfoArg% ^
-  -Summary || (exit /b 1)
+  -Summary ^
+  -Trace || (exit /b 1)
 
 :: Publish PDBs into a Microsoft-compatible symbol store and zip it so that
 :: CI can upload the archive to the Swift debug-symbols server.
