@@ -802,7 +802,7 @@ extension MutableRawSpan {
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func updateAll(copying source: RawSpan) {
-    precondition(source.byteCount == self.byteCount)
+    _precondition(source.byteCount == self.byteCount)
     if self.isEmpty { return }
     unsafe _start().copyMemory(from: source._start(), byteCount: byteCount)
   }
@@ -867,7 +867,7 @@ extension MutableRawSpan {
   @export(implementation)
   @_lifetime(self: copy self)
   public mutating func updateAll(moving source: inout OutputRawSpan) {
-    precondition(source.byteCount == self.byteCount)
+    _precondition(source.byteCount == self.byteCount)
     if self.isEmpty { return }
     unsafe _start().copyMemory(from: source._start(), byteCount: byteCount)
     source.removeAll()
