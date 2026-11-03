@@ -747,6 +747,15 @@ public:
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
 
+  /// The C++ methods built by
+  /// \c SwiftDeclSynthesizer::synthesizeCXXForwardingMethod() , keyed by its
+  /// arguments (with flags packed into one integer).
+  llvm::DenseMap<
+      std::tuple<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *,
+                 const clang::CXXMethodDecl *, uint8_t>,
+      clang::CXXMethodDecl *>
+      synthesizedForwardingMethods;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -926,6 +935,12 @@ public:
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inherit);
+
+  /// Like three-arg \c importBaseMemberDecl() , but clones only the indicated
+  /// \p projection .
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                                  ClangInheritanceInfo inherit,
+                                  CArrayProjection projection);
 
   /// Returns the operator that was synthesized from \p decl , a function
   /// imported from a C++ operator (so its name starts with `__operator`), or

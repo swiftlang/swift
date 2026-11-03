@@ -367,9 +367,10 @@ public:
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::OverloadedOperatorKind opKind);
   
-  // Synthesize a C++ method that invokes the method from the base
-  // class. This lets Clang take care of the cast from the derived class
-  // to the base class during the invocation of the method.
+  /// Synthesize a C++ method that invokes the method from the base
+  /// class. This lets Clang take care of the cast from the derived class
+  /// to the base class during the invocation of the method. Results are
+  /// memoized.
   clang::CXXMethodDecl *synthesizeCXXForwardingMethod(
       const clang::CXXRecordDecl *derivedClass,
       const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
@@ -385,7 +386,7 @@ public:
                               StringRef swiftName);
 
   FuncDecl *makeInstanceToStaticOperatorCallMethod(
-      const clang::CXXMethodDecl *clangMethodDecl);
+      const clang::CXXMethodDecl *clangMethodDecl, CArrayProjection projection);
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);

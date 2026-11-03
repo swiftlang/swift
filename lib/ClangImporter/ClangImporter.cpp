@@ -5038,7 +5038,7 @@ static bool doesInterfaceTypeMention(ValueDecl *D,
     return false;
 
   auto type = D->getInterfaceType();
-  return type && type.findIf(predicate);
+  return type && type->getCanonicalType().findIf(predicate);
 }
 
 void CArrayProjectionVerifier::verifyDecl(ValueDecl *D) {
@@ -9223,57 +9223,39 @@ Decl *ClangImporter::lookupImportedDecl(const clang::NamedDecl *decl) {
 }
 
 ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
-    ValueDecl *decl, DeclContext *newContext, ClangInheritanceInfo inherit) {
-  if (auto known = clonedBaseMembers.find({decl, newContext});
-      known != clonedBaseMembers.end())
-    return known->second;
+    ValueDecl *decl, DeclContext *newContext, ClangInheritanceInfo inherit,
+    CArrayProjection projection) {
+  decl = getDeclForCArrayProjection(decl, projection);
+  if (!decl)
+    return nullptr;
 
   // Make sure we don't clone a member again for this class, as that would
   // result in multiple definitions of the same symbol.
-  auto cloneAndRecord = [&](ValueDecl *member) {
-    std::pair<ValueDecl *, DeclContext *> key = {member, newContext};
-    auto known = clonedBaseMembers.find(key);
-    if (known == clonedBaseMembers.end()) {
-      ValueDecl *cloned =
-          cloneBaseMemberDecl(*this, member, newContext, inherit);
-      known = clonedBaseMembers.try_emplace(key, cloned).first;
-      clonedMembers.try_emplace(cloned, member);
-    }
-
-    return known->second;
-  };
-
-  auto *cloned = cloneAndRecord(decl);
-
-  // If the member has two C array projections, clone the other one too and mark
-  // the two clones as counterparts of each other.
-  auto *cArrayAttr = decl->getAttrs().getAttribute<CArrayProjectionAttr>();
-  if (!cloned || !cArrayAttr)
-    return cloned;
-
-  ValueDecl *clonedCounterpart = nullptr;
-  if (auto counterpart = cArrayAttr->getCounterpart()) {
-    auto *counterpartAttr =
-        counterpart->getAttrs().getAttribute<CArrayProjectionAttr>();
-
-    // We don't need to clone a HiddenStorage projection; it wouldn't be used
-    // because the clone of a modern projection calls its base decl, not its
-    // counterpart.
-    if (counterpartAttr->getProjection() !=
-            CArrayProjection::HiddenStorage)
-      clonedCounterpart = cloneAndRecord(counterpart);
+  std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
+  auto known = clonedBaseMembers.find(key);
+  if (known == clonedBaseMembers.end()) {
+    ValueDecl *cloned = cloneBaseMemberDecl(*this, decl, newContext, inherit);
+    known = clonedBaseMembers.try_emplace(key, cloned).first;
+    clonedMembers.try_emplace(cloned, decl);
   }
 
-  // Alternates are cloned separately by the callers that need them, so don't
-  // also record one here.
-  bool isModern = cArrayAttr->getProjection() == CArrayProjection::Modern;
-  ASSERT((isModern || clonedCounterpart) &&
-         "legacy projection of a member always has a modern counterpart");
-  SwiftDeclSynthesizer(*this).registerCArrayProjections(
-      isModern ? cloned : clonedCounterpart,
-      isModern ? clonedCounterpart : cloned,
+  return known->second;
+}
+
+ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
+    ValueDecl *decl, DeclContext *newContext, ClangInheritanceInfo inherit) {
+  // We don't need to clone a hidden storage projection because the modern
+  // projection will forward to its base decl, not its counterpart. Fortunately,
+  // this overload of `forEachCArrayProjection()` only asks for legacy
+  // projections.
+  auto *modernClone = forEachCArrayProjection(
+      decl->getAttrs().hasAttribute<CArrayProjectionAttr>(),
+      [&](CArrayProjection projection) {
+        return importBaseMemberDecl(decl, newContext, inherit, projection);
+      },
       /*addAlternate=*/false);
-  return cloned;
+
+  return getDeclForCArrayProjectionMatching(modernClone, decl);
 }
 
 ValueDecl *ClangImporter::Implementation::getOriginalForClonedMember(

@@ -5385,7 +5385,8 @@ namespace {
       if (decl->getOverloadedOperator() ==
               clang::OverloadedOperatorKind::OO_Call &&
           decl->isStatic()) {
-        auto result = synthesizer.makeInstanceToStaticOperatorCallMethod(decl);
+        auto result = synthesizer.makeInstanceToStaticOperatorCallMethod(
+            decl, getCArrayProjection());
         if (result)
           return result;
       }
@@ -5969,7 +5970,8 @@ namespace {
 
         auto clonedMethod =
             dyn_cast_or_null<FuncDecl>(Impl.importBaseMemberDecl(
-                importedBaseMethod, importedDC, ClangInheritanceInfo()));
+                importedBaseMethod, importedDC, ClangInheritanceInfo(),
+                getCArrayProjection()));
         if (!clonedMethod)
           return nullptr;
         clonedMethod->overwriteAccess(getAccessLevel(decl));

@@ -1683,14 +1683,19 @@ void SwiftDeclSynthesizer::registerCArrayProjections(
                             findSubscript(counterpartVD));
   }
 
-  // If an operator was synthesized from a function, there is one for each
-  // projection and they are projections of each other too.
+  // If an operator was synthesized from a function (rather than the function
+  // being directly imported as an operator), there is one for each projection
+  // and they are projections of each other too.
   if (auto *modernFunc = dyn_cast<FuncDecl>(modernVD)) {
-    if (auto *op = ImporterImpl.getCXXSynthesizedOperatorFunc(modernFunc)) {
-      auto *counterpartOp = counterpartVD
-                     ? ImporterImpl.getCXXSynthesizedOperatorFunc(counterpartVD)
-                     : nullptr;
-      registerCArrayProjections(op, counterpartOp, /*addAlternate=*/false);
+    if (!modernFunc->isOperator()) {
+      if (auto *modernOp =
+              ImporterImpl.getCXXSynthesizedOperatorFunc(modernFunc)) {
+        auto *counterpartOp = counterpartVD
+                   ? ImporterImpl.getCXXSynthesizedOperatorFunc(counterpartVD)
+                   : nullptr;
+        registerCArrayProjections(modernOp, counterpartOp,
+                                  /*addAlternate=*/false);
+      }
     }
   }
 }
@@ -2601,6 +2606,40 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   return createSingleReturnBody(ctx, callExpr);
 }
 
+static std::tuple<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *,
+                  const clang::CXXMethodDecl *, uint8_t>
+getCacheKeyForSynthesizeCXXForwardingMethod(
+    const clang::CXXRecordDecl *derivedClass,
+    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
+    ForwardingMethodKind forwardingMethodKind,
+    ReferenceReturnTypeBehaviorForBaseMethodSynthesis
+        referenceReturnTypeBehavior,
+    bool forceConstQualifier) {
+  uint8_t flags = forceConstQualifier ? 1 : 0;
+
+  switch (forwardingMethodKind) {
+  case ForwardingMethodKind::Base:
+    break;
+  case ForwardingMethodKind::Virtual:
+    flags |= 1 << 1;
+    break;
+  }
+
+  switch (referenceReturnTypeBehavior) {
+  case ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference:
+    break;
+  case ReferenceReturnTypeBehaviorForBaseMethodSynthesis::RemoveReference:
+    flags |= 1 << 2;
+    break;
+  case ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+      RemoveReferenceIfPointer:
+    flags |= 1 << 3;
+    break;
+  }
+
+  return {derivedClass, baseClass, method, flags};
+}
+
 clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     const clang::CXXRecordDecl *derivedClass,
     const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
@@ -2614,6 +2653,13 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   assert(!method->isStatic() ||
          method->getNameInfo().getName().getCXXOverloadedOperator() ==
              clang::OO_Call);
+
+  auto &cacheEntry = ImporterImpl.synthesizedForwardingMethods
+      [getCacheKeyForSynthesizeCXXForwardingMethod(
+          derivedClass, baseClass, method, forwardingMethodKind,
+          referenceReturnTypeBehavior, forceConstQualifier)];
+  if (cacheEntry)
+    return cacheEntry;
 
   // Create a new method in the derived class that calls the base method.
   clang::DeclarationName name = method->getNameInfo().getName();
@@ -2865,6 +2911,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     return nullptr;
 
   newMethod->setBody(returnStmt);
+  cacheEntry = newMethod;
   return newMethod;
 }
 
@@ -2984,7 +3031,7 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
 // MARK: C++ operators
 
 FuncDecl *SwiftDeclSynthesizer::makeInstanceToStaticOperatorCallMethod(
-    const clang::CXXMethodDecl *clangMethodDecl) {
+    const clang::CXXMethodDecl *clangMethodDecl, CArrayProjection projection) {
   auto clangDC = clangMethodDecl->getParent();
   auto &ctx = ImporterImpl.SwiftContext;
 
@@ -2994,12 +3041,16 @@ FuncDecl *SwiftDeclSynthesizer::makeInstanceToStaticOperatorCallMethod(
       clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Base,
       ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
       /*forceConstQualifier*/ true);
-  newMethod->addAttr(clang::SwiftNameAttr::CreateImplicit(
-      clangMethodDecl->getASTContext(), "callAsFunction"));
+  if (!newMethod)
+    return nullptr;
+
+  if (!newMethod->hasAttr<clang::SwiftNameAttr>())
+    newMethod->addAttr(clang::SwiftNameAttr::CreateImplicit(
+        clangMethodDecl->getASTContext(), "callAsFunction"));
 
   auto result = dyn_cast_or_null<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
-  return result;
+  return getDeclForCArrayProjection(result, projection);
 }
 
 // MARK: C++ properties

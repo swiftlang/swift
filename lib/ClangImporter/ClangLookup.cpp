@@ -553,8 +553,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   if (result.empty() && !inheritance) {
     if (name.isSimpleName("pointee")) {
-      if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl))
+      if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl)){
         result.push_back(pointee);
+        if (auto *legacyPointee =
+                importer::getDeclForCounterpartCArrayProjection(pointee))
+          result.push_back(legacyPointee);
+      }
     } else if (name.getBaseName() == "successor" &&
                name.getArgumentNames().empty()) {
       if (auto *succ = Importer.Impl.lookupAndImportSuccessor(inheritingDecl))
@@ -793,7 +797,6 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
     setter = importUnderlyingFunction(*this, CXXSetter, Struct);
     if (!setter)
       return {};
-    markUnavailable(setter, "use .pointee property");
   }
 
   if (CXXGetter == CXXSetter) {
@@ -802,17 +805,41 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
     getter = importUnderlyingFunction(*this, CXXGetter, Struct);
     if (!getter)
       return {};
-    markUnavailable(getter, "use .pointee property");
   }
 
   SwiftDeclSynthesizer synth{*this};
-  auto *pointee = synth.makeDereferencedPointeeProperty(getter, setter);
+  auto *pointee = forEachCArrayProjection(
+      (getter ? getter : setter)->getAttrs()
+                                    .hasAttribute<CArrayProjectionAttr>(),
+      [&](CArrayProjection projection) -> VarDecl * {
+        FuncDecl *projectedGetter = importer::getDeclForCArrayProjection(
+                     getter, projection),
+                 *projectedSetter = importer::getDeclForCArrayProjection(
+                     setter, projection);
+        if ((getter && !projectedGetter) || (setter && !projectedSetter))
+          return nullptr;
+
+        if (projectedSetter)
+          markUnavailable(projectedSetter, "use .pointee property");
+        if (projectedGetter && projectedGetter != projectedSetter)
+          markUnavailable(projectedGetter, "use .pointee property");
+
+        auto *projectedPointee = synth.makeDereferencedPointeeProperty(
+            projectedGetter, projectedSetter);
+        if (projectedPointee)
+          Struct->addMember(projectedPointee);
+        return projectedPointee;
+      },
+      /*addAlternate=*/false);
   if (!pointee)
     return {};
 
-  importAttributes(CXXGetter ? CXXGetter.method : CXXSetter.method, pointee);
+  auto *clangOperator = CXXGetter ? CXXGetter.method : CXXSetter.method;
+  importAttributes(clangOperator, pointee);
+  if (auto *legacyPointee =
+          importer::getDeclForCounterpartCArrayProjection(pointee))
+    importAttributes(clangOperator, legacyPointee);
 
-  Struct->addMember(pointee);
   auto pointeeAndOpStar =
       std::make_tuple(pointee, getter ? getter : setter, setter);
   importedPointeeCache[Struct] = pointeeAndOpStar;
