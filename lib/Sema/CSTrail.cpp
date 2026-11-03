@@ -383,12 +383,12 @@ SolverTrail::Change::AddedConflict(TypeVariableType *typeVar,
 SolverTrail::Change
 SolverTrail::Change::PrunedDisjunction(Constraint *disjunction,
                                        FunctionType *argFuncType,
-                                       unsigned resultGenerationNumber) {
+                                       uint64_t generationNumber) {
   Change result;
   result.Kind = ChangeKind::PrunedDisjunction;
   result.Disjunction.Disjunction = disjunction;
   result.Disjunction.ArgFuncType = argFuncType;
-  result.Disjunction.ResultGenerationNumber = resultGenerationNumber;
+  result.Disjunction.GenerationNumber = generationNumber;
 
   return result;
 }
@@ -441,14 +441,14 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                                                     TheConstraint.Constraint;  \
                                            }),                                 \
                            bindings.Storage.end());                            \
-    ++bindings.GenerationNumber;                                               \
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();           \
     break;                                                                     \
   }
-#define BINDING_CONSTRAINT_RETRACTION(PropertyName, Storage)                     \
+#define BINDING_CONSTRAINT_RETRACTION(PropertyName, Storage)                   \
   case ChangeKind::Retracted##PropertyName: {                                  \
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();         \
     bindings.Storage.push_back(TheConstraint.Constraint);                      \
-    ++bindings.GenerationNumber;                                               \
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();           \
     break;                                                                     \
   }
 #define BINDING_VAR_RELATION_ADDITION(RelationName, Storage)                   \
@@ -463,7 +463,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                                      BindingRelation.Constraint;               \
                         }),                                                    \
         bindings.Storage.end());                                               \
-    ++bindings.GenerationNumber;                                               \
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();           \
     break;                                                                     \
   }
 #define BINDING_VAR_RELATION_RETRACTION(RelationName, Storage)                 \
@@ -472,7 +472,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     bindings.Storage.emplace_back(                                             \
         cast<TypeVariableType>(BindingRelation.OtherType.getPointer()),        \
         BindingRelation.Constraint);                                           \
-    ++bindings.GenerationNumber;                                               \
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();           \
     break;                                                                     \
   }
 #define BINDING_TYPE_RELATION_ADDITION(RelationName, Storage)                  \
@@ -487,7 +487,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                                      BindingRelation.Constraint;               \
                         }),                                                    \
         bindings.Storage.end());                                               \
-    ++bindings.GenerationNumber;                                               \
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();           \
     break;                                                                     \
   }
 #define BINDING_TYPE_RELATION_RETRACTION(RelationName, Storage)                \
@@ -495,7 +495,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();       \
     bindings.Storage.emplace_back(BindingRelation.OtherType,                   \
                                   BindingRelation.Constraint);                 \
-    ++bindings.GenerationNumber;                                               \
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();           \
     break;                                                                     \
   }
 #include "swift/Sema/CSTrail.def"
@@ -524,7 +524,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
     bool removed = bindings.Constraints.remove(TheConstraint.Constraint);
     ASSERT(removed);
-    ++bindings.GenerationNumber;
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();
     break;
   }
 
@@ -532,7 +532,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
     bool inserted = bindings.Constraints.insert(TheConstraint.Constraint);
     ASSERT(inserted);
-    ++bindings.GenerationNumber;
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();
     break;
   }
 
@@ -667,14 +667,14 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                                  TheConstraint.Constraint;
                         }),
         bindings.Literals.end());
-    ++bindings.GenerationNumber;
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();
     break;
   }
 
   case ChangeKind::RetractedLiteral: {
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
     bindings.inferFromLiteral(TheConstraint.Constraint, /*recordChange=*/false);
-    ++bindings.GenerationNumber;
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();
     break;
   }
 
@@ -693,7 +693,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                      existing.Originator == binding.Originator;
             }),
         bindings.Bindings.end());
-    ++bindings.GenerationNumber;
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();
     break;
   }
 
@@ -703,7 +703,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
     auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();
     bindings.Bindings.push_back(binding);
-    ++bindings.GenerationNumber;
+    bindings.GenerationNumber = cs.getNextBindingGenerationNumber();
     break;
   }
 
@@ -721,7 +721,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::PrunedDisjunction: {
     cs.getRemainingDisjunction(Disjunction.Disjunction)
-        .undoArgFuncTypeChange(Disjunction.ArgFuncType, Disjunction.ResultGenerationNumber);
+        .undoArgFuncTypeChange(Disjunction.ArgFuncType,
+                               Disjunction.GenerationNumber);
     break;
   }
 }
@@ -982,7 +983,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     Disjunction.Disjunction->print(out, &cs.getASTContext().SourceMgr, indent + 2);
     out << " with type ";
     Disjunction.ArgFuncType->print(out, PO);
-    out << " and result generation number " << Disjunction.ResultGenerationNumber << ")\n";
+    out << " and generation number " << Disjunction.GenerationNumber << ")\n";
     break;
   }
 }

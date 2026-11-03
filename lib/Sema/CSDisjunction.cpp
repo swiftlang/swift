@@ -717,6 +717,21 @@ static void forEachDisjunctionChoice(
 
 static const bool verifyIncrementalDisjunctionPruning = false;
 
+static uint64_t computeGenerationNumber(ConstraintSystem &cs,
+                                        FunctionType *newFuncType) {
+  uint64_t newGenerationNumber = 0;
+
+  auto newResultTypeVar =
+      newFuncType->getResult()->getAs<TypeVariableType>();
+  if (newResultTypeVar) {
+    const auto &node = cs.getConstraintGraph()[newResultTypeVar];
+    const auto &bindings = node.getPotentialBindings();
+    newGenerationNumber = bindings.GenerationNumber;
+  }
+
+  return newGenerationNumber;
+}
+
 /// Lazily prune a disjunction if the argument and result types at the call site
 /// changed since last time.
 void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
@@ -742,17 +757,10 @@ void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
   // result.)
   auto newFuncType =
       cs.simplifyType(applicableFn->getFirstType())->castTo<FunctionType>();
-  auto newTypeVar =
-      newFuncType->getResult()->getAs<TypeVariableType>();
-  unsigned newGenerationNumber = 0;
-  if (newTypeVar) {
-    const auto &bindings = cs.getConstraintGraph()[newTypeVar].getPotentialBindings();
-    newGenerationNumber = bindings.GenerationNumber;
-  }
+  uint64_t newGenerationNumber = computeGenerationNumber(cs, newFuncType);
 
   if (newFuncType == argFuncType &&
-      newTypeVar == resultTypeVar &&
-      newGenerationNumber == resultGenerationNumber) {
+      newGenerationNumber == generationNumber) {
     ++NumDisjunctionsSkipped;
     LLVM_DEBUG(llvm::dbgs() << "No change: " << newFuncType->getString(PO) << "\n");
     if (verifyIncrementalDisjunctionPruning)
@@ -773,11 +781,10 @@ void SolverDisjunction::pruneDisjunctionIfNeeded(ConstraintSystem &cs,
     cs.recordChange(
       SolverTrail::Change::PrunedDisjunction(disjunction,
                                              argFuncType,
-                                             resultGenerationNumber));
+                                             generationNumber));
   }
   argFuncType = newFuncType;
-  resultTypeVar = newTypeVar;
-  resultGenerationNumber = newGenerationNumber;
+  generationNumber = newGenerationNumber;
 
   pruneDisjunction(cs, applicableFn, /*verify=*/false);
 }
@@ -893,6 +900,8 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
       }
 
       auto overloadResultType = overloadType->getResult();
+      auto argResultType = argFuncType->getResult();
+      auto *resultTypeVar = argResultType->getAs<TypeVariableType>();
 
       // If the result of the applicable fn is a type variable, consider each
       // potential subtype binding on this type variable. If any of them
@@ -900,7 +909,7 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
       if (resultTypeVar != nullptr) {
         const auto &node = cs.getConstraintGraph()[resultTypeVar];
         const auto &bindings = node.getPotentialBindings();
-        ASSERT(bindings.GenerationNumber == resultGenerationNumber);
+        ASSERT(bindings.GenerationNumber <= generationNumber);
 
         for (const auto &binding : bindings.Bindings) {
           if (binding.Kind == inference::AllowedBindingKind::Subtypes) {
@@ -912,8 +921,7 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
 
       // Otherwise, the result type is concrete. Check conversion directly.
       } else {
-        reason |= checkConversion(cs.CC, overloadResultType,
-                                  argFuncType->getResult(),
+        reason |= checkConversion(cs.CC, overloadResultType, argResultType,
                                   genericSig);
       }
 
