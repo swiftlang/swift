@@ -174,7 +174,7 @@ private func canPromote(allocBox: AllocBoxInst, _ accessSummary: BoxAccessSummar
       // Note: all instructions which are handled here must also be handled in `FunctionSpecializations.rewriteUses`!
       switch use.instruction {
       case is ProjectBoxInst, is DestroyValueInst,
-           is EndBorrowInst, is DebugValueInst, is DeallocStackInst:
+           is EndBorrowInst, is DebugValueInst, is DeallocStackInst, is IgnoredUseInst:
         break
       case let deallocBox as DeallocBoxInst where deallocBox.parentFunction == allocBox.parentFunction:
         break
@@ -257,7 +257,7 @@ private struct FunctionSpecializations {
     while let use = box.uses.first {
       let user = use.instruction
       switch user {
-      case is DestroyValueInst, is EndBorrowInst, is DeallocBoxInst:
+      case is DestroyValueInst, is EndBorrowInst, is DeallocBoxInst, is IgnoredUseInst:
         context.erase(instruction: user)
       case let projectBox as ProjectBoxInst:
         assert(projectBox.fieldIndex == 0, "only single-field boxes are handled")
