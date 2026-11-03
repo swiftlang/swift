@@ -920,9 +920,10 @@ struct CxxReferenceParameter {
   CxxReferenceParameterKind kind;
 };
 
-/// Classifies a C++ reference parameter type, or `None` if \p type is not a
-/// C++ reference type. Every kind but `Mutating` is lowered indirectly, so
-/// those must be imported as the pointee rather than as a pointer.
+/// Classifies a C++ reference parameter type, or `None` if \p type is not a C++
+/// reference type or is a reference to a function. Every kind but `Mutating` is
+/// lowered indirectly, so those must be imported as the pointee rather than as
+/// a pointer.
 std::optional<CxxReferenceParameter>
 classifyCxxReferenceParameter(clang::QualType type);
 

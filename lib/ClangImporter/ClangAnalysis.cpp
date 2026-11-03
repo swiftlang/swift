@@ -1285,7 +1285,7 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
       return safe();
 
     if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-        hasIteratorCategory(cxxRecordReturnType))
+        hasIteratorCategoryOrIteratorConcept(cxxRecordReturnType))
       return unsafe(CxxUnsafetyReason::ReturnsIterator);
 
     // Mark this as safe to help our diganostics down the road.
