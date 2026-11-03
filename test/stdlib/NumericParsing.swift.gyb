@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 // -*- swift -*-
 // RUN: %empty-directory(%t)
-// RUN: %gyb -DCMAKE_SIZEOF_VOID_P=%target-ptrsize %s -o %t/NumericParsing.swift
+// RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/NumericParsing.swift
 // RUN: %line-directive %t/NumericParsing.swift -- %target-build-swift %t/NumericParsing.swift -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %line-directive %t/NumericParsing.swift -- %target-run %t/a.out
@@ -19,7 +19,7 @@
 %{
 from SwiftIntTypes import all_integer_types
 
-word_bits = int(CMAKE_SIZEOF_VOID_P)
+word_bits = int(WORD_BITS)
 
 def maskOfWidth(n):
   return (1 << n) - 1
