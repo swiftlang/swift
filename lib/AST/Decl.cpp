@@ -12326,8 +12326,28 @@ AccessorDecl *AccessorDecl::createParsed(
       newParams.push_back(param);
     }
 
-    if (isa<SendingTypeRepr>(SD->getElementTypeRepr()))
-      accessor->setSendingResult();
+    if (isa<SendingTypeRepr>(SD->getElementTypeRepr())) {
+      switch (accessorKind) {
+      case AccessorKind::Get:
+      case AccessorKind::DistributedGet:
+      case AccessorKind::Borrow:
+        accessor->setSendingResult();
+        break;
+
+      case AccessorKind::Set:
+      case AccessorKind::Init:
+        assert(!newParams.empty());
+        newParams[0]->setSending();
+        break;
+
+      case AccessorKind::WillSet:
+      case AccessorKind::DidSet:
+        llvm_unreachable("willSet/didSet are not allowed in subscripts");
+
+      default:
+        break;
+      }
+    }
   }
   accessor->setParameters(
       ParameterList::create(ctx, paramsStart, newParams, paramsEnd));
