@@ -2275,6 +2275,65 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
   }
 }
 
+/// Build the value of the empty type \p type. This can be an empty struct,
+/// tuple, or inline array, or any combination of those.
+static SILValue createEmptyValue(SILBuilder &builder, SILLocation loc,
+                                 SILType type) {
+  SILFunction &f = builder.getFunction();
+  SmallVector<SILValue, 4> elements;
+  if (auto tupleTy = type.getAs<TupleType>()) {
+    for (unsigned idx : indices(tupleTy->getElements()))
+      elements.push_back(
+          createEmptyValue(builder, loc, type.getTupleElementType(idx)));
+    return builder.createTuple(loc, type, elements);
+  }
+  if (StructDecl *structDecl = type.getStructDecl()) {
+    for (VarDecl *field : structDecl->getStoredProperties())
+      elements.push_back(
+          createEmptyValue(builder, loc, type.getFieldType(field, &f)));
+    return builder.createStruct(loc, type, elements);
+  }
+  // Fallback for zero-length InlineArrays.
+  return builder.createZeroInitValue(loc, type);
+}
+
+/// Replaces the loads of the address-category operand \p operandIdx of
+/// \p debugValue by a constant empty value, and kills its other uses.
+static void replaceOperandWithEmptyValue(DebugValueInst *debugValue,
+                                  unsigned operandIdx) {
+  SILBasicBlock *debugBB = debugValue->getOrCreateDebugReconstructionBlock();
+  SILArgument *argument = debugBB->getArgument(operandIdx);
+  for (Operand *use : llvm::make_early_inc_range(argument->getUses())) {
+    auto *load = dyn_cast<LoadInst>(use->getUser());
+    if (!load)
+      continue;
+    SILBuilder builder(load);
+    load->replaceAllUsesWith(
+        createEmptyValue(builder, load->getLoc(), load->getType()));
+    load->eraseFromParent();
+  }
+  debugValue->killOperand(operandIdx);
+  // Remove the dead operand.
+  addOperandsToDebugValue(debugValue, {});
+}
+
+/// Salvage an `alloc_stack` if its content is empty and can be reconstructed.
+static void salvageEmptyAllocStack(AllocStackInst *asi) {
+  SILFunction &f = *asi->getFunction();
+  SILType type = asi->getElementType();
+  if (type.hasLocalArchetype() || type.isMoveOnly() || !type.isEmpty(f))
+    return;
+
+  // Give the variable of the allocation a debug use, rewritten below.
+  if (auto varInfo = asi->getVarInfo())
+    SILBuilder(asi, asi->getDebugScope())
+      .createDebugValue(asi->getLoc(), asi, *varInfo);
+
+  while (Operand *use = getAnyDebugUse(asi))
+    replaceOperandWithEmptyValue(cast<DebugValueInst>(use->getUser()),
+                                 use->getOperandNumber());
+}
+
 // TODO: this currently fails to notify the pass with notifyNewInstruction.
 //
 // TODO: whenever a debug_value is inserted at a new location, check that no
@@ -2287,6 +2346,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   // Stores to an allocation are salvaged: debug values are cloned at each
   // store. The debug values on the allocation itself are deleted rather than
   // killed, as the clones describe the variable now.
+  // Empty alloc_stacks have no stores and need to be salvaged.
+  if (auto *asi = dyn_cast<AllocStackInst>(I))
+    salvageEmptyAllocStack(asi);
   if (isa<AllocStackInst>(I) || isa<AllocPackInst>(I))
     return deleteAllDebugUses(I, /*salvage=*/false);
 

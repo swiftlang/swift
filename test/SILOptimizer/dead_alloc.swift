@@ -24,15 +24,18 @@ func g<T : P>(_ x : T) -> Bool {
 }
 
 // Check that this function can be completely constant folded and no alloc_stack remains.
+// Note: the debug_value from "x" is duplicated but only the last one is kept by
+// LLVM's RemoveRedundantDbgInstrs.
 
 // CHECK-LABEL: sil @$s10dead_alloc0A10AllocStackySbAA1XVF :
 // CHECK:         debug_value %0, let, name "x", argno 1
 // CHECK-NEXT:    debug_value {{.*}}, let, name "x", argno 1
+// CHECK-NEXT:    debug_value {{.*}}, let, name "x", argno 1
 // TODO:          debug_value {{.*}}, let, name "y"
 // CHECK-NEXT:    debug_value {{.*}}, let, name "self", argno 1
-// CHECK-NEXT:    %4 = integer_literal
-// CHECK-NEXT:    %5 = struct
-// CHECK-NEXT:    return %5
+// CHECK-NEXT:    %5 = integer_literal
+// CHECK-NEXT:    %6 = struct
+// CHECK-NEXT:    return %6
 // CHECK-NEXT:  } // end sil function '$s10dead_alloc0A10AllocStackySbAA1XVF'
 public func deadAllocStack(_ x: X) -> Bool {
   return g(x)
