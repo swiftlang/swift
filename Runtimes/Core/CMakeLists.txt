@@ -32,6 +32,12 @@ cmake_minimum_required(VERSION 3.29)
 # in `EmitSwiftInterface.cmake`
 # to ensure it keeps laying down nested swiftmodule folders
 
+# `emit_swift_interface` emits nested swiftmodule directories, which CMake 4.1+
+# only does itself when CMP0195 is NEW. This must precede `project()`.
+if(POLICY CMP0195)
+  cmake_policy(SET CMP0195 NEW)
+endif()
+
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
