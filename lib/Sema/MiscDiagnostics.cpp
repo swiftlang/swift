@@ -6418,24 +6418,28 @@ static void maybeDiagnoseCallToKeyValueObserveMethod(const Expr *E,
           addKeyPathLiteral(argExpr);
       }
       for (auto [keyPathArg, lookedThrough] : keyPathArgs) {
-        // A key path through a direct property is given no key-value coding
-        // string, as for '#keyPath', so a KVO method traps on it every time.
+        // A key path through a direct property has no key-value coding string,
+        // so the call would trap every time. Without the feature, only warn.
         auto components = keyPathArg->getComponents();
         auto directComponent =
             llvm::find_if(components, [&](const KeyPathExpr::Component &c) {
               if (c.getKind() != KeyPathExpr::Component::Kind::Member)
                 return false;
               auto *var = dyn_cast<VarDecl>(c.getDeclRef().getDecl());
-              return var && var->isDynamicUseDisallowed();
+              return var && var->isObjCDirectDispatched();
             });
         if (directComponent != components.end()) {
+          auto *direct = directComponent->getDeclRef().getDecl();
+          bool isError = direct->isObjCDirectFeatureEnabled();
           C.Diags
               .diagnose(expr->getLoc(),
                         diag::observe_keypath_property_objc_direct,
-                        directComponent->getDeclRef().getDecl()->getName(),
-                        fn->getName(), stringUse == KeyPathStringUse::KVC)
-              .highlight(directComponent->getLoc());
-          continue;
+                        direct->getName(), fn->getName(),
+                        stringUse == KeyPathStringUse::KVC, isError)
+              .highlight(directComponent->getLoc())
+              .limitBehaviorIf(!isError, DiagnosticBehavior::Warning);
+          if (isError)
+            continue;
         }
         if (!needsKVOCompliance || isNested || lookedThrough)
           continue;

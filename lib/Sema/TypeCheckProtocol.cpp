@@ -6143,20 +6143,23 @@ void ConformanceChecker::resolveValueWitnesses() {
         }
 
         // A direct method is absent from the class's Objective-C method list,
-        // but a witness for an @objc requirement is dispatched by selector --
-        // so every call made through the protocol would fail to resolve, at a
-        // distance from the declaration that carries the attribute. Reject the
-        // conformance instead.
-        if (witness->isDynamicUseDisallowed()) {
+        // but a witness for an @objc requirement is dispatched by selector, so
+        // every call made through the protocol would fail to resolve. Reject
+        // the conformance, or only warn without the feature.
+        if (witness->isObjCDirectDispatched()) {
+          bool isError = witness->isObjCDirectFeatureEnabled();
           SourceLoc diagLoc = getLocForDiagnosingWitness(Conformance, witness);
           C.Diags.diagnose(diagLoc, diag::witness_objc_direct, witness,
                            Proto->getName(),
-                           isa<AbstractStorageDecl>(witness));
+                           isa<AbstractStorageDecl>(witness))
+              .limitBehaviorIf(!isError, DiagnosticBehavior::Warning);
           if (diagLoc != witness->getLoc())
             witness->diagnose(diag::decl_declared_here, witness);
           requirement->diagnose(diag::requirement_declared_here, requirement);
-          Conformance->setInvalid();
-          return;
+          if (isError) {
+            Conformance->setInvalid();
+            return;
+          }
         }
 
         // The selectors must coincide.

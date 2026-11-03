@@ -339,15 +339,19 @@ ObjCKeyPathStringRequest::evaluate(Evaluator &evaluator, KeyPathExpr *expr,
           diags.diagnose(var, diag::make_decl_objc, var)
               .fixItInsert(var->getAttributeInsertionLoc(false), "@objc ");
         }
-      } else if (var->isDynamicUseDisallowed()) {
+      } else if (var->isObjCDirectDispatched()) {
         // Key-value coding falls back to the instance variable when it
         // finds no accessor, so this resolves today and quietly bypasses the
-        // property.
+        // property. Only a warning without the feature.
+        bool isError = var->isObjCDirectFeatureEnabled();
         diags.diagnose(componentNameLoc, diag::expr_keypath_objc_direct,
-                       var->getName());
+                       var->getName())
+            .limitBehaviorIf(!isError, DiagnosticBehavior::Warning);
         diags.diagnose(var, diag::note_objc_direct_no_key_path);
-        isInvalid = true;
-        break;
+        if (isError) {
+          isInvalid = true;
+          break;
+        }
       } else {
         // FIXME: Warn about non-KVC-compliant getter/setter names?
       }

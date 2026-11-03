@@ -1,8 +1,6 @@
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_ObjCDirect
 
-// Where '@objcDirect' is accepted and rejected.
-
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ObjCDirect
 
 import Foundation
@@ -65,8 +63,7 @@ class ImpliedObjC: NSObject {
 
 struct NotObjCRepresentable {}
 
-class InitClass: NSObject {
-  // init is exempt from the `final` requirement.
+final class InitClass: NSObject {
   @objcDirect
   init(ok value: Int) { super.init() }
 
@@ -289,6 +286,106 @@ class TopLevel: NSObject {
 }
 
 // MARK: - Enclosing classes
+
+class NonFinalDesignated: NSObject {
+// expected-note@-1 {{add 'final' to 'NonFinalDesignated'}} {{1-1=final }}
+  @objcDirect init(value: Int) { super.init() }
+  // expected-error@-1 {{a designated '@objcDirect' initializer requires class 'NonFinalDesignated' to be 'final'}} {{none}}
+  // expected-note@-2 {{a subclass could neither override nor hide it}}
+  // expected-note@-3 {{replace '@objcDirect' with '@objc' to keep 'NonFinalDesignated' subclassable}} {{3-14=@objc}}
+}
+
+// The fix-it inserts 'final' after 'public'.
+public class PublicNonFinalDesignated: NSObject {
+// expected-note@-1 {{add 'final' to 'PublicNonFinalDesignated'}} {{8-8=final }}
+  @objcDirect public init(value: Int) { super.init() }
+  // expected-error@-1 {{a designated '@objcDirect' initializer requires class 'PublicNonFinalDesignated' to be 'final'}}
+  // expected-note@-2 {{a subclass could neither override nor hide it}}
+  // expected-note@-3 {{replace '@objcDirect' with '@objc' to keep 'PublicNonFinalDesignated' subclassable}}
+}
+
+// An open class can't be final, so there is no 'final' note.
+open class OpenDesignated: NSObject {
+  @objcDirect public init(value: Int) { super.init() }
+  // expected-error@-1 {{a designated '@objcDirect' initializer requires class 'OpenDesignated' to be 'final'}}
+  // expected-note@-2 {{a subclass could neither override nor hide it}}
+  // expected-note@-3 {{replace '@objcDirect' with '@objc' to keep 'OpenDesignated' subclassable}}
+}
+
+// With '@objc' written, the fix-it only removes '@objcDirect'.
+class NonFinalExplicitObjC: NSObject {
+// expected-note@-1 {{add 'final' to 'NonFinalExplicitObjC'}}
+  @objc @objcDirect init(value: Int) { super.init() }
+  // expected-error@-1 {{a designated '@objcDirect' initializer requires class 'NonFinalExplicitObjC' to be 'final'}}
+  // expected-note@-2 {{a subclass could neither override nor hide it}}
+  // expected-note@-3 {{remove '@objcDirect' to keep 'NonFinalExplicitObjC' subclassable}} {{9-21=}}
+}
+
+// A convenience initializer's class needn't be final.
+class NonFinalConvenience: NSObject {
+  init(value: Int) { super.init() }
+  fileprivate init(file: Int) { super.init() }
+  // expected-note@-1 {{'init(file:)' is 'fileprivate', so a subclass in another file can't override it}}
+  private init(hidden: Int) { super.init() }
+  // expected-note@-1 {{'init(hidden:)' is 'private', so a subclass can't override it}}
+  @objcDirect convenience init(twice: Int) { self.init(value: twice * 2) }
+  // Another direct initializer gets the check itself.
+  @objcDirect convenience init(quad: Int) { self.init(twice: quad * 2) }
+  @objcDirect convenience init(viaFile: Int) { self.init(file: viaFile) }
+  // expected-error@-1 {{an '@objcDirect' initializer must delegate to an initializer every subclass can override}}
+  @objcDirect convenience init(viaHidden: Int) {
+    if viaHidden > 0 { self.init(value: viaHidden) } else { self.init(hidden: 0) }
+    // expected-error@-1 {{an '@objcDirect' initializer must delegate to an initializer every subclass can override}}
+  }
+}
+
+// An open class can have subclasses in other modules.
+open class OpenConvenience: NSObject {
+  public init(value: Int) { super.init() }
+  init(module: Int) { super.init() }
+  // expected-note@-1 {{'init(module:)' is 'internal', so a subclass in another module can't override it}}
+  @objcDirect public convenience init(twice: Int) { self.init(value: twice * 2) }
+  @objcDirect public convenience init(viaModule: Int) { self.init(module: viaModule) }
+  // expected-error@-1 {{an '@objcDirect' initializer must delegate to an initializer every subclass can override}}
+}
+
+class Overridden: NSObject {
+  init(value: Int) { super.init() }
+  @objcDirect convenience init(twice: Int) { self.init(value: twice * 2) }
+  // expected-note@-1 {{overridden declaration is here}}
+  // expected-note@-2 {{overridden declaration is here}}
+  // expected-note@-3 {{initializer 'init(twice:)' declared here}}
+}
+
+class SameName: Overridden {
+  init(twice: Int) { super.init(value: twice) }
+  // expected-error@-1 {{initializer overrides an '@objcDirect' initializer}}
+}
+
+class SameNameConvenience: Overridden {
+  convenience init(twice: Int) { self.init(value: twice) }
+  // expected-error@-1 {{initializer overrides an '@objcDirect' initializer}}
+}
+
+class SameSelector: Overridden {
+  @objc(initWithTwice:) convenience init(label: Int) { self.init(value: label) }
+  // expected-error@-1 {{initializer 'init(label:)' with Objective-C selector 'initWithTwice:' conflicts with initializer 'init(twice:)' from superclass 'Overridden' with the same Objective-C selector}}
+}
+
+// In a class declared in Objective-C, it must reach an initializer a header
+// declares, such as 'init()'.
+extension NSObject {
+  @objcDirect convenience init(tag: Int) { self.init() }
+  convenience init(raw: Int) { self.init() }
+  // expected-note@-1 {{'init(raw:)' isn't in the header, so a subclass can't override it}}
+  @objcDirect convenience init(viaRaw: Int) { self.init(raw: viaRaw) }
+  // expected-error@-1 {{an '@objcDirect' initializer must delegate to an initializer every subclass can override}}
+}
+
+final class FinalInits: NSObject {
+  @objcDirect init(value: Int) { super.init() }
+  @objcDirect convenience init(twice: Int) { self.init(value: twice * 2) }
+}
 
 class PureSwift {
   @objcDirect func f() {}

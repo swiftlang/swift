@@ -1,16 +1,37 @@
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_ObjCDirect
 
-// #selector, #keyPath and '@objc' protocol witnesses accept imported direct
-// members until the feature is on.
-// The notes land in the imported header, hence -verify-ignore-unrelated.
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -emit-module -o %t/Lib.swiftmodule \
+// RUN:   -module-name Lib -enable-experimental-feature ObjCDirect %t/Lib.swift
 
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/../Inputs/objc_direct.h
-// RUN: %target-typecheck-verify-swift -import-objc-header %S/../Inputs/objc_direct.h \
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   -import-objc-header %S/../Inputs/objc_direct.h %t/main.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   -import-objc-header %S/../Inputs/objc_direct.h %t/main.swift \
 // RUN:   -enable-experimental-feature ObjCDirect -verify-additional-prefix enabled- \
 // RUN:   -verify-ignore-unrelated
 
+// Without the feature: warnings, which '-Werror ObjCDirect' makes errors.
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   -import-objc-header %S/../Inputs/objc_direct.h %t/main.swift \
+// RUN:   -Werror ObjCDirect -verify-additional-prefix enabled- \
+// RUN:   -verify-ignore-unrelated
+
+//--- Lib.swift
+
 import Foundation
+
+@objc public class C: NSObject {
+  @objcDirect public final func f() {}
+  @objcDirect public var q: Int = 0
+}
+
+//--- main.swift
+
+import Foundation
+import Lib
 
 func nameOnlyUses(_ bar: Bar) {
   _ = NSStringFromSelector(#selector(getter: Bar.directProperty))
@@ -63,3 +84,13 @@ extension Bar: HasOptionalMethod {}
 // expected-enabled-error@-1 {{instance method 'directMethod2()' cannot satisfy a requirement of '@objc' protocol 'HasOptionalMethod' because it is a direct method}}
 extension Bar: RequiresProperty {}
 // expected-enabled-error@-1 {{property 'directProperty' cannot satisfy a requirement of '@objc' protocol 'RequiresProperty' because it is direct}}
+
+// A Swift '@objcDirect' member of another module.
+func libraryUses() {
+  _ = #selector(C.f)
+  // expected-enabled-error@-1 {{argument of '#selector' refers to instance method 'f()' that is a direct method}}
+  // expected-enabled-note@Lib.C.f:2 {{a direct method is not added to its class's Objective-C method list}}
+  _ = #keyPath(C.q)
+  // expected-enabled-error@-1 {{argument of '#keyPath' refers to property 'q' that is direct}}
+  // expected-enabled-note@Lib.C.q:2 {{key-value coding cannot reach the property}}
+}

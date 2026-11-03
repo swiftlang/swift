@@ -57,6 +57,8 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/Attr.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/MapVector.h"
@@ -2047,12 +2049,81 @@ void AttributeChecker::visitObjCDirectAttr(ObjCDirectAttr *attr) {
     return;
   }
 
-  // No 'final' requirement: '@objcDirect' implies 'final' (see IsFinalRequest).
-
-  // Required initializers must be inherited - incompatible with direct.
+  // '@objcDirect' implies 'final'.
   if (auto *ctor = dyn_cast<ConstructorDecl>(VD)) {
+    // Required initializers must be inherited - incompatible with direct.
     if (ctor->isRequired()) {
       diagnoseAndRemoveAttr(attr, diag::objc_direct_required_init);
+      return;
+    }
+
+    // A designated init is not allowed on an '@objc @implementation' class,
+    // because a designated init must be on a final class.
+    if (ctor->isObjCMemberImplementation()) {
+      auto methods = classDecl->lookupDirect(ctor->getObjCSelector(),
+                                             /*isInstance=*/true);
+      auto it = llvm::find_if(
+          methods, [](AbstractFunctionDecl *m) { return m->hasClangNode(); });
+      auto *imported =
+          it != methods.end() ? dyn_cast<ConstructorDecl>(*it) : nullptr;
+      bool headerDesignated = imported && imported->isDesignatedInit();
+      auto diagnoseObjCDirectInitDesignated = [&]() {
+        diagnose(attr->getLocation(),
+                 diag::objc_direct_init_implementation_designated,
+                 ctor->isConvenienceInit(), ctor);
+        diagnose(attr->getLocation(), diag::objc_direct_init_nonfinal_reason);
+      };
+      // If the header says it's designated, find out why and ask for a fix.
+      if (headerDesignated) {
+        diagnoseObjCDirectInitDesignated();
+        auto *method = cast<clang::ObjCMethodDecl>(imported->getClangDecl());
+        auto getHeaderNote = [&]() {
+          auto *direct = method->getAttr<clang::ObjCDirectAttr>();
+          auto *category =
+              dyn_cast<clang::ObjCCategoryDecl>(method->getDeclContext());
+          // 'objc_direct_members'
+          if (direct && direct->isImplicit() &&
+              (!category || category->IsClassExtension()))
+            return diag::objc_direct_init_header_direct_members;
+          // Explicitly marked as 'NS_DESIGNATED_INITIALIZER'.
+          if (method->hasAttr<clang::ObjCDesignatedInitializerAttr>())
+            return diag::objc_direct_init_header_marked;
+          // The class marks none, so every initializer is designated.
+          return diag::objc_direct_init_header_none_marked;
+        };
+        imported->diagnose(getHeaderNote(), imported, classDecl);
+        return;
+      }
+      // If Swift didn't say `convenience`, just ask the developer to do so
+      if (!ctor->isConvenienceInit()) {
+        diagnoseObjCDirectInitDesignated();
+        diagnose(ctor,
+                 diag::objc_implementation_init_turn_designated_to_convenience)
+            .fixItInsert(ctor->getAttributeInsertionLoc(/*forModifier=*/true),
+                         "convenience ");
+        return;
+      }
+    } else if (ctor->isDesignatedInit() && !classDecl->isFinal()) {
+      attr->setInvalid();
+      diagnose(attr->getLocation(), diag::objc_direct_init_nonfinal, classDecl);
+      diagnose(attr->getLocation(), diag::objc_direct_init_nonfinal_reason);
+      // An open class can't be made final.
+      if (classDecl->getFormalAccess() != AccessLevel::Open &&
+          classDecl->getStartLoc().isValid())
+        classDecl
+            ->diagnose(diag::objc_direct_init_nonfinal_add_final, classDecl)
+            .fixItInsert(classDecl->getStartLoc(), "final ");
+
+      // '@objcDirect' implies '@objc', so keep the initializer exposed.
+      auto *objcAttr = ctor->getAttrs().getAttribute<ObjCAttr>();
+      bool replaceWithObjC = !objcAttr || objcAttr->isImplicit();
+      auto note = diagnose(attr->getLocation(),
+                           diag::objc_direct_init_nonfinal_remove_attr,
+                           classDecl, replaceWithObjC);
+      if (replaceWithObjC)
+        note.fixItReplace(attr->getRangeWithAt(), "@objc");
+      else
+        note.fixItRemove(attr->getRangeWithAt());
       return;
     }
   }

@@ -2693,6 +2693,78 @@ static bool isKnownEndOfConstructor(ASTNode N) {
   return isa<ReturnStmt>(S) || isa<FailStmt>(S);
 }
 
+/// A direct convenience initializer must delegate to an initializer every
+/// subclass can override, so a call like '[[Sub alloc] initWithX:1]' still
+/// initializes Sub's stored properties. In a Swift class, that initializer
+/// can't be private. In a class declared in Objective-C, the header must
+/// declare it.
+static void checkObjCDirectInitDelegation(ClassDecl *classDecl,
+                                          ConstructorDecl *ctor,
+                                          BraceStmt *body) {
+  // A final class has no subclasses.
+  if (!ctor->isObjCDirect() || classDecl->isFinal())
+    return;
+
+  // Find every 'self.init' call. The body init kind records only the first,
+  // and none when 'self' has type 'Self', as in Swift 5 mode.
+  class FindDelegations : public ASTWalker {
+  public:
+    SmallVector<ApplyExpr *, 2> Found;
+
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      return Action::SkipNodeIf(isa<NominalTypeDecl>(D));
+    }
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+      if (isa<ClosureExpr>(E))
+        return Action::SkipNode(E);
+      if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+        auto *arg = apply->getArgs()->getUnaryExpr();
+        if (isa<OtherConstructorDeclRefExpr>(apply->getSemanticFn()) && arg &&
+            !arg->isSuperExpr())
+          Found.push_back(apply);
+      }
+      return Action::Continue(E);
+    }
+  };
+
+  FindDelegations finder;
+  body->walk(finder);
+
+  // An open class can have subclasses in other modules, any other class only
+  // in its own. (A direct initializer's class is visible to the whole module.)
+  auto needed = classDecl->getFormalAccess() == AccessLevel::Open
+                    ? AccessLevel::Public
+                    : AccessLevel::Internal;
+  auto &ctx = ctor->getASTContext();
+  for (auto *apply : finder.Found) {
+    auto *callee =
+        cast<OtherConstructorDeclRefExpr>(apply->getSemanticFn())->getDecl();
+    // Another direct initializer gets this check itself.
+    if (callee->isObjCDirect())
+      continue;
+    if (classDecl->hasClangNode()) {
+      // An inherited initializer counts if the one it overrides is declared
+      // in a header, e.g. 'init()' from NSObject.
+      auto *target = callee;
+      while (target && !target->hasClangNode())
+        target = target->getOverriddenDecl();
+      if (target)
+        continue;
+      ctx.Diags.diagnose(apply->getLoc(), diag::objc_direct_init_delegation);
+      callee->diagnose(diag::objc_direct_init_delegation_not_in_header, callee);
+    } else if (callee->getFormalAccess() < needed) {
+      ctx.Diags.diagnose(apply->getLoc(), diag::objc_direct_init_delegation);
+      callee->diagnose(diag::objc_direct_init_delegation_access, callee,
+                       callee->getFormalAccess());
+    }
+  }
+}
+
 /// Check for problems specific to the body of a constructor within a
 /// class, involving (e.g.) implicit calls to the superclass initializer and
 /// issues related to designated/convenience initializers.
@@ -2708,6 +2780,7 @@ static void checkClassConstructorBody(ClassDecl *classDecl,
   case BodyInitKind::Delegating:
     isDelegating = true;
     wantSuperInitCall = false;
+    checkObjCDirectInitDelegation(classDecl, ctor, body);
     break;
 
   case BodyInitKind::Chained:

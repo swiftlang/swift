@@ -51,6 +51,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-version-missing>
 - <doc:module-self-import>
 - <doc:oslog>
+- <doc:objc-direct>
 - <doc:option-obsoleted-by-module-selectors>
 - <doc:unstable-global-actor-shared>
 - <doc:public-import-of-project-internal-module>
@@ -115,6 +116,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:non-sendable-types-and-objective-c-interoperability>
 - <doc:non-sendable-values-in-async-conformances-and-overrides>
 - <doc:oslog>
+- <doc:objc-direct>
 - <doc:option-obsoleted-by-module-selectors>
 - <doc:exclusivity-violation>
 - <doc:performance-hints>

@@ -1688,9 +1688,28 @@ public:
       } else {
         // Note: if we ever implement delegating from one designated initializer
         // to another, this won't be correct; that should do a direct dispatch.
-        constant = constant.asForeign(ctorRef->getDecl()->isObjC());
+        auto *ctor = ctorRef->getDecl();
+        constant = constant.asForeign(ctor->isObjC() && !ctor->isObjCDirect());
       }
     }
+
+    auto *ctorDecl = ctorRef->getDecl();
+    auto *declared = ctorDecl;
+    // Skip the importer's copies of inherited initializers.
+    while (declared->isImplicit() && declared->hasClangNode() &&
+           declared->getOverriddenDecl())
+      declared = declared->getOverriddenDecl();
+    // Delegation to a direct initializer is a static call in two cases:
+    bool isStaticDirectInit =
+      // 1. It's written in Swift with '@objcDirect', which implies 'final': no
+      //    subclass can override it.
+      ctorDecl->isObjCDirect() ||
+      // 2. It's imported from Objective-C, the feature is on, and the header
+      //    declares it convenience: it delegates on through 'self', so a
+      //    subclass's override still runs. A designated one keeps the message
+      //    send, as without the feature.
+      (ctorDecl->isObjCDirectDispatched() && declared->isConvenienceInit() &&
+        !declared->isImplicit() && ctorDecl->isObjCDirectFeatureEnabled());
 
     // Determine the callee. This is normally the allocating
     // entry point, unless we're delegating to an ObjC initializer.
@@ -1699,7 +1718,8 @@ public:
       setCallee(Callee::forWitnessMethod(
           SGF, self.getType().getASTType(),
           constant, subs, expr));
-    } else if ((useAllocatingCtor || constant.isForeign) &&
+    } else if (!isStaticDirectInit &&
+               (useAllocatingCtor || constant.isForeign) &&
                !isSelfCallToReplacedInDynamicReplacement &&
                ((constant.isForeign && !useAllocatingCtor) ||
                 getMethodDispatch(ctorRef->getDecl()) == MethodDispatch::Class)) {

@@ -10,6 +10,9 @@
 // RUN:   -enable-experimental-feature ObjCDirect %t/Lib.swift
 // RUN: %target-swift-frontend -typecheck -verify -I %t \
 // RUN:   -import-objc-header %t/Gauge.h %t/client.swift
+// RUN: %target-swift-frontend -typecheck -verify -I %t \
+// RUN:   -import-objc-header %t/Gauge.h %t/client.swift \
+// RUN:   -Wwarning ObjCDirect -verify-additional-prefix warn-
 
 //--- Gauge.h
 
@@ -112,15 +115,14 @@ public final class LibModel: NSObject {
 import Foundation
 import Lib
 
-// A Swift @objcDirect property's key paths have no string whether or not the
-// client enables the feature.
+// Without the feature, a key path through a direct property is just a warning.
 func observeLibrary(_ m: LibModel) {
   _ = m.observe(\.count, options: [.new]) { _, _ in }
-  // expected-error@-1 {{passing reference to direct property 'count' to KVO method 'observe(_:options:changeHandler:)' always traps at runtime}}
+  // expected-warn-warning@-1 {{passing reference to direct property 'count' to KVO method 'observe(_:options:changeHandler:)' does not work at runtime, because key-value coding cannot find its accessors}}
+  // expected-warning@-2 {{passing reference to non-'@objc dynamic' property 'count' to KVO method 'observe(_:options:changeHandler:)' may lead to unexpected behavior or runtime trap}}
 }
 
-// An imported objc_direct property keeps its string, and is accepted as
-// before, until the feature is enabled.
 func observeImported(_ g: Gauge) {
   _ = g.observe(\.level, options: [.new]) { _, _ in }
+  // expected-warn-warning@-1 {{passing reference to direct property 'level' to KVO method 'observe(_:options:changeHandler:)' does not work at runtime, because key-value coding cannot find its accessors}}
 }

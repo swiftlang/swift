@@ -44,6 +44,11 @@ import Foundation
   @objcDirect public var count: Int = 0
 }
 
+@objc open class DirectWidget: NSObject {
+  public init(value: Int) { super.init() }
+  @objcDirect public convenience init(twice: Int) { self.init(value: twice * 2) }
+}
+
 //--- Client.swift
 
 import DirectLib
@@ -57,3 +62,10 @@ extension DirectCounter: @retroactive Counter {}
 // expected-direct-error@-1 {{cannot satisfy a requirement of '@objc' protocol 'Counter' because it is direct}}
 // expected-direct-note@DirectLib.DirectCounter.count:2 {{'count' declared here}}
 // expected-direct-note@DirectLib.Counter.count:2 {{requirement 'count' declared here}}
+
+class Kid: DirectWidget {
+  init(twice: Int) { super.init(value: twice) }
+  // expected-direct-error@-1 {{initializer overrides an '@objcDirect' initializer}}
+  // expected-direct-note@DirectLib.DirectWidget.init:2 {{overridden declaration is here}}
+  override init(value: Int) { super.init(value: value) }
+}

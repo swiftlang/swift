@@ -35,7 +35,7 @@ class Foo: NSObject {
 
 // Overloaded initializers mangle by selector, so each gets its own symbol.
 @objc
-class Inits: NSObject {
+final class Inits: NSObject {
   // CHECK-DAG: define hidden ptr @"-[Inits initWithValue:]D"(ptr %0, i64 %1)
   @objcDirect init(value: Int) { super.init() }
 

@@ -11557,16 +11557,10 @@ bool ValueDecl::isObjCDirectDispatched() const {
   return false;
 }
 
-bool ValueDecl::isDynamicUseDisallowed() const {
-  // Dynamic use of a Swift '@objcDirect' member is banned outright.
-  if (isObjCDirect())
-    return true;
-
-  // For an imported objc_direct member, only disallow when the feature is on
-  // to give existing code time to transition.
-  // TODO: Drop the feature check, leaving isObjCDirectDispatched().
-  return isObjCDirectDispatched() &&
-         getASTContext().LangOpts.hasFeature(Feature::ObjCDirect);
+bool ValueDecl::isObjCDirectFeatureEnabled() const {
+  // Without the feature, keep existing code compiling.
+  // TODO: Drop once the feature is on by default.
+  return getASTContext().LangOpts.hasFeature(Feature::ObjCDirect);
 }
 
 std::optional<ForeignLanguage> AbstractFunctionDecl::getCDeclKind() const {

@@ -22,10 +22,23 @@
 // CHECK: #if compiler(>=5.3) && $ObjCDirect
 // CHECK-NEXT: @objcDirect{{.*}}subscript(
 
+// CHECK: #if compiler(>=5.3) && $ObjCDirect
+// CHECK-NEXT: @objc @objcDirect convenience public init(twice: Swift::Int)
+// CHECK-NEXT: #endif
+// CHECK: #if compiler(>=5.3) && $ObjCDirect
+// CHECK-NEXT: @objc @objcDirect public init(value: Swift::Int)
+// CHECK-NEXT: #endif
+
 import Foundation
 
 @objc public class Cache: NSObject {
   @objcDirect public final func lookup() {}
   @objcDirect public var count: Int = 0
   @objcDirect public subscript(i: Int) -> Int { i }
+  public init(value: Int) { super.init() }
+  @objcDirect public convenience init(twice: Int) { self.init(value: twice * 2) }
+}
+
+public final class Sealed: NSObject {
+  @objcDirect public init(value: Int) { super.init() }
 }

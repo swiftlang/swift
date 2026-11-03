@@ -657,7 +657,7 @@ GROUPED_ERROR(expression_unused_keypath_result,NoUsage,NoUsage,
 ERROR(expr_keypath_non_objc_property,none,
       "argument of '#keyPath' refers to non-'@objc' property %0",
       (Identifier))
-ERROR(expr_keypath_objc_direct,none,
+GROUPED_ERROR(expr_keypath_objc_direct,ObjCDirect,none,
       "argument of '#keyPath' refers to property %0 that is direct",
       (Identifier))
 NOTE(note_objc_direct_no_key_path,none,
@@ -791,7 +791,7 @@ ERROR(expr_selector_not_objc,none,
       "argument of '#selector' refers to %kind0 that is not exposed to "
       "Objective-C",
       (const ValueDecl *))
-ERROR(expr_selector_objc_direct,none,
+GROUPED_ERROR(expr_selector_objc_direct,ObjCDirect,none,
       "argument of '#selector' refers to %kind0 "
       "%select{that is a direct method|whose accessors are direct}1",
       (const ValueDecl *, bool))
@@ -2675,7 +2675,7 @@ ERROR(objc_direct_iboutlet,none,
       "'@objcDirect' cannot be applied to an '@IBOutlet', "
       "'@IBInspectable' or '@GKInspectable' property; the value is set "
       "by key through key-value coding", ())
-ERROR(witness_objc_direct,none,
+GROUPED_ERROR(witness_objc_direct,ObjCDirect,none,
       "%kind0 cannot satisfy a requirement of '@objc' protocol %1 because it "
       "is %select{a direct method|direct}2", (const ValueDecl *, Identifier, bool))
 ERROR(objc_direct_required_init,none,
@@ -2687,6 +2687,46 @@ ERROR(objc_direct_class_not_objc,none,
       "'@objcDirect' cannot be applied to members of %0, which is not exposed "
       "to Objective-C",
       (const ValueDecl *))
+GROUPED_ERROR(objc_direct_init_nonfinal,ObjCDirect,none,
+      "a designated '@objcDirect' initializer requires class %0 to be 'final'",
+      (const ValueDecl *))
+NOTE(objc_direct_init_nonfinal_reason,none,
+     "a subclass could neither override nor hide it", ())
+NOTE(objc_direct_init_nonfinal_add_final,none,
+     "add 'final' to %0", (const ValueDecl *))
+NOTE(objc_direct_init_nonfinal_remove_attr,none,
+     "%select{remove '@objcDirect'|replace '@objcDirect' with '@objc'}1 to "
+     "keep %0 subclassable", (const ValueDecl *, bool))
+GROUPED_ERROR(objc_direct_init_implementation_designated,ObjCDirect,none,
+      "%select{a designated initializer in an '@objc @implementation' "
+      "extension can't be '@objcDirect'|"
+      "%1 can't be '@objcDirect': the header makes it a designated "
+      "initializer}0", (bool, const ValueDecl *))
+NOTE(objc_direct_init_header_marked,none,
+     "remove 'NS_DESIGNATED_INITIALIZER' from %0; %1 needs a designated "
+     "initializer that isn't direct",
+     (const ValueDecl *, const ValueDecl *))
+NOTE(objc_direct_init_header_none_marked,none,
+     "%1 marks no designated initializers, so %0 is one; mark the designated "
+     "ones 'NS_DESIGNATED_INITIALIZER', which can't be direct, and leave this "
+     "one out",
+     (const ValueDecl *, const ValueDecl *))
+NOTE(objc_direct_init_header_direct_members,none,
+     "'objc_direct_members' makes %0 direct; declare the designated "
+     "initializers of %1 in a class extension without 'objc_direct_members'",
+     (const ValueDecl *, const ValueDecl *))
+GROUPED_ERROR(objc_direct_init_delegation,ObjCDirect,none,
+      "an '@objcDirect' initializer must delegate to an initializer every "
+      "subclass can override", ())
+NOTE(objc_direct_init_delegation_not_in_header,none,
+     "%0 isn't in the header, so a subclass can't override it",
+     (const ValueDecl *))
+NOTE(objc_direct_init_delegation_access,none,
+     "%0 is '%select{private|fileprivate|internal|package}1', so a subclass "
+     "%select{|in another file |in another module |outside its package }1"
+     "can't override it", (const ValueDecl *, AccessLevel))
+GROUPED_ERROR(objc_direct_init_override,ObjCDirect,none,
+      "initializer overrides an '@objcDirect' initializer", ())
 ERROR(objc_direct_protocol_requirement_selector,none,
       "%kind0 cannot be '@objcDirect': its Objective-C selector %1 is a "
       "requirement of protocol %2, and a method that implements a protocol "
@@ -8267,11 +8307,13 @@ WARNING(variable_never_read, none,
 WARNING(observe_keypath_property_not_objc_dynamic, none,
         "passing reference to non-'@objc dynamic' property %0 to KVO method %1 "
         "may lead to unexpected behavior or runtime trap", (DeclName, DeclName))
-ERROR(observe_keypath_property_objc_direct, none,
+GROUPED_ERROR(observe_keypath_property_objc_direct, ObjCDirect, none,
       "passing reference to direct property %0 to "
-      "%select{KVO method|key-value coding API}2 %1 always traps at runtime, "
-      "because a key path through a direct property has no key-value coding "
-      "string", (DeclName, DeclName, bool))
+      "%select{KVO method|key-value coding API}2 %1 "
+      "%select{does not work at runtime, because key-value coding cannot find "
+      "its accessors|always traps at runtime, because a key path through a "
+      "direct property has no key-value coding string}3",
+      (DeclName, DeclName, bool, bool))
 
 WARNING(default_magic_identifier_mismatch, none,
         "parameter %0 with default argument '%1' passed to parameter %2, whose "

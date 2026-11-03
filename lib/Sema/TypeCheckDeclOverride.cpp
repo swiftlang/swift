@@ -2224,6 +2224,13 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     return true;
   }
 
+  // A direct implies final and can't be overriden.
+  if (isa<ConstructorDecl>(base) && base->isObjCDirect()) {
+    override->diagnose(diag::objc_direct_init_override);
+    base->diagnose(diag::overridden_here);
+    return true;
+  }
+
   auto [status, constraint] = checkOverrideAvailability(override, base);
   switch (status) {
   case OverrideAvailability::BaseUnavailable: {
