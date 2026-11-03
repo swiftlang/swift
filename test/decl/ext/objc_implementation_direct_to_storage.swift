@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -target %target-stable-abi-triple
+// RUN: %target-typecheck-verify-swift -Xcc -fmodule-map-file=%S/Inputs/objc_implementation_private.modulemap -target %target-stable-abi-triple -verify-ignore-unrelated
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
@@ -17,6 +17,7 @@ import objc_implementation_internal
   }
 
   override init() {
+    // expected-warning@-1 {{cannot override 'init' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}
     self.prop1 = 1
     self.prop2 = 2
     super.init()
