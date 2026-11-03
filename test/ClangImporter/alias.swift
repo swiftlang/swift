@@ -18,6 +18,22 @@ public func g() {
   UI = 32
 }
 
+public func testStruct(s: ALIASED_STRUCT) -> ALIASED_STRUCT {
+  return s
+}
+
+public func testUnion(u: ALIASED_UNION) -> ALIASED_UNION {
+  return u
+}
+
+public func testEnum(e: ALIASED_ENUM) -> ALIASED_ENUM {
+  return e
+}
+
+public func testInt(i: ALIASED_INT) -> ALIASED_INT {
+  return i
+}
+
 // CHECK-ANSI-IR: @VA = external {{(dso_local )?}}local_unnamed_addr constant i32
 // CHECK-ANSI-IR: @UIA = external {{(dso_local )?}}local_unnamed_addr global float
 
@@ -36,6 +52,10 @@ public func g() {
 // CHECK-ANSI-IR:   store float 3.200000e+01, ptr @UIA
 // CHECK-ANSI-IR:   ret void
 // CHECK-ANSI-IR: }
+// CHECK-ANSI-IR: define {{.*}}swiftcc i32 @"$s5Alias10testStruct1sSo02MyC0VAE_tF"(i32 returned %0)
+// CHECK-ANSI-IR: define {{.*}}swiftcc i32 @"$s5Alias9testUnion1uSo02MyC0VAE_tF"(i32 returned %0)
+// CHECK-ANSI-IR: define {{.*}}swiftcc i32 @"$s5Alias8testEnum1eSo02MyC0VAE_tF"(i32 returned %0)
+// CHECK-ANSI-IR: define {{.*}}swiftcc i32 @"$s5Alias7testInt1is5Int32VAE_tF"(i32 returned %0)
 
 // CHECK-UNICODE-IR: @VW = external {{(dso_local )?}}local_unnamed_addr constant i64
 // CHECK-UNICODE-IR: @UIW = external {{(dso_local )?}}local_unnamed_addr global double
@@ -55,6 +75,10 @@ public func g() {
 // CHECK-UNICODE-IR:   store double 3.200000e+01, ptr @UIW
 // CHECK-UNICODE-IR:   ret void
 // CHECK-UNICODE-IR: }
+// CHECK-UNICODE-IR: define {{.*}}swiftcc i32 @"$s5Alias10testStruct1sSo02MyC0VAE_tF"(i32 returned %0)
+// CHECK-UNICODE-IR: define {{.*}}swiftcc i32 @"$s5Alias9testUnion1uSo02MyC0VAE_tF"(i32 returned %0)
+// CHECK-UNICODE-IR: define {{.*}}swiftcc i32 @"$s5Alias8testEnum1eSo02MyC0VAE_tF"(i32 returned %0)
+// CHECK-UNICODE-IR: define {{.*}}swiftcc i32 @"$s5Alias7testInt1is5Int32VAE_tF"(i32 returned %0)
 
 func h() {
   let _ = CLOCK_MONOTONIC
