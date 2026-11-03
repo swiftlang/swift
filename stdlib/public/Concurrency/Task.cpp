@@ -2359,6 +2359,11 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 
   // If the status is already Resumed, we can resume immediately.
   if (oldStatus == ContinuationStatus::Resumed) {
+    // Tell TSan about the acquire from the load above. The non-Resumed path
+    // does this after the compare_exchange below, where the task is already
+    // loaded. Here we'd have to fetch it, so skip that when TSan is off.
+    if (swift::tsan::enabled())
+      _swift_tsan_acquire(static_cast<Job *>(swift_task_getCurrent()));
     if (context->isExecutorSwitchForced())
       return swift_task_switch(context, context->ResumeParent,
                                context->ResumeToExecutor);
@@ -2438,6 +2443,10 @@ static void swift_continuation_awaitImpl(ContinuationAsyncContext *context) {
 #else
   task->resumeRunningAfterFailedSuspend();
 #endif /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
+
+  // Notify TSan of the acquire barrier from the compare_exchange failure path
+  // above, since we'll be reading the relevant data after this.
+  _swift_tsan_acquire(static_cast<Job *>(task));
 
   if (context->isExecutorSwitchForced())
     return swift_task_switch(context, context->ResumeParent,

@@ -26,7 +26,7 @@
 
 namespace swift {
 
-#if SWIFT_THREADING_NONE                                                \
+#if SWIFT_THREADING_NONE || SWIFT_THREADING_EMBEDDED                    \
   || defined(_WIN32) || defined(__wasi__)                               \
   || !__has_include(<dlfcn.h>)                                          \
   || (defined(SWIFT_STDLIB_HAS_DLSYM) && !SWIFT_STDLIB_HAS_DLSYM)
