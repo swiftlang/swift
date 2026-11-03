@@ -53,3 +53,40 @@ class X {
   static func test() {
   }
 }
+
+// withValue doesn't throw errors of its own, so it should preserve the
+// operation's thrown error type.
+enum TaskLocalTypedError: Error { case boom }
+
+@available(SwiftStdlib 5.1, *)
+func test_withValue_typedThrows() async {
+  // async: typed error is preserved (`do throws(TaskLocalTypedError)` only
+  // type-checks if the error is TaskLocalTypedError, not `any Error`)
+  do throws(TaskLocalTypedError) {
+    try await TL.$number.withValue(1) { () async throws(TaskLocalTypedError) in
+      throw .boom
+    }
+  } catch {
+    let _: TaskLocalTypedError = error
+  }
+
+  // sync: same
+  do throws(TaskLocalTypedError) {
+    try TL.$number.withValue(2) { () throws(TaskLocalTypedError) in
+      throw .boom
+    }
+  } catch {
+    let _: TaskLocalTypedError = error
+  }
+
+  // non-throwing closure: Failure == Never, so no `try` needed
+  let _: Int = await TL.$number.withValue(3) { () async in TL.number }
+  let _: Int = TL.$number.withValue(4) { TL.number }
+}
+
+@available(SwiftStdlib 5.1, *)
+func test_withValue_untypedStillWorks() async throws {
+  // Failure == any Error: existing code keeps compiling
+  try await TL.$number.withValue(5) { () async throws in throw TaskLocalTypedError.boom }
+  try TL.$number.withValue(6) { () throws in throw TaskLocalTypedError.boom }
+}
