@@ -4097,6 +4097,14 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
     }
   };
 
+  /// The operation closure of a 'send' if it is the current context
+  ClosureExpr *getSendOperationClosure() const {
+    auto *closure = dyn_cast<ClosureExpr>(CurContext.getDeclContext());
+    if (closure && closure->isOnewaySendOperation())
+      return closure;
+    return nullptr;
+  }
+
   /// Retrieve the type of the error that can be caught when an error is
   /// thrown from the given location.
   Type getCaughtErrorTypeAt(SourceLoc loc) {
@@ -4110,6 +4118,14 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
         return *type;
 
       // Otherwise, the closure does not throw.
+      return Ctx.getNeverType();
+    }
+
+    // Neither can the operation closure of a 'send', which pre-checking
+    // creates after parsing
+    if (auto *closure = getSendOperationClosure()) {
+      if (auto type = closure->getEffectiveThrownType())
+        return *type;
       return Ctx.getNeverType();
     }
 
@@ -4672,7 +4688,9 @@ private:
     // produce an error.
     if (!Flags.has(ContextFlags::HasAnyAsyncSite)) {
       if (CurContext.handlesAsync(ConditionalEffectKind::Conditional)) {
-        diagnoseRedundantAwait(E);
+        // The implicit 'await' of a 'send' call cannot be removed by the user
+        if (!E->isImplicit() || !getSendOperationClosure())
+          diagnoseRedundantAwait(E);
       } else {
         CurContext.diagnoseUnhandledAsyncSite(Ctx.Diags, E, std::nullopt,
                                               /*forAwait=*/true);

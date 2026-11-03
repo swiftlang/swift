@@ -2967,6 +2967,15 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
           if (!V->isSendingCapture())
             continue;
 
+          // The compiler synthesizes 'sending' captures for the operation
+          // closure of a 'send'
+          if (V->isImplicit()) {
+            auto *closure =
+                dyn_cast<ClosureExpr>(captureList->getClosureBody());
+            if (closure && closure->isOnewaySendOperation())
+              continue;
+          }
+
           if (!Ctx.LangOpts.hasFeature(Feature::OnceFunctions)) {
             Ctx.Diags.diagnose(
                 V->getLoc(),

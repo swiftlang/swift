@@ -53,6 +53,7 @@
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
 
@@ -3820,6 +3821,971 @@ namespace {
 
     Expr *visitConsumeExpr(ConsumeExpr *expr) {
       return transformExprWithSubExpr(expr);
+    }
+
+    /// The call which is the operand of a 'send', in the operation closure
+    /// '{ try await <call> }' synthesized by pre-checking, looking through
+    /// the opening of an existential receiver and an optional chain
+    ApplyExpr *getSendOperandCall(ClosureExpr *closure) {
+      Expr *body = closure->getSingleExpressionBody();
+      while (body) {
+        if (auto *anyTry = dyn_cast<AnyTryExpr>(body))
+          body = anyTry->getSubExpr();
+        else if (auto *await = dyn_cast<AwaitExpr>(body))
+          body = await->getSubExpr();
+        else if (auto *paren = dyn_cast<ParenExpr>(body))
+          body = paren->getSubExpr();
+        else if (auto *open = dyn_cast<OpenExistentialExpr>(body))
+          body = open->getSubExpr();
+        else if (auto *optEval = dyn_cast<OptionalEvaluationExpr>(body))
+          body = optEval->getSubExpr();
+        else if (auto *inject = dyn_cast<InjectIntoOptionalExpr>(body))
+          body = inject->getSubExpr();
+        else
+          break;
+      }
+
+      auto *apply = dyn_cast_or_null<ApplyExpr>(body);
+      if (!apply || isa<SelfApplyExpr>(apply))
+        return nullptr;
+      return apply;
+    }
+
+    /// Whether the callee of the 'send' call \p apply is a function which is
+    /// isolated to an actor.
+    ///
+    /// A call of a function value, like a closure, is
+    /// accepted only if its function type is isolated to a global actor or
+    /// has an 'isolated' parameter, whose argument is the actor the call is
+    /// enqueued on. A nonisolated, 'nonisolated(nonsending)', '@concurrent'
+    /// or '@isolated(any)' function value is not
+    bool isActorIsolatedSendCallee(ApplyExpr *apply) {
+      ValueDecl *callee =
+          apply->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!callee)
+        if (auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn()))
+          callee = selfApply->getCalledValue(/*skipFunctionConversions=*/true);
+      if (callee && isa<AbstractFunctionDecl>(callee)) {
+        auto isolation = getActorIsolation(callee);
+        return isolation.isActorInstanceIsolated() ||
+               isolation.isGlobalActor();
+      }
+
+      Expr *fn = apply->getFn();
+      Type fnTy = cs.hasType(fn) ? cs.getType(fn) : fn->getType();
+      auto *anyFnTy = fnTy ? fnTy->getAs<AnyFunctionType>() : nullptr;
+      if (!anyFnTy)
+        return false;
+      auto fnIsolation = anyFnTy->getIsolation();
+      return fnIsolation.isGlobalActor() || fnIsolation.isParameter();
+    }
+
+    /// Diagnose the operand of a 'send' which is not a call: a property
+    /// access, or a reference to a function
+    void diagnoseSendOfNonCall(ClosureExpr *closure, SendExpr *expr) {
+      Expr *body = closure->getSingleExpressionBody();
+      while (body) {
+        if (auto *anyTry = dyn_cast<AnyTryExpr>(body))
+          body = anyTry->getSubExpr();
+        else if (auto *await = dyn_cast<AwaitExpr>(body))
+          body = await->getSubExpr();
+        else if (auto *paren = dyn_cast<ParenExpr>(body))
+          body = paren->getSubExpr();
+        else if (auto *load = dyn_cast<LoadExpr>(body))
+          body = load->getSubExpr();
+        else if (auto *open = dyn_cast<OpenExistentialExpr>(body))
+          body = open->getSubExpr();
+        else if (auto *optEval = dyn_cast<OptionalEvaluationExpr>(body))
+          body = optEval->getSubExpr();
+        else if (auto *inject = dyn_cast<InjectIntoOptionalExpr>(body))
+          body = inject->getSubExpr();
+        else
+          break;
+      }
+
+      if (body && isa<SubscriptExpr>(body)) {
+        ctx.Diags.diagnose(expr->getSendLoc(), diag::send_subscript_access);
+        return;
+      }
+      ValueDecl *referenced = nullptr;
+      if (auto *memberRef = dyn_cast_or_null<MemberRefExpr>(body))
+        referenced = memberRef->getMember().getDecl();
+      else if (auto *declRef = dyn_cast_or_null<DeclRefExpr>(body))
+        referenced = declRef->getDecl();
+      if (referenced && isa<VarDecl>(referenced)) {
+        ctx.Diags.diagnose(expr->getSendLoc(), diag::send_property_access);
+        return;
+      }
+      ctx.Diags.diagnose(expr->getSendLoc(), diag::send_requires_call);
+    }
+
+    /// Whether the callee of \p apply can throw, according to its function
+    /// type. A 'throws(Never)' function does not throw
+    bool canCalleeOfSendThrow(ApplyExpr *apply) {
+      Expr *fn = apply->getFn();
+      Type fnTy = cs.hasType(fn) ? cs.getType(fn) : fn->getType();
+      auto *anyFnTy = fnTy ? fnTy->getAs<AnyFunctionType>() : nullptr;
+      if (!anyFnTy)
+        return false;
+      auto thrownTy = anyFnTy->getEffectiveThrownErrorType();
+      return thrownTy && !(*thrownTy)->isNever();
+    }
+
+    Expr *visitSendExpr(SendExpr *expr) {
+      // 'send' discards the result of the call, so it is unconditionally
+      // Void
+      cs.setType(expr, ctx.TheEmptyTupleType);
+
+      // Validate the target via the operation closure synthesized in
+      // pre-checking ('{ try await <call> }'). On error we still return the
+      // (Void-typed) node - the diagnostic halts compilation before SILGen
+      auto *closure = dyn_cast<ClosureExpr>(expr->getSubExpr());
+      if (!closure)
+        return expr;
+
+      // 'send' runs a call without waiting for it, so there is nobody to
+      // receive its result or its error: it can be applied to any call which
+      // returns 'Void' and does not throw
+      auto *call = getSendOperandCall(closure);
+      if (!call) {
+        diagnoseSendOfNonCall(closure, expr);
+        // Drop the operand, so that it is not diagnosed again, e.g. as a
+        // partial application of an actor-isolated method
+        auto *error = new (ctx) ErrorExpr(closure->getSourceRange(),
+                                          ctx.TheEmptyTupleType);
+        cs.cacheType(error);
+        expr->setSubExpr(error);
+        return expr;
+      }
+
+      // A 'send' call is enqueued on the callee's actor, so the callee must
+      // be isolated to an actor: an actor instance, also through an
+      // 'isolated' parameter, or a global actor
+      if (!expr->isImplicit() && !isActorIsolatedSendCallee(call)) {
+        ctx.Diags.diagnose(expr->getSendLoc(),
+                           diag::send_requires_actor_isolated_callee);
+        return expr;
+      }
+
+      // A 'send' of a distributed function would have to make a remote call
+      // without waiting for its reply, which distributed actor systems do not
+      // support yet
+      if (!expr->isImplicit()) {
+        ValueDecl *callee =
+            call->getCalledValue(/*skipFunctionConversions=*/true);
+        if (!callee)
+          if (auto *selfApply = dyn_cast<SelfApplyExpr>(call->getFn()))
+            callee =
+                selfApply->getCalledValue(/*skipFunctionConversions=*/true);
+        if (auto *calleeFunc = dyn_cast_or_null<AbstractFunctionDecl>(callee);
+            calleeFunc && calleeFunc->isDistributed()) {
+          ctx.Diags.diagnose(expr->getSendLoc(),
+                             diag::send_distributed_not_supported, calleeFunc);
+          return expr;
+        }
+      }
+
+      // The caller does not wait for a 'send' call, so it cannot get the
+      // value of an 'inout' argument back, and the call would access the
+      // caller's variable after the caller has moved on
+      for (auto arg : *call->getArgs()) {
+        if (arg.isInOut() || isa<InOutExpr>(arg.getExpr())) {
+          ctx.Diags
+              .diagnose(expr->getSendLoc(), diag::send_call_inout_argument)
+              .highlight(arg.getExpr()->getSourceRange());
+          return expr;
+        }
+      }
+
+      // The lifetime of a non-escapable value is bound to the caller's
+      // scope, which the call outlives. A non-escaping closure is formed in
+      // the closure of the 'send' instead, see 'captureOnewaySendArguments'
+      for (auto arg : *call->getArgs()) {
+        Expr *argExpr = arg.getExpr();
+        if (auto *vararg = dyn_cast<VarargExpansionExpr>(argExpr))
+          argExpr = vararg->getSubExpr();
+        Type argTy = argExpr->getType();
+        if (!argTy || argTy->hasError() || argTy->is<AnyFunctionType>() ||
+            isa<AutoClosureExpr>(argExpr))
+          continue;
+        argTy = argTy->getRValueType();
+        if (!argTy->isEscapable()) {
+          ctx.Diags
+              .diagnose(expr->getSendLoc(),
+                        diag::send_call_nonescapable_argument, argTy)
+              .highlight(argExpr->getSourceRange());
+          return expr;
+        }
+      }
+
+      // There is nobody to receive the result of a 'send', so the callee
+      // must return 'Void', even if its result is '@discardableResult'. An
+      // optional chain around a 'Void' call ('send a?.f()') is
+      // 'Optional<Void>' and does not make the call if the chain fails. The
+      // single-expression closure's result type is the operand's type
+      if (cs.hasType(closure)) {
+        if (auto fnTy = cs.getType(closure)->getAs<FunctionType>()) {
+          Type resultTy = fnTy->getResult();
+          if (resultTy && !resultTy->hasError() &&
+              !resultTy->lookThroughAllOptionalTypes()->isVoid()) {
+            auto *callee = call->getCalledValue(
+                /*skipFunctionConversions=*/true);
+            ctx.Diags
+                .diagnose(expr->getSendLoc(), diag::send_call_discards_result,
+                          callee != nullptr, callee)
+                .fixItReplace(expr->getSendLoc(), "await");
+            return expr;
+          }
+        }
+      }
+
+      // 'send' cannot forward an error, so the callee must not throw
+      if (canCalleeOfSendThrow(call)) {
+        auto *callee = call->getCalledValue(/*skipFunctionConversions=*/true);
+        ctx.Diags
+            .diagnose(expr->getSendLoc(), diag::send_call_can_throw,
+                      callee != nullptr, callee)
+            .fixItReplace(expr->getSendLoc(), "await");
+        return expr;
+      }
+
+      // A synchronous target is lowered without any async code at the call
+      // site where possible: replace the operation closure with a synchronous
+      // expression. Otherwise the call runs in a new task, whose operation
+      // closure evaluates the receiver and the arguments at the call site
+      // The task consumes its operation by calling it, which older runtimes
+      // do not support. A synchronous target enqueued by the
+      // '_enqueueOneway*' helpers has the same minimum, so that 'send' has a
+      // single availability. Embedded Swift has no OS availability, the
+      // runtime ships with the binary
+      auto checkRuntimeAvailability = [&] {
+        if (ctx.LangOpts.hasFeature(Feature::Embedded) || expr->isImplicit())
+          return;
+        TypeChecker::checkAvailability(
+            expr->getSourceRange(),
+            ctx.getCreateTaskWithConsumedFunctionAvailability(), dc,
+            [&](AvailabilityDomain domain, AvailabilityRange range) {
+              return ctx.Diags.diagnose(expr->getSendLoc(),
+                                        diag::send_only_version_newer, domain,
+                                        range);
+            });
+      };
+
+      bool missingConcurrencySupport = false;
+      Expr *synchronous =
+          lowerSynchronousSend(closure, missingConcurrencySupport);
+      if (missingConcurrencySupport) {
+        ctx.Diags.diagnose(expr->getSendLoc(),
+                           diag::send_requires_newer_concurrency_library);
+        return expr;
+      }
+      if (Expr *lowered = synchronous) {
+        expr->setSubExpr(lowered);
+        auto *call = dyn_cast<CallExpr>(lowered);
+        auto *callee = call ? dyn_cast<DeclRefExpr>(call->getFn()) : nullptr;
+        if (callee && callee->getDecl()->getBaseIdentifier().str().starts_with(
+                          "_enqueueOneway"))
+          checkRuntimeAvailability();
+        return expr;
+      }
+      // The task-based lowering diagnoses a call it cannot lower, rather than
+      // evaluating the receiver and the arguments in the task
+      Expr *lowered = lowerSendOperationToCalledOnce(closure, expr);
+      if (!lowered)
+        return expr;
+      expr->setSubExpr(lowered);
+
+      checkRuntimeAvailability();
+      return expr;
+    }
+
+    /// Bind \p value to a new variable \p name in the capture list of the
+    /// closure of a 'send' that is being lowered, so that \p value is
+    /// evaluated at the call site when the closure is formed, and return a
+    /// reference to the variable. A 'sending' capture sends the value to the
+    /// closure, which requires the closure to be called at most once
+    Expr *captureSendValue(Expr *value, StringRef name, DeclContext *outerDC,
+                           bool isSending,
+                           SmallVectorImpl<CaptureListEntry> &captures) {
+      Type valueTy = value->getType();
+      TypeChecker::contextualizeExpr(value, outerDC);
+      solution.setExprTypes(value);
+
+      auto *var = new (ctx) VarDecl(/*static*/ false,
+                                    VarDecl::Introducer::Let,
+                                    value->getLoc(),
+                                    ctx.getIdentifier(name), outerDC);
+      var->setImplicit();
+      var->setInterfaceType(valueTy->mapTypeOutOfEnvironment());
+      if (isSending)
+        var->setIsSendingCapture();
+
+      auto *pattern = NamedPattern::createImplicit(ctx, var, valueTy);
+      auto *pbd = PatternBindingDecl::createImplicit(
+          ctx, StaticSpellingKind::None, pattern, value, outerDC);
+      captures.push_back(CaptureListEntry(pbd));
+
+      auto *ref = new (ctx) DeclRefExpr(var, DeclNameLoc(value->getLoc()),
+                                        /*Implicit=*/true);
+      ref->setType(valueTy);
+      return ref;
+    }
+
+    /// Evaluate the arguments of the call of a 'send' that is being lowered at
+    /// the call site, in order, just like the arguments of a direct call, by
+    /// binding each of them with \p captureArg in the capture list of the
+    /// closure. The arguments which cannot be evaluated at the call site are
+    /// left in place, to be formed in the closure
+    void captureOnewaySendArguments(
+        ArgumentList *args,
+        llvm::function_ref<Expr *(Expr *, unsigned)> captureArg) {
+      for (unsigned i : indices(*args)) {
+        Expr *argExpr = args->getExpr(i);
+
+        // A default argument is evaluated at the call site too, unless it is
+        // isolated to the callee's actor (SE-0411), which is only satisfied
+        // in the closure. That includes a caller-side default like '#line'
+        // or '#isolation', which must see the caller's context, not the
+        // closure's
+        if (auto *defaultArg = dyn_cast<DefaultArgumentExpr>(argExpr)) {
+          if (defaultArg->getRequiredIsolation().isActorIsolated())
+            continue;
+          args->setExpr(i, captureArg(argExpr, i));
+          continue;
+        }
+
+        // An '@autoclosure' is evaluated by the callee, and a non-escaping
+        // closure cannot be captured by the escaping closure, so they are
+        // formed in the closure
+        if (isa<AutoClosureExpr>(argExpr))
+          continue;
+        if (auto *fnTy = argExpr->getType()->getAs<AnyFunctionType>())
+          if (fnTy->isNoEscape())
+            continue;
+
+        // The variadic arguments are evaluated at the call site into their
+        // array, which is then forwarded as the variadic parameter
+        if (auto *vararg = dyn_cast<VarargExpansionExpr>(argExpr)) {
+          auto *expansion = VarargExpansionExpr::createParamExpansion(
+              ctx, captureArg(vararg->getSubExpr(), i));
+          cs.cacheType(expansion);
+          args->setExpr(i, expansion);
+          continue;
+        }
+
+        args->setExpr(i, captureArg(argExpr, i));
+      }
+    }
+
+    /// How the callee of a 'send' call relates to the isolation of its caller
+    enum class SendCallerIsolation {
+      /// The callee is not isolated to the caller's actor
+      None,
+      /// The callee is isolated to the caller's global actor
+      CallerGlobalActor,
+      /// The callee is isolated to the caller's own actor instance, which is
+      /// the receiver of the call
+      CallerActorInstance,
+    };
+
+    /// Whether the callee of the 'send' call \p apply is isolated to the
+    /// actor that its caller in \p outerDC is isolated to: the caller's own
+    /// actor instance as the receiver \p base, or the same global actor.
+    ///
+    /// The isolation of closures is only known after this rewrite, so only a
+    /// call directly in a function body is recognized
+    SendCallerIsolation getSendCallerIsolation(ApplyExpr *apply, Expr *base,
+                                               DeclContext *outerDC) {
+      ValueDecl *calleeVD =
+          apply->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!calleeVD)
+        if (auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn()))
+          calleeVD =
+              selfApply->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!calleeVD || !isa<AbstractFunctionDecl>(outerDC))
+        return SendCallerIsolation::None;
+
+      auto calleeIsolation = getActorIsolation(calleeVD);
+      auto callerIsolation = getActorIsolationOfContext(outerDC);
+
+      if (calleeIsolation.isGlobalActor() && callerIsolation.isGlobalActor() &&
+          calleeIsolation.getGlobalActor()->isEqual(
+              callerIsolation.getGlobalActor()))
+        return SendCallerIsolation::CallerGlobalActor;
+
+      if (calleeIsolation.isActorInstanceIsolated() &&
+          calleeIsolation.isActorInstanceForSelfParameter() &&
+          callerIsolation.isActorInstanceIsolated() && base) {
+        auto *baseRef =
+            dyn_cast<DeclRefExpr>(base->getSemanticsProvidingExpr());
+        if (baseRef && callerIsolation.getActorInstance() &&
+            baseRef->getDecl() == callerIsolation.getActorInstance())
+          return SendCallerIsolation::CallerActorInstance;
+      }
+      return SendCallerIsolation::None;
+    }
+
+    /// Lower the operation closure '{ try await <call> }' of a 'send' which
+    /// runs the call in a new task to a closure which is called exactly once,
+    /// by the task, and which evaluates the receiver and the arguments of the
+    /// call at the call site:
+    ///
+    ///     send a.f(x)  =>  send { @once
+    ///                             [sending $send_base = a,
+    ///                              sending $send_arg0 = x] in
+    ///                        try await $send_base.f($send_arg0)
+    ///                      }
+    ///
+    /// The receiver and the arguments are evaluated in order before the next
+    /// statement, just like the arguments of a direct call, and are sent to
+    /// the task like 'sending' arguments: a non-Sendable value cannot be used
+    /// after the 'send', and it is disconnected in the task, which sends it on
+    /// to the callee. A callee which is a function value rather than a
+    /// function, like a closure stored in a property, is evaluated at the
+    /// call site as well.
+    ///
+    /// A call in an optional chain keeps the chain at the call site, around
+    /// an implicit 'send' of the call on the unwrapped receiver, so that
+    /// nothing is evaluated and no task is created if the chain fails, just
+    /// like for a direct call:
+    ///
+    ///     send a?.f(x)  =>  send ((send { @once
+    ///                                     [sending $send_base = a?,
+    ///                                      sending $send_arg0 = x] in
+    ///                                try await $send_base.f($send_arg0)
+    ///                              })?)
+    ///
+    /// Any effect of the receiver or the arguments, like a call that can
+    /// throw, therefore happens at the call site, and needs its own 'try' or
+    /// 'await' there.
+    ///
+    /// Returns the new operand of the 'send', or null if the call cannot be
+    /// lowered, which is diagnosed
+    Expr *lowerSendOperationToCalledOnce(ClosureExpr *closure,
+                                         SendExpr *send) {
+      auto unsupported = [&](Diag<> diag, Expr *highlight) -> Expr * {
+        auto diagnostic = ctx.Diags.diagnose(send->getSendLoc(), diag);
+        if (highlight)
+          diagnostic.highlight(highlight->getSourceRange());
+        return nullptr;
+      };
+
+      Expr *root = closure->getSingleExpressionBody();
+      if (!root)
+        return unsupported(diag::send_call_unsupported, nullptr);
+
+      // The 'try', 'await' and parentheses around the call, outermost first
+      SmallVector<Expr *, 3> wrappers;
+      Expr *body = root;
+      while (true) {
+        Expr *sub = nullptr;
+        if (auto *anyTry = dyn_cast<AnyTryExpr>(body))
+          sub = anyTry->getSubExpr();
+        else if (auto *await = dyn_cast<AwaitExpr>(body))
+          sub = await->getSubExpr();
+        else if (auto *paren = dyn_cast<ParenExpr>(body))
+          sub = paren->getSubExpr();
+        else
+          break;
+        wrappers.push_back(body);
+        body = sub;
+      }
+
+      // An optional chain around the call is moved out of the closure, see
+      // above
+      auto *optionalEval = dyn_cast<OptionalEvaluationExpr>(body);
+      InjectIntoOptionalExpr *injectIntoOptional = nullptr;
+      if (optionalEval) {
+        body = optionalEval->getSubExpr();
+        injectIntoOptional = dyn_cast<InjectIntoOptionalExpr>(body);
+        if (injectIntoOptional)
+          body = injectIntoOptional->getSubExpr();
+      }
+
+      // A call on an existential receiver opens the existential around the
+      // call, the existential is evaluated at the call site and opened in the
+      // task
+      auto *openExistential = dyn_cast<OpenExistentialExpr>(body);
+      if (openExistential)
+        body = openExistential->getSubExpr();
+
+      auto *apply = dyn_cast<ApplyExpr>(body);
+      if (!apply || isa<SelfApplyExpr>(apply))
+        return unsupported(diag::send_call_unsupported, nullptr);
+
+      // The method reference may be converted, e.g. to a 'Sendable' function
+      Expr *fn = apply->getFn();
+      while (auto *conversion = dyn_cast<ImplicitConversionExpr>(fn))
+        fn = conversion->getSubExpr();
+      auto *selfApply = dyn_cast<SelfApplyExpr>(fn);
+      DeclContext *outerDC = closure->getParent();
+
+      // Only arguments which are values (including variadic arrays) can be
+      // evaluated at the call site. 'inout' arguments are diagnosed before
+      auto *args = apply->getArgs();
+      for (auto arg : *args) {
+        Expr *argExpr = arg.getExpr();
+        if (isa<PackExpansionExpr>(argExpr))
+          return unsupported(diag::send_call_pack_expansion_argument, argExpr);
+        if (arg.isInOut() || !argExpr->getType() ||
+            argExpr->getType()->hasLValueType())
+          return unsupported(diag::send_call_unsupported, argExpr);
+        if (auto *vararg = dyn_cast<VarargExpansionExpr>(argExpr))
+          if (!isa<ArrayExpr>(vararg->getSubExpr()))
+            return unsupported(diag::send_call_unsupported, argExpr);
+      }
+
+      Expr *base = nullptr;
+      if (openExistential)
+        base = openExistential->getExistentialValue();
+      else if (selfApply)
+        base = selfApply->getBase();
+      if (base && !base->getType())
+        return unsupported(diag::send_call_unsupported, base);
+      if (base && (isa<InOutExpr>(base) || base->getType()->hasLValueType() ||
+                   base->getType()->is<InOutType>()))
+        return unsupported(diag::send_call_mutating_method, base);
+
+      // A function value is evaluated at the call site, a function is not a
+      // value which could change before the task calls it. A non-escaping
+      // function value cannot be captured by the escaping closure, which is
+      // diagnosed when the closure refers to it
+      auto *calleeDecl = apply->getCalledValue(/*skipFunctionConversions=*/true);
+      bool captureFn = !selfApply && !openExistential &&
+                       !isa_and_nonnull<AbstractFunctionDecl>(calleeDecl);
+      // The function value itself, a variable is loaded from
+      Expr *fnValue = apply->getFn();
+      if (captureFn &&
+          (!fnValue->getType() || fnValue->getType()->hasLValueType()))
+        return unsupported(diag::send_call_unsupported, fnValue);
+      if (captureFn)
+        if (auto *fnTy = fnValue->getType()->getAs<AnyFunctionType>())
+          if (fnTy->isNoEscape())
+            captureFn = false;
+
+      // The task runs the call on the callee's actor. If that is the actor
+      // the caller is isolated to, like for 'send self.f(x)' in one of the
+      // actor's methods, the closure keeps the caller's isolation: passing
+      // the actor's state is a same-actor use, just like in a direct call.
+      // Otherwise the closure is not isolated to the caller, like a closure
+      // passed to a 'sending' parameter, so that the values sent to the task
+      // leave the caller's isolation
+      auto callerIsolation = getSendCallerIsolation(
+          apply, selfApply ? selfApply->getBase() : nullptr, outerDC);
+      if (callerIsolation == SendCallerIsolation::None)
+        closure->setIsPassedToSendingParameter();
+
+      // The optional chain is not part of the call in the closure anymore:
+      // its body is the call, and it returns 'Void', the result is discarded
+      if (optionalEval) {
+        Expr *inner = openExistential ? static_cast<Expr *>(openExistential)
+                                      : static_cast<Expr *>(apply);
+        if (wrappers.empty()) {
+          root = inner;
+        } else {
+          Expr *innermost = wrappers.back();
+          if (auto *anyTry = dyn_cast<AnyTryExpr>(innermost))
+            anyTry->setSubExpr(inner);
+          else if (auto *await = dyn_cast<AwaitExpr>(innermost))
+            await->setSubExpr(inner);
+          else
+            cast<ParenExpr>(innermost)->setSubExpr(inner);
+          for (Expr *wrapper : llvm::reverse(wrappers)) {
+            wrapper->setType(inner->getType());
+            cs.cacheType(wrapper);
+          }
+        }
+        closure->setBody(BraceStmt::createImplicit(ctx, {ASTNode(root)}));
+        auto *fnTy = cs.getType(closure)->castTo<FunctionType>();
+        closure->setType(FunctionType::get(fnTy->getParams(), /*yields=*/{},
+                                           ctx.TheEmptyTupleType,
+                                           fnTy->getExtInfo()));
+        cs.cacheType(closure);
+      }
+
+      SmallVector<CaptureListEntry, 4> captures;
+      auto captureValue = [&](Expr *value, StringRef name) -> Expr * {
+        return captureSendValue(value, name, outerDC, /*isSending=*/true,
+                                captures);
+      };
+
+      // The receiver first, unless it is a metatype, or the caller's own
+      // actor, which the closure has to capture to keep the actor's
+      // isolation. That is an actor, which is Sendable, and evaluating
+      // a reference to it has no side effects. A receiver in an optional
+      // chain is unwrapped at the call site, even if it is a metatype
+      if (base && (optionalEval || !base->getType()->is<AnyMetatypeType>()) &&
+          callerIsolation != SendCallerIsolation::CallerActorInstance) {
+        Expr *baseRef = captureValue(base, "$send_base");
+        if (openExistential)
+          openExistential->setExistentialValue(baseRef);
+        else
+          selfApply->setBase(baseRef);
+      }
+
+      // Or the callee, if it is a function value
+      if (captureFn)
+        apply->setFn(captureValue(apply->getFn(), "$send_fn"));
+
+      // Then the arguments, in order
+      captureOnewaySendArguments(args, [&](Expr *argExpr, unsigned i) {
+        return captureValue(argExpr, ("$send_arg" + llvm::Twine(i)).str());
+      });
+
+      // The task calls its operation exactly once, which lets the closure
+      // consume its 'sending' captures
+      auto *closureTy = cs.getType(closure)->castTo<FunctionType>();
+      Type onceTy = closureTy->withExtInfo(
+          closureTy->getExtInfo().withExecutionSemantics(
+              ExecutionSemantics::Once));
+      closure->setType(onceTy);
+      cs.cacheType(closure);
+
+      Expr *lowered = closure;
+      if (!captures.empty()) {
+        auto *captureList = CaptureListExpr::create(ctx, captures, closure);
+        captureList->setImplicit();
+        captureList->setType(onceTy);
+        cs.cacheType(captureList);
+        lowered = captureList;
+      }
+      if (!optionalEval)
+        return lowered;
+
+      // '(send <lowered>)?', whose 'send' only runs if the chain succeeds
+      auto *innerSend =
+          SendExpr::createImplicit(ctx, send->getSendLoc(), lowered);
+      cs.cacheType(innerSend);
+      Type optionalVoidTy = OptionalType::get(ctx.TheEmptyTupleType);
+      if (!injectIntoOptional)
+        injectIntoOptional = new (ctx) InjectIntoOptionalExpr(innerSend,
+                                                              optionalVoidTy);
+      injectIntoOptional->setSubExpr(innerSend);
+      injectIntoOptional->setType(optionalVoidTy);
+      cs.cacheType(injectIntoOptional);
+      optionalEval->setSubExpr(injectIntoOptional);
+      optionalEval->setType(optionalVoidTy);
+      cs.cacheType(optionalEval);
+      return optionalEval;
+    }
+
+    /// Whether a 'send' call of the synchronous \p callee is enqueued
+    /// without any async code (see 'lowerSynchronousSend'): 'send' already
+    /// requires the call to return 'Void' and not to throw, and the lowering
+    /// checks the isolation of the callee. An 'async' callee keeps the
+    /// task-based lowering
+    bool isSynchronouslyEnqueuedSendCallee(FuncDecl *callee) {
+      return ctx.LangOpts.hasFeature(Feature::SendCalls) &&
+             !callee->hasAsync();
+    }
+
+    /// Lower the operation closure '{ <call> }' of a 'send' call to a synchronous expression,
+    /// so that the call site has no async code and can be in a synchronous context:
+    ///
+    /// A synchronous function (see 'isSynchronouslyEnqueuedSendCallee')
+    /// is enqueued as a task whose operation is synchronous
+    /// where the runtime supports it, see '_enqueueOnewayUnchecked':
+    ///
+    /// - An actor-isolated method is enqueued on the actor:
+    ///
+    ///     send a.f(x)  =>  _enqueueOneway(on: a) {
+    ///                        [$send_arg0 = x] $send_actor in
+    ///                        $send_actor.f($send_arg0)
+    ///                      }
+    ///
+    /// - A global-actor-isolated function is enqueued on its global actor:
+    ///
+    ///     send c.f(x)  =>  _enqueueOnewayIsolatedAny({
+    ///                        [$send_base = c, $send_arg0 = x] @GA in
+    ///                        $send_base.f($send_arg0)
+    ///                      })
+    ///
+    /// The receiver and the arguments are evaluated at the call site, in the
+    /// caller's isolation, just like the arguments of a direct call.
+    ///
+    /// Returns the new operand of the 'send', or null to keep the
+    /// task-based lowering. Sets \p missingConcurrencySupport if the call
+    /// should be enqueued but the '_enqueueOneway*' helpers are missing from
+    /// the _Concurrency module: falling back to the task-based lowering would
+    /// silently change the semantics of the call
+    Expr *lowerSynchronousSend(ClosureExpr *closure,
+                               bool &missingConcurrencySupport) {
+      Expr *body = closure->getSingleExpressionBody();
+      if (!body)
+        return nullptr;
+      while (true) {
+        if (auto *anyTry = dyn_cast<AnyTryExpr>(body))
+          body = anyTry->getSubExpr();
+        else if (auto *await = dyn_cast<AwaitExpr>(body))
+          body = await->getSubExpr();
+        else if (auto *paren = dyn_cast<ParenExpr>(body))
+          body = paren->getSubExpr();
+        else
+          break;
+      }
+
+      // TODO: Lower a call on an existential plain actor ('any Tellable') too.
+      // Its enqueued closure would have to be isolated to the opened
+      // existential, which the closure's captures do not support yet, so such
+      // a call keeps the task-based lowering, and so does a call in an
+      // optional chain
+      if (isa<OptionalEvaluationExpr>(body) || isa<OpenExistentialExpr>(body))
+        return nullptr;
+
+      auto *apply = dyn_cast<ApplyExpr>(body);
+      if (!apply || isa<SelfApplyExpr>(apply))
+        return nullptr;
+
+      auto *selfApply = dyn_cast<SelfApplyExpr>(apply->getFn());
+      ValueDecl *calleeVD =
+          apply->getCalledValue(/*skipFunctionConversions=*/true);
+      if (!calleeVD && selfApply)
+        calleeVD = selfApply->getCalledValue(/*skipFunctionConversions=*/true);
+      auto *callee = dyn_cast_or_null<FuncDecl>(calleeVD);
+      if (!callee || !isSynchronouslyEnqueuedSendCallee(callee))
+        return nullptr;
+
+      DeclContext *outerDC = closure->getParent();
+
+      // The receiver, which is the actor to enqueue on for an actor-isolated
+      // method
+      Expr *base = selfApply ? selfApply->getBase() : nullptr;
+
+      // Whether the receiver is the actor the calling function is already
+      // isolated to, e.g. 'send self.f(x)' in one of the actor's methods, or
+      // 'send d.f(x)' in a function with an 'isolated d' parameter.
+      //
+      // The isolation of closures is only known after this rewrite, so only a
+      // call directly in a function body is recognized
+      bool isCallerActor = getSendCallerIsolation(apply, base, outerDC) ==
+                           SendCallerIsolation::CallerActorInstance;
+
+      auto isolation = getActorIsolation(callee);
+      bool isActorInstance = isolation.isActorInstanceIsolated() &&
+                             isolation.isActorInstanceForSelfParameter();
+      if (!isActorInstance && !isolation.isGlobalActor())
+        return nullptr;
+
+      auto *concurrency = ctx.getLoadedModule(ctx.Id_Concurrency);
+      if (!concurrency) {
+        missingConcurrencySupport = true;
+        return nullptr;
+      }
+      auto lookupEnqueueFunc = [&](StringRef name) -> FuncDecl * {
+        SmallVector<ValueDecl *, 1> results;
+        concurrency->lookupValue(ctx.getIdentifier(name),
+                                 NLKind::QualifiedLookup, results);
+        if (results.size() != 1)
+          return nullptr;
+        return dyn_cast<FuncDecl>(results.front());
+      };
+
+      Type actorTy;
+      FuncDecl *enqueueFunc = nullptr;
+      if (isActorInstance) {
+        if (!base)
+          return nullptr;
+        actorTy = base->getType();
+        if (!actorTy || actorTy->hasLValueType())
+          return nullptr;
+        // Distributed actors are not 'Actor's (and their non-distributed
+        // methods cannot be called cross-actor anyway), only a call on the
+        // caller's own actor, which needs no 'Actor' conformance, is enqueued
+        // on a distributed actor.
+        //
+        // TODO: Recognize a self-send from a closure isolated to the actor.
+        // A self-send from a nested closure is lowered like a send to another
+        // actor, so passing the actor's own state is conservatively diagnosed
+        // as a send
+        auto *actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+        bool isActor =
+            actorProto && !lookupConformance(actorTy, actorProto).isInvalid();
+        if (!isActor && !isCallerActor)
+          return nullptr;
+
+        // The '@isolated(any)' closure of '_enqueueOnewayIsolatedAny' erases a
+        // distributed actor to 'any Actor' through the conformance of
+        // 'DistributedActor' as 'Actor', which Embedded Swift cannot emit
+        // yet. The task-based lowering, which is enqueued on the actor's
+        // executor directly, has the same ordering
+        if (!isActor && ctx.LangOpts.hasFeature(Feature::Embedded))
+          return nullptr;
+
+        // A call on the caller's own actor is enqueued with a closure which
+        // captures that actor and inherits its isolation, so that the region
+        // checker sees a same-actor use: passing the actor's own state is
+        // fine, just like in a direct call. Otherwise the actor becomes the
+        // closure's 'isolated' parameter
+        enqueueFunc = lookupEnqueueFunc(isCallerActor ? "_enqueueOnewayIsolatedAny"
+                                                      : "_enqueueOneway");
+      } else {
+        enqueueFunc = lookupEnqueueFunc("_enqueueOnewayIsolatedAny");
+      }
+      if (!enqueueFunc) {
+        missingConcurrencySupport = true;
+        return nullptr;
+      }
+
+      // Only arguments which are values (including variadic arrays) can be
+      // evaluated at the call site; fall back to the task-based lowering
+      // otherwise
+      auto *args = apply->getArgs();
+      for (auto arg : *args) {
+        Expr *argExpr = arg.getExpr();
+        if (arg.isInOut() || isa<PackExpansionExpr>(argExpr) ||
+            !argExpr->getType() || argExpr->getType()->hasLValueType())
+          return nullptr;
+        if (auto *vararg = dyn_cast<VarargExpansionExpr>(argExpr))
+          if (!isa<ArrayExpr>(vararg->getSubExpr()))
+            return nullptr;
+      }
+
+      // A 'send' consumes its noncopyable arguments. The closure captures
+      // them, which consumes them at the call site, and passes them on to the
+      // callee. A 'borrowing' parameter only borrows the capture, which is
+      // destroyed with the closure once the call returned. A 'consuming'
+      // parameter consumes the capture, which only a closure that is called
+      // exactly once may do. The '_enqueueOneway*' helpers take a closure
+      // which is not, so such a call keeps the task-based lowering, whose
+      // operation closure is called exactly once
+      if (auto *calleeFnTy = apply->getFn()->getType()->getAs<AnyFunctionType>()) {
+        auto params = calleeFnTy->getParams();
+        for (unsigned i : indices(*args)) {
+          if (i >= params.size())
+            break;
+          Type argTy = args->getExpr(i)->getType();
+          if (!argTy->isNoncopyable())
+            continue;
+          if (params[i].getValueOwnership() != ValueOwnership::Shared)
+            return nullptr;
+        }
+      }
+
+      SmallVector<CaptureListEntry, 4> captures;
+      auto captureValue = [&](Expr *value, StringRef name) -> Expr * {
+        return captureSendValue(value, name, outerDC, /*isSending=*/false,
+                                captures);
+      };
+
+      // The receiver of a global-actor-isolated or nonisolated method is
+      // evaluated at the call site too, before the arguments, unless it is a
+      // metatype
+      bool captureGlobalActorBase = !isActorInstance && base &&
+                                    !base->getType()->is<AnyMetatypeType>();
+      if (captureGlobalActorBase && base->getType()->hasLValueType())
+        return nullptr;
+      if (captureGlobalActorBase)
+        selfApply->setBase(captureValue(base, "$send_base"));
+
+      // A capture of a plain variable is named like the variable, so that the
+      // region checker's diagnostics about it name the variable of the call
+      // site rather than a synthesized capture
+      llvm::SmallSet<Identifier, 4> captureNames;
+      auto captureNameFor = [&](Expr *argExpr, unsigned i) -> std::string {
+        if (auto *ref = dyn_cast<DeclRefExpr>(
+                argExpr->getSemanticsProvidingExpr())) {
+          auto *var = dyn_cast<VarDecl>(ref->getDecl());
+          if (var && !var->getName().empty() &&
+              captureNames.insert(var->getName()).second)
+            return var->getName().str().str();
+        }
+        return ("$send_arg" + llvm::Twine(i)).str();
+      };
+
+      // Evaluate the arguments at the call site
+      captureOnewaySendArguments(args, [&](Expr *argExpr, unsigned i) {
+        return captureValue(argExpr, captureNameFor(argExpr, i));
+      });
+
+      SubstitutionMap enqueueSubs;
+      if (isActorInstance && !isCallerActor) {
+        enqueueSubs = SubstitutionMap::get(
+            enqueueFunc->getGenericSignature(), ArrayRef<Type>{actorTy},
+            LookUpConformanceInModule());
+      }
+      Type enqueueFnTy = enqueueFunc->getInterfaceType();
+      if (auto *genericFnTy = enqueueFnTy->getAs<GenericFunctionType>())
+        enqueueFnTy = genericFnTy->substGenericArgs(enqueueSubs);
+      auto *enqueueFnType = enqueueFnTy->castTo<FunctionType>();
+      Type bodyParamTy = enqueueFnType->getParams().back().getPlainType();
+
+      SmallVector<Argument, 2> enqueueArgs;
+      FunctionType *closureTy;
+      if (isCallerActor) {
+        // '() -> Void' inheriting the caller's actor isolation, erased to the
+        // '@isolated(any)' parameter of '_enqueueOnewayIsolatedAny' below
+        closureTy = FunctionType::get({}, /*yields=*/{}, ctx.TheEmptyTupleType,
+                                    FunctionType::ExtInfoBuilder().build());
+        // The closure captures the actor 'self' just like the direct call
+        // would use it, 'send f()' does not need an explicit 'self.'
+        closure->setAllowsImplicitSelfCapture();
+      } else if (isActorInstance) {
+        // The actor becomes the closure's 'isolated' parameter, so that the
+        // call in the closure is a synchronous same-actor call
+        auto *actorParam = new (ctx) ParamDecl(
+            SourceLoc(), SourceLoc(), Identifier(), SourceLoc(),
+            ctx.getIdentifier("$send_actor"), closure);
+        actorParam->setImplicit();
+        actorParam->setSpecifier(ParamSpecifier::Default);
+        actorParam->setInterfaceType(actorTy->mapTypeOutOfEnvironment());
+        actorParam->setIsolated();
+        closure->setParameterList(ParameterList::create(ctx, {actorParam}));
+
+        auto *actorRef = new (ctx) DeclRefExpr(
+            actorParam, DeclNameLoc(base->getLoc()), /*Implicit=*/true);
+        actorRef->setType(actorTy);
+        selfApply->setBase(actorRef);
+
+        // '(isolated A) -> Void', exactly the type '_enqueueOneway' expects
+        closureTy = bodyParamTy->castTo<FunctionType>();
+
+        TypeChecker::contextualizeExpr(base, outerDC);
+        enqueueArgs.push_back(Argument(SourceLoc(), ctx.Id_on, base));
+      } else {
+        Type globalActorTy =
+            outerDC->mapTypeIntoEnvironment(isolation.getGlobalActor());
+        closureTy = FunctionType::get(
+            {}, /*yields=*/{}, ctx.TheEmptyTupleType,
+            FunctionType::ExtInfoBuilder()
+                .withIsolation(
+                    FunctionTypeIsolation::forGlobalActor(globalActorTy))
+                .build());
+      }
+
+      // The closure's body is just the (now synchronous, same-isolation) call
+      closure->setBody(BraceStmt::createImplicit(ctx, {ASTNode(apply)}));
+      closure->setType(closureTy);
+      cs.cacheType(closure);
+
+      Expr *closureExpr = closure;
+      if (!captures.empty()) {
+        auto *captureList = CaptureListExpr::create(ctx, captures, closure);
+        captureList->setImplicit();
+        captureList->setType(closureTy);
+        cs.cacheType(captureList);
+        closureExpr = captureList;
+      }
+
+      // The closure parameter of '_enqueueOnewayIsolatedAny' is
+      // '@isolated(any)', erase the closure's global actor to it
+      if (!bodyParamTy->isEqual(closureTy)) {
+        closureExpr = new (ctx) FunctionConversionExpr(closureExpr,
+                                                       bodyParamTy);
+        closureExpr->setImplicit();
+        cs.cacheType(closureExpr);
+      }
+      enqueueArgs.push_back(Argument::unlabeled(closureExpr));
+
+      auto *enqueueRef = new (ctx) DeclRefExpr(
+          ConcreteDeclRef(enqueueFunc, enqueueSubs), DeclNameLoc(),
+          /*Implicit=*/true, AccessSemantics::Ordinary, enqueueFnType);
+      cs.cacheType(enqueueRef);
+
+      auto *enqueueCall = CallExpr::createImplicit(
+          ctx, enqueueRef, ArgumentList::createImplicit(ctx, enqueueArgs));
+      enqueueCall->setType(ctx.TheEmptyTupleType);
+      cs.cacheType(enqueueCall);
+      return enqueueCall;
     }
 
     Expr *visitAnyTryExpr(AnyTryExpr *expr) {

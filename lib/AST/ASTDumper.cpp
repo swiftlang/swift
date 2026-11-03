@@ -3864,6 +3864,11 @@ public:
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }
+  void visitSendExpr(SendExpr *E, Label label) {
+    printCommon(E, "send_expr", label);
+    printRec(E->getSubExpr(), Label::optional("sub_expr"));
+    printFoot();
+  }
   void visitBorrowExpr(BorrowExpr *E, Label label) {
     printCommon(E, "borrow_expr", label);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));

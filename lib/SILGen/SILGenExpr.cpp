@@ -27,8 +27,11 @@
 #include "StorageRefResult.h"
 #include "SwitchEnumBuilder.h"
 #include "Varargs.h"
+#include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ActorIsolation.h"
+#include "swift/AST/Builtins.h"
 #include "swift/AST/CanTypeVisitor.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -670,6 +673,7 @@ namespace {
         LinearToDifferentiableFunctionExpr *E, SGFContext C);
     RValue visitConsumeExpr(ConsumeExpr *E, SGFContext C);
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
+    RValue visitSendExpr(SendExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
     RValue visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E, SGFContext C);
     RValue visitTypeValueExpr(TypeValueExpr *E, SGFContext C);
@@ -7488,9 +7492,15 @@ RValue RValueEmitter::visitTapExpr(TapExpr *E, SGFContext C) {
 
 RValue RValueEmitter::visitDefaultArgumentExpr(DefaultArgumentExpr *E,
                                                SGFContext C) {
-  // We should only be emitting this as an rvalue for caller-side default
-  // arguments such as magic literals. Other default arguments get handled
-  // specially.
+  // Default arguments in an argument list are handled specially. Only
+  // caller-side default arguments such as magic literals, and the default
+  // arguments which a 'send' call of a synchronous function evaluates at
+  // the call site (see 'lowerSynchronousSend' in CSApply), are emitted as an
+  // rvalue
+  if (!E->isCallerSide())
+    return SGF.emitApplyOfDefaultArgGenerator(
+        E, E->getDefaultArgsOwner(), E->getParamIndex(),
+        E->getType()->getCanonicalType(), E->isImplicitlyAsync(), C);
   return SGF.emitRValue(E->getCallerSideDefaultExpr());
 }
 
@@ -7503,6 +7513,220 @@ RValue RValueEmitter::visitErrorExpr(ErrorExpr *E, SGFContext C) {
   // Use report_fatal_error to ensure we trap in release builds instead of
   // miscompiling.
   llvm::report_fatal_error("Found an ErrorExpr but didn't emit an error?");
+}
+
+RValue RValueEmitter::visitSendExpr(SendExpr *E, SGFContext C) {
+  // 'send <call>' lowers to an unstructured, discarding task that runs the
+  // wrapped operation closure and returns control to the caller immediately
+  auto &ctx = SGF.getASTContext();
+  SILLocation loc = E;
+
+  // A 'send' call to a synchronous function has already been lowered by the
+  // type checker to a synchronous call of '_enqueueOneway' /
+  // '_enqueueOnewayIsolatedAny'. There is no operation closure here, just emit
+  // the call
+  if (!isAnyClosureExpr(E->getSubExpr())) {
+    SGF.emitIgnoredExpr(E->getSubExpr());
+    return SGF.emitEmptyTupleRValue(E, C);
+  }
+
+  auto executorOptTy =
+      SGF.getLoweredType(ctx.TheExecutorType.wrapInOptionalType());
+  auto rawPtrOptTy =
+      SGF.getLoweredType(ctx.TheRawPointerType.wrapInOptionalType());
+
+  CanType taskExecutorElemTy;
+  if (auto proto = ctx.getProtocol(KnownProtocolKind::TaskExecutor)) {
+    taskExecutorElemTy =
+        proto->getDeclaredExistentialType()->getCanonicalType();
+  } else {
+    taskExecutorElemTy = ctx.TheExecutorType;
+  }
+  auto taskExecutorConsumingOptTy =
+      SGF.getLoweredType(taskExecutorElemTy.wrapInOptionalType());
+
+  ManagedValue initialSerialExecutor =
+      SGF.B.createManagedOptionalNone(loc, executorOptTy);
+
+  // Build '.some(actorTy's serial executor)' as a '(Builtin.Executor)?' via
+  // the 'buildDefaultActorExecutorRef' builtin
+  auto buildSomeDefaultActorExecutor = [&](ManagedValue actorMV,
+                                           Type actorTy) -> SILValue {
+    auto builtinID = ctx.getIdentifier(
+        getBuiltinName(BuiltinValueKind::BuildDefaultActorExecutorRef));
+    auto *builtinFn = getBuiltinValueDecl(ctx, builtinID);
+    auto subs = SubstitutionMap::get(
+        cast<FuncDecl>(builtinFn)->getGenericSignature(),
+        ArrayRef<Type>{actorTy}, LookUpConformanceInModule());
+    SILValue actorBorrowed = actorMV.borrow(SGF, loc).getValue();
+    SILValue exec = SGF.B.createBuiltin(
+        loc, builtinID, SILType::getPrimitiveObjectType(ctx.TheExecutorType),
+        subs, {actorBorrowed});
+    return SGF.B.createEnum(loc, exec, ctx.getOptionalSomeDecl(), executorOptTy);
+  };
+
+  // Set 'actorTy's serial executor as the task's initial serial executor.
+  // Only default actors are handled this way; custom executors fall back to
+  // no initial executor (no FIFO, still correct via the operation closure's
+  // own 'await'). Returns whether an executor was derived
+  auto deriveDefaultActorExecutor = [&](ManagedValue actorMV,
+                                        Type actorTy) -> bool {
+    auto *cd = actorTy ? actorTy->getClassDecl() : nullptr;
+    if (!cd || !cd->isDefaultActor(SGF.SGM.SwiftModule,
+                                   SGF.F.getResilienceExpansion()))
+      return false;
+    SILValue someExec = buildSomeDefaultActorExecutor(actorMV, actorTy);
+    initialSerialExecutor =
+        ManagedValue::forObjectRValueWithoutOwnership(someExec);
+    return true;
+  };
+
+  // FIFO: when we can statically tell the target's serial executor, pass it
+  // as the task's initial serial executor above, so that successive 'send'
+  // calls enqueue on it in program order. Dig the underlying call out of the
+  // operation closure '{ try await <call> }' to find the target
+  auto deriveInitialSerialExecutor = [&](AbstractClosureExpr *operation) {
+    auto *closure = dyn_cast<ClosureExpr>(operation);
+    if (!closure)
+      return;
+    if (Expr *body = closure->getSingleExpressionBody()) {
+      if (auto *anyTry = dyn_cast<AnyTryExpr>(body))
+        body = anyTry->getSubExpr();
+      if (auto *call = dyn_cast<ApplyExpr>(body->getSemanticsProvidingExpr())) {
+        bool done = false;
+
+        // The outer call's getCalledValue() is null for a method call; get
+        // the method from the inner 'self'-apply (the dot-syntax call)
+        ValueDecl *calleeVD =
+            call->getCalledValue(/*skipFunctionConversions=*/true);
+        if (!calleeVD) {
+          if (auto *selfApply = dyn_cast<SelfApplyExpr>(call->getFn()))
+            calleeVD =
+                selfApply->getCalledValue(/*skipFunctionConversions=*/true);
+        }
+        auto *calleeFn = dyn_cast_or_null<AbstractFunctionDecl>(calleeVD);
+        std::optional<ActorIsolation> calleeIsolation;
+        if (calleeFn)
+          calleeIsolation = swift::getActorIsolation(calleeFn);
+
+        // (1) actor-instance target: the callee is isolated to its 'self',
+        // and the call's 'self' base is an actor instance referenced without
+        // side effects, usually the capture variable the receiver was
+        // evaluated into at the call site. A 'nonisolated' method of an
+        // actor does not run on the actor, so it has no initial serial
+        // executor. Neither does a distributed actor, which may be remote,
+        // the task hops to it when it starts
+        bool isIsolatedToSelf = calleeIsolation &&
+                                calleeIsolation->isActorInstanceIsolated() &&
+                                calleeIsolation->isActorInstanceForSelfParameter();
+        auto *selfApply = dyn_cast<SelfApplyExpr>(call->getFn());
+        if (selfApply && isIsolatedToSelf) {
+          Expr *selfExpr = selfApply->getBase();
+          Expr *selfSemantic =
+              selfExpr ? selfExpr->getSemanticsProvidingExpr() : nullptr;
+          if (selfSemantic && isa<DeclRefExpr>(selfSemantic)) {
+            Type selfTy = selfExpr->getType();
+            if (auto *nominal = selfTy ? selfTy->getAnyNominal() : nullptr) {
+              if (nominal->isActor() && !nominal->isDistributedActor()) {
+                ManagedValue actorMV = SGF.emitRValueAsSingleValue(selfExpr);
+                done = deriveDefaultActorExecutor(actorMV, selfTy);
+              }
+            }
+          }
+        }
+
+        // (2) global-actor target: the callee is isolated to a global actor;
+        // enqueue on that global actor's shared instance's executor
+        if (!done) {
+          if (calleeIsolation) {
+            auto isolation = *calleeIsolation;
+            if (isolation.isMainActor()) {
+              // The main actor is a singleton with a dedicated builtin (it
+              // does not go through the default-actor executor scheme)
+              auto builtinID = ctx.getIdentifier(
+                  getBuiltinName(BuiltinValueKind::BuildMainActorExecutorRef));
+              SILValue exec = SGF.B.createBuiltin(
+                  loc, builtinID,
+                  SILType::getPrimitiveObjectType(ctx.TheExecutorType),
+                  SubstitutionMap(), {});
+              SILValue someExec = SGF.B.createEnum(
+                  loc, exec, ctx.getOptionalSomeDecl(), executorOptTy);
+              initialSerialExecutor =
+                  ManagedValue::forObjectRValueWithoutOwnership(someExec);
+            } else if (isolation.isGlobalActor()) {
+              Type gaTy =
+                  SGF.F.mapTypeIntoEnvironment(isolation.getGlobalActor());
+              auto shared = SGF.emitLoadOfGlobalActorShared(
+                  loc, gaTy->getCanonicalType());
+              deriveDefaultActorExecutor(shared.first, shared.second);
+            }
+          }
+        }
+      }
+    }
+  };
+
+  // The operation closure: '{ try await <call> }', of type
+  // '() async throws -> Void' (thick). Usually its capture list evaluates the
+  // receiver and the arguments of the call at the call site; derive the
+  // executor from the evaluated receiver, before the closure consumes its
+  // 'sending' captures
+  ManagedValue operationVal;
+  if (auto *captureList = dyn_cast<CaptureListExpr>(E->getSubExpr())) {
+    operationVal = emitCaptureListExpr(
+        SGF, captureList, [&](AbstractClosureExpr *operation) {
+          deriveInitialSerialExecutor(operation);
+          return visitAbstractClosureExpr(operation, SGFContext())
+              .getScalarValue();
+        });
+  } else {
+    auto *operation = cast<AbstractClosureExpr>(E->getSubExpr());
+    operationVal = SGF.emitRValueAsSingleValue(operation);
+    deriveInitialSerialExecutor(operation);
+  }
+
+  // Task creation flags:
+  // - copy task-locals
+  // - result discarding, we always ignore the result of the call
+  //
+  // We do NOT inherit the caller's actor context, but the task is NOT detached,
+  // so vouchers should propagate still. We may add @oneway(detached) to influence
+  // this in the future.
+  TaskCreateFlags taskFlags;
+  taskFlags.setCopyTaskLocals(true);
+  taskFlags.setEnqueueJob(true);
+  taskFlags.setIsDiscardingTask(true);
+  if (operationVal.getType().castTo<SILFunctionType>()->isCalleeConsumed())
+    taskFlags.setIsTaskFunctionConsumed(true);
+  SILValue flags = SGF.emitWrapIntegerLiteral(
+      loc, SGF.getLoweredType(ctx.getIntType()), taskFlags.getOpaqueValue());
+
+  ManagedValue taskGroup = SGF.B.createManagedOptionalNone(loc, rawPtrOptTy);
+  ManagedValue initialTaskExecutor =
+      SGF.B.createManagedOptionalNone(loc, executorOptTy);
+  ManagedValue initialTaskExecutorConsuming =
+      SGF.B.createManagedOptionalNone(loc, taskExecutorConsumingOptTy);
+  ManagedValue taskName = SGF.B.createManagedOptionalNone(loc, rawPtrOptTy);
+
+  SILValue builtinArgs[] = {
+      flags,
+      initialSerialExecutor.forward(SGF),
+      taskGroup.forward(SGF),
+      initialTaskExecutor.forward(SGF),
+      initialTaskExecutorConsuming.forward(SGF),
+      taskName.forward(SGF),
+      operationVal.forward(SGF),
+  };
+
+  auto resultTy = SGF.getLoweredType(getAsyncTaskAndContextType(ctx));
+  SILValue result = SGF.B.createBuiltin(loc, BuiltinNames::CreateAsyncTask,
+                                        resultTy, SubstitutionMap(),
+                                        builtinArgs);
+
+  // Fire-and-forget: drop our reference to the unstructured task
+  SGF.emitManagedRValueWithCleanup(result);
+
+  return SGF.emitEmptyTupleRValue(E, C);
 }
 
 RValue RValueEmitter::visitConsumeExpr(ConsumeExpr *E, SGFContext C) {
