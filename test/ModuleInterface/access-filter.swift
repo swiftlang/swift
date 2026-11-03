@@ -114,6 +114,41 @@ extension PublicStruct {
   // CHECK-NEXT: get
   // CHECK-NEXT: }
   public private(set) static var secretlySettable: Int = 0
+
+  // CHECK: @usableFromInline
+  // CHECK-NEXT: internal static var ufiStorage: Swift::Int
+  @usableFromInline internal static var ufiStorage: Int = 0
+
+  // A setter that is printed because it is ABI-public must keep its
+  // 'internal(set)'. https://github.com/swiftlang/swift/issues/93893
+
+  // CHECK: @inlinable public internal(set) static var inlinableInternalSet: Swift::Int {
+  // CHECK-NEXT: get { ufiStorage }
+  // CHECK-NEXT: set { ufiStorage = newValue }
+  // CHECK-NEXT: }
+  @inlinable public internal(set) static var inlinableInternalSet: Int {
+    get { ufiStorage }
+    set { ufiStorage = newValue }
+  }
+
+  // CHECK: public internal(set) static var inlinableSetter: Swift::Int {
+  // CHECK-NEXT: get{{$}}
+  // CHECK-NEXT: @inlinable set { ufiStorage = newValue }
+  // CHECK-NEXT: }
+  public internal(set) static var inlinableSetter: Int {
+    get { ufiStorage }
+    @inlinable set { ufiStorage = newValue }
+  }
+
+  // CHECK: public internal(set) static var ufiSetter: Swift::Int {
+  // CHECK-NEXT: get{{$}}
+  // CHECK-NEXT: @usableFromInline
+  // CHECK-NEXT: set{{$}}
+  // CHECK-NEXT: }
+  public internal(set) static var ufiSetter: Int {
+    get { ufiStorage }
+    @usableFromInline set { ufiStorage = newValue }
+  }
 } // CHECK: {{^[}]$}}
 
 extension InternalStruct_BAD: PublicProto {

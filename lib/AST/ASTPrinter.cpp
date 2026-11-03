@@ -1096,7 +1096,14 @@ class PrintAST : public ASTVisitor<PrintAST> {
     if (auto storageDecl = dyn_cast<AbstractStorageDecl>(D)) {
       if (auto setter = storageDecl->getAccessor(AccessorKind::Set)) {
         AccessLevel setterAccess = setter->getFormalAccess();
-        if (setterAccess != D->getFormalAccess() && !shouldSkipSetterAccess)
+        // Module interfaces usually convey a less accessible setter by omitting
+        // it. A setter that is still printed in the accessor list (e.g. because
+        // it is '@inlinable' or '@usableFromInline') must spell out its access
+        // level. Simply stored properties are always printed as '{ get }'.
+        bool setterIsPrinted = !storageDecl->getImplInfo().isSimpleStored() &&
+                               Options.shouldPrint(setter);
+        if (setterAccess != D->getFormalAccess() &&
+            (!shouldSkipSetterAccess || setterIsPrinted))
           printAccess(setterAccess, "(set)");
       }
     }
