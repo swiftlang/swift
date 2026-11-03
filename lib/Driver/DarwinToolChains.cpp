@@ -244,17 +244,21 @@ toolchains::Darwin::addLinkerInputArgs(InvocationInfo &II,
   }
 
 
-  if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
-    addInputsOfType(Arguments, context.Inputs, context.Args,
-                    file_types::TY_SwiftModuleFile, "-add_ast_path");
-  else
-    addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
-                           file_types::TY_SwiftModuleFile, "-add_ast_path");
+  // Under an explicit module build the frontend is passed -debug-module-path,
+  // which supersedes -add_ast_path for this module.
+  if (!context.Args.hasArg(options::OPT_driver_explicit_module_build)) {
+    if (context.OI.CompilerMode == OutputInfo::Mode::SingleCompile)
+      addInputsOfType(Arguments, context.Inputs, context.Args,
+                      file_types::TY_SwiftModuleFile, "-add_ast_path");
+    else
+      addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
+                             file_types::TY_SwiftModuleFile, "-add_ast_path");
 
-  // Add all .swiftmodule file inputs as arguments, preceded by the
-  // "-add_ast_path" linker option.
-  addInputsOfType(Arguments, context.InputActions,
-                  file_types::TY_SwiftModuleFile, "-add_ast_path");
+    // Add all .swiftmodule file inputs as arguments, preceded by the
+    // "-add_ast_path" linker option.
+    addInputsOfType(Arguments, context.InputActions,
+                    file_types::TY_SwiftModuleFile, "-add_ast_path");
+  }
 }
 
 void toolchains::Darwin::addLTOLibArgs(ArgStringList &Arguments,
