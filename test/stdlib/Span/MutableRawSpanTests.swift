@@ -538,9 +538,7 @@ suite.test("updateElements(from:copying:), bad index")
 
   var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
   var span = MutableRawSpan(elements: a.mutableSpan)
-  expectCrashLater(
-    withMessage: _isDebugAssertConfiguration() ? "Byte offset out of bounds" : ""
-  )
+  expectCrashLater(withDebugMessage: "Byte offset out of bounds")
   _ = span.updateElements(from: 5, copying: Span<UInt8>())
 }
 

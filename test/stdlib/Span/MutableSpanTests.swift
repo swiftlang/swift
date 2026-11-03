@@ -581,9 +581,7 @@ suite.test("updateElements(from:copying:), bad index")
 
   var a = ContiguousArray(repeating: 0, count: 4)
   var span = a.mutableSpan
-  expectCrashLater(
-    withMessage: _isDebugAssertConfiguration() ? "Index out of bounds" : ""
-  )
+  expectCrashLater(withDebugMessage: "Index out of bounds")
   _ = span.updateElements(from: 5, copying: Span())
 }
 
