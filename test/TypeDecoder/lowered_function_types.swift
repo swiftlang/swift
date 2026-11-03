@@ -27,6 +27,12 @@ do {
 // DEMANGLE: $sSpyyXlGyXls5NeverOIOoxyrzr_D
 // DEMANGLE: $syXlIeOxr_D
 // DEMANGLE: $syXlIeOoxr_D
+// DEMANGLE: $sSiIetMy_D
+// DEMANGLE: $sSiIetOy_D
+// DEMANGLE: $sSiIetKy_D
+// DEMANGLE: $sBpIetVy_D
+// DEMANGLE: $sSiIetCy_D
+// DEMANGLE: $sSiIetWy_D
 
 // CHECK: @callee_guaranteed (Int, @guaranteed Class, @owned Class, @in_guaranteed Any, @inout Int) -> (Int, @owned Class, @out Any)
 // CHECK: @callee_guaranteed () -> @error Error
@@ -35,3 +41,12 @@ do {
 // CHECK: @noescape @callable(once) @callee_owned (UnsafeMutablePointer<AnyObject>) -> (@out AnyObject, @error_indirect Never)
 // CHECK: {{^}}@once @callee_owned () -> @out AnyObject
 // CHECK: {{^}}@callable(once) @callee_owned () -> @out AnyObject
+// CHECK: {{^}}@convention(method) (Int) -> ()
+// CHECK: {{^}}@convention(objc_method) (Int) -> ()
+// CHECK: {{^}}@convention(closure) (Int) -> ()
+// CHECK: {{^}}@convention(com_method) (Builtin.RawPointer) -> ()
+// CHECK: {{^}}@convention(c) (Int) -> ()
+
+// The mangling of a witness_method function type doesn't record the
+// protocol conformance, so the type can't be reconstructed.
+// CHECK: Can't resolve type of $sSiIetWy_D

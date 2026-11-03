@@ -1272,16 +1272,17 @@ public:
     ExtendedFunctionTypeFlags extFuncFlags;
     switch (flags.getRepresentation()) {
     case Demangle::ImplFunctionRepresentation::Thick:
-    case Demangle::ImplFunctionRepresentation::Closure:
       funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Swift);
       break;
     case Demangle::ImplFunctionRepresentation::Thin:
     case Demangle::ImplFunctionRepresentation::Method:
     case Demangle::ImplFunctionRepresentation::ObjCMethod:
     case Demangle::ImplFunctionRepresentation::WitnessMethod:
+    case Demangle::ImplFunctionRepresentation::Closure:
       funcFlags = funcFlags.withConvention(FunctionMetadataConvention::Thin);
       break;
     case Demangle::ImplFunctionRepresentation::CFunctionPointer:
+    case Demangle::ImplFunctionRepresentation::COMMethod:
       funcFlags = funcFlags.withConvention(
           FunctionMetadataConvention::CFunctionPointer);
       break;
