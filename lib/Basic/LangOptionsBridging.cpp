@@ -14,6 +14,8 @@
 
 #include "swift/Basic/LangOptions.h"
 
+#include "llvm/ADT/StringSwitch.h"
+
 using namespace swift;
 
 bool BridgedLangOptions_hasFeature(BridgedLangOptions cLangOpts,
@@ -184,9 +186,21 @@ void BridgedLangOptions_enumerateBuildConfigurationEntries(
     callback(cLangOpts, callbackContext, BCKFeature, condition.drop_front());
   }
 
+  // An attribute gated behind a language feature is only available when that
+  // feature is enabled; using it otherwise is an error. Attributes that are not
+  // gated at all are always available.
+  auto requiredFeatureEnabled = [&langOpts](StringRef attrClass) {
+    auto feature = llvm::StringSwitch<std::optional<Feature>>(attrClass)
+#define DECL_ATTR_FEATURE_REQUIREMENT(CLASS, FEATURE_NAME)                     \
+  .Case(#CLASS, Feature::FEATURE_NAME)
+#include "swift/AST/DeclAttr.def"
+                       .Default(std::nullopt);
+    return !feature || langOpts.hasFeature(*feature);
+  };
+
   // Enumerate attributes that are available.
 #define DECL_ATTR(SPELLING, CLASS, REQUIREMENTS, BEHAVIORS, CODE)              \
-  if ((BEHAVIORS) == 0) \
+  if ((BEHAVIORS) == 0 && requiredFeatureEnabled(StringRef(#CLASS)))           \
     callback(cLangOpts, callbackContext, BCKAttribute, StringRef(#SPELLING));
 #include "swift/AST/DeclAttr.def"
 
