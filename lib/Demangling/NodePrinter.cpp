@@ -2333,6 +2333,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     }
     Printer << "autodiff subset parameters thunk for ";
+    if (Node->getNumChildren() < 5) {
+      setInvalid();
+      return nullptr;
+    }
     auto currentIndex = Node->getNumChildren() - 1;
     auto toParamIndices = Node->getChild(currentIndex--);
     auto resultIndices = Node->getChild(currentIndex--);
