@@ -40,7 +40,7 @@ class UnknownSDKError(Exception):
         self.sdk = sdk
 
         super(UnknownSDKError, self).__init__(
-            'Unknown SDK: {}'.format(self.sdk))
+            f'Unknown SDK: {self.sdk}')
 
 
 def migrate_swift_sdks(args):
@@ -71,7 +71,7 @@ def migrate_swift_sdks(args):
         targets = _flatten(map(_swift_sdk_to_stdlib_targets, sdk_list))
         target_names = [target.name for target in targets]
 
-        return '--stdlib-deployment-targets={}'.format(' '.join(target_names))
+        return f'--stdlib-deployment-targets={" ".join(target_names)}'
 
     return list(map(_migrate_swift_sdks_arg, args))
 
