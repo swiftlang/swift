@@ -24,6 +24,8 @@ struct X {
   var x16: Int
 }
 
+typealias Words8 = (UInt, UInt, UInt, UInt, UInt, UInt, UInt, UInt)
+
 
 // CHECK: sil @test1 : $@convention(thin) () -> () {
 // CHECK: bb0:
@@ -205,4 +207,38 @@ bb0(%0 : $Wide):
   }
   %t = tuple ()
   return %t : $()
+}
+
+// A large value stored into a slot that another variable describes keeps its
+// own debug_value.
+// CHECK-LABEL: sil @test_store_to_described_slot :
+// CHECK:         [[DS_TMP:%[0-9]+]] = alloc_stack $(UInt, UInt,
+// CHECK:         debug_value [[DS_TMP]], let, name "outer", argno 1, expr op_deref
+// CHECK-NEXT:    [[DS_SLOT:%[0-9]+]] = alloc_stack $(UInt, UInt,
+// CHECK-NEXT:    copy_addr [take] [[DS_TMP]] to [init] [[DS_SLOT]]
+// CHECK-NEXT:    debug_value [[DS_SLOT]], var, name "inner", expr op_deref
+// CHECK-LABEL: } // end sil function 'test_store_to_described_slot'
+sil @test_store_to_described_slot : $@convention(thin) (UInt, UInt, UInt, UInt, UInt, UInt, UInt, UInt) -> () {
+bb0(%0 : $UInt, %1 : $UInt, %2 : $UInt, %3 : $UInt, %4 : $UInt, %5 : $UInt, %6 : $UInt, %7 : $UInt):
+  %8 = tuple (%0, %1, %2, %3, %4, %5, %6, %7)
+  debug_value %8, let, name "outer", argno 1
+  %10 = alloc_stack $Words8
+  store %8 to %10
+  debug_value %10, var, name "inner", expr op_deref
+  dealloc_stack %10
+  %t = tuple ()
+  return %t
+}
+
+// A value with more than 15 explosion elements keeps its debug_value.
+// CHECK-LABEL: sil @test_wide_explosion :
+// CHECK:         [[WE_ADDR:%[0-9]+]] = alloc_stack $X
+// CHECK:         debug_value [[WE_ADDR]], let, name "s", expr op_deref
+// CHECK-LABEL: } // end sil function 'test_wide_explosion'
+sil @test_wide_explosion : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = struct $X (%0, %0, %0, %0, %0, %0, %0, %0, %0, %0, %0, %0, %0, %0, %0, %0)
+  debug_value %1, let, name "s"
+  %t = tuple ()
+  return %t
 }

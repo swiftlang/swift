@@ -3917,7 +3917,6 @@ public:
    void visit(SILArgument *arg);
 
    bool isLargeLoadableType(SILType ty);
-   bool isPotentiallyCArray(SILType ty);
 
    void propagate(PostOrderFunctionInfo &po);
 
@@ -4112,29 +4111,6 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
   }
 }
 
-bool LargeLoadableHeuristic::isPotentiallyCArray(SILType ty) {
-  if (ty.isAddress() || ty.isClassOrClassMetatype()) {
-    return false;
-  }
-
-  auto canType = ty.getASTType();
-  if (canType->hasTypeParameter()) {
-    assert(genEnv && "Expected a GenericEnv");
-    canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
-  }
-
-  if (canType.getAnyGeneric() || isa<TupleType>(canType)) {
-    assert(ty.isObject() &&
-           "Expected only two categories: address and object");
-    assert(!canType->hasTypeParameter());
-    const TypeInfo &TI = irgenModule->getTypeInfoForLowered(canType);
-    auto explosionSchema = TI.getSchema();
-    if (explosionSchema.size() > 15)
-      return true;
-  }
-  return false;
-}
-
 // The old heuristic to determine whether we deem a type as large.
 bool LargeLoadableHeuristic::isLargeLoadableTypeOld(SILType ty) {
   if (ty.isAddress() || ty.isClassOrClassMetatype()) {
@@ -4245,10 +4221,6 @@ public:
 
   void markBlockArgumentForDeletion(SILBasicBlock *b, unsigned argIdx = 0) {
     toDeleteBlockArg.push_back(std::make_pair(b, argIdx));
-  }
-
-  bool isPotentiallyCArray(SILType ty) {
-    return heuristic.isPotentiallyCArray(ty);
   }
 
   bool isLargeLoadableType(SILType ty) {
@@ -4872,21 +4844,6 @@ protected:
     assignment.markForDeletion(store);
   }
 
-  bool overlapsWithOnStackDebugLoc(SILValue v) {
-    for (auto *use : v->getUses()) {
-      auto *store = dyn_cast<StoreInst>(use->getUser());
-      if (!store)
-        continue;
-
-      auto *stackLoc = dyn_cast<AllocStackInst>(store->getDest());
-      if (!stackLoc)
-        continue;
-      if (getAnyDebugUse(stackLoc))
-        return true;
-    }
-    return false;
-  }
-
   void visitDebugValueInst(DebugValueInst *dbg) {
     for (auto &operand : dbg->getAllOperands()) {
       SILValue operandVal = operand.get();
@@ -4901,12 +4858,6 @@ protected:
       // Rewriting them would also break nullary debug reconstruction blocks.
       if (isa<SILUndef>(operandVal))
         continue;
-      if (!operandVal->getType().isAddress() &&
-          (assignment.isPotentiallyCArray(operandVal->getType()) ||
-           overlapsWithOnStackDebugLoc(operandVal))) {
-        assignment.markForDeletion(dbg);
-        return;
-      }
       SILValue addr = assignment.getAddressForValue(operandVal);
       operand.set(addr);
       assignment.tryPrependDerefToDebugValue(dbg, operand.getOperandNumber());
