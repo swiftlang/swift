@@ -325,6 +325,10 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
       PrintResponse = false;
       break;
 
+    case OPT_allow_error_response:
+      AllowErrorResponse = true;
+      break;
+
     case OPT_INPUT:
       SourceFile = InputArg->getValue();
       SourceText = std::nullopt;
