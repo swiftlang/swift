@@ -20,8 +20,10 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Demangling/Demangle.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/RemoteInspection/MetadataSourceBuilder.h"
@@ -194,7 +196,8 @@ static bool nominalIsAlwaysAvailableForDemangling(const NominalTypeDecl *nom) {
 }
 
 std::optional<llvm::VersionTuple>
-getRuntimeVersionThatSupportsDemanglingType(CanType type) {
+getRuntimeVersionThatSupportsDemanglingType(CanType type,
+                                            CanGenericSignature genericSig) {
   enum VersionRequirement {
     None,
     Swift_5_2,
@@ -268,6 +271,37 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       // declarations that use them are already covered by availability
       // guards, so we don't need to limit availability of mangled names
       // involving them.
+    }
+
+    // Retroactive conformances are mangled after the generic arguments.
+    // Pack conformances need the Swift 6.0 runtime and conformances of
+    // opaque archetypes need the Swift 6.2 runtime to demangle them.
+    if (latestRequirement < Swift_6_2 &&
+        (t->hasPack() || t->hasOpaqueArchetype())) {
+      // Only opaque types and bound generic types have a list of
+      // conformances mangled after their generic arguments, where "HO" and
+      // "HX" can appear.
+      SubstitutionMap subs;
+      if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(t))
+        subs = opaque->getSubstitutions();
+      else if (t->isSpecialized())
+        subs = t->getContextSubstitutionMap();
+      if (llvm::any_of(subs.getConformances(),
+                       Mangle::ASTMangler::containsRetroactiveConformance)) {
+        // Check which of these the mangled name actually contains.
+        auto name = IRGenMangler(t->getASTContext())
+                        .mangleTypeWithoutPrefix(t, genericSig);
+        Demangle::Context ctx;
+        auto *root = ctx.demangleTypeAsNode(name);
+        ASSERT(root && "IRGen mangling should be demangleable");
+        auto contains = [&](Demangle::Node::Kind kind) {
+          return root->findByKind(kind, INT_MAX);
+        };
+        if (contains(Demangle::Node::Kind::DependentProtocolConformanceOpaque))
+          return addRequirement(Swift_6_2);
+        if (contains(Demangle::Node::Kind::PackProtocolConformance))
+          return addRequirement(Swift_6_0);
+      }
     }
 
     /// Any nominal type that has an inverse requirement in its generic
@@ -479,11 +513,12 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
 }
 
 bool swift::irgen::mangledNameIsUnknownToDeployTarget(IRGenModule &IGM,
-                                                      CanType type) {
+                                                      CanType type,
+                                                      CanGenericSignature sig) {
   if (auto runtimeCompatVersion = getSwiftRuntimeCompatibilityVersionForTarget(
           IGM.Context.LangOpts.Target)) {
     if (auto minimumSupportedRuntimeVersion =
-            getRuntimeVersionThatSupportsDemanglingType(type)) {
+            getRuntimeVersionThatSupportsDemanglingType(type, sig)) {
       if (*runtimeCompatVersion < *minimumSupportedRuntimeVersion) {
         return true;
       }
@@ -589,7 +624,7 @@ getTypeRefImpl(IRGenModule &IGM,
     // If the minimum deployment target's runtime demangler wouldn't understand
     // this mangled name, then fall back to generating a "mangled name" with a
     // symbolic reference with a callback function.
-    if (mangledNameIsUnknownToDeployTarget(IGM, type)) {
+    if (mangledNameIsUnknownToDeployTarget(IGM, type, sig)) {
       return getTypeRefByFunction(IGM, sig, type, role);
     }
 
