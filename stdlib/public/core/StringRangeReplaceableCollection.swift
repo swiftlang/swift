@@ -212,12 +212,12 @@ extension String: RangeReplaceableCollection {
   ///
   /// - Parameters:
   ///   - newElement: The new character to insert into the string.
-  ///   - i: A valid index of the string. If `i` is equal to the string's end
+  ///   - index: A valid index of the string. If `index` is equal to the string's end
   ///     index, this methods appends `newElement` to the string.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the string.
-  public mutating func insert(_ newElement: Character, at i: Index) {
-    let i = _guts.validateInclusiveScalarIndex(i)
+  public mutating func insert(_ newElement: Character, at index: Index) {
+    let i = _guts.validateInclusiveScalarIndex(index)
     let range = unsafe Range(_uncheckedBounds: (i, i))
     _guts.replaceSubrange(range, with: newElement._str)
   }
@@ -230,7 +230,7 @@ extension String: RangeReplaceableCollection {
   /// - Parameters:
   ///   - newElements: A collection of `Character` elements to insert into the
   ///     string.
-  ///   - i: A valid index of the string. If `i` is equal to the string's end
+  ///   - index: A valid index of the string. If `index` is equal to the string's end
   ///     index, this methods appends the contents of `newElements` to the
   ///     string.
   ///
@@ -240,9 +240,9 @@ extension String: RangeReplaceableCollection {
   @_specialize(where S == Substring)
   @_specialize(where S == Array<Character>)
   public mutating func insert<S: Collection>(
-    contentsOf newElements: S, at i: Index
+    contentsOf newElements: S, at index: Index
   ) where S.Element == Character {
-    let i = _guts.validateInclusiveScalarIndex(i)
+    let i = _guts.validateInclusiveScalarIndex(index)
     let range = unsafe Range(_uncheckedBounds: (i, i))
     _guts.replaceSubrange(range, with: newElements)
   }
@@ -262,12 +262,12 @@ extension String: RangeReplaceableCollection {
   /// Calling this method invalidates any existing indices for use with this
   /// string.
   ///
-  /// - Parameter i: The position of the character to remove. `i` must be a
+  /// - Parameter position: The position of the character to remove. `position` must be a
   ///   valid index of the string that is not equal to the string's end index.
   /// - Returns: The character that was removed.
   @discardableResult
-  public mutating func remove(at i: Index) -> Character {
-    let i = _guts.validateScalarIndex(i)
+  public mutating func remove(at position: Index) -> Character {
+    let i = _guts.validateScalarIndex(position)
     let stride = _characterStride(startingAt: i)
     let j = Index(_encodedOffset: i._encodedOffset &+ stride)._scalarAligned
 

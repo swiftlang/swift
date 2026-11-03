@@ -141,11 +141,11 @@ extension String.Index {
   ///
   /// - Parameters:
   ///   - offset: An offset in UTF-16 code units.
-  ///   - s: The string.
-  public init<S: StringProtocol>(utf16Offset offset: Int, in s: S) {
-    let (start, end) = (s.utf16.startIndex, s.utf16.endIndex)
+  ///   - string: The string.
+  public init<S: StringProtocol>(utf16Offset offset: Int, in string: S) {
+    let (start, end) = (string.utf16.startIndex, string.utf16.endIndex)
     guard offset >= 0,
-          let idx = s.utf16.index(start, offsetBy: offset, limitedBy: end)
+          let idx = string.utf16.index(start, offsetBy: offset, limitedBy: end)
     else {
       self = end.nextEncoded
       return
