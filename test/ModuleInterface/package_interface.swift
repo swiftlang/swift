@@ -151,6 +151,10 @@ public class PubKlass {
   package var pkgVarInPub: String
   public private(set) var pubVarPrivSetInPub: Int
   public package(set) var pubVarPkgSetInPub: Int
+  public package(set) var pubComputedPkgSetInPub: Int {
+    get { pubVarPkgSetInPub }
+    set { pubVarPkgSetInPub = newValue }
+  }
 
   public init() {
     pubVarInPub = ""
@@ -172,6 +176,16 @@ public class PubKlass {
 // CHECK:   public var pubVarPkgSetInPub: Swift::Int {
 // CHECK:     get
 // CHECK:   }
+// CHECK-PUB:        public var pubComputedPkgSetInPub: Swift::Int {
+// CHECK-PUB-NEXT:     get
+// CHECK-PUB-NEXT:   }
+// CHECK-PRIV-ONLY:  public var pubComputedPkgSetInPub: Swift::Int {
+// CHECK-PRIV-ONLY-NEXT: get
+// CHECK-PRIV-ONLY-NEXT: }
+// CHECK-PKG:        public package(set) var pubComputedPkgSetInPub: Swift::Int {
+// CHECK-PKG-NEXT:     get
+// CHECK-PKG-NEXT:     set
+// CHECK-PKG-NEXT:   }
 // CHECK:   public init()
 // CHECK-PKG:   package func pkgMethodInPub()
 // CHECK:   deinit
