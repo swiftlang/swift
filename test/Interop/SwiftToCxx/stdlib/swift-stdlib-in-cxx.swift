@@ -103,16 +103,14 @@
 
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
-// CHECK-NEXT: // Allow user to find the header using additional include paths
 // CHECK-NEXT: #if __has_include(<swiftToCxx/_SwiftStdlibCxxOverlay.h>)
 // CHECK-NEXT: #include <swiftToCxx/_SwiftStdlibCxxOverlay.h>
-// CHECK-NEXT: // Look for the C++ interop support header relative to clang's resource dir:
-// CHECK-NEXT: // '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
 // CHECK-NEXT: #elif __has_include(<../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
 // CHECK-NEXT: #include <../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>
 // CHECK-NEXT: #elif __has_include(<../../../../../lib/swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
-// CHECK-NEXT: // '<toolchain>/usr/local/lib/clang/<version>/include/../../../../../lib/swift/swiftToCxx'.
 // CHECK-NEXT: #include <../../../../../lib/swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>
+// CHECK-NEXT: #else
+// CHECK-NEXT: #error "Swift C++ interoperability headers are not available"
 // CHECK-NEXT: #endif
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: private:
@@ -137,17 +135,15 @@
 
 // CHECK: #pragma clang diagnostic push
 // CHECK: #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
-// CHECK-NEXT: // Allow user to find the header using additional include paths
 // CHECK-NEXT: #if __has_include(<swiftToCxx/_SwiftStdlibCxxOverlay.h>)
 // CHECK-NEXT: #include <swiftToCxx/_SwiftStdlibCxxOverlay.h>
-// CHECK-NEXT: // Look for the C++ interop support header relative to clang's resource dir:
-// CHECK-NEXT: // '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
 // CHECK-NEXT: #elif __has_include(<../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
 // CHECK-NEXT: #include <../../../swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>
 // CHECK-NEXT: #elif __has_include(<../../../../../lib/swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>)
-// CHECK-NEXT: // '<toolchain>/usr/local/lib/clang/<version>/include/../../../../../lib/swift/swiftToCxx'.
 // CHECK-NEXT: #include <../../../../../lib/swift/swiftToCxx/_SwiftStdlibCxxOverlay.h>
+// CHECK-NEXT: #else
+// CHECK-NEXT: #error "Swift C++ interoperability headers are not available"
 // CHECK-NEXT: #endif
-// CHECK-NEXTZ: #pragma clang diagnostic pop
+// CHECK-NEXT: #pragma clang diagnostic pop
 
 // CHECK: } // namespace swift

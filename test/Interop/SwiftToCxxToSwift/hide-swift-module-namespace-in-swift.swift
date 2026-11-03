@@ -4,6 +4,8 @@
 // RUN: %target-swift-frontend %t/swiftMod.swift -module-name SwiftMod -typecheck -verify -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
 
 // RUN: %FileCheck %s < %t/swiftMod.h
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/SharedSwiftStdlib.h
+// RUN: %FileCheck %s --check-prefix=SHARED < %t/SharedSwiftStdlib.h
 
 // RUN: %target-swift-frontend %t/swiftMod.swift -module-name SwiftMod -typecheck -verify -emit-clang-header-path %t/swiftMod2.h -I %t -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR
 
@@ -32,7 +34,8 @@ public func testFunction() -> String {
     return ""
 }
 
-// CHECK: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
+// SHARED: namespace swift SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("swift") {
+// CHECK: #include <swift/Swift.h>
 // CHECK: namespace SwiftMod SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("SwiftMod") {
 // CHECK-NOT: namespace swift {
 

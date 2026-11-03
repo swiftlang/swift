@@ -24,6 +24,7 @@
 #include "clang/Basic/AddressSpaces.h"
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallVector.h"
 
 using namespace swift;
@@ -200,6 +201,7 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
   // - Generic requirement parameters
   // - Metadata source parameter
   bool embedded = astContext.LangOpts.hasFeature(Feature::Embedded);
+  bool guardAvailability = !embedded && astContext.LangOpts.Target.isOSDarwin();
 
   // Some of these types were introduced after the oldest runtime that the
   // deployment target supports. Referencing their type metadata from the
@@ -211,8 +213,11 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
       return false;
     if (embedded)
       return true;
+    auto availableRange = AvailabilityInference::availableRange(nominal);
+    if (guardAvailability)
+      return !availableRange.isKnownUnreachable();
     return AvailabilityRange::forDeploymentTarget(astContext)
-        .isContainedIn(AvailabilityInference::availableRange(nominal));
+        .isContainedIn(availableRange);
   };
   auto addIfAvailable = [&](Type type) {
     if (type && isAvailableAtDeploymentTarget(type))
@@ -230,6 +235,29 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
     addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "Float16"));
 
   for (Type type : supportedPrimitiveTypes) {
+    // A separately installed stdlib header serves every deployment target for
+    // this platform. Select newer primitive metadata at C++ compile time rather
+    // than baking in the deployment target used to build the toolchain.
+    auto availableRange =
+        AvailabilityInference::availableRange(type->getNominalDecl());
+    bool emitAvailabilityGuard =
+        guardAvailability && availableRange.hasMinimumVersion();
+    if (emitAvailabilityGuard) {
+      auto version = availableRange.getRawMinimumVersion();
+      unsigned major = version.getMajor();
+      unsigned minor = version.getMinor().value_or(0);
+      unsigned patch = version.getSubminor().value_or(0);
+      unsigned encodedVersion = major * 10000 + minor * 100 + patch;
+      // Clang uses the older four-digit encoding before macOS 10.10.
+      if (astContext.LangOpts.Target.isMacOSX() && major == 10 && minor < 10)
+        encodedVersion = major * 100 + minor * 10 + patch;
+      os << "#if __ENVIRONMENT_OS_VERSION_MIN_REQUIRED__ >= " << encodedVersion
+         << "\n";
+    }
+    auto endAvailabilityGuard = llvm::make_scope_exit([&] {
+      if (emitAvailabilityGuard)
+        os << "#endif\n";
+    });
     auto typeInfo = *typeMapping.getKnownCxxTypeInfo(
         type->getNominalDecl());
 
@@ -288,10 +316,11 @@ void swift::printSwiftToClangCoreScaffold(SwiftToClangInteropContext &ctx,
             });
         os << "\n";
         // C++ only supports inline variables from C++17.
-        ClangSyntaxPrinter(astContext, os).printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
-          printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
-                                          /*isCForwardDefinition=*/false);
-        });
+        ClangSyntaxPrinter(astContext, os)
+            .printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
+              printPrimitiveGenericTypeTraits(os, astContext, typeMapping,
+                                              /*isCForwardDefinition=*/false);
+            });
       },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate);
 }
