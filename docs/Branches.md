@@ -35,7 +35,7 @@ Note that these branches come not from the "development" branches (above), but t
 
 The LLVM Project's `next` branch includes all changes necessary to support Swift. Changes from llvm.org's main branch are merged in by a gated automerger. Why isn't Swift's `main` paired with this branch? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
 
-If you are making changes to LLVM to support Swift, you'll probably need to work on them in the `stable/*` branch paired with Swift's `main` to test them against Swift itself. Changes made to a stabilization branch are cherry-picked to `next`, and to the current release branch (`swift/release/x.y`) if needed.
+If you are making changes to LLVM to support Swift, you'll probably need to work on them in the `stable/*` branch paired with Swift's `main`, to test them against Swift itself. Changes made to a stabilization branch are cherry-picked to `next`, and to the current release branch (`swift/release/x.y`) if needed.
 
 (If you're making changes to the LLVM Project that *aren't* about Swift, they should generally be made on llvm.org instead, then cherry-picked to the active `stable/*` or release branch.)
 
