@@ -2593,6 +2593,16 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
     return false;
   }
 
+  // Don't print a synthesized, back-deployed member at all. They will be
+  // synthesized by the client.
+  if (Options.IsForSwiftInterface && D->isImplicit() &&
+      !Options.excludeAttrKind(DeclAttrKind::BackDeployed)) {
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      if (VD->isSynthesized() && VD->getDeclContext()->isTypeContext() &&
+          VD->isBackDeployed())
+        return false;
+  }
+
   // Optionally skip these checks for extensions synthesized for '@_nonSendable'
   if (!Options.AlwaysPrintNonSendableExtensions || !isNonSendableExtension(D)) {
     if (Options.SkipImplicit && D->isImplicit()) {
