@@ -3002,18 +3002,30 @@ public:
     // of their un-sent captures.
     SmallVector<Operand *, 2> nonescapingCalledAtMostOnceArguments;
     SmallVector<Operand *, 8> sendingIndirectResults;
+    Operand *calleeClosure = nullptr;
 
     // NOTE: We want to process indirect parameters as if they are
     // parameters... so we process them in nonSendingParameters.
     for (auto &op : fas->getAllOperands()) {
-      // If op is the callee operand or type dependent operand, skip it.
+      // If op is a type dependent operand, skip it.
       if (op.isTypeDependent())
         continue;
 
       if (fas.isCalleeOperand(op)) {
+        // A closure may capture non-Sendable state that the call could connect
+        // with its arguments and results. As such, we need to conservatively
+        // merge it with the other operands below.
+        if (op.get()->getType().isFunctionTypeWithContext()) {
+          calleeClosure = &op;
+          continue;
+        }
+
+        // Non-closure callees capture nothing, and so we just require them.
         if (auto calleeResult = tryToTrackValue(op.get())) {
           builder.addRequire(*calleeResult);
+          continue;
         }
+
         continue;
       }
 
@@ -3048,6 +3060,12 @@ public:
         builder.addSend(lookupResult->value, &op);
       }
     }
+
+    // Add the callee last so that we merge into the region of the first
+    // argument. This matters when that argument is a 'sending' indirect
+    // result since we diagnose merges of non-disconnected regions into it.
+    if (calleeClosure)
+      nonSendingParameters.push_back(calleeClosure);
 
     SWIFT_DEFER {
       for (auto &op : fas->getAllOperands()) {

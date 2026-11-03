@@ -1544,11 +1544,13 @@ func closure_carrier_bystander_reversed(_ b: NS) async {
   // expected-note @-1 {{sending 'a' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
+// Calling 'f' merges its argument 'a' into the region of its capture 'b'.
 func closure_call_merge(_ b: NS) async {
   let a = NS()
-  let f = { (n: NS) in mergeFn(n, b) }
-  f(a)
-  await transferToMain(a)
+  let f = { (n: NS) in mergeFn(n, b) } // expected-note {{'f' is connected to 'b' which is accessible to code in the current isolation context}}
+  f(a) // expected-note {{'a' is connected to 'f'}}
+  await transferToMain(a) // expected-warning {{sending 'a' risks causing data races}}
+  // expected-note @-1 {{sending 'a' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func send_closure_capturing_isolated(_ b: NS) async {
