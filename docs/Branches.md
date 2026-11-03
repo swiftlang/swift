@@ -8,7 +8,7 @@
 
 `main` is the place for active development on Swift. If you're just working on Swift, that's where you'll spend most of your time.
 
-In the LLVM Project repo, Swift's `main` branch is paired with a periodic stabilization branch named `stable/*`. The paired branch changes over time, so check the `main` scheme in [`update-checkout-config.json`](https://github.com/swiftlang/swift/blob/main/utils/update_checkout/update-checkout-config.json) for the current one. If you want to do Swift-related development on LLVM projects, see "The Upstream Branches" below and LLVM Project's [branching scheme](https://github.com/swiftlang/llvm-project/blob/next/apple-docs/AppleBranchingScheme.md) document.
+In the LLVM Project repo, Swift's `main` branch is paired with a periodic stabilization branch named `stable/*`. The paired branch changes over time, so check the `main` scheme in [`update-checkout-config.json`](https://github.com/swiftlang/swift/blob/main/utils/update_checkout/update-checkout-config.json) for the current one. If you want to do Swift-related development on LLVM projects, see "The Upstream Branches" below and the LLVM Project's [branching scheme](https://github.com/swiftlang/llvm-project/blob/next/apple-docs/AppleBranchingScheme.md) document.
 
 To switch from one set of branches to another, you can use `utils/update-checkout` in the Swift repository with the `--scheme` option. You can use the Swift branch name or any of its aliases as the argument to `--scheme`: in this case, `main`.
 
@@ -33,11 +33,11 @@ Note that these branches come not from the "development" branches (above), but t
 | ----------- | -----------------
 | next        | next
 
-LLVM Project's `next` branch includes all changes necessary to support Swift. Changes from llvm.org's main branch are merged in by a gated automerger. Why isn't Swift's `main` paired with this branch? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
+The LLVM Project's `next` branch includes all changes necessary to support Swift. Changes from llvm.org's main branch are merged in by a gated automerger. Why isn't Swift's `main` paired with this branch? Well, because LLVM changes *very* rapidly, and that wouldn't be very stable. However, we do want to make sure the Swift stuff keeps working.
 
 If you are making changes to LLVM to support Swift, you'll probably need to work on them in the `stable/*` branch paired with Swift's `main` to test them against Swift itself. Changes made to a stabilization branch are cherry-picked to `next`, and to the current release branch (`swift/release/x.y`) if needed.
 
-(If you're making changes to LLVM Project that *aren't* about Swift, they should generally be made on llvm.org instead, then cherry-picked to the active `stable/*` or release branch.)
+(If you're making changes to the LLVM Project that *aren't* about Swift, they should generally be made on llvm.org instead, then cherry-picked to the active `stable/*` or release branch.)
 
 `next` is an effort to keep Swift building with the latest LLVM changes. Ideally when LLVM changes, no Swift updates are needed, but that isn't always the case. In these situations, any adjustments can go into Swift's `next` branch. Changes from Swift's `main` are automatically merged into `next` as well.
 
