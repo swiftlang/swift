@@ -9655,6 +9655,9 @@ importer::classifyCxxReferenceParameter(clang::QualType type) {
   if (!pointeeType)
     return std::nullopt;
 
+  if ((*pointeeType)->isFunctionType())
+    return std::nullopt;
+
   auto kind = CxxReferenceParameterKind::Borrowed;
   if (!pointeeType->isConstQualified())
     kind = type->isRValueReferenceType()
