@@ -162,3 +162,7 @@ void _swift_tls_set(__swift_tls_key_t key, void *value) {
 __swift_ptrdiff_t _swift_thread_isMain(void) {
   return pthread_main_np() != 0;
 }
+
+__swift_ptrdiff_t _swift_thread_isMultithreaded(void) {
+  return 1;
+}

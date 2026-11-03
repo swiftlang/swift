@@ -619,6 +619,17 @@ void _swift_tls_set(__swift_tls_key_t key,
 __swift_ptrdiff_t _swift_thread_isMain(void);
 
 /**
+ * Whether or not Swift supports concurrency.
+ * 
+ * Returns nonzero when the platform supports multithreaded (concurrent)
+ * execution and Swift has been configured to use it.
+ * 
+ * In particular, if you link to the single-threaded concurrency implementation
+ * provided with the Swift toolchain, this function returns zero.
+ */
+__swift_ptrdiff_t _swift_thread_isMultithreaded(void);
+
+/**
  * Exit the program.
  *
  * - Parameters:

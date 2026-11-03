@@ -163,3 +163,8 @@ public func _swift_tls_set(_ key: Int, _ value: UnsafeMutableRawPointer?) {
 public func _swift_thread_isMain() -> Int {
   1
 }
+
+@implementation @c
+public func _swift_thread_isMultithreaded() -> Int {
+  0
+}
