@@ -381,7 +381,7 @@ protocol P2 {}
 
 class MismatchOptional : MismatchOptionalBase {
   override func param(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{29-29=?}}
-  override func paramIUO(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{32-32=?}}
+  override func paramIUO(_: Int) {} // expected-error {{cannot override instance method parameter of type 'Int?' with non-optional type 'Int'}} {{32-32=?}} {{32-32=!}}
   override func result() -> Int? { return nil } // expected-error {{cannot override instance method result type 'Int' with optional type 'Int?'}} {{32-33=}}
 
   override func fixSeveralTypes(a: Int, b: Int) -> Int! { return nil }
