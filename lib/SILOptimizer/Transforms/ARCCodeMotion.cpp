@@ -595,7 +595,7 @@ void RetainCodeMotionContext::convergeCodeMotionDataFlow() {
 
 void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
 #ifndef NDEBUG
-  printCtx.emplace(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true);
+  printCtx.emplace(llvm::dbgs(), SILPrintContext::Flag::SortedSIL);
 #endif
   // The BBSetOuts have converged, run last iteration and figure out
   // insertion point for each refcounted root.
@@ -1022,7 +1022,7 @@ void ReleaseCodeMotionContext::convergeCodeMotionDataFlow() {
 
 void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
 #ifndef NDEBUG
-  printCtx.emplace(llvm::dbgs(), /*Verbose=*/false, /*Sorted=*/true);
+  printCtx.emplace(llvm::dbgs(), SILPrintContext::Flag::SortedSIL);
 #endif
 
   // The BBSetIns have converged, run last iteration and figure out insertion
