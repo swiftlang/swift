@@ -669,8 +669,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // Get underlying params for both callee and caller, if declared.
       auto *calleeParam = getParameterAt(callee, argIndex);
       auto *callerParam = dyn_cast_or_null<ParamDecl>(
-          arg->getReferencedDecl(/*stopAtParenExpr=*/true).getDecl()
-      );
+          arg->getReferencedDecl(
+                 Expr::ReferencedDeclLookThrough::AllExceptParens)
+              .getDecl());
 
       // (Otherwise, we don't need to do anything.)
       if (!calleeParam || !callerParam)
@@ -6812,7 +6813,10 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
     DiagnoseWalker(const DeclContext *dc) : dc(dc) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto declRef = E->getReferencedDecl()) {
+      // Expressions that forward the reference of a sub-expression are skipped
+      // since the walker visits that sub-expression separately.
+      if (auto declRef =
+              E->getReferencedDecl(Expr::ReferencedDeclLookThrough::None)) {
         bool downgradeToWarning = false;
         auto *decl = declRef.getDecl();
 
@@ -6999,7 +7003,10 @@ static void diagnoseImplicitForceUnwrap(const Expr *E, const DeclContext *DC) {
             force->isForceOfImplicitlyUnwrappedOptional())
           diagnoseForce(force);
       } else if (auto *keyPath = dyn_cast<KeyPathExpr>(E)) {
-        diagnoseKeyPath(keyPath);
+        // A force in an implicit key path, such as the argument of a
+        // `subscript(dynamicMember:)` reference, can't be written explicitly.
+        if (!keyPath->isImplicit())
+          diagnoseKeyPath(keyPath);
       }
 
       return Action::Continue(E);
