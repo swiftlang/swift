@@ -29,7 +29,7 @@ compatibility should be opt-in and site-specific.  If Swift would
 benefit from internally using a better convention than C/Objective-C uses,
 and switching to that convention doesn't damage the dynamic abilities
 of our target platforms (debugging, dtrace, stack traces, unwinding,
-etc.), there should be nothing preventing us from doing so.  (If we
+and so on), there should be nothing preventing us from doing so.  (If we
 did want to guarantee compatibility on this level, this paper would be
 a lot shorter!)
 
@@ -40,10 +40,10 @@ components, each operating on a different abstraction level:
   vs. pass-by-value),
 
 * the ownership and validity conventions about argument and result
-  values ("+0" vs. "+1", etc.), and
+  values ("+0" vs. "+1", and so on), and
 
 * the "physical" representation conventions of how values are actually
-  communicated between functions (in registers, on the stack, etc.).
+  communicated between functions (in registers, on the stack, and so on).
 
 We'll tackle each of these in turn, then conclude with a detailed
 discussion of function signature lowering.
@@ -246,7 +246,7 @@ value from *somewhere*:
   global variable `x`, call an unknown function `bar()`, and then use
   `r` in some way.  If `bar()` can't possibly overwrite `x`, `foo()`
   doesn't have to do anything to keep `r` alive across the call;
-  otherwise it does (e.g. by retaining it in a refcounted
+  otherwise it does (for example, by retaining it in a refcounted
   environment).  This is a situation where humans are often much
   smarter than compilers.  Of course, it's also a situation where
   humans are sometimes insufficiently conservative.
@@ -297,7 +297,7 @@ considering here:
 
   This is optimal if the caller can acquire the value without
   responsibility and the callee doesn't require responsibility of it.
-  In very simple code --- e.g., loading values from an array and
+  In very simple code --- for example, loading values from an array and
   passing them to a comparator function which just reads a few fields
   from each and returns --- this can be extremely efficient.
 
@@ -696,7 +696,7 @@ anything else with the result is if it needs to spill the value before
 emitting the call.
 
 Therefore, in principle, it would be really nice if it were possible
-to tell these functions to return in a very specific way, e.g. to
+to tell these functions to return in a very specific way, for example to
 return two values in the second and third argument registers, or to
 return a value at a specific location relative to the stack pointer
 (although this might be excessively constraining; it would be
@@ -800,7 +800,7 @@ of things:
     isn't statically known.  Therefore, the signature of a function
     intended to be passed as this argument must pass them indirectly,
     even if they are actually known statically to be non-address-only
-    types like (e.g.) `Int` and `Float`.
+    types like (for example) `Int` and `Float`.
 
 * It expands tuples in the parameter and result types.  This is done
   at this level both because it is affected by abstraction patterns
@@ -878,9 +878,9 @@ range), (2) the special type **opaque**, or (3) the special type
 combined.
 
 For most of the types in Swift, this process is obvious: they either
-correspond to an obvious legal type (e.g. thick metatypes are
+correspond to an obvious legal type (for example, thick metatypes are
 pointer-sized integers), or to an obvious sequence of scalars
-(e.g. class existentials are a sequence of pointer-sized integers).
+(for example, class existentials are a sequence of pointer-sized integers).
 Only a few cases remain:
 
 * Integer types that are not legal types should be mapped as opaque.
