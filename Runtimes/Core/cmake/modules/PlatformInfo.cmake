@@ -20,8 +20,8 @@ execute_process(COMMAND ${module_triple_command}
   ERROR_VARIABLE stderr
   RESULT_VARIABLE ec)
 if(ec)
-  message(FATAL_ERROR "'${module_triple_command}' returned non-zero exit code ${ec}")
   message(CONFIGURE_LOG "Error Output: ${stderr}")
+  message(FATAL_ERROR "'${module_triple_command}' returned non-zero exit code ${ec}")
 endif()
 message(CONFIGURE_LOG "Swift target info: ${module_triple_command}\n"
 "${target_info_json}")
@@ -54,7 +54,7 @@ if(APPLE)
   # Note: *moduleTriple* doesn't have an "x" on the end of "macos"; just to be
   # safe, we support both cases here.
   set(availability_platform_macos "macOS")
-  set(availaiblity_platform_macosx "macOS")
+  set(availability_platform_macosx "macOS")
   set(availability_platform_ios "iOS")
   set(availability_platform_watchos "watchOS")
   set(availability_platform_tvos "tvOS")
