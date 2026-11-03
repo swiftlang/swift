@@ -81,3 +81,9 @@ func passCallbacks() {
 // CHECK: sil {{.*}}[clang callWithConstIntRef] @{{.*}} : $@convention(c) (Optional<@convention(c) (@in_guaranteed Int32) -> ()>) -> ()
 // CHECK: sil {{.*}}[clang callWithIntRvalueRef] @{{.*}} : $@convention(c) (Optional<@convention(c) (@in_cxx Int32) -> ()>) -> ()
 // CHECK: sil {{.*}}[clang callWithConstIntRvalueRef] @{{.*}} : $@convention(c) (Optional<@convention(c) (@in_guaranteed Int32) -> ()>) -> ()
+
+func passFuncPtrRvalueRef() -> CInt {
+  return callFuncPtrRvalueRef(consuming: getStaticInt)
+}
+
+// CHECK: sil {{.*}}[clang callFuncPtrRvalueRef] @{{.*}} : $@convention(c) (@in_cxx Optional<@convention(c) () -> Int32>) -> Int32

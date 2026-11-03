@@ -4206,8 +4206,7 @@ public:
           }
         }
       }
-      SILType silTy = SILType::getPrimitiveObjectType(type.getType());
-      if (silTy.isSensitive())
+      if (substTL.getLoweredType().isSensitive())
         return ParameterConvention::Indirect_In_Guaranteed;
     }
     return getIndirectCParameterConvention(getParamType(index));
