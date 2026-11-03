@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Functions -cxx-interoperability-mode=default -clang-header-expose-decls=all-public -I %S/Inputs/ -typecheck -verify -emit-clang-header-path %t/functions.h -target %target-swift-5.8-abi-triple
 // RUN: %FileCheck %s < %t/functions.h
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/stdlib.h
+// RUN: %FileCheck %s --check-prefix=SHARED < %t/stdlib.h
 
 // REQUIRES: objc_interop
 
@@ -13,9 +15,9 @@
 import Foundation
 import CPointerTypes
 
-// CHECK: #if !defined(NS_RETURNS_RETAINED)
-// CHECK: #if !defined(CF_RETURNS_RETAINED)
-// CHECK: #if !defined(SWIFT_RETURNS_RETAINED)
+// SHARED: #if !defined(NS_RETURNS_RETAINED)
+// SHARED: #if !defined(CF_RETURNS_RETAINED)
+// SHARED: #if !defined(SWIFT_RETURNS_RETAINED)
 
 public final class SwiftClass {
   public init() {}

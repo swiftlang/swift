@@ -1,13 +1,15 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -module-name Core -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/core.h
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/core.h
 // RUN: %FileCheck %s < %t/core.h
+// RUN: %FileCheck %s --check-prefix=WITNESS < %test-resource-dir/swiftToCxx/_SwiftValueWitnessTable.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/core.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/core.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function)
 
 
 // CHECK:      #ifndef SWIFT_PRINTED_CORE
 // CHECK-NEXT: #define SWIFT_PRINTED_CORE
-// CHECK-NEXT: namespace swift SWIFT_PRIVATE_ATTR {
+// CHECK:      #include <swiftToCxx/_SwiftValueWitnessTable.h>
+// CHECK:      namespace swift SWIFT_PRIVATE_ATTR {
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace _impl {
 // CHECK-EMPTY:
@@ -22,52 +24,6 @@
 // CHECK-NEXT: };
 // CHECK-NEXT: // Swift type metadata request type.
 // CHECK-NEXT: typedef uint{{.*}}_t MetadataRequestTy;
-// CHECK-EMPTY:
-// CHECK-NEXT: #if __cplusplus > 201402L
-// CHECK-NEXT: #  define SWIFT_NOEXCEPT_FUNCTION_PTR noexcept
-// CHECK-NEXT: #else
-// CHECK-NEXT: #  define SWIFT_NOEXCEPT_FUNCTION_PTR
-// CHECK-NEXT: #endif
-// CHECK-EMPTY:
-// CHECK-NEXT: using ValueWitnessInitializeBufferWithCopyOfBufferTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(55882))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using ValueWitnessDestroyTy = void(* __ptrauth_swift_value_witness_function_pointer(1272))(void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using ValueWitnessInitializeWithCopyTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(58298))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using ValueWitnessAssignWithCopyTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(34641))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using ValueWitnessInitializeWithTakeTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(18648))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using ValueWitnessAssignWithTakeTy = void * _Nonnull(* __ptrauth_swift_value_witness_function_pointer(61402))(void * _Nonnull, void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using ValueWitnessGetEnumTagSinglePayloadTy = unsigned(* __ptrauth_swift_value_witness_function_pointer(24816))(const void * _Nonnull, unsigned, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using ValueWitnessStoreEnumTagSinglePayloadTy = void(* __ptrauth_swift_value_witness_function_pointer(41169))(void * _Nonnull, unsigned, unsigned, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-EMPTY:
-// CHECK-NEXT: struct ValueWitnessTable {
-// CHECK-NEXT:  ValueWitnessInitializeBufferWithCopyOfBufferTy _Nonnull initializeBufferWithCopyOfBuffer;
-// CHECK-NEXT:  ValueWitnessDestroyTy _Nonnull destroy;
-// CHECK-NEXT:  ValueWitnessInitializeWithCopyTy _Nonnull initializeWithCopy;
-// CHECK-NEXT:  ValueWitnessAssignWithCopyTy _Nonnull assignWithCopy;
-// CHECK-NEXT:  ValueWitnessInitializeWithTakeTy _Nonnull initializeWithTake;
-// CHECK-NEXT:  ValueWitnessAssignWithTakeTy _Nonnull assignWithTake;
-// CHECK-NEXT:  ValueWitnessGetEnumTagSinglePayloadTy _Nonnull getEnumTagSinglePayload;
-// CHECK-NEXT:  ValueWitnessStoreEnumTagSinglePayloadTy _Nonnull storeEnumTagSinglePayload;
-// CHECK-NEXT:  size_t size;
-// CHECK-NEXT:  size_t stride;
-// CHECK-NEXT:  unsigned flags;
-// CHECK-NEXT:  unsigned extraInhabitantCount;
-// CHECK-EMPTY:
-// CHECK-NEXT:  constexpr size_t getAlignment() const { return (flags & 255) + 1; }
-// CHECK-NEXT: };
-// CHECK-EMPTY:
-// CHECK-NEXT: using EnumValueWitnessGetEnumTagTy = unsigned(* __ptrauth_swift_value_witness_function_pointer(41909))(const void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using EnumValueWitnessDestructiveProjectEnumDataTy = void(* __ptrauth_swift_value_witness_function_pointer(1053))(void * _Nonnull, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-NEXT: using EnumValueWitnessDestructiveInjectEnumTagTy = void(* __ptrauth_swift_value_witness_function_pointer(45796))(void * _Nonnull, unsigned, void * _Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
-// CHECK-EMPTY:
-// CHECK-NEXT: struct EnumValueWitnessTable {
-// CHECK-NEXT:   ValueWitnessTable vwTable;
-// CHECK-NEXT:   EnumValueWitnessGetEnumTagTy _Nonnull getEnumTag;
-// CHECK-NEXT:   EnumValueWitnessDestructiveProjectEnumDataTy _Nonnull destructiveProjectEnumData;
-// CHECK-NEXT:   EnumValueWitnessDestructiveInjectEnumTagTy _Nonnull destructiveInjectEnumTag;
-// CHECK-NEXT: };
-// CHECK-EMPTY:
-// CHECK-NEXT: #undef SWIFT_NOEXCEPT_FUNCTION_PTR
-// CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: // type metadata address for Bool.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSbN;
@@ -239,3 +195,72 @@
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT: #endif
+
+// The shared support header defines the stable value witness ABI.
+// WITNESS: #if __cplusplus > 201402L
+// WITNESS-NEXT: #define SWIFT_NOEXCEPT_FUNCTION_PTR noexcept
+// WITNESS-NEXT: #else
+// WITNESS-NEXT: #define SWIFT_NOEXCEPT_FUNCTION_PTR
+// WITNESS-NEXT: #endif
+// WITNESS-EMPTY:
+// WITNESS-NEXT: using ValueWitnessInitializeBufferWithCopyOfBufferTy = void *_Nonnull (
+// WITNESS-NEXT:     *__ptrauth_swift_value_witness_function_pointer(55882))(
+// WITNESS-NEXT:     void *_Nonnull, void *_Nonnull, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using ValueWitnessDestroyTy =
+// WITNESS-NEXT:     void (*__ptrauth_swift_value_witness_function_pointer(1272))(
+// WITNESS-NEXT:         void *_Nonnull, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using ValueWitnessInitializeWithCopyTy = void *_Nonnull (
+// WITNESS-NEXT:     *__ptrauth_swift_value_witness_function_pointer(58298))(
+// WITNESS-NEXT:     void *_Nonnull, void *_Nonnull, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using ValueWitnessAssignWithCopyTy = void *_Nonnull (
+// WITNESS-NEXT:     *__ptrauth_swift_value_witness_function_pointer(34641))(
+// WITNESS-NEXT:     void *_Nonnull, void *_Nonnull, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using ValueWitnessInitializeWithTakeTy = void *_Nonnull (
+// WITNESS-NEXT:     *__ptrauth_swift_value_witness_function_pointer(18648))(
+// WITNESS-NEXT:     void *_Nonnull, void *_Nonnull, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using ValueWitnessAssignWithTakeTy = void *_Nonnull (
+// WITNESS-NEXT:     *__ptrauth_swift_value_witness_function_pointer(61402))(
+// WITNESS-NEXT:     void *_Nonnull, void *_Nonnull, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using ValueWitnessGetEnumTagSinglePayloadTy = unsigned (
+// WITNESS-NEXT:     *__ptrauth_swift_value_witness_function_pointer(24816))(
+// WITNESS-NEXT:     const void *_Nonnull, unsigned, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using ValueWitnessStoreEnumTagSinglePayloadTy =
+// WITNESS-NEXT:     void (*__ptrauth_swift_value_witness_function_pointer(41169))(
+// WITNESS-NEXT:         void *_Nonnull, unsigned, unsigned,
+// WITNESS-NEXT:         void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-EMPTY:
+// WITNESS-NEXT: struct ValueWitnessTable {
+// WITNESS-NEXT:   ValueWitnessInitializeBufferWithCopyOfBufferTy _Nonnull initializeBufferWithCopyOfBuffer;
+// WITNESS-NEXT:   ValueWitnessDestroyTy _Nonnull destroy;
+// WITNESS-NEXT:   ValueWitnessInitializeWithCopyTy _Nonnull initializeWithCopy;
+// WITNESS-NEXT:   ValueWitnessAssignWithCopyTy _Nonnull assignWithCopy;
+// WITNESS-NEXT:   ValueWitnessInitializeWithTakeTy _Nonnull initializeWithTake;
+// WITNESS-NEXT:   ValueWitnessAssignWithTakeTy _Nonnull assignWithTake;
+// WITNESS-NEXT:   ValueWitnessGetEnumTagSinglePayloadTy _Nonnull getEnumTagSinglePayload;
+// WITNESS-NEXT:   ValueWitnessStoreEnumTagSinglePayloadTy _Nonnull storeEnumTagSinglePayload;
+// WITNESS-NEXT:   size_t size;
+// WITNESS-NEXT:   size_t stride;
+// WITNESS-NEXT:   unsigned flags;
+// WITNESS-NEXT:   unsigned extraInhabitantCount;
+// WITNESS-EMPTY:
+// WITNESS-NEXT:   constexpr size_t getAlignment() const { return (flags & 255) + 1; }
+// WITNESS-NEXT: };
+// WITNESS-EMPTY:
+// WITNESS-NEXT: using EnumValueWitnessGetEnumTagTy =
+// WITNESS-NEXT:     unsigned (*__ptrauth_swift_value_witness_function_pointer(41909))(
+// WITNESS-NEXT:         const void *_Nonnull, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using EnumValueWitnessDestructiveProjectEnumDataTy =
+// WITNESS-NEXT:     void (*__ptrauth_swift_value_witness_function_pointer(1053))(
+// WITNESS-NEXT:         void *_Nonnull, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-NEXT: using EnumValueWitnessDestructiveInjectEnumTagTy =
+// WITNESS-NEXT:     void (*__ptrauth_swift_value_witness_function_pointer(45796))(
+// WITNESS-NEXT:         void *_Nonnull, unsigned, void *_Nonnull) SWIFT_NOEXCEPT_FUNCTION_PTR;
+// WITNESS-EMPTY:
+// WITNESS-NEXT: struct EnumValueWitnessTable {
+// WITNESS-NEXT:   ValueWitnessTable vwTable;
+// WITNESS-NEXT:   EnumValueWitnessGetEnumTagTy _Nonnull getEnumTag;
+// WITNESS-NEXT:   EnumValueWitnessDestructiveProjectEnumDataTy _Nonnull destructiveProjectEnumData;
+// WITNESS-NEXT:   EnumValueWitnessDestructiveInjectEnumTagTy _Nonnull destructiveInjectEnumTag;
+// WITNESS-NEXT: };
+// WITNESS-EMPTY:
+// WITNESS-NEXT: #undef SWIFT_NOEXCEPT_FUNCTION_PTR

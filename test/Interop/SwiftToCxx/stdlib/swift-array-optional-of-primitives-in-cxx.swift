@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name UsePrimitives -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/uses.h
 // RUN: %FileCheck %s < %t/uses.h
+// RUN: %target-interop-build-clangxx -std=c++17 -x c++ -E -P %t/uses.h | %FileCheck %s --check-prefix=TRAIT
 
 // RUN: %check-interop-cxx-header-in-clang(%t/uses.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
@@ -11,10 +12,12 @@ public struct UsesUnicodeScalar {
     public var maybeScalar: Unicode.Scalar?
 }
 
-// The trait specializations must be emitted so that the swift::Array /
-// swift::Optional instantiations below satisfy their internal static_assert.
+// The shared header must provide the trait specialization so that the
+// swift::Array / swift::Optional instantiations satisfy their static_assert.
 
-// CHECK: inline const constexpr bool isUsableInGenericContext<char32_t> = true;
+// TRAIT: inline const constexpr bool isUsableInGenericContext<char32_t> = true;
+
+// CHECK: #include <swift/Swift.h>
 
 // CHECK: swift::Array<char32_t> getScalars() const
 // CHECK: swift::Optional<char32_t> getMaybeScalar() const

@@ -1,10 +1,31 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -typecheck -clang-header-expose-decls=all-public -emit-clang-header-path %t/empty.h
-// RUN: %FileCheck %s < %t/empty.h
+// RUN: %FileCheck %s --check-prefix=MODULE --implicit-check-not=SWIFT_PRINTED_CORE --implicit-check-not=_SwiftCxxInteroperability.h < %t/empty.h
+// RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftmodule -module-name Swift -parse-stdlib -typecheck -cxx-interoperability-mode=default -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/stdlib.h
+// RUN: %FileCheck %s < %t/stdlib.h
 
-// CHECK-LABEL: #ifndef EMPTY_SWIFT_H
-// CHECK-NEXT:  #define EMPTY_SWIFT_H
+// MODULE-LABEL: #ifndef EMPTY_SWIFT_H
+// MODULE-NEXT:  #define EMPTY_SWIFT_H
+// MODULE:       #include <swift/Swift.h>
+// Skip the C and Objective-C preamble in the #else branch.
+// MODULE-LABEL: #if !__has_feature(nullability_nullable_result)
+// MODULE-NEXT:  # define _Nullable_result _Nullable
+// MODULE-NEXT:  #endif
+// MODULE-NEXT:  #endif
+// MODULE-LABEL: #if defined(__OBJC__)
+// MODULE-NEXT:  #if __has_feature(objc_modules)
+// MODULE-LABEL: #if defined(__OBJC__)
+// MODULE-EMPTY:
+// MODULE-NEXT:  #endif
+// MODULE-NEXT:  #if __has_attribute(external_source_symbol)
+// MODULE-NEXT:  # pragma clang attribute pop
+// MODULE-NEXT:  #endif
+// MODULE:       namespace empty SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("empty") {
+// MODULE:       } // namespace empty
+// MODULE:       #endif
+// MODULE-NOT:   @
 
+// C++ consumers get the common definitions from the standard library header.
 // CHECK-LABEL: #if !defined(__has_include)
 // CHECK-NEXT: # define __has_include(x) 0
 // CHECK-NEXT: #endif
@@ -89,37 +110,17 @@
 // CHECK:       # define SWIFT_CONTEXT __attribute__((swift_context))
 // CHECK:       # define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
 
-// CHECK-LABEL: #if defined(__OBJC__)
-// CHECK-NEXT:  #if __has_feature(objc_modules)
-
-// CHECK-LABEL: #if defined(__OBJC__)
-// CHECK-EMPTY:
-// CHECK-NEXT:  #endif
-// CHECK-NEXT:  #if __has_attribute(external_source_symbol)
-// CHECK-NEXT:  # pragma clang attribute pop
-// CHECK-NEXT:  #endif
-// CHECK-NEXT:  #if defined(__cplusplus)
-// CHECK-NEXT:  #pragma clang diagnostic push
-// CHECK-NEXT:  #pragma clang diagnostic ignored "-Wnon-modular-include-in-framework-module"
-// CHECK-NEXT:  // Allow user to find the header using additional include paths
-// CHECK-NEXT:  #if __has_include(<swiftToCxx/_SwiftCxxInteroperability.h>)
+// CHECK:       #if __has_include(<swiftToCxx/_SwiftCxxInteroperability.h>)
 // CHECK-NEXT:  #include <swiftToCxx/_SwiftCxxInteroperability.h>
-// CHECK-NEXT:  // Look for the C++ interop support header relative to clang's resource dir:
-// CHECK-NEXT:  // '<toolchain>/usr/lib/clang/<version>/include/../../../swift/swiftToCxx'.
 // CHECK-NEXT:  #elif __has_include(<../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>)
 // CHECK-NEXT:  #include <../../../swift/swiftToCxx/_SwiftCxxInteroperability.h>
 // CHECK-NEXT:  #elif __has_include(<../../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>)
-// CHECK-NEXT:  // '<toolchain>/usr/local/lib/clang/<version>/include/../../../../../lib/swift/swiftToCxx'.
 // CHECK-NEXT:  #include <../../../../../lib/swift/swiftToCxx/_SwiftCxxInteroperability.h>
+// CHECK-NEXT:  #else
+// CHECK-NEXT:  #error "Swift C++ interoperability headers are not available"
 // CHECK-NEXT:  #endif
 // CHECK-NEXT:  #pragma clang diagnostic pop
-// CHECK-NEXT:  #if __has_feature(objc_modules)
 // CHECK:       #ifndef SWIFT_PRINTED_CORE
 // CHECK:       } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT:  #endif
-// CHECK:       namespace empty SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("empty") {
-// CHECK:       } // namespace empty
-// CHECK:       #endif
-
-// CHECK-NOT: @
