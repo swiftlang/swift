@@ -158,6 +158,33 @@ suite.test("formUnion.${inputKind}.${argumentKind}") {
 %   end
 % end
 
+suite.test("formUnion.array-with-duplicates") {
+  let b = makeArray(5 ..< 15, identity: 2) + makeArray(0 ..< 20, identity: 3)
+  for count in [0, 10] {
+    // `c` shares storage with `a` (the empty singleton when `count == 0`).
+    let a = makeNativeSet(0 ..< count, identity: 1)
+    var c = a
+    c.formUnion(b)
+    expectEqual(a.count, count)
+    expectEqual(c.count, 20)
+    // Check that existing members and the first of equal elements are kept.
+    for v in 0 ..< 20 {
+      guard let i = c.firstIndex(of: Value(v)) else {
+        expectTrue(false, "Could not find \(v)")
+        continue
+      }
+      expectEqual(c[i].identity, v < count ? 1 : (5 ..< 15).contains(v) ? 2 : 3)
+    }
+  }
+}
+
+suite.test("formUnion.slice") {
+  let padded = makeArray([99] + Array(0 ..< 10) + [99], identity: 2)
+  var a = makeNativeSet(0 ..< 5, identity: 1)
+  a.formUnion(padded[1 ..< 11])
+  expectEqual(a, makeNativeSet(0 ..< 10, identity: 1))
+}
+
 % for inputKind, inputGenerator in inputKinds.items():
 %   for argumentKind, argumentGenerator in argumentKinds.items():
 %     needsCocoa = inputKind == "cocoa" or argumentKind == "cocoa"
