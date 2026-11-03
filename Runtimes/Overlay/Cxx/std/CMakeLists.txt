@@ -47,6 +47,7 @@ install(TARGETS swiftCxxStdlib
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swiftCxxStdlib)
+emit_symbol_graph(swiftCxxStdlib)
 install_swift_interface(swiftCxxStdlib)
 
 embed_manifest(swiftCxxStdlib)
