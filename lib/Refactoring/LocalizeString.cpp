@@ -23,16 +23,16 @@ static Expr *findLocalizeTarget(ResolvedCursorInfoPtr CursorInfo) {
     Expr *Target;
     StringLiteralFinder(SourceLoc StartLoc)
         : StartLoc(StartLoc), Target(nullptr) {}
-    bool walkToExprPre(Expr *E) override {
+    PreWalkAction walkToExprPre(Expr *E) override {
       if (E->getStartLoc() != StartLoc)
-        return false;
+        return Action::SkipNode();
       if (E->getKind() == ExprKind::InterpolatedStringLiteral)
-        return false;
+        return Action::SkipNode();
       if (E->getKind() == ExprKind::StringLiteral) {
         Target = E;
-        return false;
+        return Action::SkipNode();
       }
-      return true;
+      return Action::Continue();
     }
   } Walker(ExprStartInfo->getTrailingExpr()->getStartLoc());
   Walker.walk(ExprStartInfo->getTrailingExpr());

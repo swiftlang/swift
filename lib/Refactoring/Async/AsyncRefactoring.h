@@ -813,11 +813,11 @@ public:
 private:
   DeclCollector(llvm::DenseSet<const Decl *> &Decls) : Decls(Decls) {}
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override;
 
-  bool walkToExprPre(Expr *E) override;
+  PreWalkAction walkToExprPre(Expr *E) override;
 
-  bool walkToStmtPre(Stmt *S) override;
+  PreWalkAction walkToStmtPre(Stmt *S) override;
 };
 
 class ReferenceCollector : private SourceEntityWalker {
@@ -844,13 +844,13 @@ private:
       : SM(SM), DeclaredDecls(), ReferencedDecls(Decls), Target(Target),
         AfterTarget(false) {}
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override;
 
-  bool walkToExprPre(Expr *E) override;
+  PreWalkAction walkToExprPre(Expr *E) override;
 
-  bool walkToStmtPre(Stmt *S) override;
+  PreWalkAction walkToStmtPre(Stmt *S) override;
 
-  bool walkToPatternPre(Pattern *P) override;
+  PreWalkAction walkToPatternPre(Pattern *P) override;
 
   bool shouldWalkInto(SourceRange Range);
 };
@@ -886,13 +886,13 @@ public:
   const RefDeclsTy *getReferencedDecls(Stmt *Scope) const;
 
 private:
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override;
 
-  bool walkToExprPre(Expr *E) override;
+  PreWalkAction walkToExprPre(Expr *E) override;
 
-  bool walkToStmtPre(Stmt *S) override;
+  PreWalkAction walkToStmtPre(Stmt *S) override;
 
-  bool walkToStmtPost(Stmt *S) override;
+  PostWalkAction walkToStmtPost(Stmt *S) override;
 };
 
 /// Checks whether an ASTNode contains a reference to a given declaration.
@@ -900,7 +900,7 @@ class DeclReferenceFinder : private SourceEntityWalker {
   bool HasFoundReference = false;
   const Decl *Search;
 
-  bool walkToExprPre(Expr *E) override;
+  PreWalkAction walkToExprPre(Expr *E) override;
 
   DeclReferenceFinder(const Decl *Search) : Search(Search) {}
 
@@ -1129,21 +1129,21 @@ private:
   ///    synchronously).
   void wrapScopeInContinationIfNecessary(ASTNode Node);
 
-  bool walkToPatternPre(Pattern *P) override;
+  PreWalkAction walkToPatternPre(Pattern *P) override;
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override;
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override;
 
-  bool walkToDeclPost(Decl *D) override;
+  PostWalkAction walkToDeclPost(Decl *D) override;
 
-  bool walkToExprPre(Expr *E) override;
+  PreWalkAction walkToExprPre(Expr *E) override;
 
   bool replaceRangeWithPlaceholder(SourceRange range);
 
-  bool walkToExprPost(Expr *E) override;
+  PostWalkAction walkToExprPost(Expr *E) override;
 
-  bool walkToStmtPre(Stmt *S) override;
+  PreWalkAction walkToStmtPre(Stmt *S) override;
 
-  bool walkToStmtPost(Stmt *S) override;
+  PostWalkAction walkToStmtPost(Stmt *S) override;
 
   bool addCustom(SourceRange Range, llvm::function_ref<void()> Custom = {});
 

@@ -373,28 +373,30 @@ void AsyncConverter::wrapScopeInContinationIfNecessary(ASTNode Node) {
   });
 }
 
-bool AsyncConverter::walkToPatternPre(Pattern *P) {
+ASTWalker::PreWalkAction AsyncConverter::walkToPatternPre(Pattern *P) {
   // If we're not converting a pattern, there's nothing extra to do.
   if (!ConvertingPattern)
-    return true;
+    return Action::Continue();
 
   // When converting a pattern, don't print the 'let' or 'var' of binding
   // subpatterns, as they're illegal when nested in PBDs, and we print a
   // top-level one.
   if (auto *BP = dyn_cast<BindingPattern>(P)) {
-    return addCustom(BP->getSourceRange(),
-                     [&]() { convertPattern(BP->getSubPattern()); });
+    addCustom(BP->getSourceRange(),
+              [&]() { convertPattern(BP->getSubPattern()); });
+    return Action::SkipNode();
   }
-  return true;
+  return Action::Continue();
 }
 
-bool AsyncConverter::walkToDeclPre(Decl *D, CharSourceRange Range) {
+ASTWalker::PreWalkAction AsyncConverter::walkToDeclPre(Decl *D,
+                                                       CharSourceRange Range) {
   if (isa<PatternBindingDecl>(D)) {
     // We can't hoist a closure inside a PatternBindingDecl. If it contains
     // a call to the completion handler, wrap it in a continuation.
     wrapScopeInContinationIfNecessary(D);
     NestedExprCount++;
-    return true;
+    return Action::Continue();
   }
 
   // Functions and types already have their names in \c Scopes.Names, only
@@ -412,21 +414,21 @@ bool AsyncConverter::walkToDeclPre(Decl *D, CharSourceRange Range) {
   // Note we don't walk into any nested local function decls. If we start
   // doing so in the future, be sure to update the logic that deals with
   // converting unhandled returns into placeholders in walkToStmtPre.
-  return false;
+  return Action::SkipNode();
 }
 
-bool AsyncConverter::walkToDeclPost(Decl *D) {
+ASTWalker::PostWalkAction AsyncConverter::walkToDeclPost(Decl *D) {
   NestedExprCount--;
-  return true;
+  return Action::Continue();
 }
 
 #define PLACEHOLDER_START "<#"
 #define PLACEHOLDER_END "#>"
-bool AsyncConverter::walkToExprPre(Expr *E) {
+ASTWalker::PreWalkAction AsyncConverter::walkToExprPre(Expr *E) {
   // We've already added any shorthand if declaration, don't add its
   // synthesized initializer as well.
   if (shorthandIfInits.contains(E))
-    return true;
+    return Action::Continue();
 
   // TODO: Handle Result.get as well
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
@@ -441,8 +443,8 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
 
       bool AddPlaceholder = Placeholders.count(D);
       StringRef Name = newNameFor(D, false);
-      if (AddPlaceholder || !Name.empty())
-        return addCustom(DRE->getSourceRange(), [&]() {
+      if (AddPlaceholder || !Name.empty()) {
+        addCustom(DRE->getSourceRange(), [&]() {
           if (AddPlaceholder)
             OS << PLACEHOLDER_START;
           if (!Name.empty())
@@ -452,6 +454,8 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
           if (AddPlaceholder)
             OS << PLACEHOLDER_END;
         });
+        return Action::SkipNode();
+      }
     }
   } else if (isa<ForceValueExpr>(E) || isa<BindOptionalExpr>(E)) {
     // Remove a force unwrap or optional chain of a returned success value,
@@ -464,17 +468,20 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
     // optionals are involved in the chain, e.g foo?.x?.y -> foo.x?.y is
     // completely valid.
     if (auto *D = E->getReferencedDecl().getDecl()) {
-      if (Unwraps.count(D))
-        return addCustom(E->getSourceRange(),
-                         [&]() { OS << newNameFor(D, true); });
+      if (Unwraps.count(D)) {
+        addCustom(E->getSourceRange(), [&]() { OS << newNameFor(D, true); });
+        return Action::SkipNode();
+      }
     }
   } else if (CallExpr *CE = TopHandler.getAsHandlerCall(E)) {
     if (Scopes.back().isWrappedInContination()) {
-      return addCustom(E->getSourceRange(),
-                       [&]() { convertHandlerToContinuationResume(CE); });
+      addCustom(E->getSourceRange(),
+                [&]() { convertHandlerToContinuationResume(CE); });
+      return Action::SkipNode();
     } else if (NestedExprCount == 0) {
-      return addCustom(E->getSourceRange(),
-                       [&]() { convertHandlerToReturnOrThrows(CE); });
+      addCustom(E->getSourceRange(),
+                [&]() { convertHandlerToReturnOrThrows(CE); });
+      return Action::SkipNode();
     }
   } else if (auto *CE = dyn_cast<CallExpr>(E)) {
     // Try and hoist a call's completion handler. Don't do so if
@@ -489,8 +496,9 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
           getUnderlyingFunc(CE->getFn()),
           /*RequireAttributeOrName=*/StartNode.dyn_cast<Expr *>() != CE);
       if (HandlerDesc.isValid()) {
-        return addCustom(CE->getSourceRange(),
-                         [&]() { addHoistedCallback(CE, HandlerDesc); });
+        addCustom(CE->getSourceRange(),
+                  [&]() { addHoistedCallback(CE, HandlerDesc); });
+        return Action::SkipNode();
       }
     }
   }
@@ -501,7 +509,7 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
   if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
     auto ty = SVE->getType();
     if (!ty || ty->isVoid())
-      return true;
+      return Action::Continue();
   }
 
   // We didn't do any special conversion for this expression. If needed, wrap
@@ -509,7 +517,7 @@ bool AsyncConverter::walkToExprPre(Expr *E) {
   wrapScopeInContinationIfNecessary(E);
 
   NestedExprCount++;
-  return true;
+  return Action::Continue();
 }
 
 bool AsyncConverter::replaceRangeWithPlaceholder(SourceRange range) {
@@ -520,20 +528,20 @@ bool AsyncConverter::replaceRangeWithPlaceholder(SourceRange range) {
   });
 }
 
-bool AsyncConverter::walkToExprPost(Expr *E) {
+ASTWalker::PostWalkAction AsyncConverter::walkToExprPost(Expr *E) {
   if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
     auto ty = SVE->getType();
     if (!ty || ty->isVoid())
-      return true;
+      return Action::Continue();
   }
   NestedExprCount--;
-  return true;
+  return Action::Continue();
 }
 
 #undef PLACEHOLDER_START
 #undef PLACEHOLDER_END
 
-bool AsyncConverter::walkToStmtPre(Stmt *S) {
+ASTWalker::PreWalkAction AsyncConverter::walkToStmtPre(Stmt *S) {
   // Keep track of any shorthand initializer expressions
   if (auto *labeledConditional = dyn_cast<LabeledConditionalStmt>(S)) {
     for (const auto &condition : labeledConditional->getCond()) {
@@ -570,8 +578,10 @@ bool AsyncConverter::walkToStmtPre(Stmt *S) {
       // re-written as a part of the transform, turn it into a placeholder, as
       // it would have been lifted out of the switch statement.
       if (auto *SS = dyn_cast<SwitchStmt>(BS->getTarget())) {
-        if (HandledSwitches.contains(SS))
-          return replaceRangeWithPlaceholder(S->getSourceRange());
+        if (HandledSwitches.contains(SS)) {
+          replaceRangeWithPlaceholder(S->getSourceRange());
+          return Action::SkipNode();
+        }
       }
     } else if (isa<ReturnStmt>(S) && NestedExprCount == 0) {
       // For a return, if it's not nested inside another closure or function,
@@ -581,10 +591,10 @@ bool AsyncConverter::walkToStmtPre(Stmt *S) {
       replaceRangeWithPlaceholder(S->getStartLoc());
     }
   }
-  return true;
+  return Action::Continue();
 }
 
-bool AsyncConverter::walkToStmtPost(Stmt *S) {
+ASTWalker::PostWalkAction AsyncConverter::walkToStmtPost(Stmt *S) {
   if (startsNewScope(S)) {
     bool ClosedScopeWasWrappedInContinuation =
         Scopes.back().isWrappedInContination();
@@ -597,7 +607,7 @@ bool AsyncConverter::walkToStmtPost(Stmt *S) {
       insertCustom(S->getEndLoc(), [&]() { OS << tok::r_brace << '\n'; });
     }
   }
-  return true;
+  return Action::Continue();
 }
 
 bool AsyncConverter::addCustom(SourceRange Range,
