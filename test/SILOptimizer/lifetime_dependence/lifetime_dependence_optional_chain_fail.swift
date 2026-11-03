@@ -148,6 +148,12 @@ func classPropertyAfterBinding(_ w: ClassBaseHolderWrapper?) {
   // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
 }
 
+// A parenthesized chain is evaluated on its own, so its value is a temporary.
+func parenthesizedChain(_ o: GlobalOuter?) { // expected-note {{it depends on the lifetime of this parent value}}
+  f((o?.inner)?.view) // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-1 {{this use of the lifetime-dependent value is out of scope}}
+}
+
 func yieldedOperand(_ y: Yielded) {
   f(y.inner?.view) // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-1 {{it depends on the lifetime of this parent value}}

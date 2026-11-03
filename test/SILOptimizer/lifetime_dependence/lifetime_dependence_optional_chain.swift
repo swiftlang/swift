@@ -305,3 +305,16 @@ func parenthesizedInout(_ b: inout Base?) {
 func parenthesizedHopInout(_ o: inout Outer) {
   f((o.inner)?.view)
 }
+
+func parenthesized(_ b: Base?) {
+  f((b)?.view)
+}
+
+func parenthesizedLocal() {
+  let b = make()
+  f((b)?.view)
+}
+
+func parenthesizedHop(_ o: Outer) {
+  f((o.inner)?.view)
+}
