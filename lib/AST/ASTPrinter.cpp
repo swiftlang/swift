@@ -4052,8 +4052,11 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 
   bool printAsVar = false;
   if (anyVar) {
-    printAsVar = (anyVar->isSettable(anyVar->getDeclContext()) ||
-                  isInObjCImpl(anyVar));
+    if (Options.PrintPatternBindingIntroducerAsWritten)
+      printAsVar = anyVar->getIntroducer() != VarDecl::Introducer::Let;
+    else
+      printAsVar = (anyVar->isSettable(anyVar->getDeclContext()) ||
+                    isInObjCImpl(anyVar));
   }
 
   Printer << (printAsVar ? "var " : "let ");
