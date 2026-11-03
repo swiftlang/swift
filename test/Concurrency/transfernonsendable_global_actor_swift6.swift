@@ -23,8 +23,10 @@ struct CustomActor {
   static let shared = CustomActorInstance()
 }
 
+func merge<T, U>(_ t: T, _ u: U) {}
 func transferToNonIsolated<T>(_ t: T) async {}
 @MainActor func transferToMainActor<T>(_ t: T) async {}
+@MainActor func transferToMainActor2<T, U>(_ t: T, _ u: U) async {}
 @CustomActor func transferToCustomActor<T>(_ t: T) async {}
 func useValue<T>(_ t: T) {}
 func useValueAsync<T>(_ t: T) async {}
@@ -86,4 +88,32 @@ var booleanFlag: Bool { false }
 
   await useValueAsync(erased) // expected-ni-error {{sending 'erased' risks causing data races}}
   // expected-ni-note @-1 {{sending main actor-isolated 'erased' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
+}
+
+@concurrent
+func nonisolatedToGlobalActorMergedRegionNoError() async {
+  let x = NonSendableKlass()
+  let y = NonSendableKlass()
+
+  merge(x, y)
+
+  switch Int.random(in: 1...3) {
+    case 1:
+    await transferToMainActor2(x, y)
+
+    case 2:
+    let c = { @MainActor in
+      useValue(x)
+      useValue(y)
+    }
+    await c()
+
+    // TODO: should this behave similarly?
+    // case 3:
+    // async let v = transferToMainActor2(x, y)
+    // await v
+
+    default:
+    fatalError()
+  }
 }
