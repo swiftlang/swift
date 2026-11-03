@@ -2904,6 +2904,21 @@ RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
   return result;
 }
 
+/// Emit a copyable value read through a `borrow` accessor of a borrowed
+/// parameter as a borrow of the accessor's result.
+static RValue emitBorrowAccessorRead(SILGenFunction &SGF, Expr *e) {
+  auto depth = SGF.FormalEvalContext.stable_begin();
+  LValue lv = SGF.emitLValue(e, SGFAccessKind::BorrowedObjectRead);
+  ManagedValue mv = SGF.emitRawProjectedLValue(e, std::move(lv));
+
+  // A formal access needed to reach the result, such as materializing the
+  // base, ends with the enclosing scope, possibly before the result is used.
+  if (mv.isPlusZero() && SGF.FormalEvalContext.stable_begin() != depth)
+    mv = mv.copy(SGF, e);
+
+  return RValue(SGF, e, mv);
+}
+
 RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
                                          SGFContext resultCtx) {
   assert(!e->getType()->is<LValueType>() &&
@@ -2912,6 +2927,10 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
 
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
+
+  if (resultCtx.isGuaranteedPlusZeroOk() &&
+      SGF.isBorrowAccessorReadOfBorrowedParameter(e))
+    return emitBorrowAccessorRead(SGF, e);
 
   LValue lv = SGF.emitLValue(e, SGFAccessKind::OwnedObjectRead);
 
@@ -2957,6 +2976,10 @@ RValue RValueEmitter::visitSubscriptExpr(SubscriptExpr *E, SGFContext C) {
 
     return RValue(SGF, E, mv);
   }
+
+  if (C.isGuaranteedPlusZeroOk() &&
+      SGF.isBorrowAccessorReadOfBorrowedParameter(E))
+    return emitBorrowAccessorRead(SGF, E);
 
   LValue lv = SGF.emitLValue(E, SGFAccessKind::OwnedObjectRead);
   // We can't load at +0 without further analysis, since the formal access into
