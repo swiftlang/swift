@@ -1,0 +1,26 @@
+// RUN: %swift -target wasm32-unknown-none -parse-stdlib %s -module-name main -emit-irgen -o - | %FileCheck %s
+
+// REQUIRES: concurrency, CODEGENERATOR=WebAssembly
+
+// Await resume funclets store their own async context through
+// llvm.swift.async.context.addr, which backends can lower with specific logic.
+
+sil_stage canonical
+
+import Builtin
+
+sil @callee : $@convention(thin) @async () -> ()
+
+sil @caller : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @callee : $@convention(thin) @async () -> ()
+  %1 = apply %0() : $@convention(thin) @async () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
+
+// CHECK-LABEL: define {{.*}}ptr @__swift_async_resume_project_context(ptr %0)
+// CHECK:         [[CALLER_CTX:%.*]] = load ptr, ptr %0
+// CHECK-NEXT:    [[ADDR:%.*]] = call ptr @llvm.swift.async.context.addr()
+// CHECK-NEXT:    store ptr [[CALLER_CTX]], ptr [[ADDR]]
+// CHECK-NEXT:    ret ptr [[CALLER_CTX]]

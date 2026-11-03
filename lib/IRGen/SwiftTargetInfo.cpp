@@ -197,6 +197,8 @@ static void configureWasm32(IRGenModule &IGM, const llvm::Triple &triple,
                             SwiftTargetInfo &target) {
   target.LeastValidPointerValue =
     SWIFT_ABI_WASM32_LEAST_VALID_POINTER;
+
+  target.UsableSwiftAsyncContextAddrIntrinsic = true;
 }
 
 /// Configure a default target.
