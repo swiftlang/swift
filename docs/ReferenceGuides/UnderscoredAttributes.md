@@ -532,7 +532,8 @@ property is stored or computed to correctly perform type layout.
 Used to mark an imported module as an implementation detail.
 This prevents types from that module being exposed in API
 (types of public functions, constraints in public extension etc.)
-and ABI (usage in `@inlinable` code).
+and ABI (usage in `@inlinable` code). In Swift 6 and later, an
+[access level modifier](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0409-access-level-on-imports.md) of `internal` or lower should generally be used instead.
 
 ## `@_spiOnly`
 
