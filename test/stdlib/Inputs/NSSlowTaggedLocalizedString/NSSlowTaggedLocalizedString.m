@@ -23,7 +23,10 @@
     
     Method fastCString = class_getInstanceMethod(ourClass, @selector(_fastCStringContents:));
     class_replaceMethod(tagClass, @selector(_fastCStringContents:), method_getImplementation(fastCString), method_getTypeEncoding(fastCString));
-    
+
+    Method fastUTF8 = class_getInstanceMethod(ourClass, @selector(_fastUTF8StringContents:utf8Length:));
+    class_replaceMethod(tagClass, @selector(_fastUTF8StringContents:utf8Length:), method_getImplementation(fastUTF8), method_getTypeEncoding(fastUTF8));
+
     Method length = class_getInstanceMethod(ourClass, @selector(length));
     class_replaceMethod(tagClass, @selector(length), method_getImplementation(length), method_getTypeEncoding(length));
     
@@ -68,6 +71,11 @@ static const char *contents = NULL;
 
 - (const char *)_fastCStringContents:(BOOL)nullTerminationRequired {
   return contents;
+}
+
+- (const uint8_t *)_fastUTF8StringContents:(BOOL)nullTerminationRequired utf8Length:(NSUInteger *)outLen {
+  *outLen = strlen(contents);
+  return (const uint8_t *)contents;
 }
 
 - (uint64_t)length {
