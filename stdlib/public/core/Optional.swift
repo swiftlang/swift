@@ -456,7 +456,7 @@ extension Optional where Wrapped: ~Copyable & Escapable {
     @_lifetime(&self)
     mutating get {
       let count = (self == nil) ? 0 : 1
-      let address = Builtin.unprotectedAddressOfBorrow(self)
+      let address = Builtin.unprotectedAddressOf(&self)
       let span = unsafe MutableSpan<Wrapped>(
         _unchecked: UnsafeMutablePointer(address), count: count
       )
@@ -504,7 +504,7 @@ extension Optional where Wrapped: ~Copyable & Escapable {
     _ body: (inout OutputSpan<Wrapped>) throws(E) -> R
   ) throws(E) -> R {
     let count = (self == nil) ? 0 : 1
-    let address = Builtin.unprotectedAddressOfBorrow(self)
+    let address = Builtin.unprotectedAddressOf(&self)
     let storage = unsafe UnsafeMutableBufferPointer<Wrapped>(
       start: .init(address), count: 1
     )
