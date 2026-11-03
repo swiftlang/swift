@@ -85,6 +85,7 @@ Some branches are *automerged* into other branches, to keep them in sync. This i
 - `main` is automerged into `next`
 
 ### LLVM Project
+- `swift/release/x.y` (the *latest* release branch) *may* be automerged into the `stable/*` branch paired with Swift's `main`, typically until that release ships
 - llvm.org's `main` is automerged into `next`, through a gated automerger that tests changes before merging them
 - llvm.org's release branch *may* be automerged into `swift/release/x.y`, if they are in sync
 
