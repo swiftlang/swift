@@ -534,6 +534,9 @@ void ArgsToFrontendOptionsConverter::computeDebugTimeOptions() {
     if (Args.getLastArg(OPT_profile_stats_entities)) {
       Opts.ProfileEntities = true;
     }
+    if (Args.getLastArg(OPT_incremental_build_stats)) {
+      Opts.IncrementalBuildStats = true;
+    }
   }
 }
 

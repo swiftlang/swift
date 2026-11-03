@@ -902,7 +902,7 @@ bool swift::performLLVM(const IRGenOptions &Opts, DiagnosticEngine &Diags,
   performLLVMOptimizations(Opts, Diags, DiagMutex, Module, TargetMachine, FS,
                            OutputFile ? &OutputFile->getOS() : nullptr);
 
-  if (Stats) {
+  if (Stats && Stats->isCollectingSubsystem("IRModule")) {
     if (DiagMutex)
       DiagMutex->lock();
     countStatsPostIRGen(*Stats, *Module);
