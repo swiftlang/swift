@@ -290,6 +290,26 @@ bb0(%thin: $@convention(thin) () -> (), %c: $@convention(c) () -> (), %block: @o
 // CHECK-NEXT:     (tuple))
 // CHECK-NEXT: - Metadata sources:
 
+sil [ossa] @com_method_callee : $@convention(thin) (@convention(com_method) (Builtin.RawPointer) -> ()) -> () {
+bb0(%com_method : $@convention(com_method) (Builtin.RawPointer) -> ()):
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [ossa] @com_method_caller : $@convention(thin) (@convention(com_method) (Builtin.RawPointer) -> ()) -> @owned @callee_guaranteed () -> () {
+bb0(%com_method : $@convention(com_method) (Builtin.RawPointer) -> ()):
+  %f = function_ref @com_method_callee : $@convention(thin) (@convention(com_method) (Builtin.RawPointer) -> ()) -> ()
+  %result = partial_apply [callee_guaranteed] %f(%com_method) : $@convention(thin) (@convention(com_method) (Builtin.RawPointer) -> ()) -> ()
+  return %result : $@callee_guaranteed () -> ()
+}
+
+// CHECK:      - Capture types:
+// CHECK-NEXT: (function convention=c
+// CHECK-NEXT:   (parameters)
+// CHECK-NEXT:   (result
+// CHECK-NEXT:     (tuple))
+// CHECK-NEXT: - Metadata sources:
+
 // Capturing opened existentials
 //
 // Not supported yet -- make sure we bail out instead of crashing.

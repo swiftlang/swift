@@ -308,7 +308,8 @@ enum class ImplFunctionRepresentation {
   Method,
   ObjCMethod,
   WitnessMethod,
-  Closure
+  Closure,
+  COMMethod,
 };
 
 enum class ImplFunctionDifferentiabilityKind {
@@ -332,7 +333,7 @@ enum class ImplFunctionIsolation {
 };
 
 class ImplFunctionTypeFlags {
-  unsigned Rep : 3;
+  unsigned Rep : 4;
   unsigned Pseudogeneric : 1;
   unsigned Escaping : 1;
   unsigned Concurrent : 1;
@@ -1279,14 +1280,21 @@ protected:
 
           // [TODO: synthesize-Clang-type-from-mangled-name] If there are two
           // grand-children, the second is going to be the mangled Clang type.
-          StringRef text = child->getFirstChild()->getText();
-          if (text == "c") {
-            flags =
-              flags.withRepresentation(ImplFunctionRepresentation::CFunctionPointer);
-          } else if (text == "block") {
-            flags =
-              flags.withRepresentation(ImplFunctionRepresentation::Block);
-          }
+          auto representation =
+              llvm::StringSwitch<std::optional<ImplFunctionRepresentation>>(
+                  child->getFirstChild()->getText())
+                  .Case("c", ImplFunctionRepresentation::CFunctionPointer)
+                  .Case("block", ImplFunctionRepresentation::Block)
+                  .Case("method", ImplFunctionRepresentation::Method)
+                  .Case("objc_method", ImplFunctionRepresentation::ObjCMethod)
+                  .Case("witness_method",
+                        ImplFunctionRepresentation::WitnessMethod)
+                  .Case("closure", ImplFunctionRepresentation::Closure)
+                  .Case("com_method", ImplFunctionRepresentation::COMMethod)
+                  .Default(std::nullopt);
+          if (!representation)
+            return MAKE_NODE_TYPE_ERROR0(child, "unknown function convention");
+          flags = flags.withRepresentation(*representation);
         } else if (child->getKind() == NodeKind::ImplFunctionAttribute) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
