@@ -509,25 +509,28 @@ suite.test("updateSubrange(_:moving:) with spare capacity")
   expectEqual(span[3], 11)
 }
 
-suite.test("updateElements(from:copying:)")
+suite.test("updateElements(startingAt:copying:)")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let capacity = 8
   let source = ContiguousArray(0..<4)
+  let elements = source.span
   let more: [2 of Int] = [8, 9]
+  let empty = Span<Int>()
 
   var a = ContiguousArray(repeating: -1, count: capacity)
   var span = a.mutableSpan
 
-  var end = span.updateElements(from: 2, copying: source.span)
-  expectEqual(end, 6)
-  end = span.updateElements(from: end, copying: more)
-  expectEqual(end, capacity)
+  var index = 2
+  span.updateElements(startingAt: &index, copying: elements)
+  expectEqual(index, 6)
+  span.updateElements(startingAt: &index, copying: more)
+  expectEqual(index, capacity)
 
-  end = span.updateElements(from: capacity, copying: Span())
-  expectEqual(end, capacity)
+  span.updateElements(startingAt: &index, copying: empty)
+  expectEqual(index, capacity)
 
   expectEqual(a, [-1, -1, 0, 1, 2, 3, 8, 9])
 }
@@ -544,7 +547,7 @@ struct IterableSequence: Sequence, Iterable {
   }
 }
 
-suite.test("updateElements(from:copying:), with Sequence as Iterable")
+suite.test("updateElements(startingAt:copying:), with Sequence as Iterable")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -555,25 +558,40 @@ suite.test("updateElements(from:copying:), with Sequence as Iterable")
   var a = ContiguousArray(repeating: -1, count: capacity)
   var span = a.mutableSpan
 
-  let end = span.updateElements(from: 0, copying: sequence)
-  expectEqual(end, capacity)
+  var index = 0
+  span.updateElements(startingAt: &index, copying: sequence)
+  expectEqual(index, capacity)
   expectEqual(a.elementsEqual(0..<capacity), true)
 }
 
-suite.test("updateElements(from:copying:), Iterable overflows source")
+suite.test("updateElements(startingAt:copying:), source longer than destination")
 .require(.minimumStdlib(.stdlib_6_5))
-.require(.crashTesting)
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let source = ContiguousArray(0..<8)
-  var a = ContiguousArray(repeating: 0, count: 4)
+  let elements = source.span
+  var a = ContiguousArray(repeating: -1, count: 6)
   var span = a.mutableSpan
-  expectCrashLater()
-  _ = span.updateElements(from: 0, copying: source.span)
+
+  // copying stops when the destination is full
+  var index = 2
+  var iterator = span.updateElements(startingAt: &index, copying: elements)
+  expectEqual(index, 6)
+  expectEqual(a, [-1, -1, 0, 1, 2, 3])
+
+  // the returned iterator is positioned after the last element copied
+  do {
+    let rest = iterator.nextSpan()
+    expectEqual(rest.count, 4)
+    for i in rest.indices {
+      expectEqual(rest[i], 4 + i)
+    }
+  }
+  expectEqual(iterator.nextSpan().isEmpty, true)
 }
 
-suite.test("updateElements(from:copying:), bad index")
+suite.test("updateElements(startingAt:copying:), bad index")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
 .code {
@@ -581,32 +599,87 @@ suite.test("updateElements(from:copying:), bad index")
 
   var a = ContiguousArray(repeating: 0, count: 4)
   var span = a.mutableSpan
+  var index = 5
+  let empty = Span<Int>()
   expectCrashLater(withDebugMessage: "Index out of bounds")
-  _ = span.updateElements(from: 5, copying: Span())
+  span.updateElements(startingAt: &index, copying: empty)
 }
 
-suite.test("updateElements(from:copying:), from inout borrowing iterator")
+suite.test("updateElements(startingAt:copying:), continuing with the returned iterator")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let source = ContiguousArray(0..<6)
   let elements = source.span
-  var iterator = elements.makeBorrowingIterator()
 
   var first = ContiguousArray(repeating: -1, count: 4)
   var span1 = first.mutableSpan
   var index = 0
-  span1.updateElements(from: &index, copying: &iterator)
+  var iterator = span1.updateElements(startingAt: &index, copying: elements)
   expectEqual(index, 4)
   expectEqual(first, [0, 1, 2, 3])
 
   var second = ContiguousArray(repeating: -1, count: 4)
   var span2 = second.mutableSpan
   index = 0
-  span2.updateElements(from: &index, copying: &iterator)
+  span2.updateElements(startingAt: &index, copying: &iterator)
   expectEqual(index, 2)
   expectEqual(second, [4, 5, -1, -1])
+}
+
+suite.test("updateElements(startingAt:copying:), temporary Span source")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let source = ContiguousArray(0..<6)
+
+  // the `copying:` span is a temporary, `iterator` depends on `source`.
+  var first = ContiguousArray(repeating: -1, count: 4)
+  var span1 = first.mutableSpan
+  var index = 0
+  var iterator = span1.updateElements(startingAt: &index, copying: source.span)
+  expectEqual(index, 4)
+  expectEqual(first, [0, 1, 2, 3])
+
+  var second = ContiguousArray(repeating: -1, count: 4)
+  var span2 = second.mutableSpan
+  index = 0
+  span2.updateElements(startingAt: &index, copying: &iterator)
+  expectEqual(index, 2)
+
+  // an empty temporary with an empty iterator.
+  var emptyIterator = span2.updateElements(
+    startingAt: &index, copying: Span<Int>()
+  )
+  expectEqual(index, 2)
+  expectEqual(emptyIterator.nextSpan().isEmpty, true)
+  expectEqual(second, [4, 5, -1, -1])
+}
+
+suite.test("updateElements(startingAt:copying:), Iterable source longer than destination")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let source: [8 of Int] = [0, 1, 2, 3, 4, 5, 6, 7]
+  var a = ContiguousArray(repeating: -1, count: 6)
+  var span = a.mutableSpan
+
+  var index = 2
+  var iterator = span.updateElements(startingAt: &index, copying: source)
+  expectEqual(index, 6)
+  expectEqual(a, [-1, -1, 0, 1, 2, 3])
+
+  do {
+    let rest = iterator.nextSpan()
+    expectEqual(rest.count, 4)
+    for i in rest.indices {
+      expectEqual(rest[i], 4 + i)
+    }
+  }
+  expectEqual(iterator.nextSpan().isEmpty, true)
 }
 
 private struct SourceError: Error, Equatable {}
@@ -666,7 +739,7 @@ private struct ThrowingIterable: Iterable, ~Copyable, ~Escapable {
   }
 }
 
-suite.test("updateElements(from:copying:), source throws")
+suite.test("updateElements(startingAt:copying:), source throws")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -680,7 +753,7 @@ suite.test("updateElements(from:copying:), source throws")
   var span = a.mutableSpan
   var index = 2
   do throws(SourceError) {
-    try span.updateElements(from: &index, copying: source)
+    _ = try span.updateElements(startingAt: &index, copying: source)
     expectUnreachable()
   } catch {
     expectEqual(error, SourceError())
@@ -689,18 +762,25 @@ suite.test("updateElements(from:copying:), source throws")
   expectEqual(a, [-1, -1, 0, 1, 2, 3, 4, -1])
 
   // the destination is filled by the elements provided before the error;
-  // the error occurs when checking that the source has no elements left
+  // the source isn't read any further, so the error is not encountered
   var b = ContiguousArray(repeating: -1, count: 5)
   var full = b.mutableSpan
   index = 0
   do throws(SourceError) {
-    try full.updateElements(from: &index, copying: source)
-    expectUnreachable()
+    var iterator = try full.updateElements(startingAt: &index, copying: source)
+    expectEqual(index, 5)
+    expectEqual(b, [0, 1, 2, 3, 4])
+
+    // the error comes when reading from the returned iterator
+    do throws(SourceError) {
+      _ = try iterator.nextSpan()
+      expectUnreachable()
+    } catch {
+      expectEqual(error, SourceError())
+    }
   } catch {
-    expectEqual(error, SourceError())
+    expectUnreachable()
   }
-  expectEqual(index, 5)
-  expectEqual(b, [0, 1, 2, 3, 4])
 }
 
 suite.test("span property")

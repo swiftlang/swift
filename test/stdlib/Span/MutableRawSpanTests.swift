@@ -495,43 +495,60 @@ suite.test("updateSubrange(_:moving:)")
   expectEqual(source.finalize(for: storage), 0)
 }
 
-suite.test("updateElements(from:copying:)")
+suite.test("updateElements(startingAt:copying:)")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return } // for `Iterable`
 
   let byteCount = 8
   let source = ContiguousArray<UInt8>([1, 2, 3, 4])
+  let elements = source.span
   let more: [2 of UInt8] = [8, 9]
+  let empty = RawSpan()
 
   var a = ContiguousArray<UInt8>(repeating: 0, count: byteCount)
   var span = MutableRawSpan(elements: a.mutableSpan)
 
-  var end = span.updateElements(from: 2, copying: source.span)
-  expectEqual(end, 6)
-  end = span.updateElements(from: end, copying: more)
-  expectEqual(end, byteCount)
+  var offset = 2
+  span.updateElements(startingAt: &offset, copying: elements)
+  expectEqual(offset, 6)
+  span.updateElements(startingAt: &offset, copying: more)
+  expectEqual(offset, byteCount)
 
-  end = span.updateElements(from: byteCount, copying: RawSpan())
-  expectEqual(end, byteCount)
+  span.updateElements(startingAt: &offset, copying: empty)
+  expectEqual(offset, byteCount)
 
   expectEqual(a, [0, 0, 1, 2, 3, 4, 8, 9])
 }
 
-suite.test("updateElements(from:copying:), Iterable overflows source")
+suite.test("updateElements(startingAt:copying:), source longer than destination")
 .require(.minimumStdlib(.stdlib_6_5))
-.require(.crashTesting)
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let source = ContiguousArray<UInt8>(0..<8)
-  var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
+  let elements = source.span
+  var a = ContiguousArray<UInt8>(repeating: 0xff, count: 6)
   var span = MutableRawSpan(elements: a.mutableSpan)
-  expectCrashLater()
-  _ = span.updateElements(from: 0, copying: source.span)
+
+  // copying stops when the destination is full
+  var offset = 2
+  var iterator = span.updateElements(startingAt: &offset, copying: elements)
+  expectEqual(offset, 6)
+  expectEqual(a, [0xff, 0xff, 0, 1, 2, 3])
+
+  // the returned iterator is positioned after the last byte copied
+  do {
+    let rest = iterator.nextSpan()
+    expectEqual(rest.count, 4)
+    for i in rest.indices {
+      expectEqual(rest[i], UInt8(4 + i))
+    }
+  }
+  expectEqual(iterator.nextSpan().isEmpty, true)
 }
 
-suite.test("updateElements(from:copying:), bad index")
+suite.test("updateElements(startingAt:copying:), bad index")
 .require(.minimumStdlib(.stdlib_6_5))
 .require(.crashTesting)
 .code {
@@ -539,32 +556,110 @@ suite.test("updateElements(from:copying:), bad index")
 
   var a = ContiguousArray<UInt8>(repeating: 0, count: 4)
   var span = MutableRawSpan(elements: a.mutableSpan)
+  var offset = 5
+  let empty = Span<UInt8>()
   expectCrashLater(withDebugMessage: "Byte offset out of bounds")
-  _ = span.updateElements(from: 5, copying: Span<UInt8>())
+  span.updateElements(startingAt: &offset, copying: empty)
 }
 
-suite.test("updateElements(from:copying:), from inout borrowing iterator")
+suite.test("updateElements(startingAt:copying:), continuing with the returned iterator")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let source = ContiguousArray<UInt8>(0..<6)
   let elements = source.span
-  var iterator = elements.makeBorrowingIterator()
 
   var first = ContiguousArray<UInt8>(repeating: 0xff, count: 4)
   var span1 = MutableRawSpan(elements: first.mutableSpan)
   var offset = 0
-  span1.updateElements(from: &offset, copying: &iterator)
+  var iterator = span1.updateElements(startingAt: &offset, copying: elements)
   expectEqual(offset, 4)
   expectEqual(first, [0, 1, 2, 3])
 
   var second = ContiguousArray<UInt8>(repeating: 0xff, count: 4)
   var span2 = MutableRawSpan(elements: second.mutableSpan)
   offset = 0
-  span2.updateElements(from: &offset, copying: &iterator)
+  span2.updateElements(startingAt: &offset, copying: &iterator)
   expectEqual(offset, 2)
   expectEqual(second, [4, 5, 0xff, 0xff])
+}
+
+suite.test("updateElements(startingAt:copying:), temporary Span and RawSpan sources")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let source = ContiguousArray<UInt8>(0..<6)
+
+  var first = ContiguousArray<UInt8>(repeating: 0xff, count: 4)
+  var span1 = MutableRawSpan(elements: first.mutableSpan)
+  var offset = 0
+  // the `copying:` span is a temporary, `iterator` depends on `source`.
+  var iterator = span1.updateElements(startingAt: &offset, copying: source.span)
+  expectEqual(offset, 4)
+  expectEqual(first, [0, 1, 2, 3])
+
+  var second = ContiguousArray<UInt8>(repeating: 0xff, count: 4)
+  var span2 = MutableRawSpan(elements: second.mutableSpan)
+  offset = 0
+  span2.updateElements(startingAt: &offset, copying: &iterator)
+  expectEqual(offset, 2)
+  expectEqual(second, [4, 5, 0xff, 0xff])
+
+  // similar to the previous, but with a temporary RawSpan
+  var third = ContiguousArray<UInt8>(repeating: 0xff, count: 3)
+  var span3 = MutableRawSpan(elements: third.mutableSpan)
+  offset = 1
+  var rawIterator = span3.updateElements(
+    startingAt: &offset, copying: source.span.bytes
+  )
+  expectEqual(offset, 3)
+
+  // empty temporaries with empty iterators
+  var emptySpanIterator = span3.updateElements(
+    startingAt: &offset, copying: Span<UInt8>()
+  )
+  var emptyRawIterator = span3.updateElements(
+    startingAt: &offset, copying: RawSpan()
+  )
+  expectEqual(offset, 3)
+  expectEqual(emptySpanIterator.nextSpan().isEmpty, true)
+  expectEqual(emptyRawIterator.nextSpan().isEmpty, true)
+
+  expectEqual(third, [0xff, 0, 1])
+  do {
+    let rest = rawIterator.nextSpan()
+    expectEqual(rest.count, 4)
+    for i in rest.indices {
+      expectEqual(rest[i], UInt8(2 + i))
+    }
+  }
+  expectEqual(rawIterator.nextSpan().isEmpty, true)
+}
+
+suite.test("updateElements(startingAt:copying:), Iterable source longer than destination")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let source: [8 of UInt8] = [0, 1, 2, 3, 4, 5, 6, 7]
+  var a = ContiguousArray<UInt8>(repeating: 0xff, count: 6)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+
+  var offset = 2
+  var iterator = span.updateElements(startingAt: &offset, copying: source)
+  expectEqual(offset, 6)
+  expectEqual(a, [0xff, 0xff, 0, 1, 2, 3])
+
+  do {
+    let rest = iterator.nextSpan()
+    expectEqual(rest.count, 4)
+    for i in rest.indices {
+      expectEqual(rest[i], UInt8(4 + i))
+    }
+  }
+  expectEqual(iterator.nextSpan().isEmpty, true)
 }
 
 private struct SourceError: Error, Equatable {}
@@ -624,7 +719,7 @@ private struct ThrowingIterable: Iterable, ~Copyable, ~Escapable {
   }
 }
 
-suite.test("updateElements(from:copying:), source throws")
+suite.test("updateElements(startingAt:copying:), source throws")
 .require(.minimumStdlib(.stdlib_6_5))
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
@@ -638,7 +733,7 @@ suite.test("updateElements(from:copying:), source throws")
   var span = MutableRawSpan(elements: a.mutableSpan)
   var offset = 2
   do throws(SourceError) {
-    try span.updateElements(from: &offset, copying: source)
+    _ = try span.updateElements(startingAt: &offset, copying: source)
     expectUnreachable()
   } catch {
     expectEqual(error, SourceError())
@@ -647,18 +742,25 @@ suite.test("updateElements(from:copying:), source throws")
   expectEqual(a, [0xff, 0xff, 0, 1, 2, 3, 4, 0xff])
 
   // the destination is filled by the bytes provided before the error;
-  // the error occurs when checking that the source has no bytes left
+  // the source isn't read any further, so the error is not encountered
   var b = ContiguousArray<UInt8>(repeating: 0xff, count: 5)
   var full = MutableRawSpan(elements: b.mutableSpan)
   offset = 0
   do throws(SourceError) {
-    try full.updateElements(from: &offset, copying: source)
-    expectUnreachable()
+    var iterator = try full.updateElements(startingAt: &offset, copying: source)
+    expectEqual(offset, 5)
+    expectEqual(b, [0, 1, 2, 3, 4])
+
+    // the error comes when reading from the returned iterator
+    do throws(SourceError) {
+      _ = try iterator.nextSpan()
+      expectUnreachable()
+    } catch {
+      expectEqual(error, SourceError())
+    }
   } catch {
-    expectEqual(error, SourceError())
+    expectUnreachable()
   }
-  expectEqual(offset, 5)
-  expectEqual(b, [0, 1, 2, 3, 4])
 }
 
 suite.test("_mutatingExtracting()")

@@ -931,10 +931,10 @@ extension MutableRawSpan {
 
 #if !SPAN_COMPATIBILITY_STUB
   /// Overwrites bytes of this span, starting at a byte offset, by copying
-  /// every byte of the source.
+  /// bytes from the source.
   ///
-  /// This span must have enough space from `byteOffset` to its end
-  /// (`byteOffset..<byteCount`) for every byte provided by `source`.
+  /// Copying stops as soon as `source` has provided all its elements,
+  /// or the end of this span is reached, whichever comes first.
   ///
   /// If reading from `source` throws an error, the bytes copied before
   /// the error occurred remain in this span, and `byteOffset` is updated to
@@ -945,43 +945,79 @@ extension MutableRawSpan {
   ///      offset into this span, or equal to its `byteCount`. On return, it
   ///      is updated to the offset after the last byte updated.
   ///   - source: The bytes to copy into this span.
+  /// - Returns: An iterator over `source`, positioned after the last
+  ///     byte copied.
   /// - Throws: Any error thrown while reading from `source`.
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
+  @_lifetime(borrow source)
   public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    from byteOffset: inout Int, copying source: borrowing I
-  ) throws(I.Failure) where I.Element == UInt8 {
+    startingAt byteOffset: inout Int, copying source: borrowing I
+  ) throws(I.Failure) -> I.BorrowingIterator where I.Element == UInt8 {
     var iterator = source.makeBorrowingIterator()
-    try updateElements(from: &byteOffset, copying: &iterator)
-    let next = try iterator.nextSpan()
-    _precondition(next.isEmpty)
+    try updateElements(startingAt: &byteOffset, copying: &iterator)
+    return iterator
   }
 
   /// Overwrites bytes of this span, starting at a byte offset, by copying
-  /// every byte of the source.
+  /// bytes from a span.
   ///
-  /// This span must have enough space from `byteOffset` to its end
-  /// (`byteOffset..<byteCount`) for every byte provided by `source`.
+  /// Copying stops as soon as `source` has provided all its elements,
+  /// or the end of this span is reached, whichever comes first.
+  ///
+  /// This function is equivalent to the generic `Iterable` overload of
+  /// `updateElements`, except that the returned iterator depends on the
+  /// memory `source` refers to, rather than on `source` itself. As a result,
+  /// `source` can be a temporary value.
   ///
   /// - Parameters:
   ///   - byteOffset: The offset at which to start copying. It must be a valid
-  ///      offset into this span, or equal to its `byteCount`.
+  ///      offset into this span, or equal to its `byteCount`. On return, it
+  ///      is updated to the offset after the last byte updated.
   ///   - source: The bytes to copy into this span.
-  /// - Returns: The offset after the last byte updated.
+  /// - Returns: An iterator over `source`, positioned after the last
+  ///     byte copied.
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
-  public mutating func updateElements<
-    I: Iterable & ~Escapable & ~Copyable
-  >(
-    from byteOffset: Int, copying source: borrowing I
-  ) -> Int where I.Element == UInt8, I.Failure == Never {
-    var byteOffset = byteOffset
-    updateElements(from: &byteOffset, copying: source)
-    return byteOffset
+  @_lifetime(copy source)
+  public mutating func updateElements(
+    startingAt byteOffset: inout Int, copying source: Span<UInt8>
+  ) -> Span<UInt8>.BorrowingIterator {
+    var iterator = Span<UInt8>.BorrowingIterator(source)
+    updateElements(startingAt: &byteOffset, copying: &iterator)
+    return iterator
+  }
+
+  /// Overwrites bytes of this span, starting at a byte offset, by copying
+  /// bytes from a raw span.
+  ///
+  /// Copying stops as soon as `source` has provided all its bytes,
+  /// or the end of this span is reached, whichever comes first.
+  ///
+  /// This function is equivalent to the generic `Iterable` overload of
+  /// `updateElements`, except that the returned iterator depends on the
+  /// memory `source` refers to, rather than on `source` itself. As a result,
+  /// `source` can be a temporary value.
+  ///
+  /// - Parameters:
+  ///   - byteOffset: The offset at which to start copying. It must be a valid
+  ///      offset into this span, or equal to its `byteCount`. On return, it
+  ///      is updated to the offset after the last byte updated.
+  ///   - source: The bytes to copy into this span.
+  /// - Returns: An iterator over `source`, positioned after the last
+  ///     byte copied.
+  @export(implementation)
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  @_lifetime(copy source)
+  public mutating func updateElements(
+    startingAt byteOffset: inout Int, copying source: RawSpan
+  ) -> Span<UInt8>.BorrowingIterator {
+    updateElements(startingAt: &byteOffset, copying: Span(viewing: source))
   }
 
   /// Overwrites bytes of this span, starting at a byte offset, by copying
@@ -1007,7 +1043,7 @@ extension MutableRawSpan {
   public mutating func updateElements<
     I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
   >(
-    from byteOffset: inout Int,
+    startingAt byteOffset: inout Int,
     copying source: inout I
   ) throws(I.Failure) where I.Element == UInt8 {
     _precondition(

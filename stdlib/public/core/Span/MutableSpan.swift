@@ -795,10 +795,10 @@ extension MutableSpan {
 
 #if !SPAN_COMPATIBILITY_STUB
   /// Overwrites elements of this span, starting at an index, by copying
-  /// every element of the source.
+  /// elements from the source.
   ///
-  /// This span must have enough space from `index` to its end
-  /// (`index..<count`) for every element provided by `source`.
+  /// Copying stops as soon as `source` has provided all its elements,
+  /// or the end of this span is reached, whichever comes first.
   ///
   /// If reading from `source` throws an error, the elements copied before
   /// the error occurred remain in this span, and `index` is updated to
@@ -809,47 +809,55 @@ extension MutableSpan {
   ///      index of this span, or equal to its `count`. On return, it is
   ///      updated to the index after the last element updated.
   ///   - source: The elements to copy into this span.
+  /// - Returns: An iterator over `source`, positioned after the last
+  ///     element copied.
   /// - Throws: Any error thrown while reading from `source`.
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
+  @_lifetime(borrow source)
   public mutating func updateElements<
     I: Iterable & ~Escapable & ~Copyable
   >(
-    from index: inout Index, copying source: borrowing I
-  ) throws(I.Failure) where I.Element == Element {
+    startingAt index: inout Index, copying source: borrowing I
+  ) throws(I.Failure) -> I.BorrowingIterator where I.Element == Element {
     var iterator = source.makeBorrowingIterator()
-    try updateElements(from: &index, copying: &iterator)
-    let next = try iterator.nextSpan()
-    _precondition(next.isEmpty)
+    try updateElements(startingAt: &index, copying: &iterator)
+    return iterator
   }
 
   /// Overwrites elements of this span, starting at an index, by copying
-  /// every element of the source.
+  /// elements from the source.
   ///
-  /// This span must have enough space from `index` to its end
-  /// (`index..<count`) for every element provided by `source`.
+  /// Copying stops as soon as `source` has provided all its elements,
+  /// or the end of this span is reached, whichever comes first.
+  ///
+  /// This function is equivalent to the generic `Iterable` overload of
+  /// `updateElements`, except that the returned iterator depends on the
+  /// memory `source` refers to, rather than on `source` itself. As a result,
+  /// `source` can be a temporary value.
   ///
   /// - Parameters:
   ///   - index: The index at which to start copying. It must be a valid
-  ///      index of this span, or equal to its `count`.
+  ///      index of this span, or equal to its `count`. On return, it is
+  ///      updated to the index after the last element updated.
   ///   - source: The elements to copy into this span.
-  /// - Returns: The index after the last element updated.
+  /// - Returns: An iterator over `source`, positioned after the last
+  ///     element copied.
   @export(implementation)
   @available(SwiftStdlib 6.4, *)
   @_lifetime(self: copy self)
-  public mutating func updateElements<
-    I: Iterable & ~Escapable & ~Copyable
-  >(
-    from index: Index, copying source: borrowing I
-  ) -> Index where I.Element == Element, I.Failure == Never {
-    var index = index
-    updateElements(from: &index, copying: source)
-    return index
+  @_lifetime(copy source)
+  public mutating func updateElements(
+    startingAt index: inout Index, copying source: Span<Element>
+  ) -> Span<Element>.BorrowingIterator {
+    var iterator = Span<Element>.BorrowingIterator(source)
+    updateElements(startingAt: &index, copying: &iterator)
+    return iterator
   }
 
   /// Overwrites elements of this span, starting at an index, by copying
-  /// elements from an iterator.
+  /// elements from the source.
   ///
   /// Copying stops as soon as `source` has provided all its elements,
   /// or the end of this span is reached, whichever comes first.
@@ -871,7 +879,7 @@ extension MutableSpan {
   public mutating func updateElements<
     I: BorrowingIteratorProtocol & ~Escapable & ~Copyable
   >(
-    from index: inout Index, copying source: inout I
+    startingAt index: inout Index, copying source: inout I
   ) throws(I.Failure) where I.Element == Element {
     _precondition(
       UInt(bitPattern: index) <= UInt(bitPattern: _count),
