@@ -19,7 +19,7 @@
 // RUN: %FileCheck %s < %t/explicit-clang-target-irgen.ll
 
 // Ensure that the platform version check is not optimized away, which it would, if we code-generate for '-clang-target' of macosx12.0
-// CHECK: {{%[0-9]+}} = tail call i32 @__isPlatformVersionAtLeast(i32 1, i32 11, i32 0, i32 0)
+// CHECK: {{%[0-9]+}} = {{.*}}call i32 @__isPlatformVersionAtLeast(i32 1, i32 11, i32 0, i32 0)
 
 //--- map.json.template
 [

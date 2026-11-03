@@ -36,6 +36,20 @@ ClassMetadata CLASS_METADATA_SYM(s26__EmptyDictionarySingleton);
 // _direct type metadata for Swift.__EmptySetSingleton
 SWIFT_RUNTIME_STDLIB_API
 ClassMetadata CLASS_METADATA_SYM(s19__EmptySetSingleton);
+
+extern "C" {
+
+SWIFT_RUNTIME_STDLIB_API
+struct _SwiftEmptyArrayStorage _swiftEmptyArrayStorage;
+
+SWIFT_RUNTIME_STDLIB_API
+struct _SwiftEmptyDictionarySingleton _swiftEmptyDictionarySingleton;
+
+SWIFT_RUNTIME_STDLIB_API
+struct _SwiftEmptySetSingleton _swiftEmptySetSingleton;
+
+}
+
 } // namespace swift
 
 SWIFT_RUNTIME_STDLIB_API
