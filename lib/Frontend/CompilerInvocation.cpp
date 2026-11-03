@@ -4135,6 +4135,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
     Opts.EnableReflectionNames = false;
   }
 
+  if (Args.hasArg(OPT_disable_objc_ivar_metadata)) {
+    Opts.DisableObjCIvarMetadata = true;
+  }
+
   if (Args.hasArg(OPT_disable_llvm_merge_functions_pass)) {
     Opts.DisableLLVMMergeFunctions = true;
   }
