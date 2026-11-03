@@ -850,7 +850,7 @@ fileprivate final class ProjectGenerator {
             """
         }
         script += """
-          ninja -C \(spec.runnableBuildDir.path.escaped) -- \
+          xcrun ninja -C \(spec.runnableBuildDir.path.escaped) -- \
           \(runnable.ninjaTargetName.escaped)
           """
         target.addShellScriptBuildPhase(
