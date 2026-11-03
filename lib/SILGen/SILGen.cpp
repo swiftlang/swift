@@ -1585,7 +1585,7 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // A member of a back-deployed type that has no body, such as the implicit
   // members of a derived conformance when the module is built from its
   // textual interface, has nothing to use as a fallback.
-  if (AFD->isBackDeployed() &&
+  if (AFD->isBackDeployed() && !isa<DestructorDecl>(AFD) &&
       (AFD->hasBody() || AFD->getAttrs().hasAttribute<BackDeployedAttr>() ||
        (isa<AccessorDecl>(AFD) &&
         cast<AccessorDecl>(AFD)->getStorage()
@@ -1952,6 +1952,14 @@ void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
     SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
     emitFunctionDefinition(deallocator,
                            getFunction(deallocator, ForDefinition));
+
+    // Clients of a back-deployed type emit their own copy of its deinit when
+    // needed.
+    if (dd->isBackDeployed()) {
+      auto fallback = deallocator.asBackDeploymentKind(
+          SILDeclRef::BackDeploymentKind::Fallback);
+      emitFunctionDefinition(fallback, getFunction(fallback, ForDefinition));
+    }
   }
 }
 

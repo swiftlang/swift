@@ -1453,6 +1453,10 @@ void SILGenModule::emitNonCopyableTypeDeinitTable(NominalTypeDecl *nom) {
     return;
 
   SILDeclRef constant(dd, SILDeclRef::Kind::Deallocator);
+  // The deinit of a back-deployed type is serialized as a fallback.
+  if (dd->isBackDeployed() && dd->hasBody())
+    constant = constant.asBackDeploymentKind(
+        SILDeclRef::BackDeploymentKind::Fallback);
   SILFunction *f = getFunction(constant, NotForDefinition);
   auto serialized = SerializedKind_t::IsNotSerialized;
   bool nomIsPublic = nom->getEffectiveAccess() >= AccessLevel::Public;

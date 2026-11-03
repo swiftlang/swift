@@ -162,6 +162,19 @@ void SILGenModule::useConformancesFromType(SILInstruction *inst, CanType type) {
       }
     }
 
+    // The value witnesses that this module emits for a back-deployed
+    // noncopyable type call its deinit, so load the type's deinit table and
+    // the body of the deinit that it refers to.
+    if (decl->isBackDeployedIntoClient() && !decl->canBeCopyable() &&
+        decl->hasValueTypeDestructor()) {
+      if (auto *deinit = M.lookUpMoveOnlyDeinit(
+              decl, /*deserializeLazily=*/true)) {
+        auto *impl = deinit->getImplementation();
+        if (impl->isExternalDeclaration())
+          M.loadFunction(impl, SILModule::LinkingMode::LinkNormal);
+      }
+    }
+
     // If this is an imported noncopyable type with a deinitializer, record it.
     if (decl->hasClangNode() && !decl->canBeCopyable() &&
         decl->hasValueTypeDestructor() &&
