@@ -60,3 +60,63 @@ bb0(%0 : @owned $AnyObject):
   return %8
 }
 
+// CHECK-LABEL: // specialized generic_checked_cast_to_nserror
+// CHECK-LABEL: sil shared [ossa] @$s31generic_checked_cast_to_nserrorSo7NSErrorC_Tg5 :
+// CHECK: store %0 to [init]
+// CHECK: checked_cast_addr_br take_on_success NSObject in {{.*}} to NSError
+// CHECK: load [take]
+// CHECK-LABEL: } // end sil function '$s31generic_checked_cast_to_nserrorSo7NSErrorC_Tg5'
+sil [ossa] @generic_checked_cast_to_nserror : $@convention(thin) <T where T : NSObject> (@owned NSObject) -> @owned Optional<T> {
+bb0(%0 : @owned $NSObject):
+  checked_cast_br NSObject in %0 : $NSObject to T, bb1, bb2
+
+bb1(%succ : @owned $T):
+  %some = enum $Optional<T>, #Optional.some!enumelt, %succ : $T
+  br bb3(%some : $Optional<T>)
+
+bb2(%fail : @owned $NSObject):
+  destroy_value %fail : $NSObject
+  %none = enum $Optional<T>, #Optional.none!enumelt
+  br bb3(%none : $Optional<T>)
+
+bb3(%result : @owned $Optional<T>):
+  return %result : $Optional<T>
+}
+
+sil [ossa] @caller_specialize_nserror : $@convention(thin) (@owned NSObject) -> @owned Optional<NSError> {
+bb0(%0 : @owned $NSObject):
+  %f = function_ref @generic_checked_cast_to_nserror : $@convention(thin) <T where T : NSObject> (@owned NSObject) -> @owned Optional<T>
+  %r = apply %f<NSError>(%0) : $@convention(thin) <T where T : NSObject> (@owned NSObject) -> @owned Optional<T>
+  return %r : $Optional<NSError>
+}
+
+protocol ParameterizedProto<T> {
+  associatedtype T
+}
+
+// CHECK-LABEL: sil shared [ossa] @$s29generic_checked_cast_metatype
+// CHECK-NOT: checked_cast_br (any AnyObject).Type in {{.*}} to (any ParameterizedProto<Int>).Type
+// CHECK: } // end sil function
+sil [ossa] @generic_checked_cast_metatype : $@convention(thin) <Element> () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick (any AnyObject).Type
+  checked_cast_br (any AnyObject).Type in %0 : $@thick (any AnyObject).Type to Element.Type, bb1, bb2
+
+bb1(%succ : $@thick Element.Type):
+  %t = integer_literal $Builtin.Int1, -1
+  br bb3(%t : $Builtin.Int1)
+
+bb2(%fail : $@thick (any AnyObject).Type):
+  %f = integer_literal $Builtin.Int1, 0
+  br bb3(%f : $Builtin.Int1)
+
+bb3(%result : $Builtin.Int1):
+  return %result : $Builtin.Int1
+}
+
+sil [ossa] @parameterized_existential_caller : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %f = function_ref @generic_checked_cast_metatype : $@convention(thin) <Element> () -> Builtin.Int1
+  %r = apply %f<any ParameterizedProto<Int>>() : $@convention(thin) <Element> () -> Builtin.Int1
+  return %r : $Builtin.Int1
+}
