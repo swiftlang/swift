@@ -20,3 +20,5 @@ public let benchmarks = [
 public func run_{name}(n: Int) {{
     // TODO
 }}
+
+//clunky much
