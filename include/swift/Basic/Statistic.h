@@ -49,6 +49,12 @@
 //    - Opens $dir/stats-$timestamp-$name-$random.json for writing
 //    - Calls llvm::PrintStatisticsJSON(ostream) and/or its own writer
 //
+// With -incremental-build-stats, it collects only the counters in
+// IncrementalBuildStatistics.def and the timers of tracers created as
+// incremental build events, and skips LLVM's statistics, so that the file
+// holds the same keys with or without assertions. Other tracers do nothing,
+// so traces and profiles see only the incremental build events too.
+//
 // Generally we make one of these per-process: either early in the life of the
 // driver, or early in the life of the frontend.
 
@@ -178,6 +184,10 @@ private:
   /// Whether we are printing all stats even if they are zero.
   bool IsPrintingZeroStats;
 
+  /// Whether we collect only the statistics in IncrementalBuildStatistics.def,
+  /// rather than every statistic.
+  bool IsCollectingIncrementalBuildStatsOnly;
+
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(raw_ostream &OS);
 
@@ -190,7 +200,8 @@ private:
                        bool TraceEvents,
                        bool ProfileEvents,
                        bool ProfileEntities,
-                       bool PrintZeroStats);
+                       bool PrintZeroStats,
+                       bool IncrementalBuildStats);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef ModuleName,
@@ -205,10 +216,21 @@ public:
                        bool TraceEvents,
                        bool ProfileEvents,
                        bool ProfileEntities,
-                       bool PrintZeroStats);
+                       bool PrintZeroStats,
+                       bool IncrementalBuildStats = false);
   ~UnifiedStatsReporter();
 
   bool fineGrainedTimers() const { return FineGrainedTimers; }
+
+  /// Whether this process collects any counter of the subsystem \p Name: the
+  /// name prefix of a counter in Statistics.def, such as "AST" or "SILModule".
+  /// Code that fills a subsystem's counters in bulk checks this first.
+  bool isCollectingSubsystem(StringRef Name) const;
+
+  /// Whether this process collects only the incremental build statistics.
+  bool isCollectingIncrementalBuildStatsOnly() const {
+    return IsCollectingIncrementalBuildStatsOnly;
+  }
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
@@ -225,7 +247,8 @@ class FrontendStatsTracer
   FrontendStatsTracer(UnifiedStatsReporter *Reporter,
                       StringRef EventName,
                       const void *Entity,
-                      const UnifiedStatsReporter::TraceFormatter *Formatter);
+                      const UnifiedStatsReporter::TraceFormatter *Formatter,
+                      bool IsIncrementalBuildEvent);
 
   // In the general case we do not know how to format an entity for tracing.
   template<typename T> static
@@ -251,25 +274,34 @@ public:
   /// entity type, and produce a tracer that's either active or inert depending
   /// on whether the provided \p Reporter is null (nullptr means "tracing is
   /// disabled").
-  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName);
+  ///
+  /// \p IsIncrementalBuildEvent marks a tracer whose timer belongs to the
+  /// statistics that -incremental-build-stats collects. With that flag, every
+  /// other tracer is inert.
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const Decl *D);
+                      bool IsIncrementalBuildEvent = false);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const ProtocolConformance *P);
+                      const Decl *D, bool IsIncrementalBuildEvent = false);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const clang::Decl *D);
+                      const ProtocolConformance *P,
+                      bool IsIncrementalBuildEvent = false);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const Expr *E);
+                      const clang::Decl *D,
+                      bool IsIncrementalBuildEvent = false);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const SILFunction *F);
+                      const Expr *E, bool IsIncrementalBuildEvent = false);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const SourceFile *F);
+                      const SILFunction *F,
+                      bool IsIncrementalBuildEvent = false);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const Stmt *S);
+                      const SourceFile *F,
+                      bool IsIncrementalBuildEvent = false);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const Pattern *P);
+                      const Stmt *S, bool IsIncrementalBuildEvent = false);
   FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
-                      const TypeRepr *TR);
+                      const Pattern *P, bool IsIncrementalBuildEvent = false);
+  FrontendStatsTracer(UnifiedStatsReporter *Reporter, StringRef EventName,
+                      const TypeRepr *TR, bool IsIncrementalBuildEvent = false);
 };
 
 // In particular cases, we do know how to format traced entities: we declare
@@ -320,52 +352,60 @@ FrontendStatsTracer::getTraceFormatter<const TypeRepr *>();
 // specifier scope cannot be used to declare them).
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
-                                                StringRef S)
-    : FrontendStatsTracer(R, S, nullptr, nullptr) {}
+                                                StringRef S, bool IB)
+    : FrontendStatsTracer(R, S, nullptr, nullptr, IB) {}
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
-                                                StringRef S, const Decl *D)
-    : FrontendStatsTracer(R, S, D, getTraceFormatter<const Decl *>()) {}
+                                                StringRef S, const Decl *D,
+                                                bool IB)
+    : FrontendStatsTracer(R, S, D, getTraceFormatter<const Decl *>(), IB) {}
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
                                                 StringRef S,
-                                                const ProtocolConformance *P)
+                                                const ProtocolConformance *P,
+                                                bool IB)
     : FrontendStatsTracer(R, S, P,
-                          getTraceFormatter<const ProtocolConformance *>()) {}
+                          getTraceFormatter<const ProtocolConformance *>(),
+                          IB) {}
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
                                                 StringRef S,
-                                                const clang::Decl *D)
-    : FrontendStatsTracer(R, S, D, getTraceFormatter<const clang::Decl *>()) {}
+                                                const clang::Decl *D, bool IB)
+    : FrontendStatsTracer(R, S, D, getTraceFormatter<const clang::Decl *>(),
+                          IB) {}
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
-                                                StringRef S, const Expr *E)
-    : FrontendStatsTracer(R, S, E, getTraceFormatter<const Expr *>()) {}
-
-inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
-                                                StringRef S,
-                                                const SILFunction *F)
-    : FrontendStatsTracer(R, S, F, getTraceFormatter<const SILFunction *>()) {}
+                                                StringRef S, const Expr *E,
+                                                bool IB)
+    : FrontendStatsTracer(R, S, E, getTraceFormatter<const Expr *>(), IB) {}
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
                                                 StringRef S,
-                                                const SourceFile *SF)
-    : FrontendStatsTracer(R, S, SF, getTraceFormatter<const SourceFile *>()) {}
+                                                const SILFunction *F, bool IB)
+    : FrontendStatsTracer(R, S, F, getTraceFormatter<const SILFunction *>(),
+                          IB) {}
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
                                                 StringRef S,
-                                                const Stmt *ST)
-    : FrontendStatsTracer(R, S, ST, getTraceFormatter<const Stmt *>()) {}
+                                                const SourceFile *SF, bool IB)
+    : FrontendStatsTracer(R, S, SF, getTraceFormatter<const SourceFile *>(),
+                          IB) {}
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
                                                 StringRef S,
-                                                const Pattern *P)
-    : FrontendStatsTracer(R, S, P, getTraceFormatter<const Pattern *>()) {}
+                                                const Stmt *ST, bool IB)
+    : FrontendStatsTracer(R, S, ST, getTraceFormatter<const Stmt *>(), IB) {}
 
 inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
                                                 StringRef S,
-                                                const TypeRepr *TR)
-    : FrontendStatsTracer(R, S, TR, getTraceFormatter<const TypeRepr *>()) {}
+                                                const Pattern *P, bool IB)
+    : FrontendStatsTracer(R, S, P, getTraceFormatter<const Pattern *>(), IB) {}
+
+inline FrontendStatsTracer::FrontendStatsTracer(UnifiedStatsReporter *R,
+                                                StringRef S,
+                                                const TypeRepr *TR, bool IB)
+    : FrontendStatsTracer(R, S, TR, getTraceFormatter<const TypeRepr *>(),
+                          IB) {}
 
 /// Utilities for constructing TraceFormatters from entities in the request-evaluator:
 

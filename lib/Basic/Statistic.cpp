@@ -67,7 +67,8 @@ static std::string
 makeFileName(StringRef Prefix,
              StringRef ProgramName,
              StringRef AuxName,
-             StringRef Suffix) {
+             StringRef Suffix,
+             StringRef Tag = StringRef()) {
   std::string tmp;
   raw_string_ostream stream(tmp);
   auto now = std::chrono::system_clock::now();
@@ -77,15 +78,21 @@ makeFileName(StringRef Prefix,
          << "-" << usec.count()
          << "-" << ProgramName
          << "-" << AuxName
-         << "-" << Process::GetRandomNumber()
-         << "." << Suffix;
+         << "-" << Process::GetRandomNumber();
+  if (!Tag.empty())
+    stream << "-" << Tag;
+  stream << "." << Suffix;
   return stream.str();
 }
 
 static std::string
 makeStatsFileName(StringRef ProgramName,
-                  StringRef AuxName) {
-  return makeFileName("stats", ProgramName, AuxName, "json");
+                  StringRef AuxName,
+                  bool IncrementalBuildStats) {
+  // The tag tells a file of the incremental build statistics from a file of
+  // every statistic. The pattern in utils/jobstats/jobstats.py allows it.
+  return makeFileName("stats", ProgramName, AuxName, "json",
+                      IncrementalBuildStats ? "incremental" : StringRef());
 }
 
 static std::string
@@ -305,6 +312,41 @@ struct UnifiedStatsReporter::StatsProfilers
   {}
 };
 
+namespace {
+
+/// One flag for each frontend counter: whether -incremental-build-stats
+/// collects it.
+struct IncrementalBuildCounters {
+#define FRONTEND_STATISTIC(Subsystem, Id) bool Id = false;
+#include "swift/Basic/Statistics.def"
+#undef FRONTEND_STATISTIC
+
+  IncrementalBuildCounters() {
+#define INCREMENTAL_BUILD_COUNTER(Subsystem, Id) Id = true;
+#include "swift/Basic/IncrementalBuildStatistics.def"
+#undef INCREMENTAL_BUILD_COUNTER
+  }
+};
+
+} // end anonymous namespace
+
+/// The counters that -incremental-build-stats collects.
+static const IncrementalBuildCounters &getIncrementalBuildCounters() {
+  static const IncrementalBuildCounters Counters;
+  return Counters;
+}
+
+bool UnifiedStatsReporter::isCollectingSubsystem(StringRef Name) const {
+  if (!IsCollectingIncrementalBuildStatsOnly)
+    return true;
+#define INCREMENTAL_BUILD_COUNTER(Subsystem, Id)                               \
+  if (Name == #Subsystem)                                                      \
+    return true;
+#include "swift/Basic/IncrementalBuildStatistics.def"
+#undef INCREMENTAL_BUILD_COUNTER
+  return false;
+}
+
 UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            StringRef ModuleName,
                                            StringRef InputName,
@@ -318,7 +360,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            bool TraceEvents,
                                            bool ProfileEvents,
                                            bool ProfileEntities,
-                                           bool PrintZeroStats)
+                                           bool PrintZeroStats,
+                                           bool IncrementalBuildStats)
   : UnifiedStatsReporter(ProgramName,
                          auxName(ModuleName,
                                  InputName,
@@ -328,7 +371,7 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                          Directory,
                          SM, CSM, FineGrainedTimers,
                          TraceEvents, ProfileEvents, ProfileEntities,
-                         PrintZeroStats)
+                         PrintZeroStats, IncrementalBuildStats)
 {
 }
 
@@ -341,7 +384,8 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
                                            bool TraceEvents,
                                            bool ProfileEvents,
                                            bool ProfileEntities,
-                                           bool PrintZeroStats)
+                                           bool PrintZeroStats,
+                                           bool IncrementalBuildStats)
   : currentProcessExitStatusSet(false),
     currentProcessExitStatus(EXIT_FAILURE),
     StatsFilename(Directory),
@@ -357,12 +401,16 @@ UnifiedStatsReporter::UnifiedStatsReporter(StringRef ProgramName,
     RecursiveTimers(std::make_unique<RecursionSafeTimers>()),
     FineGrainedTimers(FineGrainedTimers),
     IsFlushingTracesAndProfiles(false),
-    IsPrintingZeroStats(PrintZeroStats)
+    IsPrintingZeroStats(PrintZeroStats),
+    IsCollectingIncrementalBuildStatsOnly(IncrementalBuildStats)
 {
-  path::append(StatsFilename, makeStatsFileName(ProgramName, AuxName));
+  path::append(StatsFilename,
+               makeStatsFileName(ProgramName, AuxName, IncrementalBuildStats));
   path::append(TraceFilename, makeTraceFileName(ProgramName, AuxName));
   path::append(ProfileDirname, makeProfileDirName(ProgramName, AuxName));
-  EnableStatistics(/*PrintOnExit=*/false);
+  // The incremental build set has none of LLVM's statistics.
+  if (!IncrementalBuildStats)
+    EnableStatistics(/*PrintOnExit=*/false);
   if (TraceEvents || ProfileEvents || ProfileEntities)
     LastTracedFrontendCounters.emplace();
   if (TraceEvents)
@@ -457,9 +505,14 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
   const char *delim = "";
   if (FrontendCounters) {
     auto &C = getFrontendCounters();
+    // With -incremental-build-stats, only the counters in the set.
+    const IncrementalBuildCounters *Selected =
+        IsCollectingIncrementalBuildStatsOnly ? &getIncrementalBuildCounters()
+                                              : nullptr;
 #define FRONTEND_STATISTIC(TY, NAME)                          \
     do {                                                      \
-      if (C.NAME || IsPrintingZeroStats) {                    \
+      if ((C.NAME || IsPrintingZeroStats) &&                  \
+          (!Selected || Selected->NAME)) {                    \
         OS << delim << "\t\"" #TY "." #NAME "\": " << C.NAME; \
         delim = ",\n";                                        \
       }                                                       \
@@ -488,12 +541,19 @@ UnifiedStatsReporter::printAlwaysOnStatsAndTimers(raw_ostream &OS) {
 
 FrontendStatsTracer::FrontendStatsTracer(
     UnifiedStatsReporter *Reporter, StringRef EventName, const void *Entity,
-    const UnifiedStatsReporter::TraceFormatter *Formatter)
+    const UnifiedStatsReporter::TraceFormatter *Formatter,
+    bool IsIncrementalBuildEvent)
     : Reporter(Reporter), SavedTime(), EventName(EventName), Entity(Entity),
       Formatter(Formatter) {
-  if (Reporter) {
+  // With -incremental-build-stats, a tracer outside the set is inert: it
+  // reads no clock and reports nothing.
+  if (this->Reporter &&
+      this->Reporter->isCollectingIncrementalBuildStatsOnly() &&
+      !IsIncrementalBuildEvent)
+    this->Reporter = nullptr;
+  if (this->Reporter) {
     SavedTime = llvm::TimeRecord::getCurrentTime();
-    Reporter->saveAnyFrontendStatsEvents(*this, true);
+    this->Reporter->saveAnyFrontendStatsEvents(*this, true);
   }
 }
 
@@ -732,9 +792,15 @@ UnifiedStatsReporter::~UnifiedStatsReporter()
   //    manually.
 
 #if !defined(NDEBUG) || LLVM_ENABLE_STATS
-  publishAlwaysOnStatsToLLVM();
-  PrintStatisticsJSON(ostream);
-  TimerGroup::clearAll();
+  if (!IsCollectingIncrementalBuildStatsOnly) {
+    publishAlwaysOnStatsToLLVM();
+    PrintStatisticsJSON(ostream);
+    TimerGroup::clearAll();
+  } else {
+    // The incremental build set has none of LLVM's statistics, so the file
+    // holds the same keys with or without assertions.
+    printAlwaysOnStatsAndTimers(ostream);
+  }
 #else
   printAlwaysOnStatsAndTimers(ostream);
 #endif

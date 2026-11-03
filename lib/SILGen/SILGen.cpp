@@ -2333,7 +2333,8 @@ ASTLoweringRequest::evaluate(Evaluator &evaluator,
                                              desc.opts, desc.irgenOptions);
 
   auto &ctx = silMod->getASTContext();
-  FrontendStatsTracer tracer(ctx.Stats, "SILGen");
+  FrontendStatsTracer tracer(ctx.Stats, "SILGen",
+                             /*IsIncrementalBuildEvent=*/true);
 
   // If all function bodies are being skipped there's no reason to do any
   // SIL generation.
