@@ -105,7 +105,7 @@ extension X {
     shadowedByMemberOnXinB() // expected-member-visibility-warning{{'shadowedByMemberOnXinB()' is deprecated}}
     shadowedByMemberOnXinC()
 
-    _ = max(0, 1) // expected-ambiguity-error{{static member 'max' cannot be used on instance of type 'X'}}
+    _ = max(0, 1) // expected-ambiguity-error{{static member 'max' can only be used on the type 'X', not on the instance self}}
     // expected-ambiguity-error@-1{{cannot call value of non-function type 'Int'}}
   }
 
