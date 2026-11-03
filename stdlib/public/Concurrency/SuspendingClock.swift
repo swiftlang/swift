@@ -21,7 +21,6 @@ import Swift
 ///
 /// This clock is suitable for high resolution measurements of execution.
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 public struct SuspendingClock: Sendable {
   public struct Instant: Sendable {
     internal var _value: Swift.Duration
@@ -41,7 +40,6 @@ extension SuspendingClock.Instant: Codable {
 #endif
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension Clock where Self == SuspendingClock {
   /// A clock that measures time that always increments but stops incrementing
   /// while the system is asleep.
@@ -53,7 +51,6 @@ extension Clock where Self == SuspendingClock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension SuspendingClock: Clock {
   /// The current instant accounting for machine suspension.
   @available(StdlibDeploymentTarget 5.7, *)
@@ -103,9 +100,27 @@ extension SuspendingClock: Clock {
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
     if #available(StdlibDeploymentTarget 6.3, *) {
+      #if $Embedded
+      // Embedded cannot dynamically cast the generic clock's associated types,
+      // so decompose the concrete deadline here and use the concrete sleep path.
+      let deadlineComponents = self.timestamp(for: deadline)
+      let toleranceComponents: (seconds: Int64, nanoseconds: Int64)
+      if let tolerance {
+        toleranceComponents = self.durationComponents(for: tolerance)
+      } else {
+        toleranceComponents = (0, -1)
+      }
+      try await Task._sleepUntilDeadline(
+        clockID: deadlineComponents.clockID,
+        seconds: deadlineComponents.seconds,
+        nanoseconds: deadlineComponents.nanoseconds,
+        toleranceSeconds: toleranceComponents.seconds,
+        toleranceNanoseconds: toleranceComponents.nanoseconds)
+      #else
       try await Task._sleep(until: deadline,
                             tolerance: tolerance,
                             clock: self)
+      #endif
     } else {
       fatalError("we shouldn't get here; if we have, availability is broken")
     }
@@ -122,7 +137,6 @@ extension SuspendingClock: Clock {
 }
 
 @available(StdlibDeploymentTarget 5.7, *)
-@_unavailableInEmbedded
 extension SuspendingClock {
   @available(SwiftStdlib 5.7, *)
   @export(implementation)
@@ -132,7 +146,6 @@ extension SuspendingClock {
 }
 
 @available(SwiftStdlib 5.7, *)
-@_unavailableInEmbedded
 extension SuspendingClock.Instant: InstantProtocol {
   public static var now: SuspendingClock.Instant { SuspendingClock().now }
 
