@@ -234,6 +234,15 @@ func testKeyPaths(dict: [NC: Int], nc: NC) {
   _ = \HasNC.dict[nc] // expected-warning{{cannot form key path that captures non-Sendable type 'NC'}}
 }
 
+@dynamicMemberLookup
+struct NonSendableKeyPathLens<T> {
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U { fatalError() }
+}
+
+func testDynamicMemberLookupKeyPaths() {
+  _ = \NonSendableKeyPathLens<HasNC>.dict // expected-warning{{cannot form key path that captures non-Sendable type 'KeyPath<HasNC, [NC : Int]>'}}
+}
+
 // ----------------------------------------------------------------------
 // Sendable restriction on nonisolated declarations.
 // ----------------------------------------------------------------------
