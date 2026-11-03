@@ -150,7 +150,7 @@
                 "swift-llvm-bindings": "stable/23.x",
                 "swift": "main",
                 "cmark": "gfm",
-                "llbuild": "main",
+                "llbuild": "package-swift-6.2",
                 "swift-build": "main",
                 "swift-toolchain-sarif": "main",
                 "swift-toolchain-sqlite": "1.0.13",
