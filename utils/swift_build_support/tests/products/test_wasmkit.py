@@ -73,7 +73,7 @@ class WasmKitTestCase(unittest.TestCase):
             source_dir='/path/to/src',
             build_dir='/path/to/build')
         wasmkit_product.build("linux-x86_64")
-        self.assertNotIn("-arch ", self.stdout)
+        self.assertNotIn("-arch ", self.stdout.getvalue())
 
     def test_one_arch_flag_macos(self):
         wasmkit_product = WasmKit(
@@ -96,3 +96,12 @@ class WasmKitTestCase(unittest.TestCase):
         command_output = self.stdout.getvalue()
         self.assertIn("-arch arm64", command_output)
         self.assertIn("-arch x86_64", command_output)
+
+    def test_install_dry_run(self):
+        wasmkit_product = WasmKit(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        wasmkit_product.install("macosx-arm64")
+        self.assertIn("cp /path/to/build/wasmkit-cli", self.stdout.getvalue())
