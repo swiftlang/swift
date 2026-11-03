@@ -4476,7 +4476,8 @@ public:
           "result of ref_element_addr does not match type of field");
     }
     if (EI->getModule().getOptions().EnableImportPtrauthFieldFunctionPointers &&
-        EI->getField()->getPointerAuthQualifier().isPresent()) {
+        EI->getField()->getPointerAuthQualifier().isPresent() &&
+        EI->getField()->hasClangNode()) {
       for (auto *use : EI->getUses()) {
         auto *bai = dyn_cast<BeginAccessInst>(use->getUser());
         require(bai && bai->getEnforcement() == SILAccessEnforcement::Signed,
