@@ -31,7 +31,7 @@ public final class CompletelyHollowActorSystem: DistributedActorSystem {
   }
 
   public struct Decoder: InvocationDecoder {
-  // expected-error@-1 {{inheritance from non-protocol type 'CompletelyHollowActorSystem.InvocationDecoder' (aka 'CompletelyHollowActorSystem.Decoder')}}
+  // expected-error@-1 {{non-protocol type 'CompletelyHollowActorSystem.InvocationDecoder' (aka 'CompletelyHollowActorSystem.Decoder') cannot be used in a conformance list}}
 
   }
 
