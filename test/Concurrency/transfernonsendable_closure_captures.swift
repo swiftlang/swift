@@ -1552,11 +1552,13 @@ func useAfterFreeClosureTests() {
 
 func identity<T>(_ t: T) -> T { t }
 
+// Since we merge the result of 'f' into the task-isolated region of 'f', we
+// diagnose sending a task-isolated value instead of the use of 'x'.
 func useAfterSendClosureParameterResult(_ f: (KlassNonsendable) -> KlassNonsendable) {
   let x = KlassNonsendable()
   sendValue(f(x)) // expected-error {{sending 'f' risks causing data races}}
-  // expected-note @-1 {{'f' used after being passed as a 'sending' parameter; Later uses could race}}
-  useValue(x) // expected-note {{access can happen concurrently}}
+  // expected-note @-1 {{'f' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+  useValue(x)
 }
 
 func sendClosureParameterResultTaskIsolatedArgument(_ f: (KlassNonsendable) -> KlassNonsendable, _ x: KlassNonsendable) {
