@@ -154,8 +154,8 @@ class C4 {
 // UNRESOLVED_3_OPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Convertible]: nil[#SomeEnum1?#]; name=nil
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: none[#Optional<SomeEnum1>#]; name=none
 // UNRESOLVED_3_OPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
-// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws(Error) -> ~Copyable) -> ~Copyable?#]; name=map(:)
-// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws(Error) -> ~Copyable?) -> ~Copyable?#];
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((consuming SomeEnum1) throws(Error) -> ~Copyable) -> ~Copyable?#]; name=map(:)
+// UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((consuming SomeEnum1) throws(Error) -> ~Copyable?) -> ~Copyable?#];
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_3_OPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: take({#(self): &Optional<SomeEnum1>#})[#() -> Optional<SomeEnum1>#];
 
@@ -167,8 +167,8 @@ class C4 {
 // UNRESOLVED_3_OPTOPTOPT-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Convertible]: nil[#SomeEnum1???#]; name=nil
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: none[#Optional<SomeEnum1??>#]; name=none
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: some({#SomeEnum1??#})[#Optional<SomeEnum1??>#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws(Error) -> ~Copyable) -> ~Copyable?#];
-// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1??>#})[#((SomeEnum1??) throws(Error) -> ~Copyable?) -> ~Copyable?#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1??>#})[#((consuming SomeEnum1??) throws(Error) -> ~Copyable) -> ~Copyable?#];
+// UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1??>#})[#((consuming SomeEnum1??) throws(Error) -> ~Copyable?) -> ~Copyable?#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: take({#(self): &Optional<SomeEnum1??>#})[#() -> Optional<SomeEnum1??>#];
 // UNRESOLVED_3_OPTOPTOPT-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1??>#})[#(into: inout Hasher) -> Void#];
 
@@ -190,8 +190,8 @@ func testOptionalWithCustomExtension() {
 // UNRESOLVED_OPT_4-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: some({#Somewhere#})[#Optional<Somewhere>#];
 // UNRESOLVED_OPT_4-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init({#str: String#})[#Optional<Somewhere>#]; name=init(str:)
 // UNRESOLVED_OPT_4-DAG: Decl[StaticVar]/CurrNominal/TypeRelation[Convertible]: nowhere[#Optional<Somewhere>#]; name=nowhere
-// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<Somewhere>#})[#((Somewhere) throws(Error) -> ~Copyable) -> ~Copyable?#];
-// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<Somewhere>#})[#((Somewhere) throws(Error) -> ~Copyable?) -> ~Copyable?#];
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<Somewhere>#})[#((consuming Somewhere) throws(Error) -> ~Copyable) -> ~Copyable?#];
+// UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<Somewhere>#})[#((consuming Somewhere) throws(Error) -> ~Copyable?) -> ~Copyable?#];
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: take({#(self): &Optional<Somewhere>#})[#() -> Optional<Somewhere>#];
 // UNRESOLVED_OPT_4-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<Somewhere>#})[#(into: inout Hasher) -> Void#];
 // UNRESOLVED_OPT_4-NOT: init({#(some):
@@ -697,8 +697,8 @@ func testSameType() {
 // SUGAR_TYPE-DAG: Keyword[nil]/None/Erase[1]/TypeRelation[Convertible]: nil[#SomeEnum1?#];
 // SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: none[#Optional<SomeEnum1>#];
 // SUGAR_TYPE-DAG: Decl[EnumElement]/CurrNominal/IsSystem/TypeRelation[Convertible]: some({#SomeEnum1#})[#Optional<SomeEnum1>#];
-// SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws(Error) -> ~Copyable) -> ~Copyable?#];
-// SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((SomeEnum1) throws(Error) -> ~Copyable?) -> ~Copyable?#];
+// SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: map({#(self): Optional<SomeEnum1>#})[#((consuming SomeEnum1) throws(Error) -> ~Copyable) -> ~Copyable?#];
+// SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: flatMap({#(self): Optional<SomeEnum1>#})[#((consuming SomeEnum1) throws(Error) -> ~Copyable?) -> ~Copyable?#];
 // SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem: take({#(self): &Optional<SomeEnum1>#})[#() -> Optional<SomeEnum1>#];
 // SUGAR_TYPE-DAG: Decl[InstanceMethod]/CurrNominal/IsSystem/TypeRelation[Invalid]: hash({#(self): Optional<SomeEnum1>#})[#(into: inout Hasher) -> Void#];
 }
