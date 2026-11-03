@@ -70,6 +70,19 @@ struct Wrapper {
   var holder: Holder
 }
 
+struct ComputedBaseHolder {
+  var stored: Base
+  var computed: Base { stored }
+}
+
+final class ClassBaseHolder {
+  var base = Base(id: "")
+}
+
+struct ClassBaseHolderWrapper {
+  var holder: ClassBaseHolder
+}
+
 func f(_ s: View?) {}
 
 func make() -> Base? { Base(id: "") }
@@ -118,6 +131,20 @@ func computedOperand(_ c: Computed) {
 func computedMember(_ c: Computed?) {
   f(c?.computed?.view) // expected-error {{lifetime-dependent value escapes its scope}}
   // expected-note @-1 {{it depends on the lifetime of this parent value}}
+  // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+// A computed property after the binding produces a temporary value.
+func computedAfterBinding(_ c: ComputedBaseHolder?) {
+  f(c?.computed.view) // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-1 {{it depends on the lifetime of this parent value}}
+  // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+// Class storage after the binding isn't handled.
+func classPropertyAfterBinding(_ w: ClassBaseHolderWrapper?) {
+  f(w?.holder.base.view) // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-1 {{it depends on this scoped access to variable 'base'}}
   // expected-note @-2 {{this use of the lifetime-dependent value is out of scope}}
 }
 

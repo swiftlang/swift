@@ -3445,9 +3445,6 @@ static bool isValueTypeRootedLocalStorage(Expr *e) {
 /// borrowed before they split.
 static BindOptionalExpr *getBindOfAddressableOptional(SILGenFunction &SGF,
                                                       Expr *e) {
-  if (auto *load = dyn_cast<LoadExpr>(e))
-    e = load->getSubExpr()->getSemanticsProvidingExpr();
-
   auto *bind = dyn_cast<BindOptionalExpr>(e);
   if (!bind || !SGF.isInNonEscapableOptionalChain(bind->getDepth()))
     return nullptr;
@@ -3463,6 +3460,23 @@ static BindOptionalExpr *getBindOfAddressableOptional(SILGenFunction &SGF,
   return bind;
 }
 
+/// Return \p e if it is a binding borrowed in place, or a chain of stored
+/// properties starting with a binding borrowed in place.
+static Expr *getAddressablePath(SILGenFunction &SGF, Expr *e) {
+  if (auto *load = dyn_cast<LoadExpr>(e))
+    e = load->getSubExpr()->getSemanticsProvidingExpr();
+
+  auto *mre = dyn_cast<MemberRefExpr>(e);
+  if (!mre)
+    return getBindOfAddressableOptional(SGF, e) ? e : nullptr;
+
+  auto *var = dyn_cast<VarDecl>(mre->getMember().getDecl());
+  if (!var || !var->hasStorage())
+    return nullptr;
+
+  return getAddressablePath(SGF, mre->getBase()) ? e : nullptr;
+}
+
 LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
                               LValueOptions options, AbstractionPattern orig) {
   // First see if we have an lvalue type. If we do, then quickly handle that and
@@ -3474,8 +3488,8 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // If the component wants an addressable base, see whether we can provide
   // one.
   if (options.TryAddressable) {
-    if (auto *bind = getBindOfAddressableOptional(SGF, e))
-      return visit(bind, SGFAccessKind::BorrowedAddressRead, options);
+    if (auto *path = getAddressablePath(SGF, e))
+      return visit(path, SGFAccessKind::BorrowedAddressRead, options);
 
     auto ownership = mapAddressableValueOwnership(accessKind);
     if (auto addressable
@@ -4465,8 +4479,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   }
 
   // Keep the base addressable to project the property from the base's address.
-  if (options.TryAddressable
-      && getBindOfAddressableOptional(SGF, e->getBase())) {
+  if (options.TryAddressable && getAddressablePath(SGF, e->getBase())) {
     addressable = true;
     orig = AbstractionPattern::getOpaque();
   }
@@ -4951,16 +4964,8 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   }
   
   // Do formal evaluation of the base l-value.
-  LValue optLV;
-  auto *subMember =
-      dyn_cast<MemberRefExpr>(e->getSubExpr()->getSemanticsProvidingExpr());
-  if (subMember && getBindOfAddressableOptional(SGF, subMember->getBase())) {
-    // Project the property in place from an earlier binding in the chain.
-    optLV = visit(subMember, baseAccessKind, options.forComputedBaseLValue());
-  } else {
-    optLV = visitRec(e->getSubExpr(), baseAccessKind,
-                     options.forComputedBaseLValue());
-  }
+  LValue optLV = visitRec(e->getSubExpr(), baseAccessKind,
+                          options.forComputedBaseLValue());
   // For move-checking purposes, the binding is also treated as an opaque use
   // of the entire value, since we can't leave the value partially initialized
   // across multiple optional binding expressions.

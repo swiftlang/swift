@@ -44,6 +44,32 @@ func utf8Count(ofInout string: inout String?) -> Int? {
   byteCount(string?.utf8Span)
 }
 
+struct Name {
+  var string: String
+}
+
+struct Person {
+  var name: Name
+}
+
+@available(SwiftStdlib 6.2, *)
+@inline(never)
+func utf8Count(ofName name: Name?) -> Int? {
+  byteCount(name?.string.utf8Span)
+}
+
+@available(SwiftStdlib 6.2, *)
+@inline(never)
+func utf8Count(ofInoutName name: inout Name?) -> Int? {
+  byteCount(name?.string.utf8Span)
+}
+
+@available(SwiftStdlib 6.2, *)
+@inline(never)
+func utf8Count(ofPerson person: Person?) -> Int? {
+  byteCount(person?.name.string.utf8Span)
+}
+
 suite.test("Span from Small String")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }
@@ -187,4 +213,26 @@ suite.test("Span through an optional chain of UTF8Span")
   expectEqual(count(of: "abc"), 3)
   expectEqual(count(of: String(repeating: "x", count: 100)), 100)
   expectNil(count(of: nil))
+}
+
+suite.test("UTF8Span through stored properties after an optional binding")
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.2, *) else { return }
+
+  let small = Name(string: "abc")
+  let large = Name(string: String(repeating: "x", count: 100))
+  expectEqual(utf8Count(ofName: small), 3)
+  expectEqual(utf8Count(ofName: large), 100)
+  expectNil(utf8Count(ofName: nil))
+
+  var local: Name? = small
+  expectEqual(utf8Count(ofInoutName: &local), 3)
+  local = large
+  expectEqual(utf8Count(ofInoutName: &local), 100)
+  local = nil
+  expectNil(utf8Count(ofInoutName: &local))
+
+  expectEqual(utf8Count(ofPerson: Person(name: small)), 3)
+  expectEqual(utf8Count(ofPerson: Person(name: large)), 100)
+  expectNil(utf8Count(ofPerson: nil))
 }

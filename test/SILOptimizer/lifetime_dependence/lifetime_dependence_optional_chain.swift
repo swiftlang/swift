@@ -106,6 +106,22 @@ struct Observed {
   }
 }
 
+struct BaseHolder {
+  var base: Base
+}
+
+struct NestedBaseHolder {
+  var holder: BaseHolder
+}
+
+struct OptionalBaseHolder {
+  var holder: BaseHolder?
+}
+
+struct NoncopyableBaseHolder: ~Copyable {
+  var base: NoncopyableBase
+}
+
 func f(_ s: View?) {}
 
 func g(_ s: Window?) {}
@@ -238,4 +254,54 @@ func observedProperty(_ o: Observed) {
 
 func observedPropertyInout(_ o: inout Observed) {
   f(o.inner?.view)
+}
+
+func afterBinding(_ h: BaseHolder?) {
+  f(h?.base.view)
+}
+
+func afterBindingInout(_ h: inout BaseHolder?) {
+  f(h?.base.view)
+}
+
+func afterBindingLocal() {
+  let h: BaseHolder? = BaseHolder(base: make()!)
+  f(h?.base.view)
+}
+
+func afterBindingBoundToLet(_ h: BaseHolder?) {
+  let v = h?.base.view
+  f(v)
+}
+
+func twoHopsAfterBinding(_ h: NestedBaseHolder?) {
+  f(h?.holder.base.view)
+}
+
+func hopBeforeAndAfterBinding(_ l: OptionalBaseHolder) {
+  f(l.holder?.base.view)
+}
+
+func hopsAroundTwoBindings(_ l: OptionalBaseHolder?) {
+  f(l?.holder?.base.view)
+}
+
+func hopsAroundTwoBindingsInout(_ l: inout OptionalBaseHolder?) {
+  f(l?.holder?.base.view)
+}
+
+func noncopyableAfterBindingInout(_ h: inout NoncopyableBaseHolder?) {
+  f(h?.base.view)
+}
+
+func noncopyableAfterBindingConsuming(_ h: consuming NoncopyableBaseHolder?) {
+  f(h?.base.view)
+}
+
+func parenthesizedInout(_ b: inout Base?) {
+  f((b)?.view)
+}
+
+func parenthesizedHopInout(_ o: inout Outer) {
+  f((o.inner)?.view)
 }
