@@ -30,7 +30,7 @@ struct S: Sendable {
 }
 
 actor MyActor {
-  let s: Sendable
+  let s: S
 
   func call() async {
     s.performSync() // runs on actor's executor
