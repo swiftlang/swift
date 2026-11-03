@@ -3442,6 +3442,16 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   if (!storage)
     return nullptr;
 
+  // A capture held as a value has no memory to consume in place.
+  if (auto *vd = dyn_cast<VarDecl>(storage)) {
+    auto it = VarLocs.find(vd);
+    if (kind == StorageReferenceOperationKind::Consume &&
+        it != VarLocs.end() && vd->getDeclContext() != FunctionDC &&
+        !silConv.useLoweredAddresses() &&
+        it->second.value->getType().isObject())
+      return nullptr;
+  }
+
   // This should match the strategy computation used in
   // SILGenLValue::visit{DeclRef,Member}RefExpr.
   auto strategy = storage->getAccessStrategy(
