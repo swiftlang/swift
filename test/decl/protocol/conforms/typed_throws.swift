@@ -29,7 +29,7 @@ protocol VeryThrowing {
 struct ConformingToVeryThrowing: VeryThrowing {
   func f() throws(MyError) { } // okay to make type more specific
   func g() { } // okay to be non-throwing
-  func h() throws(MyError) { } // expected-note{{candidate throws, but protocol does not allow it}}
+  func h() throws(MyError) { } // expected-note{{candidate throws, but protocol does not allow it}}{{12-28=}} 
                                // FIXME: Diagnostic above should be better
   func i() throws(SubError) { } // okay to have a subtype
 
