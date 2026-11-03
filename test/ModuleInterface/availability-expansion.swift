@@ -7,7 +7,8 @@
 // RUN:   -define-availability "_macOS10_11:macOS 10.11" \
 // RUN:   -define-availability "_myProject 1.0:macOS 10.11" \
 // RUN:   -define-availability "_myProject 2.5:macOS 10.12" \
-// RUN:   -define-availability "_emptyMacro:*"
+// RUN:   -define-availability "_emptyMacro:*" \
+// RUN:   -define-availability "MyLib_v1_0:iOS 13.0, macOS 10.15, tvOS 13.0, watchOS 6.0"
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface)
 // RUN: %FileCheck %s < %t/Test.swiftinterface
@@ -46,3 +47,17 @@ public func emptyMacro() {}
 public func testSemanticsAvailability<T>(_ t: T) {}
 // CHECK: @_specialize(exported: true, kind: full, availability: macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0, *; where T == Swift::Int)
 // CHECK-NEXT: public func testSemanticsAvailability
+
+// A library's availability macro can overlap with an explicit platform
+// requirement, regardless of which attribute appears first.
+@available(macOS 15.0, *)
+@available(MyLib_v1_0, *)
+public func api() {}
+// CHECK: @available(macOS 15.0, iOS 13.0, tvOS 13.0, watchOS 6.0, *)
+// CHECK-NEXT: public func api()
+
+@available(MyLib_v1_0, *)
+@available(macOS 15.0, *)
+public func apiWithMacroFirst() {}
+// CHECK-NEXT: @available(iOS 13.0, macOS 15.0, tvOS 13.0, watchOS 6.0, *)
+// CHECK-NEXT: public func apiWithMacroFirst()
