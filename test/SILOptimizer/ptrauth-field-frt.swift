@@ -3,6 +3,9 @@
 // RUN: %target-build-swift -O -cxx-interoperability-mode=default \
 // RUN:   -import-objc-header %t/header.h %t/test.swift \
 // RUN:   -Xfrontend -sil-verify-all -emit-sil -o /dev/null
+// RUN: %target-build-swift -Onone -cxx-interoperability-mode=default \
+// RUN:   -import-objc-header %t/header.h %t/test.swift \
+// RUN:   -Xfrontend -sil-verify-all -emit-sil -o /dev/null
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: OS=macosx
@@ -30,6 +33,11 @@ Box {
 
 inline void BoxRetain(Box * _Nonnull) {}
 inline void BoxRelease(Box * _Nonnull) {}
+
+struct CStruct {
+  int (* _Nullable SIGNED_PTR fn)(void);
+  int * _Nullable SIGNED_DATA_PTR p;
+};
 
 //--- test.swift
 
@@ -60,4 +68,41 @@ public func writeKeyPath(_ b: Box, _ q: UnsafeMutablePointer<Int32>?) {
 
 public func readFnKeyPath(_ b: Box) -> (@convention(c) () -> Int32)? {
   return b[keyPath: \Box.fn]
+}
+
+// @inline(never) prevents the early inliner from consuming the key path
+// getter/setter before SILCombine
+@inline(never)
+public func readKeyPathNeverInline(_ b: Box) -> UnsafeMutablePointer<Int32>? {
+  return unsafe b[keyPath: \Box.p]
+}
+@inline(never)
+public func writeKeyPathNeverInline(_ b: Box, _ q: UnsafeMutablePointer<Int32>?) {
+  unsafe b[keyPath: \Box.p] = q
+}
+
+// C struct ptrauth fields
+public func readCStructKeyPath(_ s: CStruct) -> UnsafeMutablePointer<Int32>? {
+  return unsafe s[keyPath: \CStruct.p]
+}
+public func writeCStructKeyPath(_ s: inout CStruct, _ q: UnsafeMutablePointer<Int32>?) {
+  unsafe s[keyPath: \CStruct.p] = q
+}
+@inline(never)
+public func readCStructKeyPathNeverInline(_ s: CStruct) -> UnsafeMutablePointer<Int32>? {
+  return unsafe s[keyPath: \CStruct.p]
+}
+@inline(never)
+public func writeCStructKeyPathNeverInline(_ s: inout CStruct, _ q: UnsafeMutablePointer<Int32>?) {
+  unsafe s[keyPath: \CStruct.p] = q
+}
+
+// Closure capture
+public func makeFRTReader(_ b: Box) -> () -> Int32 {
+  return { unsafe b.p?.pointee ?? -1 }
+}
+
+// Generic key paths
+public func readGenericKeyPath<T>(_ t: T, _ kp: KeyPath<T, UnsafeMutablePointer<Int32>?>) -> UnsafeMutablePointer<Int32>? {
+  return t[keyPath: kp]
 }

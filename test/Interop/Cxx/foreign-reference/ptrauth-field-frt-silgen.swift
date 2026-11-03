@@ -72,3 +72,32 @@ public func keyPathFRT() -> ReferenceWritableKeyPath<RefBox, UnsafeMutablePointe
 // CHECK:   [[ACC:%.*]] = begin_access [modify] [signed] [[ADDR]]
 // CHECK:   end_access [[ACC]]
 // CHECK-LABEL: } // end sil function
+
+// CHECK-LABEL: sil {{.*}} @$s{{.*}}keyPathCBox{{.*}} :
+// CHECK:   keypath {{.*}}, (root $CBox; settable_property
+// CHECK-NOT: stored_property
+// CHECK-LABEL: } // end sil function
+public func keyPathCBox() -> WritableKeyPath<CBox, UnsafeMutablePointer<Int32>?> {
+  return \CBox.p
+}
+
+// CHECK-LABEL: sil shared [thunk] {{.*}} @$sSo4CBoxV1p{{.*}}TK :
+// CHECK:   [[ADDR:%.*]] = struct_element_addr {{%.*}} : $*CBox, #CBox.p
+// CHECK:   [[ACC:%.*]] = begin_access [read] [signed] [[ADDR]]
+// CHECK:   end_access [[ACC]]
+// CHECK-LABEL: } // end sil function
+
+// CHECK-LABEL: sil shared [thunk] {{.*}} @$sSo4CBoxV1p{{.*}}Tk :
+// CHECK:   [[ADDR:%.*]] = struct_element_addr {{%.*}} : $*CBox, #CBox.p
+// CHECK:   [[ACC:%.*]] = begin_access [modify] [signed] [[ADDR]]
+// CHECK:   end_access [[ACC]]
+// CHECK-LABEL: } // end sil function
+
+// CHECK-LABEL: sil private {{.*}} @$s{{.*}}makeReader{{.*}}fU_ :
+// CHECK:   [[ADDR:%.*]] = ref_element_addr {{%.*}} : $RefBox, #RefBox.p
+// CHECK:   [[ACC:%.*]] = begin_access [read] [signed] [[ADDR]]
+// CHECK:   end_access [[ACC]]
+// CHECK-LABEL: } // end sil function
+public func makeReader(_ b: RefBox) -> () -> UnsafeMutablePointer<Int32>? {
+  return { unsafe b.p }
+}
