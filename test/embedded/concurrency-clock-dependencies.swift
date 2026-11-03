@@ -1,6 +1,7 @@
 // RUN: %llvm-nm -u %swift_obj_root/lib/swift/embedded/%module-target-triple/libswift_Concurrency.a | %FileCheck %s
 // RUN: %llvm-nm -u %swift_obj_root/lib/swift/embedded/%module-target-triple/libswift_Concurrency.a | %FileCheck %s --check-prefix=EXCLUDES
 
+// REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: OS=macosx || OS=wasip1
 
