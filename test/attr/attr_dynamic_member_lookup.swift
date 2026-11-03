@@ -1382,3 +1382,17 @@ struct InaccessibleAndInvalidCandidate {
   // expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
   // expected-error@-2 {{'@dynamicMemberLookup' requires parameter to have a default value}}
 }
+
+// https://github.com/swiftlang/swift/issues/83344
+// Fix-it to add subscript(dynamicMember:) stub when no subscript exists.
+
+@dynamicMemberLookup struct EmptyStruct_83344 {} // expected-error {{'@dynamicMemberLookup' requires 'EmptyStruct_83344' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}} {{48-48=\n  subscript(dynamicMember member: String) -> <#Value#> {\n    <#code#>\n  }}}
+
+@dynamicMemberLookup class EmptyClass_83344 {} // expected-error {{'@dynamicMemberLookup' requires 'EmptyClass_83344' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}} {{46-46=\n  subscript(dynamicMember member: String) -> <#Value#> {\n    <#code#>\n  }}}
+
+@dynamicMemberLookup enum EmptyEnum_83344 {} // expected-error {{'@dynamicMemberLookup' requires 'EmptyEnum_83344' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}} {{44-44=\n  subscript(dynamicMember member: String) -> <#Value#> {\n    <#code#>\n  }}}
+
+@dynamicMemberLookup struct StructWithUnrelatedMembers_83344 { // expected-error {{'@dynamicMemberLookup' requires 'StructWithUnrelatedMembers_83344' to have a 'subscript(dynamicMember:)' method that accepts either 'ExpressibleByStringLiteral' or a key path}} {{63-63=\n  subscript(dynamicMember member: String) -> <#Value#> {\n    <#code#>\n  }}}
+  var x: Int = 0
+  func foo() {}
+}
