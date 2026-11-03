@@ -429,4 +429,4 @@ class TestUnsupportedAction(unittest.TestCase):
         with utils.redirect_stderr() as stderr, self.assertRaises(SystemExit):
             parser.parse_args(['--foo'])
 
-            self.assertIn(message, stderr)
+        self.assertIn(message, stderr.getvalue())
