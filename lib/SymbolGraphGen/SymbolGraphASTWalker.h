@@ -150,6 +150,18 @@ public:
   /// Returns the owning module of the given decl. Loads the module from Clang if necessary, to
   /// correctly fetch owning submodules.
   virtual ModuleDecl *getRealModuleOf(const Decl *D) const;
+
+  /// Walk into peer macro expansions so that macro-generated peer decls
+  /// (e.g. overloads produced by an `@attached(peer)` macro) appear in 
+  /// the symbol graph alongside hand-written decls.
+  ///
+  /// `SourceEntityWalker` defaults to `MacroWalking::Arguments` to 
+  /// represent the source as written, which is appropriate for IDE 
+  /// source navigation but causes the symbol graph to omit 
+  /// macro-expanded peers.
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::ArgumentsAndExpansion;
+  }
 };
 
 LLVM_ATTRIBUTE_USED
