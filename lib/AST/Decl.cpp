@@ -12330,7 +12330,6 @@ AccessorDecl *AccessorDecl::createParsed(
       switch (accessorKind) {
       case AccessorKind::Get:
       case AccessorKind::DistributedGet:
-      case AccessorKind::Borrow:
         accessor->setSendingResult();
         break;
 
@@ -12340,11 +12339,22 @@ AccessorDecl *AccessorDecl::createParsed(
         newParams[0]->setSending();
         break;
 
+      case AccessorKind::Read:
+      case AccessorKind::YieldingBorrow:
+      case AccessorKind::Modify:
+      case AccessorKind::YieldingMutate:
+      case AccessorKind::Address:
+      case AccessorKind::MutableAddress:
+      case AccessorKind::Borrow:
+      case AccessorKind::Mutate:
+        // Diagnosed in ParseDecl.cpp accessor validation.
+        break;
+
       case AccessorKind::WillSet:
       case AccessorKind::DidSet:
-        llvm_unreachable("willSet/didSet are not allowed in subscripts");
-
-      default:
+        // Observers are not allowed in subscripts (diagnosed by parser).
+        // Reachable for invalid input since createParsed runs before
+        // parser validation.
         break;
       }
     }
