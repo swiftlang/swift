@@ -721,12 +721,26 @@ static uint64_t computeGenerationNumber(ConstraintSystem &cs,
                                         FunctionType *newFuncType) {
   uint64_t newGenerationNumber = 0;
 
+  // The disjunction generation number is the maximum of the generation
+  // number of the result's type variable, and any argument type variables
+  // that are the types of closure literals.
   auto newResultTypeVar =
       newFuncType->getResult()->getAs<TypeVariableType>();
   if (newResultTypeVar) {
     const auto &node = cs.getConstraintGraph()[newResultTypeVar];
     const auto &bindings = node.getPotentialBindings();
     newGenerationNumber = bindings.GenerationNumber;
+  }
+
+  for (auto param : newFuncType->getParams()) {
+    if (auto *paramTypeVar = param.getParameterType()->getAs<TypeVariableType>()) {
+      if (paramTypeVar->getImpl().isClosureType()) {
+        const auto &node = cs.getConstraintGraph()[paramTypeVar];
+        const auto &bindings = node.getPotentialBindings();
+        newGenerationNumber = std::max(newGenerationNumber,
+                                       bindings.GenerationNumber);
+      }
+    }
   }
 
   return newGenerationNumber;
@@ -892,6 +906,26 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
         // FIXME: Get rid of the usage of InOutType here.
         auto argType = argParam.getOldType();
         auto paramType = param.getOldType();
+
+        // We delay binding the type of a closure until we're ready to
+        // type check its body, because of how result builders work.
+        //
+        // If the argument is a type variable representing a closure type,
+        // fish out the actual type of the closure from its potential
+        // bindings.
+        if (auto *typeVar = argType->getAs<TypeVariableType>()) {
+          if (typeVar->getImpl().isClosureType()) {
+            const auto &node = cs.getConstraintGraph()[typeVar];
+            const auto &bindings = node.getPotentialBindings();
+
+            if (bindings.Defaults.size() == 1) {
+              auto defaultType = bindings.Defaults[0]->getSecondType();
+              if (defaultType->is<FunctionType>()) {
+                argType = defaultType;
+              }
+            }
+          }
+        }
 
         if (paramFlags.isAutoClosure())
           paramType = paramType->castTo<FunctionType>()->getResult();
