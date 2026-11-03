@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift
+// RUN: %target-run-stdlib-swift(-enable-experimental-feature Lifetimes)
 
+// REQUIRES: swift_feature_Lifetimes
 // REQUIRES: executable_test
 
 // Blocked by https://github.com/swiftlang/swift/issues/91660 (rdar://181604244)
@@ -564,6 +565,100 @@ suite.test("updateElements(from:copying:), from inout borrowing iterator")
   span2.updateElements(from: &offset, copying: &iterator)
   expectEqual(offset, 2)
   expectEqual(second, [4, 5, 0xff, 0xff])
+}
+
+private struct SourceError: Error, Equatable {}
+
+@available(SwiftStdlib 6.4, *)
+private struct ThrowingIterator
+: BorrowingIteratorProtocol, ~Copyable, ~Escapable {
+  typealias Element = UInt8
+  typealias Failure = SourceError
+
+  var _inner: Span<UInt8>.BorrowingIterator
+  var _remaining: Int
+  let _chunkSize: Int
+
+  @_lifetime(copy inner)
+  init(
+    _ inner: consuming Span<UInt8>.BorrowingIterator,
+    limit: Int,
+    chunkSize: Int
+  ) {
+    self._inner = inner
+    self._remaining = limit
+    self._chunkSize = chunkSize
+  }
+
+  @_lifetime(&self)
+  @_lifetime(self: copy self)
+  mutating func nextSpan(maxCount: Int) throws(SourceError) -> Span<UInt8> {
+    if _remaining <= 0 { throw SourceError() }
+    let count = Swift.min(maxCount, _remaining, _chunkSize)
+    let span = _inner.nextSpan(maxCount: count)
+    _remaining -= span.count
+    return span
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+private struct ThrowingIterable: Iterable, ~Copyable, ~Escapable {
+  typealias Element = UInt8
+  typealias Failure = SourceError
+  typealias BorrowingIterator = ThrowingIterator
+
+  var _span: Span<UInt8>
+  var _limit: Int
+  var _chunkSize: Int
+
+  @_lifetime(copy span)
+  init(_ span: Span<UInt8>, limit: Int, chunkSize: Int) {
+    self._span = span
+    self._limit = limit
+    self._chunkSize = chunkSize
+  }
+
+  @_lifetime(borrow self)
+  func makeBorrowingIterator() -> ThrowingIterator {
+    ThrowingIterator(.init(_span), limit: _limit, chunkSize: _chunkSize)
+  }
+}
+
+suite.test("updateElements(from:copying:), source throws")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let values = ContiguousArray<UInt8>(0..<10)
+  // provides 0..<5 as spans of 2, 2 and 1 bytes, then throws
+  let source = ThrowingIterable(values.span, limit: 5, chunkSize: 2)
+
+  // the destination has room for every byte provided before the error
+  var a = ContiguousArray<UInt8>(repeating: 0xff, count: 8)
+  var span = MutableRawSpan(elements: a.mutableSpan)
+  var offset = 2
+  do throws(SourceError) {
+    try span.updateElements(from: &offset, copying: source)
+    expectUnreachable()
+  } catch {
+    expectEqual(error, SourceError())
+  }
+  expectEqual(offset, 7)
+  expectEqual(a, [0xff, 0xff, 0, 1, 2, 3, 4, 0xff])
+
+  // the destination is filled by the bytes provided before the error;
+  // the error occurs when checking that the source has no bytes left
+  var b = ContiguousArray<UInt8>(repeating: 0xff, count: 5)
+  var full = MutableRawSpan(elements: b.mutableSpan)
+  offset = 0
+  do throws(SourceError) {
+    try full.updateElements(from: &offset, copying: source)
+    expectUnreachable()
+  } catch {
+    expectEqual(error, SourceError())
+  }
+  expectEqual(offset, 5)
+  expectEqual(b, [0, 1, 2, 3, 4])
 }
 
 suite.test("_mutatingExtracting()")

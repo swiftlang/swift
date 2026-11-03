@@ -609,6 +609,100 @@ suite.test("updateElements(from:copying:), from inout borrowing iterator")
   expectEqual(second, [4, 5, -1, -1])
 }
 
+private struct SourceError: Error, Equatable {}
+
+@available(SwiftStdlib 6.4, *)
+private struct ThrowingIterator
+: BorrowingIteratorProtocol, ~Copyable, ~Escapable {
+  typealias Element = Int
+  typealias Failure = SourceError
+
+  var _inner: Span<Int>.BorrowingIterator
+  var _remaining: Int
+  let _chunkSize: Int
+
+  @_lifetime(copy inner)
+  init(
+    _ inner: consuming Span<Int>.BorrowingIterator,
+    limit: Int,
+    chunkSize: Int
+  ) {
+    self._inner = inner
+    self._remaining = limit
+    self._chunkSize = chunkSize
+  }
+
+  @_lifetime(&self)
+  @_lifetime(self: copy self)
+  mutating func nextSpan(maxCount: Int) throws(SourceError) -> Span<Int> {
+    if _remaining <= 0 { throw SourceError() }
+    let count = Swift.min(maxCount, _remaining, _chunkSize)
+    let span = _inner.nextSpan(maxCount: count)
+    _remaining -= span.count
+    return span
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+private struct ThrowingIterable: Iterable, ~Copyable, ~Escapable {
+  typealias Element = Int
+  typealias Failure = SourceError
+  typealias BorrowingIterator = ThrowingIterator
+
+  var _span: Span<Int>
+  var _limit: Int
+  var _chunkSize: Int
+
+  @_lifetime(copy span)
+  init(_ span: Span<Int>, limit: Int, chunkSize: Int) {
+    self._span = span
+    self._limit = limit
+    self._chunkSize = chunkSize
+  }
+
+  @_lifetime(borrow self)
+  func makeBorrowingIterator() -> ThrowingIterator {
+    ThrowingIterator(.init(_span), limit: _limit, chunkSize: _chunkSize)
+  }
+}
+
+suite.test("updateElements(from:copying:), source throws")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let values = ContiguousArray(0..<10)
+  // provides 0..<5 as spans of 2, 2 and 1 elements, then throws
+  let source = ThrowingIterable(values.span, limit: 5, chunkSize: 2)
+
+  // the destination has room for every element provided before the error
+  var a = ContiguousArray(repeating: -1, count: 8)
+  var span = a.mutableSpan
+  var index = 2
+  do throws(SourceError) {
+    try span.updateElements(from: &index, copying: source)
+    expectUnreachable()
+  } catch {
+    expectEqual(error, SourceError())
+  }
+  expectEqual(index, 7)
+  expectEqual(a, [-1, -1, 0, 1, 2, 3, 4, -1])
+
+  // the destination is filled by the elements provided before the error;
+  // the error occurs when checking that the source has no elements left
+  var b = ContiguousArray(repeating: -1, count: 5)
+  var full = b.mutableSpan
+  index = 0
+  do throws(SourceError) {
+    try full.updateElements(from: &index, copying: source)
+    expectUnreachable()
+  } catch {
+    expectEqual(error, SourceError())
+  }
+  expectEqual(index, 5)
+  expectEqual(b, [0, 1, 2, 3, 4])
+}
+
 suite.test("span property")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
