@@ -25,6 +25,7 @@
 #include "swift/ConstExtract/ConstExtractRequests.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/PrefixMapper.h"
@@ -493,12 +494,18 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
       auto tapExpr = interpolatedStringExpr->getAppendingExpr();
       auto &Ctx = tapExpr->getVar()->getASTContext();
 
-      std::vector<std::shared_ptr<CompileTimeValue>> segments;
+      std::vector<InterpolatedStringSegment> segments;
       interpolatedStringExpr->forEachSegment(
           Ctx, [&](bool isInterpolation, CallExpr *segment) -> void {
-            auto arg = segment->getArgs()->get(0);
-            auto expr = arg.getExpr();
-            segments.push_back(extractCompileTimeValue(expr, declContext));
+            if (isInterpolation) {
+              auto args = extractFunctionArguments(segment->getArgs(),
+                                                  declContext);
+              segments.push_back(InterpolationSegment{args});
+            } else {
+              auto arg = segment->getArgs()->get(0);
+              auto value = extractCompileTimeValue(arg.getExpr(), declContext);
+              segments.push_back(RawStringSegment{value});
+            }
           });
 
       return std::make_shared<InterpolatedStringLiteralValue>(segments);
@@ -986,9 +993,32 @@ void writeValue(llvm::json::OStream &JSON,
     JSON.attribute("valueKind", "InterpolatedStringLiteral");
     JSON.attributeObject("value", [&]() {
       JSON.attributeArray("segments", [&] {
-        auto segments = interpolatedStringValue->getSegments();
-        for (auto s : segments) {
-          JSON.object([&] { writeValue(JSON, s); });
+        for (auto &seg : interpolatedStringValue->getSegments()) {
+          JSON.object([&] {
+            std::visit(llvm::makeVisitor(
+              [&](const RawStringSegment &raw) {
+                writeValue(JSON, raw.Value);
+              },
+              [&](const InterpolationSegment &interp) {
+                // Backwards-compatible rule: a single unlabeled argument uses the
+                // existing flat format so existing consumers are unaffected.
+                if (interp.Arguments.size() == 1 && interp.Arguments[0].Label.empty()) {
+                  writeValue(JSON, interp.Arguments[0].Value);
+                } else {
+                  JSON.attributeArray("arguments", [&] {
+                    for (auto &param : interp.Arguments) {
+                      JSON.object([&] {
+                        JSON.attribute("label", param.Label);
+                        JSON.attribute("type",
+                                       toFullyQualifiedTypeNameString(param.Type));
+                        writeValue(JSON, param.Value);
+                      });
+                    }
+                  });
+                }
+              }
+            ), seg);
+          });
         }
       });
     });
