@@ -24,6 +24,8 @@ public struct Types : MyProto {
 // CHECK:       "valueKind": "Array",
 // CHECK-NEXT:  "value": [
 // CHECK-NEXT:    {
+// CHECK-NEXT:      "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractTypes.swift",
+// CHECK-NEXT:      "line": 16,
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
 // CHECK-NEXT:        "type": "ExtractTypes.TypeA"
@@ -31,6 +33,8 @@ public struct Types : MyProto {
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
+// CHECK-NEXT:      "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractTypes.swift",
+// CHECK-NEXT:      "line": 17,
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
 // CHECK-NEXT:        "type": "ExtractTypes.TypeB"
@@ -38,6 +42,8 @@ public struct Types : MyProto {
 // CHECK-NEXT:      }
 // CHECK-NEXT:    },
 // CHECK-NEXT:    {
+// CHECK-NEXT:      "file": "{{.*}}test{{/|\\\\}}ConstExtraction{{/|\\\\}}ExtractTypes.swift",
+// CHECK-NEXT:      "line": 18,
 // CHECK-NEXT:      "valueKind": "Type",
 // CHECK-NEXT:      "value": {
 // CHECK-NEXT:        "type": "ExtractTypes.TypeC"
