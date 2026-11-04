@@ -353,7 +353,6 @@ struct FunctionStat {
   using VarID = std::tuple<const SILDebugScope *, llvm::StringRef, SourceLoc>;
   llvm::StringSet<> VarNames;
   llvm::DenseMap<FunctionStat::VarID, DebugVarState> DebugVariables;
-  llvm::DenseSet<const SILDebugScope *> VisitedScope;
 
   FunctionStat(SILFunction *F);
   FunctionStat() {}
