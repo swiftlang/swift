@@ -176,7 +176,12 @@ extension ASTGenVisitor {
   func generateDeclAttributes(attributeList node: AttributeListSyntax, handler: (BridgedDeclAttribute) -> Void) {
     let outerExposureKinds = self.seenExposureKinds
     self.seenExposureKinds = []
-    defer { self.seenExposureKinds = outerExposureKinds }
+    let outerExternKinds = self.seenExternKinds
+    self.seenExternKinds = []
+    defer {
+      self.seenExposureKinds = outerExposureKinds
+      self.seenExternKinds = outerExternKinds
+    }
 
     visitIfConfigElements(node, of: AttributeSyntax.self) { element in
       switch element {
@@ -1476,51 +1481,109 @@ extension ASTGenVisitor {
   ///   @_extern(wasm, module: "x", name: "y")
   ///   ```
   func generateExternAttr(attribute node: AttributeSyntax) -> BridgedExternAttr? {
-    return self.generateWithLabeledExprListArguments(attribute: node) { args in
-      let kind: swift.ExternKind? = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
-        switch $0.rawText {
-        case "c":
-          return .c
-        case "wasm":
-          return .wasm
-        default:
-          return nil
-        }
-      }
-      guard let kind else {
+    guard let arguments = node.arguments?.as(LabeledExprListSyntax.self) else {
+      self.diagnoseExpectedAttributeArguments(node)
+      return nil
+    }
+
+    // The arguments are checked token by token, as the C++ parser does, because
+    // the diagnostics depend on exactly which token is missing.
+    let attrName = node.attributeName.trimmedDescription
+    let tokens = Array(arguments.tokens(viewMode: .sourceAccurate))
+    var index = 0
+    var current: TokenSyntax? { index < tokens.count ? tokens[index] : nil }
+    var currentOrEnd: Syntax { current.map(Syntax.init) ?? Syntax(node.rightParen ?? node.attributeName.lastToken(viewMode: .sourceAccurate)!) }
+
+    /// Parse `, [label:] "string"`; returns `nil` after diagnosing a problem.
+    func parseStringArgument(field: String?) -> BridgedStringRef? {
+      guard current?.tokenKind == .comma else {
+        self.diagnose(.attr_expected_comma(attrName, false), at: node.attributeName)
         return nil
       }
-
-      // Module and symbol name.
-      let moduleName: BridgedStringRef?
-      let symbolName: BridgedStringRef?
-      switch kind {
-      case .c:
-        moduleName = nil
-        symbolName = args.isEmpty ? nil : self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
-      case .wasm:
-        guard let _moduleName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "module") else {
+      index += 1
+      if let field {
+        guard let label = current, label.rawTokenKind == .identifier, label.text == field else {
+          self.diagnose(.attr_extern_expected_label(field), at: node.attributeName)
           return nil
         }
-        guard let _symbolName = self.generateConsumingSimpleStringLiteralAttrOption(args: &args, label: "name") else {
+        index += 1
+        guard current?.tokenKind == .colon else {
+          self.diagnose(.attr_expected_colon_after_label(field), at: currentOrEnd)
           return nil
         }
-
-        moduleName = _moduleName
-        symbolName = _symbolName
+        index += 1
       }
-
-      return .createParsed(
-        self.ctx,
-        atLoc: self.generateSourceLoc(node.atSign),
-        range: self.generateAttrSourceRange(node),
-        lParenLoc: self.generateSourceLoc(node.leftParen),
-        rParenLoc: self.generateSourceLoc(node.rightParen),
-        kind: kind,
-        moduleName: moduleName ?? "",
-        name: symbolName ?? ""
-      )
+      guard let literal = current.flatMap({ Syntax($0).ancestorOrSelf(mapping: { $0.as(StringLiteralExprSyntax.self) }) }),
+        literal.openingQuote.id == current?.id || literal.openingPounds?.id == current?.id
+      else {
+        self.diagnose(.attr_expected_string_literal(attrName), at: node.attributeName)
+        return nil
+      }
+      // Skip the whole literal.
+      let last = literal.lastToken(viewMode: .sourceAccurate)
+      while let token = current, token.id != last?.id {
+        index += 1
+      }
+      index += 1
+      return self.generateStringLiteralTextIfNotInterpolated(expr: literal)
     }
+
+    guard let kindToken = current, kindToken.rawTokenKind == .identifier else {
+      self.diagnose(.attr_expected_option_such_as(attrName, "c"), at: currentOrEnd)
+      return nil
+    }
+    index += 1
+
+    var kind: swift.ExternKind
+    var moduleName: BridgedStringRef?
+    var symbolName: BridgedStringRef?
+    var discard = false
+    switch kindToken.text {
+    case "wasm":
+      kind = .wasm
+      moduleName = parseStringArgument(field: "module")
+      discard = moduleName == nil
+      symbolName = parseStringArgument(field: "name")
+      discard = discard || symbolName == nil
+    case "c":
+      kind = .c
+      if current?.tokenKind == .comma {
+        symbolName = parseStringArgument(field: nil)
+        discard = symbolName == nil
+      }
+    default:
+      self.diagnose(.attr_expected_option_such_as(attrName, "c"), at: currentOrEnd)
+      return nil
+    }
+
+    // Anything left over is not the closing parenthesis.
+    if current != nil {
+      self.diagnose(.attr_expected_rparen(attrName, false), at: node.attributeName)
+      return nil
+    }
+
+    // A declaration cannot have two '@_extern' attributes of the same kind.
+    if !discard {
+      if self.seenExternKinds.contains(kind.rawValue) {
+        self.diagnose(.duplicate_attribute(false), at: node.attributeName)
+        discard = true
+      }
+      self.seenExternKinds.append(kind.rawValue)
+    }
+    if discard {
+      return nil
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      lParenLoc: self.generateSourceLoc(node.leftParen),
+      rParenLoc: self.generateSourceLoc(node.rightParen),
+      kind: kind,
+      moduleName: moduleName ?? BridgedStringRef(),
+      name: symbolName ?? BridgedStringRef()
+    )
   }
 
   /// E.g.

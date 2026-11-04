@@ -446,12 +446,14 @@ BridgedExternAttr BridgedExternAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     SourceLoc lParenLoc, SourceLoc rParenLoc, swift::ExternKind kind,
     BridgedStringRef cModuleName, BridgedStringRef cName) {
+  // A null string means the argument was not written; an empty one was written
+  // as "".
   std::optional<StringRef> moduleName = cModuleName.unbridged();
-  if (moduleName->empty())
+  if (!moduleName->data())
     moduleName = std::nullopt;
 
   std::optional<StringRef> name = cName.unbridged();
-  if (name->empty())
+  if (!name->data())
     name = std::nullopt;
 
   return new (cContext.unbridged())

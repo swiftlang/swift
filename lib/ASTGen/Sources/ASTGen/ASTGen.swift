@@ -41,6 +41,10 @@ struct ASTGenVisitor {
   /// attribute list being generated, to diagnose duplicates.
   @Boxed var seenExposureKinds: [UInt8] = []
 
+  /// The kinds of the `@_extern` attributes seen so far in the attribute list
+  /// being generated, to diagnose duplicates.
+  @Boxed var seenExternKinds: [UInt8] = []
+
   /// The `#if` blocks already checked for clauses following `#else`.
   @Boxed var diagnosedIfConfigs: Set<SyntaxIdentifier> = []
 
