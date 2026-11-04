@@ -14980,6 +14980,19 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   auto fixContextualFailure = [&](Type fromType, Type toType,
                                   ConstraintLocatorBuilder locator) -> bool {
     auto *loc = getConstraintLocator(locator);
+
+    // `repairFailures` doesn't record a fix for an element of a collection
+    // literal in presence of restrictions, so if all of them failed let's
+    // diagnose the element here e.g. `let _: [Int?] = ["a"]`.
+    if (loc->isLastElement<LocatorPathElt::TupleElement>() &&
+        (isExpr<ArrayExpr>(loc->getAnchor()) ||
+         isExpr<DictionaryExpr>(loc->getAnchor()))) {
+      auto *fix = CollectionElementContextualMismatch::create(*this, fromType,
+                                                              toType, loc);
+      return simplifyFixConstraint(fix, fromType, toType, matchKind, subflags,
+                                   locator) == SolutionKind::Solved;
+    }
+
     // Since this is a contextual type mismatch, let's start from higher
     // impact than regular fix to avoid ambiguities.
     auto impact = FixImpact::TypeMismatch;
