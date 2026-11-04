@@ -534,6 +534,10 @@ extension ASTGenVisitor {
   }
 
   func generate(guardStmt node: GuardStmtSyntax, labelInfo: BridgedLabeledStmtInfo = nil) -> BridgedGuardStmt {
+    // See `generate(repeatStmt:)`.
+    if node.conditions.firstToken(viewMode: .sourceAccurate)?.rawTokenKind == .leftBrace {
+      self.diagnose(.missing_condition_after_guard, at: node.guardKeyword)
+    }
     return .createParsed(
       self.ctx,
       guardLoc: self.generateSourceLoc(node.guardKeyword),
@@ -631,6 +635,11 @@ extension ASTGenVisitor {
   }
 
   func generate(repeatStmt node: RepeatStmtSyntax, labelInfo: BridgedLabeledStmtInfo = nil) -> BridgedRepeatWhileStmt {
+    // A condition cannot start with a brace: swift-syntax reads `{ true }()` as a
+    // call of a closure, but to the C++ parser the brace begins no condition.
+    if node.condition.firstToken(viewMode: .sourceAccurate)?.rawTokenKind == .leftBrace {
+      self.diagnose(.missing_condition_after_while, at: node.whileKeyword)
+    }
     return .createParsed(
       self.ctx,
       labelInfo: labelInfo,

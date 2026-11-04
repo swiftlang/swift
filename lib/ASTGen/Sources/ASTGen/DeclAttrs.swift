@@ -155,7 +155,62 @@ extension ASTGenVisitor {
       staticSpelling = spelling
     }
 
+    // The syntax node the modifiers belong to.
+    let declSyntax = Syntax(node)
+    // The first fixity modifier of a function, which the later ones contradict.
+    var firstFixity: BridgedDeclAttribute?
+
     for node in node.modifiers {
+      // A function takes at most one of 'prefix' and 'postfix', and not 'infix'.
+      if declSyntax.is(FunctionDeclSyntax.self) {
+        let kind: swift.DeclAttrKind? =
+          switch node.name.text {
+          case "prefix": .Prefix
+          case "postfix": .Postfix
+          case "infix": .Infix
+          default: nil
+          }
+        if let kind {
+          let attr = BridgedDeclAttribute.createSimple(self.ctx, kind: kind, atLoc: nil, nameLoc: self.generateSourceLoc(node))
+          if let firstFixity {
+            self.diagnose(
+              .mutually_exclusive_decl_attrs(attr, firstFixity),
+              at: node,
+              fixIts: [self.tidyRemovalFixIt(node)]
+            )
+            continue
+          }
+          if kind == .Infix {
+            self.diagnose(.invalid_infix_on_func, at: node, fixIts: [self.tidyRemovalFixIt(node)])
+            continue
+          }
+          firstFixity = attr
+        }
+      }
+
+      // `async func f()`: the modifier belongs after the parameter list. The
+      // function is still async; the modifier is not recorded as an attribute.
+      if node.name.text == "async", node.detail == nil,
+        let rightParen = declSyntax.as(FunctionDeclSyntax.self)?.signature.parameterClause.rightParen
+          ?? declSyntax.as(InitializerDeclSyntax.self)?.signature.parameterClause.rightParen
+      {
+        self.diagnose(
+          .async_func_modifier,
+          at: node,
+          fixIts: [
+            self.tidyRemovalFixIt(node),
+            .init(
+              replace: self.generateCharSourceRange(
+                start: rightParen.endPositionBeforeTrailingTrivia,
+                length: SourceLength(utf8Length: 0)
+              ),
+              with: " async"
+            ),
+          ]
+        )
+        continue
+      }
+
       switch node.name.keywordKind {
       case .static:
         genStatic(node: node, spelling: .static)

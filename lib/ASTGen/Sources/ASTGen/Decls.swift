@@ -1249,6 +1249,30 @@ extension ASTGenVisitor {
     if let accessors = node.accessorBlock {
       let storage = subscriptDecl.asAbstractStorageDecl
       storage.setAccessors(generate(accessorBlock: accessors, for: storage))
+    } else if !node.hasError,
+      !sequence(first: Syntax(node).parent, next: { $0?.parent }).contains(where: { $0?.is(ABIAttributeArgumentsSyntax.self) == true })
+    {
+      // A subscript needs at least a getter. (One in an '@abi' attribute is
+      // only a stub.)
+      let next = node.returnClause.lastToken(viewMode: .sourceAccurate)?.nextToken(viewMode: .sourceAccurate)
+      let location = next.map(Syntax.init) ?? Syntax(node.returnClause)
+      if self.isProtocolMember(node) {
+        self.diagnose(
+          .expected_lbrace_subscript_protocol,
+          at: location,
+          fixIts: [
+            .init(
+              replace: self.generateCharSourceRange(
+                start: node.returnClause.endPositionBeforeTrailingTrivia,
+                length: SourceLength(utf8Length: 0)
+              ),
+              with: " { get <#set#> }"
+            )
+          ]
+        )
+      } else {
+        self.diagnose(.expected_lbrace_subscript, at: location)
+      }
     }
     return subscriptDecl
   }
@@ -1373,7 +1397,7 @@ extension ASTGenVisitor {
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: signature.parameterList,
-      asyncSpecifierLoc: signature.asyncLoc,
+      asyncSpecifierLoc: signature.asyncLoc.isValid ? signature.asyncLoc : self.generateSourceLoc(node.modifiers.first(where: { $0.name.text == "async" })),
       throwsSpecifierLoc: signature.throwsLoc,
       thrownType: signature.thrownType.asNullable,
       yieldList: signature.yieldList.asNullable,
@@ -1430,7 +1454,7 @@ extension ASTGenVisitor {
       isIUO: node.optionalMark?.rawTokenKind == .exclamationMark,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: signature.parameterList,
-      asyncSpecifierLoc: signature.asyncLoc,
+      asyncSpecifierLoc: signature.asyncLoc.isValid ? signature.asyncLoc : self.generateSourceLoc(node.modifiers.first(where: { $0.name.text == "async" })),
       throwsSpecifierLoc: signature.throwsLoc,
       thrownType: signature.thrownType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
@@ -1603,6 +1627,11 @@ extension ASTGenVisitor {
     } else {
       fixity = .infix
       self.diagnose(.unexpectedTokenKind(token: node.fixitySpecifier))
+    }
+
+    // A postfix operator cannot start like the built-in unwrapping operators.
+    if fixity == .postfix, node.name.rawText.first == UInt8(ascii: "?") || node.name.rawText.first == UInt8(ascii: "!") {
+      self.diagnose(.postfix_operator_name_cannot_start_with_unwrap, at: node.name)
     }
 
     // Only an infix operator may declare a precedence group. A prefix or postfix
