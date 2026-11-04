@@ -6779,14 +6779,21 @@ bool ConstraintSystem::repairFailures(
       return true;
     }
 
-    if (hasAnyRestriction())
-      return false;
-
     if (isExpr<ArrayExpr>(anchor) || isExpr<DictionaryExpr>(anchor)) {
       // If we could record a generic arguments mismatch instead of this fix,
       // don't record a ContextualMismatch here.
       if (hasConversionOrRestriction(ConversionRestrictionKind::DeepEquality))
         break;
+
+      // If there are restrictions, let's add an element mismatch fix as an
+      // alternative to them. It would only be selected if none of the
+      // restrictions apply e.g. `let _: [Int?] = ["a"]`.
+      if (hasAnyRestriction()) {
+        conversionsOrFixes.push_back(
+            CollectionElementContextualMismatch::create(
+                *this, lhs, rhs, getConstraintLocator(locator)));
+        break;
+      }
 
       // We already have a fix for trying to initialize/assign an array literal
       // to a dictionary type. In this case elements mismatch only add extra
@@ -6818,6 +6825,9 @@ bool ConstraintSystem::repairFailures(
           *this, lhs, rhs, getConstraintLocator(locator)));
       break;
     }
+
+    if (hasAnyRestriction())
+      return false;
 
     // Drop the `tuple element` locator element so that all tuple element
     // mismatches within the same tuple type can be coalesced later.
