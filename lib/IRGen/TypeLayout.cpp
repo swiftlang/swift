@@ -15,6 +15,7 @@
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
 #include "GenExistential.h"
+#include "GenBorrow.h"
 #include "GenOpaque.h"
 #include "GenericArguments.h"
 #include "IRGen.h"
@@ -2259,31 +2260,62 @@ bool ArchetypeLayoutEntry::computeLayoutSemantics(
 }
 
 void ArchetypeLayoutEntry::destroy(IRGenFunction &IGF, Address addr) const {
+  // Borrows are trivially destroyed.
+  if (shouldComputeBorrowLayoutInline(IGF, archetype)) {
+    return;
+  }
   emitDestroyCall(IGF, archetype, addr);
 }
 
 void ArchetypeLayoutEntry::assignWithCopy(IRGenFunction &IGF, Address dest,
                                           Address src) const {
+  // We have no metadata for such a borrow; the type info knows how to copy it.
+  if (shouldComputeBorrowLayoutInline(IGF, archetype)) {
+    IGF.getTypeInfo(archetype).assignWithCopy(IGF, dest, src, archetype,
+                                    /*isOutlined*/ false);
+    return;
+  }
   emitAssignWithCopyCall(IGF, archetype, dest, src);
 }
 
 void ArchetypeLayoutEntry::assignWithTake(IRGenFunction &IGF, Address dest,
                                           Address src) const {
+  if (shouldComputeBorrowLayoutInline(IGF, archetype)) {
+    IGF.getTypeInfo(archetype).assignWithTake(IGF, dest, src, archetype,
+                                    /*isOutlined*/ false);
+    return;
+  }
   emitAssignWithTakeCall(IGF, archetype, dest, src);
 }
 
 void ArchetypeLayoutEntry::initWithCopy(IRGenFunction &IGF, Address dest,
                                         Address src) const {
+  if (shouldComputeBorrowLayoutInline(IGF, archetype)) {
+    IGF.getTypeInfo(archetype).initializeWithCopy(
+        IGF, dest, src, archetype, /*isOutlined*/ false);
+    return;
+  }
   emitInitializeWithCopyCall(IGF, archetype, dest, src);
 }
 
 void ArchetypeLayoutEntry::initWithTake(IRGenFunction &IGF, Address dest,
                                         Address src) const {
+  if (shouldComputeBorrowLayoutInline(IGF, archetype)) {
+    IGF.getTypeInfo(archetype).initializeWithTake(
+        IGF, dest, src, archetype, /*isOutlined*/ false,
+        /*zeroizeIfSensitive*/ false);
+    return;
+  }
   emitInitializeWithTakeCall(IGF, archetype, dest, src);
 }
 
 llvm::Value *ArchetypeLayoutEntry::getEnumTagSinglePayload(
     IRGenFunction &IGF, llvm::Value *numEmptyCases, Address value) const {
+  if (shouldComputeBorrowLayoutInline(IGF, archetype)) {
+    return IGF.getTypeInfo(archetype).getEnumTagSinglePayload(
+        IGF, numEmptyCases, value, archetype, /*isOutlined*/ false);
+  }
+
   value = Address(
       IGF.Builder.CreateBitCast(value.getAddress(), IGF.IGM.OpaquePtrTy),
       IGF.IGM.OpaqueTy, value.getAlignment());
@@ -2295,6 +2327,12 @@ void ArchetypeLayoutEntry::storeEnumTagSinglePayload(IRGenFunction &IGF,
                                                      llvm::Value *tag,
                                                      llvm::Value *numEmptyCases,
                                                      Address addr) const {
+  if (shouldComputeBorrowLayoutInline(IGF, archetype)) {
+    IGF.getTypeInfo(archetype).storeEnumTagSinglePayload(
+        IGF, tag, numEmptyCases, addr, archetype, /*isOutlined*/ false);
+    return;
+  }
+
   addr =
       Address(IGF.Builder.CreateBitCast(addr.getAddress(), IGF.IGM.OpaquePtrTy),
               IGF.IGM.OpaqueTy, addr.getAlignment());

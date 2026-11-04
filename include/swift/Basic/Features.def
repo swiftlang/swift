@@ -709,8 +709,12 @@ EXPERIMENTAL_FEATURE(Cells, true)
 /// Extend `@specialized` for `@specialized(exported: true, ...)`.
 EXPERIMENTAL_FEATURE(ExtendedSpecializedAttribute, false)
 
+
 /// Builtin.createSynchronousDiscardingTask
 LANGUAGE_FEATURE(BuiltinCreateSynchronousDiscardingTask, 0, "Builtin.createSynchronousDiscardingTask")
+
+/// Allow `@backDeployed(before:)` on `@frozen` structs and enums.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(BackDeployFrozenValueTypes, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

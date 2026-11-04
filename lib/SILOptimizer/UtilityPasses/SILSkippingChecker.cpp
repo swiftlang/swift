@@ -80,7 +80,9 @@ static bool shouldHaveSkippedFunction(const SILFunction &F) {
   // second resilient SILFunction is also emitted for back deployed functions.
   // Since the body of the function as written was not skipped, it's expected
   // that we see the SILFunction for the resilient copy here.
-  if (func->hasBackDeployedAttr())
+  // That includes the members of a back-deployed type, which are back-deployed
+  // along with it.
+  if (func->isBackDeployed())
     return false;
 
   // If none of those conditions trip, then this is something that _should_

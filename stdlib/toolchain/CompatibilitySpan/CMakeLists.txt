@@ -25,6 +25,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND DEFINED SWIFT_STDLIB_LIBRARY_BUILD_TY
       -parse-stdlib
       -module-abi-name Swift
       -DSPAN_COMPATIBILITY_STUB
+      -enable-experimental-feature BackDeployFrozenValueTypes
 
     NO_SWIFTMODULE
 

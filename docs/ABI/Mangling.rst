@@ -253,6 +253,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function
   global ::= global 'TX'                 // function pointer of a dynamic_replaceable function
+  global ::= global 'Twa'                // back deployment copy
   global ::= global 'Twb'                // back deployment thunk
   global ::= global 'TwB'                // back deployment fallback function
   global ::= global 'Twc'                // coro function pointer of a function
@@ -300,6 +301,14 @@ types where the metadata itself has unknown layout.)
 
 All reabstraction thunks have the "from" and "to" types in that order, and
 are always non-polymorphic ``<impl-function-type>`` types.
+
+A back deployment copy is a module's own copy of the type metadata access
+function of a back-deployed struct or enum from another module. A module whose
+deployment target predates the type emits its own copy of the type, and gives
+its copy of the access function a distinct name, so that it can reference the
+defining module's access function by its usual name, and use it when it is
+available at runtime. For example, ``$s5MyKit5PointVMaTwa`` is a back
+deployment copy of ``$s5MyKit5PointVMa``.
 
 ::
 

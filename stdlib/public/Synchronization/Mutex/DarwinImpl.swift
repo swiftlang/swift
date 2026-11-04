@@ -12,35 +12,32 @@
 
 import Darwin
 
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 6.0)
 @frozen
 @_staticExclusiveOnly
 public struct _MutexHandle: ~Copyable {
   @usableFromInline
   let value: _Cell<os_unfair_lock>
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public init() {
     value = _Cell(os_unfair_lock())
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   internal borrowing func _lock() {
     unsafe os_unfair_lock_lock(value._address)
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   internal borrowing func _tryLock() -> Bool {
     unsafe os_unfair_lock_trylock(value._address)
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   internal borrowing func _unlock() {

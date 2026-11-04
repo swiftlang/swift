@@ -582,6 +582,19 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       if (storage->isAlwaysEmittedIntoClient())
         return Limit::AlwaysEmitIntoClient;
     }
+
+    // A transparent member of a type that is back-deployed into the client
+    // doesn't inherit back deployment.
+    if (auto *nominal = d->getDeclContext()->getSelfNominalTypeDecl()) {
+      if (nominal->isBackDeployedIntoClient()) {
+        const Decl *owner = d;
+        if (auto accessor = dyn_cast<AccessorDecl>(d))
+          owner = accessor->getStorage();
+        if (d->getAttrs().hasAttribute<TransparentAttr>() ||
+            owner->getAttrs().hasAttribute<TransparentAttr>())
+          return Limit::AlwaysEmitIntoClient;
+      }
+    }
     break;
   }
   case Kind::EnumElement:
@@ -1362,8 +1375,10 @@ bool SILDeclRef::isDistributed() const {
 bool SILDeclRef::isBackDeploymentFallback() const {
   if (backDeploymentKind != BackDeploymentKind::Fallback)
     return false;
+  // The deinit of a back-deployed noncopyable type has a fallback so that
+  // clients can emit it, but no thunk: nothing calls it by name.
   return kind == Kind::Func || kind == Kind::Initializer ||
-         kind == Kind::Allocator;
+         kind == Kind::Allocator || kind == Kind::Deallocator;
 }
 
 bool SILDeclRef::isBackDeploymentThunk() const {

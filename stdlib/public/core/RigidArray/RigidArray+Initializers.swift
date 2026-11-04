@@ -10,12 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Initializes a new rigid array with zero capacity and no elements.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal init() {
@@ -25,7 +23,6 @@ extension _RigidArray where Element: ~Copyable {
   }
   
   /// Initializes a new rigid array with the specified capacity and no elements.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal init(capacity: Int) {
     _precondition(capacity >= 0, "Array capacity must be nonnegative")
@@ -40,7 +37,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Creates a new array with the specified capacity, directly initializing
   /// its storage using an output span.
@@ -52,7 +48,6 @@ extension _RigidArray where Element: ~Copyable {
   ///       is allowed to add fewer than `capacity` items. The array is
   ///       initialized with however many items the callback adds to the
   ///       output span before it returns (or before it throws an error).
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal init<E: Error>(
     capacity: Int,
@@ -63,7 +58,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: Copyable {
   /// Creates a new array containing the specified number of a single,
   /// repeated value.
@@ -74,7 +68,6 @@ extension _RigidArray where Element: Copyable {
   ///     `repeating` parameter. `count` must be zero or greater.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal init(repeating repeatedValue: Element, count: Int) {
     self.init(capacity: count)
@@ -83,7 +76,6 @@ extension _RigidArray where Element: Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: Copyable {
   /// Creates a new array with the specified capacity, holding a copy
   /// of the contents of a given sequence.
@@ -92,7 +84,6 @@ extension _RigidArray where Element: Copyable {
   ///   - capacity: The storage capacity of the new array.
   ///   - contents: The sequence whose contents to copy into the new array.
   ///      The sequence must not contain more than `capacity` elements.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal init(
@@ -111,7 +102,6 @@ extension _RigidArray where Element: Copyable {
   ///      just enough capacity to store the contents.
   ///   - contents: The collection whose contents to copy into the new array.
   ///      The collection must not contain more than `capacity` elements.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal init(
@@ -130,7 +120,6 @@ extension _RigidArray where Element: Copyable {
   ///      just enough capacity to store the contents of the span.
   ///   - span: The span whose contents to copy into the new array.
   ///      The span must not contain more than `capacity` elements.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   internal init(

@@ -22,6 +22,7 @@ import Swift
 /// owning the contiguous memory, ensuring temporal safety and avoiding
 /// use-after-free errors. Operations on `Span` are bounds-checked,
 /// ensuring spatial safety and avoiding buffer overflow errors.
+@backDeployed(before: SwiftStdlib 6.2)
 @frozen
 @safe
 @available(SwiftCompatibilitySpan 5.0, *)
