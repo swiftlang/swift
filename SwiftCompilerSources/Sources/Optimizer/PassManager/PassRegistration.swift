@@ -203,4 +203,5 @@ private func registerOptimizerUtilities() {
   registerControlFlowUtils()
   registerLifetimeCompletion()
   registerDebugReconstructionSimplification()
+  registerBorrowAccessorFixup()
 }

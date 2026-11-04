@@ -372,6 +372,11 @@ void replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *
 /// For details see the swift implementation `completeLifetimes(in: Function)`.
 void completeAllLifetimes(SILPassManager *pm, SILFunction *f, bool includeTrivialVars = false);
 
+/// Rewrite the result of a borrow accessor that SILGen returns from within
+/// local borrow scopes into a return_borrow. Returns true if \p f changed.
+/// For details see the swift implementation `fixupBorrowAccessors(in:)`.
+bool fixupBorrowAccessors(SILPassManager *pm, SILFunction *f);
+
 /// Complete lifetimes of all `values` at `deadEnds` instructions.
 /// Instead of completing the lifetimes at `unreachable` instructions, they are
 /// complete at custom `deadEnd` points.
