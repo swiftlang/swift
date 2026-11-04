@@ -229,9 +229,10 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       // addressable dependencies directly depend on the incoming address, unless that address is projected from an
       // unsafe[Mutable]Address accessor. Then it depends on the accessor's 'self', which gatherVariableIntroducers
       // finds.
-      if source.convention.isAddressable(for: source.value)
-           && source.value.accessBaseWithScopes.innermostAccess?.unsafeAddressorSelf == nil {
-        bases.append(source.value)
+      let addressableSource = addressOfLoadedArgument(source.value)
+      if source.convention.isAddressable(for: addressableSource)
+           && addressableSource.accessBaseWithScopes.innermostAccess?.unsafeAddressorSelf == nil {
+        bases.append(addressableSource)
         return
       }
       // Create a new dependence on the apply's access to the argument.
@@ -243,6 +244,18 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
       }
     }
   }
+}
+
+/// With opaque values, SILGen passes an @in_guaranteed argument of a loadable type by value, as a load of the address
+/// that the callee's lifetime dependence is on. Returns that address. Otherwise, returns \p argument.
+///
+/// Without this, an addressable dependence would be created on the loaded copy, which is not associated with the
+/// access scope or the variable that it was loaded from.
+private func addressOfLoadedArgument(_ argument: Value) -> Value {
+  if !argument.type.isAddress, let load = argument.definingInstruction as? LoadInstruction {
+    return load.address
+  }
+  return argument
 }
 
 /// If the result of this apply depends on the scope of one or more
