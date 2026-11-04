@@ -20,6 +20,7 @@ from . import product
 from . import swift
 from . import swift_testing_macros
 from .. import shell
+from ..targets import StdlibDeploymentTarget
 
 
 class SwiftTesting(product.Product):
@@ -66,32 +67,64 @@ class SwiftTesting(product.Product):
             source_dir=self.source_dir,
             build_dir=build_dir)
 
-    def _for_each_host_target(self, base_target, body):
+    def _infer_macos_targets(self, base_target):
+        macos_targets = []
+
+        # On Darwin we need to ensure to build for all supported macOS architectures
+        # if those are not crosscompiled, ensure we build and install those as part of
+        # the host build
+        if self.is_darwin_host(base_target) and base_target == self.args.host_target:
+            cross_compile_targets = self.args.cross_compile_hosts if self.has_cross_compile_hosts() else [] 
+            for macos_target in StdlibDeploymentTarget.OSX.targets:
+                if (macos_target.name not in cross_compile_targets + [ base_target ]
+                        and (
+                            not self.args.swift_darwin_supported_archs
+                            or macos_target.arch in self.args.swift_darwin_supported_archs)):
+                    macos_targets.append(macos_target.name)
+
+        return macos_targets
+
+    def _for_each_host_and_macos_target(self, base_target, body):
         body(base_target)
 
-        # For Darwin host, 'build' is only called for the builder.
-        # Manually iterate the cross compile hosts.
-        if self.has_cross_compile_hosts() and self.is_darwin_host(base_target):
-            for target in self.args.cross_compile_hosts:
-                body(target)
+        for target in self._infer_macos_targets(base_target):
+            body(target)
 
     def _clean_with_cmake(self, host_target):
         self._cmake_product(host_target).clean(host_target)
 
     def clean(self, host_target):
-        self._for_each_host_target(host_target, self._clean_with_cmake)
+        self._for_each_host_and_macos_target(host_target, self._clean_with_cmake)
 
     def _build_with_cmake(self, host_target):
         self._cmake_product(host_target).build(host_target)
 
     def build(self, host_target):
-        self._for_each_host_target(host_target, self._build_with_cmake)
+        self._for_each_host_and_macos_target(host_target, self._build_with_cmake)
 
     def _install_with_cmake(self, host_target):
         self._cmake_product(host_target).install(host_target)
 
     def install(self, host_target):
-        self._for_each_host_target(host_target, self._install_with_cmake)
+        macos_targets = self._infer_macos_targets(host_target)
+
+        if macos_targets:
+            final_install_destdir = self.host_install_destdir(host_target)
+            intermediate_destdirs = []
+            for target in [ host_target ] + macos_targets:
+                intermediate_destdir = os.path.join(
+                        os.path.dirname(self.build_dir), f'swifttesting-{target}-install')
+                self._cmake_product(target).install(target, intermediate_destdir)
+                intermediate_destdirs.append(intermediate_destdir)
+
+            shell.call(
+                [
+                    os.path.join(self.source_dir, "../swift", "utils/recursive-lipo"),
+                    "-v" if self.args.verbose_build else "",
+                    "--destination", os.path.join(final_install_destdir)
+                ] + intermediate_destdirs)
+        else:
+            self._cmake_product(host_target).install(host_target)
 
 
 class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
@@ -129,8 +162,8 @@ class SwiftTestingCMakeShim(cmake_product.CMakeProduct):
         self.build_with_cmake([], self.args.build_variant, [],
                               prefer_native_toolchain=True)
 
-    def install(self, host_target):
-        install_destdir = self.host_install_destdir(host_target)
+    def install(self, host_target, override_install_destdir=None):
+        install_destdir = override_install_destdir if override_install_destdir else self.host_install_destdir(host_target)
         install_prefix = install_destdir + self.args.install_prefix
 
         self.install_with_cmake(['install'], install_prefix)
