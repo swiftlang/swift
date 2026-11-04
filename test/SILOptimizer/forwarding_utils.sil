@@ -280,3 +280,54 @@ entry(%0 : @owned $C, %1 : @owned $C):
   %void = tuple()
   return %void : $()
 }
+
+sil @borrowPairA : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+sil @borrowPairAIndirect : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+
+// Test that the @guaranteed result of a borrow accessor forwards from its 'self' only when 'self' is also @guaranteed.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingBorrowAccessorTest: forwarding_use_def_test with: %result
+// CHECK: INTRODUCER: %0 = argument of bb0 : $CPair
+// CHECK-LABEL: end running test 1 of 2 on forwardingBorrowAccessorTest: forwarding_use_def_test with: %result
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingBorrowAccessorTest: forwarding_use_def_test with: %indirectResult
+// CHECK: INTRODUCER: %{{.*}} = apply %{{.*}}(%0) : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+// CHECK-LABEL: end running test 2 of 2 on forwardingBorrowAccessorTest: forwarding_use_def_test with: %indirectResult
+sil [ossa] @forwardingBorrowAccessorTest : $@convention(thin) (@guaranteed CPair) -> () {
+entry(%0 : @guaranteed $CPair):
+  %f = function_ref @borrowPairA : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+  %result = apply %f(%0) : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+  specify_test "forwarding_use_def_test %result"
+
+  %g = function_ref @borrowPairAIndirect : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+  %indirectResult = apply %g(%0) : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+  specify_test "forwarding_use_def_test %indirectResult"
+
+  %void = tuple()
+  return %void : $()
+}
+
+// Test that the uses of a borrow accessor's @guaranteed result are forwarded uses of its @guaranteed 'self', and that
+// the call is also a use of 'self'. The result of a borrow accessor with an @in_guaranteed 'self' is not followed.
+//
+// CHECK-LABEL: begin running test 1 of 1 on forwardingBorrowAccessorDefUseTest: forwarding_def_use_test with: %0
+// CHECK-NEXT:  USE: operand #1 of   %{{[0-9]+}} = apply %{{.*}}(%0) : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+// CHECK-NEXT:  USE: operand #1 of   [[RESULT:%[0-9]+]] = apply %{{.*}}(%0) : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+// CHECK-NEXT:  USE: operand #0 of   %{{[0-9]+}} = copy_value [[RESULT]] : $C
+// CHECK-NEXT:  end running test 1 of 1 on forwardingBorrowAccessorDefUseTest: forwarding_def_use_test with: %0
+sil [ossa] @forwardingBorrowAccessorDefUseTest : $@convention(thin) (@guaranteed CPair) -> () {
+entry(%0 : @guaranteed $CPair):
+  specify_test "forwarding_def_use_test %0"
+  %f = function_ref @borrowPairA : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+  %result = apply %f(%0) : $@convention(method) (@guaranteed CPair) -> @guaranteed C
+  %resultCopy = copy_value %result : $C
+
+  %g = function_ref @borrowPairAIndirect : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+  %indirectResult = apply %g(%0) : $@convention(method) (@in_guaranteed CPair) -> @guaranteed C
+  %indirectResultCopy = copy_value %indirectResult : $C
+
+  destroy_value %resultCopy : $C
+  destroy_value %indirectResultCopy : $C
+  %void = tuple()
+  return %void : $()
+}
