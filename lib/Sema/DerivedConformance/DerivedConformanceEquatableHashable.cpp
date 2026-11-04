@@ -1037,7 +1037,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
       if (auto ED = dyn_cast<EnumDecl>(Nominal)) {
         std::pair<BraceStmt *, bool> (*bodySynthesizer)(
             AbstractFunctionDecl *, void *);
-        if (ED->isObjC())
+        if (ED->isCCompatibleEnum())
           bodySynthesizer = deriveBodyHashable_enum_rawValue_hashInto;
         else if (ED->hasOnlyCasesWithoutAssociatedValues())
           bodySynthesizer = deriveBodyHashable_enum_noAssociatedValues_hashInto;

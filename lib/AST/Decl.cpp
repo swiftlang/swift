@@ -6403,9 +6403,13 @@ bool NominalTypeDecl::isFormallyResilient() const {
   if (hasClangNode())
     return false;
 
-  // @objc enums and protocols always have a fixed layout.
-  if ((isa<EnumDecl>(this) || isa<ProtocolDecl>(this)) && isObjC())
+  // @objc and @c enums and @objc protocols always have a fixed layout.
+  if (auto *ED = dyn_cast<EnumDecl>(this)) {
+    if (ED->isCCompatibleEnum())
+      return false;
+  } else if (isa<ProtocolDecl>(this) && isObjC()) {
     return false;
+  }
 
   // A COM interface's IID fixes its requirements across module versions.
   if (auto *protocol = dyn_cast<ProtocolDecl>(this);
@@ -7937,10 +7941,10 @@ bool EnumDecl::isFormallyExhaustive(const DeclContext *useDC) const {
 
 bool EnumDecl::isEffectivelyExhaustive(ModuleDecl *M,
                                        ResilienceExpansion expansion) const {
-  // Generated Swift code commits to handling garbage values of @objc enums,
-  // whether imported or not, to deal with C's loose rules around enums.
-  // This covers both frozen and non-frozen @objc enums.
-  if (isObjC())
+  // Generated Swift code commits to handling garbage values of @objc and @c
+  // enums, whether imported or not, to deal with C's loose rules around enums.
+  // This covers both frozen and non-frozen @objc and @c enums.
+  if (isCCompatibleEnum())
     return false;
 
   // Otherwise, the only non-exhaustive enums are those that don't have

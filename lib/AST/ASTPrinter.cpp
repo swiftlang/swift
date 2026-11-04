@@ -5013,7 +5013,7 @@ void PrintAST::printEnumElement(EnumElementDecl *elt) {
   case PrintOptions::EnumRawValueMode::Skip:
     return;
   case PrintOptions::EnumRawValueMode::PrintObjCOnly:
-    if (!elt->isObjC())
+    if (!elt->getParentEnum()->isCCompatibleEnum())
       return;
     break;
   case PrintOptions::EnumRawValueMode::Print:

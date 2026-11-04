@@ -3335,8 +3335,11 @@ public:
     // NonCopyableChecks
     //
 
-    if (ED->isObjC() && !ED->canBeCopyable()) {
-      ED->diagnose(diag::noncopyable_objc_enum);
+    if (ED->isCCompatibleEnum() && !ED->canBeCopyable()) {
+      DeclAttribute *attr = ED->getAttrs().getAttribute<ObjCAttr>();
+      if (!attr)
+        attr = ED->getAttrs().getAttribute<CDeclAttr>();
+      ED->diagnose(diag::noncopyable_objc_enum, attr);
     }
 
     checkExplicitAvailability(ED);

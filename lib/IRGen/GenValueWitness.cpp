@@ -1438,7 +1438,7 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
     // witnesses for their tag manipulation (except when they're empty, in
     // which case values never exist to witness).
     if (auto enumDecl = dyn_cast<EnumDecl>(nom))
-      if (!enumDecl->isObjC() && !type->isUninhabited())
+      if (!enumDecl->isCCompatibleEnum() && !type->isUninhabited())
         return {};
   }
  
