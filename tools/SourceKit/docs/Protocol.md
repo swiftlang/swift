@@ -22,6 +22,7 @@ The protocol is documented in the following format:
 | -------------:|:------------|
 | [Code Completion](#code-completion) | source.request.codecomplete |
 | [Cursor Info](#cursor-info) | source.request.cursorinfo |
+| [Related Identifiers](#related-identifiers) | source.request.relatedidents |
 | [Demangling](#demangling) | source.request.demangle |
 | [Mangling](#simple-class-mangling) | source.request.mangle_simple_class |
 | [Documentation](#documentation) | source.request.docinfo |
@@ -743,6 +744,97 @@ Welcome to SourceKit.  Type ':help' for assistance.
   key.offset: 7,
   key.compilerargs: ["/path/to/file.swift"]
 }
+```
+
+## Related Identifiers
+
+SourceKit is capable of finding all occurrences, within a single file, of the symbol at a given offset. This can be used, for example, to highlight every use of a variable when the cursor is placed on it.
+
+If the offset does not point to a symbol that can be renamed, such as a keyword or a module name, the response contains an empty `key.results` array.
+
+### Request
+
+```
+{
+    <key.request>:            (UID)     <source.request.relatedidents>,
+    [opt] <key.primary_file>: (string)  // Absolute path to the primary file of the compiler invocation.
+    [opt] <key.sourcefile>:   (string)  // Absolute path to the file to search. Used as the primary file if
+                                        // key.primary_file is not provided.
+                                        // **Require**: key.primary_file or key.sourcefile
+    <key.offset>:             (int64)   // Byte offset of the identifier inside the source contents.
+    <key.compilerargs>:       [string*] // Array of zero or more strings for the compiler arguments,
+                                        // e.g ["-sdk", "/path/to/sdk"]. These must include the path to
+                                        // the file.
+    [opt] <key.include_non_editable_base_names>: (int64) // By default, no results are returned when
+                                        // the offset points to the declaration of an initializer,
+                                        // deinitializer or subscript, since their base names can't be
+                                        // renamed. Set to 1 to return results in these cases.
+                                        // Defaults to 0.
+    [opt] <key.cancel_on_subsequent_request>: (int64) // Whether this request should be canceled if a
+                                        // new related-identifiers request is made that uses the same AST.
+                                        // For backwards compatibility, the default is 1.
+}
+```
+
+### Response
+
+```
+{
+    <key.results>: (array) [related-ident-info*] // A list of the occurrences of the symbol in the file.
+    [opt] <key.name>: (string)                   // Name of the symbol.
+}
+```
+
+```
+related-ident-info ::=
+{
+    <key.offset>:   (int64) // Byte offset of the occurrence inside the source contents.
+    <key.length>:   (int64) // Length of the occurrence in bytes.
+    <key.nametype>: (UID)   // How the name is used at this occurrence. One of
+                            // <source.syntacticrename.definition>,
+                            // <source.syntacticrename.reference>,
+                            // <source.syntacticrename.call> or
+                            // <source.syntacticrename.unknown>.
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=related-idents -offset=<offset> <file> [-- <compiler args>]
+$ sourcekitd-test -req=related-idents -pos=<line>:<column> <file> [-- <compiler args>]
+```
+
+For example, using a document containing:
+
+```
+class C1 {
+  init() {}
+}
+
+func test1() {
+  var x : C1 = C1()
+}
+
+extension C1 {}
+```
+
+To find all occurrences of `C1`, you would make the following request:
+
+```
+$ sourcekitd-test -req=related-idents -pos=6:17 /path/to/file.swift -- /path/to/file.swift
+```
+
+This produces the following output, where each line shows the line and column of an occurrence, its length and its usage:
+
+```
+START RANGES
+1:7 - 2 - source.syntacticrename.definition
+6:11 - 2 - source.syntacticrename.reference
+6:16 - 2 - source.syntacticrename.reference
+9:11 - 2 - source.syntacticrename.reference
+END RANGES
+NAME: C1
 ```
 
 ## Expression Type
