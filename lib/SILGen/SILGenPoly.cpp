@@ -623,29 +623,15 @@ ManagedValue Transform::transform(ManagedValue v,
     auto *inputStruct = inputSubstType->getStructDecl();
     auto *outputStruct = outputSubstType->getStructDecl();
 
-    // Attempt collection upcast only if input and output declarations match.
-    if (inputStruct == outputStruct) {
-      FuncDecl *fn = nullptr;
-      if (inputSubstType->isArray()) {
-        fn = SGF.SGM.getArrayForceCast(Loc);
-      } else if (inputSubstType->isDictionary()) {
-        fn = SGF.SGM.getDictionaryUpCast(Loc);
-      } else if (inputSubstType->isSet()) {
-        fn = SGF.SGM.getSetUpCast(Loc);
-      } else {
-        ABORT([&](llvm::raw_ostream &out) {
-          out << "Unsupported collection upcast kind\n";
-          v.dump(out);
-          loweredResultTy.getASTType()->dump(out);
-          inputSubstType->dump(out);
-          outputSubstType->dump(out);
-        });
-      }
-
+    // Attempt collection upcast only if input and output declarations match
+    // and the type is a known collection (Array, Dictionary, or Set).
+    if (inputStruct == outputStruct &&
+        (inputSubstType->isArray() || inputSubstType->isDictionary() ||
+         inputSubstType->isSet())) {
       return SGF
-          .emitCollectionConversion(Loc, fn, inputSubstType, outputSubstType, v,
-                                    /*keyConversion*/ ManagedValue(),
-                                    /*valueConversion*/ ManagedValue(), ctxt)
+          .emitCollectionConversion(
+              Loc, inputSubstType, outputSubstType, v,
+              SILGenFunction::CollectionCastKind::Upcast, ctxt)
           .getScalarValue();
     }
   }

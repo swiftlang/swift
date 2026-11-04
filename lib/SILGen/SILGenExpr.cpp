@@ -1586,14 +1586,82 @@ RValue RValueEmitter::visitMetatypeConversionExpr(MetatypeConversionExpr *E,
   return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(upcast));
 }
 
-RValue SILGenFunction::emitCollectionConversion(
-    SILLocation loc, FuncDecl *fn, CanType fromCollection, CanType toCollection,
-    ManagedValue mv, ManagedValue keyConversion, ManagedValue valueConversion,
-    SGFContext C) {
-  SmallVector<Type, 4> replacementTypes;
+static bool elementConversionNeedsThunk(CanType fromType, CanType toType);
+static ManagedValue createValueConversionThunk(SILGenFunction &SGF,
+                                               SILLocation loc,
+                                               CanType fromType,
+                                               CanType toType);
 
+RValue SILGenFunction::emitCollectionConversion(
+    SILLocation loc, CanType fromCollection, CanType toCollection,
+    ManagedValue mv, CollectionCastKind castKind, SGFContext C) {
   auto fromArgs = cast<NominalType>(fromCollection)->getGenericArgs();
   auto toArgs = cast<NominalType>(toCollection)->getGenericArgs();
+
+  FuncDecl *fn = nullptr;
+  ManagedValue keyConversion;
+  ManagedValue valueConversion;
+
+  bool isArray = fromCollection->isArray();
+  bool isDictionary = fromCollection->isDictionary();
+  bool isSet = fromCollection->isSet();
+  assert((isArray || isDictionary || isSet) &&
+         "unsupported collection type");
+
+  switch (castKind) {
+  case CollectionCastKind::Upcast: {
+    // Determine element types and whether thunks are needed.
+    if (isArray) {
+      CanType fromElem = fromArgs[0]->getCanonicalType();
+      CanType toElem = toArgs[0]->getCanonicalType();
+      if (elementConversionNeedsThunk(fromElem, toElem)) {
+        fn = SGM.getArrayWitnessCast(loc);
+        valueConversion = createValueConversionThunk(*this, loc,
+                                                     fromElem, toElem);
+      } else {
+        fn = SGM.getArrayForceCast(loc);
+      }
+    } else if (isDictionary) {
+      CanType fromKey = fromArgs[0]->getCanonicalType();
+      CanType toKey = toArgs[0]->getCanonicalType();
+      CanType fromVal = fromArgs[1]->getCanonicalType();
+      CanType toVal = toArgs[1]->getCanonicalType();
+      if (elementConversionNeedsThunk(fromKey, toKey) ||
+          elementConversionNeedsThunk(fromVal, toVal)) {
+        fn = SGM.getDictionaryWitnessCast(loc);
+        keyConversion = createValueConversionThunk(*this, loc, fromKey, toKey);
+        valueConversion = createValueConversionThunk(*this, loc,
+                                                     fromVal, toVal);
+      } else {
+        fn = SGM.getDictionaryUpCast(loc);
+      }
+    } else {
+      CanType fromElem = fromArgs[0]->getCanonicalType();
+      CanType toElem = toArgs[0]->getCanonicalType();
+      if (elementConversionNeedsThunk(fromElem, toElem)) {
+        fn = SGM.getSetWitnessCast(loc);
+        valueConversion = createValueConversionThunk(*this, loc,
+                                                     fromElem, toElem);
+      } else {
+        fn = SGM.getSetUpCast(loc);
+      }
+    }
+    break;
+  }
+  case CollectionCastKind::ForceDowncast:
+    if (isArray) fn = SGM.getArrayForceCast(loc);
+    else if (isDictionary) fn = SGM.getDictionaryDownCast(loc);
+    else fn = SGM.getSetDownCast(loc);
+    break;
+  case CollectionCastKind::ConditionalDowncast:
+    if (isArray) fn = SGM.getArrayConditionalCast(loc);
+    else if (isDictionary) fn = SGM.getDictionaryDownCastConditional(loc);
+    else fn = SGM.getSetDownCastConditional(loc);
+    break;
+  }
+
+  // Build substitution map.
+  SmallVector<Type, 4> replacementTypes;
   replacementTypes.insert(replacementTypes.end(),
                           fromArgs.begin(), fromArgs.end());
   replacementTypes.insert(replacementTypes.end(),
@@ -1860,58 +1928,13 @@ static ManagedValue createValueConversionThunk(SILGenFunction &SGF,
 RValue RValueEmitter::
 visitCollectionUpcastConversionExpr(CollectionUpcastConversionExpr *E,
                                     SGFContext C) {
-
   SILLocation loc = RegularLocation(E);
-
   auto mv = SGF.emitRValueAsSingleValue(E->getSubExpr());
-
   auto fromCollection = E->getSubExpr()->getType()->getCanonicalType();
   auto toCollection = E->getType()->getCanonicalType();
-
-  auto fromArgs = cast<NominalType>(fromCollection)->getGenericArgs();
-  auto toArgs = cast<NominalType>(toCollection)->getGenericArgs();
-
-  FuncDecl *fn = nullptr;
-  ManagedValue keyConversion;
-  ManagedValue valueConversion;
-
-  if (fromCollection->isArray()) {
-    CanType fromElem = fromArgs[0]->getCanonicalType();
-    CanType toElem = toArgs[0]->getCanonicalType();
-    if (elementConversionNeedsThunk(fromElem, toElem)) {
-      fn = SGF.SGM.getArrayWitnessCast(loc);
-      valueConversion = createValueConversionThunk(SGF, loc, fromElem, toElem);
-    } else {
-      fn = SGF.SGM.getArrayForceCast(loc);
-    }
-  } else if (fromCollection->isDictionary()) {
-    CanType fromKey = fromArgs[0]->getCanonicalType();
-    CanType toKey = toArgs[0]->getCanonicalType();
-    CanType fromVal = fromArgs[1]->getCanonicalType();
-    CanType toVal = toArgs[1]->getCanonicalType();
-    if (elementConversionNeedsThunk(fromKey, toKey) ||
-        elementConversionNeedsThunk(fromVal, toVal)) {
-      fn = SGF.SGM.getDictionaryWitnessCast(loc);
-      keyConversion = createValueConversionThunk(SGF, loc, fromKey, toKey);
-      valueConversion = createValueConversionThunk(SGF, loc, fromVal, toVal);
-    } else {
-      fn = SGF.SGM.getDictionaryUpCast(loc);
-    }
-  } else if (fromCollection->isSet()) {
-    CanType fromElem = fromArgs[0]->getCanonicalType();
-    CanType toElem = toArgs[0]->getCanonicalType();
-    if (elementConversionNeedsThunk(fromElem, toElem)) {
-      fn = SGF.SGM.getSetWitnessCast(loc);
-      valueConversion = createValueConversionThunk(SGF, loc, fromElem, toElem);
-    } else {
-      fn = SGF.SGM.getSetUpCast(loc);
-    }
-  } else {
-    llvm_unreachable("unsupported collection upcast kind");
-  }
-
-  return SGF.emitCollectionConversion(loc, fn, fromCollection, toCollection, mv,
-                                      keyConversion, valueConversion, C);
+  return SGF.emitCollectionConversion(
+      loc, fromCollection, toCollection, mv,
+      SILGenFunction::CollectionCastKind::Upcast, C);
 }
 
 RValue

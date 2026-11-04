@@ -747,11 +747,7 @@ ArrayCasts.testSync("Covariant nested") {
     { _ in ["abc"] },
     { x in (x + x).map { $0() as! String } }
   ]
-  
-  // Currently failing
-  // See https://forums.swift.org/t/casting-closure-collections/82100/10
-  expectCrashLater()
-  
+
   let b = a as Y
   expectEqual(b.count, 3)
   let probe: [() -> String] = [{ "xyz" }, { "ijk" } ]
@@ -1534,11 +1530,7 @@ DictionaryCasts.testSync("Covariant nested") {
       return result
     }
   ]
-  
-  // Currently failing
-  // See https://forums.swift.org/t/casting-closure-collections/82100/10
-  expectCrashLater()
-  
+
   let b = a as Y
   expectEqual(b.count, 3)
   let probe: [String: () -> String] = ["a": { "xyz" }, "b": { "ijk" } ]
