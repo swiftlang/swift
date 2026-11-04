@@ -23,6 +23,7 @@ swift_compiler_sources(Optimizer
   SimplifyConvertEscapeToNoEscape.swift
   SimplifyCopyBlock.swift
   SimplifyCopyValue.swift
+  SimplifyDebugReconstruction.swift
   SimplifyDebugStep.swift
   SimplifyDestroyValue.swift
   SimplifyDestructure.swift
@@ -61,5 +62,6 @@ swift_compiler_sources(Optimizer
   SimplifyUncheckedAddrCast.swift
   SimplifyUncheckedEnumData.swift
   SimplifyUncheckedOwnershipConversion.swift
+  SimplifyUpcast.swift
   SimplifyValueToBridgeObject.swift
   SimplifyWitnessMethod.swift)

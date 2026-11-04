@@ -702,7 +702,7 @@ SILValue swift::simplifyOverflowBuiltinInstruction(BuiltinInst *BI) {
 ///
 /// NOTE: We assume that the insertion point associated with the SILValue must
 /// dominate \p i.
-static SILValue simplifyInstruction(SILInstruction *i) {
+SILValue swift::simplifyInstruction(SILInstruction *i) {
   return InstSimplifier().visit(i);
 }
 
