@@ -18,6 +18,7 @@ import Swift
 /// with some number of initialized bytes, followed by uninitialized memory.
 /// It provides operations to access the bytes it stores,
 /// as well as to append and to remove bytes.
+@backDeployed(before: SwiftStdlib 6.2)
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -334,7 +335,6 @@ extension OutputRawSpan {
   ///   - type: The type of the instance to store.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
   @export(implementation)
-  @available(StdlibDeploymentTarget 6.4, *)
   @_lifetime(self: copy self)
   public mutating func append<T>(
     _ value: T, as type: T.Type, _ byteOrder: ByteOrder
@@ -417,7 +417,6 @@ extension OutputRawSpan {
   ///   - type: The type of the instance to store repeatedly.
   ///   - byteOrder: The order in which the bytes will be encoded to the span.
   @export(implementation)
-  @available(StdlibDeploymentTarget 6.4, *)
   @_lifetime(self: copy self)
   public mutating func append<T>(
     repeating repeatedValue: T,

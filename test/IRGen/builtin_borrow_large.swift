@@ -16,6 +16,7 @@ func makeBigArc() -> BigArc
 
 // CHECK-LABEL: define {{.*}} @"$s{{.*}}12borrowBigPod
 // CHECK:         ret ptr %0
+@available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *)
 @_lifetime(borrow target)
 public func borrowBigPod(_ target: BigPod) -> Ref<BigPod> {
 	return Ref(target)
@@ -29,23 +30,27 @@ public func borrowBigPod(_ target: BigPod) -> Ref<BigPod> {
 // CHECK-NEXT:    memcpy{{.*}} [[BUF]], {{.*}} %0
 // CHECK-NEXT:    @llvm.lifetime.end
 // CHECK-NEXT:    ret ptr %0
+@available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *)
 @_lifetime(borrow target)
 public func borrowBigArc(_ target: BigArc) -> Ref<BigArc> {
 	return Ref(target)
 }
 
+@available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *)
 @_silgen_name("takeBorrowBigPod")
 func takeBorrowBigPod(_: Ref<BigPod>)
 
 // CHECK-LABEL: define {{.*}} @"$s{{.*}}17borrowBigPodLocal
 // CHECK:         call {{.*}} @makeBigPod(ptr noalias sret(%T4main6BigPodV) captures(none) [[LOCAL_POD:%.*]])
 // CHECK:         call {{.*}} @takeBorrowBigPod(ptr [[LOCAL_POD]])
+@available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *)
 public func borrowBigPodLocal() {
 	let target = makeBigPod()
 	takeBorrowBigPod(Ref(target))
 }
 
 // CHECK-LABEL: define {{.*}} @"$s{{.*}}11derefBigPod
+@available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *)
 public func derefBigPod(_ borrow: Ref<BigPod>) -> BigPod {
 	// CHECK:     store ptr %1, ptr [[TMP:%.*]], align
 	// CHECK:     [[BORROW:%.*]] = load ptr, ptr [[TMP]]
@@ -59,6 +64,7 @@ public func derefBigPod(_ borrow: Ref<BigPod>) -> BigPod {
 	return borrow.value
 }
 
+@available(macOS 26, iOS 26, watchOS 26, tvOS 26, visionOS 26, *)
 public func derefBigArc(_ borrow: Ref<BigArc>) -> BigArc {
 	return borrow.value
 }

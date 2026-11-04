@@ -2202,6 +2202,11 @@ private:
   void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
   bool isConcurrencyAvailable();
+
+  /// Whether the runtime support for `Builtin.Borrow` of a non-fixed referent
+  /// (swift_getBorrowTypeMetadata and friends) is guaranteed to exist at the
+  /// deployment target. If not, IRGen computes that layout inline.
+  bool isBorrowRuntimeAvailable();
   bool isTypedAllocationAvailable();
   void noteSwiftAsyncFunctionDef() {
     hasSwiftAsyncFunctionDef = true;
