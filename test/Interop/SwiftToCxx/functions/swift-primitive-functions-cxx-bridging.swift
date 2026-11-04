@@ -21,7 +21,7 @@
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK char32_t passThroughCChar32(char32_t x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return Functions::_impl::$s9Functions18passThroughCChar32ys7UnicodeO6ScalarVAFF(x);
+// CHECK-NEXT:   return Functions::_impl::$s9Functions18passThroughCChar32ys6UInt32VADF(x);
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK double passThroughCDouble(double x) noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
