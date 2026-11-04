@@ -222,11 +222,6 @@ void printPrimitiveGenericTypeTraits(raw_ostream &os, ASTContext &astContext,
 
   addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "CChar32"));
 
-  if (clangTI.hasInt128Type()) {
-    addIfAvailable(astContext.getInt128Type());
-    addIfAvailable(astContext.getUInt128Type());
-  }
-
   if (clangTI.hasFloat16Type())
     addIfAvailable(astContext.getNamedSwiftType(stdlibModule, "Float16"));
 

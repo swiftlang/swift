@@ -17,17 +17,8 @@
 
 public func takesInt(_ x: Int) {}
 
-// OLD-NOT: $ss6Int128VN
-// OLD-NOT: $ss7UInt128VN
-// OLD-NOT: isUsableInGenericContext<__int128>
 // OLD: // type metadata address for CChar32.
 // OLD: struct TypeMetadataTrait<char32_t> {
-// OLD-NOT: $ss6Int128VN
-// OLD-NOT: $ss7UInt128VN
-// OLD-NOT: isUsableInGenericContext<__int128>
 
-// NEW: // type metadata address for Int128.
-// NEW-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss6Int128VN;
-// NEW-NEXT: // type metadata address for UInt128.
-// NEW-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7UInt128VN;
-// NEW: struct TypeMetadataTrait<__int128> {
+// NEW: // type metadata address for CChar32.
+// NEW: struct TypeMetadataTrait<char32_t> {

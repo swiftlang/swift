@@ -37,10 +37,6 @@
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $sSuN;
 // CHECK-NEXT: // type metadata address for CChar32.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7UnicodeO6ScalarVN;
-// CHECK-NEXT: // type metadata address for Int128.
-// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss6Int128VN;
-// CHECK-NEXT: // type metadata address for UInt128.
-// CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7UInt128VN;
 // CHECK-NEXT: // type metadata address for Float16.
 // CHECK-NEXT: SWIFT_IMPORT_STDLIB_SYMBOL extern size_t $ss7Float16VN;
 // CHECK-EMPTY:
@@ -84,26 +80,6 @@
 // CHECK-NEXT: struct TypeMetadataTrait<char32_t> {
 // CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
 // CHECK-NEXT:     return &_impl::$ss7UnicodeO6ScalarVN;
-// CHECK-NEXT:   }
-// CHECK-NEXT: };
-// CHECK-EMPTY:
-// CHECK-NEXT: template<>
-// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<__int128> = true;
-// CHECK-EMPTY:
-// CHECK-NEXT: template<>
-// CHECK-NEXT: struct TypeMetadataTrait<__int128> {
-// CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
-// CHECK-NEXT:     return &_impl::$ss6Int128VN;
-// CHECK-NEXT:   }
-// CHECK-NEXT: };
-// CHECK-EMPTY:
-// CHECK-NEXT: template<>
-// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<unsigned __int128> = true;
-// CHECK-EMPTY:
-// CHECK-NEXT: template<>
-// CHECK-NEXT: struct TypeMetadataTrait<unsigned __int128> {
-// CHECK-NEXT:   static SWIFT_INLINE_PRIVATE_HELPER void * _Nonnull getTypeMetadata() {
-// CHECK-NEXT:     return &_impl::$ss7UInt128VN;
 // CHECK-NEXT:   }
 // CHECK-NEXT: };
 // CHECK-EMPTY:
