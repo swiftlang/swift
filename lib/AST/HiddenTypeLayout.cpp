@@ -14,7 +14,9 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/TypeWalker.h"
 #include "swift/AST/Types.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include <functional>
 
@@ -28,7 +30,10 @@ void swift::forEachRequiredHiddenTypeLayout(
   // in a module's API, but they can implicitly affect its ABI by
   // defining storage in another type that is part of the module's API.
   // Serialize hidden representations for types used to define storage on an
-  // ABI-accessible struct or enum, or a public class.
+  // ABI-accessible struct or enum, or a public class. A stored type may also
+  // refer to a hidden declaration without depending on its layout, such as a
+  // parameter in a stored closure's function type. Preserve those references
+  // so the stored type itself can be deserialized.
 
   // Clients need complete layout information for ABI-accessible value types in
   // order to copy them correctly. Public classes also need complete layout
@@ -36,14 +41,25 @@ void swift::forEachRequiredHiddenTypeLayout(
   // that are not public are intentionally excluded.
 
   llvm::SmallPtrSet<const TypeBase *, 16> visitedTypes;
+  llvm::SmallMapVector<const Decl *, HiddenTypeLayoutRequirement, 16>
+      requirements;
 
   auto reportHiddenType = [&](const Decl *layoutDecl, Type hiddenType,
                               HiddenTypeLayoutOrigin origin,
+                              HiddenTypeRepresentationKind kind,
                               NominalTypeDecl *abiExposedType,
                               ValueDecl *layoutAffectingStorage) {
     assert(abiExposedType && layoutAffectingStorage);
-    callback({layoutDecl, hiddenType, origin, abiExposedType,
-              layoutAffectingStorage});
+    HiddenTypeLayoutRequirement requirement{layoutDecl, hiddenType, origin,
+                                            kind, abiExposedType,
+                                            layoutAffectingStorage};
+    auto entry = requirements.find(layoutDecl);
+    if (entry == requirements.end()) {
+      requirements.insert({layoutDecl, std::move(requirement)});
+      return;
+    }
+    if (kind == HiddenTypeRepresentationKind::AbstractTypeLayout)
+      entry->second = std::move(requirement);
   };
 
   auto isInternalBridgingHeaderImportedType =
@@ -60,46 +76,36 @@ void swift::forEachRequiredHiddenTypeLayout(
         return importedModule->isClangBridgingHeaderImportModule();
       };
 
-  // Traverse a type that contributes to an ABI-accessible layout. If it is
-  // hidden from clients, schedule it to receive a hidden representation.
-  // Otherwise, recurse into non-resilient structs and enums, or the public
-  // class root, looking for hidden component types.
-  std::function<void(Type, DeclContext *, NominalTypeDecl *, ValueDecl *)>
-      processTypeForHiddenLayouts =
-          [&](Type type, DeclContext *useDC,
-              NominalTypeDecl *abiExposedType,
-              ValueDecl *layoutAffectingStorage) {
+  auto reportHiddenTypeIfNeeded =
+      [&](Type type, HiddenTypeRepresentationKind representationKind,
+          DeclContext *useDC, NominalTypeDecl *abiExposedType,
+          ValueDecl *layoutAffectingStorage) {
         if (auto *hiddenType = type->getAs<HiddenType>()) {
           if (auto *layoutInfo = hiddenType->getLayoutInfoDecl())
             reportHiddenType(layoutInfo, type,
                              HiddenTypeLayoutOrigin::RecoveredHiddenType,
-                             abiExposedType, layoutAffectingStorage);
-          return;
+                             representationKind, abiExposedType,
+                             layoutAffectingStorage);
+          return true;
         }
 
-        if (auto *tupleType = type->getAs<TupleType>()) {
-          for (auto elt : tupleType->getElements())
-            processTypeForHiddenLayouts(elt.getType(), useDC, abiExposedType,
-                                        layoutAffectingStorage);
-          return;
-        }
-
-        NominalTypeDecl *nominal = type->getAnyNominal();
+        auto *nominal = type->getAnyNominal();
         if (!nominal)
-          return;
+          return false;
 
         // We schedule a hidden representation for types
         // that contribute to ABI and will not be visible to clients
         // for some reason.
 
         // @_implementationOnly imported types will not be provided to clients
-        ModuleDecl *typeModule = nominal->getModuleContext();
+        auto *typeModule = nominal->getModuleContext();
         if (module->isImportedImplementationOnly(typeModule,
                                                  /*assumeImported=*/false)) {
           reportHiddenType(nominal, type,
                            HiddenTypeLayoutOrigin::ImplementationOnly,
-                           abiExposedType, layoutAffectingStorage);
-          return;
+                           representationKind, abiExposedType,
+                           layoutAffectingStorage);
+          return true;
         }
 
         // Types from internally imported bridging headers will not be provided to clients
@@ -107,10 +113,75 @@ void swift::forEachRequiredHiddenTypeLayout(
           if (isInternalBridgingHeaderImportedType(nominal, useDC))
             reportHiddenType(
                 nominal, type,
-                HiddenTypeLayoutOrigin::InternalBridgingHeader, abiExposedType,
+                HiddenTypeLayoutOrigin::InternalBridgingHeader,
+                representationKind, abiExposedType, layoutAffectingStorage);
+          return true;
+        }
+
+        return false;
+      };
+
+  // Process the declarations referenced by a type expression without
+  // traversing the storage of those declarations.
+  auto processTypeReferencedFromABIContributingType =
+      [&](Type type, DeclContext *useDC,
+          NominalTypeDecl *abiExposedType,
+          ValueDecl *layoutAffectingStorage) {
+        class ReferencedTypeWalker final : public TypeWalker {
+          llvm::function_ref<void(Type)> Callback;
+
+        public:
+          explicit ReferencedTypeWalker(
+              llvm::function_ref<void(Type)> callback)
+              : Callback(callback) {}
+
+          Action walkToTypePre(Type type) override {
+            Callback(type);
+            return Action::Continue;
+          }
+        };
+
+        auto visitReferencedType = [&](Type referencedType) {
+          reportHiddenTypeIfNeeded(
+              referencedType, HiddenTypeRepresentationKind::Opaque,
+              useDC, abiExposedType, layoutAffectingStorage);
+        };
+        ReferencedTypeWalker walker(visitReferencedType);
+        type.walk(walker);
+      };
+
+  // Process a type whose layout contributes to ABI-accessible storage.
+  std::function<void(Type, DeclContext *, NominalTypeDecl *, ValueDecl *)>
+      processABIContributingType =
+          [&](Type type, DeclContext *useDC,
+              NominalTypeDecl *abiExposedType,
+              ValueDecl *layoutAffectingStorage) {
+        if (auto *tupleType = type->getAs<TupleType>()) {
+          for (auto elt : tupleType->getElements())
+            processABIContributingType(
+                elt.getType(), useDC, abiExposedType,
                 layoutAffectingStorage);
           return;
         }
+
+        if (type->getAs<AnyFunctionType>() ||
+            type->getAs<AnyMetatypeType>() ||
+            type->getAs<ExistentialType>()) {
+          processTypeReferencedFromABIContributingType(
+              type, useDC, abiExposedType, layoutAffectingStorage);
+          return;
+        }
+
+        if (reportHiddenTypeIfNeeded(
+                type, HiddenTypeRepresentationKind::AbstractTypeLayout, useDC,
+                abiExposedType, layoutAffectingStorage))
+          return;
+
+        NominalTypeDecl *nominal = type->getAnyNominal();
+        if (!nominal)
+          return;
+
+        ModuleDecl *typeModule = nominal->getModuleContext();
 
         // We intentionally do not handle the other disallowed origin kinds that
         // sema's exportability analysis diagnoses:
@@ -161,8 +232,8 @@ void swift::forEachRequiredHiddenTypeLayout(
             auto *storage = prop->getModuleContext() == module
                                 ? prop
                                 : layoutAffectingStorage;
-            processTypeForHiddenLayouts(storedType, prop->getDeclContext(),
-                                        abiExposedType, storage);
+            processABIContributingType(storedType, prop->getDeclContext(),
+                                       abiExposedType, storage);
           }
         } else if (auto *innerEnum = dyn_cast<EnumDecl>(nominal)) {
           for (auto *elt : innerEnum->getAllElements()) {
@@ -172,9 +243,9 @@ void swift::forEachRequiredHiddenTypeLayout(
               auto *storage = elt->getModuleContext() == module
                                   ? elt
                                   : layoutAffectingStorage;
-              processTypeForHiddenLayouts(payloadType.subst(substitutions),
-                                          elt->getDeclContext(), abiExposedType,
-                                          storage);
+              processABIContributingType(payloadType.subst(substitutions),
+                                         elt->getDeclContext(), abiExposedType,
+                                         storage);
             }
           }
         }
@@ -194,7 +265,7 @@ void swift::forEachRequiredHiddenTypeLayout(
                   /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/false)
               .isPublic();
       if (isABIAccessibleValueType || isPublicClass) {
-        processTypeForHiddenLayouts(
+        processABIContributingType(
             nominal->getDeclaredInterfaceType(), nominal, nominal,
             /*layoutAffectingStorage=*/nullptr);
       }
@@ -213,4 +284,7 @@ void swift::forEachRequiredHiddenTypeLayout(
     for (auto *decl : fileDecls)
       processABIAccessibleDecls(decl);
   }
+
+  for (const auto &entry : requirements)
+    callback(entry.second);
 }
