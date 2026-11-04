@@ -4060,6 +4060,12 @@ void ExtendUnconsumedLiveness::runOnField(
     for (auto *predecessor : block->getPredecessorBlocks()) {
       if (consumedAtExitBlocks.contains(predecessor))
         continue;
+      // A predecessor that wasn't originally live isn't on that boundary. For
+      // example, when the field is defined in a loop header and consumed in the
+      // loop, the header is consumed at entry along the back edge, but the
+      // field isn't live in the loop's preheader at all.
+      if (!originalLiveBlocks.contains(predecessor))
+        continue;
       // Add "the instruction(s) before the terminator" of the predecessor to
       // liveness.
       addPreviousInstructionToLiveness(predecessor->getTerminator(), element);

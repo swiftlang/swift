@@ -1,0 +1,120 @@
+// RUN: %target-sil-opt -sil-print-types -address-lowering -enable-sil-opaque-values -sil-verify-all -module-name test %s | %FileCheck %s
+
+// Consuming a non-Copyable enum's payload consumes the entire enum. The address
+// form projects the payload without consuming anything, so AddressLowering
+// encloses the projection in a deinit access, as SILGen does for a consuming
+// switch over an address. Otherwise the move-only checker treats the other
+// cases' payloads as still live within the case.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+enum NCE<T> : ~Copyable {
+  case a(T)
+  case b(Builtin.Int64)
+}
+
+enum CE<T> {
+  case a(T)
+  case b(Builtin.Int64)
+}
+
+sil @consumeT : $@convention(thin) <T> (@in T) -> ()
+
+// An owned unchecked_enum_data, as for `switch consume`.
+//
+// CHECK-LABEL: sil [ossa] @consume_unchecked_enum_data : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*NCE<T>):
+// CHECK:         switch_enum_addr {{%[^,]+}} : $*NCE<T>, case #NCE.a!enumelt: [[A:bb[0-9]+]], case #NCE.b!enumelt: [[B:bb[0-9]+]]
+// CHECK:       [[A]]:
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [deinit] [static] [no_nested_conflict] [[ENUM]] : $*NCE<T>
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_{{inplace|take}}_enum_data_addr [[ACCESS]] : $*NCE<T>, #NCE.a!enumelt
+// CHECK:         apply {{%[^,]+}}<T>([[PAYLOAD]])
+// CHECK-NEXT:    end_access [[ACCESS]]
+// CHECK:       [[B]]:
+// CHECK-NOT:     begin_access [deinit]
+// CHECK-LABEL: } // end sil function 'consume_unchecked_enum_data'
+sil [ossa] @consume_unchecked_enum_data : $@convention(thin) <T> (@in NCE<T>) -> () {
+bb0(%0 : @owned $NCE<T>):
+  %1 = begin_borrow %0 : $NCE<T>
+  switch_enum %1 : $NCE<T>, case #NCE.a!enumelt: bb1, case #NCE.b!enumelt: bb2
+
+bb1(%3 : @guaranteed $T):
+  end_borrow %1 : $NCE<T>
+  %5 = unchecked_enum_data %0 : $NCE<T>, #NCE.a!enumelt
+  %6 = function_ref @consumeT : $@convention(thin) <T> (@in T) -> ()
+  %7 = apply %6<T>(%5) : $@convention(thin) <T> (@in T) -> ()
+  br bb3
+
+bb2(%9 : $Builtin.Int64):
+  end_borrow %1 : $NCE<T>
+  destroy_value %0 : $NCE<T>
+  br bb3
+
+bb3:
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// A consuming switch_enum, as for `if case ... = consume`. Each case with a
+// payload gets its own deinit access.
+//
+// CHECK-LABEL: sil [ossa] @consume_switch_enum : {{.*}} {
+// CHECK:       bb0([[ENUM:%[^,]+]] : $*NCE<T>):
+// CHECK:         switch_enum_addr [[ENUM]] : $*NCE<T>, case #NCE.a!enumelt: [[A:bb[0-9]+]], case #NCE.b!enumelt: [[B:bb[0-9]+]]
+// CHECK:       [[A]]:
+// CHECK-NEXT:    [[ACCESS_A:%[^,]+]] = begin_access [deinit] [static] [no_nested_conflict] [[ENUM]] : $*NCE<T>
+// CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_{{inplace|take}}_enum_data_addr [[ACCESS_A]] : $*NCE<T>, #NCE.a!enumelt
+// CHECK:         apply {{%[^,]+}}<T>([[PAYLOAD]])
+// CHECK-NEXT:    end_access [[ACCESS_A]]
+// CHECK:       [[B]]:
+// CHECK-NEXT:    [[ACCESS_B:%[^,]+]] = begin_access [deinit] [static] [no_nested_conflict] [[ENUM]] : $*NCE<T>
+// CHECK-NEXT:    [[INT_ADDR:%[^,]+]] = unchecked_{{inplace|take}}_enum_data_addr [[ACCESS_B]] : $*NCE<T>, #NCE.b!enumelt
+// CHECK-NEXT:    load [trivial] [[INT_ADDR]]
+// CHECK:         end_access [[ACCESS_B]]
+// CHECK-LABEL: } // end sil function 'consume_switch_enum'
+sil [ossa] @consume_switch_enum : $@convention(thin) <T> (@in NCE<T>) -> () {
+bb0(%0 : @owned $NCE<T>):
+  switch_enum %0 : $NCE<T>, case #NCE.a!enumelt: bb1, case #NCE.b!enumelt: bb2
+
+bb1(%2 : @owned $T):
+  %3 = function_ref @consumeT : $@convention(thin) <T> (@in T) -> ()
+  %4 = apply %3<T>(%2) : $@convention(thin) <T> (@in T) -> ()
+  br bb3
+
+bb2(%6 : $Builtin.Int64):
+  br bb3
+
+bb3:
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// A Copyable enum gets no access.
+//
+// CHECK-LABEL: sil [ossa] @consume_copyable : {{.*}} {
+// CHECK-NOT:     begin_access [deinit]
+// CHECK-LABEL: } // end sil function 'consume_copyable'
+sil [ossa] @consume_copyable : $@convention(thin) <T> (@in CE<T>) -> () {
+bb0(%0 : @owned $CE<T>):
+  %1 = begin_borrow %0 : $CE<T>
+  switch_enum %1 : $CE<T>, case #CE.a!enumelt: bb1, case #CE.b!enumelt: bb2
+
+bb1(%3 : @guaranteed $T):
+  end_borrow %1 : $CE<T>
+  %5 = unchecked_enum_data %0 : $CE<T>, #CE.a!enumelt
+  %6 = function_ref @consumeT : $@convention(thin) <T> (@in T) -> ()
+  %7 = apply %6<T>(%5) : $@convention(thin) <T> (@in T) -> ()
+  br bb4
+
+bb2(%9 : $Builtin.Int64):
+  end_borrow %1 : $CE<T>
+  destroy_value %0 : $CE<T>
+  br bb4
+
+bb4:
+  %13 = tuple ()
+  return %13 : $()
+}

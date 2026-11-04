@@ -605,6 +605,11 @@ struct AddressLoweringState {
   // Scratch operands of unchecked_borrow_enum_data_addr.
   SmallVector<AllocStackInst *, 4> enumScratchAllocs;
 
+  // Deinit accesses enclosing the payload projections of consumed
+  // non-Copyable enums. Each is ended where control leaves the region its
+  // block dominates.
+  SmallVector<BeginAccessInst *, 4> enumDeinitAccesses;
+
   SILLoopAnalysis *SLA;
 
   AddressLoweringState(SILFunction *function, DominanceInfo *domInfo,
@@ -1906,6 +1911,9 @@ void OpaqueStorageAllocation::sinkProjections() {
       continue;
     auto *inst = dyn_cast<SingleValueInstruction>(addr);
     if (!inst)
+      continue;
+    // Sinking markers would risk separating them from initializations.
+    if (isa<MarkUnresolvedNonCopyableValueInst>(inst))
       continue;
     auto sank = sinkToUses(inst, pass.domInfo);
     if (sank == SinkResult::NoUsers) {
@@ -4757,8 +4765,19 @@ void UseRewriter::visitSwitchEnumInst(SwitchEnumInst * switchEnum) {
       caseAddr = caseBuilder.createUncheckedBorrowEnumDataAddr(
           loc, enumAddr, scratch, caseDecl);
     } else {
-      caseAddr = caseBuilder.createUncheckedEnumDataAddrForTake(loc, enumAddr,
-                                                                caseDecl);
+      // A consuming switch over a non-Copyable enum consumes the entire enum in
+      // each case. Enter a deinit access for the case, as for an owned
+      // unchecked_enum_data.
+      SILValue caseEnumAddr = enumAddr;
+      if (!borrowed && enumAddr->getType().isMoveOnly(/*orWrapped*/ false)) {
+        auto *deinitAccess = caseBuilder.createBeginAccess(
+            loc, enumAddr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
+            /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+        pass.enumDeinitAccesses.push_back(deinitAccess);
+        caseEnumAddr = deinitAccess;
+      }
+      caseAddr = caseBuilder.createUncheckedEnumDataAddrForTake(
+          loc, caseEnumAddr, caseDecl);
     }
     SILValue caseLoad = createCaseLoad(caseBuilder, caseAddr);
     caseArg->replaceAllUsesWith(caseLoad);
@@ -4841,11 +4860,24 @@ void UseRewriter::visitUncheckedEnumDataInst(
 
   assert(enumDataInst->getOwnershipKind() != OwnershipKind::Guaranteed);
 
-  auto srcAddr = pass.valueStorageMap.getStorage(use->get()).storageAddress;
+  SILValue srcAddr =
+      pass.valueStorageMap.getStorage(use->get()).storageAddress;
 
   auto loc = enumDataInst->getLoc();
   auto elt = enumDataInst->getElement();
   auto destTy = enumDataInst->getType().getAddressType();
+
+  // An owned unchecked_enum_data consumes the whole enum. Start a
+  // deinit access to properly record this for the move checker
+  // (only for noncopyable enums).
+  if (srcAddr->getType().isMoveOnly(/*orWrapped*/ false)) {
+    auto *access = builder.createBeginAccess(
+        loc, srcAddr, SILAccessKind::Deinit, SILAccessEnforcement::Static,
+        /*noNestedConflict*/ true, /*fromBuiltin*/ false);
+    pass.enumDeinitAccesses.push_back(access);
+    srcAddr = access;
+  }
+
   auto *enumAddrInst =
       builder.createUncheckedEnumDataAddrForTake(loc, srcAddr, elt, destTy);
 
@@ -5350,6 +5382,27 @@ static void removeOpaquePhis(SILBasicBlock *bb, AddressLoweringState &pass) {
   }
 }
 
+// A consuming switch must consume the enum at the end of each case block.
+static void endEnumDeinitAccesses(AddressLoweringState &pass) {
+  SmallVector<SILBasicBlock *, 4> boundary;
+  for (auto *access : pass.enumDeinitAccesses) {
+    computeDominatedBoundaryBlocks(access->getParent(), pass.domInfo, boundary);
+    for (SILBasicBlock *block : boundary) {
+      // As with deallocation, paths ending in unreachable need no end.
+      if (DeadEndBlocks::triviallyEndsInUnreachable(block))
+        continue;
+      // End the access before any deallocation of storage at the block's end.
+      auto insertPt = block->back().getIterator();
+      while (insertPt != block->begin() &&
+             isa<DeallocStackInst>(*std::prev(insertPt)))
+        --insertPt;
+      pass.getBuilder(insertPt).createEndAccess(pass.genLoc(), access,
+                                                /*aborted*/ false);
+    }
+    boundary.clear();
+  }
+}
+
 // Instructions that use an opaque value without producing one are already
 // deleted. The rest of the opaque definitions are now removed bottom-up
 // by visiting valuestorageMap.
@@ -5465,6 +5518,8 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
   for (SILValue argAddr : pass.guaranteedIndirectArgs) {
     forwardArgAddressToAddressableBuffers(pass, argAddr);
   }
+
+  endEnumDeinitAccesses(pass);
 
   allocator.finalizeOpaqueStorage();
 

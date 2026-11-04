@@ -272,7 +272,7 @@ bb5:
 // CHECK:       [[BOX]]:
 // CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_inplace_enum_data_addr [[ACCESS]] : $*BoxEnum<T>, #BoxEnum.box!enumelt
 // CHECK:         [[PAYLOAD_MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PAYLOAD]] : $*Box<T>
-// CHECK-NEXT:    [[VALUE:%[^,]+]] = struct_element_addr [[PAYLOAD_MARK]] : $*Box<T>, #Box.value
+// CHECK:         [[VALUE:%[^,]+]] = struct_element_addr [[PAYLOAD_MARK]] : $*Box<T>, #Box.value
 // CHECK-NEXT:    apply {{%[^,]+}}<T>([[VALUE]])
 // CHECK-NEXT:    end_access [[ACCESS]] : $*BoxEnum<T>
 // CHECK:       [[EMPTY]]:
@@ -505,7 +505,7 @@ bb6:
 // CHECK-NEXT:    [[SCRATCH:%[^,]+]] = alloc_stack $ResilientBoxEnum<T>
 // CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_borrow_enum_data_addr [[ACCESS]] : $*ResilientBoxEnum<T>, #ResilientBoxEnum.box!enumelt in [[SCRATCH]] : $*ResilientBoxEnum<T>
 // CHECK:         [[PAYLOAD_MARK:%[^,]+]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[PAYLOAD]] : $*Box<T>
-// CHECK-NEXT:    [[VALUE:%[^,]+]] = struct_element_addr [[PAYLOAD_MARK]] : $*Box<T>, #Box.value
+// CHECK:         [[VALUE:%[^,]+]] = struct_element_addr [[PAYLOAD_MARK]] : $*Box<T>, #Box.value
 // CHECK-NEXT:    apply {{%[^,]+}}<T>([[VALUE]])
 // CHECK-NEXT:    end_access [[ACCESS]] : $*ResilientBoxEnum<T>
 // CHECK-NEXT:    dealloc_stack [[SCRATCH]] : $*ResilientBoxEnum<T>
