@@ -1163,8 +1163,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   bool HadError = false;
 
   if (auto A = Args.getLastArg(OPT_language_mode)) {
-    auto vers =
-        VersionParser::parseVersionString(A->getValue(), SourceLoc(), &Diags);
+    auto vers = VersionParser::parseLanguageMode(A->getValue(), &Diags);
     bool isValid = false;
     if (vers.has_value()) {
       if (auto effectiveVers = vers.value().getEffectiveLanguageVersion()) {

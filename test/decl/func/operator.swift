@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -verify-additional-prefix future- %}
 
 infix operator %%%
 infix operator %%%%
@@ -36,24 +37,24 @@ extension X {
 // #60268: Make sure we insert at the start of the attributes.
 @discardableResult
 internal
-func ^^^ (lhs: Int, rhs: Int) -> Int {} // expected-error {{operator implementation without matching operator declaration}} {{37:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
+func ^^^ (lhs: Int, rhs: Int) -> Int {} // expected-error {{operator implementation without matching operator declaration}} {{38:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
 
 @discardableResult
 internal
-prefix func ^^^ (rhs: Int) -> Int {} // expected-error {{operator implementation without matching operator declaration}} {{41:1-1=prefix operator ^^^ : <# Precedence Group #>\n}}
+prefix func ^^^ (rhs: Int) -> Int {} // expected-error {{operator implementation without matching operator declaration}} {{42:1-1=prefix operator ^^^ : <# Precedence Group #>\n}}
 
 @frozen
 public
 struct Z {
   struct Y {
-    static func ^^^ (lhs: Y, rhs: Y) {} // expected-error {{operator implementation without matching operator declaration}} {{45:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
+    static func ^^^ (lhs: Y, rhs: Y) {} // expected-error {{operator implementation without matching operator declaration}} {{46:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
   }
 }
 
 _ = {
   func ^^^ (lhs: Int, rhs: Int) {}
   // expected-error@-1 {{operator functions can only be declared at global or in type scope}}
-  // expected-error@-2 {{operator implementation without matching operator declaration}} {{53:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
+  // expected-error@-2 {{operator implementation without matching operator declaration}} {{54:1-1=infix operator ^^^ : <# Precedence Group #>\n}}
 }
 
 infix operator ++++ : ReallyHighPrecedence
@@ -155,7 +156,8 @@ var f2 : (Int) -> Int = (+-+)
 var f3 : (inout Int) -> Int = (-+-) // expected-error{{ambiguous use of operator '-+-'}}
 var f4 : (inout Int, Int) -> Int = (+-+=)
 var r5 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (+, -)
-var r6 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (b : +, a : -) // expected-warning {{implicit reordering of tuple elements from 'b:a:' to 'a:b:' is deprecated; this will be an error in a future Swift language mode}}
+var r6 : (a : (Int, Int) -> Int, b : (Int, Int) -> Int) = (b : +, a : -) // expected-swift6-warning {{implicit reordering of tuple elements from 'b:a:' to 'a:b:' is deprecated; this will be an error in a future Swift language mode}}
+// expected-future-error@-1 {{cannot implicitly reorder tuple elements from 'b:a:' to 'a:b:'}}
 
 struct f6_S {
   subscript(op : (Int, Int) -> Int) -> Int {
@@ -383,12 +385,14 @@ protocol P3 {
   // Not allowed: there's no way to infer 'Self' from this interface type
   static func %%%(lhs: P3, rhs: Unrelated) -> Unrelated
   // expected-error@-1 {{member operator '%%%' of protocol 'P3' must have at least one argument of type 'Self'}}
+  // expected-future-error@-2 {{use of protocol 'P3' as a type must be written 'any P3'}}
 }
 
 extension P3 {
   // Not allowed: there's no way to infer 'Self' from this interface type
   static func %%%%(lhs: P3, rhs: Unrelated) -> Unrelated { }
   // expected-error@-1 {{member operator '%%%%' of protocol 'P3' must have at least one argument of type 'Self'}}
+  // expected-future-error@-2 {{use of protocol 'P3' as a type must be written 'any P3'}}
 }
 
 // rdar://problem/27940842 - recovery with a non-static '=='.

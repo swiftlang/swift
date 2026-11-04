@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -verify-ignore-unrelated -verify-additional-prefix future- %}
 
 //===----------------------------------------------------------------------===//
 // Tests and samples.
@@ -10,8 +11,11 @@ func markUsed<T>(_: T) {}
 
 // Various function types.
 var func1 : () -> ()    // No input, no output.
+// expected-future-note@-1 {{var declared here}}
 var func2 : (Int) -> Int
+// expected-future-note@-1 {{var declared here}}
 var func3 : () -> () -> ()                   // Takes nothing, returns a fn.
+// expected-future-note@-1 {{var declared here}}
 var func3a : () -> (() -> ())                // same as func3
 var func6 : (_ fn : (Int,Int) -> Int) -> ()    // Takes a fn, returns nothing.
 var func7 : () -> (Int,Int,Int)              // Takes nothing, returns tuple.
@@ -26,6 +30,7 @@ var bind_test2 : Int = 4; func1 // expected-warning {{variable is unused}}
 (func1, func2) // expected-warning {{variable is unused}}
 
 func basictest() {
+// expected-future-note@-1 3 {{add '@MainActor' to make global function 'basictest()' part of global actor 'MainActor'}}
   // Simple integer variables.
   var x : Int
   var x2 = 4              // Simple Type inference.
@@ -72,8 +77,11 @@ func basictest() {
 
   // Function calls.
   var call1 : () = func1()
+  // expected-future-error@-1 {{main actor-isolated var 'func1' can not be referenced from a nonisolated context}}
   var call2 = func2(1)
+  // expected-future-error@-1 {{main actor-isolated var 'func2' can not be referenced from a nonisolated context}}
   var call3 : () = func3()()
+  // expected-future-error@-1 {{main actor-isolated var 'func3' can not be referenced from a nonisolated context}}
 
   // Cannot call an integer.
   bind_test2() // expected-error {{cannot call value of non-function type 'Int'}}{{13-15=}}
@@ -194,7 +202,8 @@ func test5() {
 
 
   let c: (a: Int, b: Int) = (1,2)
-  let _: (b: Int, a: Int) = c  // expected-warning {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
+  let _: (b: Int, a: Int) = c  // expected-swift5-warning {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
+  // expected-future-error@-1 {{cannot implicitly reorder tuple elements from 'a:b:' to 'b:a:'}}
 }
 
 
@@ -566,7 +575,9 @@ func testInOut(_ arg: inout Int) {
 //===----------------------------------------------------------------------===//
 
 var pi_f: Float
+// expected-future-note@-1 2 {{var declared here}}
 var pi_d: Double
+// expected-future-note@-1 {{var declared here}}
 
 struct SpecialPi {} // Type with no implicit construction.
 
@@ -583,6 +594,7 @@ extension Empty {
 }
 
 func conversionTest(_ a: inout Double, b: inout Int) {
+// expected-future-note@-1 3 {{add '@MainActor' to make global function 'conversionTest(_:b:)' part of global actor 'MainActor'}}
   var f: Float
   var d: Double
   a = Double(b)
@@ -592,7 +604,9 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   f = Float(b)
 
   var pi_f1 = Float(pi_f)
+  // expected-future-error@-1 {{main actor-isolated var 'pi_f' can not be referenced from a nonisolated context}}
   var pi_d1 = Double(pi_d)
+  // expected-future-error@-1 {{main actor-isolated var 'pi_d' can not be referenced from a nonisolated context}}
   var pi_s1 = SpecialPi(pi_s) // expected-error {{argument passed to call that takes no arguments}}
 
   var pi_f2 = Float(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
@@ -602,6 +616,7 @@ func conversionTest(_ a: inout Double, b: inout Int) {
   var float = Float.self
   var pi_f3 = float.init(getPi()) // expected-error {{ambiguous use of 'getPi()'}}
   var pi_f4 = float.init(pi_f)
+  // expected-future-error@-1 {{main actor-isolated var 'pi_f' can not be referenced from a nonisolated context}}
 
   var e = Empty(f) // expected-warning {{variable 'e' inferred to have type 'Empty', which is an enum with no cases}} expected-note {{add an explicit type annotation to silence this warning}}  {{8-8=: Empty}}
   var e2 = Empty(d) // expected-error{{cannot convert value of type 'Double' to expected argument type 'Float'}}
@@ -899,6 +914,7 @@ func r22348394() {
 // <rdar://problem/23185177> Compiler crashes in Assertion failed: ((AllowOverwrite || !E->hasLValueAccessKind()) && "l-value access kind has already been set"), function visit
 protocol Proto { var y: String? { get } }
 func r23185177(_ x: Proto?) -> [String] {
+// expected-future-error@-1 {{use of protocol 'Proto' as a type must be written 'any Proto'}}
   return x?.y // expected-error{{cannot convert return expression of type 'String?' to return type '[String]'}}
 }
 

@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -parse-as-library -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -parse-as-library -verify-additional-prefix future- %}
 
 // REQUIRES: OS=macosx
 
@@ -15,13 +16,25 @@ public struct UniversallyUnavailableStruct {}
 // Ok, initialization of globals is lazy and boxed.
 @available(macOS, unavailable)
 var unavailableMacOSGlobal: UnavailableMacOSStruct = .init()
+// expected-future-error@-1 {{var 'unavailableMacOSGlobal' is not concurrency-safe because it is nonisolated global shared mutable state}}
+// expected-future-note@-2 {{convert 'unavailableMacOSGlobal' to a 'let' constant to make 'Sendable' shared state immutable}}
+// expected-future-note@-3 {{add '@MainActor' to make var 'unavailableMacOSGlobal' part of global actor 'MainActor'}}
+// expected-future-note@-4 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
 
 @available(iOS, introduced: 8.0)
 @_spi_available(macOS, introduced: 10.9)
 var spiAvailableMacOSGlobal: SPIAvailableMacOSStruct = .init()
+// expected-future-error@-1 {{var 'spiAvailableMacOSGlobal' is not concurrency-safe because it is nonisolated global shared mutable state}}
+// expected-future-note@-2 {{convert 'spiAvailableMacOSGlobal' to a 'let' constant to make 'Sendable' shared state immutable}}
+// expected-future-note@-3 {{add '@MainActor' to make var 'spiAvailableMacOSGlobal' part of global actor 'MainActor'}}
+// expected-future-note@-4 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
 
 @available(*, unavailable)
 var universallyUnavailableGlobal: UniversallyUnavailableStruct = .init()
+// expected-future-error@-1 {{var 'universallyUnavailableGlobal' is not concurrency-safe because it is nonisolated global shared mutable state}}
+// expected-future-note@-2 {{convert 'universallyUnavailableGlobal' to a 'let' constant to make 'Sendable' shared state immutable}}
+// expected-future-note@-3 {{add '@MainActor' to make var 'universallyUnavailableGlobal' part of global actor 'MainActor'}}
+// expected-future-note@-4 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
 
 @available(*, deprecated)
 struct DeprecatedStruct {}
@@ -48,6 +61,10 @@ struct GoodAvailableStruct {
   // Ok, initialization of static vars is lazy and boxed.
   @available(macOS, unavailable)
   static var staticUnavailableMacOS: UnavailableMacOSStruct = .init()
+  // expected-future-error@-1 {{static property 'staticUnavailableMacOS' is not concurrency-safe because it is nonisolated global shared mutable state}}
+  // expected-future-note@-2 {{convert 'staticUnavailableMacOS' to a 'let' constant to make 'Sendable' shared state immutable}}
+  // expected-future-note@-3 {{add '@MainActor' to make static property 'staticUnavailableMacOS' part of global actor 'MainActor'}}
+  // expected-future-note@-4 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
 
   // Ok, an init accessor without an initial value has no initialization to run.
   @available(macOS, unavailable)
@@ -125,15 +142,17 @@ struct BadStruct {
     get { UnavailableMacOSStruct() }
   }
 
-  // expected-warning@+1 {{computed property with initial value cannot be marked unavailable with '@available'; this will be an error in a future Swift language mode}}
+  // expected-swift5-warning@+1 {{computed property with initial value cannot be marked unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(macOS, unavailable)
+  // expected-future-error@-1 {{computed property with initial value cannot be marked unavailable with '@available'}}
   var computedUnavailableMacOSWithInitialValue: UnavailableMacOSStruct = .init() { // expected-error {{'UnavailableMacOSStruct' is unavailable in macOS}}
     init { _ = newValue }
     get { UnavailableMacOSStruct() } // expected-error {{'UnavailableMacOSStruct' is unavailable in macOS}}
   }
 
-  // expected-warning@+1 {{computed property with initial value cannot be marked unavailable with '@available'; this will be an error in a future Swift language mode}}
+  // expected-swift5-warning@+1 {{computed property with initial value cannot be marked unavailable with '@available'; this will be an error in a future Swift language mode}}
   @available(*, unavailable)
+  // expected-future-error@-1 {{computed property with initial value cannot be marked unavailable with '@available'}}
   var computedUniversallyUnavailableWithInitialValue: UniversallyUnavailableStruct = .init() { // expected-error {{'UniversallyUnavailableStruct' is unavailable}}
     init { _ = newValue }
     get { UniversallyUnavailableStruct() } // expected-error {{'UniversallyUnavailableStruct' is unavailable}}
