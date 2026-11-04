@@ -254,7 +254,7 @@ namespace swift {
     SmallVector<std::string, 4> AvailabilityMacros;
 
     /// Detect and automatically import modules' cross-import overlays.
-    bool EnableCrossImportOverlays = false;
+    bool EnableCrossImportOverlays = true;
 
     /// Emit a remark when import resolution implicitly adds a cross-import
     /// overlay.
