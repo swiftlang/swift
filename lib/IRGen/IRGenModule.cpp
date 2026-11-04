@@ -72,6 +72,7 @@
 #include "ConformanceDescription.h"
 #include "GenDecl.h"
 #include "GenEnum.h"
+#include "GenExistential.h"
 #include "GenMeta.h"
 #include "GenPointerAuth.h"
 #include "GenIntegerLiteral.h"
@@ -2373,6 +2374,8 @@ void IRGenModule::cleanupClangCodeGenMetadata() {
 }
 
 bool IRGenModule::finalize() {
+  emitEmbeddedExistentialBoxDeallocator(*this);
+
   if (getOptions().DumpAbstractTypeLayoutInfo !=
       IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
     for (auto type : Context.getRecoveredHiddenTypes()) {

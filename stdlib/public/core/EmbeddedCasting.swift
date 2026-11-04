@@ -21,6 +21,7 @@ fileprivate struct DynamicCastFlags {
 
 struct ValueWitnessFlags {
   static let IsNonInline = UInt32(0x00020000)
+  static let IsNonCopyable = UInt32(0x00800000)
 }
 
 /// The representation of an existential type, which describes its layout it
@@ -104,6 +105,9 @@ enum MetadataKind: Equatable {
   /// The type is an enum.
   case `enum`
 
+  /// The type is an Optional. Its metadata records the payload's metadata.
+  case optional
+
   /// The type is an existential with the given representation.
   case existential(ExistentialTypeRepresentation)
 
@@ -116,6 +120,7 @@ enum MetadataKind: Equatable {
     case 0: self = .class
     case 0 | Self.metadataKindIsNonHeap: self = .struct
     case 1 | Self.metadataKindIsNonHeap: self = .enum
+    case 2 | Self.metadataKindIsNonHeap: self = .optional
  
     case 3 | Self.metadataKindIsNonHeap | Self.metadataKindIsRuntimePrivate:
       let rawRepr = unsafe (addrOfMetadataKind + 1).pointee
@@ -225,14 +230,49 @@ private func tryCast(
   case .existential(let repr):
     // Project the existential, then try to cast it.
     // Note that we can only "take" on success if the projection didn't change
-    // the address. Otherwise, we would be destroying an inner object.
+    // the address. Otherwise, we would be destroying an inner object. The
+    // exception is a non-`Copyable` payload, which can't be copied: take it
+    // out of its box, and free the box below.
     let (srcInnerMetadata, srcInner) = unsafe repr.project(src)
-    return unsafe tryCast(
+    let srcIsInline = unsafe src == srcInner
+    let srcInnerIsNoncopyable = unsafe UInt32(
+      _swift_embedded_metadata_get_vwt_flags(
+        UnsafeMutableRawPointer(mutating: srcInnerMetadata)))
+      & ValueWitnessFlags.IsNonCopyable != 0
+    let result = unsafe tryCast(
       dst: dst,
       dstMetadata: dstMetadata,
       src: UnsafeMutableRawPointer(mutating: srcInner),
       srcMetadata: srcInnerMetadata,
-      takeOnSuccess: takeOnSuccess && src == srcInner
+      takeOnSuccess: takeOnSuccess && (srcIsInline || srcInnerIsNoncopyable)
+    )
+
+    // If we moved the payload out of the box of an opaque existential, the
+    // box itself still needs to be freed. Only compiled code knows how it was
+    // allocated, so use the helper that the compiler defines for that.
+    if case .successViaTake = result, !srcIsInline, repr == .opaque {
+      unsafe __swift_deallocate_boxed_opaque_existential_0(src)
+    }
+    return result
+
+  case .optional:
+    // Unwrap the source: `nil` fails, and `.some(x)` casts `x`, which is stored
+    // at the Optional's own address. (The destination isn't an Optional of the
+    // same type -- that matched exactly above -- and Embedded Swift has no
+    // conformances to look up, so unwrapping first is what the full runtime's
+    // tryCastUnwrappingOptionalSource() does too.)
+    let srcPayloadMetadata = unsafe srcMetadata
+      .assumingMemoryBound(to: UnsafeRawPointer.self)[1]
+    if unsafe _swift_embedded_metadata_get_enum_tag_single_payload(
+         srcPayloadMetadata, src, 1) != 0 {
+      return .failure
+    }
+    return unsafe tryCast(
+      dst: dst,
+      dstMetadata: dstMetadata,
+      src: src,
+      srcMetadata: srcPayloadMetadata,
+      takeOnSuccess: takeOnSuccess
     )
 
   case .class:
