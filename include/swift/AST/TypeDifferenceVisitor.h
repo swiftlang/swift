@@ -201,13 +201,29 @@ public:
 
   bool visitUnboundGenericType(CanUnboundGenericType type1,
                                CanUnboundGenericType type2) {
-    assert(type1->getDecl() != type2->getDecl());
-    return asImpl().visitDifferentTypeStructure(type1, type2);
+    if (type1->getDecl() != type2->getDecl())
+      return asImpl().visitDifferentTypeStructure(type1, type2);
+
+    auto parent1 = type1.getParent();
+    auto parent2 = type2.getParent();
+    if (bool(parent1) != bool(parent2))
+      return asImpl().visitDifferentTypeStructure(type1, type2);
+    if (parent1 && asImpl().visit(parent1, parent2))
+      return true;
+
+    return false;
   }
 
   bool visitNominalType(CanNominalType type1, CanNominalType type2) {
     if (type1->getDecl() != type2->getDecl())
       return asImpl().visitDifferentTypeStructure(type1, type2);
+
+    auto parent1 = type1.getParent();
+    auto parent2 = type2.getParent();
+    if (bool(parent1) != bool(parent2))
+      return asImpl().visitDifferentTypeStructure(type1, type2);
+    if (parent1 && asImpl().visit(parent1, parent2))
+      return true;
 
     return visitComponentArray(type1, type2,
                                type1.getGenericArgs(), type2.getGenericArgs());

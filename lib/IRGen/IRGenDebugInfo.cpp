@@ -138,7 +138,14 @@ public:
     if (t1->getDecl() != t2->getDecl() &&
         !sameMangledDecl(t1->getDecl(), t2->getDecl()))
       return visitDifferentTypeStructure(t1, t2);
-    // FIXME: parent types
+
+    auto parent1 = t1.getParent();
+    auto parent2 = t2.getParent();
+    if (bool(parent1) != bool(parent2))
+      return visitDifferentTypeStructure(t1, t2);
+    if (parent1 && visit(parent1, parent2))
+      return true;
+
     return visitComponentArray(t1, t2, t1.getGenericArgs(),
                                t2.getGenericArgs());
   }
