@@ -183,6 +183,9 @@ extension ASTGenVisitor {
     var obsoleted: VersionAndRange? = nil
     var message: BridgedStringRef? = nil
     var renamed: BridgedStringRef? = nil
+    /// Set when an argument was diagnosed; as in the C++ parser, that drops the
+    /// attribute.
+    var anyArgumentInvalid = false
 
     /// Record `newKind`, diagnosing if a conflicting kind was already given.
     func setAttrKind(_ newKind: BridgedAvailableAttrKind, _ spelling: String, at token: TokenSyntax) {
@@ -202,6 +205,16 @@ extension ASTGenVisitor {
         let version = VersionTuple(parsing: versionSytnax.trimmedDescription)
       else {
         self.diagnose(.attr_availability_expected_version(attrNameText), at: arg.value)
+        anyArgumentInvalid = true
+        return
+      }
+      // A version cannot be empty (`0`, `0.0`): warn, until Swift 6.
+      if version.components.allSatisfy({ $0 == 0 }) {
+        self.diagnose(
+          CompilerDiagnostic.attr_availability_expected_version(attrNameText).warnUntilLanguageMode(6),
+          at: versionSytnax
+        )
+        anyArgumentInvalid = true
         return
       }
       if target != nil {
@@ -224,10 +237,18 @@ extension ASTGenVisitor {
       let label = String(syntaxText: arg.label.rawText)
       guard let literal = arg.value.as(SimpleStringLiteralExprSyntax.self) else {
         self.diagnose(.attr_expected_string_literal(attrNameText), at: arg.value)
+        anyArgumentInvalid = true
         return
       }
       guard let text = self.generateStringLiteralTextIfNotInterpolated(expr: literal) else {
         // `generateStringLiteralTextIfNotInterpolated` has diagnosed.
+        anyArgumentInvalid = true
+        return
+      }
+      // The replacement named by 'renamed:' has to be a declaration name.
+      if label == "renamed", !isParsableDeclName(text) {
+        self.diagnose(.attr_availability_invalid_renamed(attrNameText), at: range.start)
+        anyArgumentInvalid = true
         return
       }
       guard target == nil else {
@@ -237,7 +258,9 @@ extension ASTGenVisitor {
       target = text
     }
 
+    var sawArgument = false
     while let arg = args.popFirst() {
+      sawArgument = true
       switch arg.argument {
       case .availabilityVersionRestriction(let platformVersion):
         // E.g. `@available(EnabledDomain, macOS 10.10, *)`: shorthand
@@ -295,6 +318,15 @@ extension ASTGenVisitor {
           self.diagnose(.attr_availability_expected_option(attrNameText), at: arg.label)
         }
       }
+    }
+
+    if anyArgumentInvalid {
+      return nil
+    }
+
+    // The platform has to be followed by at least one annotation.
+    if !sawArgument, !self.ctx.langOpts.hasFeature(.CustomAvailability) {
+      self.diagnose(.attr_expected_comma(attrNameText, false), at: Syntax(platformToken).nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(platformToken))
     }
 
     return BridgedAvailableAttr.createParsed(

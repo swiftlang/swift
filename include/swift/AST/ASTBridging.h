@@ -956,6 +956,11 @@ bool BridgedDeclAttribute_shouldBeRejectedByParser(swift::DeclAttrKind kind);
 SWIFT_NAME("BridgedDeclAttribute.isDeclModifier(_:)")
 bool BridgedDeclAttribute_isDeclModifier(swift::DeclAttrKind kind);
 
+/// Whether \p name can be parsed as a (possibly qualified or compound)
+/// declaration name, as the argument of `@available(..., renamed:)` must be.
+SWIFT_NAME("isParsableDeclName(_:)")
+bool BridgedStringRef_isParsableDeclName(BridgedStringRef name);
+
 SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
                                BridgedDeclAttribute add);

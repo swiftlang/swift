@@ -2720,10 +2720,15 @@ extension ASTGenVisitor {
   ///   @_specialize(exported: true, T == Int)
   ///   ```
   func generateSpecializeAttr(attribute node: AttributeSyntax, attrName: SyntaxText) -> BridgedSpecializeAttr? {
+    let isPublic = attrName == "specialized"
+    let rightParenOrName = Syntax(node.rightParen ?? node.attributeName.lastToken(viewMode: .sourceAccurate)!)
     guard
       var args = node.arguments?.as(SpecializeAttributeArgumentListSyntax.self)?[...]
     else {
-      // TODO: Diagnose
+      // `@_specialize()`: nothing, not even a 'where' clause.
+      if !node.hasError {
+        self.diagnose(.attr_specialize_missing_parameter_label_or_where_clause, at: rightParenOrName)
+      }
       return nil
     }
     var exported: Bool?
@@ -2732,6 +2737,9 @@ extension ASTGenVisitor {
     var targetFunction: (name: BridgedDeclNameRef, loc: BridgedDeclNameLoc)?
     var spiGroups: [Identifier] = []
     var availableAttrs: [BridgedAvailableAttr] = []
+    // Diagnostics for the cases the parser accepts but the C++ parser rejects
+    // are only needed when the parser had no complaint of its own.
+    let parserDiagnosed = node.hasError
 
     while let arg = args.popFirst() {
       switch arg {
@@ -2754,10 +2762,14 @@ extension ASTGenVisitor {
         )
       case .labeledSpecializeArgument(let arg):
         // FIXME: Can be 'LabeledExprSyntax'.
+        let label = String(syntaxText: arg.label.rawText)
+        func diagnoseAlreadyDefined() {
+          self.diagnose(.attr_specialize_parameter_already_defined(label, isPublic), at: arg.value)
+        }
         switch arg.label.rawText {
         case "kind":
           if kind != nil {
-            // TODO: Diagnose.
+            diagnoseAlreadyDefined()
           }
           switch arg.value.rawText {
           case "partial":
@@ -2765,13 +2777,14 @@ extension ASTGenVisitor {
           case "full":
             kind = .full
           default:
-            // TODO: Diagnose.
-            break
+            if !parserDiagnosed {
+              self.diagnose(.attr_specialize_expected_partial_or_full, at: arg.value)
+            }
           }
 
         case "exported":
           if exported != nil {
-            // TODO: Diagnose.
+            diagnoseAlreadyDefined()
           }
           switch arg.value.rawText {
           case "true":
@@ -2779,23 +2792,46 @@ extension ASTGenVisitor {
           case "false":
             exported = false
           default:
-            // TODO: Diagnose
-            break
+            if !parserDiagnosed {
+              self.diagnose(.attr_specialize_expected_bool_value(isPublic), at: arg.value)
+            }
           }
 
         case "spi":
+          if !spiGroups.isEmpty {
+            diagnoseAlreadyDefined()
+          }
           guard arg.value.rawTokenKind == .identifier || arg.value.rawTokenKind == .wildcard else {
-            // TODO: Diagnose
+            if !parserDiagnosed {
+              self.diagnose(.attr_specialize_expected_spi_name, at: arg.value)
+            }
             break
           }
           spiGroups.append(self.generateIdentifier(arg.value))
 
         default:
-          // TODO: Diagnose
-          break
+          if !parserDiagnosed {
+            self.diagnose(.attr_specialize_unknown_parameter_name(label, isPublic), at: arg.label)
+          }
         }
 
+        // Each parameter other than the last is followed by a comma.
+        if arg.trailingComma == nil, let next = args.first, !parserDiagnosed {
+          self.diagnose(
+            .attr_specialize_missing_comma(isPublic),
+            at: next.firstToken(viewMode: .sourceAccurate).map(Syntax.init) ?? rightParenOrName
+          )
+        }
       }
+    }
+
+    // The list ends with a 'where' clause.
+    if whereClause == nil, !parserDiagnosed {
+      self.diagnose(
+        isPublic ? .attr_specialized_missing_where_clause : .attr_specialize_missing_parameter_label_or_where_clause,
+        at: rightParenOrName
+      )
+      return nil
     }
 
     return .createParsed(
