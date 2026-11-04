@@ -1169,6 +1169,10 @@ void BridgedFunction::setIsPerformanceConstraint(bool isPerfConstraint) const {
   getFunction()->setIsPerformanceConstraint(isPerfConstraint);
 }
 
+void BridgedFunction::addSemanticsAttr(BridgedStringRef attrName) const {
+  getFunction()->addSemanticsAttr(attrName.unbridged());
+}
+
 bool BridgedFunction::hasOwnershipForTrivialValues() const {
   return getFunction()->hasOwnershipForTrivialValues();
 }
