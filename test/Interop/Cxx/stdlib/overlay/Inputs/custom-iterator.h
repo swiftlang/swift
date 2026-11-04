@@ -1144,6 +1144,76 @@ struct InheritedConstIterator : BaseIntIterator {
   }
 };
 
+struct BaseWithIteratorCategory {
+  using iterator_category = std::input_iterator_tag;
+  using value_type = int;
+  using reference = const int &;
+
+  int value;
+
+  BaseWithIteratorCategory(int value) : value(value) {}
+
+  reference operator*() const { return value; }
+
+  BaseWithIteratorCategory &operator++() {
+    ++value;
+    return *this;
+  }
+
+  bool operator==(const BaseWithIteratorCategory &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const BaseWithIteratorCategory &other) const {
+    return value != other.value;
+  }
+};
+
+struct InheritedFromBaseWithIteratorCategory : BaseWithIteratorCategory {
+  using BaseWithIteratorCategory::BaseWithIteratorCategory;
+};
+
+struct ReturnsInheritedFromBaseWithIteratorCategory {
+  int value;
+  InheritedFromBaseWithIteratorCategory get() const {
+    return InheritedFromBaseWithIteratorCategory(value);
+  }
+};
+
+struct BaseWithIteratorConcept {
+  using iterator_concept = std::input_iterator_tag;
+  using value_type = int;
+  using reference = const int &;
+
+  int value;
+
+  BaseWithIteratorConcept(int value) : value(value) {}
+
+  reference operator*() const { return value; }
+
+  BaseWithIteratorConcept &operator++() {
+    ++value;
+    return *this;
+  }
+
+  bool operator==(const BaseWithIteratorConcept &other) const {
+    return value == other.value;
+  }
+  bool operator!=(const BaseWithIteratorConcept &other) const {
+    return value != other.value;
+  }
+};
+
+struct InheritedFromBaseWithIteratorConcept : BaseWithIteratorConcept {
+  using BaseWithIteratorConcept::BaseWithIteratorConcept;
+};
+
+struct ReturnsInheritedFromBaseWithIteratorConcept {
+  int value;
+  InheritedFromBaseWithIteratorConcept get() const {
+    return InheritedFromBaseWithIteratorConcept(value);
+  }
+};
+
 // MARK: Templated iterator types that use inheritance
 
 template <typename T>

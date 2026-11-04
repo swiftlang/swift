@@ -189,6 +189,15 @@
 // CHECK: struct InheritedConstIterator : UnsafeCxxInputIterator {
 // CHECK: }
 
+// CHECK: struct InheritedFromBaseWithIteratorCategory : UnsafeCxxInputIterator {
+// CHECK: }
+
+// CHECK: struct ReturnsInheritedFromBaseWithIteratorCategory {
+// CHECK:   @available(*, deprecated, renamed: "get()")
+// CHECK:   func __getUnsafe() -> InheritedFromBaseWithIteratorCategory
+// CHECK:   func get() -> InheritedFromBaseWithIteratorCategory
+// CHECK: }
+
 // CHECK: struct InheritedTemplatedConstIterator<T> {
 // CHECK: }
 // CHECK: struct InheritedTemplatedConstIterator<CInt> : UnsafeCxxInputIterator {
