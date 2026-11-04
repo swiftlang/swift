@@ -62,6 +62,15 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
                         "swift": "main",
                     },
                 },
+                # Pins repo1 to a tag rather than a branch.
+                "tagged": {
+                    "aliases": ["tagged"],
+                    "repos": {
+                        "repo1": "1.0.0",
+                        "repo2": "main",
+                        "swift": "main",
+                    },
+                },
             },
         }
 
@@ -505,3 +514,43 @@ class CrossRepoPRTestCase(scheme_mock.SchemeMockTestCase):
         self.verify_head_for_stale_pr_merge_ref(
             repo_name=repo_name, rev_scheme_name=rev_scheme, pr_id=pr_id
         )
+
+    def check_pr_for_repo_pinned_to_tag(self, *, stale: bool):
+        repo_name = "repo1"
+        pr_id = 1
+        repo_path = os.path.join(self.local_path, repo_name)
+
+        # The scheme pins repo1 to a tag, while the PR itself targets main.
+        tag = self.get_branch(rev_scheme_name="tagged", repo_name=repo_name)
+        self.call(["git", "tag", tag, "main"], cwd=repo_path)
+        self.call(["git", "push", "origin", tag], cwd=repo_path)
+        self.set_up_pr_merge_ref(
+            repo_name=repo_name, rev_scheme_name="main", pr_id=pr_id, stale=stale
+        )
+
+        self.call(
+            self.update_checkout_base_args
+            + [
+                "--clone",
+                "--scheme",
+                "tagged",
+                "--github-comment",
+                f"""
+                https://github.com/apple/{repo_name}/pull/{pr_id}
+                @swift-ci please test
+                """,
+            ]
+        )
+        # There is no base branch to check staleness against or to merge, so
+        # the PR merge ref is used as-is, even if its actual base branch has
+        # since moved on.
+        self.verify_head_for_up_to_date_pr_merge_ref(repo_name=repo_name, pr_id=pr_id)
+
+    # A scheme can pin a repository to a tag instead of a branch. A PR for such a
+    # repository should still be checked out, rather than failing because the
+    # tag is not a branch on the remote.
+    def test_checkout_pr_merge_ref_for_repo_pinned_to_tag(self):
+        self.check_pr_for_repo_pinned_to_tag(stale=False)
+
+    def test_checkout_stale_pr_merge_ref_for_repo_pinned_to_tag(self):
+        self.check_pr_for_repo_pinned_to_tag(stale=True)
