@@ -45,6 +45,15 @@ public:
   parseVersionString(StringRef VersionString, SourceLoc Loc,
                      DiagnosticEngine *Diags);
 
+  /// Parse a language mode, as specified by `-language-mode`. In addition to
+  /// version strings, this accepts `future`, which names the abstract future
+  /// language mode.
+  ///
+  /// The result has not been validated; use
+  /// \c version::Version::getEffectiveLanguageVersion() to do that.
+  static std::optional<version::Version>
+  parseLanguageMode(StringRef ModeString, DiagnosticEngine *Diags);
+
   /// Parse a user module version, as specified by `-user-module-version`.
   ///
   /// Components beyond the fifth are ignored, as is a fifth component that is

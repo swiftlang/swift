@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -verify %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_preconcurrency_objc.h
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -verify %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_preconcurrency_objc.h -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-swift-frontend -emit-sil -verify %s -o /dev/null -import-objc-header %S/Inputs/transfernonsendable_preconcurrency_objc.h -swift-version future -verify-additional-prefix future- %}
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -16,12 +17,13 @@
 @MainActor
 class HostComponent: SceneComponent {
   // expected-warning @+3 {{call to main actor-isolated instance method 'helper()' in a synchronous nonisolated context}}
-  // expected-warning @+2 {{this will be an error in a future Swift language mode}}
+  // expected-swift6-warning @+2 {{this will be an error in a future Swift language mode}}
   // expected-warning @+1 {{sending 'self' risks causing data races}}
   override func doWork() { helper() }
   // expected-note @-1 {{'self' is exposed to code in the current isolation context}}
   // expected-note @-2 {{value is exposed to main actor-isolated code}}
   // expected-note @-3 {{sending 'self' to main actor-isolated instance method 'helper()' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  // expected-future-error@-4 {{assignment could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
 
   // expected-note @+1 {{calls to instance method 'helper()' from outside of its actor context are implicitly asynchronous}}
   private func helper() {}
@@ -46,13 +48,14 @@ class UseAfterSendComponent: SceneComponent {
   override func doWork() {
     let x = NonSendable()
     // expected-warning @+5 {{call to main actor-isolated instance method 'consume' in a synchronous nonisolated context}}
-    // expected-warning @+4 {{this will be an error in a future Swift language mode}}
+    // expected-swift6-warning @+4 {{this will be an error in a future Swift language mode}}
     // expected-warning @+3 {{sending 'x' risks causing data races}}
     // expected-warning @+2 {{sending 'self' risks causing data races}}
     // expected-note    @+1 {{value is exposed to main actor-isolated code}}
     consume(x)
     // expected-note @-1 {{sending 'x' to main actor-isolated instance method 'consume' risks causing data races between main actor-isolated and local nonisolated uses}}
     // expected-note @-2 {{sending 'self' to main actor-isolated instance method 'consume' risks causing data races between main actor-isolated code and code in the current isolation context}}
+    // expected-future-error@-3 {{assignment could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
     nonisolatedUse(x)
     // expected-note @-1 {{access can happen concurrently}}
   }

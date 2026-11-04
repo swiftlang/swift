@@ -8,9 +8,9 @@
 
 // The public interface prints `@_spi_available` overrides as unavailable, but
 // it must still build in a language mode that rejects unavailable overrides.
-// RUN: %if swift7 %{ %target-swift-emit-module-interfaces(%t/Foo7.swiftinterface, %t/Foo7.private.swiftinterface) -parse-as-library %s -module-name Foo -library-level api -swift-version 7 %}
-// RUN: %if swift7 %{ %target-swift-frontend -compile-module-from-interface %t/Foo7.swiftinterface -o %t/Foo7.public.swiftmodule -module-name Foo %}
-// RUN: %if swift7 %{ %target-swift-frontend -compile-module-from-interface %t/Foo7.private.swiftinterface -o %t/Foo7.private.swiftmodule -module-name Foo %}
+// RUN: %if swift_future %{ %target-swift-emit-module-interfaces(%t/FooFuture.swiftinterface, %t/FooFuture.private.swiftinterface) -parse-as-library %s -module-name Foo -library-level api -swift-version future %}
+// RUN: %if swift_future %{ %target-swift-frontend -compile-module-from-interface %t/FooFuture.swiftinterface -o %t/FooFuture.public.swiftmodule -module-name Foo %}
+// RUN: %if swift_future %{ %target-swift-frontend -compile-module-from-interface %t/FooFuture.private.swiftinterface -o %t/FooFuture.private.swiftmodule -module-name Foo %}
 
 @_spi_available(macOS 10.10, tvOS 14.0, *)
 @available(iOS 8.0, *)

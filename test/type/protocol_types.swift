@@ -1,22 +1,24 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -verify-additional-prefix future- %}
 
 protocol HasSelfRequirements {
   func foo(_ x: Self)
 
-  func returnsOwnProtocol() -> HasSelfRequirements // expected-warning {{use of protocol 'HasSelfRequirements' as a type must be written 'any HasSelfRequirements'}}
+  func returnsOwnProtocol() -> HasSelfRequirements // expected-swift6-warning {{use of protocol 'HasSelfRequirements' as a type must be written 'any HasSelfRequirements'}}
+  // expected-future-error@-1 {{use of protocol 'HasSelfRequirements' as a type must be written 'any HasSelfRequirements'}}
 }
 protocol Bar {
   // init() methods should not prevent use as an existential.
   init()
 
-  func bar() -> Bar
+  func bar() -> Bar // expected-future-error {{use of protocol 'Bar' as a type must be written 'any Bar'}}
 }
 
-func useBarAsType(_ x: Bar) {}
+func useBarAsType(_ x: Bar) {} // expected-future-error {{use of protocol 'Bar' as a type must be written 'any Bar'}}
 
 protocol Pub : Bar { }
 
-func refinementErasure(_ p: Pub) {
+func refinementErasure(_ p: Pub) { // expected-future-error {{use of protocol 'Pub' as a type must be written 'any Pub'}}
   useBarAsType(p)
 }
 
@@ -69,12 +71,13 @@ protocol HasAssoc {
 
 do {
   enum MyError : Error {
-    case bad(Any)
+    case bad(Any) // expected-warning {{associated value 'bad' of 'Sendable'-conforming enum 'MyError' has non-Sendable type 'Any'}}
   }
 
   func checkIt(_ js: Any) throws {
     switch js {
-    case let dbl as HasAssoc: // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    case let dbl as HasAssoc: // expected-swift6-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-future-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
       throw MyError.bad(dbl)
 
     default:
@@ -83,7 +86,8 @@ do {
   }
 }
 
-func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-swift6-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+// expected-future-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   if let p = x as? any HasAssoc {
     p.foo() // don't crash here.
   }
@@ -92,12 +96,14 @@ func testHasAssoc(_ x: Any, _: HasAssoc) { // expected-warning {{use of protocol
     typealias Assoc = Int
     func foo() {}
 
-    func method() -> HasAssoc {} // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    func method() -> HasAssoc {} // expected-swift6-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-future-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   }
 }
 
 // https://github.com/apple/swift/issues/42661
-var b: HasAssoc // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+var b: HasAssoc // expected-swift6-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+// expected-future-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
 
 // Further generic constraint error testing - typealias used inside statements
 protocol P {}
@@ -115,23 +121,30 @@ struct Outer {
 }
 
 typealias X = Struct1<Pub & Bar>
+// expected-future-error@-1 {{use of protocol 'Pub' as a type must be written 'any Pub'}}
+// expected-future-error@-2 {{use of protocol 'Bar' as a type must be written 'any Bar'}}
 _ = Struct1<Pub & Bar>.self
+// expected-future-error@-1 {{use of protocol 'Pub' as a type must be written 'any Pub'}}
+// expected-future-error@-2 {{use of protocol 'Bar' as a type must be written 'any Bar'}}
 
 typealias AliasWhere<T> = T
-where T : HasAssoc, T.Assoc == HasAssoc // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+where T : HasAssoc, T.Assoc == HasAssoc // expected-swift6-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+// expected-future-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
 
 struct StructWhere<T>
 where T : HasAssoc,
       T.Assoc == any HasAssoc {}
 
-protocol ProtocolWhere where T == HasAssoc { // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+protocol ProtocolWhere where T == HasAssoc { // expected-swift6-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+// expected-future-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   associatedtype T
 
   associatedtype U : HasAssoc
     where U.Assoc == any HasAssoc
 }
 
-extension HasAssoc where Assoc == HasAssoc {} // expected-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+extension HasAssoc where Assoc == HasAssoc {} // expected-swift6-warning {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+// expected-future-error@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
 
 func FunctionWhere<T>(_: T)
 where T : HasAssoc,
@@ -155,7 +168,8 @@ typealias HasAssocAlias = HasAssoc
 func testExistentialInCase(_ x: Any) {
   switch x {
   case is HasAssoc:
-    // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-swift6-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-future-error@-2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
     break
   default:
     break
@@ -163,7 +177,8 @@ func testExistentialInCase(_ x: Any) {
   _ = {
     switch x {
     case is HasAssoc:
-      // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+      // expected-swift6-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+      // expected-future-error@-2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
       break
     default:
       break
@@ -171,7 +186,8 @@ func testExistentialInCase(_ x: Any) {
   }
   switch x {
   case is HasAssocAlias:
-    // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+    // expected-swift6-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+    // expected-future-error@-2 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
     break
   default:
     break
@@ -179,7 +195,8 @@ func testExistentialInCase(_ x: Any) {
   _ = {
     switch x {
     case is HasAssocAlias:
-      // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+      // expected-swift6-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+      // expected-future-error@-2 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
       break
     default:
       break
@@ -187,8 +204,9 @@ func testExistentialInCase(_ x: Any) {
   }
   switch x {
   case is ~Copyable:
-    // expected-warning@-1 {{constraint that suppresses conformance requires 'any'}}
+    // expected-swift6-warning@-1 {{constraint that suppresses conformance requires 'any'}}
     // expected-warning@-2 {{'is' test is always true}}
+    // expected-future-error@-3 {{constraint that suppresses conformance requires 'any'}}
     break
   default:
     break
@@ -196,8 +214,9 @@ func testExistentialInCase(_ x: Any) {
   _ = {
     switch x {
     case is ~Copyable:
-      // expected-warning@-1 {{constraint that suppresses conformance requires 'any'}}
+      // expected-swift6-warning@-1 {{constraint that suppresses conformance requires 'any'}}
       // expected-warning@-2 {{'is' test is always true}}
+      // expected-future-error@-3 {{constraint that suppresses conformance requires 'any'}}
       break
     default:
       break
@@ -207,41 +226,48 @@ func testExistentialInCase(_ x: Any) {
 
 func throwingFn() throws {}
 
-// These are downgraded to warnings until Swift 7, see protocol_types_swift7.swift.
+// These are downgraded to warnings until a future language mode, since they
+// were previously missed.
 // https://github.com/swiftlang/swift/issues/77553
 func testExistentialInCatch() throws {
   do {
     try throwingFn()
   } catch is HasAssoc {}
-  // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+  // expected-swift6-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+  // expected-future-error@-2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   _ = {
     do {
       try throwingFn()
     } catch is HasAssoc {}
-    // expected-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-swift6-warning@-1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
+    // expected-future-error@-2 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}
   }
   do {
     try throwingFn()
   } catch is HasAssocAlias {}
-  // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+  // expected-swift6-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+  // expected-future-error@-2 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
   _ = {
     do {
       try throwingFn()
     } catch is HasAssocAlias {}
-    // expected-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+    // expected-swift6-warning@-1 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
+    // expected-future-error@-2 {{use of 'HasAssocAlias' (aka 'HasAssoc') as a type must be written 'any HasAssocAlias' (aka 'any HasAssoc')}}
   }
   do {
     try throwingFn()
   } catch is ~Copyable {}
-  // expected-warning@-1 {{constraint that suppresses conformance requires 'any'}}
+  // expected-swift6-warning@-1 {{constraint that suppresses conformance requires 'any'}}
   // expected-warning@-2 {{'is' test is always true}}
+  // expected-future-error@-3 {{constraint that suppresses conformance requires 'any'}}
 
   // FIXME: We shouldn't emit a duplicate 'always true' warning here.
   _ = {
     do {
       try throwingFn()
     } catch is ~Copyable {}
-    // expected-warning@-1 {{constraint that suppresses conformance requires 'any'}}
+    // expected-swift6-warning@-1 {{constraint that suppresses conformance requires 'any'}}
     // expected-warning@-2 2{{'is' test is always true}}
+    // expected-future-error@-3 {{constraint that suppresses conformance requires 'any'}}
   }
 }

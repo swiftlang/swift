@@ -2,10 +2,9 @@
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift
 
 // RUN: %target-typecheck-verify-swift -swift-version 6 -load-plugin-library %t/%target-library-name(MacroDefinition) -verify-additional-prefix swift6-
-// RUN: %target-typecheck-verify-swift -swift-version 7 -load-plugin-library %t/%target-library-name(MacroDefinition) -verify-additional-prefix swift7-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -load-plugin-library %t/%target-library-name(MacroDefinition) -verify-additional-prefix future- %}
 
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift7
 
 // https://github.com/swiftlang/swift/issues/80835
 
@@ -29,15 +28,15 @@ func takesAsyncFn(_ fn: () async -> Void) {}
 #asyncMacro {
   defer {
     noasyncFn()
-    // expected-swift7-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
+    // expected-future-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
     // expected-swift6-warning@-2 {{global function 'noasyncFn' is unavailable from asynchronous contexts; this will be an error in a future Swift language mode}}
   }
   noasyncFn()
-  // expected-swift7-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
+  // expected-future-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
   // expected-swift6-warning@-2 {{global function 'noasyncFn' is unavailable from asynchronous contexts; this will be an error in a future Swift language mode}}
 
   unavailableFromAsyncFn()
-  // expected-swift7-error@-1 {{global function 'unavailableFromAsyncFn' is unavailable from asynchronous contexts}}
+  // expected-future-error@-1 {{global function 'unavailableFromAsyncFn' is unavailable from asynchronous contexts}}
   // expected-swift6-warning@-2 {{global function 'unavailableFromAsyncFn' is unavailable from asynchronous contexts; this will be an error in a future Swift language mode}}
 
   // This was always an error.
@@ -55,25 +54,25 @@ takesAsyncFn {
 
 #asyncMacroDecl {
   noasyncFn()
-  // expected-swift7-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
+  // expected-future-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
   // expected-swift6-warning@-2 {{global function 'noasyncFn' is unavailable from asynchronous contexts; this will be an error in a future Swift language mode}}
 }
 
 typealias Magic<T> = T
 
-// expected-swift7-error@+2 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
+// expected-future-error@+2 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
 // expected-swift6-warning@+1 {{global function 'noasyncFn' is unavailable from asynchronous contexts; this will be an error in a future Swift language mode}}
 @AsyncMacro({ noasyncFn() })
 func foo() {
   #asyncMacro(({
     noasyncFn()
-    // expected-swift7-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
+    // expected-future-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
     // expected-swift6-warning@-2 {{global function 'noasyncFn' is unavailable from asynchronous contexts; this will be an error in a future Swift language mode}}
   }))
 
   #asyncMacroDecl(({
     noasyncFn()
-    // expected-swift7-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
+    // expected-future-error@-1 {{global function 'noasyncFn' is unavailable from asynchronous contexts}}
     // expected-swift6-warning@-2 {{global function 'noasyncFn' is unavailable from asynchronous contexts; this will be an error in a future Swift language mode}}
   }))
 
