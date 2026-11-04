@@ -56,11 +56,12 @@ enum ExistentialTypeRepresentation: UInt8 {
 
     case .class:
       /// For a class-bound existential, the payload is the object itself and
-      /// the metadata is available within the object.
+      /// the metadata is available within the object. Read it through the
+      /// runtime's accessor, which authenticates the isa where it's signed.
       let object = unsafe existential[0]
       return unsafe (
-        metadata: unsafe object.assumingMemoryBound(to: UnsafeRawPointer.self)
-          .pointee,
+        metadata: _swift_embedded_get_heap_object_metadata_pointer(
+          UnsafeMutableRawPointer(mutating: object)),
         value: object
       )
     

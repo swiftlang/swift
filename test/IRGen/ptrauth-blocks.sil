@@ -13,10 +13,12 @@ import Builtin
 // CHECK: @block_destroy_helper.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @block_destroy_helper, i32 0, i64 ptrtoint ({{.*}} getelementptr inbounds ({{.*}} [[NONTRIVIAL_BLOCK_DESCRIPTOR:@.*]], i32 0, i32 3) to i64), i64 0 }, section "llvm.ptrauth"
 // CHECK: [[NONTRIVIAL_BLOCK_DESCRIPTOR]] = internal constant { {{.*}} } { i64 0, i64 40, ptr @block_copy_helper.ptrauth, {{.*}} @block_destroy_helper.ptrauth, ptr [[VOID_BLOCK_SIGNATURE]] }
 
-// The invoke function of a global block is signed with the address of its
-// slot in the block header.
-// CHECK: @invoke_global.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @invoke_global, i32 0, i64 ptrtoint (ptr getelementptr inbounds ({ %objc_block, %swift.function }, ptr [[GLOBAL_BLOCK:@block[.0-9]*]], i32 0, i32 0, i32 3) to i64), i64 0 }, section "llvm.ptrauth"
-// CHECK: [[GLOBAL_BLOCK]] = private constant { %objc_block, %swift.function } { %objc_block { ptr @_NSConcreteGlobalBlock, i32 1342177280, i32 0, ptr @invoke_global.ptrauth, ptr {{@block_descriptor[.0-9]*}} }, %swift.function { ptr @global_block_callee.ptrauth, ptr null } }
+// The isa of a global block is signed with the isa schema (DA key, address
+// diversity, discriminator 0x6ae1), and its invoke function is signed with the
+// address of its slot in the block header.
+// CHECK: [[GLOBAL_ISA:@_NSConcreteGlobalBlock.ptrauth[.0-9]*]] = private constant { ptr, i32, i64, i64 } { ptr @_NSConcreteGlobalBlock, i32 2, i64 ptrtoint (ptr [[GLOBAL_BLOCK:@block[.0-9]*]] to i64), i64 27361 }, section "llvm.ptrauth"
+// CHECK: @invoke_global.ptrauth = private constant { ptr, i32, i64, i64 } { ptr @invoke_global, i32 0, i64 ptrtoint (ptr getelementptr inbounds ({ %objc_block, %swift.function }, ptr [[GLOBAL_BLOCK]], i32 0, i32 0, i32 3) to i64), i64 0 }, section "llvm.ptrauth"
+// CHECK: [[GLOBAL_BLOCK]] = private constant { %objc_block, %swift.function } { %objc_block { ptr [[GLOBAL_ISA]], i32 1342177280, i32 0, ptr @invoke_global.ptrauth, ptr {{@block_descriptor[.0-9]*}} }, %swift.function { ptr @global_block_callee.ptrauth, ptr null } }
 
 sil @init_header_trivial : $@convention(thin) (@inout_aliasable @block_storage Builtin.RawPointer) -> @convention(block) () -> () {
 entry(%0 : $*@block_storage Builtin.RawPointer):
