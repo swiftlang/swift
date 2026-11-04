@@ -285,7 +285,6 @@ public:
   
   SILInstruction *visitPackLengthInst(PackLengthInst *PLI);
   SILInstruction *visitPackElementGetInst(PackElementGetInst *PEGI);
-  SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
   SILInstruction *visitCopyAddrInst(CopyAddrInst *CAI);
 
   SILInstruction *legacyVisitGlobalValueInst(GlobalValueInst *globalValue);

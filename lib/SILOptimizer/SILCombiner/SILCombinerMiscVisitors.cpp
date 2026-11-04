@@ -1538,42 +1538,6 @@ SILInstruction *SILCombiner::visitPackElementGetInst(PackElementGetInst *PEGI) {
       PEGI->getLoc(), NewPEGI, PEGI->getElementType());
 }
 
-// Simplify `tuple_pack_element_addr` where the index is a `dynamic_pack_index`
-//with a constant operand.
-//
-// Before:
-// %idx = integer_literal Builtin.Word, N
-// %pack_idx = dynamic_pack_index %Pack{Int, String, Float}, %idx
-// %tuple_elt = tuple_pack_element_addr %tuple_value, %pack_idx, @element("...")
-//
-// After:
-// %concrete_elt = tuple_element_addr %tuple_value, N
-// %tuple_elt = unchecked_addr_cast %concrete_elt, @element("...")
-SILInstruction *
-SILCombiner::visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI) {
-  auto *DPII = dyn_cast<DynamicPackIndexInst>(TPEAI->getIndex());
-  if (DPII == nullptr)
-    return nullptr;
-
-  auto PackTy = DPII->getIndexedPackType();
-  if (PackTy->containsPackExpansionType())
-    return nullptr;
-
-  auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
-  if (Op == nullptr)
-    return nullptr;
-
-  if (Op->getValue().uge(PackTy->getNumElements()))
-    return nullptr;
-
-  unsigned Index = Op->getValue().getZExtValue();
-
-  auto *TEAI = Builder.createTupleElementAddr(
-      TPEAI->getLoc(), TPEAI->getTuple(), Index);
-  return Builder.createUncheckedAddrCast(
-      TPEAI->getLoc(), TEAI, TPEAI->getElementType());
-}
-
 // This is a hack. When optimizing a simple pack expansion expression which
 // forms a tuple from a pack, like `(repeat each t)`, after the above
 // peepholes we end up with:

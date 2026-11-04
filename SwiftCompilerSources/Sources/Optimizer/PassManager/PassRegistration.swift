@@ -145,6 +145,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(GlobalValueInst.self,      { run(GlobalValueInst.self, $0) })
   registerForSILCombine(StructInst.self,           { run(StructInst.self, $0) })
   registerForSILCombine(TupleInst.self,            { run(TupleInst.self, $0) })
+  registerForSILCombine(TuplePackElementAddrInst.self, { run(TuplePackElementAddrInst.self, $0) })
   registerForSILCombine(StoreBorrowInst.self,      { run(StoreBorrowInst.self, $0) })
   registerForSILCombine(StrongRetainInst.self,     { run(StrongRetainInst.self, $0) })
   registerForSILCombine(StrongReleaseInst.self,    { run(StrongReleaseInst.self, $0) })
