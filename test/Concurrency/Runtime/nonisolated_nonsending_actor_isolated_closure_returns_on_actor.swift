@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
-// RUN: %target-build-swift -O -swift-version 6 -target %target-swift-5.1-abi-triple \
-// RUN:   -parse-as-library -emit-library -emit-module-path %t/Lib.swiftmodule \
-// RUN:   -module-name Lib %t/src/Lib.swift -o %t/%target-library-name(Lib)
+// RUN: %target-build-swift-dylib(%t/%target-library-name(Lib)) -O -swift-version 6 \
+// RUN:   -target %target-swift-5.1-abi-triple -emit-module-path %t/Lib.swiftmodule \
+// RUN:   -module-name Lib %t/src/Lib.swift
 // RUN: %target-codesign %t/%target-library-name(Lib)
 
 // RUN: %target-build-swift -O -swift-version 6 -target %target-swift-6.0-abi-triple \
