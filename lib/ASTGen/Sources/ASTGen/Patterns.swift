@@ -139,12 +139,66 @@ extension ASTGenVisitor {
       }
     default: introducer = .var
     }
+    self.diagnoseNestedBinding(node, introducer: introducer)
     return .createParsed(
       self.ctx,
       keywordLoc: self.generateSourceLoc(node.bindingSpecifier),
       introducer: introducer,
       subPattern: self.generate(pattern: node.pattern)
     )
+  }
+
+  /// Diagnose a 'var', 'let' or 'inout' pattern that is nested inside another
+  /// one, or a 'let' pattern in the implicitly immutable pattern of a for-each
+  /// loop.
+  private func diagnoseNestedBinding(_ node: ValueBindingPatternSyntax, introducer: BridgedVarDeclIntroducer) {
+    var isNested = false
+    var isImplicitlyImmutable = false
+    var child = Syntax(node)
+    ancestors: while let parent = child.parent {
+      switch parent.as(SyntaxEnum.self) {
+      case .valueBindingPattern:
+        isNested = true
+        break ancestors
+      case .patternBinding(let binding):
+        // A 'var' or 'let' declaration's own pattern is a binding pattern too.
+        if child.id == Syntax(binding.pattern).id {
+          isNested = true
+        }
+        break ancestors
+      case .forStmt(let forStmt):
+        // The pattern of a for-each loop is immutable unless it is a
+        // refutable pattern after 'case'.
+        isImplicitlyImmutable = forStmt.caseKeyword == nil && child.id == Syntax(forStmt.pattern).id
+        break ancestors
+      // Patterns do not extend into closures, declarations, or other
+      // statements.
+      case .closureExpr, .codeBlockItem, .switchCase, .conditionElement, .catchItem:
+        break ancestors
+      default:
+        if parent.is(DeclSyntax.self) || parent.is(StmtSyntax.self) {
+          break ancestors
+        }
+      }
+      child = parent
+    }
+
+    if isNested {
+      let index: UInt =
+        switch introducer {
+        case .let, .borrowing: 0
+        case .inOut: 1
+        case .var: 2
+        }
+      if self.ctx.langOpts.hasFeature(.ReferenceBindings) {
+        self.diagnose(.var_pattern_in_var_inout(index), at: node.bindingSpecifier)
+      } else {
+        self.diagnose(.var_pattern_in_var(index), at: node.bindingSpecifier)
+      }
+    }
+    if introducer == .let, isImplicitlyImmutable {
+      self.diagnose(.let_pattern_in_immutable_context, at: node.bindingSpecifier)
+    }
   }
 
   func generate(wildcardPattern node: WildcardPatternSyntax) -> BridgedAnyPattern {

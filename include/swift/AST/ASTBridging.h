@@ -1671,12 +1671,14 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedVarDeclIntroducer {
 };
 
 SWIFT_NAME("BridgedPatternBindingDecl.createParsed(_:declContext:attributes:"
-           "staticLoc:staticSpelling:introducerLoc:introducer:entries:)")
+           "staticLoc:staticSpelling:introducerLoc:introducer:entries:"
+           "isTopLevelGlobal:)")
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedDeclAttributes cAttrs, swift::SourceLoc staticLoc,
     BridgedStaticSpelling cStaticSpelling, swift::SourceLoc introducerLoc,
-    BridgedVarDeclIntroducer cIntorducer, BridgedArrayRef cBindingEntries);
+    BridgedVarDeclIntroducer cIntorducer, BridgedArrayRef cBindingEntries,
+    bool isTopLevelGlobal);
 
 SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
            "argNameLoc:paramName:paramNameLoc:defaultValue:"

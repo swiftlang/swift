@@ -177,7 +177,8 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedDeclAttributes cAttrs, SourceLoc staticLoc,
     BridgedStaticSpelling cStaticSpelling, SourceLoc introducerLoc,
-    BridgedVarDeclIntroducer cIntroducer, BridgedArrayRef cBindingEntries) {
+    BridgedVarDeclIntroducer cIntroducer, BridgedArrayRef cBindingEntries,
+    bool isTopLevelGlobal) {
 
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
@@ -194,7 +195,7 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
       VD->attachParsedAttrs(cAttrs.unbridged());
       VD->setStatic(staticLoc.isValid());
       VD->setIntroducer(introducer);
-      VD->setTopLevelGlobal(isa<TopLevelCodeDecl>(declContext));
+      VD->setTopLevelGlobal(isTopLevelGlobal);
     });
 
     entries.emplace_back(pattern, entry.equalLoc, entry.init.unbridged(),

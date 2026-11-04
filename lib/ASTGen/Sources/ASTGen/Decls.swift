@@ -974,7 +974,13 @@ extension ASTGenVisitor {
 
     var initExpr: BridgedExpr?
     var initContext: BridgedPatternBindingInitializer?
-    if let initializer = binding.initializer {
+    if let initializer = binding.initializer, let variable = binding.parent?.parent,
+      self.isProtocolMember(variable)
+    {
+      // A protocol requirement has no initial value. The C++ parser diagnoses
+      // the initializer and drops it.
+      self.diagnose(.disallowed_init, at: initializer.equal)
+    } else if let initializer = binding.initializer {
       // Create a PatternBindingInitializer if we're not in a local context (this
       // ensures that property initializers are correctly treated as being in a
       // local context).
@@ -1140,7 +1146,10 @@ extension ASTGenVisitor {
       staticSpelling: attrs.staticSpelling,
       introducerLoc: self.generateSourceLoc(node.bindingSpecifier),
       introducer: introducer,
-      entries: entries
+      entries: entries,
+      // Only a declaration that is itself wrapped in a TopLevelCodeDecl is a
+      // global; one in a top-level 'do' block is local.
+      isTopLevelGlobal: topLevelDecl != nil
     )
     if bindingIsInvalid {
       decl.asDecl.setInvalid()
@@ -1353,8 +1362,14 @@ extension ASTGenVisitor {
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
-      self.attachBody(body, to: decl.asDecl, declContext: decl.asDeclContext) {
-        decl.setParsedBody($0)
+      if self.isProtocolMember(node) {
+        // A protocol requirement has no body. The C++ parser diagnoses the
+        // body and skips it.
+        self.diagnose(.protocol_method_with_body, at: body.leftBrace)
+      } else {
+        self.attachBody(body, to: decl.asDecl, declContext: decl.asDeclContext) {
+          decl.setParsedBody($0)
+        }
       }
     }
 
