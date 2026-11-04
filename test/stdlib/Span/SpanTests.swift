@@ -777,6 +777,20 @@ suite.test("init(viewing:) traps on non-stride byteCount")
   _ = Span<Int>(viewing: raw)
 }
 
+suite.test("init from RawSpan with 1-byte elements")
+.require(.minimumStdlib(.stdlib_6_4)).code {
+  let buf = UnsafeMutableRawBufferPointer.allocate(byteCount: 8, alignment: 8)
+  defer { unsafe buf.deallocate() }
+  _ = unsafe buf.initializeMemory(as: UInt8.self, fromContentsOf: 0..<8)
+  let raw = unsafe RawSpan(_unsafeBytes: buf[1..<6])
+
+  let signed = Span<Int8>(viewing: raw)
+  expectEqual(signed.count, 5)
+  expectEqual(signed[4], 5)
+
+  expectEqual(Span<Int8>(viewing: RawSpan()).count, 0)
+}
+
 suite.test("safe bytes property")
 .require(.stdlib_6_4).code {
   let capacity = 4
