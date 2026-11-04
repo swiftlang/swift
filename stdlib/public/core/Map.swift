@@ -142,6 +142,25 @@ extension LazyMapCollection: Collection {
   @inlinable
   public var isEmpty: Bool { return _base.isEmpty }
 
+  /// The first element of the collection.
+  ///
+  /// If the collection is empty, the value of this property is `nil`.
+  ///
+  /// This shadows `Collection.first` for concrete uses of a lazy map. The
+  /// default implementation computes `startIndex` and then subscripts it,
+  /// which is equivalent to a single application of `transform` here, but
+  /// going through an iterator keeps that guarantee local to this type
+  /// instead of depending on how an underlying collection implements
+  /// indexing. In particular, when this map sits atop a lazy filter (as in
+  /// `lazy.compactMap`, which is `map`/`filter`/`map`), the scan for
+  /// `startIndex` would otherwise evaluate the transform once and the
+  /// subscript a second time on the winning element.
+  @inlinable
+  public var first: Element? {
+    var iterator = makeIterator()
+    return iterator.next()
+  }
+
   /// The number of elements in the collection.
   ///
   /// To check whether the collection is empty, use its `isEmpty` property
