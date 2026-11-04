@@ -52,7 +52,6 @@ include(GNUInstallDirs)
 
 include(AvailabilityMacros)
 include(EmitSwiftInterface)
-include(InstallSwiftInterface)
 include(PlatformInfo)
 include(ResourceEmbedding)
 

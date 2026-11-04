@@ -20,10 +20,12 @@ target_link_libraries(swiftAndroid PRIVATE
 target_include_directories(swiftAndroid INTERFACE
   "$<$<COMPILE_LANGUAGE:Swift>:$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>$<INSTALL_INTERFACE:$<INSTALL_PREFIX>/${SwiftCore_INSTALL_SWIFTMODULEDIR}>>")
 
+emit_swift_interface(swiftAndroid)
 install(TARGETS swiftAndroid
   EXPORT SwiftOverlayTargets
   ARCHIVE DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
   LIBRARY DESTINATION "${SwiftOverlay_INSTALL_LIBDIR}"
-  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftAndroid)
-install_swift_interface(swiftAndroid)
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+  FILE_SET swift_modules
+    COMPONENT SwiftOverlay_development
+    DESTINATION "${SwiftOverlay_INSTALL_SWIFTMODULEDIR}")

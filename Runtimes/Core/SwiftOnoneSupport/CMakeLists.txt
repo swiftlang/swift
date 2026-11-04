@@ -33,14 +33,16 @@ target_link_libraries(swiftSwiftOnoneSupport
     swiftCore
     $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
+emit_swift_interface(swiftSwiftOnoneSupport)
 install(TARGETS swiftSwiftOnoneSupport
     EXPORT SwiftCoreTargets
     COMPONENT SwiftCore_runtime
     ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
-    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-emit_swift_interface(swiftSwiftOnoneSupport)
-install_swift_interface(swiftSwiftOnoneSupport)
+    RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+    FILE_SET swift_modules
+      COMPONENT SwiftCore_development
+      DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}")
 
 # Configure plist creation for Darwin platforms.
 generate_plist(swiftSwiftOnoneSupport "${CMAKE_PROJECT_VERSION}" swiftSwiftOnoneSupport)

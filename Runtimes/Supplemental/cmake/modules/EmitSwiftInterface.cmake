@@ -18,34 +18,38 @@ function(emit_swift_interface target)
   if(NOT module_name)
     set(module_name ${target})
   endif()
+  set(module_directory "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
   # Account for an existing swiftmodule file
   # generated with the previous logic
-  if(EXISTS "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule"
-     AND NOT IS_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
-    message(STATUS "Removing regular file ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule to support nested swiftmodule generation")
-    file(REMOVE "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule")
+  if(EXISTS "${module_directory}" AND NOT IS_DIRECTORY "${module_directory}")
+    message(STATUS "Removing regular file ${module_directory} to support nested swiftmodule generation")
+    file(REMOVE "${module_directory}")
   endif()
   target_compile_options(${target} PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_MODULE_TRIPLE}.swiftmodule>")
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${module_directory}/${${PROJECT_NAME}_MODULE_TRIPLE}.swiftmodule>")
   if(${PROJECT_NAME}_VARIANT_MODULE_TRIPLE)
     target_compile_options(${target} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_VARIANT_MODULE_TRIPLE}.swiftmodule>")
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${module_directory}/${${PROJECT_NAME}_VARIANT_MODULE_TRIPLE}.swiftmodule>")
   endif()
-  add_custom_command(OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_MODULE_TRIPLE}.swiftmodule"
-    DEPENDS ${target})
   target_sources(${target}
     INTERFACE
-      $<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_MODULE_TRIPLE}.swiftmodule>)
+      FILE_SET swift_modules
+      TYPE HEADERS
+      BASE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
+      FILES "${module_directory}")
+  set_source_files_properties("${module_directory}" PROPERTIES GENERATED TRUE)
+  set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
+    "${module_directory}")
 
   # Generate textual swift interfaces is library-evolution is enabled
   if(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION)
     target_compile_options(${target} PRIVATE
-      $<$<COMPILE_LANGUAGE:Swift>:-emit-module-interface-path$<SEMICOLON>${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_MODULE_TRIPLE}.swiftinterface>
-      $<$<COMPILE_LANGUAGE:Swift>:-emit-private-module-interface-path$<SEMICOLON>${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_MODULE_TRIPLE}.private.swiftinterface>)
+      $<$<COMPILE_LANGUAGE:Swift>:-emit-module-interface-path$<SEMICOLON>${module_directory}/${${PROJECT_NAME}_MODULE_TRIPLE}.swiftinterface>
+      $<$<COMPILE_LANGUAGE:Swift>:-emit-private-module-interface-path$<SEMICOLON>${module_directory}/${${PROJECT_NAME}_MODULE_TRIPLE}.private.swiftinterface>)
     if(${PROJECT_NAME}_VARIANT_MODULE_TRIPLE)
       target_compile_options(${target} PRIVATE
-        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-interface-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_VARIANT_MODULE_TRIPLE}.swiftinterface>"
-        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-private-module-interface-path ${CMAKE_CURRENT_BINARY_DIR}/${module_name}.swiftmodule/${${PROJECT_NAME}_VARIANT_MODULE_TRIPLE}.private.swiftinterface>")
+        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-interface-path ${module_directory}/${${PROJECT_NAME}_VARIANT_MODULE_TRIPLE}.swiftinterface>"
+        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-private-module-interface-path ${module_directory}/${${PROJECT_NAME}_VARIANT_MODULE_TRIPLE}.private.swiftinterface>")
     endif()
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-library-level$<SEMICOLON>api>

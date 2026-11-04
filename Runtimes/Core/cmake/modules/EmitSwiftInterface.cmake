@@ -28,14 +28,20 @@ function(emit_swift_interface target)
 
   target_compile_options(${target} PRIVATE
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule>")
+  target_sources(${target}
+    INTERFACE
+      FILE_SET swift_modules
+      TYPE HEADERS
+      BASE_DIRS "${CMAKE_CURRENT_BINARY_DIR}"
+      FILES "${module_directory}"
+  )
+  set_source_files_properties("${module_directory}" PROPERTIES GENERATED TRUE)
   set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
-    "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule"
-    "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftdoc"
-    "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo")
+    "${module_directory}")
 
   if(SwiftCore_ENABLE_SOURCE_INFO)
     target_compile_options(${target} PRIVATE
-      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-source-info-path "$<SHELL_PATH:${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo>">")
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-source-info-path $<SHELL_PATH:${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo>>")
   else()
     target_compile_options(${target} PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-avoid-emit-module-source-info>")
@@ -44,34 +50,17 @@ function(emit_swift_interface target)
   if(SwiftCore_VARIANT_MODULE_TRIPLE)
     target_compile_options(${target} PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule>")
-    set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
-      "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule"
-      "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftdoc"
-      "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftsourceinfo"
-    )
   endif()
-
-  add_custom_command(OUTPUT "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule"
-    DEPENDS ${target})
-  target_sources(${target}
-    INTERFACE
-      $<BUILD_INTERFACE:${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule>)
 
   # Generate textual swift interfaces is library-evolution is enabled
   if(SwiftCore_ENABLE_LIBRARY_EVOLUTION)
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-emit-module-interface-path$<SEMICOLON>${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftinterface>
       $<$<COMPILE_LANGUAGE:Swift>:-emit-private-module-interface-path$<SEMICOLON>${module_directory}/${SwiftCore_MODULE_TRIPLE}.private.swiftinterface>)
-    set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
-      "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftinterface"
-      "${module_directory}/${SwiftCore_MODULE_TRIPLE}.private.swiftinterface")
     if(SwiftCore_VARIANT_MODULE_TRIPLE)
       target_compile_options(${target} PRIVATE
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-interface-path ${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftinterface>"
         "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-private-module-interface-path ${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.private.swiftinterface>")
-      set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
-        "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftinterface"
-        "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.private.swiftinterface")
     endif()
     target_compile_options(${target} PRIVATE
       $<$<COMPILE_LANGUAGE:Swift>:-library-level$<SEMICOLON>api>
