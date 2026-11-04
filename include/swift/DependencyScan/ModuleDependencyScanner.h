@@ -535,6 +535,7 @@ private:
   /// Count of lookups the scanner performed on the filesystem rather than
   /// answering from the dependency cache: one per module name looked up and
   /// one per header scan. Reported as the NumDepScanFilesystemLookups
+  /// frontend statistic.
   std::atomic<unsigned> NumLookups = 0;
 
   /// Whether each worker uses a single Clang compiler instance for all of
