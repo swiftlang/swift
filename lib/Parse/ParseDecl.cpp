@@ -30,7 +30,6 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -9424,45 +9423,6 @@ void Parser::ParsedAccessors::classify(Parser &P, AbstractStorageDecl *storage,
     }
   }
 
-  if (auto *SD = dyn_cast<SubscriptDecl>(storage)) {
-    if (isa_and_nonnull<SendingTypeRepr>(SD->getElementTypeRepr())) {
-      // Yielding subscripts fail to diagnose attempts to yield a value in a non-disconnected region.
-      if (Read)
-        P.diagnose(Read->getLoc(),
-                   diag::sending_subscript_with_incompatible_accessor,
-                   "_read");
-      if (Modify)
-        P.diagnose(Modify->getLoc(),
-                   diag::sending_subscript_with_incompatible_accessor,
-                   "_modify");
-      if (YieldingBorrow)
-        P.diagnose(YieldingBorrow->getLoc(),
-                   diag::sending_subscript_with_incompatible_accessor,
-                   "yielding borrow");
-      if (YieldingMutate)
-        P.diagnose(YieldingMutate->getLoc(),
-                   diag::sending_subscript_with_incompatible_accessor,
-                   "yielding mutate");
-      // Address subscripts cannot work with `sending` return type, because `sending` cannot be part of the pointee type.
-      if (Address)
-        P.diagnose(Address->getLoc(),
-                   diag::sending_subscript_with_incompatible_accessor,
-                   "unsafeAddress");
-      if (MutableAddress)
-        P.diagnose(MutableAddress->getLoc(),
-                   diag::sending_subscript_with_incompatible_accessor,
-                   "unsafeMutableAddress");
-      // There is no practical way to implement an accessor returning a `sending` value using storage inside the containing value
-      if (Borrow)
-        P.diagnose(Borrow->getLoc(),
-                   diag::sending_subscript_with_incompatible_accessor,
-                   "borrow");
-      if (Mutate)
-        P.diagnose(Mutate->getLoc(),
-                   diag::sending_subscript_with_incompatible_accessor,
-                   "mutate");
-    }
-  }
 }
 
 
