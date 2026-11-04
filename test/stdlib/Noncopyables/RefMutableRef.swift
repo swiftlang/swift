@@ -52,7 +52,7 @@ extension Optional where Wrapped: ~Copyable {
   @_lifetime(&self)
   mutating func insert(_ new: consuming Wrapped) -> MutableRef<Wrapped> {
     self = .some(new)
-    return mutate()._consumingUnsafelyUnwrap()
+    return mutate().unsafelyUnwrapped
   }
 }
 
