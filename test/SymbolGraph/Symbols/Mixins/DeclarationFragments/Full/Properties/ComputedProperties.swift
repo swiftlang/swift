@@ -123,14 +123,6 @@ public struct S {
 // YFULL-NEXT:   },
 // YFULL-NEXT:   {
 // YFULL-NEXT:     "kind": "text",
-// YFULL-NEXT:     "spelling": " "
-// YFULL-NEXT:   },
-// YFULL-NEXT:   {
-// YFULL-NEXT:     "kind": "keyword",
-// YFULL-NEXT:     "spelling": "set"
-// YFULL-NEXT:   },
-// YFULL-NEXT:   {
-// YFULL-NEXT:     "kind": "text",
 // YFULL-NEXT:     "spelling": " }"
 // YFULL-NEXT:   }
 // YFULL-NEXT: ]

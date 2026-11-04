@@ -31,6 +31,8 @@
 #include "SymbolGraph.h"
 #include "SymbolGraphASTWalker.h"
 
+#include <algorithm>
+
 using namespace swift;
 using namespace symbolgraphgen;
 
@@ -54,6 +56,14 @@ SymbolGraph::SymbolGraph(SymbolGraphASTWalker &Walker, ModuleDecl &M,
 
 PrintOptions SymbolGraph::getDeclarationFragmentsPrintOptions() const {
   PrintOptions Opts;
+  // Access modifiers aren't printed, so hide setters that the graph's audience
+  // can't use: in a public graph, `public internal(set) var x: Int` is printed
+  // as `var x: Int { get }`. (Symbols themselves are filtered by the graph, so
+  // AccessFilter isn't used.) Open and public setters are equally usable.
+  Opts.SetterAccessFilter =
+      std::min(Walker.Options.MinimumSetterAccessLevel.value_or(
+                   Walker.Options.MinimumAccessLevel),
+               AccessLevel::Public);
   Opts.FunctionDefinitions = false;
   Opts.ArgAndParamPrinting =
     PrintOptions::ArgAndParamPrintingMode::MatchSource;

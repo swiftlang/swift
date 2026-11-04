@@ -1082,6 +1082,10 @@ fillSymbolInfo(CursorSymbolInfo &Symbol, const DeclInfo &DInfo,
     symbolgraphgen::SymbolGraphOptions Options;
     Options.Target = Invoc.getLangOptions().Target;
     Options.MinimumAccessLevel = AccessLevel::Private;
+    // MinimumAccessLevel is lowered only so that any declaration can be
+    // printed. Hide setters that are less accessible than their declaration,
+    // as public documentation would, rather than showing every setter.
+    Options.MinimumSetterAccessLevel = AccessLevel::Public;
     Options.IncludeSPISymbols = true;
     Options.IncludeClangDocs = true;
     Options.PrintPrivateSystemSymbols = true;
