@@ -481,3 +481,118 @@ bb2(%error : @owned $any Error):
   hop_to_executor %0 : $Builtin.ImplicitActor
   throw %error : $any Error
 }
+
+// A closure that keeps its static isolation but behaves like
+// nonisolated(nonsending) gets an implicit leading Builtin.ImplicitActor
+// parameter that is not marked isolated. It does not hop in its prologue and
+// its callers don't hop back after calling it, so it must keep the hop back to
+// its actor before returning.
+
+// CHECK-LABEL: sil [ossa] @behavesLikeNonisolatedNonsendingKeepsHopBeforeReturn : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_isolated @guaranteed MyActor) -> () {
+// CHECK:         apply
+// CHECK-NEXT:    hop_to_executor %1
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'behavesLikeNonisolatedNonsendingKeepsHopBeforeReturn'
+sil [ossa] @behavesLikeNonisolatedNonsendingKeepsHopBeforeReturn : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $MyActor):
+  %f = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  apply %f() : $@convention(thin) @async () -> ()
+  hop_to_executor %1 : $MyActor
+  %r = tuple ()
+  return %r : $()
+}
+
+// A call to such a closure needs the hop before it and returns on the caller's
+// executor, so the hop after it is redundant.
+
+// CHECK-LABEL: sil [ossa] @callBehavesLikeNonisolatedNonsending : $@convention(thin) @async (@guaranteed MyActor, @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK:       bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $Builtin.ImplicitActor):
+// CHECK-NEXT:    hop_to_executor %0
+// CHECK:         apply {{%.*}}(%1, %0)
+// CHECK-NOT:     hop_to_executor
+// CHECK:       } // end sil function 'callBehavesLikeNonisolatedNonsending'
+sil [ossa] @callBehavesLikeNonisolatedNonsending : $@convention(thin) @async (@guaranteed MyActor, @guaranteed Builtin.ImplicitActor) -> () {
+bb0(%0 : @guaranteed $MyActor, %1 : @guaranteed $Builtin.ImplicitActor):
+  hop_to_executor %0 : $MyActor
+  %f = function_ref @behavesLikeNonisolatedNonsendingKeepsHopBeforeReturn : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_isolated @guaranteed MyActor) -> ()
+  apply %f(%1, %0) : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_isolated @guaranteed MyActor) -> ()
+  hop_to_executor %0 : $MyActor
+  %g = function_ref @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
+  apply %g(%0) : $@convention(method) (@guaranteed MyActor) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// An actor-isolated closure that behaves like nonisolated(nonsending). It has an
+// implicit leading Builtin.ImplicitActor parameter that is not isolated, so it
+// does not hop in its prologue and its callers do not hop after calling it.
+//
+// The continuation resumes on the generic executor, so the hop to the actor in
+// the resume block is the only thing that puts the closure's caller back on the
+// actor. The hop to the implicit actor right before it is dead because the hop
+// to the actor supersedes it, but the hop to the actor must be kept.
+
+// CHECK-LABEL: sil private [isolation "actor_instance"] [ossa] @behavesLikeNonisolatedNonsendingKeepsHopToActorAfterContinuation : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_isolated @guaranteed MyActor) -> @out () {
+// CHECK:         await_async_continuation
+// CHECK:       bb1:
+// MUST NOT be eliminated:
+// CHECK-NEXT:    hop_to_executor %2
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'behavesLikeNonisolatedNonsendingKeepsHopToActorAfterContinuation'
+sil private [isolation "actor_instance"] [ossa] @behavesLikeNonisolatedNonsendingKeepsHopToActorAfterContinuation : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_isolated @guaranteed MyActor) -> @out () {
+bb0(%0 : $*(), %1 : @guaranteed $Builtin.ImplicitActor, %2 : @guaranteed $MyActor):
+  %c = get_async_continuation_addr (), %0 : $*()
+  %f = function_ref @syncFunction : $@convention(thin) () -> ()
+  apply %f() : $@convention(thin) () -> ()
+  await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1
+
+bb1:
+  hop_to_executor %1 : $Builtin.ImplicitActor
+  hop_to_executor %2 : $MyActor // MUST NOT be eliminated: resumed on the generic executor, callers do not hop back
+  %t = tuple ()
+  return %t : $()
+}
+
+// A closure that behaves like nonisolated(nonsending) starts out on its
+// isolated capture's actor, but only until the first call that may leave the
+// actor. The hop after the nonisolated(nonsending) call before that is
+// redundant, every hop back to the actor after a call that may leave it must be
+// kept.
+
+// CHECK-LABEL: sil private [isolation "actor_instance"] [ossa] @behavesLikeNonisolatedNonsendingEntryActor : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_isolated @guaranteed MyActor) -> () {
+// CHECK:       bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $MyActor):
+// CHECK-NOT:     hop_to_executor
+// CHECK:         apply [[REQUIRED:%[0-9]+]](%1)
+// CHECK-NEXT:    apply [[NONSENDING:%[0-9]+]](%0)
+// CHECK-NEXT:    apply [[REQUIRED]](%1)
+// CHECK-NEXT:    apply [[ASYNC:%[0-9]+]]()
+// CHECK-NEXT:    hop_to_executor %1
+// CHECK-NEXT:    apply [[REQUIRED]](%1)
+// CHECK-NEXT:    apply [[ASYNC]]()
+// CHECK-NEXT:    hop_to_executor %1
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'behavesLikeNonisolatedNonsendingEntryActor'
+sil private [isolation "actor_instance"] [ossa] @behavesLikeNonisolatedNonsendingEntryActor : $@convention(thin) @async (@sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @sil_isolated @guaranteed MyActor) -> () {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $MyActor):
+  %required = function_ref @requiredToRunOnActor : $@convention(method) (@guaranteed MyActor) -> ()
+  %async = function_ref @anotherAsyncFunction : $@convention(thin) @async () -> ()
+  %nonsending = function_ref @nonisolatedNonsendingAsyncFunction : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  // Called on the actor, no hop needed
+  apply %required(%1) : $@convention(method) (@guaranteed MyActor) -> ()
+  // Stays on the actor
+  apply %nonsending(%0) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+  hop_to_executor %1 : $MyActor // redundant: still on the entry actor
+  apply %required(%1) : $@convention(method) (@guaranteed MyActor) -> ()
+  // Leaves the actor
+  apply %async() : $@convention(thin) @async () -> ()
+  hop_to_executor %1 : $MyActor // MUST NOT be eliminated
+  apply %required(%1) : $@convention(method) (@guaranteed MyActor) -> ()
+  // Leaves the actor
+  apply %async() : $@convention(thin) @async () -> ()
+  hop_to_executor %1 : $MyActor // MUST NOT be eliminated: callers do not hop back
+  %r = tuple ()
+  return %r : $()
+}

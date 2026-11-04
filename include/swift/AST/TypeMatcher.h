@@ -395,9 +395,7 @@ private:
           if (firstElt.getLabel() != secondElt.getLabel() ||
               firstElt.isVariadic() != secondElt.isVariadic() ||
               firstElt.isInOut() != secondElt.isInOut())
-            return mismatch(firstElt.getOldType().getPointer(),
-                            secondElt.getOldType(),
-                            sugaredFirstFunc->getParams()[i].getOldType());
+            return mismatch(firstFunc.getPointer(), secondType, sugaredFirstFunc);
 
           // Recurse on parameter components.
           if (!this->visit(firstElt.getOldType()->getCanonicalType(),
