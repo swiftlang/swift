@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 #if !$Embedded && os(anyAppleOS)
-
 import Swift
 
 @_silgen_name("_swift_concurrency_dlopen_noload")
@@ -44,6 +43,12 @@ enum CoreFoundation {
 
   @_extern(c, "CFRunLoopStop")
   static func CFRunLoopStop(_ runLoop: OpaquePointer)
+
+  @_extern(c, "CFRunLoopRunInMode")
+  @discardableResult
+  static func CFRunLoopRunInMode(_ mode: CFRunLoopMode,
+                                 _ seconds: CFTimeInterval,
+                                 _ returnAfterSourceHandled: Bool) -> CFRunLoopResult
 #else
   static func symbol<T>(_ name: String) -> T {
     guard let result = unsafe dlsym(handle, name) else {
@@ -58,20 +63,37 @@ enum CoreFoundation {
     unsafe symbol("CFRunLoopGetMain")
   static let CFRunLoopStop: @convention(c) (OpaquePointer) -> () =
     unsafe symbol("CFRunLoopStop")
+  static let CFRunLoopRunInMode: @convention(c) (CFRunLoopMode, CFTimeInterval, Bool) -> CFRunLoopResult =
+    unsafe symbol("CFRunLoopRunInMode")
 #endif
+
+  typealias CFRunLoopMode = AnyObject
+  typealias CFTimeInterval = Double
+  typealias CFRunLoopResult = Int32
+
+  static let kCFRunLoopDefaultMode: CFRunLoopMode =
+    "kCFRunLoopDefaultMode"._bridgeToObjectiveCImpl()
 }
 
 // .. Main Executor ............................................................
 
-/// A CFRunLoop-based main executor (Apple platforms only)
 @available(StdlibDeploymentTarget 6.3, *)
-final class CFMainExecutor: DispatchMainExecutor, @unchecked Sendable {
+final class CFMainExecutor: DispatchMainExecutor, RunLoopExecutor,
+                            @unchecked Sendable {
 
   override public func run() throws {
     CoreFoundation.CFRunLoopRun()
   }
 
-  override public func stop() {
+  public func runUntil(_ condition: () -> Bool) throws {
+    while !condition() {
+      CoreFoundation.CFRunLoopRunInMode(CoreFoundation.kCFRunLoopDefaultMode,
+                                        0,
+                                        false)
+    }
+  }
+
+  public func stop() {
     unsafe CoreFoundation.CFRunLoopStop(CoreFoundation.CFRunLoopGetMain())
   }
 
