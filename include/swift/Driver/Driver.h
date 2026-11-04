@@ -398,6 +398,7 @@ private:
                                  CommandOutput *Output) const;
 
   void chooseSerializedDiagnosticsPath(Compilation &C, const JobAction *JA,
+                                       file_types::ID diagnosticsType,
                                        const TypeToPathMap *OutputMap,
                                        StringRef workingDirectory,
                                        CommandOutput *Output) const;

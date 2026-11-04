@@ -13,9 +13,12 @@
 
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/DiagnosticOptions.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
+#include "swift/Option/SerializedDiagnosticsOptions.h"
 #include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
@@ -568,11 +571,13 @@ static bool shouldEmitFineModuleTrace(FrontendOptions::ActionType action) {
 }
 
 /// Whether diagnostics are serialized as SARIF rather than in the binary
-/// format, as requested by -serialize-diagnostics=<format>.
+/// format.
 static bool serializesDiagnosticsAsSARIF(const llvm::opt::ArgList &Args) {
-  const llvm::opt::Arg *A =
-      Args.getLastArg(options::OPT_serialize_diagnostics_EQ);
-  return A && StringRef(A->getValue()) == "sarif";
+  auto format = diagnosticsSerializationFormat(Args, [](const Arg &) {
+    ABORT("an unknown -serialize-diagnostics= format must have been rejected "
+          "by ParseDiagnosticArgs");
+  });
+  return format == DiagnosticOptions::SerializedFormat::SARIF;
 }
 
 std::optional<SupplementaryOutputPaths>
