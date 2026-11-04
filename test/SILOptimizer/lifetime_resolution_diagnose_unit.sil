@@ -37,7 +37,7 @@ bb0:
   assign %val to %root : $*K
 
   %d1 = begin_access [deinit] [unknown] %root : $*K
-  %c = load [copy] %d1 : $*K // expected-note {{consumed here}}
+  %c = load [copy] %d1 : $*K // expected-note {{consumed here}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
   diagnose [unpermitted_copy] %c : $K
   end_access %d1 : $*K
   destroy_value %c : $K
@@ -65,7 +65,7 @@ bb0:
 
   %copy = copy_value %root : $K
   diagnose [unpermitted_copy] %copy : $K
-  %m = move_value [allows_diagnostics] %copy : $K // expected-note {{consumed here}}
+  %m = move_value [allows_diagnostics] %copy : $K // expected-note {{consumed here}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
   ignored_use %m
   destroy_value %m : $K
 
@@ -110,13 +110,13 @@ bb0:
   cond_br undef, bb1, bb2
 
 bb1:
-  %c1 = load [copy] %0 : $*K // expected-note {{consumed here}}
+  %c1 = load [copy] %0 : $*K // expected-note {{consumed here}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
   diagnose [unpermitted_copy] %c1 : $K
   destroy_value %c1 : $K
   br bb3
 
 bb2:
-  %c2 = load [copy] %0 : $*K // expected-note {{consumed here}}
+  %c2 = load [copy] %0 : $*K // expected-note {{consumed here}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
   diagnose [unpermitted_copy] %c2 : $K
   destroy_value %c2 : $K
   br bb3
