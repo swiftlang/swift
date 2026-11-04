@@ -33,9 +33,15 @@
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-base-key -- \
 // RUN:   %target-swift-frontend-plain -cache-compile-job %t/a.swift -c @%t/MyApp.cmd -DTEST > %t4.casid
 
+/// The driver path that swiftc adds for the build log doesn't affect base key.
+// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-base-key -- \
+// RUN:   %target-swift-frontend-plain -cache-compile-job %t/a.swift -c @%t/MyApp.cmd \
+// RUN:   -new-driver-path %t/another-toolchain/usr/bin/swift-driver > %t10.casid
+
 // RUN: diff %t1.casid %t2.casid
 // RUN: diff %t1.casid %t3.casid
 // RUN: not diff %t1.casid %t4.casid
+// RUN: diff %t1.casid %t10.casid
 
 /// Check filelist option.
 // RUN: echo "%t/a.swift" > %t/filelist-1
