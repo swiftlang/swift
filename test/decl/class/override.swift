@@ -366,6 +366,80 @@ class HasFlagsDerivedBad2 : HasFlagsBase {
   override func collect(x: [B]) {} // expected-error {{method does not override any method from its superclass}}
 }
 
+class VariadicClosureBase {
+  func take(_ fn: (Int) -> Void) {}
+  // expected-note@-1 {{potential overridden instance method 'take' here}}
+  func takeVariadic(_ fn: (Int...) -> Void) {}
+  // expected-note@-1 {{potential overridden instance method 'takeVariadic' here}}
+  func takeOptional(_ fn: ((Int) -> Void)?) {}
+  // expected-note@-1 {{potential overridden instance method 'takeOptional' here}}
+  func takeSecond(_ fn: (Int, String) -> Void) {}
+  // expected-note@-1 {{potential overridden instance method 'takeSecond' here}}
+  func takeNested(_ fn: (@escaping (Int) -> Void) -> Void) {}
+  // expected-note@-1 {{potential overridden instance method 'takeNested' here}}
+  func takeGeneric<T>(_ fn: (T) -> Void) {}
+  // expected-note@-1 {{potential overridden instance method 'takeGeneric' here}}
+  func produce() -> (Int) -> Void { { _ in } }
+  // expected-note@-1 {{potential overridden instance method 'produce()' here}}
+  init(fn: (Int) -> Void) {}
+  // expected-note@-1 {{potential overridden initializer 'init(fn:)' here}}
+  subscript(fn: (Int) -> Void) -> Int { 0 }
+  // expected-note@-1 2{{potential overridden subscript 'subscript(_:)' here}}
+  subscript(i: Int) -> (Int) -> Void { { _ in } }
+  // expected-note@-1 2{{potential overridden subscript 'subscript(_:)' here}}
+  var prop: (Int) -> Void { { _ in } }
+  // expected-note@-1 {{attempt to override property here}}
+}
+
+class VariadicClosureDerivedGood : VariadicClosureBase {
+  override func take(_ fn: (Int) -> Void) {}
+  override func takeVariadic(_ fn: (Int...) -> Void) {}
+  override func takeOptional(_ fn: ((Int) -> Void)?) {}
+  override func takeSecond(_ fn: (Int, String) -> Void) {}
+  override func takeNested(_ fn: (@escaping (Int) -> Void) -> Void) {}
+  override func takeGeneric<T>(_ fn: (T) -> Void) {}
+  override func produce() -> (Int) -> Void { { _ in } }
+  override subscript(fn: (Int) -> Void) -> Int { 0 }
+  override subscript(i: Int) -> (Int) -> Void { { _ in } }
+  override var prop: (Int) -> Void { { _ in } }
+}
+
+class VariadicClosureDerivedBad : VariadicClosureBase {
+  override func take(_ fn: (Int...) -> Void) {}
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override func takeVariadic(_ fn: (Int) -> Void) {}
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override func takeOptional(_ fn: ((Int...) -> Void)?) {}
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override func takeSecond(_ fn: (Int, String...) -> Void) {}
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override func takeNested(_ fn: (@escaping (Int...) -> Void) -> Void) {}
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override func takeGeneric<T>(_ fn: (T...) -> Void) {}
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override func produce() -> (Int...) -> Void { { _ in } }
+  // expected-error@-1 {{method does not override any method from its superclass}}
+  override init(fn: (Int...) -> Void) {}
+  // expected-error@-1 {{initializer does not override a designated initializer from its superclass}}
+  override subscript(fn: (Int...) -> Void) -> Int { 0 }
+  // expected-error@-1 {{subscript does not override any subscript from its superclass}}
+  override subscript(i: Int) -> (Int...) -> Void { { _ in } }
+  // expected-error@-1 {{subscript does not override any subscript from its superclass}}
+  override var prop: (Int...) -> Void { { _ in } }
+  // expected-error@-1 {{property 'prop' with type '(Int...) -> Void' cannot override a property with type '(Int) -> Void'}}
+}
+
+class VariadicClosureDerivedOverloads : VariadicClosureBase {
+  func take(_ fn: (Int...) -> Void) {}
+  func takeVariadic(_ fn: (Int) -> Void) {}
+  func takeSecond(_ fn: (Int, String...) -> Void) {}
+  func takeNested(_ fn: (@escaping (Int...) -> Void) -> Void) {}
+  func takeGeneric<T>(_ fn: (T...) -> Void) {}
+  func produce() -> (Int...) -> Void { { _ in } }
+  init(fn: (Int...) -> Void) {}
+  subscript(fn: (Int...) -> Void) -> Int { 0 }
+}
+
 // Issues with overrides of internal(set) and fileprivate(set) members
 public class BaseWithInternalSetter {
     public internal(set) var someValue: Int = 0
