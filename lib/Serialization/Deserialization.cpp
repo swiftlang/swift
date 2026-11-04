@@ -2317,10 +2317,9 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
         // Pass through deserialization errors.
         if (maybeType.errorIsA<FatalDeserializationError>())
           return maybeType.takeError();
-        // FIXME: Don't throw away the inner error's information.
-        diagnoseAndConsumeError(maybeType.takeError());
-        return llvm::make_error<XRefError>("couldn't decode type",
-                                           pathTrace, name);
+        return llvm::make_error<XRefError>(
+            "couldn't decode type", pathTrace, name,
+            takeErrorInfo(maybeType.takeError()));
       }
       filterTy = maybeType.get();
       pathTrace.addType(filterTy);
@@ -2748,10 +2747,9 @@ giveUpFastPath:
           if (maybeType.errorIsA<FatalDeserializationError>())
             return maybeType.takeError();
 
-          // FIXME: Don't throw away the inner error's information.
-          diagnoseAndConsumeError(maybeType.takeError());
-          return llvm::make_error<XRefError>("couldn't decode type",
-                                             pathTrace, memberName);
+          return llvm::make_error<XRefError>(
+              "couldn't decode type", pathTrace, memberName,
+              takeErrorInfo(maybeType.takeError()));
         }
         filterTy = maybeType.get();
         pathTrace.addType(filterTy);
@@ -4053,12 +4051,13 @@ public:
       MF.diagnoseAndConsumeError(overriddenOrError.takeError());
       overridden = nullptr;
     } else {
-      MF.diagnoseAndConsumeError(overriddenOrError.takeError());
       if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
-        return llvm::make_error<OverrideError>(name, errorFlags,
-                                               numTableEntries);
+        return llvm::make_error<OverrideError>(
+            name, errorFlags, numTableEntries,
+            takeErrorInfo(overriddenOrError.takeError()));
       }
 
+      MF.diagnoseAndConsumeError(overriddenOrError.takeError());
       overridden = nullptr;
     }
 
@@ -4201,6 +4200,7 @@ public:
       if (!isStatic) {
         auto actualReadImpl = getActualReadImplKind(readImpl);
         if (actualReadImpl && *actualReadImpl == ReadImplKind::Stored) {
+          errorFlags |= DeclDeserializationError::Flag::AffectsMemoryLayout;
           errorFlags |= DeclDeserializationError::Flag::NeedsFieldOffsetVectorEntry;
         }
       }
@@ -4214,10 +4214,9 @@ public:
       if (overridden.errorIsA<FatalDeserializationError>())
         return overridden.takeError();
 
-      MF.diagnoseAndConsumeError(overridden.takeError());
-
       return llvm::make_error<OverrideError>(
-          name, getErrorFlags(), numVTableEntries);
+          name, getErrorFlags(), numVTableEntries,
+          takeErrorInfo(overridden.takeError()));
     }
 
     // Extract the accessor IDs.
@@ -4257,8 +4256,12 @@ public:
     declOrOffset = var;
 
     auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
-    if (!interfaceTypeOrError)
-      return interfaceTypeOrError.takeError();
+    if (!interfaceTypeOrError) {
+      auto error = interfaceTypeOrError.takeError();
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(std::move(error)), getErrorFlags(),
+          numVTableEntries);
+    }
     Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
@@ -4337,6 +4340,10 @@ public:
       if (!backingDecl) {
         // Pass through deserialization errors.
         if (backingDecl.errorIsA<FatalDeserializationError>())
+          return backingDecl.takeError();
+
+        if (MF.getContext().LangOpts.hasFeature(
+                Feature::SerializeAbstractTypeLayoutForHiddenTypes))
           return backingDecl.takeError();
 
         // FIXME: This is actually wrong. We can't just drop stored properties
@@ -4614,9 +4621,9 @@ public:
       overridden = overriddenOrError.get();
     } else {
       if (overriddenAffectsABI || !ctx.LangOpts.EnableDeserializationRecovery) {
-        MF.diagnoseAndConsumeError(overriddenOrError.takeError());
-        return llvm::make_error<OverrideError>(name, errorFlags,
-                                               numTableEntries);
+        return llvm::make_error<OverrideError>(
+            name, errorFlags, numTableEntries,
+            takeErrorInfo(overriddenOrError.takeError()));
       }
       // Pass through deserialization errors.
       if (overriddenOrError.errorIsA<FatalDeserializationError>())
@@ -5355,6 +5362,10 @@ public:
     DeclName name = argNames.empty() ? baseName : compoundName;
     PrettySupplementalDeclNameTrace trace(name);
 
+    DeclDeserializationError::Flags errorFlags;
+    if (hasPayload)
+      errorFlags |= DeclDeserializationError::Flag::AffectsMemoryLayout;
+
     for (TypeID dependencyID : argNameAndDependencyIDs.slice(numArgNames)) {
       auto dependency = MF.getTypeChecked(dependencyID);
       if (!dependency) {
@@ -5367,7 +5378,7 @@ public:
         // For a resilient enum, we don't care and just drop the element
         // and continue.
         return llvm::make_error<TypeError>(
-          name, takeErrorInfo(dependency.takeError()));
+          name, takeErrorInfo(dependency.takeError()), errorFlags);
       }
     }
 
@@ -5387,9 +5398,13 @@ public:
 
     // Read payload parameter list, if it exists.
     if (hasPayload) {
-      ParameterList *paramList;
-      SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
-      elem->setParameterList(paramList);
+      auto paramList = MF.readParameterList();
+      if (!paramList) {
+        auto error = paramList.takeError();
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(std::move(error)), errorFlags);
+      }
+      elem->setParameterList(*paramList);
     }
 
     // Deserialize the literal raw value, if any.
@@ -5475,11 +5490,10 @@ public:
       // Pass through deserialization errors.
       if (overridden.errorIsA<FatalDeserializationError>())
         return overridden.takeError();
-      MF.diagnoseAndConsumeError(overridden.takeError());
-
       DeclDeserializationError::Flags errorFlags;
       return llvm::make_error<OverrideError>(
-          name, errorFlags, numTableEntries);
+          name, errorFlags, numTableEntries,
+          takeErrorInfo(overridden.takeError()));
     }
 
     for (TypeID dependencyID : argNameAndDependencyIDs) {
@@ -9397,6 +9411,21 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
   return suppliedMissingMember;
 }
 
+llvm::Error
+ModuleFile::fatalIfLayoutAffectingMemberError(llvm::Error error) const {
+  if (!getContext().LangOpts.hasFeature(
+          Feature::SerializeAbstractTypeLayoutForHiddenTypes))
+    return error;
+
+  return llvm::handleErrors(
+      std::move(error),
+      [&](std::unique_ptr<DeclDeserializationError> error) -> llvm::Error {
+        if (error->affectsMemoryLayout())
+          fatal(llvm::Error(std::move(error)));
+        return llvm::Error(std::move(error));
+      });
+}
+
 Decl *
 ModuleFile::handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const {
   diagnoseAndConsumeError(std::move(error));
@@ -9417,6 +9446,7 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
     return handleErrorAndSupplyMissingProtoMember(context, std::move(error),
                                                   containingProto);
   }
+  error = fatalIfLayoutAffectingMemberError(std::move(error));
   return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }
 
