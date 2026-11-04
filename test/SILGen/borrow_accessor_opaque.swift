@@ -210,7 +210,9 @@ func mutateNonmutatingInout<T>(_ w: inout PointerWrapper<T>, _ v: T) {
 // valid within the scope of the copy that wraps it.
 // CHECK-LABEL: sil hidden [ossa] [opaque] @$s22borrow_accessor_opaque16CheckedContainerVAARi_zrlEyxSicib : $@convention(method) <Element where Element : ~Copyable> (Int, CheckedContainer<Element>) -> @guaranteed_address Element {
 // CHECK:   [[RESULT:%.*]] = apply {{%.*}}<Element>({{%.*}}, {{%.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, CheckedContainer<τ_0_0>) -> @guaranteed_address τ_0_0
-// CHECK:   return [[RESULT]]
+// CHECK:   [[UNCHECKED:%.*]] = unchecked_ownership [[RESULT]]
+// CHECK:   end_borrow [[RESULT]]
+// CHECK:   return [[UNCHECKED]]
 // CHECK: } // end sil function '$s22borrow_accessor_opaque16CheckedContainerVAARi_zrlEyxSicib'
 struct CheckedContainer<Element: ~Copyable> {
   var _storage: UnsafeMutablePointer<Element>
@@ -235,7 +237,8 @@ struct CheckedContainer<Element: ~Copyable> {
 // its copy.
 // CHECK-LABEL: sil hidden [ossa] [opaque] @$s22borrow_accessor_opaque27NoncopyableCheckedContainerVAARi_zrlEyxSicib : $@convention(method) <Element where Element : ~Copyable> (Int, @guaranteed NoncopyableCheckedContainer<Element>) -> @guaranteed_address Element {
 // CHECK:   [[RESULT:%.*]] = apply {{%.*}}<Element>({{%.*}}, {{%.*}}) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @guaranteed NoncopyableCheckedContainer<τ_0_0>) -> @guaranteed_address τ_0_0
-// CHECK:   return [[RESULT]]
+// CHECK:   [[UNCHECKED:%.*]] = unchecked_ownership [[RESULT]]
+// CHECK:   return [[UNCHECKED]]
 // CHECK: } // end sil function '$s22borrow_accessor_opaque27NoncopyableCheckedContainerVAARi_zrlEyxSicib'
 struct NoncopyableCheckedContainer<Element: ~Copyable>: ~Copyable {
   var _storage: UnsafeMutablePointer<Element>

@@ -3014,17 +3014,27 @@ forwardFunctionArguments(SILGenFunction &SGF, SILLocation loc,
     }
 
     if (isGuaranteedParameterInCallee(argTy.getConvention())) {
-      auto forwardedArg =
-          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue();
-      if (forwardedArg->getType().isObject() && fTy->hasGuaranteedResult()) {
-        forwardedArg = SGF.B.createUncheckedOwnership(loc, forwardedArg);
-      }
-      forwardedArgs.push_back(forwardedArg);
+      forwardedArgs.push_back(
+          SGF.emitManagedBeginBorrow(loc, arg.getValue()).getValue());
       continue;
     }
 
     forwardedArgs.push_back(arg.getValue());
   }
+}
+
+/// Emit a @guaranteed borrow accessor result as a borrow introducer and emit
+/// unchecked_ownership which SILGenCleanup with fixup.
+static SILValue prepareGuaranteedResultForReturn(SILGenFunction &SGF,
+                                                 SILLocation loc,
+                                                 SILValue result) {
+  if (!result->isBorrowAccessorResult() ||
+      result->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return result;
+  }
+  auto borrowIntroducerResult =
+      SGF.emitManagedBorrowedRValueWithCleanup(result);
+  return SGF.B.createUncheckedOwnership(loc, borrowIntroducerResult).getValue();
 }
 
 namespace {
@@ -7336,6 +7346,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
       emitApplyWithRethrow(loc, derivedRef,
                             SILType::getPrimitiveObjectType(derivedFTy),
                             subs, args);
+    implResult = prepareGuaranteedResultForReturn(*this, loc, implResult);
 
     // Reabstract the return.
     result = resultPlanner->execute(implResult, derivedFTy);
@@ -7851,6 +7862,8 @@ void SILGenFunction::emitProtocolWitness(
   case SILCoroutineKind::None: {
     SILValue witnessResultValue =
       emitApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs, args);
+    witnessResultValue =
+        prepareGuaranteedResultForReturn(*this, loc, witnessResultValue);
 
     // Reabstract the result value.
     reqtResultValue = resultPlanner->execute(witnessResultValue, witnessFTy);
