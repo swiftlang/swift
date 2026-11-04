@@ -280,8 +280,6 @@ ERROR(no_candidates_match_argument_type,none,
 ERROR(cannot_infer_closure_parameter_type,none,
       "cannot infer type of closure parameter %0 without a type annotation",
        (StringRef))
-ERROR(cannot_infer_closure_type,none,
-      "unable to infer closure type without a type annotation", ())
 ERROR(cannot_infer_empty_closure_result_type,none,
       "cannot infer return type of empty closure", ())
 ERROR(cannot_infer_closure_result_type,none,
@@ -8415,8 +8413,6 @@ ERROR(property_wrapper_attribute_not_on_property, none,
 ERROR(property_wrapper_param_not_supported,none,
       "property wrapper attribute on parameter not yet supported on %kindonly0",
       (const ValueDecl *))
-NOTE(property_wrapper_declared_here,none,
-     "property wrapper type %0 declared here", (Identifier))
 ERROR(invalid_projection_argument,none,
       "cannot use property wrapper projection %select{argument|parameter}0",
       (bool))
@@ -8465,9 +8461,6 @@ ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",
       (Identifier))
 
-ERROR(property_wrapper_incompatible_property, none,
-      "property type %0 does not match that of the 'wrappedValue' property of "
-      "its wrapper type %1", (Type, Type))
 ERROR(wrapped_value_mismatch, none,
       "property type %0 does not match 'wrappedValue' type %1",
       (Type, Type))

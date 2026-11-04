@@ -902,7 +902,7 @@ ConstraintSystem::solve(SyntacticElementTarget &target,
 
     case SolutionResult::UndiagnosedError:
       if (stage == 1) {
-        diagnoseFailureFor(target);
+        produceFallbackDiagnostic(target.getLoc());
         reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
         return std::nullopt;
