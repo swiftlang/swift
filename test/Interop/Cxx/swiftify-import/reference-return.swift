@@ -1,15 +1,24 @@
 // REQUIRES: swift_feature_SafeInteropWrappers
 // REQUIRES: swift_feature_Cells
+// REQUIRES: swift_feature_Lifetimes
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells \
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells -enable-experimental-feature Lifetimes \
 // RUN:   -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -verify -eager-macro-checking
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells \
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells -enable-experimental-feature Lifetimes \
 // RUN:   -strict-memory-safety -Xcc -Werror %t/test.swift -dump-macro-expansions 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --implicit-check-not __swiftmacro
+
+// Wrappers borrowing from a C++ reference take it by address, so that the
+// returned Ref points to the caller's value rather than to a temporary copy.
+// RUN: %target-swift-frontend -emit-silgen -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells -enable-experimental-feature Lifetimes \
+// RUN:   %t/test.swift -D SILGEN | %FileCheck %s --check-prefix=SIL
+// SIL-DAG: sil {{.*}}@$sSC9constPick{{.*}} : $@convention(thin) (@in_guaranteed Int32) -> @lifetime(borrow address 0) @owned Ref<ConstCell<Int32>> {
+// SIL-DAG: sil {{.*}}@$sSo7CounterV4cget{{.*}} : $@convention(method) (@in_guaranteed Counter) -> @lifetime(borrow address 0) @owned Ref<ConstCell<Int32>> {
 
 // Without the Cells feature, no wrappers are generated for reference return values.
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
@@ -27,7 +36,7 @@
 // CHECK-LABEL:@__swiftmacro_So9constPick15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(borrow a) @_disfavoredOverload public func constPick(_ a: borrowing CInt) -> Swift.Ref<Swift.ConstCell<CInt>> {
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(borrow a) @_disfavoredOverload public func constPick(_ a: borrowing @_addressable CInt) -> Swift.Ref<Swift.ConstCell<CInt>> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe constPick(a)).assumingMemoryBound(to: Swift.ConstCell<CInt>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
@@ -42,7 +51,7 @@
 // CHECK-LABEL:@__swiftmacro_So7CounterV4cget15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(borrow self) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_addressableSelf @_lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT:public borrowing func cget() -> Swift.Ref<Swift.ConstCell<CInt>> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe cget()).assumingMemoryBound(to: Swift.ConstCell<CInt>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
@@ -72,7 +81,7 @@
 // CHECK-LABEL:@__swiftmacro_So9ContainerV6cfront15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(borrow self) @_disfavoredOverload
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_addressableSelf @_lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT:public borrowing func cfront() -> Swift.Ref<Swift.ConstCell<Container.value_type>> {
 // CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe cfront()).assumingMemoryBound(to: Swift.ConstCell<Container.value_type>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
@@ -178,3 +187,12 @@ func test(_ c: inout Counter, _ x: inout CInt, _ y: inout CInt, _ k: inout Conta
   let _: IntRef = unsafe typedefRef(&x)
   let _: Container.reference = unsafe k.front()
 }
+
+#if !NO_CELLS && !SILGEN
+// A non-addressable borrowing parameter has no stable address to refer to.
+@available(SwiftStdlib 6.2, *)
+@_lifetime(borrow x)
+func forward(_ x: borrowing CInt) -> Ref<ConstCell<CInt>> { // expected-note {{it depends on the lifetime of argument 'x'}}
+  return constPick(x) // expected-error {{lifetime-dependent value escapes its scope}} expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+#endif

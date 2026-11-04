@@ -68,7 +68,7 @@ public func mutableRef(_ a: inout CInt, _ b: inout CInt) -> Swift.Ref<Swift.Cell
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @inline(always) @_lifetime(borrow a) @_disfavoredOverload
-public func constRef(_ a: borrowing CInt) -> Swift.Ref<Swift.ConstCell<CInt>> {
+public func constRef(_ a: borrowing @_addressable CInt) -> Swift.Ref<Swift.ConstCell<CInt>> {
     return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe constRef(a)).assumingMemoryBound(to: Swift.ConstCell<CInt>.self), borrowing: ()), copying: ())
 }
 ------------------------------
@@ -107,7 +107,7 @@ public func spanAndRef(_ p: Span<CInt>, _ a: inout CInt) -> Swift.Ref<Swift.Cell
 @__swiftmacro_4test1SV4cget15_SwiftifyImportfMp_.swift
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
-  @_alwaysEmitIntoClient @inline(always) @_lifetime(borrow self) @_disfavoredOverload
+  @_alwaysEmitIntoClient @inline(always) @_addressableSelf @_lifetime(borrow self) @_disfavoredOverload
   public borrowing func cget() -> Swift.Ref<Swift.ConstCell<CInt>> {
     return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe cget()).assumingMemoryBound(to: Swift.ConstCell<CInt>.self), borrowing: ()), copying: ())
 }

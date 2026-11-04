@@ -111,7 +111,7 @@ struct ValueType {
 
   // expected-expansion@+12:55{{
   //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload|}}
+  //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_addressableSelf @_lifetime(borrow self) @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public borrowing func valLifetimeboundSelf(_ len: CInt) -> MutableSpan<CInt> {|}}
   //   expected-remark@4{{macro content: |    let _resultValue: UnsafeMutablePointer<CInt>? = unsafe valLifetimeboundSelf(len)|}}
   //   expected-remark@5{{macro content: |    if unsafe _resultValue == nil {|}}
