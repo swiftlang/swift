@@ -1788,6 +1788,20 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
 
   public override var mayCallFunction: Bool { true }
+
+  /// A non-trivial @guaranteed result of a borrow accessor introduces a local borrow scope, which is ended by
+  /// end_borrow. With an @in_guaranteed self, the result borrows the self memory location, like a load_borrow. With a
+  /// @guaranteed self, the result is a nested borrow of the self value, like a begin_borrow.
+  ///
+  /// If the result borrows a @guaranteed self value, return the self operand, which is borrowed over the scope of the
+  /// result. Returns nil if self is @in_guaranteed, there is no self, or the result is trivial.
+  public var selfObjectOfGuaranteedBorrowAccessorResult: Operand? {
+    guard hasGuaranteedResult, !type.isTrivial(in: parentFunction),
+          let selfOperand = selfArgumentOperand, !selfOperand.value.type.isAddress else {
+      return nil
+    }
+    return selfOperand
+  }
 }
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}

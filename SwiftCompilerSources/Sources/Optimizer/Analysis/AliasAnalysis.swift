@@ -747,7 +747,7 @@ private enum ImmutableScope {
         }
 
         switch singleBorrowIntroducer {
-        case .beginBorrow, .loadBorrow, .dereferenceBorrow, .reborrow:
+        case .beginBorrow, .loadBorrow, .dereferenceBorrow, .reborrow, .borrowAccessor:
           self = .borrow(singleBorrowIntroducer)
         case .functionArgument:
           self = .wholeFunction
@@ -772,6 +772,7 @@ private enum ImmutableScope {
         case .beginBorrow(let bbi): return bbi
         case .loadBorrow(let lbi):  return lbi
         case .reborrow(let phi):    return phi.borrowedFrom!
+        case .borrowAccessor(let apply): return apply
         default:                    fatalError("unsupported BeginBorrowValue")
       }
     }

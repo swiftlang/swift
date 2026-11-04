@@ -657,6 +657,9 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::BeginAsyncLet:
     os << "BeginAsyncLet";
     return;
+  case Kind::BorrowAccessor:
+    os << "BorrowAccessor";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -690,7 +693,8 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::PartialApplyStack:
-  case BorrowingOperandKind::MarkDependenceNonEscaping: {
+  case BorrowingOperandKind::MarkDependenceNonEscaping:
+  case BorrowingOperandKind::BorrowAccessor: {
     return op->getUser()->hasUsesOfAnyResult();
   }
   case BorrowingOperandKind::Branch: {
@@ -718,7 +722,8 @@ bool BorrowingOperand::visitScopeEndingUses(
       return visitUnknownUse(op);
     }
     LLVM_FALLTHROUGH;
-  case BorrowingOperandKind::BeginBorrow: {
+  case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BorrowAccessor: {
     bool deadBorrow = true;
     for (auto *use : cast<SingleValueInstruction>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
@@ -850,6 +855,7 @@ SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
     return SILValue();
 
   case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BorrowAccessor:
     return cast<SingleValueInstruction>(op->getUser());
 
   case BorrowingOperandKind::BorrowedFrom: {
@@ -919,6 +925,7 @@ SILValue BorrowingOperand::getDependentUserResult() const {
   case BorrowingOperandKind::Yield:
   case BorrowingOperandKind::PartialApplyStack:
   case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::BorrowAccessor:
     return SILValue();
   }
   llvm_unreachable("covered switch");
@@ -949,6 +956,9 @@ void BorrowedValueKind::print(llvm::raw_ostream &os) const {
     return;
   case BorrowedValueKind::DereferenceBorrow:
     os << "DereferenceBorrow";
+    return;
+  case BorrowedValueKind::BorrowAccessor:
+    os << "BorrowAccessor";
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
@@ -984,6 +994,7 @@ bool BorrowedValue::visitLocalScopeEndingUses(
   case BorrowedValueKind::DereferenceBorrow:
   case BorrowedValueKind::Phi:
   case BorrowedValueKind::BeginApplyToken:
+  case BorrowedValueKind::BorrowAccessor:
     for (auto *use : lookThroughBorrowedFromUser(value)->getUses()) {
       if (isa<ExtendLifetimeInst>(use->getUser())) {
         if (!visitor(use))
@@ -1829,6 +1840,15 @@ public:
         return std::move(*this).visitBorrowIntroducers(
             cast<BeginBorrowInst>(value)->getOperand(), visitor);
 
+      case BorrowedValueKind::BorrowAccessor:
+        if (auto *selfOperand =
+                cast<ApplyInst>(value)
+                    ->getSelfObjectOfGuaranteedBorrowAccessorResult()) {
+          return std::move(*this).visitBorrowIntroducers(selfOperand->get(),
+                                                         visitor);
+        }
+        return true;
+
       case BorrowedValueKind::LoadBorrow:
       case BorrowedValueKind::DereferenceBorrow:
       case BorrowedValueKind::SILFunctionArgument:
@@ -2047,6 +2067,16 @@ protected:
       recursivelyFindBorrowIntroducers(
         cast<BeginBorrowInst>(incomingValue)->getOperand(), enclosingDefs,
         visitedValues);
+      break;
+    }
+    case BorrowedValueKind::BorrowAccessor: {
+      if (auto *selfOperand =
+              cast<ApplyInst>(incomingValue)
+                  ->getSelfObjectOfGuaranteedBorrowAccessorResult()) {
+        LocalValueSetVector visitedValues;
+        recursivelyFindBorrowIntroducers(selfOperand->get(), enclosingDefs,
+                                         visitedValues);
+      }
       break;
     }
     case BorrowedValueKind::LoadBorrow:
