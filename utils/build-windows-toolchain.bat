@@ -110,6 +110,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %TestArg% ^
   %SBoMArg% ^
   %DebugInfoArg% ^
+  -Trace ^
   -Summary ^
   -Trace || (exit /b 1)
 
