@@ -133,7 +133,7 @@ public class NotFinalActorSystemForAdHocRequirementTest: DistributedActorSystem,
 // FIXME: This call should be devirtualized but it cannot be done at the moment due to issues with ad-hoc serialization requirement.
 
 // CHECK-LABEL: sil shared [transparent] [thunk] @$s52distributed_actor_adhoc_requirements_optimized_build42NotFinalActorSystemForAdHocRequirementTestC11Distributed0piJ0AadEP10remoteCall2on6target10invocation8throwing9returningqd_1_qd___AD06RemoteR6TargetV17InvocationEncoderQzzqd_0_mqd_1_mtYaKAD0pI0Rd__s5ErrorRd_0_2IDQyd__0I2IDRtzr1_lFTW
-// CHECK: bb0(%0 : $*τ_0_2, %1 : $τ_0_0, %2 : $*RemoteCallTarget, %3 : $*FakeInvocationEncoder, %4 : $@thick τ_0_1.Type, %5 : $@thick τ_0_2.Type, %6 : $*NotFinalActorSystemForAdHocRequirementTest):
+// CHECK: bb0(%0 : $*τ_0_2, %1 : $τ_0_0, %2 : ${{\*?}}RemoteCallTarget, %3 : $*FakeInvocationEncoder, %4 : $@thick τ_0_1.Type, %5 : $@thick τ_0_2.Type, %6 : $*NotFinalActorSystemForAdHocRequirementTest):
 // CHECK-NEXT:  [[DIST_IMPL:%.*]] = load %6
 // CHECK-NEXT:  [[REMOTE_CALL_WITNESS:%.*]] = class_method [[DIST_IMPL]], #NotFinalActorSystemForAdHocRequirementTest.remoteCall
 // CHECK-NEXT: try_apply [[REMOTE_CALL_WITNESS]]<τ_0_0, τ_0_1, τ_0_2>(%0, %1, %2, %3, %4, %5, [[DIST_IMPL]])

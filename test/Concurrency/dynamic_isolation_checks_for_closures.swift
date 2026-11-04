@@ -34,7 +34,7 @@ func forceIsolation(isolation: isolated (any Actor)?) {}
 // CHECK-LABEL: sil private [ossa] @$s6Client17test_global_actoryyFyycfU_ : $@convention(thin) () -> ()
 // CHECK: [[EXPECTED_EXECUTOR:%.*]] = extract_executor {{.*}} : $MainActor
 // CHECK: [[CHECK_EXECUTOR_FN:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
-// CHECK: %11 = apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+// CHECK: {{%[0-9]+}} = apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 // CHECK: } // end sil function '$s6Client17test_global_actoryyFyycfU_'
 @MainActor
 func test_global_actor() {
@@ -83,7 +83,7 @@ func test_concurrency_checked_isolated_has_no_checks(isolation: isolated MainAct
 // CHECK-LABEL: sil private [ossa] @$s6Client24test_direct_closure_callyyFyyXEfU_yycfU_ : $@convention(thin) () -> ()
 // CHECK: [[EXPECTED_EXECUTOR:%.*]] = extract_executor {{.*}} : $MainActor
 // CHECK: [[CHECK_EXECUTOR_FN:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
-// CHECK: %11 = apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
+// CHECK: {{%[0-9]+}} = apply [[CHECK_EXECUTOR_FN]]({{.*}}, [[EXPECTED_EXECUTOR]]) : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, Builtin.Word, Builtin.Executor) -> ()
 // CHECK: } // end sil function '$s6Client24test_direct_closure_callyyFyyXEfU_yycfU_'
 @MainActor
 func test_direct_closure_call() {

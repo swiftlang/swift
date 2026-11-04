@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-ir %s -min-swift-runtime-version 5.0 -O -enable-experimental-feature StandaloneSwiftAvailability | %FileCheck %s
 
 // REQUIRES: swift_feature_StandaloneSwiftAvailability
+// REQUIRES: swift_stdlib_library_evolution
 
 @_silgen_name("callMeMaybe")
 public func callMeMaybe()

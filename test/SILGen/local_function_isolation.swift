@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
-// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -target %target-swift-5.1-abi-triple | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -target %target-swift-5.1-abi-triple | %FileCheck %s --check-prefixes=CHECK,%if swift_stdlib_library_evolution %{CHECK-EVO%} %else %{CHECK-NOEVO%}
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -target %target-swift-5.1-abi-triple | %FileCheck %s --check-prefix=CHECK-NESTED
 
 // REQUIRES: concurrency
@@ -96,12 +96,18 @@ final class AsyncDeferInGlobalActorClosure {
       // CHECK-NOT: %0 = enum $Optional<any Actor>, #Optional.none!enumelt
 
       // We know the defer must be isolated the same way as enclosing context:
-      // CHECK-NEXT: %0 = metatype $@thick MainActor.Type
-      // CHECK-NEXT: // function_ref static MainActor.shared.getter
-      // CHECK-NEXT: %1 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-      // CHECK-NEXT: %2 = apply %1(%0) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-      // CHECK-NEXT: %3 = begin_borrow %2 : $MainActor
-      // CHECK-NEXT: hop_to_executor %3 : $MainActor
+      // CHECK-EVO-NEXT: %0 = metatype $@thick MainActor.Type
+      // CHECK-EVO-NEXT: // function_ref static MainActor.shared.getter
+      // CHECK-EVO-NEXT: %1 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+      // CHECK-EVO-NEXT: [[MAIN_ACTOR:%.*]] = apply %1(%0) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+      // CHECK-NOEVO-NEXT: %0 = metatype $@thin MainActor.Type
+      // CHECK-NOEVO-NEXT: // function_ref MainActor.shared.unsafeMutableAddressor
+      // CHECK-NOEVO-NEXT: %1 = function_ref @$sScM6sharedScMvau : $@convention(thin) () -> Builtin.RawPointer
+      // CHECK-NOEVO-NEXT: %2 = apply %1() : $@convention(thin) () -> Builtin.RawPointer
+      // CHECK-NOEVO-NEXT: %3 = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*MainActor
+      // CHECK-NOEVO-NEXT: [[MAIN_ACTOR:%.*]] = load [copy] %3 : $*MainActor
+      // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
+      // CHECK-NEXT: hop_to_executor [[BORROW]] : $MainActor
       // CHECK: } // end sil function '$s24local_function_isolation30AsyncDeferInGlobalActorClosureC3runyyFyyYacfU_6$deferL_yyYaF'
       defer {
         MainActor.assertIsolated("Inside task")
@@ -401,16 +407,22 @@ func testAsyncDeferIsolatedParam(isolated: isolated (any Actor)? = nil) async {
     // CHECK-NEXT: // %0 "z"
     // CHECK-NEXT: bb0(%0 : @closureCapture $Int):
     // CHECK-NEXT: debug_value %0 : $Int, let, name "z", argno 1
-    // CHECK-NEXT: %2 = metatype $@thick MainActor.Type
-    // CHECK-NEXT: // function_ref static MainActor.shared.getter
-    // CHECK-NEXT: %3 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-    // CHECK-NEXT: %4 = apply %3(%2) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-    // CHECK-NEXT: %5 = begin_borrow %4 : $MainActor
-    // CHECK-NEXT: hop_to_executor %5 : $MainActor
+    // CHECK-EVO-NEXT: %2 = metatype $@thick MainActor.Type
+    // CHECK-EVO-NEXT: // function_ref static MainActor.shared.getter
+    // CHECK-EVO-NEXT: %3 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+    // CHECK-EVO-NEXT: [[MAIN_ACTOR:%.*]] = apply %3(%2) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+    // CHECK-NOEVO-NEXT: %2 = metatype $@thin MainActor.Type
+    // CHECK-NOEVO-NEXT: // function_ref MainActor.shared.unsafeMutableAddressor
+    // CHECK-NOEVO-NEXT: %3 = function_ref @$sScM6sharedScMvau : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK-NOEVO-NEXT: %4 = apply %3() : $@convention(thin) () -> Builtin.RawPointer
+    // CHECK-NOEVO-NEXT: %5 = pointer_to_address %4 : $Builtin.RawPointer to [strict] $*MainActor
+    // CHECK-NOEVO-NEXT: [[MAIN_ACTOR:%.*]] = load [copy] %5 : $*MainActor
+    // CHECK-NEXT: [[BORROW:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
+    // CHECK-NEXT: hop_to_executor [[BORROW]] : $MainActor
     // CHECK-NEXT: // function_ref test()
-    // CHECK-NEXT: %7 = function_ref @$s24local_function_isolation4testyyYaF : $@convention(thin) @async () -> ()
-    // CHECK-NEXT: %8 = apply %7() : $@convention(thin) @async () -> ()
-    // CHECK-NEXT: hop_to_executor %5 : $MainActor
+    // CHECK-NEXT: [[TEST:%.*]] = function_ref @$s24local_function_isolation4testyyYaF : $@convention(thin) @async () -> ()
+    // CHECK-NEXT: {{%.*}} = apply [[TEST]]() : $@convention(thin) @async () -> ()
+    // CHECK-NEXT: hop_to_executor [[BORROW]] : $MainActor
     defer {
       await test()
       _ = z

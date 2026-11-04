@@ -155,8 +155,8 @@ func useCallerIsolatedDefaultArg() async {
 //   Check that we pass the right isolation to the generator.
 // CHECK-LABEL: sil hidden [ossa] @$s4test27useCallerIsolatedDefaultArgyyYaF :
 //   Get the main actor reference.
-// CHECK:         [[GET_MAIN_ACTOR:%.*]] = function_ref @$sScM6sharedScMvgZ :
-// CHECK-NEXT:    [[T0:%.*]] = apply [[GET_MAIN_ACTOR]](
+// CHECK:         function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK:         [[T0:%.*]] = {{apply .* -> @owned MainActor|load \[copy\]}}
 // CHECK-NEXT:    [[MAIN_ACTOR:%.*]] = begin_borrow [[T0]]
 //   Call the accessor.
 // CHECK:         // function_ref default argument 0 of

@@ -1,4 +1,6 @@
 // REQUIRES: OS=windows-msvc
+// The standard library modules are built from their textual interfaces.
+// REQUIRES: swift_stdlib_library_evolution
 
 // Test building the CRT module with C++ interop enabled on Windows
 

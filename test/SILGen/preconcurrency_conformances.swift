@@ -77,9 +77,8 @@ extension IsolatedType : @preconcurrency Q {
 
 // protocol witness for static Q.data.getter in conformance IsolatedType<A>
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP4dataSaySiGSgvgZTW : $@convention(witness_method: Q) <τ_0_0> (@thick IsolatedType<τ_0_0>.Type) -> @owned Optional<Array<Int>>
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\]}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -87,9 +86,8 @@ extension IsolatedType : @preconcurrency Q {
 
 // protocol witness for static Q.data.setter in conformance IsolatedType<A>
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP4dataSaySiGSgvsZTW : $@convention(witness_method: Q) <τ_0_0> (@owned Optional<Array<Int>>, @thick IsolatedType<τ_0_0>.Type) -> ()
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\]}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -97,9 +95,8 @@ extension IsolatedType : @preconcurrency Q {
 
 // protocol witness for static Q.data.modify in conformance IsolatedType<A>
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP4dataSaySiGSgvMZTW : $@yield_once @convention(witness_method: Q) <τ_0_0> @substituted <τ_0_0> (@thick τ_0_0.Type) -> @yields @inout Optional<Array<Int>> for <IsolatedType<τ_0_0>>
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\]}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
@@ -107,9 +104,8 @@ extension IsolatedType : @preconcurrency Q {
 
 // protocol witness for static Q.staticFn() in conformance IsolatedType<A>
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances12IsolatedTypeVyxGAA1QA2aEP8staticFnSSSgyFZTW : $@convention(witness_method: Q) <τ_0_0> (@thick IsolatedType<τ_0_0>.Type) -> @owned Optional<String>
-// CHECK: [[MAIN_ACTOR_METATYPE:%.*]] = metatype $@thick MainActor.Type
-// CHECK: [[SHARED_FIELD_GETTER:%.*]] = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
-// CHECK-NEXT: [[MAIN_ACTOR:%.*]] = apply [[SHARED_FIELD_GETTER]]([[MAIN_ACTOR_METATYPE]]) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// CHECK: function_ref @$sScM6sharedScMv{{gZ|au}} :
+// CHECK: [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\]}}
 // CHECK-NEXT: [[MAIN_ACTOR_ACCESS:%.*]] = begin_borrow [[MAIN_ACTOR]] : $MainActor
 // CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR_ACCESS]] : $MainActor
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF

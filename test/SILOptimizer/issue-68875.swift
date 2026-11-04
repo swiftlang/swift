@@ -7,7 +7,7 @@ public struct ID {
   var d: Int = 3
   var e: Int = 4
   var description: String = ""
-  var mirror: Mirror
+  var mirror: Any
 }
 
 struct Test {

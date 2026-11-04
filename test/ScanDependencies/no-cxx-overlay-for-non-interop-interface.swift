@@ -79,10 +79,10 @@ import Darwin
 // ENABLE-CHECK: "swift": "Foo"
 // ENABLE-CHECK:      "directDependencies": [
 // ENABLE-CHECK:        {
-// ENABLE-CHECK:          "swift": "SwiftOnoneSupport"
+// ENABLE-CHECK:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 // ENABLE-CHECK:        },
 // ENABLE-CHECK:        {
-// ENABLE-CHECK:          "swift": "CxxStdlib"
+// ENABLE-CHECK:          "swift{{(PrebuiltExternal)?}}": "CxxStdlib"
 // ENABLE-CHECK:        },
 // ENABLE-CHECK:        {
 // ENABLE-CHECK:          "clang": "std_Bar"
@@ -100,7 +100,7 @@ import Darwin
 // DISABLE-CHECK: "swift": "FooNoInterop"
 // DISABLE-CHECK:      "directDependencies": [
 // DISABLE-CHECK:        {
-// DISABLE-CHECK:          "swift": "SwiftOnoneSupport"
+// DISABLE-CHECK:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 // DISABLE-CHECK:        },
 // DISABLE-CHECK:        {
 // DISABLE-CHECK:          "clang": "std_Bar"
@@ -110,10 +110,10 @@ import Darwin
 // DISABLE-BINARY-CHECK: "modulePath": "{{.*}}{{/|\\}}BinaryDepNoInterop.swiftmodule"
 // DISABLE-BINARY-CHECK:      "directDependencies": [
 // DISABLE-BINARY-CHECK-NEXT:        {
-// DISABLE-BINARY-CHECK-NEXT:          "swift": "Swift"
+// DISABLE-BINARY-CHECK-NEXT:          "swift{{(PrebuiltExternal)?}}": "Swift"
 // DISABLE-BINARY-CHECK-NEXT:        },
 // DISABLE-BINARY-CHECK-NEXT:        {
-// DISABLE-BINARY-CHECK-NEXT:          "swift": "SwiftOnoneSupport"
+// DISABLE-BINARY-CHECK-NEXT:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 // DISABLE-BINARY-CHECK-NEXT:        },
 // DISABLE-BINARY-CHECK-NEXT:        {
 // DISABLE-BINARY-CHECK-NEXT:          "clang": "normal"
@@ -123,7 +123,7 @@ import Darwin
 // DARWIN-CHECK: "modulePath": "{{.*}}{{/|\\}}Darwin-{{.*}}.swiftmodule"
 // DARWIN-CHECK:      "directDependencies": [
 // DARWIN-CHECK-NEXT:        {
-// DARWIN-CHECK-NEXT:          "swift": "SwiftOnoneSupport"
+// DARWIN-CHECK-NEXT:          "swift{{(PrebuiltExternal)?}}": "SwiftOnoneSupport"
 // DARWIN-CHECK-NEXT:        },
 // DARWIN-CHECK-NEXT:        {
 // DARWIN-CHECK-NEXT:          "clang": "std_Bar"

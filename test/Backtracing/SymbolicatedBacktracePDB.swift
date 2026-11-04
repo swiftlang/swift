@@ -8,6 +8,8 @@
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=windows-msvc
+// A non-resilient Runtime module requires clients to enable C++ interop.
+// REQUIRES: swift_stdlib_library_evolution
 
 import Runtime
 

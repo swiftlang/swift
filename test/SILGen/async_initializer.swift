@@ -187,7 +187,7 @@ enum Birb {
 // NI-NS:        bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // NI-NS:          hop_to_executor [[ACTOR]]
 // NI-NS:          [[INIT:%.*]] = function_ref @$s12initializers3CatC4nameACSS_tcfC : $@convention(method) (@owned String, @thick Cat.Type) -> @owned Cat
-// NI-NS:          [[MAIN_ACTOR:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+// NI-NS:          [[MAIN_ACTOR:%.*]] = {{apply .* -> @owned MainActor|load \[copy\]}}
 // NI-NS:          [[MAIN_ACTOR_B:%.*]] = begin_borrow [[MAIN_ACTOR]]
 // NI-NS:          hop_to_executor [[MAIN_ACTOR_B]]
 // NI-NS:          {{%[0-9]+}} = apply [[INIT]]({{%[0-9]+}}, {{%[0-9]+}}) : $@convention(method) (@owned String, @thick Cat.Type) -> @owned Cat

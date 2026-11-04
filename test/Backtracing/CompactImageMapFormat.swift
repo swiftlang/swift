@@ -8,6 +8,8 @@
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
+// A non-resilient Runtime module requires clients to enable C++ interop.
+// REQUIRES: swift_stdlib_library_evolution
 
 // Comprehensive, byte-level tests for the Compact Image Map Format decoder
 // and encoder (see docs/CompactImageMapFormat.md).  Rather than relying on

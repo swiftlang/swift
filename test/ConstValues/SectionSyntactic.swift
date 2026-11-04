@@ -1,5 +1,9 @@
 // Constant globals using @section
-// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift
+// RUN: %target-swift-frontend -emit-ir -primary-file %s -parse-as-library -verify -I %t
+
+import resilient_struct
 
 // integer literals
 @section("mysection") let intLiteral1 = 42 // ok
@@ -137,7 +141,7 @@ enum E { case a }
 // expected-error@-1{{type expressions not supported in a literal expression}}
 @section("mysection") let invalidMetatype3 = Array<Int>.self // generic
 // expected-error@-1{{type expressions not supported in a literal expression}}
-@section("mysection") let invalidMetatype4 = Mirror.self // resilient
+@section("mysection") let invalidMetatype4 = ResilientInt.self // resilient
 // expected-error@-1{{type expressions not supported in a literal expression}}
 
 // tuples

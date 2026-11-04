@@ -266,7 +266,7 @@ public func memoryLayoutDotOffsetOfWithResilientStruct() -> Int? {
   // CHECK-NEXT: entry:
   // CHECK: [[RAW_KEY_PATH:%.*]] = call ptr @swift_getKeyPath
 
-  // CHECK: [[STORED_INLINE_OFFSET:%.*]] = call swiftcc { [[INT]], i8 } @"$ss10AnyKeyPathC19_storedInlineOffsetSiSgvgTj"(ptr swiftself [[RAW_KEY_PATH]])
+  // CHECK: [[STORED_INLINE_OFFSET:%.*]] = call swiftcc { [[INT]], i8 } {{@"\$ss10AnyKeyPathC19_storedInlineOffsetSiSgvgTj"|%[0-9]+}}(ptr swiftself [[RAW_KEY_PATH]])
   // CHECK: [[VALUE:%.*]] = extractvalue { [[INT]], i8 } [[STORED_INLINE_OFFSET]], 0
 
   // CHECK: [[RET_PARTIAL:%.*]] = insertvalue { [[INT]], i8 } undef, [[INT]] [[VALUE]], 0

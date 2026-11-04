@@ -11,6 +11,10 @@
 //===----------------------------------------------------------------------===//
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
+// FIXME: Against the Windows SDK's standard library, which is built without
+// library evolution, new buffers holding a class reference are not uniquely
+// referenced.
+// XFAIL: OS=windows-msvc && !swift_stdlib_library_evolution
 // XFAIL: OS=emscripten
 // XFAIL: OS=openbsd
 

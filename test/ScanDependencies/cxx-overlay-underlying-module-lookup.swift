@@ -1,3 +1,5 @@
+// REQUIRES: swift_stdlib_library_evolution
+
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -scan-dependencies -o %t/deps.json %s -cxx-interoperability-mode=default -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import
