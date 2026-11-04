@@ -4778,59 +4778,6 @@ void SyntacticElementTargetKey::dump(raw_ostream &OS) const {
   llvm_unreachable("invalid statement kind");
 }
 
-/// Given a specific expression and the remnants of the failed constraint
-/// system, produce a specific diagnostic.
-///
-/// This is guaranteed to always emit an error message.
-///
-void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
-  auto &DE = getASTContext().Diags;
-
-  // If constraint system is in invalid state always produce
-  // a fallback diagnostic that asks to file a bug.
-  if (inInvalidState()) {
-    produceFallbackDiagnostic(target.getLoc());
-    return;
-  }
-
-  if (auto *wrappedVar = target.getAsUninitializedWrappedVar()) {
-    auto *outerWrapper = wrappedVar->getOutermostAttachedPropertyWrapper();
-    Type propertyType = wrappedVar->getInterfaceType();
-    Type wrapperType = outerWrapper->getType();
-
-    // Emit the property wrapper fallback diagnostic
-    wrappedVar->diagnose(diag::property_wrapper_incompatible_property,
-                         propertyType, wrapperType);
-    if (auto nominal = wrapperType->getAnyNominal()) {
-      nominal->diagnose(diag::property_wrapper_declared_here,
-                        nominal->getName());
-    }
-    return;
-  }
-
-  if (auto expr = target.getAsExpr()) {
-    if (auto *assignment = dyn_cast<AssignExpr>(expr)) {
-      if (isa<DiscardAssignmentExpr>(assignment->getDest()))
-        expr = assignment->getSrc();
-    }
-
-    // Look through RebindSelfInConstructorExpr to avoid weird Sema issues.
-    if (auto *RB = dyn_cast<RebindSelfInConstructorExpr>(expr))
-      expr = RB->getSubExpr();
-
-    // Unresolved/Anonymous ClosureExprs are common enough that we should give
-    // them tailored diagnostics.
-    if (auto *closure = dyn_cast<ClosureExpr>(expr->getValueProvidingExpr())) {
-      DE.diagnose(closure->getLoc(), diag::cannot_infer_closure_type)
-        .highlight(closure->getSourceRange());
-      return;
-    }
-  }
-
-  // Emit a poor fallback message.
-  produceFallbackDiagnostic(target.getLoc());
-}
-
 bool ConstraintSystem::isDeclUnavailable(const Decl *D,
                                          ConstraintLocator *locator) const {
   auto found = UnavailableDecls.find(std::make_pair(D, locator));

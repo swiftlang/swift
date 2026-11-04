@@ -2134,17 +2134,6 @@ public:
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
   SolutionResult salvage();
-  
-  /// Mine the active and inactive constraints in the constraint
-  /// system to generate a plausible diagnosis of why the system could not be
-  /// solved.
-  ///
-  /// \param target The solution target whose constraints we're investigating
-  /// for a better diagnostic.
-  ///
-  /// Assuming that this constraint system is actually erroneous, this *always*
-  /// emits an error message.
-  void diagnoseFailureFor(SyntacticElementTarget target);
 
   bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);

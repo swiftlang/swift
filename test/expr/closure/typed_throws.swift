@@ -50,7 +50,7 @@ func testClosures() {
   }
 
   // FIXME: Terrible diagnostic.
-  // expected-error@+1{{unable to infer closure type without a type annotation}}
+  // expected-error@+1{{failed to produce diagnostic for expression}}
   let _ = { () throws(MyBadError) in
     throw MyBadError.fail
   }

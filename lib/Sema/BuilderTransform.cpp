@@ -1049,7 +1049,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
 
     case SolutionResult::Kind::UndiagnosedError:
       reportSolutionsToSolutionCallback(salvagedResult);
-      cs.diagnoseFailureFor(target);
+      cs.produceFallbackDiagnostic(target.getLoc());
       salvagedResult.markAsDiagnosed();
       return nullptr;
 
