@@ -54,6 +54,7 @@ Options:
 """
 import argparse
 import difflib
+import fcntl
 import glob
 import os
 import re
@@ -64,6 +65,8 @@ SRC_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 TEST_DIR = os.path.join(SRC_ROOT, "test")
 
 KINDS = ("error", "warning", "note", "remark")
+
+LOCK_PATH = os.path.join(os.environ.get("TMPDIR", "/tmp"), "astgen-split-expectations.lock")
 
 # Tests may contain bytes that are not valid UTF-8 on purpose.
 FILE_MODE = dict(encoding="utf-8", errors="surrogateescape", newline="")
@@ -277,13 +280,19 @@ def test_dir_for(build_dir):
 
 def run_lit(build_dir, lit, rel_test, mode):
     env = dict(os.environ)
-    args = [lit, "-j1", "-v", "--filter", re.escape(rel_test) + "$"]
+    # lit deletes the module cache on startup unless told not to, which would
+    # break two instances of this tool running at once.
+    args = [lit, "-j1", "-v", "--param", "keep_modulecache=1",
+            "--filter", re.escape(rel_test) + "$"]
     if mode == "astgen":
         args += ["--param", "swift_parser_astgen=1"]
     else:
         env["SWIFT_FRONTEND_TEST_OPTIONS"] = "-disable-experimental-feature ParserASTGen"
     args.append(test_dir_for(build_dir))
-    p = subprocess.run(args, capture_output=True, text=True, errors="replace", env=env, cwd=build_dir)
+    # Two lit runs at once corrupt each other's timing data, so take turns.
+    with open(LOCK_PATH, "w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        p = subprocess.run(args, capture_output=True, text=True, errors="replace", env=env, cwd=build_dir)
     out = p.stdout + p.stderr
     if re.search(r"^\s+Unsupported\s+:", out, re.M) and p.returncode == 0:
         return None, out
