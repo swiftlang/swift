@@ -122,7 +122,7 @@ public protocol Spoon { }
 // CHECK-SAME:           i32 131328
 // -- conditional requirement #1
 // CHECK-SAME:           i32 128,
-// CHECK-SAME:           i32 0,
+// CHECK-SAME:           @"symbolic x"
 // CHECK-SAME:           @"$s28protocol_conformance_records5SpoonMp"
 // CHECK-SAME:         }
 extension NativeGenericType : Spoon where T: Spoon {
