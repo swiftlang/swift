@@ -2024,6 +2024,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (abiDecl) {
       PrintOptions::OverrideScope scope(Options);
 
+      // The counterpart borrows its implementation info from its API
+      // counterpart, so print it the way it was written: with its own
+      // introducer and without accessors.
+      OVERRIDE_PRINT_OPTION(scope, PrintPropertyAccessors, false);
+      OVERRIDE_PRINT_OPTION(scope, PrintSubscriptAccessors, false);
+      OVERRIDE_PRINT_OPTION(scope, InferPropertyIntroducerFromAccessors, false);
+      OVERRIDE_PRINT_OPTION(scope, PrintPatternBindingIntroducerAsWritten,
+                            true);
+
       // Don't print any attributes marked with `ForbiddenInABIAttr`.
       // (Reminder: There is manual logic in `PrintAST::printAttributes()`
       // to handle non-ABI attributes when `PrintImplicitAttrs` is set.)

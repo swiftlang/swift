@@ -7484,6 +7484,11 @@ void swift::checkGlobalIsolation(VarDecl *var) {
   if (!var->isGlobalStorage())
     return;
 
+  // The counterpart in an `@abi` attribute doesn't represent storage of its
+  // own; its API counterpart is checked instead.
+  if (!ABIRoleInfo(var).providesAPI())
+    return;
+
   // At this point, we've found global state that may need to be diagnosed.
   auto *diagVar = var;
 

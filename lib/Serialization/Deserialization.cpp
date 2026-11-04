@@ -3535,7 +3535,10 @@ void ModuleFile::configureStorage(AbstractStorageDecl *decl,
   auto implInfo = StorageImplInfo(*readImpl, *writeImpl, *readWriteImpl);
   decl->setImplInfo(implInfo);
 
-  decl->getASTContext().evaluator.cacheOutput(HasStorageRequest{decl}, implInfo.hasStorage());
+  // Don't go through `HasStorageRequest`, which consults the ABI role of the
+  // decl. Its attributes, including any `@abi` attribute, have not been
+  // attached yet, so that would cache the wrong ABI role.
+  decl->setHasStorage(implInfo.hasStorage());
 
   SmallVector<AccessorDecl*, 8> accessors;
   for (DeclID id : rawIDs.IDs) {

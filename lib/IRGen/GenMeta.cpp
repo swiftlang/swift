@@ -6950,6 +6950,10 @@ namespace {
     std::optional<Size> getPayloadSize() {
       return getConstantPayloadSize(IGM, Target, type);
     }
+
+    void addEmbeddedOptionalPayload() {
+      B.add(IGM.getAddrOfTypeMetadata(type.getOptionalObjectType()));
+    }
   };
 
   class EnumMetadataBuilder

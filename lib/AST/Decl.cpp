@@ -8631,8 +8631,7 @@ void AbstractStorageDecl::setImplInfo(StorageImplInfo implInfo) {
 
   if (isImplicit()) {
     if (!LazySemanticInfo.HasStorageComputed) {
-      LazySemanticInfo.HasStorageComputed = true;
-      LazySemanticInfo.HasStorage = implInfo.hasStorage();
+      setHasStorage(implInfo.hasStorage());
     } else {
       assert(LazySemanticInfo.HasStorage == implInfo.hasStorage());
     }
