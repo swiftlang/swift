@@ -1,4 +1,5 @@
 import argparse
+import os
 from pathlib import Path
 from typing import Any, List, Optional
 
@@ -115,7 +116,9 @@ repositories.
         parser.add_argument(
             "--github-comment",
             help="""Check out related pull requests referenced in the given
-            free-form GitHub-style comment.""",
+            free-form GitHub-style comment. Defaults to the value of the
+            ghprbCommentBody environment variable if set.""",
+            default=os.environ.get("ghprbCommentBody"),
             metavar="GITHUB-COMMENT",
         )
         parser.add_argument(

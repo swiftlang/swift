@@ -202,6 +202,7 @@ import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
 import SpanTests
+import SpecializedWitnessTable
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -429,6 +430,7 @@ register(SortLargeExistentials.benchmarks)
 register(SortLettersInPlace.benchmarks)
 register(SortStrings.benchmarks)
 register(SpanTests.benchmarks)
+register(SpecializedWitnessTable.benchmarks)
 register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
