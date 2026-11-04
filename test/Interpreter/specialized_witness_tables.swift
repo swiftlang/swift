@@ -195,8 +195,8 @@ struct GenericValueHolder<T>: ValueHolder {
 @inline(never)
 func makeValueHolder() -> any ValueHolder<Int> { GenericValueHolder(value: 5) }
 
-// A generic method requirement is not specialized. The generic witness in the static
-// table gets T from the metadata of Self.
+// The witness of a generic method requirement is partially specialized: T is concrete,
+// U is still generic.
 protocol HasGenericMethod {
   func g<U>(_ u: U) -> String
 }
@@ -206,8 +206,8 @@ struct GBox<T>: HasGenericMethod {
   func g<U>(_ u: U) -> String { "GBox<\(T.self)>.g<\(U.self)>(\(t), \(u))" }
 }
 
-// The generic witness of a conditional conformance needs the conditional conformances from a
-// runtime-instantiated witness table. Therefore no specialized witness table is created.
+// The generic witness of a conditional conformance may need the conditional conformances from a
+// runtime-instantiated witness table. Therefore the specialized witness table is not emitted statically.
 extension Cond: HasGenericMethod where T: P {
   func g<U>(_ u: U) -> String { "Cond.g<\(U.self)>(\(t.foo()), \(u))" }
 }
@@ -218,8 +218,110 @@ func makeGBox() -> any HasGenericMethod { GBox(t: 1) }
 @inline(never)
 func makeCondGeneric() -> any HasGenericMethod { Cond(t: Box(t: 2)) }
 
+// Existentials which are formed in callees of specialized witnesses.
+protocol Erased {
+  func describe() -> String
+}
+
+struct Inner<T>: Erased {
+  var t: T
+  func describe() -> String { "Inner<\(T.self)>(\(t))" }
+}
+
+protocol Outer {
+  func erase() -> any Erased
+}
+
+struct OuterBox<T>: Outer {
+  var t: T
+  @inline(never)
+  func erase() -> any Erased { Inner(t: t) }
+}
+
+@inline(never)
+func makeOuter() -> any Outer { OuterBox(t: 6) }
+
+// An existential which is formed in the callee of a partially specialized witness.
+protocol Accessor {
+  func access<R>(_ body: (any Erased) -> R) -> R
+}
+
+struct ABox<T>: Accessor {
+  var t: T
+  @inline(never)
+  func access<R>(_ body: (any Erased) -> R) -> R { body(Inner(t: [t])) }
+}
+
+@inline(never)
+func makeAccessor() -> any Accessor { ABox(t: 7) }
+
+// A partially specialized witness of a generic requirement with typed throws.
+struct AccessError: Error {
+  var value: Int
+}
+
+protocol ThrowingAccessor {
+  func access<R, E: Error>(_ body: (Int) throws(E) -> R) throws(E) -> R
+}
+
+struct TBox<T>: ThrowingAccessor {
+  var t: T
+  func access<R, E: Error>(_ body: (Int) throws(E) -> R) throws(E) -> R {
+    try body(MemoryLayout<T>.size)
+  }
+}
+
+@inline(never)
+func makeThrowingAccessor() -> any ThrowingAccessor { TBox(t: 1.0) }
+
+// A proven cast to a class-bound existential uses the specialized witness table.
+protocol PC: AnyObject {
+  func foo() -> String
+}
+
+final class CBox<T>: PC {
+  var t: T
+  init(t: T) { self.t = t }
+  func foo() -> String { "CBox<\(T.self)>(\(t))" }
+}
+
+@inline(never)
+func castToPC<H: AnyObject>(_ h: H) -> any PC { h as! any PC }
+
+@inline(never)
+func makeLibOuter() -> any LibOuter { LibOuterBox(t: 9) }
+
 // CHECK: 5 5
 print(GenericValueHolder(value: 5).value, makeValueHolder().value)
+
+// CHECK: Inner<Int>(6)
+print(makeOuter().erase().describe())
+// CHECK: true
+print((makeOuter().erase() as Any) is Inner<Int>)
+// CHECK: Inner<Array<Int>>([7])
+print(makeAccessor().access { $0.describe() })
+// CHECK: 22
+print(makeAccessor().access { $0.describe().count })
+// CHECK: Optional("Inner<Array<Int>>([7])")
+print(makeAccessor().access { $0 as? Inner<[Int]> }.map { $0.describe() } as Any)
+// CHECK: 8
+print(makeThrowingAccessor().access { (size: Int) -> Int in size })
+// CHECK: caught 8
+do {
+  let _: String = try makeThrowingAccessor().access { (size: Int) throws(AccessError) -> String in
+    throw AccessError(value: size)
+  }
+} catch {
+  print("caught \(error.value)")
+}
+// CHECK: CBox<Int>(1)
+print(castToPC(CBox(t: 1)).foo())
+// CHECK: CBox<String>(x)
+print(castToPC(CBox(t: "x")).foo())
+// CHECK: true
+print(type(of: castToPC(CBox(t: 2))) == CBox<Int>.self)
+// CHECK: LibBox<Int>(9)
+print(makeLibOuter().erase().describe())
 
 // CHECK: Box<Int>(27)
 print(callFoo(makeBox()))

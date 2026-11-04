@@ -15,6 +15,18 @@ struct T {}
 
 class C {}
 
+class CC : PC {}
+
+class SubCC : CC {}
+
+class GC<T> : PC {}
+
+@MainActor class IC : @MainActor PC {}
+
+protocol PC2: AnyObject {}
+
+class CC2 : PC, PC2 {}
+
 struct X : @MainActor P {}
 
 // CHECK-LABEL: sil [ossa] @test_conforming_struct :
@@ -69,3 +81,104 @@ bb0(%0 : $@thick X.Type):
   return %1
 }
 
+// CHECK-LABEL: sil [ossa] @test_conforming_class :
+// CHECK:         %1 = init_existential_ref %0 : $CC : $CC, $any PC
+// CHECK-NEXT:    %2 = copy_value %1
+// CHECK-NEXT:    return %2
+// CHECK:       } // end sil function 'test_conforming_class'
+sil [ossa] @test_conforming_class : $@convention(thin) (@guaranteed CC) -> @owned any PC {
+bb0(%0 : @guaranteed $CC):
+  %1 = unconditional_checked_cast %0 to any PC
+  %2 = copy_value %1
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @test_conforming_class_owned :
+// CHECK:         %1 = init_existential_ref %0 : $CC : $CC, $any PC
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_conforming_class_owned'
+sil [ossa] @test_conforming_class_owned : $@convention(thin) (@owned CC) -> @owned any PC {
+bb0(%0 : @owned $CC):
+  %1 = unconditional_checked_cast %0 to any PC
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_inherited_conformance :
+// CHECK:         %1 = init_existential_ref %0 : $SubCC : $SubCC, $any PC
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_inherited_conformance'
+sil [ossa] @test_inherited_conformance : $@convention(thin) (@owned SubCC) -> @owned any PC {
+bb0(%0 : @owned $SubCC):
+  %1 = unconditional_checked_cast %0 to any PC
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_specialized_generic_class :
+// CHECK:         %1 = init_existential_ref %0 : $GC<Int> : $GC<Int>, $any PC
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_specialized_generic_class'
+sil [ossa] @test_specialized_generic_class : $@convention(thin) (@owned GC<Int>) -> @owned any PC {
+bb0(%0 : @owned $GC<Int>):
+  %1 = unconditional_checked_cast %0 to any PC
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_generic_class :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_generic_class'
+sil [ossa] @test_generic_class : $@convention(thin) <T> (@owned GC<T>) -> @owned any PC {
+bb0(%0 : @owned $GC<T>):
+  %1 = unconditional_checked_cast %0 to any PC
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_archetype :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_archetype'
+sil [ossa] @test_archetype : $@convention(thin) <T where T : AnyObject> (@owned T) -> @owned any PC {
+bb0(%0 : @owned $T):
+  %1 = unconditional_checked_cast %0 to any PC
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_existential_source :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_existential_source'
+sil [ossa] @test_existential_source : $@convention(thin) (@owned any PC2) -> @owned any PC {
+bb0(%0 : @owned $any PC2):
+  %1 = unconditional_checked_cast %0 to any PC
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_protocol_composition :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_protocol_composition'
+sil [ossa] @test_protocol_composition : $@convention(thin) (@owned CC2) -> @owned any PC & PC2 {
+bb0(%0 : @owned $CC2):
+  %1 = unconditional_checked_cast %0 to any PC & PC2
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_isolated_class_conformance :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_isolated_class_conformance'
+sil [ossa] @test_isolated_class_conformance : $@convention(thin) (@owned IC) -> @owned any PC {
+bb0(%0 : @owned $IC):
+  %1 = unconditional_checked_cast %0 to any PC
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @test_class_to_anyobject :
+// CHECK:         %1 = unconditional_checked_cast %0
+// CHECK-NEXT:    return %1
+// CHECK:       } // end sil function 'test_class_to_anyobject'
+sil [ossa] @test_class_to_anyobject : $@convention(thin) (@owned CC) -> @owned AnyObject {
+bb0(%0 : @owned $CC):
+  %1 = unconditional_checked_cast %0 to AnyObject
+  return %1
+}
