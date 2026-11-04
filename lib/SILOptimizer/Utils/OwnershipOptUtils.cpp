@@ -2123,3 +2123,17 @@ void swift::completeLifetimes(SILPassManager *pm, ArrayRef<SILValue> values, Arr
                              ArrayRef(bridgedValues), ArrayRef(bridgedEnds));
   }
 }
+
+static BridgedOptimizerUtilities::ChangeFunctionFn fixupBorrowAccessorsFunction;
+
+void BridgedOptimizerUtilities::registerBorrowAccessorFixup(ChangeFunctionFn fixupBorrowAccessorsFn) {
+  fixupBorrowAccessorsFunction = fixupBorrowAccessorsFn;
+}
+
+bool swift::fixupBorrowAccessors(SILPassManager *pm, SILFunction *f) {
+  if (!fixupBorrowAccessorsFunction) {
+    // If SwiftCompilerSources are not enabled or in SourceKit unit tests
+    return false;
+  }
+  return fixupBorrowAccessorsFunction({pm->getSwiftPassInvocation()->getCurrent()}, {f});
+}

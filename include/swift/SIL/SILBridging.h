@@ -1510,6 +1510,8 @@ struct BridgedBuilder{
                                           BridgedConformance conformance,
                                           BridgedDeclRef member, BridgedType methodType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createReturn(BridgedValue op) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createReturnBorrow(BridgedValue op,
+                                                                           BridgedValueArray enclosingValues) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createThrow(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BridgedInstruction createSwitchEnumInst(BridgedValue enumVal,
                                           OptionalBridgedBasicBlock defaultBlock,
