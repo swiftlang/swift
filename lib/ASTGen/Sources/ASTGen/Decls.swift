@@ -774,6 +774,15 @@ extension ASTGenVisitor {
       )
     }
 
+    // Whether the storage is a protocol requirement.
+    var inProtocol = false
+    for ancestor in sequence(first: accessorBlock.parent, next: { $0?.parent }) {
+      if let ancestor, ancestor.is(VariableDeclSyntax.self) || ancestor.is(SubscriptDeclSyntax.self) {
+        inProtocol = self.isProtocolMember(ancestor)
+        break
+      }
+    }
+
     // The duplicate check below, and `classifyAccessors` after it, are handled
     // here because omitting them lets an invalid AST reach the verifier; see
     // `diagnoseDuplicateAccessor`.
@@ -789,14 +798,10 @@ extension ASTGenVisitor {
       var hasEffectfulGet = false
       var nonGetSoFar: [(kind: swift.AccessorKind, node: AccessorDeclSyntax)] = []
       let isSubscript = accessorBlock.parent?.is(SubscriptDeclSyntax.self) == true
-      // Whether the storage is a protocol requirement.
-      var inProtocol = false
-      for ancestor in sequence(first: accessorBlock.parent, next: { $0?.parent }) {
-        if let ancestor, ancestor.is(VariableDeclSyntax.self) || ancestor.is(SubscriptDeclSyntax.self) {
-          inProtocol = self.isProtocolMember(ancestor)
-          break
-        }
-      }
+      /// Set once an accessor in a protocol was diagnosed as having a body.
+      /// The C++ parser stops at the body it did not skip, so the accessors
+      /// after it are dropped and the declaration is invalid.
+      var protocolBodyDiagnosed = false
 
       let record = BridgedAccessorRecord(
         lBraceLoc: leftBrace,
@@ -812,6 +817,9 @@ extension ASTGenVisitor {
           //
           // TODO: We could potentially recover from an unknown specifier if this
           // is the first accessor, by treating it as an implicit getter.
+          if protocolBodyDiagnosed {
+            return nil
+          }
           guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier,
                                          modifiers: node.modifiers) else {
             return nil
@@ -836,6 +844,10 @@ extension ASTGenVisitor {
                   String(bridged: kind.diagnosticName(article: false, underscored: false))),
                 at: body.leftBrace
               )
+              // The C++ parser does not skip the body, so it then fails to find
+              // the next accessor at the brace.
+              self.diagnose(.expected_getreadborrowsetmutate_in_protocol, at: body.leftBrace)
+              protocolBodyDiagnosed = true
               allowBody = false
             }
           }
@@ -883,11 +895,22 @@ extension ASTGenVisitor {
         generated,
         isSubscript: isSubscript,
         braceLoc: leftBrace,
-        isInvalid: accessorBlock.hasError || self.accessorsAreInvalid,
+        isInvalid: accessorBlock.hasError || self.accessorsAreInvalid || protocolBodyDiagnosed,
         storageSyntax: accessorBlock.parent
       )
       return record
     case .getter(let codeBlock):
+      // A protocol requirement lists its accessors; it cannot have an implicit
+      // getter. The C++ parser diagnoses the first token and builds no accessor,
+      // leaving the type checker to ask for an explicit '{ get }'.
+      if inProtocol, let first = codeBlock.first, !accessorBlock.hasError {
+        self.diagnose(.expected_getreadborrowsetmutate_in_protocol, at: first)
+        return BridgedAccessorRecord(
+          lBraceLoc: leftBrace,
+          accessors: .init(),
+          rBraceLoc: rightBrace
+        )
+      }
       // `subscript(i: Int) -> Int {}` in a protocol: an empty body is an empty
       // accessor list, and a subscript requirement needs a getter. (Elsewhere it
       // is an empty getter body.)
@@ -974,12 +997,16 @@ extension ASTGenVisitor {
 
     var initExpr: BridgedExpr?
     var initContext: BridgedPatternBindingInitializer?
+    // The C++ parser gives up on the entry after dropping a disallowed
+    // initializer, so any accessors that follow are not parsed.
+    var initializerDisallowed = false
     if let initializer = binding.initializer, let variable = binding.parent?.parent,
       self.isProtocolMember(variable)
     {
       // A protocol requirement has no initial value. The C++ parser diagnoses
       // the initializer and drops it.
       self.diagnose(.disallowed_init, at: initializer.equal)
+      initializerDisallowed = true
     } else if let initializer = binding.initializer {
       // Create a PatternBindingInitializer if we're not in a local context (this
       // ensures that property initializers are correctly treated as being in a
@@ -991,7 +1018,7 @@ extension ASTGenVisitor {
         generate(expr: initializer.value)
       }
     }
-    if let accessors = binding.accessorBlock {
+    if let accessors = binding.accessorBlock, !initializerDisallowed {
       self.accessorsAreInvalid = missingType
       defer { self.accessorsAreInvalid = false }
       // FIXME: We ought to have a better way of converting from the Nullable
