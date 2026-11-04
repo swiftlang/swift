@@ -419,56 +419,19 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       throw _Win32Error(functionName: "GetProcAddress", error: GetLastError())
     }
 
-    enum InvalidPEError: Error, CustomStringConvertible {
-      case invalidDosSignature(WORD)
-      case invalidNtSignature(DWORD)
-      case missingTLSDirectoryEntry(numberOfRvaAndSizes: DWORD)
-      case emptyTLSDirectory
-
-      var description: String {
-        switch self {
-        case .invalidDosSignature(let m):
-          return "invalid DOS signature 0x\(String(m, radix: 16)), expected IMAGE_DOS_SIGNATURE (\"MZ\")"
-        case .invalidNtSignature(let s):
-          return "invalid NT signature 0x\(String(s, radix: 16)), expected IMAGE_NT_SIGNATURE (\"PE00\")"
-        case .missingTLSDirectoryEntry(let n):
-          return "PE has no TLS data directory entry (NumberOfRvaAndSizes=\(n) <= 9)"
-        case .emptyTLSDirectory:
-          return "PE TLS data directory entry is empty (VirtualAddress=0)"
-        }
-      }
-    }
-
-    func getTlsDirectoryIndex(module: HMODULE) throws -> (index: DWORD, size: SIZE_T) {
+    func getTlsDirectoryIndex(module: HMODULE) throws -> (index: DWORD, size: UInt64) {
       let base = UInt64(UInt(bitPattern: module))
-      let dos = try pointee(base, as: IMAGE_DOS_HEADER.self)
-
-      guard dos.e_magic == IMAGE_DOS_SIGNATURE else {
-        throw InvalidPEError.invalidDosSignature(dos.e_magic)
+      let directory = try dataDirectory(IMAGE_DIRECTORY_ENTRY_TLS, of: module)
+      guard directory.VirtualAddress != 0 else {
+        throw InvalidPEError.emptyDataDirectory(index: Int(IMAGE_DIRECTORY_ENTRY_TLS))
       }
 
-      let nt = try pointee(base + UInt64(dos.e_lfanew), as: IMAGE_NT_HEADERS.self)
+      let tls = try pointee(base + UInt64(directory.VirtualAddress), as: IMAGE_TLS_DIRECTORY64.self)
 
-      guard nt.Signature == IMAGE_NT_SIGNATURE else {
-        let err = InvalidPEError.invalidNtSignature(nt.Signature)
-        warn("\(err)")
-        throw err
-      }
-
-      // Ensure we have IMAGE_DIRECTORY_ENTRY_TLS == 9 available.
-      guard nt.OptionalHeader.NumberOfRvaAndSizes > 9 else {
-        throw InvalidPEError.missingTLSDirectoryEntry(
-          numberOfRvaAndSizes: nt.OptionalHeader.NumberOfRvaAndSizes)
-      }
-
-      let tlsDirRVA = nt.OptionalHeader.DataDirectory.9.VirtualAddress
-      guard tlsDirRVA != 0 else {
-        throw InvalidPEError.emptyTLSDirectory
-      }
-
-      let tls = try pointee(base + UInt64(tlsDirRVA), as: IMAGE_TLS_DIRECTORY64.self)
-
-      return try (pointee(tls.AddressOfIndex, as: DWORD.self), tls.EndAddressOfRawData - tls.StartAddressOfRawData)
+      // The loader initializes each thread's TLS block with the raw data
+      // followed by SizeOfZeroFill zero bytes.
+      let size = tls.EndAddressOfRawData - tls.StartAddressOfRawData + UInt64(tls.SizeOfZeroFill)
+      return try (pointee(tls.AddressOfIndex, as: DWORD.self), size)
     }
 
     let (tlsIndex, tlsSize) = try getTlsDirectoryIndex(module: self.hSwiftConcurrency)
@@ -491,11 +454,145 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     return tasks
   }
 
+  private enum InvalidPEError: Error, CustomStringConvertible {
+    case invalidDosSignature(WORD)
+    case invalidNtSignature(DWORD)
+    case missingDataDirectory(index: Int, numberOfRvaAndSizes: DWORD)
+    case emptyDataDirectory(index: Int)
+
+    var description: String {
+      switch self {
+      case .invalidDosSignature(let m):
+        return "invalid DOS signature 0x\(String(m, radix: 16)), expected IMAGE_DOS_SIGNATURE (\"MZ\")"
+      case .invalidNtSignature(let s):
+        return "invalid NT signature 0x\(String(s, radix: 16)), expected IMAGE_NT_SIGNATURE (\"PE00\")"
+      case .missingDataDirectory(let index, let n):
+        return "PE has no data directory entry \(index) (NumberOfRvaAndSizes=\(n))"
+      case .emptyDataDirectory(let index):
+        return "PE data directory entry \(index) is empty (VirtualAddress=0)"
+      }
+    }
+  }
+
+  /// Reads the NT headers of `module`, which is loaded in the remote process.
+  private func ntHeaders(of module: HMODULE) throws -> IMAGE_NT_HEADERS {
+    let base = UInt64(UInt(bitPattern: module))
+    let dos = try pointee(base, as: IMAGE_DOS_HEADER.self)
+
+    guard dos.e_magic == IMAGE_DOS_SIGNATURE else {
+      throw InvalidPEError.invalidDosSignature(dos.e_magic)
+    }
+
+    let nt = try pointee(base + UInt64(dos.e_lfanew), as: IMAGE_NT_HEADERS.self)
+
+    guard nt.Signature == IMAGE_NT_SIGNATURE else {
+      let err = InvalidPEError.invalidNtSignature(nt.Signature)
+      warn("\(err)")
+      throw err
+    }
+
+    return nt
+  }
+
+  /// Reads data directory entry `index` (an `IMAGE_DIRECTORY_ENTRY_*` value)
+  /// of `module`, which is loaded in the remote process.
+  private func dataDirectory<Index: BinaryInteger>(_ index: Index, of module: HMODULE) throws -> IMAGE_DATA_DIRECTORY {
+    let nt = try ntHeaders(of: module)
+    let index = Int(index)
+    guard index < Int(nt.OptionalHeader.NumberOfRvaAndSizes) else {
+      throw InvalidPEError.missingDataDirectory(
+        index: index, numberOfRvaAndSizes: nt.OptionalHeader.NumberOfRvaAndSizes)
+    }
+    return withUnsafeBytes(of: nt.OptionalHeader.DataDirectory) {
+      $0.load(fromByteOffset: index * MemoryLayout<IMAGE_DATA_DIRECTORY>.stride,
+              as: IMAGE_DATA_DIRECTORY.self)
+    }
+  }
+
+  /// Finds the address of the export `name` in `module` by reading the export
+  /// directory from the remote process's memory.
+  ///
+  /// `GetProcAddress` can't be used here: it searches modules in *this*
+  /// process, which might not have the same module loaded, or might have it
+  /// loaded at a different base address or in a different version.
+  ///
+  /// - Returns: The address of the export in the remote process, or `nil` if
+  ///   `module` has no such export.
+  private func remoteExportAddress(of name: String, in module: HMODULE) throws -> swift_addr_t? {
+    let base = UInt64(UInt(bitPattern: module))
+    let directory = try dataDirectory(IMAGE_DIRECTORY_ENTRY_EXPORT, of: module)
+    guard directory.VirtualAddress != 0 else { return nil }
+
+    let exports = try readRemoteMemory(
+      address: base + UInt64(directory.VirtualAddress), as: IMAGE_EXPORT_DIRECTORY.self)
+
+    // Compares the NUL-terminated string at `address` with `target` like strcmp.
+    let target = Array(name.utf8) + [0]
+    func compare(remoteStringAt address: swift_addr_t) throws -> Int {
+      try withRemoteMemory(address: address, size: target.count) { remote in
+        for (r, t) in zip(remote, target) {
+          if r != t { return r < t ? -1 : 1 }
+          if r == 0 { break }
+        }
+        return 0
+      }
+    }
+
+    // The loader requires the name pointer table to be sorted, so binary search it.
+    var low = 0
+    var high = Int(exports.NumberOfNames)
+    while low < high {
+      let mid = low + (high - low) / 2
+      let nameRVA = try readRemoteMemory(
+        address: base + UInt64(exports.AddressOfNames) + UInt64(mid * MemoryLayout<DWORD>.size),
+        as: DWORD.self)
+      let order = try compare(remoteStringAt: base + UInt64(nameRVA))
+      if order < 0 {
+        low = mid + 1
+      } else if order > 0 {
+        high = mid
+      } else {
+        let ordinal = try readRemoteMemory(
+          address: base + UInt64(exports.AddressOfNameOrdinals) + UInt64(mid * MemoryLayout<WORD>.size),
+          as: WORD.self)
+        guard DWORD(ordinal) < exports.NumberOfFunctions else { return nil }
+        let rva = try readRemoteMemory(
+          address: base + UInt64(exports.AddressOfFunctions) + UInt64(Int(ordinal) * MemoryLayout<DWORD>.size),
+          as: DWORD.self)
+        // An RVA inside the export directory is a forwarder string, not an
+        // address within this module.
+        if rva >= directory.VirtualAddress && rva - directory.VirtualAddress < directory.Size {
+          return nil
+        }
+        return base + UInt64(rva)
+      }
+    }
+    return nil
+  }
+
+  private lazy var currentTaskTLSOffset: Result<Int, Error> = Result { try getCurrentTaskTLSOffset() }
+
+  /// Returns the offset of the current-task pointer within each thread's
+  /// swift_Concurrency.dll TLS block.
+  private func getCurrentTaskTLSOffset() throws -> Int {
+    // The runtime exports the offset, resolved by the linker from the same
+    // SECREL relocation the runtime uses to access the thread-local variable.
+    // See `_swift_concurrency_debug_current_task_tls_offset` in
+    // stdlib/public/Concurrency/Debug.h.
+    if let address = try remoteExportAddress(
+        of: "_swift_concurrency_debug_current_task_tls_offset", in: hSwiftConcurrency) {
+      return Int(try readRemoteMemory(address: address, as: UInt32.self))
+    }
+
+    // Older runtimes don't export the offset. In those, the current-task
+    // pointer is the first variable in the TLS block after the 8-byte-aligned
+    // `_tls_start` byte from the CRT, so it's at offset 8.
+    return 8
+  }
+
   internal var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
-    // FIXME: Offset '8' is subject to change; we need to expose a function in swift_Concurrency.dll,
-    // which computes it based on the address of the thread_local variable which holds the task pointer
     do {
-      return try currentTasks(offset: 8)
+      return try currentTasks(offset: currentTaskTLSOffset.get())
     } catch {
       print("ERROR: \(error)")
       return []
@@ -523,10 +620,9 @@ internal final class WindowsRemoteProcess: RemoteProcess {
       if tlsStartBase == 0 { return nil }
       
       let currentTaskPointer = tlsStartBase.advanced(by: offset)
-      guard let pointer = read(address: currentTaskPointer, size: MemoryLayout<UnsafeRawPointer>.size) else {
+      guard let currentTask = try? readRemoteMemory(address: currentTaskPointer, as: UInt.self) else {
         return nil
       }
-      let currentTask = pointer.load(as: UInt.self)
       return (threadID: threadInfo.threadID, currentTask: swift_addr_t(currentTask))
     }
   }
