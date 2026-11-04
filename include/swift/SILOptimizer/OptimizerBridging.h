@@ -139,10 +139,12 @@ struct BridgedOptimizerUtilities {
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
   typedef void (* _Nonnull UpdateLifetimeValuesFn)(BridgedContext, BridgedArrayRef, BridgedArrayRef);
+  typedef bool (* _Nonnull QueryFunctionFn)(BridgedContext, BridgedFunction);
 
   static void registerLifetimeCompletion(UpdateLifetimeFunctionFn completeAllLifetimesFn,
                                          UpdateLifetimeValuesFn completeLifetimeFn);
   static void registerControlFlowUtils(UpdateFunctionFn breakInfiniteLoopsFn);
+  static void registerGlobalInitUtils(QueryFunctionFn isFoldableGlobalObjectInitializerFn);
 };
 
 struct BridgedLoopTree {
@@ -258,7 +260,7 @@ struct BridgedPassContext {
   SwiftInt getStaticSize(BridgedType type) const;
   SwiftInt getStaticAlignment(BridgedType type) const;
   SwiftInt getStaticStride(BridgedType type) const;
-  bool canMakeStaticObjectReadOnly(BridgedType type) const;
+  bool isReadOnlyStaticObject(BridgedGlobalVar global) const;
   bool hasClassFixedMetadataLayout(BridgedDeclObj classDecl) const;
   bool fitsInOpaqueExistentialPayload(BridgedType type) const;
 

@@ -28,6 +28,14 @@ var atomic3: TwoAtomics? = TwoAtomics(a: Atomic(27), b: Atomic(28))
 // CHECK-LABEL: sil_global hidden @$s4test5mutex15Synchronization5MutexVySiGvp : $Mutex<Int> = {
 let mutex = Mutex<Int>(123)
 
+// CHECK-LABEL: sil_global private @$s4test7counter{{.*}} : $Atomic<Int> = {
+private let counter = Atomic<Int>(0)
+
+@inline(never)
+func increment(_ atomic: borrowing Atomic<Int>) -> Int {
+  atomic.add(1, ordering: .relaxed).newValue
+}
+
 @main
 struct Main {
   static func main() {
@@ -59,6 +67,9 @@ struct Main {
     mutex.withLock {
       print("mutex:", $0)
     }
+
+    // CHECK-OUTPUT: counter: 1 2
+    print("counter:", increment(counter), increment(counter))
   }
 }
 

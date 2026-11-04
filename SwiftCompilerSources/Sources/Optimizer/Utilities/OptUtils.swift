@@ -585,7 +585,7 @@ extension Instruction {
         return false
       }
     case let gvi as GlobalValueInst:
-      return context.canMakeStaticObjectReadOnly(objectType: gvi.type)
+      return context.isReadOnlyStaticObject(gvi.global)
     case is StructInst,
          is TupleInst,
          is EnumInst,

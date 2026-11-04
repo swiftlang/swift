@@ -771,6 +771,7 @@ struct DeclSILOptional {
     EffectsKind *MRK = nullptr;
     ActorIsolation *actorIsolation = nullptr;
     std::optional<SILStage> *functionStage = nullptr;
+    bool *isReadOnlyStaticObject = nullptr;
 };
 } // end anonymous namespace
 
@@ -891,6 +892,9 @@ static bool parseDeclSILOptional(
       *options.isPerformanceConstraint = true;
     else if (options.markedAsUsed && SP.P.Tok.getText() == "used")
       *options.markedAsUsed = true;
+    else if (options.isReadOnlyStaticObject &&
+             SP.P.Tok.getText() == "readonly_static_object")
+      *options.isReadOnlyStaticObject = true;
     else if (options.actorIsolation && SP.P.Tok.getText() == "isolation") {
       SP.P.consumeToken(tok::identifier);
       if (SP.P.Tok.getKind() != tok::string_literal) {
@@ -8135,6 +8139,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   StringRef asmName;
   StringRef section;
   bool isLet = false;
+  bool isReadOnlyStaticObject = false;
   std::optional<CodeGenerationModel> codeGenerationModel;
 
   SILParser State(P);
@@ -8144,6 +8149,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   options.asmName = &asmName,
   options.section = &section,
   options.isLet = &isLet,
+  options.isReadOnlyStaticObject = &isReadOnlyStaticObject,
   options.codeGenerationModel = &codeGenerationModel;
   if (parseSILLinkage(GlobalLinkage, P) ||
       parseDeclSILOptional(options, State, M) ||
@@ -8172,6 +8178,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
       RegularLocation(NameLoc), VD.value());
 
   GV->setLet(isLet);
+  GV->setReadOnlyStaticObject(isReadOnlyStaticObject);
   GV->setMarkedAsUsed(isMarkedAsUsed);
   GV->setAsmName(asmName);
   GV->setSection(section);

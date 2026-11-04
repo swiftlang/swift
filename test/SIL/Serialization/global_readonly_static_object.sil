@@ -1,0 +1,48 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend %s -emit-module -o %t/tmp.swiftmodule
+// RUN: %target-sil-opt -sil-print-types -sil-print-no-uses -emit-sorted-sil %t/tmp.swiftmodule | %FileCheck %s
+
+// Check that a module serializes and deserializes `[readonly_static_object]`, and that the
+// initializer of a global can reference another global's object via `global_value`.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class C {
+  @_hasStorage var a: Builtin.Int64
+}
+
+struct Holder {
+  @_hasStorage let object: Builtin.NativeObject
+}
+
+// CHECK-LABEL: sil_global [serialized] [let] [readonly_static_object] @readonly_object : $C = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    %initval = object $C (%0 : $Builtin.Int64)
+// CHECK-NEXT:  }
+sil_global [serialized] [let] [readonly_static_object] @readonly_object : $C = {
+  %0 = integer_literal $Builtin.Int64, 1
+  %initval = object $C (%0 : $Builtin.Int64)
+}
+
+// CHECK-LABEL: sil_global [serialized] [let] @readonly_object_holder : $Holder = {
+// CHECK-NEXT:    %0 = global_value @readonly_object : $C
+// CHECK-NEXT:    %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
+// CHECK-NEXT:    %initval = struct $Holder (%1 : $Builtin.NativeObject)
+// CHECK-NEXT:  }
+sil_global [serialized] [let] @readonly_object_holder : $Holder = {
+  %0 = global_value @readonly_object : $C
+  %1 = unchecked_ref_cast %0 : $C to $Builtin.NativeObject
+  %initval = struct $Holder (%1 : $Builtin.NativeObject)
+}
+
+// CHECK-LABEL: sil_global [serialized] [let] @regular_object : $C = {
+// CHECK-NEXT:    %0 = integer_literal $Builtin.Int64, 1
+// CHECK-NEXT:    %initval = object $C (%0 : $Builtin.Int64)
+// CHECK-NEXT:  }
+sil_global [serialized] [let] @regular_object : $C = {
+  %0 = integer_literal $Builtin.Int64, 1
+  %initval = object $C (%0 : $Builtin.Int64)
+}

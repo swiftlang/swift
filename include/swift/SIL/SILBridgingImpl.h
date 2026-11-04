@@ -1264,6 +1264,10 @@ bool BridgedGlobalVar::isLet() const { return getGlobal()->isLet(); }
 
 void BridgedGlobalVar::setLet(bool value) const { getGlobal()->setLet(value); }
 
+bool BridgedGlobalVar::isOrContainsRawLayout() const {
+  return getGlobal()->isOrContainsRawLayout();
+}
+
 bool BridgedGlobalVar::markedAsUsed() const {
   return getGlobal()->markedAsUsed();
 }

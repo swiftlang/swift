@@ -1485,6 +1485,12 @@ this case the variable cannot be used as l-value, i.e. the reference to
 the object cannot be modified. As a consequence the variable cannot be
 accessed with `global_addr` but only with `global_value`.
 
+The attribute `[readonly_static_object]` of a statically initialized object
+means that the module which defines the object emits it as a read-only static
+object. Its header is initialized statically and `global_value` does not
+initialize it at runtime. Clients must follow this decision of the defining
+module, because it determines the symbol name and layout of the object.
+
 # Differentiability Witnesses
 
 ```

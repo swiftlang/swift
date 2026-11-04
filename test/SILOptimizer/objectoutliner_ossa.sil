@@ -96,9 +96,7 @@ bb0:
 
 // CHECK-LABEL: sil [ossa] @remove_dealloc_instructions :
 // CHECK:         [[G:%.*]] = global_value
-// CHECK-NEXT:    begin_borrow [[G]]
-// CHECK-NEXT:    ref_element_addr
-// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    ref_element_addr [[G]]
 // CHECK-NEXT:    [[C:%.*]] = unchecked_ref_cast [[G]]
 // CHECK-NEXT:    end_lifetime [[C]]
 // CHECK-NEXT:    tuple
@@ -217,11 +215,9 @@ bb0:
 }
 
 // CHECK-LABEL: sil [ossa] @handle_deallocation
-// CHECK:         global_value
-// CHECK-NEXT:    begin_borrow
-// CHECK-NEXT:    ref_element_addr
-// CHECK-NEXT:    end_borrow
-// CHECK-NEXT:    end_lifetime
+// CHECK:         [[G:%.*]] = global_value
+// CHECK-NEXT:    ref_element_addr [[G]]
+// CHECK-NEXT:    end_lifetime [[G]]
 // CHECK-NEXT:    tuple
 // CHECK:       } // end sil function 'handle_deallocation'
 sil [ossa] @handle_deallocation : $@convention(thin) () -> () {

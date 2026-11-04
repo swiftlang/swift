@@ -54,6 +54,29 @@ bool swift::writeTBD(ModuleDecl *M, StringRef OutputFilename,
                         });
 }
 
+/// Returns true for the symbols of the outlined objects, the tokens and the
+/// one-time initialization functions of globals.
+///
+/// Cross-module optimization can make them public if no TBD file is emitted,
+/// so TBDGen doesn't know about them.
+static bool isGlobalInitializationSymbol(StringRef name) {
+  Demangle::Context ctx;
+  Demangle::NodePointer node = ctx.demangleSymbolAsNode(name);
+  if (!node || node->getKind() != Demangle::Node::Kind::Global ||
+      node->getNumChildren() == 0)
+    return false;
+
+  switch (node->getFirstChild()->getKind()) {
+  case Demangle::Node::Kind::OutlinedVariable:
+  case Demangle::Node::Kind::OutlinedReadOnlyObject:
+  case Demangle::Node::Kind::GlobalVariableOnceToken:
+  case Demangle::Node::Kind::GlobalVariableOnceFunction:
+    return true;
+  default:
+    return false;
+  }
+}
+
 static bool validateSymbols(DiagnosticEngine &diags,
                             const std::vector<std::string> &symbols,
                             const llvm::Module &IRModule,
@@ -87,7 +110,8 @@ static bool validateSymbols(DiagnosticEngine &diags,
         && !GV->hasHiddenVisibility();
       if (!GV->isDeclaration() && externallyVisible) {
         // Is it listed?
-        if (!symbolSet.erase(name))
+        if (!symbolSet.erase(name) &&
+            !isGlobalInitializationSymbol(unmangledName))
           // Note: Add the unmangled name to the irNotTBD list, which is owned
           //       by the IRModule, instead of the mangled name.
           irNotTBD.push_back(unmangledName);

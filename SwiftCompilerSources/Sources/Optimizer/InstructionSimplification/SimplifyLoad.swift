@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import SIL
+import OptimizerBridging
 
 extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
@@ -407,6 +408,30 @@ private func getInitializerFromInitFunction(of globalAddr: GlobalAddrInst, _ con
   return storeToGlobal.source
 }
 
+/// Returns true if other modules can fold a load of the global, which is initialized by `initFunction`,
+/// to an immutable global object, e.g. an array literal.
+/// Must be kept in sync with `getInitializerFromInitFunction`.
+private func isFoldableGlobalObjectInitializer(_ initFunction: Function, _ context: some Context) -> Bool {
+  func isImmutableGlobalValue(_ inst: Instruction) -> Bool {
+    return (inst as? GlobalValueInst)?.global.isLet ?? false
+  }
+  guard let (allocInst, _) = getGlobalInitialization(of: initFunction, context,
+                                                     handleUnknownInstruction: isImmutableGlobalValue) else
+  {
+    return false
+  }
+  return allocInst.global.isLet && initFunction.instructions.contains(where: isImmutableGlobalValue)
+}
+
+func registerGlobalInitUtils() {
+  BridgedOptimizerUtilities.registerGlobalInitUtils(
+    { (bridgedCtxt: BridgedContext, bridgedFunction: BridgedFunction) -> Bool in
+      let context = ModulePassContext(_bridged: bridgedCtxt)
+      return isFoldableGlobalObjectInitializer(bridgedFunction.function, context)
+    }
+  )
+}
+
 private func globalLoadedViaAddressor(pointer: Value) -> GlobalVariable? {
   if let ai = pointer as? ApplyInst,
      let callee = ai.referencedFunction,
@@ -454,6 +479,10 @@ private extension Value {
         {
           return false
         }
+      }
+      if value is GlobalValueInst && function.isAnySerialized {
+        // A serialized function must not reference the private global of an outlined object.
+        return false
       }
       for op in value.definingInstruction!.operands {
         if handled.insert(ObjectIdentifier(op.value)).inserted {

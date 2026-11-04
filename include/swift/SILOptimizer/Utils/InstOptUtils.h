@@ -409,6 +409,11 @@ bool simplifyUsers(SingleValueInstruction *inst);
 bool analyzeStaticInitializer(SILValue value,
                               SmallVectorImpl<SILInstruction *> &insns);
 
+/// Returns true if other modules can fold a load of the global, which is
+/// initialized by the one-time initializer \p initFn, to an immutable global
+/// object, e.g. an array literal.
+bool isFoldableGlobalObjectInitializer(SILPassManager *pm, SILFunction *initFn);
+
 /// Returns true if the below operation will succeed.
 bool canReplaceLoadSequence(SILInstruction *inst);
 

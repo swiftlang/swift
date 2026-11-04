@@ -1,0 +1,61 @@
+// RUN: %target-swift-frontend -target %target-swift-6.0-abi-triple %s -emit-ir | %FileCheck %s
+
+// REQUIRES: PTRSIZE=64
+
+// The module which defines a statically initialized object decides if it's a read-only static object.
+// A module which only declares the object must follow the `[readonly_static_object]` attribute,
+// and not recompute the decision for its own target. This test deploys to Swift 6.0, where the
+// object would be read-only on Darwin.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+// A read-only static object has the symbol suffix `r` and needs no container.
+sil_global public_external [serialized] [let] [readonly_static_object] @readonly_array_WZTv_ : $_ContiguousArrayStorage<UInt8> = {
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = struct $Int (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = struct $UInt (%2 : $Builtin.Int64)
+  %4 = struct $_SwiftArrayBodyStorage (%1 : $Int, %3 : $UInt)
+  %5 = struct $_ArrayBody (%4 : $_SwiftArrayBodyStorage)
+  %6 = integer_literal $Builtin.Int8, 48
+  %7 = struct $UInt8 (%6 : $Builtin.Int8)
+  %initval = object $_ContiguousArrayStorage<UInt8> (%5 : $_ArrayBody, [tail_elems] %7 : $UInt8)
+}
+
+// Any other object is placed in a container, which holds the token for initializing the object.
+sil_global public_external [serialized] [let] @container_array_WZTv_ : $_ContiguousArrayStorage<UInt8> = {
+  %0 = integer_literal $Builtin.Int64, 1
+  %1 = struct $Int (%0 : $Builtin.Int64)
+  %2 = integer_literal $Builtin.Int64, 2
+  %3 = struct $UInt (%2 : $Builtin.Int64)
+  %4 = struct $_SwiftArrayBodyStorage (%1 : $Int, %3 : $UInt)
+  %5 = struct $_ArrayBody (%4 : $_SwiftArrayBodyStorage)
+  %6 = integer_literal $Builtin.Int8, 48
+  %7 = struct $UInt8 (%6 : $Builtin.Int8)
+  %initval = object $_ContiguousArrayStorage<UInt8> (%5 : $_ArrayBody, [tail_elems] %7 : $UInt8)
+}
+
+// CHECK-DAG: @readonly_array_WZTv_r = external {{.*}}global
+// CHECK-DAG: @container_array_WZTv_ = external {{.*}}global %{{[A-Za-z0-9_]*}}c,
+
+// CHECK-LABEL: define {{.*}} @use_readonly_object(
+// CHECK-NEXT:  entry:
+// CHECK-NEXT:    ret ptr @readonly_array_WZTv_r
+// CHECK-NEXT:  }
+sil @use_readonly_object : $@convention(thin) () -> @owned _ContiguousArrayStorage<UInt8> {
+bb0:
+  %0 = global_value @readonly_array_WZTv_ : $_ContiguousArrayStorage<UInt8>
+  return %0 : $_ContiguousArrayStorage<UInt8>
+}
+
+// CHECK-LABEL: define {{.*}} @use_container_object(
+// CHECK:         call ptr @swift_initStaticObject({{.*}}, ptr getelementptr {{.*}}ptr @container_array_WZTv_, i32 0, i32 1)
+sil @use_container_object : $@convention(thin) () -> @owned _ContiguousArrayStorage<UInt8> {
+bb0:
+  %0 = global_value @container_array_WZTv_ : $_ContiguousArrayStorage<UInt8>
+  return %0 : $_ContiguousArrayStorage<UInt8>
+}

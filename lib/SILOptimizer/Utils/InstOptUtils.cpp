@@ -2983,3 +2983,20 @@ bool swift::shouldRemoveCondFail(StringRef withMessage, StringRef functionName) 
   // Check whether the cond_fail's message was listed in the config file.
   return CondFailsToRemove.find(withMessage.str()) != CondFailsToRemove.end();
 }
+
+//===----------------------------------------------------------------------===//
+//                            Swift Bridging
+//===----------------------------------------------------------------------===//
+
+static BridgedOptimizerUtilities::QueryFunctionFn isFoldableGlobalObjectInitializerFunction;
+
+void BridgedOptimizerUtilities::registerGlobalInitUtils(QueryFunctionFn isFoldableGlobalObjectInitializerFn) {
+  isFoldableGlobalObjectInitializerFunction = isFoldableGlobalObjectInitializerFn;
+}
+
+bool swift::isFoldableGlobalObjectInitializer(SILPassManager *pm, SILFunction *initFn) {
+  if (isFoldableGlobalObjectInitializerFunction)
+    return isFoldableGlobalObjectInitializerFunction({pm->getSwiftPassInvocation()->getCurrent()}, {initFn});
+  // If SwiftCompilerSources are not enabled or in SourceKit unit tests
+  return false;
+}

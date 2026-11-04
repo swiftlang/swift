@@ -49,12 +49,28 @@ public func testit() -> C {
 // CHECK:       } // end sil function '$s4test10managedBuf_WZ'
 public let managedBuf = ManagedBuffer<Void, UInt8>.create(minimumCapacity: 0, makingHeaderWith: { _ in })
 
+public final class Counter {
+  public var value = 0
+}
+
+// The object is mutable, so reading it must not be folded to its initial value.
+public let counter = Counter()
+
+@inline(never)
+public func increment() {
+  counter.value += 1
+}
+
 @main struct Main {
   static func main() {
     // CHECK-OUTPUT: c.x=27
     print("c.x=\(testit().x)")
     // CHECK-OUTPUT: c=test.C
     print("c=\(testit())")
+    increment()
+    increment()
+    // CHECK-OUTPUT: counter.value=2
+    print("counter.value=\(counter.value)")
   }
 }
 

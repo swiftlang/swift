@@ -734,6 +734,11 @@ static void addHighLevelFunctionPipeline(SILPassPipelinePlan &P) {
   addFunctionPasses(P, OptimizationLevelKind::HighLevel);
 
   addHighLevelLoopOptPasses(P);
+
+  // Statically initialize globals before serialization, so that other modules
+  // can access them directly.
+  P.addGlobalInitObjectOutliner();
+  P.addInitializeStaticGlobals();
   
   P.addStringOptimization();
   P.addComputeEscapeEffects();

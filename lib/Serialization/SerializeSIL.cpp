@@ -3417,6 +3417,7 @@ void SILSerializer::writeSILGlobalVar(const SILGlobalVariable &g) {
                                  (unsigned)!g.isDefinition(),
                                  (unsigned)g.isLet(),
                                  (unsigned)g.markedAsUsed(),
+                                 (unsigned)g.isReadOnlyStaticObject(),
                                  g.codeGenerationModel()
                                      ? (static_cast<unsigned>(*g.codeGenerationModel()) + 1)
                                      : 0,

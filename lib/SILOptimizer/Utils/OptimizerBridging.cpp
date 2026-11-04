@@ -200,9 +200,9 @@ SwiftInt BridgedPassContext::getStaticStride(BridgedType type) const {
   return integerValueFromConstant(c);
 }
 
-bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
+bool BridgedPassContext::isReadOnlyStaticObject(BridgedGlobalVar global) const {
   if (irgen::IRGenModule *IGM = invocation->getIRGenModule()) {
-    return IGM->canMakeStaticObjectReadOnly(type.unbridged());
+    return IGM->isReadOnlyStaticObject(global.getGlobal());
   }
   return false;
 }

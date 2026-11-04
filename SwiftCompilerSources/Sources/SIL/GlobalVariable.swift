@@ -33,6 +33,8 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
 
   public var isLet: Bool { bridged.isLet() }
 
+  public var isOrContainsRawLayout: Bool { bridged.isOrContainsRawLayout() }
+
   public var linkage: Linkage { bridged.getLinkage().linkage }
 
   /// True, if the linkage of the global variable indicates that it is visible outside the current

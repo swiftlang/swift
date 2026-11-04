@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "cross-module-serialization-setup"
+#include "../../IRGen/IRGenModule.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/Module.h"
@@ -58,6 +59,8 @@ class CrossModuleOptimization {
   llvm::SmallPtrSet<TypeBase *, 16> typesHandled;
 
   SILModule &M;
+
+  SILPassManager *pm;
   
   /// True, if CMO runs by default.
   /// In this case, serialization decisions are made very conservatively to
@@ -72,10 +75,11 @@ class CrossModuleOptimization {
   FunctionFlags canSerializeFlags;
 
 public:
-  CrossModuleOptimization(SILModule &M, bool conservative, bool everything)
-      : M(M), conservative(conservative), everything(everything) {}
+  CrossModuleOptimization(SILModule &M, SILPassManager *pm, bool conservative,
+                          bool everything)
+      : M(M), pm(pm), conservative(conservative), everything(everything) {}
 
-  void serializeFunctionsInModule(SILPassManager *manager);
+  void serializeFunctionsInModule();
   void serializeWitnessTablesInModule();
   void serializeVTablesInModule();
   void serializeMoveonlyDeinitsInModule();
@@ -105,6 +109,10 @@ private:
 
   bool canSerializeGlobal(SILGlobalVariable *global);
 
+  bool canSerializeGlobalValue(SILGlobalVariable *global, bool clientsCanFold);
+
+  bool isFoldableGlobalInitReference(SILValue ref);
+
   bool canSerializeType(SILType type);
   bool canSerializeType(CanType type);
   bool canSerializeDecl(NominalTypeDecl *decl);
@@ -127,6 +135,8 @@ private:
                             FunctionFlags &canSerializeFlags);
 
   void serializeGlobal(SILGlobalVariable *global);
+
+  void serializeReferencedGlobal(SILGlobalVariable *global);
 
   void keepMethodAlive(SILDeclRef method);
 
@@ -512,11 +522,11 @@ void CrossModuleOptimization::trySerializeFunctions(
   }
 }
 
-void CrossModuleOptimization::serializeFunctionsInModule(SILPassManager *manager) {
+void CrossModuleOptimization::serializeFunctionsInModule() {
   // Reorder SIL funtions in the module bottom up so we can serialize
   // the most nested referenced functions first and avoid unnecessary
   // recursive checks.
-  BasicCalleeAnalysis *BCA = manager->getAnalysis<BasicCalleeAnalysis>();
+  BasicCalleeAnalysis *BCA = pm->getAnalysis<BasicCalleeAnalysis>();
   BottomUpFunctionOrder BottomUpOrder(M, BCA);
   auto bottomUpFunctions = BottomUpOrder.getFunctions();
   trySerializeFunctions(bottomUpFunctions);
@@ -782,7 +792,11 @@ bool CrossModuleOptimization::canSerializeFieldsByInstructionKind(
     // function is completely inlined afterwards.
     // Also, when emitting TBD files, we cannot introduce a new public symbol.
     if (conservative || M.getOptions().emitTBD) {
-      if (!isReferenceSerializeCandidate(callee, M.getOptions()))
+      // Clients can only fold the initialization of a global if the one-time
+      // initializer is serialized.
+      if (!isReferenceSerializeCandidate(callee, M.getOptions()) &&
+          (!isFoldableGlobalInitReference(FRI) ||
+           !canSerializeFunction(callee, canSerializeFlags, maxDepth - 1)))
         return false;
     }
 
@@ -808,7 +822,8 @@ bool CrossModuleOptimization::canSerializeFieldsByInstructionKind(
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
     SILGlobalVariable *global = GAI->getReferencedGlobal();
     if ((conservative || M.getOptions().emitTBD) &&
-        !isReferenceSerializeCandidate(global, M.getOptions())) {
+        !isReferenceSerializeCandidate(global, M.getOptions()) &&
+        !isFoldableGlobalInitReference(GAI)) {
       return false;
     }
 
@@ -818,6 +833,13 @@ bool CrossModuleOptimization::canSerializeFieldsByInstructionKind(
       return false;
 
     return true;
+  }
+  if (auto *GVI = dyn_cast<GlobalValueInst>(inst)) {
+    SILFunction *function = inst->getFunction();
+    return canSerializeGlobalValue(
+        GVI->getReferencedGlobal(),
+        function->isGlobalInitOnceFunction() &&
+            isFoldableGlobalObjectInitializer(pm, function));
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(inst)) {
     bool canUse = true;
@@ -987,8 +1009,62 @@ bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
       if (!canUseFromInline(referencedFunc))
         return false;
     }
+    if (auto *GVI = dyn_cast<GlobalValueInst>(&initInst)) {
+      if (!canSerializeGlobalValue(GVI->getReferencedGlobal(),
+                                   global->isLet()))
+        return false;
+    }
   }
   return true;
+}
+
+/// Returns true if \p global, which is referenced by a `global_value`, can be
+/// serialized and made public.
+///
+/// \p clientsCanFold is true if clients fold the global's value, i.e. if the
+/// `global_value` is in the initializer of a let-global or in a foldable
+/// one-time initializer. In conservative mode, only then a non-public global is
+/// made public.
+bool CrossModuleOptimization::canSerializeGlobalValue(SILGlobalVariable *global,
+                                                      bool clientsCanFold) {
+  if (!isReferenceSerializeCandidate(global, M.getOptions())) {
+    // When emitting TBD files, we cannot introduce a new public symbol.
+    if (M.getOptions().emitTBD)
+      return false;
+
+    // Package CMO never makes symbols public.
+    if (conservative &&
+        (!clientsCanFold || isPackageCMOEnabled(M.getSwiftModule())))
+      return false;
+  }
+  return canSerializeGlobal(global);
+}
+
+/// Returns true if \p ref is the token or the initializer which the addressor
+/// of a global passes to its "once" call, and clients can fold the
+/// initialization of the global.
+///
+/// Clients inline such an addressor and use the global's object directly.
+/// Therefore the token and the initializer must be usable from clients, even in
+/// conservative mode.
+bool CrossModuleOptimization::isFoldableGlobalInitReference(SILValue ref) {
+  // When emitting TBD files, we cannot introduce a new public symbol.
+  // Package CMO never makes symbols public.
+  if (M.getOptions().emitTBD || isPackageCMOEnabled(M.getSwiftModule()))
+    return false;
+
+  SILFunction *addressor = ref->getFunction();
+  if (!addressor->isGlobalInit())
+    return false;
+
+  BuiltinInst *callToOnce;
+  SILFunction *initFn = findInitializer(addressor, callToOnce);
+  if (!initFn || !isFoldableGlobalObjectInitializer(pm, initFn))
+    return false;
+
+  auto *token = dyn_cast<AddressToPointerInst>(callToOnce->getOperand(0));
+  return ref == callToOnce->getOperand(1) ||
+         (token && ref == token->getOperand());
 }
 
 /// Returns true if the function in \p funcCtxt could be linked statically to
@@ -1172,7 +1248,7 @@ void CrossModuleOptimization::serializeInstruction(
     if (everything && isEmbedded())
       (void)canSerializeFunction(callee, canSerializeFlags, /*maxDepth=*/64);
     if (canUseFromInline(callee)) {
-      if (conservative) {
+      if (conservative && !isFoldableGlobalInitReference(FRI)) {
         // In conservative mode, avoid making non-public functions public,
         // because that can increase code size.
         if (callee->getLinkage() == SILLinkage::Private ||
@@ -1203,15 +1279,11 @@ void CrossModuleOptimization::serializeInstruction(
   }
 
   if (auto *GAI = dyn_cast<GlobalAddrInst>(inst)) {
-    SILGlobalVariable *global = GAI->getReferencedGlobal();
-    if (canSerializeGlobal(global)) {
-      serializeGlobal(global);
-    }
-    if (!hasPublicOrPackageVisibility(
-            global->getLinkage(),
-            M.getSwiftModule()->serializePackageEnabled())) {
-      global->setLinkage(SILLinkage::Public);
-    }
+    serializeReferencedGlobal(GAI->getReferencedGlobal());
+    return;
+  }
+  if (auto *GVI = dyn_cast<GlobalValueInst>(inst)) {
+    serializeReferencedGlobal(GVI->getReferencedGlobal());
     return;
   }
   if (auto *KPI = dyn_cast<KeyPathInst>(inst)) {
@@ -1238,8 +1310,30 @@ void CrossModuleOptimization::serializeGlobal(SILGlobalVariable *global) {
       if (callee->isDefinition() && !callee->isAvailableExternally())
         makeFunctionUsableFromInline(callee);
     }
+    if (auto *GVI = dyn_cast<GlobalValueInst>(&initInst))
+      serializeReferencedGlobal(GVI->getReferencedGlobal());
   }
   global->setSerializedKind(getRightSerializedKind(M));
+}
+
+/// Serializes \p global, if possible, and makes it public.
+void CrossModuleOptimization::serializeReferencedGlobal(
+    SILGlobalVariable *global) {
+  if (canSerializeGlobal(global)) {
+    serializeGlobal(global);
+  }
+  // Clients must use the decision of the module which defines the object.
+  if (global->isInitializedObject() &&
+      !isAvailableExternally(global->getLinkage())) {
+    irgen::IRGenModule *igm = pm->getIRGenModule();
+    global->setReadOnlyStaticObject(
+        igm && igm->canMakeStaticObjectReadOnly(global->getLoweredType()));
+  }
+  if (!hasPublicOrPackageVisibility(
+          global->getLinkage(),
+          M.getSwiftModule()->serializePackageEnabled())) {
+    global->setLinkage(SILLinkage::Public);
+  }
 }
 
 void CrossModuleOptimization::keepMethodAlive(SILDeclRef method) {
@@ -1388,8 +1482,8 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
     if (isPackageCMOEnabled(M.getSwiftModule()))
       assert(conservative && "Package CMO requires conservative CMO mode");
 
-    CrossModuleOptimization CMO(M, conservative, everything);
-    CMO.serializeFunctionsInModule(PM);
+    CrossModuleOptimization CMO(M, PM, conservative, everything);
+    CMO.serializeFunctionsInModule();
 
     // Serialize SIL v-tables and witness-tables if package-cmo is enabled.
     CMO.serializeVTablesInModule();
