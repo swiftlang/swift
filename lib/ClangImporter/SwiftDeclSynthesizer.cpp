@@ -2357,6 +2357,18 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     newMethod->addAttr(attr->clone(clangCtx));
   if (auto attr = method->getAttr<clang::OSReturnsNotRetainedAttr>())
     newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::CFReturnsNotRetainedAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::NSReturnsRetainedAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::NSReturnsNotRetainedAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::CFAuditedTransferAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::CFUnknownTransferAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::OSConsumesThisAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
 
   llvm::SmallVector<clang::ParmVarDecl *, 4> params;
   for (auto *param : method->parameters()) {
@@ -2378,6 +2390,12 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     if (auto *attr = param->getAttr<clang::NoEscapeAttr>())
       newParam->addAttr(attr->clone(clangCtx));
     for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::CFConsumedAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::NSConsumedAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::OSConsumedAttr>())
       newParam->addAttr(attr->clone(clangCtx));
     params.push_back(newParam);
   }
