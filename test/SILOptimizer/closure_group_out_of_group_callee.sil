@@ -1,0 +1,68 @@
+// REQUIRES: asserts
+
+// RUN: %target-sil-opt -swift-version 6 -enable-sil-verify-all %s -mark-never-written-mutable-closure-boxes-as-immutable -assert-continue 2> %t.mnw.err | %FileCheck %s --check-prefix=MNW
+// RUN: %FileCheck %s --check-prefix=ASSERT < %t.mnw.err
+
+// A closure that receives a box shares a closure group with the function that
+// passes it only if it is marked [closure], as SILGen marks it. Here the
+// closures aren't marked, so each is in a group of its own. With assertions
+// enabled, MarkNeverWrittenMutableClosureBoxesAsImmutable reports that;
+// -assert-continue lets it go on, and the pass then leaves the capture alone
+// instead of reading a body outside its group.
+
+// ASSERT: Assertion failed: (calleeInGroup && "partial_apply callee outside the closure group")
+// ASSERT: Continuing after failed assertion
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+class C : @unchecked Sendable {}
+
+sil @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+// MarkNeverWrittenMutableClosureBoxesAsImmutable treats the box as mutable: it
+// marks neither the box nor the closure's argument.
+//
+// MNW-LABEL: sil private [ossa] @mnw_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
+// MNW:       bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+// MNW-LABEL: } // end sil function 'mnw_callee'
+//
+// MNW-LABEL: sil [ossa] @mnw_caller : $@convention(thin) (@owned C) -> () {
+// MNW:         alloc_box ${ var @sil_weak Optional<C> }
+// MNW-LABEL: } // end sil function 'mnw_caller'
+sil private [ossa] @mnw_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
+  %1 = project_box %0, 0
+  %2 = begin_access [read] [unknown] %1
+  %3 = load_weak %2
+  end_access %2
+  %5 = alloc_stack $Optional<C>
+  store %3 to [init] %5
+  %7 = function_ref @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %8 = apply %7<C?>(%5) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_addr %5
+  dealloc_stack %5
+  %11 = tuple ()
+  return %11
+}
+
+sil [ossa] @mnw_caller : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_box ${ var @sil_weak Optional<C> }
+  %2 = begin_borrow [lexical] %1
+  %3 = project_box %2, 0
+  %4 = enum $Optional<C>, #Optional.some!enumelt, %0
+  store_weak %4 to [init] %3
+  destroy_value %4
+  %7 = function_ref @mnw_callee : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  %8 = copy_value %1
+  %9 = partial_apply [callee_guaranteed] %7(%8) : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> ()
+  destroy_value %9
+  end_borrow %2
+  destroy_value %1
+  %13 = tuple ()
+  return %13 : $()
+}
