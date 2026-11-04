@@ -296,11 +296,15 @@ FUNCTION(NativeStrongRelease, Swift, swift_release, C_CC, AlwaysAvailable,
          EFFECT(RuntimeEffect::RefCounting, RuntimeEffect::Deallocating),
          UNKNOWN_MEMEFFECTS)
 
+// This is intentionally not marked FirstParamReturned, as it triggers an LLVM
+// bug which makes swift_bridgeObjectRetainDirect spill and reload a bunch of
+// registers before tail calling it. This can be restored when rdar://182013755
+// is fixed.
 // void *swift_retain(void *ptr);
 FUNCTION(NativeStrongRetainDirect, Swift, swift_retainDirect, SwiftDirectRR_CC, AlwaysAvailable,
          RETURNS(RefCountedPtrTy),
          ARGS(RefCountedPtrTy),
-         ATTRS(NoUnwind, FirstParamReturned, WillReturn),
+         ATTRS(NoUnwind, WillReturn),
          EFFECT(RuntimeEffect::RefCounting),
          UNKNOWN_MEMEFFECTS)
 
@@ -1032,11 +1036,11 @@ FUNCTION(GetForeignTypeMetadata, Swift, swift_getForeignTypeMetadata,
 // SWIFT_CC(swift)
 // bool swift_compareTypeContextDescriptors(const TypeContextDescriptor *lhs,
 //                                          const TypeContextDescriptor *rhs);
-FUNCTION(CompareTypeContextDescriptors, 
+FUNCTION(CompareTypeContextDescriptors,
          Swift, swift_compareTypeContextDescriptors, SwiftCC,
          CompareTypeContextDescriptorsAvailability,
          RETURNS(Int1Ty),
-         ARGS(TypeContextDescriptorPtrTy, 
+         ARGS(TypeContextDescriptorPtrTy,
               TypeContextDescriptorPtrTy),
          ATTRS(NoUnwind, WillReturn),
          EFFECT(RuntimeEffect::NoEffect), // ?
