@@ -173,6 +173,30 @@ struct CountedBy: ParamInfo {
   }
 }
 
+/// A C++ lvalue reference, imported as `Unsafe[Mutable]Pointer<T>`. When the value has lifetime
+/// info, it is exposed as `Ref<Cell<T>>` (or `Ref<ConstCell<T>>` for const references).
+struct CxxReference: ParamInfo {
+  var pointerIndex: SwiftifyExpr
+  // Required by ParamInfo, but unused: it only applies to parameters.
+  var nonescaping: Bool = false
+  var dependencies: [LifetimeDependence] = []
+  var typeMappings: [String: String]?
+  var original: SyntaxProtocol
+
+  var description: String {
+    return ".reference(pointer: \(pointerIndex))"
+  }
+
+  func getBoundsCheckedThunkBuilder(
+    _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionParts
+  ) -> BoundsCheckedThunkBuilder {
+    // Only return values are supported, which parseReference enforces. A
+    // reference without lifetime info is rejected by checkArgs.
+    return CxxReferenceReturnThunkBuilder(
+      base: base, funcDecl: funcDecl, typeMappings: typeMappings, node: original)
+  }
+}
+
 struct RuntimeError: Error {
   let description: String
 
@@ -667,6 +691,56 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
         "MutableSpan"
       }
     return "unsafe _swiftifyOverrideLifetime(\(raw: cast)(_unsafeCxxSpan: \(call)), copying: ())"
+  }
+}
+
+/// Wraps a C++ reference return value, imported as `Unsafe[Mutable]Pointer<T>`, in a
+/// `Ref<Cell<T>>` (or `Ref<ConstCell<T>>` for const references). `Cell` and `ConstCell` have the
+/// same layout as `T`, so the pointer can be rebound. The cells give interior mutability, so the
+/// `Ref` stays sound even when C++ mutates the referenced value while it is alive. The stdlib types
+/// are qualified, because `Ref` and `Cell` are common names for C++ types too.
+struct CxxReferenceReturnThunkBuilder: ForwardingThunkBuilder {
+  public let base: BoundsCheckedThunkBuilder
+  public let funcDecl: FunctionParts
+  public let typeMappings: [String: String]?
+  public let node: SyntaxProtocol
+
+  // The pointer type, looking through typedefs like `using reference = value_type &`, which
+  // ClangImporter desugars for us.
+  var oldType: TypeSyntax {
+    let type = getSwiftifyExprType(funcDecl, .return)
+    if let desugared = typeMappings?[getUnattributedType(type).description] {
+      return TypeSyntax("\(raw: desugared)")
+    }
+    return type
+  }
+
+  var cellType: TypeSyntax {
+    get throws {
+      // getPointeeType looks through Optional, which a reference cannot be.
+      guard oldType.is(IdentifierTypeSyntax.self), let pointee = getPointeeType(oldType) else {
+        throw DiagnosticError(
+          "expected non-optional Unsafe[Mutable]Pointer<T> type for reference, got '\(oldType.trimmed)'",
+          node: node)
+      }
+      let cell = isMutablePointerType(oldType) ? "Cell" : "ConstCell"
+      return TypeSyntax("Swift.\(raw: cell)<\(pointee.trimmed)>")
+    }
+  }
+
+  func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
+    -> FunctionSignatureSyntax
+  {
+    assert(returnType == nil)
+    return try base.buildFunctionSignature(argTypes, TypeSyntax("Swift.Ref<\(cellType)>"))
+  }
+
+  func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
+    let call = try base.buildFunctionCall(pointerArgs)
+    let cell = try cellType
+    return """
+      unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(\(call)).assumingMemoryBound(to: \(cell).self), borrowing: ()), copying: ())
+      """
   }
 }
 
@@ -1280,6 +1354,25 @@ func parseNonEscaping(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> I
   return pointerParamIndex
 }
 
+func parseReference(
+  _ enumConstructorExpr: FunctionCallExprSyntax, _ signature: FunctionSignatureSyntax,
+  _ typeMappings: [String: String]?
+) throws -> ParamInfo {
+  let argumentList = enumConstructorExpr.arguments
+  let pointerExprArg = try getArgumentByName(argumentList, "pointer")
+  let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
+  if pointerExpr != .return {
+    throw DiagnosticError(
+      "reference is currently only supported for the return value", node: pointerExprArg)
+  }
+  if signature.returnClause == nil {
+    throw DiagnosticError("reference requires a return value", node: pointerExprArg)
+  }
+  return CxxReference(
+    pointerIndex: pointerExpr, typeMappings: typeMappings,
+    original: ExprSyntax(enumConstructorExpr))
+}
+
 func parseLifetimeDependence(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> (
   SwiftifyExpr, LifetimeDependence
 ) {
@@ -1384,7 +1477,8 @@ func parseMacroParam(
   _ paramExpr: ExprSyntax, _ signature: FunctionSignatureSyntax, _ rewriter: CountExprRewriter,
   nonescapingPointers: inout Set<Int>,
   lifetimeDependencies: inout [SwiftifyExpr: [LifetimeDependence]],
-  nullableAsEmptySpan: Bool
+  nullableAsEmptySpan: Bool,
+  typeMappings: [String: String]?
 ) throws -> ParamInfo? {
   guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
     throw DiagnosticError(
@@ -1428,9 +1522,11 @@ func parseMacroParam(
       nonescapingPointers.insert(idx)
     }
     return nil
+  case "reference":
+    return try parseReference(enumConstructorExpr, signature, typeMappings)
   default:
     throw DiagnosticError(
-      "expected 'countedBy', 'countedByOrNull', 'sizedBy', 'sizedByOrNull', 'endedBy', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
+      "expected 'countedBy', 'countedByOrNull', 'sizedBy', 'sizedByOrNull', 'endedBy', 'nonescaping', 'lifetimeDependence' or 'reference', got '\(enumName)'",
       node: enumConstructorExpr)
   }
 }
@@ -1440,6 +1536,12 @@ func checkArgs(_ args: [ParamInfo], _ funcComponents: FunctionParts) throws {
   var ret: ParamInfo? = nil
   let paramCount = funcComponents.signature.parameterClause.parameters.count
   for pointerInfo in args {
+    if pointerInfo is CxxReference && pointerInfo.dependencies.isEmpty {
+      // Without lifetime info there is nothing to transform, and the overload
+      // would have the same signature as the original.
+      throw DiagnosticError(
+        "reference requires a lifetimeDependence on the same value", node: pointerInfo.original)
+    }
     switch pointerInfo.pointerIndex {
     case .param(let i):
       if i < 1 || i > paramCount {
@@ -1602,8 +1704,17 @@ func isAnySpan(_ type: TypeSyntax) -> Bool {
     || name == "MutableRawSpan"
 }
 
-func getAvailability(_ newSignature: FunctionSignatureSyntax, _ spanAvailability: String?)
-  throws -> [AttributeListSyntax.Element] {
+// `refAvailability` is the availability of Ref<Cell<T>>, if the wrapper
+// returns one.
+func getAvailability(
+  _ newSignature: FunctionSignatureSyntax, _ spanAvailability: String?,
+  _ refAvailability: String?
+) throws -> [AttributeListSyntax.Element] {
+  // Ref<Cell<T>> is newer than Span, so its availability also covers any Span
+  // parameters.
+  if let refAvailability {
+    return [.attribute(AttributeSyntax("@available(\(raw: refAvailability), *)"))]
+  }
   guard let spanAvailability else {
     return []
   }
@@ -1826,6 +1937,7 @@ func deconstructFunction(_ declaration: some DeclSyntaxProtocol) throws -> Funct
 
 func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, leadingTrivia: Trivia,
                                args arguments: [ExprSyntax], spanAvailability: String?,
+                               refAvailability: String? = nil,
                                typeMappings: [String: String]?,
                                nullableAsEmptySpan: Bool,
                                parentNode: Syntax?) throws -> DeclSyntax {
@@ -1838,7 +1950,7 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     try parseMacroParam(
       $0, funcComponents.signature, rewriter, nonescapingPointers: &nonescapingPointers,
       lifetimeDependencies: &lifetimeDependencies,
-      nullableAsEmptySpan: nullableAsEmptySpan)
+      nullableAsEmptySpan: nullableAsEmptySpan, typeMappings: typeMappings)
   }
   parsedArgs.append(
     contentsOf: try parseCxxSpansInSignature(funcComponents.signature, typeMappings))
@@ -1904,7 +2016,9 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   let newLifetimeAttr = mergeLifetimeAttrs(
     funcComponents.attributes, lifetimes, funcComponents.signature.parameterClause.parameters,
     rewriter.nameMap)
-  let availabilityAttr = try getAvailability(newSignature, spanAvailability)
+  let returnsRef = parsedArgs.contains { $0 is CxxReference }
+  let availabilityAttr = try getAvailability(
+    newSignature, spanAvailability, returnsRef ? refAvailability : nil)
   let disfavoredOverload: [AttributeListSyntax.Element] =
     [
       .attribute(
@@ -1990,6 +2104,8 @@ public struct SwiftifyImportMacro: PeerMacro {
     do {
       let argumentList = node.arguments!.as(LabeledExprListSyntax.self)!
       var arguments = [LabeledExprSyntax](argumentList)
+      let refAvailability = try takeTrailingArg(&arguments, labeled: "refAvailability")
+        .flatMap(parseStringLiteralValue)
       let nullableAsEmptySpan =
         try takeTrailingArg(&arguments, labeled: "nullableAsEmptySpan")
           .map(getBoolLiteralValue) ?? false
@@ -2002,6 +2118,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         try constructOverloadFunction(
           forDecl: declaration, leadingTrivia: node.leadingTrivia, args: args,
           spanAvailability: spanAvailability,
+          refAvailability: refAvailability,
           typeMappings: typeMappings,
           nullableAsEmptySpan: nullableAsEmptySpan,
           parentNode: context.lexicalContext.first)]

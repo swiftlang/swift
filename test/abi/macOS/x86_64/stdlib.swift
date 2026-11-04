@@ -963,6 +963,7 @@ Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO13sizedByOrNullyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO15countedByOrNullyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABs01_A4ExprO_AEs01_D4TypeOtcABmFWC
+Added: _$ss13_SwiftifyInfoO9referenceyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
