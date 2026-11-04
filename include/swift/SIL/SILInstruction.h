@@ -3394,6 +3394,20 @@ public:
     return getSubstCalleeConv().hasGuaranteedAddressResult();
   }
 
+  /// If the non-trivial @guaranteed result borrows a @guaranteed self value,
+  /// like a begin_borrow, return the self operand. Otherwise return nullptr.
+  Operand *getSelfObjectOfGuaranteedBorrowAccessorResult() {
+    if (!hasGuaranteedResult() || !hasSelfArgument() ||
+        getType().isTrivial(*getFunction())) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
   bool hasAddressResult() const {
     return getSubstCalleeConv().hasAddressResult();
   }

@@ -614,11 +614,15 @@ bb0(%0 : @guaranteed $Wrapper):
   return %2
 }
 
+// The scope of the borrow accessor result is completed before the scope of its self.
 // CHECK-LABEL: sil [ossa] @test_borrow_accessor1 :
+// CHECK:  [[B:%.*]] = begin_borrow
+// CHECK:  [[R:%.*]] = apply {{%.*}}([[B]]) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:  end_borrow {{.*}}
-// CHECK:  destroy_value {{.*}}
+// CHECK:  apply [[F]]([[R]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK-NEXT:  end_borrow [[R]]
+// CHECK-NEXT:  end_borrow [[B]]
+// CHECK-NEXT:  destroy_value [dead_end]
 // CHECK:  unreachable
 // CHECK-LABEL: } // end sil function 'test_borrow_accessor1'
 sil [ossa] @test_borrow_accessor1 : $@convention(thin) (@owned Wrapper) -> () {
@@ -634,10 +638,13 @@ bb0(%0 : @owned $Wrapper):
 }
 
 // CHECK-LABEL: sil [ossa] @test_borrow_accessor2 :
+// CHECK:  [[B:%.*]] = begin_borrow
+// CHECK:  [[R:%.*]] = apply {{%.*}}([[B]]) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK:  [[F:%.*]] = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:  [[A:%.*]] = apply [[F]]({{.*}}) : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:  end_borrow {{.*}}
-// CHECK:  destroy_value {{.*}}
+// CHECK:  apply [[F]]([[R]]) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK-NEXT:  end_borrow [[R]]
+// CHECK-NEXT:  end_borrow [[B]]
+// CHECK-NEXT:  destroy_value [dead_end]
 // CHECK:  unreachable
 // CHECK-LABEL: } // end sil function 'test_borrow_accessor2'
 sil [ossa] @test_borrow_accessor2 : $@convention(thin) () -> () {

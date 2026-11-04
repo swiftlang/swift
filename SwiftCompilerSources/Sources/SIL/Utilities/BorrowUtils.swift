@@ -148,6 +148,10 @@
 /// operand. Its result, however, is not a BeginBorrowValue. Instead it is a ForwardingInstruction relative to its value
 /// operand.
 ///
+/// Note: an apply of a borrow accessor with a @guaranteed self is a BorrowingInstruction because, like begin_borrow, it
+/// borrows self over the scope of its @guaranteed result. With an @in_guaranteed self, it borrows a memory location,
+/// like load_borrow, and is not a BorrowingInstruction.
+///
 /// TODO: replace BorrowIntroducingInstruction with this.
 public enum BorrowingInstruction : CustomStringConvertible, Hashable {
   case beginBorrow(BeginBorrowInst)
@@ -157,6 +161,7 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
   case partialApply(PartialApplyInst)
   case markDependence(MarkDependenceInst)
   case startAsyncLet(BuiltinInst)
+  case borrowAccessor(ApplyInst)
 
   public init?(_ inst: Instruction) {
     switch inst {
@@ -178,6 +183,8 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
     case let bi as BuiltinInst
            where bi.id == .StartAsyncLetWithLocalBuffer:
       self = .startAsyncLet(bi)
+    case let ai as ApplyInst where ai.selfObjectOfGuaranteedBorrowAccessorResult != nil:
+      self = .borrowAccessor(ai)
     default:
       return nil
     }
@@ -199,6 +206,8 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
       return mdi
     case .startAsyncLet(let bi):
       return bi
+    case .borrowAccessor(let ai):
+      return ai
     }
   }
 
@@ -225,7 +234,7 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
         return nil
       }
       return mdi
-    case .beginBorrow, .storeBorrow, .beginApply, .partialApply, .startAsyncLet:
+    case .beginBorrow, .storeBorrow, .beginApply, .partialApply, .startAsyncLet, .borrowAccessor:
       return nil
     }
   }
@@ -233,7 +242,7 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
   /// If this is valid, then visitScopeEndingOperands succeeds.
   public var scopedValue: Value? {
     switch self {
-    case .beginBorrow, .storeBorrow:
+    case .beginBorrow, .storeBorrow, .borrowAccessor:
       return instruction as! SingleValueInstruction
     case let .borrowedFrom(bfi):
       let phi = bfi.borrowedPhi
@@ -298,6 +307,9 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
         }
         return .continueWalk
       }
+    case .borrowAccessor:
+      // end_borrow, return_borrow, or a reborrow.
+      return val.uses.endingLifetime.walk { visitor($0) }
     }
   }
 }
@@ -333,7 +345,8 @@ extension BorrowingInstruction {
 }
 
 /// A value that introduces a borrow scope:
-/// begin_borrow, load_borrow, reborrow, guaranteed function argument, begin_apply, unchecked_ownership_conversion.
+/// begin_borrow, load_borrow, reborrow, guaranteed function argument, begin_apply, unchecked_ownership_conversion,
+/// guaranteed result of a borrow accessor.
 ///
 /// If the value introduces a local scope, then that scope is
 /// terminated by scope ending operands. Function arguments do not
@@ -343,6 +356,10 @@ extension BorrowingInstruction {
 /// one of the yielded values. In any case, the scope ending operands
 /// are on the end_apply or abort_apply instructions that use the
 /// token.
+///
+/// The guaranteed result of a borrow accessor is a nested borrow of a
+/// @guaranteed self, like begin_borrow, or a borrow of the memory location
+/// of an @in_guaranteed self, like load_borrow.
 public enum BeginBorrowValue {
   case beginBorrow(BeginBorrowInst)
   case loadBorrow(LoadBorrowInst)
@@ -351,6 +368,7 @@ public enum BeginBorrowValue {
   case uncheckOwnershipConversion(UncheckedOwnershipConversionInst)
   case functionArgument(FunctionArgument)
   case reborrow(Phi)
+  case borrowAccessor(ApplyInst)
 
   public init?(_ value: Value) {
     switch value {
@@ -360,6 +378,8 @@ public enum BeginBorrowValue {
       self = .loadBorrow(lbi)
     case let dbi as DereferenceBorrowInst:
       self = .dereferenceBorrow(dbi)
+    case let ai as ApplyInst where ai.ownership == .guaranteed:
+      self = .borrowAccessor(ai)
     case let uoci as UncheckedOwnershipConversionInst where uoci.ownership == .guaranteed:
       self = .uncheckOwnershipConversion(uoci)
     case let arg as FunctionArgument where arg.ownership == .guaranteed:
@@ -384,6 +404,7 @@ public enum BeginBorrowValue {
     case .uncheckOwnershipConversion(let uoci): return uoci
     case .functionArgument(let arg): return arg
     case .reborrow(let phi): return phi.value
+    case .borrowAccessor(let ai): return ai
     }
   }
 
@@ -417,6 +438,8 @@ public enum BeginBorrowValue {
       self.init(borrowedFrom.borrowedPhi.value)
     case let .beginApply(beginApply):
       self.init(beginApply.token)
+    case let .borrowAccessor(apply):
+      self.init(apply)
     case .storeBorrow, .partialApply, .markDependence, .startAsyncLet:
       return nil
     }
@@ -424,7 +447,8 @@ public enum BeginBorrowValue {
 
   public var hasLocalScope: Bool {
     switch self {
-    case .beginBorrow, .loadBorrow, .dereferenceBorrow, .beginApply, .reborrow, .uncheckOwnershipConversion:
+    case .beginBorrow, .loadBorrow, .dereferenceBorrow, .beginApply, .reborrow, .uncheckOwnershipConversion,
+         .borrowAccessor:
       return true
     case .functionArgument:
       return false
@@ -432,7 +456,7 @@ public enum BeginBorrowValue {
   }
 
   // Return the value borrowed by begin_borrow or address borrowed by
-  // load_borrow.
+  // load_borrow. For a borrow accessor, return the self value or address.
   //
   // Return nil for begin_apply and reborrow, which need special handling.
   public var baseOperand: Operand? {
@@ -443,6 +467,8 @@ public enum BeginBorrowValue {
       return loadBorrow.operand
     case let .dereferenceBorrow(derefBorrow):
       return derefBorrow.operand
+    case let .borrowAccessor(apply):
+      return apply.selfArgumentOperand
     case .beginApply, .functionArgument, .reborrow, .uncheckOwnershipConversion:
       return nil
     }
@@ -511,6 +537,11 @@ public final class EnclosingValueIterator : IteratorProtocol {
       case let .beginBorrow(bbi):
         // Gather the outer enclosing borrow scope.
         worklist.pushIfNotVisited(bbi.borrowedValue)
+      case let .borrowAccessor(apply):
+        // Gather the outer enclosing borrow scope of a @guaranteed self.
+        if let selfOperand = apply.selfObjectOfGuaranteedBorrowAccessorResult {
+          worklist.pushIfNotVisited(selfOperand.value)
+        }
       case .loadBorrow, .dereferenceBorrow, .beginApply, .functionArgument, .uncheckOwnershipConversion:
         // There is no enclosing value on this path.
         break

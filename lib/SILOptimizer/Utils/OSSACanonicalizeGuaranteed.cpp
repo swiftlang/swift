@@ -186,6 +186,10 @@ SILValue OSSACanonicalizeGuaranteed::getCanonicalBorrowedDef(SILValue def) {
       case BorrowedValueKind::DereferenceBorrow:
       case BorrowedValueKind::Phi:
       case BorrowedValueKind::BeginApplyToken:
+      // FIXME: A borrow accessor result with a @guaranteed self could be
+      // handled like begin_borrow, but downstream utilities like
+      // filterOuterBorrowUseInsts do not support it yet.
+      case BorrowedValueKind::BorrowAccessor:
         break;
       }
     }
@@ -213,6 +217,7 @@ bool OSSACanonicalizeGuaranteed::computeBorrowLiveness() {
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::DereferenceBorrow:
   case BorrowedValueKind::Phi:
+  case BorrowedValueKind::BorrowAccessor:
     // TODO: Canonicalize load_borrow scope and phi once consolidateBorrowScope
     // can handle persistentCopies.
     return false;
