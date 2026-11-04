@@ -70,11 +70,10 @@ bb2(%8 : @owned $Error):
 // CHECK-LABEL: sil [ossa] @replace_try_apply_with_apply_cast_return_type : $@convention(method) (@guaranteed DD) -> @owned Optional<BB>
 // CHECK: bb0
 // CHECK: [[INIT:%.*]] = apply %{{.*}}
-// CHECK: [[COPY:%.*]] = copy_value [[INIT]] : $@callee_owned (@owned EE) -> @owned CC
-// CHECK: [[CVT:%.*]] = convert_function [[INIT]]
+// CHECK-NOT: copy_value
+// CHECK-NOT: convert_function
 // CHECK-NOT: try_apply
-// CHECK: destroy_value [[CVT]] : $@callee_owned (@owned EE) -> (@owned Optional<BB>, @error any Error)
-// CHECK: apply [[COPY]]
+// CHECK: apply [[INIT]]
 // Check that return value is properly casted
 // CHECK-NEXT: enum $Optional<CC>, #Optional.some!enumelt, %{{.*}} : $CC
 // CHECK-NEXT: upcast %{{.*}} : $Optional<CC> to $Optional<BB>
@@ -441,3 +440,289 @@ bb2(%8 : @owned $Error):
   unreachable
 }
 
+sil @throwingClosure : $@convention(thin) () -> (Int, @error any Error)
+sil @throwingCapturingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Int, @error any Error)
+sil @nonThrowingCapturingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+
+// The apply calls the same exactly-once closure as the try_apply did, so the
+// closure isn't destroyed before the call.
+//
+// CHECK-LABEL: sil [ossa] @test_exactly_once_thin_to_thick_with_unreachable_error :
+// CHECK:         [[CLOSURE:%.*]] = thin_to_thick_function
+// CHECK-NOT:     destroy_value
+// CHECK:         apply [nothrow] [[CLOSURE]]()
+// CHECK:       } // end sil function 'test_exactly_once_thin_to_thick_with_unreachable_error'
+sil [ossa] @test_exactly_once_thin_to_thick_with_unreachable_error : $@convention(thin) () -> Int {
+bb0:
+  %0 = function_ref @throwingClosure : $@convention(thin) () -> (Int, @error any Error)
+  %1 = thin_to_thick_function %0 to $@noescape @once @callee_owned () -> (Int, @error any Error)
+  try_apply %1() : $@noescape @once @callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%3 : $Int):
+  return %3
+
+bb2(%5 : $any Error):
+  unreachable
+}
+
+// The apply consumes the at-most-once closure as the try_apply did, so the
+// closure isn't copied.
+//
+// CHECK-LABEL: sil [ossa] @test_at_most_once_closure_with_unreachable_error :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [called_at_most_once]
+// CHECK-NOT:     copy_value
+// CHECK:         apply [nothrow] [[CLOSURE]]()
+// CHECK:       } // end sil function 'test_at_most_once_closure_with_unreachable_error'
+sil [ossa] @test_at_most_once_closure_with_unreachable_error : $@convention(thin) (@owned Builtin.NativeObject) -> Int {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @throwingCapturingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Int, @error any Error)
+  %2 = partial_apply [called_at_most_once] %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Int, @error any Error)
+  try_apply %2() : $@callable(once) @callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%4 : $Int):
+  return %4
+
+bb2(%6 : $any Error):
+  unreachable
+}
+
+// The try_apply is the only user of the convert_function, so it's deleted, and
+// the apply consumes the at-most-once closure without a copy.
+//
+// CHECK-LABEL: sil [ossa] @test_converted_at_most_once_closure :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply [called_at_most_once]
+// CHECK-NOT:     convert_function
+// CHECK-NOT:     copy_value
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:       } // end sil function 'test_converted_at_most_once_closure'
+sil [ossa] @test_converted_at_most_once_closure : $@convention(thin) (@owned Builtin.NativeObject) -> (Int, @error any Error) {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @nonThrowingCapturingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+  %2 = partial_apply [called_at_most_once] %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+  %3 = convert_function %2 : $@callable(once) @callee_owned () -> Int to $@callable(once) @callee_owned () -> (Int, @error any Error)
+  try_apply %3() : $@callable(once) @callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%5 : $Int):
+  return %5
+
+bb2(%7 : @owned $any Error):
+  throw %7
+}
+
+// CHECK-LABEL: sil [ossa] @test_owned_closure_with_unreachable_error :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NOT:     copy_value
+// CHECK:         apply [nothrow] [[CLOSURE]]()
+// CHECK:       } // end sil function 'test_owned_closure_with_unreachable_error'
+sil [ossa] @test_owned_closure_with_unreachable_error : $@convention(thin) (@owned Builtin.NativeObject) -> Int {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @throwingCapturingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Int, @error any Error)
+  %2 = partial_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> (Int, @error any Error)
+  try_apply %2() : $@callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%4 : $Int):
+  return %4
+
+bb2(%6 : $any Error):
+  unreachable
+}
+
+sil @nonThrowingClosure : $@convention(thin) () -> Int
+
+// The closure has no captures, so the apply calls its function, and the
+// conversions are deleted instead of the exactly-once closure being destroyed.
+//
+// CHECK-LABEL: sil [ossa] @test_converted_capture_less_exactly_once_closure :
+// CHECK:         [[FN:%.*]] = function_ref @nonThrowingClosure
+// CHECK-NOT:     thin_to_thick_function
+// CHECK-NOT:     convert
+// CHECK-NOT:     destroy_value
+// CHECK:         apply [[FN]]()
+// CHECK:       } // end sil function 'test_converted_capture_less_exactly_once_closure'
+sil [ossa] @test_converted_capture_less_exactly_once_closure : $@convention(thin) () -> (Int, @error any Error) {
+bb0:
+  %0 = function_ref @nonThrowingClosure : $@convention(thin) () -> Int
+  %1 = thin_to_thick_function %0 to $@once @callee_owned () -> Int
+  %2 = convert_escape_to_noescape %1 : $@once @callee_owned () -> Int to $@noescape @once @callee_owned () -> Int
+  %3 = convert_function %2 : $@noescape @once @callee_owned () -> Int to $@noescape @once @callee_owned () -> (Int, @error any Error)
+  try_apply %3() : $@noescape @once @callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%5 : $Int):
+  return %5
+
+bb2(%7 : @owned $any Error):
+  throw %7
+}
+
+// The convert_function is still used, so the apply would need a copy of the
+// noncopyable closure. Because the error block is unreachable, the apply calls
+// the converted closure instead.
+//
+// CHECK-LABEL: sil [ossa] @test_converted_at_most_once_closure_still_used :
+// CHECK:         [[CONVERTED:%.*]] = convert_function
+// CHECK-NOT:     copy_value
+// CHECK:         apply [nothrow] [[CONVERTED]]()
+// CHECK:       } // end sil function 'test_converted_at_most_once_closure_still_used'
+sil [ossa] @test_converted_at_most_once_closure_still_used : $@convention(thin) (@owned Builtin.NativeObject) -> Int {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @nonThrowingCapturingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+  %2 = partial_apply [called_at_most_once] %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+  %3 = convert_function %2 : $@callable(once) @callee_owned () -> Int to $@callable(once) @callee_owned () -> (Int, @error any Error)
+  %4 = begin_borrow %3 : $@callable(once) @callee_owned () -> (Int, @error any Error)
+  end_borrow %4 : $@callable(once) @callee_owned () -> (Int, @error any Error)
+  try_apply %3() : $@callable(once) @callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%7 : $Int):
+  return %7
+
+bb2(%9 : $any Error):
+  unreachable
+}
+
+// A guaranteed callee is borrowed for the whole call, so it isn't copied.
+//
+// CHECK-LABEL: sil [ossa] @test_converted_guaranteed_at_most_once_closure :
+// CHECK-NOT:     copy_value
+// CHECK:         apply %0()
+// CHECK:       } // end sil function 'test_converted_guaranteed_at_most_once_closure'
+sil [ossa] @test_converted_guaranteed_at_most_once_closure : $@convention(thin) (@guaranteed @noescape @callable(once) @callee_guaranteed () -> Int) -> (Int, @error any Error) {
+bb0(%0 : @guaranteed $@noescape @callable(once) @callee_guaranteed () -> Int):
+  %1 = convert_function %0 : $@noescape @callable(once) @callee_guaranteed () -> Int to $@noescape @callable(once) @callee_guaranteed () -> (Int, @error any Error)
+  try_apply %1() : $@noescape @callable(once) @callee_guaranteed () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%3 : $Int):
+  return %3
+
+bb2(%5 : @owned $any Error):
+  throw %5
+}
+
+// The convert_function is still used, so the try_apply's callee would have to
+// be destroyed, which isn't possible for an exactly-once closure.
+//
+// CHECK-LABEL: sil [ossa] @test_converted_exactly_once_closure_still_used :
+// CHECK:         [[CONVERTED:%.*]] = convert_function
+// CHECK-NOT:     destroy_value
+// CHECK:         try_apply [[CONVERTED]]()
+// CHECK:       } // end sil function 'test_converted_exactly_once_closure_still_used'
+sil [ossa] @test_converted_exactly_once_closure_still_used : $@convention(thin) () -> (Int, @error any Error) {
+bb0:
+  %0 = function_ref @nonThrowingClosure : $@convention(thin) () -> Int
+  %1 = thin_to_thick_function %0 to $@once @callee_owned () -> Int
+  %2 = convert_escape_to_noescape %1 : $@once @callee_owned () -> Int to $@noescape @once @callee_owned () -> Int
+  %3 = convert_function %2 : $@noescape @once @callee_owned () -> Int to $@noescape @once @callee_owned () -> (Int, @error any Error)
+  %4 = begin_borrow %3 : $@noescape @once @callee_owned () -> (Int, @error any Error)
+  end_borrow %4 : $@noescape @once @callee_owned () -> (Int, @error any Error)
+  try_apply %3() : $@noescape @once @callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%7 : $Int):
+  return %7
+
+bb2(%9 : @owned $any Error):
+  throw %9
+}
+
+// The deleted convert_function's debug info is salvaged.
+//
+// CHECK-LABEL: sil [ossa] @test_converted_closure_debug_info :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK-NOT:     copy_value
+// CHECK:         debug_value [[CLOSURE]] : $@callee_owned () -> Int, let, name "closure", transform {
+// CHECK:           convert_function
+// CHECK:         }
+// CHECK:         apply [[CLOSURE]]()
+// CHECK:       } // end sil function 'test_converted_closure_debug_info'
+sil [ossa] @test_converted_closure_debug_info : $@convention(thin) (@owned Builtin.NativeObject) -> (Int, @error any Error) {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @nonThrowingCapturingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+  %2 = partial_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+  %3 = convert_function %2 : $@callee_owned () -> Int to $@callee_owned () -> (Int, @error any Error)
+  debug_value %3 : $@callee_owned () -> (Int, @error any Error), let, name "closure"
+  try_apply %3() : $@callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%6 : $Int):
+  return %6
+
+bb2(%8 : @owned $any Error):
+  throw %8
+}
+
+// The convert_escape_to_noescape doesn't consume the escaping closure, which is
+// still destroyed, so the conversions are kept, and the apply consumes a copy.
+//
+// CHECK-LABEL: sil [ossa] @test_noescape_converted_owned_closure :
+// CHECK:         [[CLOSURE:%.*]] = partial_apply
+// CHECK:         [[COPY:%.*]] = copy_value [[CLOSURE]]
+// CHECK:         [[NOESCAPE:%.*]] = convert_escape_to_noescape [[CLOSURE]]
+// CHECK:         [[CONVERTED:%.*]] = convert_function [[NOESCAPE]]
+// CHECK:         destroy_value [[CONVERTED]]
+// CHECK:         apply [[COPY]]()
+// CHECK:         destroy_value [[CLOSURE]]
+// CHECK:       } // end sil function 'test_noescape_converted_owned_closure'
+sil [ossa] @test_noescape_converted_owned_closure : $@convention(thin) (@owned Builtin.NativeObject) -> (Int, @error any Error) {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @nonThrowingCapturingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+  %2 = partial_apply %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Int
+  %3 = convert_escape_to_noescape %2 : $@callee_owned () -> Int to $@noescape @callee_owned () -> Int
+  %4 = convert_function %3 : $@noescape @callee_owned () -> Int to $@noescape @callee_owned () -> (Int, @error any Error)
+  try_apply %4() : $@noescape @callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%6 : $Int):
+  destroy_value %2
+  return %6
+
+bb2(%8 : @owned $any Error):
+  destroy_value %2
+  throw %8
+}
+
+// The apply consumes the callee, so a guaranteed callee is copied.
+//
+// CHECK-LABEL: sil [ossa] @test_noescape_converted_guaranteed_closure :
+// CHECK:         [[COPY:%.*]] = copy_value %0
+// CHECK:         [[NOESCAPE:%.*]] = convert_escape_to_noescape %0
+// CHECK:         [[CONVERTED:%.*]] = convert_function [[NOESCAPE]]
+// CHECK:         destroy_value [[CONVERTED]]
+// CHECK:         apply [[COPY]]()
+// CHECK:       } // end sil function 'test_noescape_converted_guaranteed_closure'
+sil [ossa] @test_noescape_converted_guaranteed_closure : $@convention(thin) (@guaranteed @callee_owned () -> Int) -> (Int, @error any Error) {
+bb0(%0 : @guaranteed $@callee_owned () -> Int):
+  %1 = convert_escape_to_noescape %0 : $@callee_owned () -> Int to $@noescape @callee_owned () -> Int
+  %2 = convert_function %1 : $@noescape @callee_owned () -> Int to $@noescape @callee_owned () -> (Int, @error any Error)
+  try_apply %2() : $@noescape @callee_owned () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%4 : $Int):
+  return %4
+
+bb2(%6 : @owned $any Error):
+  throw %6
+}
+
+// The try_apply is outside of the borrow scope of the callee, so the apply
+// calls a copy of the callee.
+//
+// CHECK-LABEL: sil [ossa] @test_noescape_converted_borrowed_closure :
+// CHECK:         [[BORROW:%.*]] = begin_borrow %0
+// CHECK:         [[COPY:%.*]] = copy_value [[BORROW]]
+// CHECK:         end_borrow [[BORROW]]
+// CHECK:         apply [[COPY]]()
+// CHECK:         destroy_value [[COPY]]
+// CHECK:       } // end sil function 'test_noescape_converted_borrowed_closure'
+sil [ossa] @test_noescape_converted_borrowed_closure : $@convention(thin) (@owned @callee_guaranteed () -> Int) -> (Int, @error any Error) {
+bb0(%0 : @owned $@callee_guaranteed () -> Int):
+  %1 = begin_borrow %0 : $@callee_guaranteed () -> Int
+  %2 = convert_escape_to_noescape %1 : $@callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> Int
+  %3 = convert_function %2 : $@noescape @callee_guaranteed () -> Int to $@noescape @callee_guaranteed () -> (Int, @error any Error)
+  end_borrow %1 : $@callee_guaranteed () -> Int
+  try_apply %3() : $@noescape @callee_guaranteed () -> (Int, @error any Error), normal bb1, error bb2
+
+bb1(%6 : $Int):
+  destroy_value %3
+  destroy_value %0
+  return %6
+
+bb2(%8 : @owned $any Error):
+  destroy_value %3
+  destroy_value %0
+  throw %8
+}
