@@ -158,7 +158,7 @@ func testOverloading(name: String) {
 
   _ = overloadedTuplify(true) { cond in
     if cond {
-      print(\"hello") // expected-error {{invalid component of Swift key path}}
+      print(\"hello") // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{expected root in key path}} expected-astgen-error {{unexpected code '"hello"' in function call}}
     }
   }
 
@@ -669,15 +669,15 @@ struct MyView {
 
   @TupleBuilder var invalidSwitchOne: some P {
     switch Optional.some(1) {
-    case . // expected-error {{expected ':' after 'case'}}
-    } // expected-error {{expected identifier after '.' expression}}
+    case . // expected-cparser-error {{expected ':' after 'case'}} expected-astgen-error {{expected name in member access}} expected-astgen-error {{expected ':' in switch case}}
+    } // expected-cparser-error {{expected identifier after '.' expression}}
   }
 
   @TupleBuilder var invalidSwitchMultiple: some P {
     switch Optional.some(1) {
     case .none: // expected-error {{'case' label in a 'switch' must have at least one executable statement}}
-    case . // expected-error {{expected ':' after 'case'}}
-    } // expected-error {{expected identifier after '.' expression}}
+    case . // expected-cparser-error {{expected ':' after 'case'}} expected-astgen-error {{expected name in member access}} expected-astgen-error {{expected ':' in switch case}}
+    } // expected-cparser-error {{expected identifier after '.' expression}}
   }
 
   @TupleBuilder var invalidCaseWithoutDot: some P {
@@ -745,7 +745,7 @@ struct TuplifiedStructWithInvalidClosure {
   @TupleBuilder var errorsDiagnosedByParser: some Any {
     if let _ = condition {
       tuplify { _ in // expected-error {{missing argument for parameter #1 in call}}
-        self. // expected-error {{expected member name following '.'}}
+        self. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
       }
       42
     }
@@ -754,7 +754,7 @@ struct TuplifiedStructWithInvalidClosure {
   @TupleBuilder var nestedErrorsDiagnosedByParser: some Any {
     tuplify(true) { _ in
       tuplify { _ in // expected-error {{missing argument for parameter #1 in call}}
-        self. // expected-error {{expected member name following '.'}}
+        self. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
       }
       42
     }

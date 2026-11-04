@@ -112,14 +112,14 @@ let _: any P.Type? = S.self
 // ...but these should still be errors:
 
 // expected-error@+2 {{confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence}}{{12-12=(}}{{17-17=)}}
-// expected-error@+1 {{non-protocol, non-class type '(any Q)?' cannot be used within a protocol-constrained type}}
+// expected-cparser-error@+1 {{non-protocol, non-class type '(any Q)?' cannot be used within a protocol-constrained type}}
 let _: any P & Q? = S()
 
 // expected-error@+2 {{confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence}}{{12-12=(}}{{25-25=)}}
-// expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
+// expected-cparser-error@+1 {{type '(any Copyable)?' cannot be suppressed}} expected-astgen-error@+1 {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}
 let _: any P & ~Copyable? = S()
 
-// expected-error@+3 {{confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence}}{{12-12=(}}{{18-18=)}}
+// expected-cparser-error@+3 {{confusing use of optional after a 'some' or 'any' composition; use parentheses to clarify precedence}}{{12-12=(}}{{18-18=)}}
 // expected-error@+2 {{non-protocol, non-class type '(any P)?' cannot be used within a protocol-constrained type}}
 // expected-error@+1 {{non-protocol, non-class type '(any Q)?' cannot be used within a protocol-constrained type}}
 let _: any P? & Q? = S()

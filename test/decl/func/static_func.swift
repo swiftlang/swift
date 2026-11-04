@@ -13,8 +13,8 @@ static override func gf5() {} // expected-error {{static methods may only be dec
 class override func gf6() {} // expected-error {{class methods may only be declared on a type}}{{1-7=}}
     // expected-error@-1 {{'override' can only be specified on class members}}{{7-16=}}
 
-static gf7() {} // expected-error {{expected declaration}}
-class gf8() {} // expected-error {{expected '{' in class}}
+static gf7() {} // expected-cparser-error {{expected declaration}} expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{static methods may only be declared on a type}}
+class gf8() {} // expected-cparser-error {{expected '{' in class}} expected-astgen-error {{unexpected code '()' in class}}
 
 func inGlobalFunc() {
   static func gf1() {} // expected-error {{static methods may only be declared on a type}}{{3-10=}}

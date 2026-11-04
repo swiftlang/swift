@@ -7,7 +7,7 @@
 func f0<T>(x: Int, y: Int, t: T) { }
 func f1<T : Any>(x: Int, y: Int, t: T) { }
 func f2<T : IteratorProtocol>(x: Int, y: Int, t: T) { }
-func f3<T : () -> ()>(x: Int, y: Int, t: T) { } // expected-error{{expected a class type or protocol-constrained type restricting 'T'}}
+func f3<T : () -> ()>(x: Int, y: Int, t: T) { } // expected-cparser-error{{expected a class type or protocol-constrained type restricting 'T'}} expected-astgen-error {{expected inherited type in generic parameter}} expected-astgen-note {{to match this opening '<'}} expected-astgen-error {{generic parameter 'T' is not used in function signature}} expected-astgen-error {{expected '>' to end generic parameter clause}} expected-astgen-error {{unexpected code '>(x: Int, y: Int, t: T)' in function}}
 func f4<T>(x: T, y: T) { }
 
 // Non-protocol type constraints.

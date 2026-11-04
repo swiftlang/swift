@@ -67,7 +67,7 @@ let divZero: InlineArray<(1/0), Int>
 // expected-error@-2 {{generic value must be an integer literal expression}}
 
 let backwardsSugar = [Int of (1+2)]
-// expected-error@-1 {{cannot pass type 'Int' as a value for generic value 'count'}}
+// expected-cparser-error@-1 {{cannot pass type 'Int' as a value for generic value 'count'}} expected-astgen-error@-1 {{unexpected code '1+2' in tuple type}}
 // expected-error@-2 {{expected type}}
 
 struct S<each T> {}

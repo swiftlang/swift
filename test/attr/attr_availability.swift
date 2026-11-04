@@ -12,7 +12,7 @@ func unavailable_func_with_message() {}
 @available(OSX, unavailable)
 func unavailable_multiple_platforms() {}
 
-@available // expected-error {{expected '(' in 'available' attribute}}
+@available // expected-error {{expected '(' in 'available' attribute}} expected-astgen-error {{expected platform in 'available' attribute}} expected-astgen-error {{expected '()' in attribute}}
 func noArgs() {}
 @available(*) // expected-error {{expected ',' in 'available' attribute}}
 func noKind() {}
@@ -121,53 +121,53 @@ let _: Int
 
 
 // Parse errors.
-@available() // expected-error{{expected platform name or '*' for 'available' attribute}}
+@available() // expected-cparser-error{{expected platform name or '*' for 'available' attribute}} expected-astgen-error {{expected platform in 'available' attribute}}
 let _: Int
 
-@available(OSX,) // expected-error{{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
+@available(OSX,) // expected-cparser-error{{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}} expected-astgen-error {{expected platform name}}
 let _: Int
 
-@available(OSX, message) // expected-error{{expected ':' after 'message' in 'available' attribute}}
+@available(OSX, message) // expected-cparser-error{{expected ':' after 'message' in 'available' attribute}} expected-astgen-error {{expected ':' and value in availability argument}}
 let _: Int
 
 
-@available(OSX, message: ) // expected-error{{expected string literal in 'available' attribute}}
+@available(OSX, message: ) // expected-cparser-error{{expected string literal in 'available' attribute}} expected-astgen-error {{expected value to end availability argument}}
 let _: Int
 
-@available(OSX, message: x) // expected-error{{expected string literal in 'available' attribute}}
+@available(OSX, message: x) // expected-cparser-error{{expected string literal in 'available' attribute}} expected-astgen-error {{expected '"' in simple string literal}} expected-astgen-error {{expected '"' to end simple string literal}}
 let _: Int
 
-@available(OSX, unavailable:) // expected-error{{expected ')' in 'available' attribute}} expected-error{{expected declaration}}
+@available(OSX, unavailable:) // expected-cparser-error{{expected ')' in 'available' attribute}} expected-cparser-error{{expected declaration}} expected-astgen-error {{unexpected code ':' in attribute}}
 let _: Int
 
-@available(OSX, introduced) // expected-error{{expected ':' after 'introduced' in 'available' attribute}}
+@available(OSX, introduced) // expected-cparser-error{{expected ':' after 'introduced' in 'available' attribute}} expected-astgen-error {{expected ':' and value in availability argument}} expected-astgen-error {{expected version number in 'available' attribute}}
 let _: Int
 
-@available(OSX, introduced: ) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: ) // expected-error{{expected version number in 'available' attribute}} expected-astgen-error {{expected value in availability argument}}
 let _: Int
 
-@available(OSX, introduced: x) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: x) // expected-error{{expected version number in 'available' attribute}} expected-astgen-error {{cannot parse version component code 'x'}}
 let _: Int
 
-@available(OSX, introduced: 1.x) // expected-error{{expected ')' in 'available' attribute}} expected-error {{expected declaration}}
+@available(OSX, introduced: 1.x) // expected-cparser-error{{expected ')' in 'available' attribute}} expected-astgen-error {{expected version number in 'available' attribute}} expected-cparser-error {{expected declaration}} expected-astgen-error {{cannot parse version component code '.x'}}
 let _: Int
 
-@available(OSX, introduced: 1.0.x) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: 1.0.x) // expected-error{{expected version number in 'available' attribute}} expected-astgen-error {{cannot parse version component code 'x'}}
 let _: Int
 
-@available(OSX, introduced: 0x1) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: 0x1) // expected-error{{expected version number in 'available' attribute}} expected-astgen-error {{cannot parse version component code '0x1'}}
 let _: Int
 
-@available(OSX, introduced: 1.0e4) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: 1.0e4) // expected-error{{expected version number in 'available' attribute}} expected-astgen-error {{cannot parse version component code '0e4'}}
 let _: Int
 
-@available(OSX, introduced: -1) // expected-error{{expected version number in 'available' attribute}} expected-error{{expected declaration}}
+@available(OSX, introduced: -1) // expected-error{{expected version number in 'available' attribute}} expected-cparser-error{{expected declaration}} expected-astgen-error {{expected value in availability argument}} expected-astgen-error {{unexpected code '-1' in attribute}}
 let _: Int
 
-@available(OSX, introduced: 1.0.1e4) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: 1.0.1e4) // expected-error{{expected version number in 'available' attribute}} expected-astgen-error {{cannot parse version component code '1e4'}}
 let _: Int
 
-@available(OSX, introduced: 1.0.0x4) // expected-error{{expected version number in 'available' attribute}}
+@available(OSX, introduced: 1.0.0x4) // expected-error{{expected version number in 'available' attribute}} expected-astgen-error {{cannot parse version component code '0x4'}}
 let _: Int
 
 @available(OSX, introduced: 0) // expected-warning{{expected version number in 'available' attribute; this is an error in the Swift 6 language mode}}
@@ -206,9 +206,9 @@ let _: Int
 @available(*, deprecated, unavailable, message: "message") // expected-error{{'available' attribute cannot be both 'unavailable' and 'deprecated'}}
 struct BadUnconditionalAvailability { };
 
-@available(*, unavailable, message="oh no you don't") // expected-error {{'=' has been replaced with ':' in attribute arguments}} {{35-36=: }}
+@available(*, unavailable, message="oh no you don't") // expected-cparser-error {{'=' has been replaced with ':' in attribute arguments}} {{35-36=: }} expected-astgen-error {{expected ':' and value in availability argument}} expected-astgen-error {{unexpected code '="oh no you don't"' in attribute}}
 typealias EqualFixIt1 = Int
-@available(*, unavailable, message = "oh no you don't") // expected-error {{'=' has been replaced with ':' in attribute arguments}} {{36-37=:}}
+@available(*, unavailable, message = "oh no you don't") // expected-cparser-error {{'=' has been replaced with ':' in attribute arguments}} {{36-37=:}} expected-astgen-error {{expected ':' and value in availability argument}} expected-astgen-error {{unexpected code '= "oh no you don't"' in attribute}}
 typealias EqualFixIt2 = Int
 
 
@@ -264,11 +264,11 @@ func functionWithShortFormIOSVersionNoPointAvailable() {}
 @available(iOS 8.0, OSX 10.10.3, *)
 func functionWithShortFormIOSOSXAvailable() {}
 
-@available(iOS 8.0
-func shortFormMissingParen() { // expected-error {{expected ')' in 'available' attribute}}
+@available(iOS 8.0 // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{must handle potential future platforms with '*}} expected-astgen-error {{expected ')' to end attribute}}
+func shortFormMissingParen() { // expected-cparser-error {{expected ')' in 'available' attribute}}
 }
 
-@available(iOS 8.0, // expected-error {{expected platform name}}
+@available(iOS 8.0, // expected-cparser-error {{expected platform name}} expected-astgen-error {{expected ')' to end attribute}} expected-astgen-note {{to match this opening '('}} expected-astgen-error {{must handle potential future platforms with '*'}}
 func shortFormMissingPlatform() {
 }
 
@@ -305,8 +305,8 @@ func iosIsClosestThanMacOS() {}
 func shortFormWithUnrecognizedPlatformContinueValidating() {
 }
 
-@available(iOS 8.0, *
-func shortFormMissingParenAfterWildcard() { // expected-error {{expected ')' in 'available' attribute}}
+@available(iOS 8.0, * // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{expected ')' to end attribute}}
+func shortFormMissingParenAfterWildcard() { // expected-cparser-error {{expected ')' in 'available' attribute}}
 }
 
 @available(*) // expected-error {{expected ',' in 'available' attribute}}
@@ -318,7 +318,7 @@ func shortFormWithWildcardInMiddle() {}
 @available(iOS 8.0, OSX 10.10.3) // expected-error {{must handle potential future platforms with '*'}} {{32-32=, *}}
 func shortFormMissingWildcard() {}
 
-@availability(OSX, introduced: 10.10) // expected-error {{'@availability' has been renamed to '@available'}} {{2-14=available}}
+@availability(OSX, introduced: 10.10) // expected-cparser-error {{'@availability' has been renamed to '@available'}} {{2-14=available}} expected-astgen-error {{unknown attribute 'availability'}}
 func someFuncUsingOldAttribute() { }
 
 

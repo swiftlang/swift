@@ -97,13 +97,13 @@ func badTest2() {
   _ = x
 }
 func badTest3() {
-  var _ = Swift. // expected-error {{expected member name following '.'}}
+  var _ = Swift. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
 }
 func badTest4() {
   _ = Swift // expected-error {{expected module member name after module name}}
 }
 func badTest5() {
-  _ = Swift. // expected-error {{expected member name following '.'}}
+  _ = Swift. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
 }
 func badTest6() {
   _ = { () -> Int in

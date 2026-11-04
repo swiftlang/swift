@@ -198,7 +198,7 @@ func invalidAnyObjectRequirement<T: Differentiable>(x: T) -> T {
 }
 
 // expected-error @+1 {{'@differentiable' attribute does not yet support layout requirements}}
-@differentiable(reverse where Scalar: _Trivial)
+@differentiable(reverse where Scalar: _Trivial) // expected-astgen-error {{layout constraints are only allowed inside '_specialize' attributes}}
 func invalidRequirementLayout<Scalar>(x: Scalar) -> Scalar {
   return x
 }
@@ -458,7 +458,7 @@ struct NumberWrtStruct: Differentiable {
     return a*x + b*y
   }
 
-  @differentiable(reverse, wrt: -1) // expected-error {{expected a parameter, which can be a function parameter name, parameter index, or 'self'}}
+  @differentiable(reverse, wrt: -1) // expected-cparser-error {{expected a parameter, which can be a function parameter name, parameter index, or 'self'}} expected-astgen-error {{expected arguments in '@differentiable' argument}} expected-astgen-error {{unexpected code '-1' in attribute}} expected-astgen-error {{unknown parameter name ''}}
   @differentiable(reverse, wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
   func foo2(_ x: Float, _ y: Float) -> Float {
     return a*x + b*y

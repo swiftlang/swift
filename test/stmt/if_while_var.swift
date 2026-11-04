@@ -54,9 +54,9 @@ guard let _ = nonOptionalStruct() else { fatalError() } // expected-warning{{ini
 guard let _ = nonOptionalEnum() else { fatalError() } // expected-warning{{initializer for conditional binding has non-optional type 'NonOptionalEnum'}}
 
 let optional: String? = nil
-if case let optional? { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
-if case let .some(optional) { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
-if case .some(let optional) { _ = optional } // expected-error{{variable binding in a condition requires an initializer}}
+if case let optional? { _ = optional } // expected-cparser-error{{variable binding in a condition requires an initializer}} expected-astgen-error {{expected '=' and expression in pattern matching}}
+if case let .some(optional) { _ = optional } // expected-cparser-error{{variable binding in a condition requires an initializer}} expected-astgen-error {{expected '=' and expression in pattern matching}}
+if case .some(let optional) { _ = optional } // expected-cparser-error{{variable binding in a condition requires an initializer}} expected-astgen-error {{expected '=' and expression in pattern matching}}
 
 if case let x? = nonOptionalStruct() { _ = x } // expected-error{{optional pattern '?' cannot match value of non-optional type 'NonOptionalStruct'}}
 if case let x? = nonOptionalEnum() { _ = x } // expected-error{{optional pattern '?' cannot match value of non-optional type 'NonOptionalEnum'}}
@@ -72,27 +72,27 @@ class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
 if let {}
-// expected-error@-1 {{expected '{' after 'if' condition}}
+// expected-cparser-error@-1 {{expected '{' after 'if' condition}} expected-astgen-error@-1 {{expected '{' in 'if' statement}}
 // expected-error@-2 {{unwrap condition requires a valid identifier}}
 // expected-warning@-3 {{initializer for conditional binding has non-optional type '() -> ()'}}
 
-if let x = { } // expected-error{{'{' after 'if'}} expected-warning{{initializer for conditional binding has non-optional type '() -> ()'}}
-// expected-warning@-1{{value 'x' was defined but never used}}
+if let x = { } // expected-cparser-error{{'{' after 'if'}} expected-astgen-error {{expected '{' in 'if' statement}} expected-warning{{initializer for conditional binding has non-optional type '() -> ()'}} expected-astgen-note {{did you mean 'x'?}} expected-astgen-note {{did you mean 'x'?}} expected-astgen-note {{did you mean 'x'?}} expected-astgen-note {{did you mean 'x'?}}
+// expected-cparser-warning@-1{{value 'x' was defined but never used}}
 
 if let x = foo() {
   _ = x
 } else {
   // TODO: more contextual error? "x is only available on the true branch"?
-  use(x) // expected-error{{cannot find 'x' in scope}}
+  use(x) // expected-cparser-error{{cannot find 'x' in scope}} expected-astgen-error {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
 }
 
 if let x = foo() {
   use(x)
-} else if let y = foo() { // expected-note {{did you mean 'y'?}}
-  use(x) // expected-error{{cannot find 'x' in scope}}
+} else if let y = foo() { // expected-cparser-note {{did you mean 'y'?}}
+  use(x) // expected-cparser-error{{cannot find 'x' in scope}} expected-astgen-error {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
   use(y)
 } else {
-  use(x) // expected-error{{cannot find 'x' in scope}}
+  use(x) // expected-cparser-error{{cannot find 'x' in scope}} expected-astgen-error {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
   use(y) // expected-error{{cannot find 'y' in scope}}
 }
 
@@ -108,8 +108,8 @@ if var opt {
   opt = 10
 }
 
-if let x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
-if var x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
+if let x = opt {} // expected-cparser-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
+if var x = opt {} // expected-cparser-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
@@ -118,21 +118,21 @@ if case let y? = someInteger { _ = y }  // expected-error {{optional pattern '?'
 
 // Test multiple clauses on "if let".
 if let x = opt, let y = opt, x != y,
-   let a = opt, var b = opt { // expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+   let a = opt, var b = opt { // expected-cparser-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-cparser-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
 }
 
 // Leading boolean conditional.
 if 1 != 2, let x = opt,
-   y = opt,  // expected-error {{expected 'let' in conditional}} {{4-4=let }}
+   y = opt,  // expected-cparser-error {{expected 'let' in conditional}} {{4-4=let }} expected-astgen-error {{unexpected code before optional binding}}
    x != y,
-   let a = opt, var b = opt { // expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+   let a = opt, var b = opt { // expected-cparser-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-cparser-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
 }
 
 // <rdar://problem/20457938> typed pattern is not allowed on if/let condition
-if 1 != 2, let x : Int? = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+if 1 != 2, let x : Int? = opt {} // expected-cparser-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{20-24=Int}}
 
-if 1 != 2, case let x? : Int? = 42 {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+if 1 != 2, case let x? : Int? = 42 {} // expected-cparser-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 // expected-warning @-1 {{non-optional expression of type 'Int' used in a check for optionals}}
 
 
@@ -140,13 +140,13 @@ if 1 != 2, case let x? : Int? = 42 {} // expected-warning {{immutable value 'x' 
 // Test error recovery.
 // <rdar://problem/19939746> Improve error recovery for malformed if statements
 if 1 != 2, { // expected-error {{cannot convert value of type '() -> ()' to expected condition type 'Bool'}}
-} // expected-error {{expected '{' after 'if' condition}}
+} // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}}
 if 1 != 2, 4 == 57 {}
-if 1 != 2, 4 == 57, let x = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+if 1 != 2, 4 == 57, let x = opt {} // expected-cparser-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 
 // Test that these don't cause the parser to crash.
-if true { if a == 0; {} }   // expected-error {{cannot find 'a' in scope}} expected-error {{expected '{' after 'if' condition}}
-if a == 0, where b == 0 {}  // expected-error {{cannot find 'a' in scope}} expected-error {{expected expression in conditional}}
+if true { if a == 0; {} }   // expected-error {{cannot find 'a' in scope}} expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{unexpected ';' separator}}
+if a == 0, where b == 0 {}  // expected-error {{cannot find 'a' in scope}} expected-cparser-error {{expected expression in conditional}} expected-astgen-error {{expected expression in 'if' statement}} expected-astgen-error {{expected ',' joining parts of a multi-clause condition}} expected-astgen-error {{cannot find 'b' in scope}}
 
 
 
@@ -155,17 +155,17 @@ func testIfCase(_ a : Int?) {
   if case nil = a, a != nil {}
   if case let (b?) = a, b != 42 {}
   
-  if let case (b?) = a, b != 42 {}  // expected-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-10=}} {{14-14= let}}
+  if let case (b?) = a, b != 42 {}  // expected-cparser-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-10=}} {{14-14= let}} expected-astgen-error {{expected pattern in optional binding}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{'case' can only appear inside a 'switch' statement or 'enum' declaration}} expected-astgen-error {{unwrap condition requires a valid identifier}}
   
   if a != nil, let c = a, case nil = a { _ = c}
   
-  if let p? = a {_ = p}  // expected-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
+  if let p? = a {_ = p}  // expected-cparser-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
   
   
-  if let .some(x) = a {_ = x}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
+  if let .some(x) = a {_ = x}  // expected-cparser-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
 
-  if case _ = a {}  // expected-warning {{'if' condition is always true}}
-  while case _ = a {}  // expected-warning {{'while' condition is always true}}
+  if case _ = a {}  // expected-cparser-warning {{'if' condition is always true}}
+  while case _ = a {}  // expected-cparser-warning {{'while' condition is always true}} expected-astgen-error {{expected '}' to end 'if' statement}}
 
 }
 
@@ -199,7 +199,7 @@ func useInt(_ x: Int) {}
 
 func testWhileScoping(_ a: Int?) {
   while let x = a { }
-  useInt(x) // expected-error{{cannot find 'x' in scope}}
+  useInt(x) // expected-cparser-error{{cannot find 'x' in scope}} expected-astgen-error {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
 }
 
 func testWhileShorthand(_ b: Int?) {
@@ -306,4 +306,4 @@ do {
   let a = 1
   let b = Int?.none
   if let c = b ?? a { _ = c } // expected-warning{{initializer for conditional binding has non-optional type 'Int'}}
-}
+} // expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end 'if' statement}}

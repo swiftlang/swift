@@ -612,14 +612,14 @@ func test_invalid_storage_restrictions() {
 
     var b: Int {
       @storageRestrictions(initializes:)
-      // expected-error@-1 {{expected property name in '@storageRestrictions' list}}
+      // expected-cparser-error@-1 {{expected property name in '@storageRestrictions' list}} expected-astgen-error@-1 {{expected value in attribute}}
       init {}
 
       get { _b }
     }
 
     var c: Int {
-      @storageRestrictions(initializes: a, initializes: b)
+      @storageRestrictions(initializes: a, initializes: b) // expected-astgen-error {{init accessor cannot refer to property 'b'; init accessors can refer only to stored properties}}
       // expected-error@-1 {{duplicate label 'initializes' in '@storageRestrictions'}}
       // expected-error@-2 {{init accessor cannot refer to property 'a'; init accessors can refer only to stored properties}}
       init {}
@@ -628,7 +628,7 @@ func test_invalid_storage_restrictions() {
     }
 
     var d: Int {
-      @storageRestrictions(accesses: a, accesses: c)
+      @storageRestrictions(accesses: a, accesses: c) // expected-astgen-error {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}}
       // expected-error@-1 {{duplicate label 'accesses' in '@storageRestrictions'}}
       // expected-error@-2 {{init accessor cannot refer to property 'a'; init accessors can refer only to stored properties}}
       init {}
@@ -637,7 +637,7 @@ func test_invalid_storage_restrictions() {
     }
 
     var e: Int {
-      @storageRestrictions(initialize: a, b, accesses: c, d)
+      @storageRestrictions(initialize: a, b, accesses: c, d) // expected-astgen-error {{init accessor cannot refer to property 'c'; init accessors can refer only to stored properties}} expected-astgen-error {{init accessor cannot refer to property 'd'; init accessors can refer only to stored properties}}
       // expected-error@-1 {{unexpected label 'initialize' in '@storageRestrictions'}}
       init {}
 

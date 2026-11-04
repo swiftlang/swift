@@ -119,29 +119,29 @@ do {
   { consume($0) }(42)
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
 
-  { print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
+  { print(42) }  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-cparser-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
 
-  { print($0) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { print($0) }  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
 
-  { [n] in print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { [n] in print(42) }  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
 
-  { consume($0) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { consume($0) }(42)  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
 
-  { (x: Int) in consume(x) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { (x: Int) in consume(x) }(42)  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
   // This is technically a valid call, so nothing goes wrong until (42)
@@ -161,15 +161,15 @@ do {
 
   // Equivalent but more obviously unintended.
 
-  { $0(3) }  // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
+  { $0(3) }  // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
 
   { consume($0) }(42)
-  // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  // expected-cparser-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
 
-  ({ $0(3) })  // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
+  ({ $0(3) })  // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
 
   { consume($0) }(42)
-  // expected-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  // expected-cparser-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
   // Also a valid call (!!)
@@ -800,7 +800,7 @@ overloaded { print("hi") } // single-expression closure => typechecked with body
 overloaded { print("hi"); print("bye") } // multiple expression closure without explicit returns; can default to any return type
 // expected-error@-1 {{ambiguous use of 'overloaded'}}
 
-func not_overloaded(_ handler: () -> Int) {}
+func not_overloaded(_ handler: () -> Int) {} // expected-astgen-note {{'not_overloaded' declared here}}
 
 not_overloaded { } // empty body
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -1026,7 +1026,7 @@ func rdar_59741308() {
 func r60074136() {
   func takesClosure(_ closure: ((Int) -> Void) -> Void) {}
 
-  takesClosure { ((Int) -> Void) -> Void in // expected-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}}
+  takesClosure { ((Int) -> Void) -> Void in // expected-cparser-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} expected-astgen-error {{expected identifier and ':' in parameter}}
   }
 }
 
@@ -1148,15 +1148,15 @@ struct R_76250381<Result, Failure: Error> {
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 4 were used in closure body}}
 
 // rdar://77022842 - crash due to a missing argument to a ternary operator
-func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) {
+func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) { // expected-astgen-note {{to match this opening '{'}}
   if let a = argA ?? false, if let b = argB ?? {
     // expected-warning@-1 {{initializer for conditional binding has non-optional type 'Bool'}}
     // expected-error@-2 {{cannot convert value of type 'Bool?' to expected argument type '(() -> ())?'}}
     // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
     // expected-error@-4 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
     // expected-error@-5 {{'if' must have an unconditional 'else' to be used as expression}}
-  } // expected-error {{expected '{' after 'if' condition}}
-}
+  } // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}}
+} // expected-astgen-error {{expected '{' in 'if' statement}}
 
 // rdar://76058892 - spurious ambiguity diagnostic
 func rdar76058892() {
@@ -1423,4 +1423,4 @@ do {
   let _: [Int: Set<String>] = s.map(\.x)
       .reduce([:], { x, y in x.merging(y, uniquingKeysWith: +) })
       .mapValues { Set($0) }
-}
+} // expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end function}}

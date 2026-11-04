@@ -43,8 +43,8 @@ func f_54961(fleep: [Blatz]) {
 
 // https://github.com/apple/swift/issues/56996
 func f_56996() {
-  _ = \Int.byteSwapped.signum() // expected-error {{key path cannot refer to instance method 'signum()'}}
-  _ = \Int.byteSwapped.init() // expected-error {{key path cannot refer to initializer 'init()'}}
+  _ = \Int.byteSwapped.signum() // expected-error {{key path cannot refer to instance method 'signum()'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}}
+  _ = \Int.byteSwapped.init() // expected-cparser-error {{key path cannot refer to initializer 'init()'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}}
 }
 
 postfix operator ^
@@ -54,8 +54,8 @@ func unsupportedOperator() {
   struct S {
     var x: Int
   }
-  _ = \.^ // expected-error {{invalid component of Swift key path}}
-  _ = \S^ // expected-error {{invalid component of Swift key path}}
-  _ = \S.x^ // expected-error {{invalid component of Swift key path}}
-  _ = \.x^ // expected-error {{invalid component of Swift key path}}
+  _ = \.^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '.^' in function}}
+  _ = \S^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '^' in function}}
+  _ = \S.x^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '^' in function}}
+  _ = \.x^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '^' in function}} expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
 }

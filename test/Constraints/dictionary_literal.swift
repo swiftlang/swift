@@ -190,8 +190,8 @@ func defaultToAnyNoDiagnostic() {
 /// https://github.com/apple/swift/issues/47529
 /// Assertion failure during `swift::ASTVisitor<::FailureDiagnosis,...>::visit`
 func rdar32330004_1() -> [String: Any] {
-  return ["a""one": 1, "two": 2, "three": 3] // expected-note {{did you mean to use a dictionary literal instead?}}
-  // expected-error@-1 {{expected ',' separator}}
+  return ["a""one": 1, "two": 2, "three": 3] // expected-note {{did you mean to use a dictionary literal instead?}} expected-astgen-error {{expected ',' in array element}} expected-astgen-error {{unexpected code ': 1, "two": 2, "three": 3' in array}}
+  // expected-cparser-error@-1 {{expected ',' separator}} expected-astgen-error@-1 {{expected ',' in array element}}
   // expected-error@-2 {{dictionary of type '[String : Any]' cannot be used with array literal}}
 }
 

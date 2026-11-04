@@ -2,7 +2,7 @@
 
 // MARK: - Correct type eraser
 
-class AnyP: P1 {
+class AnyP: P1 { // expected-astgen-note {{type eraser declared here}}
   init<T: P1>(erasing t: T) {}
 }
 @_typeEraser(AnyP) // okay
@@ -29,11 +29,11 @@ protocol Collection {
 @_typeEraser // expected-error {{expected '(' in '_typeEraser' attribute}}
 protocol A1 {}
 
-@_typeEraser() // expected-error {{expected a type name in '@_typeEraser()'}}
+@_typeEraser() // expected-cparser-error {{expected a type name in '@_typeEraser()'}}
 protocol A2 {}
 
-@_typeEraser(AnyP // expected-note {{to match this opening '('}}
-protocol A3 {} // expected-error {{expected ')' after type name for '@_typeEraser'}}
+@_typeEraser(AnyP // expected-note {{to match this opening '('}} expected-astgen-error {{type eraser 'AnyP' must conform to protocol 'A3'}} expected-astgen-error {{expected ')' to end attribute}}
+protocol A3 {} // expected-cparser-error {{expected ')' after type name for '@_typeEraser'}}
 
 @_typeEraser(AnyP) // expected-error {{'@_typeEraser' may only be used on 'protocol' declarations}}
 func notAProtocol() {}
@@ -43,7 +43,7 @@ func notAProtocol() {}
 @_typeEraser(Undeclared) // expected-error {{cannot find type 'Undeclared' in scope}}
 protocol B1 {}
 
-@_typeEraser((Int, Int)) // expected-error {{type eraser must be a class, struct, or enum}}
+@_typeEraser((Int, Int)) // expected-cparser-error {{type eraser must be a class, struct, or enum}}
 protocol B2 {}
 
 protocol InvalidTypeEraser {}
@@ -116,10 +116,10 @@ class NoLabel: D5 { // expected-note {{type eraser declared here}}
 @_typeEraser(NoLabel) // expected-error {{type eraser 'NoLabel' must have an initializer of the form 'init<T: D5>(erasing: T)'}}
 protocol D5 {}
 
-class NonGenericInit<T: D6>: D6 { // expected-note {{type eraser declared here}}
+class NonGenericInit<T: D6>: D6 { // expected-cparser-note {{type eraser declared here}}
   init(_ t: T) {}
 }
-@_typeEraser(NonGenericInit<Self>) // expected-error {{type eraser 'NonGenericInit<Self>' must have an initializer of the form 'init<T: D6>(erasing: T)'}}
+@_typeEraser(NonGenericInit<Self>) // expected-cparser-error {{type eraser 'NonGenericInit<Self>' must have an initializer of the form 'init<T: D6>(erasing: T)'}}
 protocol D6 {}
 
 // MARK: - Unviable initializers

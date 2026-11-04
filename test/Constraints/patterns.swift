@@ -87,8 +87,8 @@ default:
 }
 
 // Raise an error if pattern productions are used in expressions.
-var b = var x // expected-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
-var c = is Int // expected-error{{expected initial value after '='}} expected-error {{expected expression}}  expected-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
+var b = var x // expected-cparser-error{{expected initial value after '='}} expected-error {{type annotation missing in pattern}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}} expected-astgen-error {{expected expression in variable}}
+var c = is Int // expected-cparser-error{{expected initial value after '='}} expected-error {{expected expression}}  expected-cparser-error {{consecutive statements on a line must be separated by ';'}} {{8-8=;}} expected-astgen-error {{unexpected code 'is Int' in source file}}
 
 // TODO: Bad recovery in these cases. Although patterns are never valid
 // expr-unary productions, it would be good to parse them anyway for recovery.
@@ -262,7 +262,7 @@ do {
 class SomeClass {}
 if case let doesNotExist as SomeClass:AlsoDoesNotExist {}
 // expected-error@-1 {{cannot find type 'AlsoDoesNotExist' in scope}}
-// expected-error@-2 {{variable binding in a condition requires an initializer}}
+// expected-cparser-error@-2 {{variable binding in a condition requires an initializer}} expected-astgen-error@-2 {{expected '=' and expression in pattern matching}}
 
 // `.foo` and `.bar(...)` pattern syntax should also be able to match
 // static members as expr patterns
