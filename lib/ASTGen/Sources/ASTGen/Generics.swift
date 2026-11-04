@@ -197,6 +197,10 @@ extension ASTGenVisitor {
   }
 
   func generate(genericWhereClause node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
+    // A trailing comma leaves the C++ parser expecting another requirement.
+    if !self.ctx.langOpts.hasFeature(.TrailingComma), let comma = node.requirements.last?.trailingComma {
+      self.diagnose(.expected_type, at: comma.nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(comma))
+    }
     let requirements  = node.requirements.lazy.map { elem -> BridgedRequirementRepr in
 
       // Unwrap 'repeat T' to  (isRequirementExpansion: true, type: T)

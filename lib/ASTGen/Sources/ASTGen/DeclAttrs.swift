@@ -229,6 +229,23 @@ extension ASTGenVisitor {
         )
       }
 
+      // The attribute parsers do not accept a trailing comma, so it ends the
+      // attribute early. The swift-syntax parser accepts one in any argument
+      // list; the cases it diagnoses itself have an error in the tree.
+      if attrKind != nil, !self.ctx.langOpts.hasFeature(.TrailingComma), !node.hasError {
+        if let trailingComma = node.arguments?.as(LabeledExprListSyntax.self)?.last?.trailingComma {
+          self.diagnose(.attr_expected_rparen(String(syntaxText: attrName), false), at: trailingComma)
+          return
+        }
+        if let trailingComma = node.arguments?.as(AvailabilityArgumentListSyntax.self)?.last?.trailingComma {
+          self.diagnose(
+            .avail_query_expected_platform_name,
+            at: trailingComma.nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(trailingComma)
+          )
+          return
+        }
+      }
+
       switch attrKind {
       case .ABI:
         return handle(self.generateABIAttr(attribute: node)?.asDeclAttribute)

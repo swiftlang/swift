@@ -236,6 +236,13 @@ extension ASTGenVisitor {
         return nil
       }
 
+      // The kind is the only argument: a comma, trailing or not, is not
+      // expected.
+      if let comma = args.kindSpecifierComma, !node.hasError {
+        self.diagnose(.attr_expected_rparen(node.attributeName.trimmedDescription, false), at: comma)
+        return nil
+      }
+
       differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
       differentiabilityLoc = self.generateSourceLoc(kindSpecifier)
       let kindText = String(syntaxText: kindSpecifier.rawText)
