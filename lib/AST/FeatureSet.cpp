@@ -475,10 +475,6 @@ static ABIAttr *getABIAttr(Decl *decl) {
   return decl->getAttrs().getAttribute<ABIAttr>();
 }
 
-static bool usesFeatureABIAttributeSE0479(Decl *decl) {
-  return getABIAttr(decl) != nullptr;
-}
-
 static bool usesFeatureIsolatedConformances(Decl *decl) {
   // FIXME: Check conformances associated with this decl?
   return false;
