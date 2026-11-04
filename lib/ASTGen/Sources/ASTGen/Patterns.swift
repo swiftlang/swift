@@ -183,7 +183,9 @@ extension ASTGenVisitor {
       child = parent
     }
 
-    if isNested {
+    // A pattern the parser already found fault with, like `let let::x`, was
+    // diagnosed there.
+    if isNested, !node.hasError {
       let index: UInt =
         switch introducer {
         case .let, .borrowing: 0

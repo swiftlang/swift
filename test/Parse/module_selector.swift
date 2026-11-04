@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -parse -verify-additional-prefix legacy-
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -parse -verify-additional-prefix legacy- -disable-experimental-feature ParserASTGen
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -parse -verify-additional-prefix new- -enable-experimental-feature ParserASTGen
 
 // Make sure the lack of the experimental flag disables the feature:
