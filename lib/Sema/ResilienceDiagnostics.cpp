@@ -47,6 +47,31 @@ static bool addMissingImport(SourceLoc loc, const Decl *D,
   return true;
 }
 
+/// A layout exposed to clients of a non-resilient module can only reference
+/// modules that clients load, which excludes modules reached only through the
+/// internal bridging header. Suggest importing the module that declares \p D,
+/// unless \p D is declared by the bridging header itself, where no import can
+/// help.
+static void noteImportForInternalBridgingHeaderOrigin(
+    const Decl *D, const ExportContext &where,
+    DisallowedOriginKind originKind) {
+  if (originKind != DisallowedOriginKind::InternalBridgingHeaderImport ||
+      where.getExportedLevel() != ExportedLevel::ImplicitlyExported)
+    return;
+
+  auto *SF = where.getDeclContext()->getOutermostParentSourceFile();
+  if (!SF)
+    return;
+
+  ModuleDecl *M = D->getModuleContext();
+  if (M->isClangBridgingHeaderImportModule())
+    return;
+
+  // Name the Swift overlay, if any, as that is what `import` resolves to.
+  noteAddImportOfModule(*SF, M->getTopLevelModule(/*overlay=*/true),
+                        AccessLevel::Internal);
+}
+
 bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
                                                  const ValueDecl *D,
                                                  const ExportContext &where) {
@@ -246,6 +271,7 @@ static bool diagnoseTypeAliasDeclRefExportability(SourceLoc loc,
                        limitImport->module.importedModule
                          ->isClangBridgingHeaderImportModule());
   }
+  noteImportForInternalBridgingHeaderOrigin(D, where, originKind);
 
   return true;
 }
@@ -453,6 +479,7 @@ static bool diagnoseValueDeclRefExportability(SourceLoc loc, const ValueDecl *D,
                        import->module.importedModule
                          ->isClangBridgingHeaderImportModule());
   }
+  noteImportForInternalBridgingHeaderOrigin(D, where, originKind);
 
   return true;
 }
@@ -545,6 +572,7 @@ TypeChecker::diagnoseConformanceExportability(SourceLoc loc,
                        limitImport->module.importedModule
                          ->isClangBridgingHeaderImportModule());
   }
+  noteImportForInternalBridgingHeaderOrigin(ext, where, originKind);
 
   return true;
 }
