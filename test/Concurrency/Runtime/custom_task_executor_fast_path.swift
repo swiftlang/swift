@@ -20,10 +20,10 @@ import Dispatch
 typealias DefaultExecutorFactory = SimpleExecutorFactory
 
 struct SimpleExecutorFactory: ExecutorFactory {
-  public static var mainExecutor: any MainExecutor {
+  public static var mainExecutor: SimpleMainExecutor {
     return SimpleMainExecutor()
   }
-  public static var defaultExecutor: any TaskExecutor {
+  public static var defaultExecutor: SimpleTaskExecutor {
     return SimpleTaskExecutor()
   }
 }
