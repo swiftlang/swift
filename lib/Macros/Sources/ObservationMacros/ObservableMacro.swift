@@ -196,7 +196,15 @@ extension TokenSyntax {
 
 extension CodeBlockSyntax {
   func locationAnnotated(in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> CodeBlockSyntax {
-    guard let firstStatement = statements.first, let loc = context.context.location(of: firstStatement) else {
+    // Use `.filePath` (absolute path) rather than the default `.fileID`
+    // (`Module/file.swift`) so SourceKit/Xcode can resolve diagnostics
+    // remapped through the synthesized `#sourceLocation` directive.
+    guard let firstStatement = statements.first,
+          let loc = context.context.location(
+            of: firstStatement,
+            at: .afterLeadingTrivia,
+            filePathMode: .filePath
+          ) else {
       return self
     }
     
