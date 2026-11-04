@@ -42,17 +42,6 @@ bool ModuleDependencyInfo::isTextualSwiftModule() const {
   return isSwiftInterfaceModule() || isSwiftSourceModule();
 }
 
-namespace {
-  ModuleDependencyKind &operator++(ModuleDependencyKind &e) {
-    if (e == ModuleDependencyKind::LastKind) {
-      llvm_unreachable(
-                       "Attempting to increment last enum value on ModuleDependencyKind");
-    }
-    e = ModuleDependencyKind(
-                             static_cast<std::underlying_type<ModuleDependencyKind>::type>(e) + 1);
-    return e;
-  }
-}
 bool ModuleDependencyInfo::isSwiftInterfaceModule() const {
   return isa<SwiftInterfaceModuleDependenciesStorage>(storage.get());
 }
@@ -814,6 +803,30 @@ bool SwiftDependencyScanningService::isDirectoryInvalidated(
       .value_or(false);
 }
 
+llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+SwiftDependencyScanningService::makeClangScanningFileSystem() {
+  assert(ClangScanningService && "dependency scanning service was not set up");
+  return ClangScanningService->getOpts().MakeVFS();
+}
+
+std::optional<llvm::vfs::Status>
+SwiftDependencyScanningService::getClangScannerCachedStatus(StringRef Path) {
+  assert(ClangScanningService && "dependency scanning service was not set up");
+  // The shared cache is keyed by absolute path.
+  if (!llvm::sys::path::is_absolute(Path))
+    return std::nullopt;
+  auto &shard =
+      ClangScanningService->getSharedCache().getShardForFilename(Path);
+  std::lock_guard<std::mutex> lock(shard.CacheLock);
+  auto state = shard.CacheByFilename.find(Path);
+  if (state == shard.CacheByFilename.end())
+    return std::nullopt;
+  const auto *entry = state->second.Entry;
+  if (!entry || entry->isError() || entry->isDirectory())
+    return std::nullopt;
+  return entry->getStatus();
+}
+
 StringRef SwiftDependencyScanningService::save(StringRef str) {
   llvm::sys::SmartScopedLock<true> Lock(ScanningServiceGlobalLock);
   return Saver.save(str);
@@ -986,9 +999,9 @@ void ModuleDependenciesCache::recordClangDependency(
               isNewlyDiscovered, checkArg);
     };
     diagnoseExtraCommandLineFlags(priorClangModuleDetails,
-                                  newClangModuleDetails, true);
+                                  newClangModuleDetails, false);
     diagnoseExtraCommandLineFlags(newClangModuleDetails,
-                                  priorClangModuleDetails, false);
+                                  priorClangModuleDetails, true);
   }
 }
 
