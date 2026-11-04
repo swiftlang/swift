@@ -3812,16 +3812,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
     Decl *abiDecl = nullptr;
     Status |= parseDecl(/*atStart=*/true, /*ifConfigInAttr=*/true, [&](Decl *D){
-      // Look through a TopLevelCodeDecl.
-      // FIXME: Do we need to reparent these decls to match their counterparts?
-      //        Feels like there might be more to do here.
-      if (auto tlcd = dyn_cast<TopLevelCodeDecl>(D)) {
-        ASSERT(tlcd->getBody()->getNumElements() == 1
-                  && "TopLevelCodeDecl with != 1 element?");
-        D = tlcd->getBody()->getElements().front().dyn_cast<Decl *>();
-        if (!D)
-          return;
-      }
       // TODO: MacroExpansionDecl?
 
       // When parsing a compound decl, like a PBD, we'll get called for both the
@@ -9467,10 +9457,11 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
   // PatternBindingDecl in a TopLevelCodeDecl, since it represents executable
   // code.  The VarDecl and any accessor decls (for computed properties) go in
   // CurDeclContext.  @const/@section globals are not top-level, per SE-0492.
-  // We follow the same rule for @_extern.
+  // We follow the same rule for @_extern. A stub in an @abi attribute is not
+  // executable code, either.
   TopLevelCodeDecl *topLevelDecl = nullptr;
   if (allowTopLevelCode() && CurDeclContext->isModuleScopeContext() &&
-      !IsConst) {
+      !IsConst && !Flags.contains(PD_StubOnly)) {
     // The body of topLevelDecl will get set later.
     topLevelDecl = new (Context) TopLevelCodeDecl(CurDeclContext);
   }
