@@ -991,7 +991,16 @@ SIMPLE_DECL_ATTR(_onewayNever, OnewayNever,
   185)
 DECL_ATTR_FEATURE_REQUIREMENT(OnewayNever, SendCalls)
 
-LAST_DECL_ATTR(OnewayNever)
+// '@_remoteCallIdempotent' marks a distributed function as safe to call more
+// than once with the same arguments. It only makes the synthesized distributed
+// thunks mark the 'RemoteCallTarget' of their remote calls, so it is ABI and
+// API stable to add or remove
+SIMPLE_DECL_ATTR(_remoteCallIdempotent, RemoteCallIdempotent,
+  OnFunc,
+  UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
+  186)
+
+LAST_DECL_ATTR(RemoteCallIdempotent)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

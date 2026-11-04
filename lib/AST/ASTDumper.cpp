@@ -5267,6 +5267,7 @@ public:
   TRIVIAL_ATTR_PRINTER(Concurrent, concurrent)
   TRIVIAL_ATTR_PRINTER(Oneway, oneway)
   TRIVIAL_ATTR_PRINTER(OnewayNever, oneway_never)
+  TRIVIAL_ATTR_PRINTER(RemoteCallIdempotent, remote_call_idempotent)
   TRIVIAL_ATTR_PRINTER(UnsafeSelfDependentResult, unsafe_self_dependent_result)
 
 #undef TRIVIAL_ATTR_PRINTER

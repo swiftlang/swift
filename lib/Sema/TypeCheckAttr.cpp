@@ -576,6 +576,7 @@ public:
     // Keep '@oneway', which also affects overload resolution
     attr->setInvalid();
   }
+  void visitRemoteCallIdempotentAttr(RemoteCallIdempotentAttr *attr);
 };
 
 } // end anonymous namespace
@@ -2905,6 +2906,14 @@ void AttributeChecker::visitOnewayAttr(OnewayAttr *attr) {
   }
 
   TypeChecker::checkDistributedOnewayAvailability(FD);
+}
+
+void AttributeChecker::visitRemoteCallIdempotentAttr(
+    RemoteCallIdempotentAttr *attr) {
+  auto *FD = dyn_cast<FuncDecl>(D);
+  if (!FD || isa<AccessorDecl>(FD) || !FD->isDistributed())
+    diagnoseAndRemoveAttr(attr,
+                          diag::remote_call_idempotent_requires_distributed);
 }
 
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {

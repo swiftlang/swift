@@ -318,6 +318,7 @@ extension ASTGenVisitor {
         .Owned,
         .Preconcurrency,
         .PropertyWrapper,
+        .RemoteCallIdempotent,
         .Reparentable,
         .RequiresStoredPropertyInits,
         .ResultBuilder,

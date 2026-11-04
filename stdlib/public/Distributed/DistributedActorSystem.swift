@@ -1148,10 +1148,14 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   // Backing storage for 'isOnewayTarget'
   private var _isOnewayTarget: Bool
 
+  // Backing storage for 'isIdempotentTarget'
+  private var _isIdempotentTarget: Bool
+
   public init(_ identifier: String) {
     self._identifier = identifier
     self._isOnewayRemoteCall = false
     self._isOnewayTarget = false
+    self._isIdempotentTarget = false
   }
 
   /// The underlying identifier of the target, returned as-is.
@@ -1246,6 +1250,41 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     set { _isOnewayTarget = newValue }
   }
 
+  /// Marks this target as the target of an `@_remoteCallIdempotent`
+  /// distributed function
+  ///
+  /// Called by the synthesized distributed thunks of such a function. Like
+  /// ``_markOnewayTarget()`` it is emitted into the client, and a no-op on a
+  /// runtime which does not have ``isIdempotentTarget``
+  @_spi(DistributedIdempotent)
+  @available(SwiftStdlib 5.7, *)
+  @export(implementation)
+  public mutating func _markIdempotentTarget() {
+    // This is SwiftStdlib 6.5, but an availability macro can't be used in an
+    // @export(implementation) function
+    if #available(anyAppleOS 9999, *) {
+      self.isIdempotentTarget = true
+    }
+  }
+
+  /// Whether the target is an `@_remoteCallIdempotent` distributed function,
+  /// which is safe to call more than once with the same arguments
+  ///
+  /// This describes the target function, not the call: every synthesized
+  /// distributed thunk of such a function sets it. An actor system may use it
+  /// to make the call more than once, e.g. to retry it after a transport
+  /// failure without knowing whether the recipient already ran it, or to send
+  /// it over more than one connection
+  ///
+  /// On the recipient side an actor system may set it on the target it passes
+  /// to `executeDistributedTarget`
+  @_spi(DistributedIdempotent)
+  @available(SwiftStdlib 6.5, *)
+  public var isIdempotentTarget: Bool {
+    get { _isIdempotentTarget }
+    set { _isIdempotentTarget = newValue }
+  }
+
   /// Attempts to pretty format the underlying target identifier.
   /// If unable to, returns the raw underlying identifier.
   public var description: String {
@@ -1256,8 +1295,8 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     }
   }
 
-  // A target's identity is its identifier, the 'oneway' flags do not
-  // participate in equality and hashing
+  // A target's identity is its identifier, the 'oneway' and idempotency flags
+  // do not participate in equality and hashing
   public static func ==(lhs: RemoteCallTarget, rhs: RemoteCallTarget) -> Bool {
     lhs._identifier == rhs._identifier
   }
@@ -1295,6 +1334,9 @@ public struct RemoteCallTarget: ~Escapable {
 
   // Backing storage for 'isOnewayTarget'
   @usableFromInline internal var _isOnewayTarget: Bool = false
+
+  // Backing storage for 'isIdempotentTarget'
+  @usableFromInline internal var _isIdempotentTarget: Bool = false
 
   /// Whether this remote call was made using `send`, and expects no reply
   ///
@@ -1345,6 +1387,28 @@ public struct RemoteCallTarget: ~Escapable {
   public var isOnewayTarget: Bool {
     get { _isOnewayTarget }
     set { _isOnewayTarget = newValue }
+  }
+
+  /// Marks this target as the target of an `@_remoteCallIdempotent`
+  /// distributed function
+  ///
+  /// Called by the synthesized distributed thunks of such a function
+  @_spi(DistributedIdempotent)
+  @export(implementation)
+  public mutating func _markIdempotentTarget() {
+    _isIdempotentTarget = true
+  }
+
+  /// Whether the target is an `@_remoteCallIdempotent` distributed function,
+  /// which is safe to call more than once with the same arguments
+  ///
+  /// Every synthesized distributed thunk of such a function sets this. An
+  /// actor system may use it to make the call more than once, e.g. to retry
+  /// it after a transport failure
+  @_spi(DistributedIdempotent)
+  public var isIdempotentTarget: Bool {
+    get { _isIdempotentTarget }
+    set { _isIdempotentTarget = newValue }
   }
 
   /// Create a target from a compile-time constant mangled name.

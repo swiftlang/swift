@@ -133,7 +133,7 @@ static Expr *createDistributedSPIFuncRef(ASTContext &C, Identifier name) {
 /// Build the implicit member reference `<targetRef>.<name>` to the member
 /// \p name of 'RemoteCallTarget', found by a direct lookup in it
 ///
-/// The 'oneway' members of 'RemoteCallTarget' are SPI, see
+/// The 'oneway' and idempotency members of 'RemoteCallTarget' are SPI, see
 /// 'createDistributedSPIFuncRef'
 static Expr *createRemoteCallTargetSPIMemberRef(ASTContext &C, Expr *targetRef,
                                                 Identifier name) {
@@ -738,9 +738,13 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   // thunk, target a '@oneway' function. The oneway witness adapter does not:
   // it makes a 'oneway' remote call of a function which is not '@oneway'
   const bool isOnewayTarget = func->isOneway() && !isOnewayAdapter;
+  // Every thunk of an '@_remoteCallIdempotent' function marks the target as
+  // idempotent, however the call is made
+  const bool isIdempotentTarget =
+      func->getAttrs().hasAttribute<RemoteCallIdempotentAttr>();
   VarDecl *targetVar =
       VarDeclBuilder(thunk, C.Id_target)
-          .introducer((isOneway || isOnewayTarget)
+          .introducer((isOneway || isOnewayTarget || isIdempotentTarget)
                           ? VarDecl::Introducer::Var
                           : VarDecl::Introducer::Let)
           .type(remoteCallTargetTy);
@@ -823,6 +827,19 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       // '_markOnewayTarget()' is SPI
       auto *markRef = createRemoteCallTargetSPIMemberRef(
           C, targetRef, C.Id_markOnewayTarget);
+      remoteBranchStmts.push_back(CallExpr::createImplicitEmpty(C, markRef));
+    }
+
+    // --- Mark the target as the target of an idempotent function
+    //
+    //   target._markIdempotentTarget()
+    if (isIdempotentTarget) {
+      auto *targetRef = new (C) DeclRefExpr(
+          ConcreteDeclRef(targetVar), dloc, implicit, AccessSemantics::Ordinary,
+          remoteCallTargetTy);
+      // '_markIdempotentTarget()' is SPI
+      auto *markRef = createRemoteCallTargetSPIMemberRef(
+          C, targetRef, C.Id_markIdempotentTarget);
       remoteBranchStmts.push_back(CallExpr::createImplicitEmpty(C, markRef));
     }
   }

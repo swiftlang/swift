@@ -6846,6 +6846,10 @@ ERROR(oneway_requires_nonthrowing,none,
 ERROR(oneway_requires_actor_isolation,none,
       "'@oneway' can only be applied to an actor isolated method", ())
 
+ERROR(remote_call_idempotent_requires_distributed,none,
+      "'@_remoteCallIdempotent' can only be applied to a 'distributed' "
+      "method", ())
+
 ERROR(override_oneway_mismatch,none,
       "%select{%kind0 must be '@oneway' to override '@oneway' %kind2|"
       "'@oneway' %kind0 cannot override %kind2, which is not '@oneway'}1",

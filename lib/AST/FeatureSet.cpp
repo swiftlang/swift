@@ -616,6 +616,10 @@ static bool usesFeatureNonexhaustiveAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<NonexhaustiveAttr>();
 }
 
+static bool usesFeatureRemoteCallIdempotent(Decl *decl) {
+  return decl->getAttrs().hasAttribute<RemoteCallIdempotentAttr>();
+}
+
 static bool usesFeatureSendCalls(Decl *decl) {
   // Whether the body of 'afd' is printed into a module interface, because it
   // is inlinable, and contains a 'send' call

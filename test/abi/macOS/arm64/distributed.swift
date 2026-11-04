@@ -154,6 +154,16 @@ Added: _$s11Distributed16RemoteCallTargetV08isOnewayD0SbvM
 // property descriptor for Distributed.RemoteCallTarget.isOnewayTarget : Swift.Bool
 Added: _$s11Distributed16RemoteCallTargetV08isOnewayD0SbvpMV
 
+// New 'isIdempotentTarget' hint on RemoteCallTarget, set by the distributed thunks of a '@_remoteCallIdempotent' function
+// Distributed.RemoteCallTarget.isIdempotentTarget.getter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV012isIdempotentD0Sbvg
+// Distributed.RemoteCallTarget.isIdempotentTarget.setter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV012isIdempotentD0Sbvs
+// Distributed.RemoteCallTarget.isIdempotentTarget.modify : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV012isIdempotentD0SbvM
+// property descriptor for Distributed.RemoteCallTarget.isIdempotentTarget : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV012isIdempotentD0SbvpMV
+
 // New '_DistributedOnewayActorSystem' protocol, whose 'remoteCallOneway' the synchronous distributed thunk of a '@oneway' function calls
 // protocol descriptor for Distributed._DistributedOnewayActorSystem
 Added: _$s11Distributed01_A17OnewayActorSystemMp

@@ -1691,6 +1691,7 @@ namespace  {
     // An override of a '@oneway(never)' method is treated as
     // '@oneway(never)' too, see FuncDecl::isOnewayNever()
     UNINTERESTING_ATTR(OnewayNever)
+    UNINTERESTING_ATTR(RemoteCallIdempotent)
     UNINTERESTING_ATTR(UnsafeNoObjCTaggedPointer)
     UNINTERESTING_ATTR(Used)
     UNINTERESTING_ATTR(Section)
