@@ -810,6 +810,17 @@ public:
   /// __convertToBool() that it returns is a member of \a Record.
   FuncDecl *lookupAndImportOperatorBool(NominalTypeDecl *Struct);
 
+  /// Attempt to synthesize and import the static factories of a C++ foreign
+  /// reference type as Swift initializers, one for each constructor.
+  ///
+  /// Returns nothing unless \a Record is imported from a CXXRecordDecl, or if
+  /// it already provides its own SWIFT_NAME(init(...)) factories.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// factories that it returns are members of \a Record.
+  llvm::ArrayRef<ValueDecl *>
+  lookupAndImportSynthesizedFactories(ClassDecl *Record);
+
   /// Info about a Clang record decl possibly annotated with REFCOUNTED_PTR.
   ///
   /// Records three pieces of information: the name of the toRawPtr operation,
@@ -902,6 +913,7 @@ private:
   llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<SubscriptDecl *, 1>>
       importedSubscriptsCache;
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
+  llvm::DenseMap<ClassDecl *, TinyPtrVector<ValueDecl *>> frtFactoryCache;
   llvm::DenseMap<NominalTypeDecl *, RefCountedPtrInfo> refCountedPtrInfoCache;
   llvm::DenseMap<NominalTypeDecl *, VarDecl *> importedAsReferenceCache;
 
@@ -2490,6 +2502,14 @@ getCxxValueSemanticsKind(const clang::Type *type,
 
 /// Create the implicit 'newValue' parameter of a synthesized setter.
 ParamDecl *createNewValueParam(ASTContext &ctx, Type type, DeclContext *dc);
+
+/// Build forwarding argument expressions for a set of clang parameters.
+/// Parameters with rvalue reference types or move-only value types are wrapped
+/// in a static_cast to preserve move semantics.
+SmallVector<clang::Expr *>
+buildClangForwardingArgs(clang::ASTContext &clangCtx, clang::Sema &clangSema,
+                         ArrayRef<clang::ParmVarDecl *> params,
+                         ClangImporter::Implementation &impl);
 
 /// Print the name of \p decl for a request's \c simple_display, falling back
 /// to a placeholder for an anonymous or otherwise unnamed record.
