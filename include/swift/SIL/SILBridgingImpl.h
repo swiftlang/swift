@@ -1478,6 +1478,10 @@ bool BridgedInstruction::LoadBorrowInst_isUnchecked() const {
   return (SwiftInt)getAs<swift::LoadBorrowInst>()->isUnchecked();
 }
 
+void BridgedInstruction::LoadBorrowInst_setUnchecked(bool unchecked) const {
+  getAs<swift::LoadBorrowInst>()->setUnchecked(unchecked);
+}
+
 BridgedInstruction::BuiltinValueKind BridgedInstruction::BuiltinInst_getID() const {
   return (BuiltinValueKind)getAs<swift::BuiltinInst>()->getBuiltinInfo().ID;
 }

@@ -2066,6 +2066,12 @@ final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, Beg
   // but the move-only checker must diagnose those problems before canonical SIL is formed.
   public var isUnchecked: Bool { bridged.LoadBorrowInst_isUnchecked() }
 
+  public func set(isUnchecked: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadBorrowInst_setUnchecked(isUnchecked)
+    context.notifyInstructionChanged(self)
+  }
+
   public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }
 
