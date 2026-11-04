@@ -1563,11 +1563,8 @@ void swift::insertDeallocOfCapturedArguments(
   ApplySite site(pai);
   for (auto &arg : pai->getArgumentOperands()) {
     auto paramInfo = site.getParamInfoForOperand(arg);
-    if (!paramInfo.isIndirectInGuaranteed())
-      continue;
-    // With opaque values, an in_guaranteed capture is an object; there is no
-    // stack slot to deallocate.
-    if (!arg.get()->getType().isAddress())
+    if (!paramInfo.isIndirectInGuaranteed() ||
+        !site.getSubstCalleeConv().isSILIndirect(paramInfo))
       continue;
 
     SILValue argValue = getAddressToDealloc(arg.get());

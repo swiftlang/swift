@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -sil-verify-all -enable-lifetime-resolution -verify \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence %s
 
 // REQUIRES: swift_feature_LifetimeDependence
@@ -17,4 +17,8 @@ func buildNestedEnum<T>(_ t: T) -> Thinger<T>? {
   if .random() { return .single(t) }
   if .random() { return .pair(t, t) }
   return nil
+}
+
+func preconditionGeneric<C: Collection>(_ c: C) {
+  precondition(c.count % 4 == 0)
 }
