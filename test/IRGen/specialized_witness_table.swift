@@ -41,20 +41,20 @@ extension Cond: P where T: P {
 // CHECK-DAG: @"$s4test3BoxVySiGAA1PAAWP" = linkonce_odr hidden {{(unnamed_addr )?}}constant {{.*}}@"$s4test3BoxVyxGAA1PAAMc"{{.*}}Si_TG5
 
 // Base protocol and associated conformance entries directly point to specialized tables.
-// CHECK-DAG: @"$s4test7WrapperVySbGAA1QAAWP" = linkonce_odr hidden {{.*}}@"$s4test7WrapperVyxGAA1QAAMc"{{.*}}@"$s4test7WrapperVySbGAA1PAAWP"{{.*}}@"$s4test3BoxVySbGAA1PAAWP"
+// CHECK-DAG: @"$s4test7WrapperVySbGAA1QAAWP" = linkonce_odr hidden {{.*}}@"$s4test7WrapperVyxGAA1QAAMc"{{.*}}@"$s4test7WrapperVySbGAA1PAAWP"{{.*}}@"$s4test3BoxVySbGAA1PAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
 // CHECK-DAG: @"$s4test7WrapperVySbGAA1PAAWP" = linkonce_odr hidden
 // CHECK-DAG: @"$s4test3BoxVySbGAA1PAAWP" = linkonce_odr hidden
 
 // CHECK-DAG: @"$s4test4CondVyAA3BoxVySdGGAA1PAAWP" = linkonce_odr hidden {{.*}}@"$s4test4CondVyxGAA1PA2aERzlMc"
 
 // An associated conformance which is the conformance itself.
-// CHECK-DAG: @"$s4test4LoopVySiGAA7SelfRefAAWP" = linkonce_odr hidden {{.*}}@"$s4test4LoopVyxGAA7SelfRefAAMc"{{.*}}@"$s4test4LoopVySiGAA7SelfRefAAWP"
+// CHECK-DAG: @"$s4test4LoopVySiGAA7SelfRefAAWP" = linkonce_odr hidden {{.*}}@"$s4test4LoopVyxGAA7SelfRefAAMc"{{.*}}@"$s4test4LoopVySiGAA7SelfRefAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
 
 // The generic witness of a conditional conformance needs a runtime-instantiated witness table.
 // NOSTATIC-NOT: @"$s4test4CondVyAA3BoxVySiGGAA16HasGenericMethodAAWP" =
 
 // A witness which cannot be specialized is the generic witness in the static table.
-// CHECK-DAG: @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP" = linkonce_odr hidden {{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodAAMc"{{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW"
+// CHECK-DAG: @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP" = linkonce_odr hidden {{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodAAMc"{{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW{{(\.ptrauth(\.[0-9]+)?)?}}"
 
 // No additional conformance descriptor is emitted for a specialized witness table.
 // DESC:     @"$s4test7WrapperVyxGAA1QAAMc" =
