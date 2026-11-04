@@ -74,7 +74,7 @@ public func lifetimeDependentCopy(_ p: RawSpan, _ len2: CInt) -> RawSpan {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @inline(always) @_lifetime(borrow p) @_disfavoredOverload
-public func lifetimeDependentBorrow(_ p: borrowing UnsafeRawBufferPointer, _ len2: CInt) -> RawSpan {
+public func lifetimeDependentBorrow(_ p: borrowing @_addressable UnsafeRawBufferPointer, _ len2: CInt) -> RawSpan {
     let len1 = CInt(exactly: p.count)!
     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
 }
@@ -98,7 +98,7 @@ public func lifetimeDependentCopyMut(_ p: inout MutableRawSpan, _ len2: CInt) ->
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @inline(always) @_lifetime(borrow p) @_disfavoredOverload
-public func lifetimeDependentBorrowMut(_ p: borrowing UnsafeMutableRawBufferPointer, _ len2: CInt) -> MutableRawSpan {
+public func lifetimeDependentBorrowMut(_ p: borrowing @_addressable UnsafeMutableRawBufferPointer, _ len2: CInt) -> MutableRawSpan {
     let len1 = CInt(exactly: p.count)!
     return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe lifetimeDependentBorrowMut(p.baseAddress!, len1, len2), byteCount: Int(len2)), copying: ())
 }
