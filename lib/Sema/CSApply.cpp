@@ -9938,9 +9938,8 @@ ConstraintSystem::applySolution(Solution &solution,
       if (diagnosedErrorsViaFixes)
         return std::nullopt;
 
-      // If we didn't manage to diagnose anything well, so fall back to
-      // diagnosing mining the system to construct a reasonable error message.
-      diagnoseFailureFor(target);
+      // If we didn't manage to diagnose anything well, emit the fallback.
+      produceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
     }
   }

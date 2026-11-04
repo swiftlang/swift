@@ -1235,7 +1235,7 @@ enum SelfPattern<T> {
 }
 
 func testUndefinedInClosureVar() {
-  // Make sure we don't produce "unable to infer closure type without a type annotation"
+  // Make sure we don't produce "failed to produce diagnostic"
   _ = {
     var x: Undefined // expected-error {{cannot find type 'Undefined' in scope}}
   }
