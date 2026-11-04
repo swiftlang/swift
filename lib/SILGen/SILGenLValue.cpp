@@ -3837,13 +3837,28 @@ void LValue::addNonMemberVarComponent(
       }
 
       if (!address.isLValue()) {
-        assert((AccessKind == SGFAccessKind::BorrowedObjectRead
-                || AccessKind == SGFAccessKind::BorrowedAddressRead)
-               && "non-borrow component requires an address base");
-        LV.add<ValueComponent>(address, std::nullopt, typeData,
-                               /*rvalue*/ true);
-        LV.add<BorrowValueComponent>(typeData);
-        return;
+        switch (AccessKind) {
+        case SGFAccessKind::BorrowedObjectRead:
+        case SGFAccessKind::BorrowedAddressRead:
+        case SGFAccessKind::OwnedAddressRead:
+        case SGFAccessKind::OwnedObjectRead:
+          LV.add<ValueComponent>(address, std::nullopt, typeData,
+                                /*rvalue*/ true);
+          LV.add<BorrowValueComponent>(typeData);
+          return;
+        case SGFAccessKind::OwnedObjectConsume:
+        case SGFAccessKind::OwnedAddressConsume:
+          LV.add<ValueComponent>(address, std::nullopt, typeData,
+                                /*rvalue*/ true);
+          return;
+        
+        case SGFAccessKind::IgnoredRead:
+          llvm_unreachable("should not appear as an lvalue component");
+        case SGFAccessKind::Write:
+        case SGFAccessKind::ReadWrite:
+          // Should be ruled out by the `!isLValue` check above.
+          llvm_unreachable("would have been an lvalue");
+        }
       }
 
       std::optional<SILAccessEnforcement> enforcement;

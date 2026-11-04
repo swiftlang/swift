@@ -10,6 +10,8 @@ extension X {
 
   public var propXinB: Bool { return true }
   package var propXinB_package: Bool { return true }
+  public var settablePropXinB: Bool { get { true } set { } }
+  public var optionalPropXinB: Bool? { return nil }
 
   public func shadowedByMemberOnXinB() { }
   public static func shadowedByStaticMemberOnXinB() { }
@@ -98,4 +100,12 @@ public struct EquatableInB: Equatable {
   public static func ==(_: EquatableInB, _: EquatableInB) -> Bool {
     false
   }
+}
+
+public struct DynamicMemberAttributesInB {
+  public var propInB: Z { Z() }
+}
+
+extension DynamicMemberScopesInA {
+  public subscript<T>(dynamicMember keyPath: KeyPath<DynamicMemberAttributesInB, T>) -> T { fatalError() }
 }

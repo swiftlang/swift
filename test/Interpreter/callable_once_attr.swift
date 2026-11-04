@@ -606,6 +606,23 @@ func testInlinedDiscard() {
 // CHECK-NEXT: Resource(discarded) deinit
 testInlinedDiscard()
 
+@_transparent
+func andRethrowing(
+  _ lhs: Bool, _ rhs: @autoclosure @callable(once) () throws -> Bool
+) rethrows -> Bool {
+  lhs ? try rhs() : false
+}
+
+@inline(never)
+func testRethrowingAutoclosure(_ flag: Bool, _ x: Int) -> Bool {
+  andRethrowing(flag, x > 0)
+}
+
+// CHECK-NEXT: true
+// CHECK-NEXT: false
+print(testRethrowingAutoclosure(true, 1))
+print(testRethrowingAutoclosure(false, 1))
+
 func genericCallAtMostOnce<R>(_ fn: @callable(once) () -> R) -> R { fn() }
 
 func makeTag() -> String { "thunk" }

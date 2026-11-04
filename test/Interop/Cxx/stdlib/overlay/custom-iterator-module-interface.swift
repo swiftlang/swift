@@ -215,3 +215,12 @@
 // CHECK:   typealias Pointee = CInt
 // CHECK:   var pointee: CInt { get nonmutating set }
 // CHECK: }
+
+// CHECK-NOT: struct HasOnlyIteratorConcept : UnsafeCxxInputIterator
+// CHECK: struct HasOnlyIteratorConcept {
+// CHECK: }
+
+// CHECK: struct ReturnsOnlyIteratorConcept {
+// CHECK-NOT:   __getUnsafe
+// CHECK:   func get() -> HasOnlyIteratorConcept
+// CHECK: }

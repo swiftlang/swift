@@ -182,6 +182,12 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
     return mangler.mangleValueWitnessTable(getType());
 
   case Kind::TypeMetadataAccessFunction:
+    // A module's copy of the access function for a back-deployed type has
+    // a distinct name, so that it can reference the defining module's.
+    if (auto nominal = getType()->getAnyNominal())
+      if (nominal->isBackDeployedIntoClient())
+        return mangler.mangleBackDeploymentCopyTypeMetadataAccessFunction(
+            getType());
     return mangler.mangleTypeMetadataAccessFunction(getType());
 
   case Kind::CanonicalSpecializedGenericTypeMetadataAccessFunction:
@@ -660,6 +666,21 @@ static bool isEmbeddedExportedConformanceSpecialization(
   return SpecializedAttr::isExportedConformanceSpecialization(conformance);
 }
 
+/// Whether the witness table of \p conformance is a specialized witness table
+/// in non-embedded Swift, i.e. a witness table which is specialized for the
+/// concrete type arguments of a generic conformance. Other than the witness
+/// table of the generic conformance, such a table has no unique definition.
+/// Embedded Swift has its own rules for the linkage of witness tables.
+static bool
+isSpecializedWitnessTableConformance(const ProtocolConformance *conformance) {
+  if (conformance->getDeclContext()->getASTContext().LangOpts.hasFeature(
+          Feature::Embedded))
+    return false;
+  if (auto *inherited = dyn_cast<InheritedProtocolConformance>(conformance))
+    conformance = inherited->getInheritedConformance();
+  return isa<SpecializedProtocolConformance>(conformance);
+}
+
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
@@ -931,6 +952,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     // Unique: defined by the owning module, external elsewhere.
     if (isEmbeddedExportedConformanceSpecialization(getProtocolConformance()))
       return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+    // A specialized witness table is emitted in every module which needs it.
+    if (isSpecializedWitnessTableConformance(getProtocolConformance()))
+      return SILLinkage::Shared;
     LLVM_FALLTHROUGH;
   case Kind::ProtocolConformanceDescriptor:
   case Kind::ProtocolConformanceDescriptorRecord:
@@ -1901,6 +1925,40 @@ bool LinkEntity::isWeakExportedSpecialization(
          type->getAnyNominal()->getModuleContext() != swiftModule;
 }
 
+bool LinkEntity::isBackDeployedIntoClient() const {
+  const NominalTypeDecl *nominal = nullptr;
+  switch (getKind()) {
+  case Kind::NominalTypeDescriptor:
+  case Kind::NominalTypeDescriptorRecord:
+  case Kind::TypeMetadataPattern:
+  case Kind::TypeMetadataInstantiationCache:
+  case Kind::TypeMetadataInstantiationFunction:
+  case Kind::TypeMetadataSingletonInitializationCache:
+  case Kind::TypeMetadataCompletionFunction:
+    nominal = dyn_cast<NominalTypeDecl>(getDecl());
+    break;
+
+  case Kind::TypeMetadata:
+    nominal = getType()->getAnyNominal();
+    break;
+
+  case Kind::ProtocolWitnessTable:
+  case Kind::ProtocolConformanceDescriptor:
+  case Kind::ProtocolConformanceDescriptorRecord:
+  case Kind::ProtocolWitnessTablePattern:
+  case Kind::GenericProtocolWitnessTableInstantiationFunction: {
+    auto *dc = getDeclContextForEmission();
+    nominal = dc->getSelfNominalTypeDecl();
+    return nominal && nominal->emitsConformanceIntoClient(dc);
+  }
+
+  default:
+    return false;
+  }
+
+  return nominal && nominal->isBackDeployedIntoClient();
+}
+
 bool LinkEntity::hasNonUniqueDefinition() const {
   if (isDeclKind(getKind())) {
     auto decl = getDecl();
@@ -1952,6 +2010,9 @@ bool LinkEntity::hasNonUniqueDefinition() const {
     // separately linked library.
     if (isEmbeddedExportedConformanceSpecialization(getProtocolConformance()))
       return false;
+    if (isSpecializedWitnessTableConformance(getProtocolConformance()))
+      return true;
+
     if (auto context = getDeclContextForEmission()) {
       if (context->getParentModule()->getASTContext().LangOpts.hasFeature(
               Feature::Embedded)) {

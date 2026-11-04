@@ -318,7 +318,8 @@ extension Task: Equatable {
 /// - SeeAlso: ``Task/currentID``
 /// - SeeAlso: ``Task/id``
 /// - SeeAlso: ``UnsafeCurrentTask/id``
-@available(StdlibDeploymentTarget 6.5, *)
+@available(SwiftStdlib 5.1, *)
+@backDeployed(before: StdlibDeploymentTarget 6.5)
 @frozen
 public struct TaskID: Sendable, Hashable {
   @usableFromInline

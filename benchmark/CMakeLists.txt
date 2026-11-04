@@ -193,6 +193,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SortLettersInPlace
     single-source/SortStrings
     single-source/SpanTests
+    single-source/SpecializedWitnessTable
     single-source/StaticArray
     single-source/StrComplexWalk
     single-source/StrToInt
@@ -225,7 +226,10 @@ set(SWIFT_BENCH_MODULES
     single-source/UTF8Decode
     single-source/UTF16Decode
     single-source/Walsh
+    single-source/Concurrency/AsyncStreamYield
     single-source/Concurrency/ChildTaskCreation
+    single-source/Concurrency/ClockMeasure
+    single-source/Concurrency/ContinuationResume
     single-source/Concurrency/TaskIsCancelledCancellationScopes
     single-source/Concurrency/TaskDeadlines
     single-source/WithUnsafeCurrentTask

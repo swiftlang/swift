@@ -81,3 +81,11 @@ func passCallbacks() {
 // CHECK: sil {{.*}}[clang callWithConstIntRef] @{{.*}} : $@convention(c) (Optional<@convention(c) (@in_guaranteed Int32) -> ()>) -> ()
 // CHECK: sil {{.*}}[clang callWithIntRvalueRef] @{{.*}} : $@convention(c) (Optional<@convention(c) (@in_cxx Int32) -> ()>) -> ()
 // CHECK: sil {{.*}}[clang callWithConstIntRvalueRef] @{{.*}} : $@convention(c) (Optional<@convention(c) (@in_guaranteed Int32) -> ()>) -> ()
+
+// A reference to a function is passed directly, like a function pointer.
+func passFuncRefs() -> CInt {
+  return callFuncRef(getStaticInt) + callFuncRvalueRef(consuming: getStaticInt)
+}
+
+// CHECK: sil {{.*}}[clang callFuncRef] @{{.*}} : $@convention(c) (@convention(c) () -> Int32) -> Int32
+// CHECK: sil {{.*}}[clang callFuncRvalueRef] @{{.*}} : $@convention(c) (@convention(c) () -> Int32) -> Int32

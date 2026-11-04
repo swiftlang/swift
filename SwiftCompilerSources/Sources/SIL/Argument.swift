@@ -77,6 +77,10 @@ final public class FunctionArgument : Argument {
     bridged.FunctionArgument_isClosureCapture()
   }
 
+  public var isNoImplicitCopy: Bool {
+    bridged.FunctionArgument_isNoImplicitCopy()
+  }
+
   public var isSelf: Bool {
     parentFunction.argumentConventions.selfIndex == index
   }

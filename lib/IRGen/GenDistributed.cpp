@@ -1313,14 +1313,20 @@ ArgumentDecoderInfo DistributedAccessor::findArgumentDecoder(
     assert(decodeNextArgRequirement);
     SILDeclRef decodeNextArgumentRef(decodeNextArgRequirement);
 
-    llvm::Constant *fnPtr =
-        IGM.getAddrOfDispatchThunk(decodeNextArgumentRef, NotForDefinition);
     auto fnType = IGM.getSILTypes().getConstantFunctionType(
         IGM.getMaximalTypeExpansionContext(), decodeNextArgumentRef);
 
-    auto sig = IGM.getSignature(fnType);
-    auto fn = FunctionPointer::forDirect(fnType, fnPtr,
-                                         /*secondaryValue=*/nullptr, sig, true);
+    // Only protocols of resilient modules have dispatch thunks.
+    FunctionPointer fn;
+    if (IGM.isResilient(decoderProtocol, ResilienceExpansion::Maximal)) {
+      llvm::Constant *fnPtr =
+          IGM.getAddrOfDispatchThunk(decodeNextArgumentRef, NotForDefinition);
+      auto sig = IGM.getSignature(fnType);
+      fn = FunctionPointer::forDirect(fnType, fnPtr,
+                                      /*secondaryValue=*/nullptr, sig, true);
+    } else {
+      fn = emitWitnessMethodValue(IGF, witnessTable, decodeNextArgumentRef);
+    }
     return {decoder, decoderTy, witnessTable,
             fn,      fnType,    /*usesWitnessDispatch=*/true};
   }

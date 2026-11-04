@@ -1,5 +1,6 @@
 // RUN: not %target-swiftc_driver -swift-version 7 -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_7 %s
-// REQUIRES: swift7
+// RUN: not %target-swiftc_driver -swift-version future -typecheck %s 2>&1 | %FileCheck --check-prefix ERROR_7 %s
+// REQUIRES: swift_future
 
 #if swift(>=3)
 asdf

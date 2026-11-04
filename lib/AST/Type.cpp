@@ -3928,6 +3928,9 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       
       // Inputs are contravariant.
       for (auto i : indices(fn2.getParams())) {
+        if (fn1Params[i].isVariadic() != fn2Params[i].isVariadic())
+          return false;
+
         if (!matches(fn2Params[i].getOldType(), fn1Params[i].getOldType(),
                      matchMode, ParameterPosition::ParameterTupleElement,
                      OptionalUnwrapping::None)) {

@@ -10,41 +10,36 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.5, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 6.5)
 @frozen
 @_rawLayout(like: Value, movesAsLike)
 public struct ConstCell<Value: ~Copyable>: ~Copyable {
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   internal var _address: UnsafeMutablePointer<Value> {
     unsafe UnsafeMutablePointer<Value>(_rawAddress)
   }
 
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   internal var _rawAddress: Builtin.RawPointer {
     Builtin.addressOfRawLayout(self)
   }
 
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public init(_ initialValue: consuming Value) {
     unsafe _address.initialize(to: initialValue)
   }
 
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   deinit {
     unsafe _address.deinitialize(count: 1)
   }
 }
 
-@available(SwiftStdlib 6.5, *)
 extension ConstCell where Value: ~Copyable {
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public func withUnsafePointer<Result: ~Copyable, E>(
@@ -54,9 +49,7 @@ extension ConstCell where Value: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.5, *)
 extension ConstCell where Value: Copyable {
-  @available(SwiftStdlib 6.5, *)
   @export(implementation)
   @_transparent
   public var value: Value {

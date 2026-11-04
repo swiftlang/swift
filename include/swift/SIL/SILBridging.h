@@ -636,6 +636,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isWithoutActuallyEscapingThunk() const;
   BRIDGED_INLINE bool needsStackProtection() const;
   BRIDGED_INLINE bool shouldOptimize() const;
+  BRIDGED_INLINE bool isOptimizedForSize() const;
   BRIDGED_INLINE bool isReferencedInModule() const;
   BRIDGED_INLINE bool wasDeserializedCanonical() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
@@ -1112,9 +1113,12 @@ struct BridgedInstruction {
   DebugValue_getDebugReconstructionBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock
   DebugValue_getOrCreateDebugReconstructionBlock() const;
+  BRIDGED_INLINE void DebugValue_clearDebugReconstructionBlock() const;
   BRIDGED_INLINE void DebugValue_stripDeref(SwiftInt operandIdx) const;
   BRIDGED_INLINE void DebugValue_prependDeref(SwiftInt operandIdx) const;
   BRIDGED_INLINE void DebugValue_killOperand(SwiftInt operandIdx, BridgedType operandType) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction
+  DebugValue_replaceOperands(BridgedValueArray operands) const;
 
   BRIDGED_INLINE bool AllocStack_hasVarInfo() const;
   BRIDGED_INLINE BridgedSILDebugVariable AllocStack_getVarInfo() const;
@@ -1140,6 +1144,7 @@ struct BridgedArgument {
   BRIDGED_INLINE bool isReborrow() const;
   BRIDGED_INLINE bool FunctionArgument_isLexical() const;
   BRIDGED_INLINE bool FunctionArgument_isClosureCapture() const;
+  BRIDGED_INLINE bool FunctionArgument_isNoImplicitCopy() const;
   BRIDGED_INLINE void setReborrow(bool reborrow) const;
   BRIDGED_INLINE void setOwnership(BridgedValue::Ownership ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getDecl() const;
@@ -1716,6 +1721,8 @@ struct BridgedContext {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   OptionalBridgedWitnessTable lookupWitnessTable(BridgedConformance conformance) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
+  OptionalBridgedWitnessTable loadWitnessTable(BridgedConformance conformance) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedConformance substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const;
   BRIDGED_INLINE bool calleesAreStaticallyKnowable(BridgedDeclRef method) const;

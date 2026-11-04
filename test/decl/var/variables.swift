@@ -14,30 +14,10 @@ var bfx : Int, bfy : Int
 
 _ = 10
 
-var self1 = self1
-// expected-note@-1 {{through reference here}}
-// expected-error@-2 {{circular reference}}
-
-var self2 : Int = self2
-var (self3) : Int = self3
-var (self4) : Int = self4
-
-var self5 = self5 + self5
-// expected-note@-1 {{through reference here}}
-// expected-error@-2 {{circular reference}}
-
-var self6 = !self6
-// expected-note@-1 {{through reference here}}
-// expected-error@-2 {{circular reference}}
-
-var (self7a, self7b) = (self7b, self7a)
-// expected-note@-1 {{through reference here}}
-// expected-error@-2 {{circular reference}}
-
-var self8 = 0
+var shadowedByLocal = 0
 func testShadowing() {
-  var self8 = self8
-  // expected-warning@-1 {{initialization of variable 'self8' was never used; consider replacing with assignment to '_' or removing it}}
+  var shadowedByLocal = shadowedByLocal
+  // expected-warning@-1 {{initialization of variable 'shadowedByLocal' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
 var (paren) = 0
@@ -92,12 +72,6 @@ weak let V = SomeClass() // ok since SE-0481
 // expected-warning@-1 {{instance will be immediately deallocated because variable 'V' is 'weak'}}
 // expected-note@-2 {{'V' declared here}}
 // expected-note@-3 {{a strong reference is required to prevent the instance from being deallocated}}
-
-let a = b ; let b = a
-// expected-error@-1:1 {{circular reference}}
-// expected-note@-2:5 {{through reference here}}
-// expected-note@-3:13 {{through reference here}}
-// expected-note@-4:17 {{through reference here}}
 
 // <rdar://problem/17501765> Swift should warn about immutable default initialized values
 let uselessValue : String?

@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -swift-version 4
+// RUN: %target-typecheck-verify-swift -swift-version 4 -verify-additional-prefix swift4-
+// RUN: %if swift_future %{ %target-typecheck-verify-swift -swift-version future -verify-additional-prefix future- %}
 
 protocol P {
   associatedtype A
@@ -116,13 +117,16 @@ protocol ComplexDerivation {
   associatedtype A2: Q
 
   func bad1<B: Equatable>(_: B) where B == Self.A1
-  // expected-warning@-1 {{instance method requirement 'bad1' cannot add constraint 'Self.A1: Equatable' on 'Self'; this will be an error in a future Swift language mode}}
+  // expected-swift4-warning@-1 {{instance method requirement 'bad1' cannot add constraint 'Self.A1: Equatable' on 'Self'; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{instance method requirement 'bad1' cannot add constraint 'Self.A1: Equatable' on 'Self'}}
 
   func bad2<B>(_: B) where A1 == [B]
-  // expected-warning@-1 {{instance method requirement 'bad2' cannot add constraint 'Self.A1 == [B]' on 'Self'; this will be an error in a future Swift language mode}}
+  // expected-swift4-warning@-1 {{instance method requirement 'bad2' cannot add constraint 'Self.A1 == [B]' on 'Self'; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{instance method requirement 'bad2' cannot add constraint 'Self.A1 == [B]' on 'Self'}}
 
   func good<B>(_: B) where A2 == B  // This is fine
 
   func bad3<B, C>(_: B, _: C) where A2 == B, B.A3 == [C]
-  // expected-warning@-1 {{instance method requirement 'bad3' cannot add constraint 'Self.A2.A3 == Array<C>' on 'Self'; this will be an error in a future Swift language mode}}
+  // expected-swift4-warning@-1 {{instance method requirement 'bad3' cannot add constraint 'Self.A2.A3 == Array<C>' on 'Self'; this will be an error in a future Swift language mode}}
+  // expected-future-error@-2 {{instance method requirement 'bad3' cannot add constraint 'Self.A2.A3 == Array<C>' on 'Self'}}
 }

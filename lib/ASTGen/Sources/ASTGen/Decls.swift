@@ -617,7 +617,9 @@ extension ASTGenVisitor {
     return entries.reversed().bridgedArray(in: self)
   }
 
-  func generate(variableDecl node: VariableDeclSyntax) -> BridgedDecl? {
+  /// - Parameter isABIOnly: Whether `node` is the counterpart in an `@abi`
+  ///   attribute.
+  func generate(variableDecl node: VariableDeclSyntax, isABIOnly: Bool = false) -> BridgedDecl? {
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
     let introducer: BridgedVarDeclIntroducer
     switch node.bindingSpecifier.rawText {
@@ -633,13 +635,14 @@ extension ASTGenVisitor {
     }
 
     // @const/@section globals are not top-level, per SE-0492.
-    // We follow the same rule for @_extern.
+    // We follow the same rule for @_extern. The counterpart in an @abi
+    // attribute is not executable code, either.
     let isConst = attrs.attributes.hasAttribute(.Section)
       || attrs.attributes.hasAttribute(.ConstVal)
       || attrs.attributes.hasAttribute(.Extern)
 
     let topLevelDecl: BridgedTopLevelCodeDecl?
-    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst {
+    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst, !isABIOnly {
       topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
     } else {
       topLevelDecl = nil

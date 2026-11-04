@@ -8,6 +8,7 @@
 # See https://swift.org/LICENSE.txt for license information
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+import difflib
 import json
 import os
 from pathlib import Path
@@ -574,6 +575,37 @@ def get_scheme_map(
                 return v["repos"]
 
     return None
+
+
+def get_scheme_map_or_exit(
+    config: Dict[str, Any], scheme_name: str
+) -> Dict[str, str]:
+    """Like `get_scheme_map`, but exits with an error if the scheme is unknown.
+
+    Args:
+        config (Dict[str, Any]): deserialized `update-checkout-config.json`
+        scheme_name (str): name of the scheme to look up in `config`
+
+    Returns:
+        Dict[str, str]: a mapping from repos to branches for the given scheme.
+    """
+
+    scheme_map = get_scheme_map(config, scheme_name)
+    if scheme_map is not None:
+        return scheme_map
+
+    print(
+        f"update-checkout error: unknown branch scheme '{scheme_name}'. "
+        "Add it to 'branch-schemes' in update-checkout-config.json, or pass "
+        "an existing scheme with --scheme."
+    )
+    aliases = [
+        alias for v in config["branch-schemes"].values() for alias in v["aliases"]
+    ]
+    close_matches = difflib.get_close_matches(scheme_name, aliases, n=5)
+    if close_matches:
+        print("Did you mean one of: " + ", ".join(close_matches) + "?")
+    sys.exit(1)
 
 
 def check_missing_clones(
@@ -1202,7 +1234,7 @@ def main() -> int:
     if scheme_name is None:
         scheme_name = config["default-branch-scheme"]
 
-    scheme_map = get_scheme_map(config, scheme_name)
+    scheme_map = get_scheme_map_or_exit(config, scheme_name)
 
     @exponential_retry(max_retries=args.max_retries)
     def do_checkout() -> int:
@@ -1241,7 +1273,7 @@ def main() -> int:
 
                 # Re-read the config after checkout.
                 config = load_config(args.configs)
-                scheme_map = get_scheme_map(config, scheme_name)
+                scheme_map = get_scheme_map_or_exit(config, scheme_name)
 
         if args.dump_hashes:
             dump_repo_hashes(args, config)

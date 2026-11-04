@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated -verify-ignore-unknown -swift-version 6 -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated -verify-ignore-unknown -swift-version future -verify-additional-prefix future- %}
 
 // REQUIRES: objc_interop
 
 import Foundation
-import ObjCParseExtras
+public import ObjCParseExtras
 
 class MyArray : DummyClass {
   @objc func setBoolProperty(_ x: Bool) { } // expected-error{{method 'setBoolProperty' with Objective-C selector 'setBoolProperty:' conflicts with setter for 'boolProperty' from superclass 'DummyClass' with the same Objective-C selector}}
@@ -86,6 +87,8 @@ class SomeCellSub5 : SomeCell {
 class SomeCellSub6 : SomeCell {
   @available(*, unavailable)
   @objc override init(string: String) {
+    // expected-swift6-warning@-1 {{cannot override 'init' with a declaration that is marked unavailable; this will be an error in a future Swift language mode}}
+    // expected-future-error@-2 {{cannot override 'init' with a declaration that is marked unavailable}}
     super.init(string: string)
   }
 }
@@ -131,6 +134,7 @@ class MyHashableNSObject: NSObject {
 
   override func hash(into hasher: inout Hasher) {
     // expected-error@-1 {{'NSObject.hash(into:)' is not overridable; did you mean to override 'NSObject.hash'?}} {{12-16=var}} {{21-48=: Int}}
+    // expected-future-error@-2 {{'NSObject.hash(into:)' is not overridable; did you mean to override 'NSObject.hash'?}}
   }
 }
 

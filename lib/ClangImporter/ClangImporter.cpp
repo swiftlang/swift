@@ -9026,7 +9026,8 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
           hasUnsafeAPIAttr(cxxRecord))
         return false;
 
-      if (hasIteratorAPIAttr(cxxRecord) || hasIteratorCategory(cxxRecord))
+      if (hasIteratorAPIAttr(cxxRecord) ||
+          hasIteratorCategoryOrIteratorConcept(cxxRecord))
         return true;
 
       if (hasPointerInSubobjects(cxxRecord))
@@ -9121,7 +9122,8 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (isSwiftClassType(cxxDecl))
     return CxxRecordSemanticsKind::SwiftClassType;
 
-  if (hasIteratorAPIAttr(cxxDecl) || hasIteratorCategory(cxxDecl)) {
+  if (hasIteratorAPIAttr(cxxDecl) ||
+      hasIteratorCategoryOrIteratorConcept(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
 
@@ -9651,6 +9653,9 @@ std::optional<importer::CxxReferenceParameter>
 importer::classifyCxxReferenceParameter(clang::QualType type) {
   auto pointeeType = getCxxReferencePointeeTypeOrNone(type.getTypePtr());
   if (!pointeeType)
+    return std::nullopt;
+
+  if ((*pointeeType)->isFunctionType())
     return std::nullopt;
 
   auto kind = CxxReferenceParameterKind::Borrowed;

@@ -818,8 +818,10 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
     // possible loop-nest.
     SmallVector<SILBasicBlock *, 16> HoistableLoopNests;
     std::function<void(SILLoop *)> processChildren = [&](SILLoop *L) {
-      ArrayPropertiesAnalysis Analysis(L, DA, deb);
-      if (Analysis.run()) {
+      // Note that the analysis must not be alive while recursing into
+      // sub-loops. Otherwise its BasicBlockSet would limit the maximum loop
+      // nesting depth to the number of available block bits.
+      if (ArrayPropertiesAnalysis(L, DA, deb).run()) {
         // Hoist in the current loop nest.
         HasChanged = true;
         HoistableLoopNests.push_back(L->getLoopPreheader());

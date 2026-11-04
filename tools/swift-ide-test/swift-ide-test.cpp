@@ -4705,8 +4705,8 @@ int main(int argc, char *argv[]) {
     // Honor the *last* -swift-version specified.
     const auto &LastSwiftVersion =
       options::SwiftVersion[options::SwiftVersion.size()-1];
-    if (auto swiftVersion = VersionParser::parseVersionString(
-            LastSwiftVersion, SourceLoc(), nullptr)) {
+    if (auto swiftVersion =
+            VersionParser::parseLanguageMode(LastSwiftVersion, nullptr)) {
       if (auto actual = swiftVersion.value().getEffectiveLanguageVersion())
         InitInvok.getLangOptions().EffectiveLanguageVersion = actual.value();
     }

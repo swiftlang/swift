@@ -22,6 +22,7 @@
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
@@ -143,6 +144,10 @@ OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction 
   auto bi = builtin.getAs<BuiltinInst>();
   std::optional<bool> resultsInError;
   return {::constantFoldBuiltin(bi, resultsInError)};
+}
+
+OptionalBridgedValue BridgedPassContext::simplifyInstruction(BridgedInstruction inst) const {
+  return {::simplifyInstruction(inst.unbridged())};
 }
 
 void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {

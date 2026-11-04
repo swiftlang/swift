@@ -829,6 +829,8 @@ bb0:
 // CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) () -> @out C
 // CHECK:         [[ALLOC:%.*]] = alloc_stack $C
 // CHECK-NEXT:    copy_addr [[ROOT]] to [init] [[ALLOC]] : $*C
+//   The diagnose below is due to the @in being seen as a 'take'. Only of concern if disabling opaque values.
+// CHECK-NEXT:    diagnose [unpermitted_copy] [[ROOT]]
 // CHECK-NEXT:    apply {{%.*}}([[ALLOC]]) : $@convention(thin) (@in C) -> ()
 // CHECK-NEXT:    dealloc_stack [[ALLOC]]
 // CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) (@in C) -> ()
@@ -1727,6 +1729,103 @@ bb3:
   tuple_addr_constructor [assign] %root : $*(K, K) with (%a : $K, %b : $K)
   destroy_addr %root : $*(K, K)
   dealloc_stack %0 : $*(K, K)
+  %t = tuple ()
+  return %t
+}
+
+// A copy of a `@noImplicitCopy` binding that was never a take is still an unpermitted copy.
+// CHECK-LABEL: sil [ossa] @noimplicitcopy_copy_then_use :
+// CHECK:          [[L1:%.*]] = load [copy] {{%.*}} : $*K
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[L1]] : $K
+// CHECK:          load [take] {{%.*}} : $*K
+// CHECK:       } // end sil function
+sil [ossa] @noimplicitcopy_copy_then_use : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @noImplicitCopy @owned $K):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  %1 = alloc_stack [lexical] [var_decl] $K, var, name "c", type $K
+  store %0 to [init] %1 : $*K
+  specify_test "lifetime_resolution_resolve %1"
+
+  %l1 = load [copy] %1 : $*K
+  apply %consumeK(%l1) : $@convention(thin) (@owned K) -> ()
+  %l2 = load [copy] %1 : $*K
+  apply %useK(%l2) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %l2
+
+  destroy_addr %1
+  dealloc_stack %1
+  %t = tuple ()
+  return %t
+}
+
+// A take of a `@noImplicitCopy` binding that must become a copy is an unpermitted copy.
+// CHECK-LABEL: sil [ossa] @noimplicitcopy_take_then_use :
+// CHECK:          [[L1:%.*]] = load [copy] {{%.*}} : $*K
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[L1]] : $K
+// CHECK:       } // end sil function
+sil [ossa] @noimplicitcopy_take_then_use : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @noImplicitCopy @owned $K):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  %1 = alloc_stack [lexical] [var_decl] $K, var, name "c", type $K
+  store %0 to [init] %1 : $*K
+  specify_test "lifetime_resolution_resolve %1"
+
+  %l1 = load [take] %1 : $*K
+  apply %consumeK(%l1) : $@convention(thin) (@owned K) -> ()
+  %l2 = load [copy] %1 : $*K
+  apply %useK(%l2) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %l2
+
+  destroy_addr %1
+  dealloc_stack %1
+  %t = tuple ()
+  return %t
+}
+
+// Copying a field of a `@noImplicitCopy` binding is permitted.
+// CHECK-LABEL: sil [ossa] @noimplicitcopy_copy_field :
+// CHECK:       } // end sil function
+sil [ossa] @noimplicitcopy_copy_field : $@convention(thin) (@owned Two) -> () {
+bb0(%0 : @noImplicitCopy @owned $Two):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %consumeTwo = function_ref @consumeTwo : $@convention(thin) (@owned Two) -> ()
+  %1 = alloc_stack [lexical] [var_decl] $Two, var, name "s", type $Two
+  store %0 to [init] %1 : $*Two
+  specify_test "lifetime_resolution_resolve %1"
+
+  %a = struct_element_addr %1 : $*Two, #Two.a
+  %l1 = load [copy] %a : $*K
+  apply %consumeK(%l1) : $@convention(thin) (@owned K) -> ()
+  %l2 = load [copy] %1 : $*Two
+  apply %consumeTwo(%l2) : $@convention(thin) (@owned Two) -> ()
+
+  destroy_addr %1
+  dealloc_stack %1
+  %t = tuple ()
+  return %t
+}
+
+// Without `@noImplicitCopy`, the copy is permitted.
+// CHECK-LABEL: sil [ossa] @copyable_copy_then_use :
+// CHECK:       } // end sil function
+sil [ossa] @copyable_copy_then_use : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  %1 = alloc_stack [lexical] [var_decl] $K, var, name "c", type $K
+  store %0 to [init] %1 : $*K
+  specify_test "lifetime_resolution_resolve %1"
+
+  %l1 = load [copy] %1 : $*K
+  apply %consumeK(%l1) : $@convention(thin) (@owned K) -> ()
+  %l2 = load [copy] %1 : $*K
+  apply %useK(%l2) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %l2
+
+  destroy_addr %1
+  dealloc_stack %1
   %t = tuple ()
   return %t
 }

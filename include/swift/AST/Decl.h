@@ -70,6 +70,7 @@ namespace swift {
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
   class ApplyExpr;
+  class AvailabilityQuery;
   class AvailabilityRange;
   class AvailabilityDomain;
   class GenericEnvironment;
@@ -1232,6 +1233,19 @@ public:
 
   /// Returns true if the decl has a valid and active `@backDeployed` attribute.
   bool isBackDeployed() const;
+
+  /// Whether this declaration, nested in a back-deployed type, is annotated
+  /// as only available within \p backDeployedRange, where the type's defining
+  /// module provides the type, on the primary target or on the target variant.
+  /// Such a declaration isn't back-deployed along with the type.
+  bool isOnlyAvailableWithinBackDeployedRange(
+      AvailabilityRange backDeployedRange, bool forTargetVariant = false) const;
+
+  /// The query that determines at runtime whether the original of this
+  /// back-deployed declaration is available, accounting for both the primary
+  /// target and the target variant, or \c std::nullopt if this declaration
+  /// isn't back-deployed.
+  std::optional<AvailabilityQuery> getBackDeploymentAvailabilityQuery() const;
 
   /// Returns the starting location of the entire declaration.
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
@@ -2825,6 +2839,11 @@ public:
 
   SourceRange getOriginalInitRange(unsigned i) const {
     return getPatternList()[i].getOriginalInitRange();
+  }
+
+  /// Retrieve the SourceRange for the pattern binding entry at a given index.
+  SourceRange getEntrySourceRange(unsigned i) const {
+    return getPatternList()[i].getSourceRange();
   }
 
   void setInit(unsigned i, Expr *E) {
@@ -4743,6 +4762,19 @@ public:
   /// is built resiliently.
   bool isResilient() const;
 
+  /// Whether this is a back-deployed struct or enum from a module other than
+  /// the one being compiled, and the deployment target doesn't guarantee that
+  /// its module provides it, so that the module being compiled emits its own
+  /// copy of the type's metadata and conformances.
+  bool isBackDeployedIntoClient() const;
+
+  /// Whether the module being compiled emits its own copy of a conformance of
+  /// this type that is declared in \p conformanceDC: that is, this type is
+  /// back-deployed into the client (\c isBackDeployedIntoClient), and the
+  /// conformance is declared alongside it, in the same module, and isn't only
+  /// available where that module provides the type.
+  bool emitsConformanceIntoClient(const DeclContext *conformanceDC) const;
+
   /// True if the decl is resilient AND also its defining module does
   /// _not_ allow non-resilient access; the module can allow such access
   /// if package optimization is enabled so its client modules within the
@@ -6445,6 +6477,11 @@ public:
   /// Return true if this is a VarDecl that has storage associated with
   /// it.
   bool hasStorage() const;
+
+  void setHasStorage(bool hasStorage) {
+    LazySemanticInfo.HasStorage = hasStorage;
+    LazySemanticInfo.HasStorageComputed = true;
+  }
 
   /// Return true if this is a VarDecl that has init accessor associated
   /// with it.

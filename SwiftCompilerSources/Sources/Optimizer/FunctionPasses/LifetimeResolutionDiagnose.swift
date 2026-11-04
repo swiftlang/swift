@@ -438,6 +438,8 @@ private struct ConsumeSite {
     }
   }
 
+  var isCopyable: Bool { return !marker.operand.value.type.isMoveOnly }
+
   /// The instruction that takes ownership of the copy, or the copy itself if unknown.
   var consumingInstruction: Instruction { consumer?.instruction ?? instruction }
 
@@ -860,6 +862,11 @@ private struct Diagnoser {
       } else {
         noteConsume(consume)
       }
+    }
+
+    // If the type is copyable, then suggest using `copy` to fix the use-after-consume.
+    for consume in report.consumes where consume.isCopyable {
+      diagnostics.diagnose(.sil_movechecking_add_explicit_copy, report.name, at: consume.location)
     }
 
     // Explain that the value cannot be implicitly copied, and suggest borrowing instead.
