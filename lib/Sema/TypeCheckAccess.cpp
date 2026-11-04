@@ -2019,6 +2019,38 @@ bool isFragileClangNode(const ClangNode &node) {
 
 } // end anonymous namespace
 
+/// Whether an import of \p SF, other than an implementation-only one, reaches
+/// \p M without going through a bridging header. Such an import makes \p M a
+/// dependency of the module even when it is less permissive than the internal
+/// bridging header's import, which then takes precedence in
+/// \c SourceFile::getImportAccessLevel.
+///
+/// All bridging headers share one header module, so its re-exports may come
+/// from the internal bridging header, which isn't recorded for clients.
+static bool isImportedOutsideBridgingHeader(const ModuleDecl *M,
+                                            const SourceFile *SF) {
+  SmallVector<const ModuleDecl *, 8> worklist;
+  for (auto &import : SF->getImports())
+    if (!import.options.contains(ImportFlags::ImplementationOnly))
+      worklist.push_back(import.module.importedModule);
+
+  llvm::SmallPtrSet<const ModuleDecl *, 16> visited;
+  while (!worklist.empty()) {
+    auto *next = worklist.pop_back_val();
+    if (next->isClangBridgingHeaderImportModule() ||
+        !visited.insert(next).second)
+      continue;
+    if (next == M)
+      return true;
+
+    SmallVector<ImportedModule, 4> exports;
+    next->getImportedModulesForLookup(exports);
+    for (auto &exported : exports)
+      worklist.push_back(exported.importedModule);
+  }
+  return false;
+}
+
 /// Returns the kind of origin, implementation-only import or SPI declaration,
 /// that restricts exporting \p decl from the given file and context.
 ///
@@ -2167,9 +2199,18 @@ swift::getDisallowedOriginKind(const Decl *decl,
   auto importSource = decl->getImportAccessFrom(where.getDeclContext());
   if (importSource.has_value() &&
       importSource->accessLevel < AccessLevel::Public) {
-    return importSource->module.importedModule->isClangBridgingHeaderImportModule()
-      ? DisallowedOriginKind::InternalBridgingHeaderImport
-      : DisallowedOriginKind::NonPublicImport;
+    if (!importSource->module.importedModule
+             ->isClangBridgingHeaderImportModule())
+      return DisallowedOriginKind::NonPublicImport;
+
+    // A layout exposed to clients only requires the defining module to be a
+    // dependency. Check for an import of it in this file, where one at any
+    // access level records that dependency.
+    if (where.getExportedLevel() == ExportedLevel::ImplicitlyExported &&
+        isImportedOutsideBridgingHeader(M, SF))
+      return DisallowedOriginKind::NonPublicImport;
+
+    return DisallowedOriginKind::InternalBridgingHeaderImport;
   }
 
   return DisallowedOriginKind::None;

@@ -387,8 +387,11 @@ SourceLoc DiagnosticEngine::getBestAddImportFixItLoc(SourceFile *SF) const {
     if (bestLoc.isValid())
       break;
 
-    // For any other item, we want to insert before it.
+    // For any other item, we want to insert before it, including the
+    // attributes of a declaration.
     SourceLoc loc = item.getStartLoc();
+    if (auto *D = item.dyn_cast<Decl *>())
+      loc = D->getSourceRangeIncludingAttrs().Start;
     if (loc.isValid()) {
       bestLoc = Lexer::getLocForStartOfLine(SM, loc);
       break;
