@@ -6451,6 +6451,11 @@ public:
   /// it.
   bool hasStorage() const;
 
+  void setHasStorage(bool hasStorage) {
+    LazySemanticInfo.HasStorage = hasStorage;
+    LazySemanticInfo.HasStorageComputed = true;
+  }
+
   /// Return true if this is a VarDecl that has init accessor associated
   /// with it.
   bool hasInitAccessor() const;
