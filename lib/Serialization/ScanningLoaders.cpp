@@ -199,20 +199,24 @@ SwiftModuleScanner::scanInterfaceFile(Identifier moduleID,
         std::vector<StringRef> compiledCandidatesRefs(
             compiledCandidates.begin(), compiledCandidates.end());
 
-        // If this interface specified '-autolink-force-load', add it to the
-        // set of linked libraries for this module.
-        std::vector<LinkLibrary> linkLibraries;
-        if (llvm::find(ArgsRefs, "-autolink-force-load") != ArgsRefs.end()) {
-          std::string linkName = realModuleName.str().str();
-          auto linkNameArgIt = llvm::find(ArgsRefs, "-module-link-name");
-          if (linkNameArgIt != ArgsRefs.end())
-            linkName = *(linkNameArgIt + 1);
-          linkLibraries.push_back(
-              {linkName,
-               isFramework ? LibraryKind::Framework : LibraryKind::Library,
-               /*static=*/false, /*force_load=*/true});
-        }
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
+
+        // Report the link libraries that the binary module built from this
+        // interface would carry (see `ModuleFile::collectLinkLibraries`): the
+        // '-module-link-name' library, force-loaded if the interface specified
+        // '-autolink-force-load', and the module itself if it is a framework.
+        std::vector<LinkLibrary> linkLibraries;
+        auto linkNameIt = llvm::find(ArgsRefs, "-module-link-name");
+        if (linkNameIt != ArgsRefs.end() &&
+            (linkNameIt + 1) != ArgsRefs.end() && !(linkNameIt + 1)->empty()) {
+          bool forceLoad =
+              llvm::find(ArgsRefs, "-autolink-force-load") != ArgsRefs.end();
+          linkLibraries.emplace_back(*(linkNameIt + 1), LibraryKind::Library,
+                                     isStatic, forceLoad);
+        }
+        if (isFramework)
+          linkLibraries.emplace_back(realModuleName.str(),
+                                     LibraryKind::Framework, isStatic);
         bool isStrictMemorySafety =
             llvm::find(ArgsRefs, "-strict-memory-safety") != ArgsRefs.end();
 
