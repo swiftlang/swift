@@ -619,6 +619,13 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
   /// Check whether the value escapes through the deinitializer
   private func handleDestroy(of value: Value, path: Path) -> WalkResult {
 
+    if value.type.isMoveOnly {
+      // For simplicity we assume that a deinit of a non-copyable type can escape the destroyed value.
+      // It's not that important to handle destroys of non-copyable types because the DeinitDevirtualizer
+      // lowers such destroys anyway.
+      return isEscaping
+    }
+
     // Even if this is a destroy_value of a struct/tuple/enum, the called destructor(s) only take a
     // single class reference as parameter.
     let p = path.projectionPath.popAllValueFields()
