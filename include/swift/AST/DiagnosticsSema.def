@@ -456,6 +456,10 @@ ERROR(ternary_expr_cases_global_actor_mismatch,none,
       "result values in '? :' expression are functions isolated to different actors (%0 vs. %1)",
       (Type, Type))
 
+ERROR(clang_function_type_mismatch,none,
+     "cannot convert function with underlying C type %0 to C type %1",
+     (const clang::Type *, const clang::Type *))
+
 // @_nonEphemeral conversion diagnostics
 GROUPED_ERROR(cannot_pass_type_to_non_ephemeral,TemporaryPointers,none,
       "cannot pass %0 to parameter; argument %1 must be a pointer that "

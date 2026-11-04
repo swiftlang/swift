@@ -2493,6 +2493,14 @@ AssociatedTypeInference::getPotentialTypeWitnessesByMatchingTypes(ValueDecl *req
       return Inferred.Witness && Inferred.Witness->hasClangNode();
     }
 
+    // Allow these minor mismatches at this stage and diagnose or codegen around
+    // them later.
+    bool allowFunctionRepresentationMismatch() const { return true; }
+    bool allowFunctionAsyncMismatch() const { return true; }
+    bool allowFunctionSendingResultMismatch() const { return true; }
+    bool allowFunctionIsolationMismatch() const { return true; }
+    bool allowFunctionDifferentiabilityMismatch() const { return true; }
+
     bool mismatch(GenericTypeParamType *selfParamType,
                   TypeBase *secondType, Type sugaredFirstType) {
       if (selfParamType->isEqual(Conformance->getProtocol()->getSelfInterfaceType())) {

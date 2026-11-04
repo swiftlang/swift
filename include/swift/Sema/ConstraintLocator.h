@@ -210,6 +210,10 @@ public:
                           numPathElements);
   }
 
+  /// Whether this locator denotes the same location as, or an ancestor
+  /// of, \p other .
+  bool isAncestorOf(const ConstraintLocator *other) const;
+
   unsigned getSummaryFlags() const { return summaryFlags; }
 
   /// Determines whether this locator is part of a function
