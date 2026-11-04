@@ -761,3 +761,7 @@ func usesAreNotAmbiguous(obj: ObjCClass) {
   obj.categoryMethodNot(fromHeader1: 1)
   obj.categoryMethodNot(fromHeader2: 2)
 }
+
+func inheritedInitsAreNotAmbiguous() {
+  _ = ObjCSubclass(fromSuperclass: 0)
+}
