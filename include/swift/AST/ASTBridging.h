@@ -624,6 +624,12 @@ void BridgedDiagnosticEngine_diagnose(
     BridgedArrayRef arguments, swift::SourceLoc highlightStart,
     uint32_t hightlightLength, BridgedArrayRef fixIts, SwiftInt warnUntilMajor);
 
+/// Whether \p diagID is declared `PointsToFirstBadToken`: when reported at a
+/// token that starts a line, it is reported at the end of the previous token.
+SWIFT_NAME("BridgedDiagnosticEngine.pointsToFirstBadToken(self:_:)")
+bool BridgedDiagnosticEngine_pointsToFirstBadToken(BridgedDiagnosticEngine,
+                                                   swift::DiagID diagID);
+
 SWIFT_NAME("BridgedDiagnosticEngine.getLocationFromExternalSource(self:path:line:column:)")
 swift::SourceLoc BridgedDiagnostic_getLocationFromExternalSource(
     BridgedDiagnosticEngine bridgedEngine, BridgedStringRef path, SwiftInt line,
@@ -1642,6 +1648,12 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
 SWIFT_NAME("BridgedDiagnosticArgument.staticSpelling(_:)")
 BridgedDiagnosticArgument
 BridgedDiagnosticArgument_createStaticSpelling(BridgedStaticSpelling spelling);
+
+/// Create an argument holding a declaration attribute, for a diagnostic
+/// declared as taking `DeclAttribute`.
+SWIFT_NAME("BridgedDiagnosticArgument.declAttribute(_:)")
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createDeclAttribute(BridgedDeclAttribute attribute);
 
 struct BridgedAccessorRecord {
   swift::SourceLoc lBraceLoc;

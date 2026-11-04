@@ -53,6 +53,11 @@ BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(SourceLoc start, uint32_t length,
                                        llvm::ArrayRef<DiagnosticArgument>());
 }
 
+bool BridgedDiagnosticEngine_pointsToFirstBadToken(
+    BridgedDiagnosticEngine bridgedEngine, swift::DiagID diagID) {
+  return bridgedEngine.unbridged()->isDiagnosticPointsToFirstBadToken(diagID);
+}
+
 void BridgedDiagnosticEngine_diagnose(
     BridgedDiagnosticEngine bridgedEngine, SourceLoc loc, DiagID diagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,

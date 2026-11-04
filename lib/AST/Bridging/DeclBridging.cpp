@@ -123,6 +123,11 @@ BridgedDiagnosticArgument_createStaticSpelling(BridgedStaticSpelling spelling) {
   return BridgedDiagnosticArgument(DiagnosticArgument(unbridged(spelling)));
 }
 
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createDeclAttribute(BridgedDeclAttribute attribute) {
+  return BridgedDiagnosticArgument(DiagnosticArgument(attribute.unbridged()));
+}
+
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
                                    BridgedDeclAttributes attrs) {
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());

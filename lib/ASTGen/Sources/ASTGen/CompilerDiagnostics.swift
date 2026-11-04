@@ -45,6 +45,7 @@ enum CompilerDiagnosticArgument {
   case unsigned(UInt)
   case boolean(Bool)
   case staticSpelling(BridgedStaticSpelling)
+  case declAttribute(BridgedDeclAttribute)
 
   /// Bridge this argument, allocating any storage it needs in `ctx`.
   fileprivate func bridged(in ctx: BridgedASTContext) -> BridgedDiagnosticArgument {
@@ -64,6 +65,8 @@ enum CompilerDiagnosticArgument {
       return BridgedDiagnosticArgument(value ? 1 : 0)
     case .staticSpelling(let value):
       return .staticSpelling(value)
+    case .declAttribute(let value):
+      return .declAttribute(value)
     }
   }
 }
@@ -122,9 +125,19 @@ extension ASTGenVisitor {
     highlight: Syntax? = nil,
     fixIts: [CompilerDiagnosticFixIt] = []
   ) {
+    // A diagnostic that points to the first bad token is reported at the end of
+    // the previous token when the bad token starts a line.
+    var loc = self.generateSourceLoc(node)
+    if self.diagnosticEngine.pointsToFirstBadToken(diagnostic.id),
+      let token = node.firstToken(viewMode: .sourceAccurate),
+      token.leadingTrivia.contains(where: { $0.isNewline }),
+      let previous = token.previousToken(viewMode: .sourceAccurate)
+    {
+      loc = SourceLoc(at: previous.endPositionBeforeTrailingTrivia, in: self.base)
+    }
     self.diagnose(
       diagnostic,
-      at: self.generateSourceLoc(node),
+      at: loc,
       highlight: highlight,
       fixIts: fixIts
     )

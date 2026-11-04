@@ -53,6 +53,7 @@ ARGUMENT_TYPES = {
     'unsigned': ('UInt', 'unsigned'),
     'int': ('Int', 'integer'),
     'StaticSpellingKind': ('BridgedStaticSpelling', 'staticSpelling'),
+    'DeclAttribute': ('BridgedDeclAttribute', 'declAttribute'),
 }
 
 DIAGNOSTIC_MACROS = {
