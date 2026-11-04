@@ -334,6 +334,7 @@ target_compile_definitions(swiftCore
     $<$<BOOL:${SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS}>:-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER>
     $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>
     # Low-address heap pointers can overlap the inline UTF-16 count encoding.
+    # TODO: Remove this when https://github.com/swiftlang/swift/issues/93680 is fixed.
     $<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:-DWORKAROUND_LOW_ENTROPY_VA_BREADCRUMBS>
   INTERFACE
     $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>)
