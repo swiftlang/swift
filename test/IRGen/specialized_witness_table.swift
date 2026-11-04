@@ -2,6 +2,7 @@
 // RUN: %FileCheck %s < %t.ll
 // RUN: %FileCheck %s --check-prefix=DESC < %t.ll
 // RUN: %FileCheck %s --check-prefix=NOSTATIC < %t.ll
+// RUN: %FileCheck %s --check-prefix=TABLE < %t.ll
 
 // In optimized non-embedded Swift, an existential which is created from a specialized
 // generic type references a statically emitted specialized witness table instead of
@@ -50,11 +51,12 @@ extension Cond: P where T: P {
 // An associated conformance which is the conformance itself.
 // CHECK-DAG: @"$s4test4LoopVySiGAA7SelfRefAAWP" = linkonce_odr hidden {{.*}}@"$s4test4LoopVyxGAA7SelfRefAAMc"{{.*}}@"$s4test4LoopVySiGAA7SelfRefAAWP"
 
-// The generic witness of a conditional conformance needs a runtime-instantiated witness table.
+// A generic witness of a conditional conformance, even if it's partially specialized, needs a
+// runtime-instantiated witness table.
 // NOSTATIC-NOT: @"$s4test4CondVyAA3BoxVySiGGAA16HasGenericMethodAAWP" =
 
-// A witness which cannot be specialized is the generic witness in the static table.
-// CHECK-DAG: @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP" = linkonce_odr hidden {{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodAAMc"{{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW"
+// The witness of a generic method requirement is partially specialized.
+// CHECK-DAG: @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP" = linkonce_odr hidden {{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodAAMc"{{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW{{.*}}_Tp5"
 
 // No additional conformance descriptor is emitted for a specialized witness table.
 // DESC:     @"$s4test7WrapperVyxGAA1QAAMc" =
@@ -189,4 +191,95 @@ extension Named {
 // CHECK:       }
 public func makeFinalBox() -> any Named {
   return FinalBox(t: 1)
+}
+
+// Existentials which are formed in callees of specialized witnesses reference static tables.
+public protocol Erased {
+  func value() -> Int
+}
+
+public struct Inner<T>: Erased {
+  var t: T
+  public func value() -> Int { MemoryLayout<T>.size }
+}
+
+public protocol Outer {
+  func erase() -> any Erased
+}
+
+public struct OuterBox<T>: Outer {
+  var t: T
+  @inline(never)
+  public func erase() -> any Erased { Inner(t: t) }
+}
+
+// TABLE-DAG: @"$s4test5InnerVySiGAA6ErasedAAWP" = linkonce_odr hidden {{.*}}@"$s4test5InnerVyxGAA6ErasedAAMc"{{.*}}Si_TG5"
+// TABLE-DAG: @"$s4test8OuterBoxVySiGAA0B0AAWP" = linkonce_odr hidden {{.*}}@"$s4test8OuterBoxVyxGAA0B0AAMc"{{.*}}Si_TG5"
+
+// CHECK-LABEL: define {{.*}} @"$s4test8OuterBoxV5eraseAA6Erased_pyFSi_Tg5"
+// CHECK-NOT:     call {{.*}}swift_getWitnessTable
+// CHECK:         store ptr @"$s4test5InnerVySiGAA6ErasedAAWP"
+// CHECK:       }
+
+// CHECK-LABEL: define {{.*}} @"$s4test9makeOuterAA0C0_pyF"
+// CHECK-NOT:     call {{.*}}swift_getWitnessTable
+// CHECK:         store ptr @"$s4test8OuterBoxVySiGAA0B0AAWP"
+// CHECK:       }
+public func makeOuter() -> any Outer {
+  return OuterBox(t: 1)
+}
+
+public protocol Accessor {
+  func access<R>(_ body: (any Erased) -> R) -> R
+}
+
+public struct ABox<T>: Accessor {
+  var t: T
+  @inline(never)
+  public func access<R>(_ body: (any Erased) -> R) -> R { body(Inner(t: [t])) }
+}
+
+// The static table contains the partially specialized witness.
+// TABLE-DAG: @"$s4test4ABoxVySiGAA8AccessorAAWP" = linkonce_odr hidden {{.*}}@"$s4test4ABoxVyxGAA8AccessorAAMc"{{.*}}_Tp5"
+// TABLE-DAG: @"$s4test5InnerVySaySiGGAA6ErasedAAWP" = linkonce_odr hidden {{.*}}@"$s4test5InnerVyxGAA6ErasedAAMc"{{.*}}SaySiG_TG5"
+
+// The partial specialization of the callee of the partially specialized witness.
+// CHECK-LABEL: define {{.*}} @"$s4test4ABoxV6access{{.*}}_Tp5"
+// CHECK-NOT:     call {{.*}}swift_getWitnessTable
+// CHECK:         store ptr @"$s4test5InnerVySaySiGGAA6ErasedAAWP"
+// CHECK:       }
+
+// CHECK-LABEL: define {{.*}} @"$s4test12makeAccessorAA0C0_pyF"
+// CHECK-NOT:     call {{.*}}swift_getWitnessTable
+// CHECK:         store ptr @"$s4test4ABoxVySiGAA8AccessorAAWP"
+// CHECK:       }
+public func makeAccessor() -> any Accessor {
+  return ABox(t: 1)
+}
+
+// A proven cast to a class-bound existential uses the static table.
+public protocol PC: AnyObject {
+  func foo() -> Int
+}
+
+public final class CBox<T>: PC {
+  var t: T
+  init(t: T) { self.t = t }
+  public func foo() -> Int { MemoryLayout<T>.size }
+}
+
+@inline(never)
+func castToPC<H: AnyObject>(_ h: H) -> any PC {
+  return h as! any PC
+}
+
+// TABLE-DAG: @"$s4test4CBoxCySiGAA2PCAAWP" = linkonce_odr hidden {{.*}}@"$s4test4CBoxCyxGAA2PCAAMc"{{.*}}Si_Tg5"
+
+// CHECK-LABEL: define {{.*}} @"$s4test8castToPCyAA0D0_pxRlzClFAA4CBoxCySiG_Tg5{{.*}}"
+// CHECK-NOT:     call {{.*}}swift_dynamicCast
+// CHECK-NOT:     call {{.*}}swift_getWitnessTable
+// CHECK:         @"$s4test4CBoxCySiGAA2PCAAWP"
+// CHECK:       }
+public func makeCastCBox() -> any PC {
+  return castToPC(CBox(t: 1))
 }

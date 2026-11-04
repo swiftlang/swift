@@ -46,13 +46,37 @@ let witnessTableSpecialization = ModulePass(name: "witness-table-specialization"
     return
   }
 
+  var specializer = WitnessTableSpecializer(moduleContext)
+
   // Collect the conformances first, because specialization creates new functions.
   var conformances: [(Conformance, Location)] = []
-  var visited = Set<Conformance>()
-
   for function in moduleContext.functions
     where function.isDefinition && !function.isGeneric && !function.isOptimizedForSize
   {
+    specializer.collectConformances(in: function, &conformances)
+  }
+  specializer.specialize(conformances)
+
+  specializer.processNewFunctions()
+}
+
+private struct WitnessTableSpecializer {
+  private let context: ModulePassContext
+  private var history = SpecializationHistory()
+  private var visitedConformances = Set<Conformance>()
+
+  /// The functions which existed before the pass, and the new functions which are already handled.
+  private var handledFunctions: Set<Function>
+
+  /// New functions - specialized witnesses and their specialized callees - which must be handled.
+  private var newFunctions: [Function] = []
+
+  init(_ context: ModulePassContext) {
+    self.context = context
+    self.handledFunctions = Set(context.functions)
+  }
+
+  mutating func collectConformances(in function: Function, _ conformances: inout [(Conformance, Location)]) {
     for inst in function.instructions {
       guard let initExistential = inst as? InitExistentialInstruction else {
         continue
@@ -61,15 +85,95 @@ let witnessTableSpecialization = ModulePass(name: "witness-table-specialization"
         where conformance.isConcrete && !conformance.protocol.isMarkerProtocol
       {
         let baseConf = conformance.isInherited ? conformance.inheritedConformance : conformance
-        if baseConf.isSpecialized && visited.insert(conformance.canonical).inserted {
+        if baseConf.isSpecialized && visitedConformances.insert(conformance.canonical).inserted {
           conformances.append((conformance, initExistential.location))
         }
       }
     }
   }
 
-  var history = SpecializationHistory()
-  for (conformance, location) in conformances {
-    specializeWitnessTable(for: conformance, errorLocation: location, history: &history, moduleContext)
+  mutating func specialize(_ conformances: [(Conformance, Location)]) {
+    for (conformance, location) in conformances {
+      if specializeWitnessTable(for: conformance, errorLocation: location, history: &history, context) {
+        var visited = Set<Conformance>()
+        addWitnessMethods(of: conformance, &visited)
+      }
+    }
+  }
+
+  /// Adds the witnesses of the specialized witness table of `conformance` and of its nested tables.
+  /// Unlike `FunctionWorklist.addWitnessMethods`, this includes the partially specialized witnesses of generic
+  /// requirements.
+  private mutating func addWitnessMethods(of conformance: Conformance, _ visited: inout Set<Conformance>) {
+    guard conformance.isConcrete,
+          visited.insert(conformance.canonical).inserted,
+          let witnessTable = context.lookupWitnessTable(for: conformance.canonical),
+          witnessTable.isSpecialized
+    else {
+      return
+    }
+    for entry in witnessTable.entries {
+      switch entry {
+      case .invalid, .associatedType:
+        break
+      case .method(_, let witness):
+        if let witness {
+          addIfNew(witness, allowGeneric: true)
+        }
+      case .baseProtocol(_, let baseConf):
+        addWitnessMethods(of: baseConf, &visited)
+      case .associatedConformance(_, let assocConf):
+        addWitnessMethods(of: assocConf, &visited)
+      }
+    }
+  }
+
+  /// Generic functions are only added if they are new, i.e. partially specialized witnesses.
+  private mutating func addIfNew(_ function: Function, allowGeneric: Bool = false) {
+    if function.isDefinition && (allowGeneric || !function.isGeneric) && !function.isOptimizedForSize &&
+       handledFunctions.insert(function).inserted
+    {
+      newFunctions.append(function)
+    }
+  }
+
+  /// The specialized witnesses are created after the generic specializer ran, so their generic callees are not
+  /// specialized yet, and existentials formed in those callees aren't visible to this pass. Specialize the calls
+  /// in the new functions transitively and specialize the witness tables of the existentials found there.
+  mutating func processNewFunctions() {
+    while let function = newFunctions.popLast() {
+      var calleesBeforeSpecialization = FunctionWorklist()
+      calleesBeforeSpecialization.addCallees(of: function, context)
+      let oldCallees = Set(calleesBeforeSpecialization.functions)
+
+      context.transform(function: function) { functionContext in
+        if functionContext.loadFunction(function: function, loadCalleesRecursively: true) {
+          // Witness and class method calls on concrete types become direct calls, which can then be specialized.
+          let applies = function.instructions.compactMap { $0 as? FullApplySite }
+          for apply in applies where apply.referencedFunction == nil {
+            _ = functionContext.tryDevirtualize(apply: apply, isMandatory: false)
+          }
+          // The generic specializer needs the bodies of the callees.
+          for case let apply as FullApplySite in function.instructions {
+            if let callee = apply.referencedFunction, !callee.isDefinition {
+              _ = functionContext.loadFunction(function: callee, loadCalleesRecursively: true)
+            }
+          }
+          // Partially specialized witnesses call generic functions with partially concrete substitutions.
+          _ = functionContext.specializeApplies(in: function, isMandatory: false,
+                                                allowPartialSpecialization: function.isGeneric)
+        }
+      }
+      var conformances: [(Conformance, Location)] = []
+      collectConformances(in: function, &conformances)
+      specialize(conformances)
+
+      var callees = FunctionWorklist()
+      callees.addCallees(of: function, context)
+      for callee in callees.functions {
+        // Callees which the specializer just created can be partial specializations, which are generic.
+        addIfNew(callee, allowGeneric: !oldCallees.contains(callee))
+      }
+    }
   }
 }

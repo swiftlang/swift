@@ -29,3 +29,16 @@ public struct LibWrapper<T>: LibQ {
   @inlinable
   public func make() -> LibBox<T> { LibBox(t: t) }
 }
+
+// A type which erases itself into another protocol.
+public protocol LibOuter {
+  func erase() -> any LibP
+}
+
+public struct LibOuterBox<T>: LibOuter {
+  public var t: T
+  @inlinable
+  public init(t: T) { self.t = t }
+  @inlinable
+  public func erase() -> any LibP { LibBox(t: t) }
+}

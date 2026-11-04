@@ -16,6 +16,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Basic/CodeGenerationModel.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
@@ -45,6 +46,9 @@ llvm::cl::list<std::string>
 llvm::cl::opt<bool> DisableSwiftVerification(
     "disable-swift-verification", llvm::cl::init(false),
     llvm::cl::desc("Disable verification which is implemented in the SwiftCompilerSources"));
+
+// Defined in Generics.cpp.
+extern llvm::cl::opt<bool> EnablePartialSpecialization;
 
 
 #ifdef PURE_BRIDGING_MODE
@@ -299,10 +303,18 @@ void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
                                                                BridgedSubstitutionMap substitutions,
                                                                bool convertIndirectToDirect,
-                                                               bool isMandatory) const {
+                                                               bool isMandatory,
+                                                               bool allowPartialSpecialization) const {
   swift::SILModule *mod = invocation->getPassManager()->getModule();
   SILFunction *origFunc = function.getFunction();
   SubstitutionMap subs = substitutions.unbridged();
+
+  // Partial specialization is behind an option, which is off by default.
+  bool wasPartialSpecializationEnabled = EnablePartialSpecialization;
+  if (allowPartialSpecialization)
+    EnablePartialSpecialization = true;
+  SWIFT_DEFER { EnablePartialSpecialization = wasPartialSpecializationEnabled; };
+
   ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
                            ApplySite(), origFunc, subs, origFunc->getSerializedKind(),
                            convertIndirectToDirect,
@@ -354,7 +366,12 @@ bool BridgedPassContext::specializeKeyPathInst(BridgedInstruction kpi) const {
                                  invocation->getTransform());
 }
 
-bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
+bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory,
+                                                     bool allowPartialSpecialization) const {
+  bool wasPartialSpecializationEnabled = EnablePartialSpecialization;
+  if (allowPartialSpecialization)
+    EnablePartialSpecialization = true;
+  SWIFT_DEFER { EnablePartialSpecialization = wasPartialSpecializationEnabled; };
   return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
 }
 

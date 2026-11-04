@@ -507,6 +507,21 @@ private func specializeWitness(_ method: Function, of conformance: Conformance,
     // Generic self types need to be handled specially (see `getMethodSubstitutions`)
     selfType = conformance.type.canonical
   }
+  // A witness of a generic requirement, e.g. `func access<R>(_ body: () -> R) -> R`, has generic parameters of
+  // its own. Only specialize the generic parameters of the conformance. The partially specialized witness still
+  // receives the requirement's generic arguments, in the same order as the original witness.
+  if selfType == nil && !context.options.enableEmbeddedSwift {
+    let partialSubs = substitutions.getPartialMethodSubstitutions(for: method)
+    if !partialSubs.isEmpty {
+      guard !partialSubs.conformances.contains(where: {!$0.isValid}),
+            context.loadFunction(function: method, loadCalleesRecursively: true)
+      else {
+        return nil
+      }
+      return context.specialize(function: method, for: partialSubs, convertIndirectToDirect: false,
+                                isMandatory: false, allowPartialSpecialization: true)
+    }
+  }
   let methodSubs = substitutions.getMethodSubstitutions(for: method, selfType: selfType)
   return specializeWitness(method, for: methodSubs, context)
 }

@@ -85,6 +85,13 @@ extension SubstitutionMap {
                                                                           selfType?.bridged ?? BridgedCanType()))
   }
 
+  /// Like `getMethodSubstitutions`, but for a method which has generic parameters of its own, e.g. the witness
+  /// of a generic protocol requirement. Those are kept generic: they are replaced with the method's archetypes.
+  /// Returns an empty substitution map if the method has no generic parameters of its own.
+  public func getPartialMethodSubstitutions(for method: Function) -> SubstitutionMap {
+    return SubstitutionMap(bridged: method.bridged.getPartialMethodSubstitutions(bridged))
+  }
+
   /// Returns true if at least one replacement type of this substitution map (partially)
   /// contains the corresponding replacement type of `other`.
   /// Both substitution maps must have the same generic signature.

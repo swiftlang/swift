@@ -104,8 +104,8 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
-  func specializeApplies(in function: Function, isMandatory: Bool) -> Bool {
-    if bridgedPassContext.specializeAppliesInFunction(function.bridged, isMandatory) {
+  func specializeApplies(in function: Function, isMandatory: Bool, allowPartialSpecialization: Bool = false) -> Bool {
+    if bridgedPassContext.specializeAppliesInFunction(function.bridged, isMandatory, allowPartialSpecialization) {
       notifyInstructionsChanged()
       notifyCallsChanged()
       return true
@@ -116,10 +116,12 @@ struct FunctionPassContext : MutatingContext {
   func specialize(function: Function,
                   for substitutions: SubstitutionMap,
                   convertIndirectToDirect: Bool,
-                  isMandatory: Bool
+                  isMandatory: Bool,
+                  allowPartialSpecialization: Bool = false
   ) -> Function? {
     return bridgedPassContext.specializeFunction(function.bridged, substitutions.bridged,
-                                                 convertIndirectToDirect, isMandatory).function
+                                                 convertIndirectToDirect, isMandatory,
+                                                 allowPartialSpecialization).function
   }
 
   func mangleOutlinedVariable(from function: Function) -> String {

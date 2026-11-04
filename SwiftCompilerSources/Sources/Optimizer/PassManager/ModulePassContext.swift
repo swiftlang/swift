@@ -134,10 +134,12 @@ struct ModulePassContext : Context, CustomStringConvertible {
   func specialize(function: Function,
                   for substitutions: SubstitutionMap,
                   convertIndirectToDirect: Bool,
-                  isMandatory: Bool
+                  isMandatory: Bool,
+                  allowPartialSpecialization: Bool = false
   ) -> Function? {
     return bridgedPassContext.specializeFunction(function.bridged, substitutions.bridged,
-                                                 convertIndirectToDirect, isMandatory).function
+                                                 convertIndirectToDirect, isMandatory,
+                                                 allowPartialSpecialization).function
   }
 
   enum DeserializationMode {

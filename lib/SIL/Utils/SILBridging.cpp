@@ -289,6 +289,32 @@ BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstituti
                                      swift::LookUpConformanceInModule());
 }
 
+BridgedSubstitutionMap
+BridgedFunction::getPartialMethodSubstitutions(BridgedSubstitutionMap contextSubstitutions) const {
+  swift::SILFunction *f = getFunction();
+  swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
+  swift::GenericEnvironment *genericEnv = f->getGenericEnvironment();
+  SubstitutionMap contextSubs = contextSubstitutions.unbridged();
+  if (!genericSig || !genericEnv || !contextSubs.getGenericSignature())
+    return swift::SubstitutionMap();
+
+  // The generic parameters of the method itself, e.g. of a witness of a generic protocol requirement, are
+  // deeper than the generic parameters of the context (the conforming type). Keep them generic by mapping them
+  // to their own archetypes.
+  unsigned contextDepth = contextSubs.getGenericSignature().getNextDepth();
+  if (genericSig.getNextDepth() <= contextDepth)
+    return swift::SubstitutionMap();
+
+  return swift::SubstitutionMap::get(genericSig,
+    [&](SubstitutableType *type) -> Type {
+      GenericTypeParamType *genericParam = cast<GenericTypeParamType>(type);
+      if (genericParam->getDepth() < contextDepth)
+        return swift::QuerySubstitutionMap{contextSubs}(genericParam);
+      return genericEnv->mapTypeIntoEnvironment(genericParam);
+    },
+    swift::LookUpConformanceInModule());
+}
+
 static SwiftInt getSpecializationLevelRecursive(StringRef funcName,
                                                 Demangler &parent) {
   using namespace Demangle;
