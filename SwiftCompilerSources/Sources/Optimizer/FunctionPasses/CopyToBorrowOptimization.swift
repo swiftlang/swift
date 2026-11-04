@@ -90,6 +90,21 @@ private func optimize(load: LoadInst, _ context: FunctionPassContext) -> Bool {
     return false
   }
 
+  // If the loaded address is a projection of a borrowed reference, the borrow scope of that reference
+  // must enclose the whole lifetime of the new `load_borrow`.
+  if let baseReference = load.address.accessBase.reference,
+     BeginBorrowValue(baseReference.lookThroughForwardingInstructions) != nil
+  {
+    var liverange = InstructionRange(begin: load, context)
+    defer { liverange.deinitialize() }
+    liverange.insert(contentsOf: collectedUses.destroys)
+    liverange.insert(contentsOf: collectedUses.nonDestroyingLiverangeExits)
+
+    if !liverange.isFullyContainedIn(borrowScopeOf: baseReference) {
+      return false
+    }
+  }
+
   load.replaceWithLoadBorrow(collectedUses: collectedUses)
   return true
 }

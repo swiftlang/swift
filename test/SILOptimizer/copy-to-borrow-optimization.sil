@@ -107,6 +107,9 @@ sil @lendC : $@yield_once_2 @convention(thin) () -> @yields @guaranteed C
 sil @useC : $@convention(thin) (@guaranteed C) -> () {
 [global:]
 }
+sil @useKlass : $@convention(thin) (@guaranteed Klass) -> () {
+[global:]
+}
 
 struct MyInt {
   var value: Builtin.Int32
@@ -140,6 +143,18 @@ sil_global @a_var_global : $Klass
 enum EnumWithIndirectCase {
 case first
 indirect case second(Builtin.NativeObject)
+}
+
+indirect enum IndirectNoPayloadEnum {
+  case a, b
+}
+
+enum IndirectKlassPayload {
+  indirect case wrapped(Klass)
+}
+
+enum IndirectEnumPayload {
+  indirect case wrapped(IndirectNoPayloadEnum)
 }
 
 struct StructWithEnumWithIndirectCaseField {
@@ -1770,6 +1785,78 @@ bb0(%0 : @owned $Klass):
   end_borrow %1 : $Klass
   destroy_value %3 : $Klass
   return %0 : $Klass
+}
+
+// The lifetime of the loaded value ends after the borrow scope of the load's base (which is reached
+// through a `project_box` of an indirect enum payload).
+//
+// CHECK-LABEL: sil [ossa] @dont_extend_borrow_scope_of_box_base :
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_extend_borrow_scope_of_box_base'
+sil [ossa] @dont_extend_borrow_scope_of_box_base : $@convention(thin) (@guaranteed { var IndirectKlassPayload }) -> () {
+bb0(%0 : @guaranteed ${ var IndirectKlassPayload }):
+  %1 = project_box %0 : ${ var IndirectKlassPayload }, 0
+  %2 = load_borrow %1 : $*IndirectKlassPayload
+  %3 = unchecked_enum_data %2 : $IndirectKlassPayload, #IndirectKlassPayload.wrapped!enumelt
+  %4 = project_box %3 : ${ var Klass }, 0
+  %5 = load [copy] %4 : $*Klass
+  end_borrow %2 : $IndirectKlassPayload
+  %7 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %8 = apply %7(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  %10 = tuple ()
+  return %10 : $()
+}
+
+// Same as above, but the lifetime of the loaded value ends at a `switch_enum` with non-payload cases.
+//
+// CHECK-LABEL: sil [ossa] @dont_extend_borrow_scope_of_box_base_switch_enum :
+// CHECK:         load [copy]
+// CHECK-LABEL: } // end sil function 'dont_extend_borrow_scope_of_box_base_switch_enum'
+sil [ossa] @dont_extend_borrow_scope_of_box_base_switch_enum : $@convention(thin) (@guaranteed { var IndirectEnumPayload }) -> Builtin.Int1 {
+bb0(%0 : @guaranteed ${ var IndirectEnumPayload }):
+  %1 = project_box %0 : ${ var IndirectEnumPayload }, 0
+  %2 = load_borrow %1 : $*IndirectEnumPayload
+  %3 = unchecked_enum_data %2 : $IndirectEnumPayload, #IndirectEnumPayload.wrapped!enumelt
+  %4 = project_box %3 : ${ var IndirectNoPayloadEnum }, 0
+  %5 = load [copy] %4 : $*IndirectNoPayloadEnum
+  end_borrow %2 : $IndirectEnumPayload
+  switch_enum %5 : $IndirectNoPayloadEnum, case #IndirectNoPayloadEnum.a!enumelt: bb1, case #IndirectNoPayloadEnum.b!enumelt: bb2
+
+bb1:
+  %8 = integer_literal $Builtin.Int1, -1
+  br bb3(%8 : $Builtin.Int1)
+
+bb2:
+  %10 = integer_literal $Builtin.Int1, 0
+  br bb3(%10 : $Builtin.Int1)
+
+bb3(%12 : $Builtin.Int1):
+  return %12 : $Builtin.Int1
+}
+
+// The lifetime of the loaded value is within the borrow scope of the load's base.
+//
+// CHECK-LABEL: sil [ossa] @load_within_borrow_scope_of_box_base :
+// CHECK:         [[OUTER:%.*]] = load_borrow
+// CHECK:         [[INNER:%.*]] = load_borrow
+// CHECK:         apply
+// CHECK-NEXT:    end_borrow [[INNER]]
+// CHECK-NEXT:    end_borrow [[OUTER]]
+// CHECK-LABEL: } // end sil function 'load_within_borrow_scope_of_box_base'
+sil [ossa] @load_within_borrow_scope_of_box_base : $@convention(thin) (@guaranteed { var IndirectKlassPayload }) -> () {
+bb0(%0 : @guaranteed ${ var IndirectKlassPayload }):
+  %1 = project_box %0 : ${ var IndirectKlassPayload }, 0
+  %2 = load_borrow %1 : $*IndirectKlassPayload
+  %3 = unchecked_enum_data %2 : $IndirectKlassPayload, #IndirectKlassPayload.wrapped!enumelt
+  %4 = project_box %3 : ${ var Klass }, 0
+  %5 = load [copy] %4 : $*Klass
+  %7 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %8 = apply %7(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %5 : $Klass
+  end_borrow %2 : $IndirectKlassPayload
+  %10 = tuple ()
+  return %10 : $()
 }
 
 // CHECK-LABEL: sil [ossa] @write_in_unreachable_block :
