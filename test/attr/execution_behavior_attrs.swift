@@ -3,9 +3,11 @@
 // REQUIRES: concurrency
 
 // FIXME: Bad parser diagnostic on C++ side
-nonisolated(something) func invalidAttr() async {} // expected-error {{cannot find 'nonisolated' in scope}}
-// expected-error@-1 {{cannot find 'something' in scope}}
-// expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
+nonisolated(something) func invalidAttr() async {} // expected-cparser-error {{cannot find 'nonisolated' in scope}}
+// expected-cparser-error@-1 {{cannot find 'something' in scope}}
+// expected-cparser-error@-2 {{consecutive statements on a line must be separated by ';'}}
+// expected-astgen-error@-3 {{expected identifier in modifier}}
+// expected-astgen-error@-4 {{unexpected code 'something' in modifier}}
 
 @concurrent nonisolated(nonsending) func mutipleAttrs() async {}
 // expected-error@-1 {{global function 'mutipleAttrs()' has multiple actor-isolation attributes ('@concurrent' and 'nonisolated(nonsending)')}}
@@ -16,8 +18,9 @@ do {
 
 
   func f(nonisolated(nonsending) param: Int) {}
-  // expected-error@-1 {{expected parameter name followed by ':'}}
-  // expected-error@-2 {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}}
+  // expected-cparser-error@-1 {{expected parameter name followed by ':'}}
+  // expected-cparser-error@-2 {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}}
+  // expected-astgen-error@-3 {{unexpected code '(nonsending) param' in parameter}}
 }
 
 @concurrent func nonAsync1() {}

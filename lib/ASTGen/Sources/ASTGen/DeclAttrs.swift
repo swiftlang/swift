@@ -815,6 +815,11 @@ extension ASTGenVisitor {
         }
       }
       guard name != nil else {
+        // `@c("name")`, `@c()` and `@c(42)` have well-formed arguments of the
+        // wrong kind; anything else was diagnosed by the parser.
+        if !underscored, !node.hasError, let attrName {
+          self.diagnose(.attr_expected_cname(attrName), at: node.attributeName)
+        }
         return nil
       }
     }
