@@ -8,7 +8,7 @@ public struct ResilientStruct {
   var x : Int64
 }
 
-sil [ossa] @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> () {
+sil [closure] [ossa] @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <ResilientStruct>) -> () {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <ResilientStruct>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <ResilientStruct>, 0
   %2 = tuple ()
@@ -17,7 +17,7 @@ bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <ResilientStruct>):
 
 // Primarily don't crash.
 
-// CHECK-LABEL: sil [ossa] @$s8closure0Tf2i_n : $@convention(thin) (ResilientStruct) -> () {
+// CHECK-LABEL: sil [closure] [ossa] @$s8closure0Tf2i_n : $@convention(thin) (ResilientStruct) -> () {
 // CHECK: bb0(%0 : $ResilientStruct):
 // CHECK:   return {{.*}} : $()
 // CHECK: }

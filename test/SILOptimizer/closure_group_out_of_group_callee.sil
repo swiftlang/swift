@@ -1,14 +1,16 @@
 // REQUIRES: asserts
 
+// RUN: %target-sil-opt -enable-sil-verify-all %s -capture-promotion -assert-continue 2> %t.cp.err | %FileCheck %s --check-prefix=CP
+// RUN: %FileCheck %s --check-prefix=ASSERT < %t.cp.err
 // RUN: %target-sil-opt -swift-version 6 -enable-sil-verify-all %s -mark-never-written-mutable-closure-boxes-as-immutable -assert-continue 2> %t.mnw.err | %FileCheck %s --check-prefix=MNW
 // RUN: %FileCheck %s --check-prefix=ASSERT < %t.mnw.err
 
 // A closure that receives a box shares a closure group with the function that
 // passes it only if it is marked [closure], as SILGen marks it. Here the
 // closures aren't marked, so each is in a group of its own. With assertions
-// enabled, MarkNeverWrittenMutableClosureBoxesAsImmutable reports that;
-// -assert-continue lets it go on, and the pass then leaves the capture alone
-// instead of reading a body outside its group.
+// enabled, CapturePromotion and MarkNeverWrittenMutableClosureBoxesAsImmutable
+// report that; -assert-continue lets them go on, and each pass then leaves
+// the capture alone instead of reading a body outside its group.
 
 // ASSERT: Assertion failed: (calleeInGroup && "partial_apply callee outside the closure group")
 // ASSERT: Continuing after failed assertion
@@ -21,7 +23,39 @@ import SwiftShims
 
 class C : @unchecked Sendable {}
 
+sil @escape : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
 sil @use_value : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+// CapturePromotion treats the capture as an escape: it neither clones the
+// closure nor rewrites the partial_apply.
+//
+// CP-LABEL: sil [ossa] @cp_parent : $@convention(thin) (Builtin.Int64) -> () {
+// CP:         [[F:%.*]] = function_ref @cp_closure
+// CP:         partial_apply [callee_guaranteed] [[F]](
+// CP-LABEL: } // end sil function 'cp_parent'
+// CP-NOT:   sil {{.*}}@$s10cp_closureTf2i_n
+sil private [ossa] @cp_closure : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64 {
+bb0(%0 : @closureCapture @guaranteed ${ var Builtin.Int64 }):
+  %1 = project_box %0, 0
+  %2 = load [trivial] %1
+  return %2
+}
+
+sil [ossa] @cp_parent : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %1 = alloc_box ${ var Builtin.Int64 }
+  %2 = project_box %1, 0
+  store %0 to [trivial] %2
+  %4 = function_ref @cp_closure : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64
+  %5 = copy_value %1
+  %6 = partial_apply [callee_guaranteed] %4(%5) : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> Builtin.Int64
+  %7 = function_ref @escape : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@guaranteed @callee_guaranteed () -> Builtin.Int64) -> ()
+  destroy_value %6
+  destroy_value %1
+  %11 = tuple ()
+  return %11 : $()
+}
 
 // MarkNeverWrittenMutableClosureBoxesAsImmutable treats the box as mutable: it
 // marks neither the box nor the closure's argument.

@@ -12,11 +12,11 @@ typealias Int = Builtin.Int32
 // apply the generic caller's substitutions to the nongeneric callee, violating
 // invariants.
 
-// CHECK-LABEL: sil @$s14promotable_boxTf2i_n : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+// CHECK-LABEL: sil [closure] @$s14promotable_boxTf2i_n : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
 // CHECK: bb0([[INPUT:%.*]] :
 // CHECk-NEXT: return [[INPUT]]
 // CHECK: } // end sil function '$s14promotable_boxTf2i_n'
-sil [ossa] @promotable_box : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil [closure] [ossa] @promotable_box : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 entry(%b : @guaranteed $<τ_0_0> { var τ_0_0 } <Int>):
   %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %v = load [trivial] %a : $*Int
@@ -39,11 +39,11 @@ entry(%0 : $*T, %1 : $Int):
 
 protocol P {}
 
-// CHECK-LABEL: sil {{.*}}@$s22generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int32) -> Builtin.Int32
+// CHECK-LABEL: sil [closure] {{.*}}@$s22generic_promotable_boxTf2ni_n : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int32) -> Builtin.Int32
 // CHECK:       bb0(%0 : $*T, %1 : $Builtin.Int32):
 // CHECK-NEXT:    return %1 : $Builtin.Int32
 // CHECK: } // end sil function '$s22generic_promotable_boxTf2ni_n'
-sil [ossa] @generic_promotable_box : $@convention(thin) <T> (@in_guaranteed T, @guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> Int {
+sil [closure] [ossa] @generic_promotable_box : $@convention(thin) <T> (@in_guaranteed T, @guaranteed <τ_0_0> { var τ_0_0 } <Int>) -> Int {
 entry(%0 : $*T, %b : @guaranteed $<τ_0_0> { var τ_0_0 } <Int>):
   %a = project_box %b : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %v = load [trivial] %a : $*Int
@@ -78,13 +78,13 @@ struct R<T> {
 // take argument of a type E<(R<T>) -> Builtin.Int32>, which used
 // to be a slot inside a box.
 //
-// CHECK-LABEL: sil {{.*}}@$s23generic_promotable_box2Tf2nnni_n : $@convention(thin) <T> (@in_guaranteed R<T>, @in_guaranteed Builtin.Int32, @guaranteed E<(R<T>) -> Builtin.Int32>) -> @out Builtin.Int32 {
+// CHECK-LABEL: sil [closure] {{.*}}@$s23generic_promotable_box2Tf2nnni_n : $@convention(thin) <T> (@in_guaranteed R<T>, @in_guaranteed Builtin.Int32, @guaranteed E<(R<T>) -> Builtin.Int32>) -> @out Builtin.Int32 {
 // CHECK:       bb0(%0 : $*Builtin.Int32, %1 : $*R<T>, %2 : $*Builtin.Int32, %3 : $E<(R<T>) -> Builtin.Int32>):
 // CHECK-NOT:     project_box
 // CHECK:         switch_enum %3 : $E<(R<T>) -> Builtin.Int32>
 // CHECK-NOT:     project_box
 // CHECK:       } // end sil function '$s23generic_promotable_box2Tf2nnni_n'
-sil [ossa] @generic_promotable_box2 : $@convention(thin) <T> (@in_guaranteed R<T>, @in_guaranteed Int, @guaranteed <τ_0_0> { var E<(R<τ_0_0>) -> Int> } <T>) -> @out Int {
+sil [closure] [ossa] @generic_promotable_box2 : $@convention(thin) <T> (@in_guaranteed R<T>, @in_guaranteed Int, @guaranteed <τ_0_0> { var E<(R<τ_0_0>) -> Int> } <T>) -> @out Int {
 entry(%result : $*Int, %0: $*R<T>, %1 : $*Int, %b : @guaranteed $<τ_0_0> { var E< (R<τ_0_0>)->Int > } <T>):
   %a = project_box %b : $<τ_0_0> { var E<(R<τ_0_0>)->Int> } <T>, 0
   %e = load_borrow %a : $*E<(R<T>)->Int>

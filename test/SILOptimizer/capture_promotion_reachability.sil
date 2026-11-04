@@ -73,7 +73,7 @@ bb4:
   return %30 : $()
 }
 
-sil private [ossa] @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+sil private [closure] [ossa] @closure0 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %3 = load [trivial] %1 : $*Builtin.Int64
@@ -81,7 +81,7 @@ bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
 }
 
 // closure1
-sil private [ossa] @closure1 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+sil private [closure] [ossa] @closure1 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %3 = load [trivial] %1 : $*Builtin.Int64
@@ -157,7 +157,7 @@ bb4:
 }
 
 // closure2
-sil private [ossa] @closure2 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+sil private [closure] [ossa] @closure2 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %3 = load [trivial] %1 : $*Builtin.Int64
@@ -165,7 +165,7 @@ bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
 }
 
 // closure3
-sil private [ossa] @closure3 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+sil private [closure] [ossa] @closure3 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %3 = load [trivial] %1 : $*Builtin.Int64
@@ -240,14 +240,14 @@ bb4:
   return %30 : $()
 }
 
-sil private [ossa] @closure4 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+sil private [closure] [ossa] @closure4 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %3 = load [trivial] %1 : $*Builtin.Int64
   return %3 : $Builtin.Int64
 }
 
-sil private [ossa] @closure5 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+sil private [closure] [ossa] @closure5 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %3 = load [trivial] %1 : $*Builtin.Int64
@@ -310,14 +310,14 @@ bb3:
   return %28 : $()
 }
 
-sil private [ossa] @closure6 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+sil private [closure] [ossa] @closure6 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %3 = load [trivial] %1 : $*Builtin.Int64
   return %3 : $Builtin.Int64
 }
 
-sil private [ossa] @closure7 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
+sil private [closure] [ossa] @closure7 : $@convention(thin) (@guaranteed <τ_0_0> { var τ_0_0 } <Builtin.Int64>) -> Builtin.Int64 {
 bb0(%0 : @guaranteed $<τ_0_0> { var τ_0_0 } <Builtin.Int64>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Builtin.Int64>, 0
   %3 = load [trivial] %1 : $*Builtin.Int64

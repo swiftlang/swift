@@ -172,7 +172,7 @@ bb0:
   return %21 : $@callee_owned () -> @out Int
 }
 
-// CHECK-LABEL: sil private [ossa] @$s8closure0Tf2iii_n : $@convention(thin) (@owned Foo, @owned Baz, Int) -> (Int, Builtin.Int64) {
+// CHECK-LABEL: sil private [closure] [ossa] @$s8closure0Tf2iii_n : $@convention(thin) (@owned Foo, @owned Baz, Int) -> (Int, Builtin.Int64) {
 // CHECK: bb0([[ORIGINAL_ARG0:%.*]] : @owned $Foo, [[ORIGINAL_ARG1:%.*]] : @owned $Baz, [[ARG2:%.*]] : $Int):
 // CHECK:   [[ARG0:%.*]] = begin_borrow [[ORIGINAL_ARG0]]
 // CHECK:   [[ARG1:%.*]] = begin_borrow [[ORIGINAL_ARG1]]
@@ -204,7 +204,7 @@ bb0:
 // CHECK: return [[RESULT]] : $(Int, Builtin.Int64)
 // CHECK: } // end sil function '$s8closure0Tf2iii_n'
 
-sil private [ossa] @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> (Int, Builtin.Int64) {
+sil private [closure] [ossa] @closure0 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> (Int, Builtin.Int64) {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Foo>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
@@ -253,7 +253,7 @@ bb0:
 
 sil [ossa] @mutate_foo : $@convention(thin) (@inout Foo) -> ()
 
-sil private [ossa] @closure1 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>) -> Int {
+sil private [closure] [ossa] @closure1 : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>) -> Int {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Foo>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Foo>, 0
   %6 = tuple ()
@@ -299,8 +299,8 @@ bb0(%0 : $*Int, %1 : $*Int):
   return %16 : $()
 }
 
-// CHECK: sil [ossa] @$s27closureWithGenericSignatureTf2ni_n : $@convention(thin) <{{[^>]+}}> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
-sil [ossa] @closureWithGenericSignature : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> () {
+// CHECK: sil [closure] [ossa] @$s27closureWithGenericSignatureTf2ni_n : $@convention(thin) <{{[^>]+}}> (@owned <τ_0_0> { var τ_0_0 } <Int>, Int) -> ()
+sil [closure] [ossa] @closureWithGenericSignature : $@convention(thin) <T> (@owned <τ_0_0> { var τ_0_0 } <Int>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %1 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Int>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Int>, 0
@@ -317,7 +317,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Int>, %2 : @owned $<τ_0_0> { var τ_0
 
 sil [transparent] [serialized] @$ss1poiyS2i_SitF : $@convention(thin) (Int, Int) -> Int
 
-sil private [ossa] @closure_indirect_result : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {
+sil private [closure] [ossa] @closure_indirect_result : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Foo>, @owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Int>) -> @out Int {
 bb0(%0: $*Int, %1 : @owned $<τ_0_0> { var τ_0_0 } <Foo>, %2 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %4 : @owned $<τ_0_0> { var τ_0_0 } <Int>):
   %17 = project_box %1 : $<τ_0_0> { var τ_0_0 } <Foo>, 0
   %3 = project_box %2 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
@@ -373,7 +373,7 @@ bb0:
   return %9 : $@callee_owned () -> ()
 }
 
-sil [ossa] @closure_multiple_uses_of_struct_element_addr : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
+sil [closure] [ossa] @closure_multiple_uses_of_struct_element_addr : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0_0 } <Baz>):
   %2 = project_box %0 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
   %3 = struct_element_addr %2 : $*Baz, #Baz.x
@@ -433,7 +433,7 @@ bb0:
   return %21 : $@callee_owned () -> ()
 }
 
-// CHECK-LABEL: sil [ossa] @$s23closure_projection_testTf2ni_n : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned Baz) -> () {
+// CHECK-LABEL: sil [closure] [ossa] @$s23closure_projection_testTf2ni_n : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned Baz) -> () {
 // CHECK: bb0([[UNPROMOTED_BAZ:%.*]] : @owned $<τ_0_0> { var τ_0_0 } <Baz>, [[BAZ:%.*]] : @owned $Baz):
 // CHECK:   [[BORROWED_BAZ:%.*]] = begin_borrow [[BAZ]] : $Baz
 // CHECK:   [[X:%.*]] = struct_extract [[BORROWED_BAZ]] : $Baz, #Baz.x
@@ -452,7 +452,7 @@ bb0:
 // CHECK:   end_borrow [[BORROWED_BAZ]]
 // CHECK:   destroy_value [[BAZ]]
 // CHECK: } // end sil function '$s23closure_projection_testTf2ni_n'
-sil [ossa] @closure_projection_test : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
+sil [closure] [ossa] @closure_projection_test : $@convention(thin) (@owned <τ_0_0> { var τ_0_0 } <Baz>, @owned <τ_0_0> { var τ_0_0 } <Baz>) -> () {
 bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0_0 } <Baz>):
   %0a = project_box %0 : $<τ_0_0> { var τ_0_0 } <Baz>, 0
   %2 = struct_element_addr %0a : $*Baz, #Baz.x
@@ -492,7 +492,7 @@ bb0(%0 : @owned $<τ_0_0> { var τ_0_0 } <Baz>, %1 : @owned $<τ_0_0> { var τ_0
 
 
 // Make sure that we properly handle guaranteed arguments when specializing here.
-sil [ossa] @capture_promotion_callee_guaranteed_box : $@convention(thin) (@guaranteed { var Builtin.NativeObject }) -> () {
+sil [closure] [ossa] @capture_promotion_callee_guaranteed_box : $@convention(thin) (@guaranteed { var Builtin.NativeObject }) -> () {
 bb0(%0 : @guaranteed ${ var Builtin.NativeObject }):
   %1 = project_box %0 : ${ var Builtin.NativeObject }, 0
   %2 = begin_access [read] [unknown] %1 : $*Builtin.NativeObject
@@ -555,7 +555,7 @@ bb0:
   return %28 : $()
 }
 
-sil [ossa] @closable : $@convention(thin) (@guaranteed { var Bar }) -> Builtin.Int64 {
+sil [closure] [ossa] @closable : $@convention(thin) (@guaranteed { var Bar }) -> Builtin.Int64 {
 entry(%box : @guaranteed ${ var Bar }):
   %retval = integer_literal $Builtin.Int64, 0
   return %retval : $Builtin.Int64
