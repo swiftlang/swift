@@ -111,6 +111,27 @@ extension ASTGenVisitor {
     else {
       return nil
     }
+    // A list of yielded values does not take labels.
+    for argument in call.arguments {
+      guard let label = argument.label else {
+        continue
+      }
+      let start = label.positionAfterSkippingLeadingTrivia
+      self.diagnose(
+        .unexpected_label_yield,
+        at: label,
+        fixIts: [
+          .init(
+            remove: self.generateCharSourceRange(
+              start: start,
+              length: SourceLength(
+                utf8Length: argument.expression.positionAfterSkippingLeadingTrivia.utf8Offset - start.utf8Offset
+              )
+            )
+          )
+        ]
+      )
+    }
     return .createParsed(
       self.ctx,
       yieldLoc: self.generateSourceLoc(callee.baseName),

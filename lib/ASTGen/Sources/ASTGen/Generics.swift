@@ -128,7 +128,7 @@ extension ASTGenVisitor {
         .type
       }
 
-    return .createParsed(
+    let decl = BridgedGenericTypeParamDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       specifierLoc: self.generateSourceLoc(node.specifier),
@@ -138,6 +138,13 @@ extension ASTGenVisitor {
       index: genericParameterIndex,
       paramKind: paramKind
     )
+
+    // Attributes are parsed here and diagnosed by the type checker if they do
+    // not apply.
+    var attrs = BridgedDeclAttributes()
+    self.generateDeclAttributes(attributeList: node.attributes) { attrs.add($0) }
+    decl.asDecl.attachParsedAttrs(attrs)
+    return decl
   }
 
   func generate(layoutRequirement node: LayoutRequirementSyntax) -> BridgedLayoutConstraint {
@@ -230,6 +237,12 @@ extension ASTGenVisitor {
           isExpansionPattern: isExpansionPattern
         )
       case .layoutRequirement(let layout):
+        // Layout constraints are only for '_specialize'.
+        if !sequence(first: Syntax(layout).parent, next: { $0?.parent }).contains(where: {
+          $0?.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "_specialize"
+        }) {
+          self.diagnose(.layout_constraints_only_inside_specialize_attr, at: layout.layoutSpecifier)
+        }
         let (isExpansionPattern, leftType) = generateIsExpansionPattern(type: layout.type)
         return .createLayoutConstraint(
           subject: self.generate(type: leftType),

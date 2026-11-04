@@ -2896,8 +2896,11 @@ extension ASTGenVisitor {
 
       // @storageRestrictions(initializes: <ident>...[, accesses: <ident>...])
 
-      guard !args.isEmpty else {
-        // TODO: Diagnostics requires arguments
+      // The first argument has to be labeled.
+      guard let first = args.first, first.label != nil else {
+        if !node.hasError {
+          self.diagnose(.missing_storage_restrictions_attr_label, at: node.attributeName)
+        }
         return nil
       }
 
@@ -2914,13 +2917,13 @@ extension ASTGenVisitor {
         // Label.
         switch arg.label?.rawText {
         case "initializes":
-          if argState.hasSeen(.initializes) {
-            // TODO: Diagnose duplicated label.
+          if argState.hasSeen(.initializes), let label = arg.label {
+            self.diagnose(.duplicate_storage_restrictions_attr_label(self.generateIdentifier(label)), at: label)
           }
           argState.current = .initializes
         case "accesses":
-          if argState.hasSeen(.accesses) {
-            // TODO: Diagnose duplicated label.
+          if argState.hasSeen(.accesses), let label = arg.label {
+            self.diagnose(.duplicate_storage_restrictions_attr_label(self.generateIdentifier(label)), at: label)
           }
           argState.current = .accesses
         case nil:
@@ -2928,8 +2931,8 @@ extension ASTGenVisitor {
           // `initializes: y, full, accesses: x`.
           break
         default:
-          if argState.hasSeen(.invalid) {
-            // TODO: Diagnose invalid or missing label.
+          if let label = arg.label {
+            self.diagnose(.invalid_storage_restrictions_attr_label(self.generateIdentifier(label)), at: label)
           }
           argState.current = .invalid
         }
@@ -2941,7 +2944,9 @@ extension ASTGenVisitor {
             node.argumentNames == nil,
             node.moduleSelector == nil
           else {
-            // TODO: Diagnose.
+            if !arg.hasError {
+              self.diagnose(.storage_restrictions_attr_expected_name, at: node)
+            }
             return nil
           }
           return self.generateIdentifier(node.baseName)
