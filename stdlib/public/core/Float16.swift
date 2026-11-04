@@ -510,6 +510,47 @@ extension Float16: BinaryFloatingPoint {
   public mutating func addProduct(_ lhs: Float16, _ rhs: Float16) {
     _value = Builtin.int_fma_FPIEEE16(lhs._value, rhs._value, _value)
   }
+  
+#if hasFeature(BuiltinRelaxedFP)
+  @export(implementation) @_transparent
+  public static func &+=(lhs: inout Float16, rhs: Float16) {
+    lhs._value = Builtin.fadd_relaxed_FPIEEE16(lhs._value, rhs._value)
+  }
+  
+  @export(implementation) @_transparent
+  public static func &-=(lhs: inout Float16, rhs: Float16) {
+    lhs._value = Builtin.fsub_relaxed_FPIEEE16(lhs._value, rhs._value)
+  }
+  
+  @export(implementation) @_transparent
+  public static func &*=(lhs: inout Float16, rhs: Float16) {
+    lhs._value = Builtin.fmul_relaxed_FPIEEE16(lhs._value, rhs._value)
+  }
+  
+  // Need to have an explicit implementation of this; we cannot just depend on
+  // the default implementation provided by FloatingPoint because it has 6.5
+  // availability and we want this to be unconditionally available.
+  @export(implementation) @_transparent
+  public static func &+(lhs: Float16, rhs: Float16) -> Float16 {
+    Float16(Builtin.fadd_relaxed_FPIEEE16(lhs._value, rhs._value))
+  }
+  
+  // Need to have an explicit implementation of this; we cannot just depend on
+  // the default implementation provided by FloatingPoint because it has 6.5
+  // availability and we want this to be unconditionally available.
+  @export(implementation) @_transparent
+  public static func &-(lhs: Float16, rhs: Float16) -> Float16 {
+    Float16(Builtin.fsub_relaxed_FPIEEE16(lhs._value, rhs._value))
+  }
+  
+  // Need to have an explicit implementation of this; we cannot just depend on
+  // the default implementation provided by FloatingPoint because it has 6.5
+  // availability and we want this to be unconditionally available.
+  @export(implementation) @_transparent
+  public static func &*(lhs: Float16, rhs: Float16) -> Float16 {
+    Float16(Builtin.fmul_relaxed_FPIEEE16(lhs._value, rhs._value))
+  }
+#endif
 
   @_transparent
   public func isEqual(to other: Float16) -> Bool {
