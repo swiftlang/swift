@@ -1604,6 +1604,11 @@ template <> struct std::iterator_traits<RandomAccessCategoryNewPtr> : NewPtrTrai
   using iterator_category = std::random_access_iterator_tag;
 };
 
+/// InputCategoryNewPtr explicitely specializes std::iterator_traits
+struct ReturnsInputCategoryNewPtr {
+  InputCategoryNewPtr get() const;
+};
+
 #if __cplusplus >= 202002L
 
 using ContiguousCategoryNewPtr = NewPtr<__LINE__>;

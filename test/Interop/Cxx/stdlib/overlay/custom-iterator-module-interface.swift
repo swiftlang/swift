@@ -225,6 +225,12 @@
 // CHECK:   var pointee: CInt { get nonmutating set }
 // CHECK: }
 
+// CHECK: struct ReturnsInputCategoryNewPtr {
+// CHECK:   @available(*, deprecated, renamed: "get()")
+// CHECK:   func __getUnsafe() -> InputCategoryNewPtr
+// CHECK:   func get() -> InputCategoryNewPtr
+// CHECK: }
+
 // CHECK-NOT: struct HasOnlyIteratorConcept : UnsafeCxxInputIterator
 // CHECK: struct HasOnlyIteratorConcept {
 // CHECK: }
