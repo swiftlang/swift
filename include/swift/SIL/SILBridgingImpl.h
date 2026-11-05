@@ -2960,6 +2960,10 @@ BridgedInstruction BridgedBuilder::createDeallocStackRef(BridgedValue operand) c
       unbridged().createDeallocStackRef(regularLoc(), operand.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createDeallocPartialRef(BridgedValue operand, BridgedValue metatype) const {
+  return {unbridged().createDeallocPartialRef(regularLoc(), operand.getSILValue(), metatype.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createDeallocPack(BridgedValue operand) const {
   return {unbridged().createDeallocPack(regularLoc(), operand.getSILValue())};
 }
@@ -3386,6 +3390,12 @@ BridgedInstruction BridgedBuilder::createStructExtract(BridgedValue str, SwiftIn
 BridgedInstruction BridgedBuilder::createStructElementAddr(BridgedValue addr, SwiftInt fieldIndex) const {
   swift::SILValue v = addr.getSILValue();
   return {unbridged().createStructElementAddr(
+      regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
+}
+
+BridgedInstruction BridgedBuilder::createRefElementAddr(BridgedValue ref, SwiftInt fieldIndex) const {
+  swift::SILValue v = ref.getSILValue();
+  return {unbridged().createRefElementAddr(
       regularLoc(), v, v->getType().getFieldDecl(fieldIndex))};
 }
 
