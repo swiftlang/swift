@@ -354,6 +354,11 @@ void DCE::markLive() {
         processBorrow(BorrowedValue(loadBorrowInst));
         break;
       }
+      case SILInstructionKind::ApplyInst:
+        if (auto borrow = BorrowedValue(cast<ApplyInst>(&I))) {
+          processBorrow(borrow);
+        }
+        LLVM_FALLTHROUGH;
       default:
         if (seemsUseful(&I))
           markInstructionLive(&I);

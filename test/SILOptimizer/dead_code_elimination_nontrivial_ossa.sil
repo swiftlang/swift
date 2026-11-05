@@ -851,6 +851,39 @@ bb1(%4 : @reborrow $Klass, %5 : @reborrow $Klass):
   return %11
 }
 
+sil [ossa] @borrow_nontrivialstruct_val : $@convention(method) (@guaranteed NonTrivialStruct) -> @guaranteed Klass
+
+// A borrow accessor result is nested in the borrow scope of self. If both
+// reborrows are dead, the reborrow of self is kept so that the end_borrow of
+// the result is inserted within self's scope.
+// CHECK-LABEL: sil [ossa] @reborrowed_borrow_accessor_result : {{.*}} {
+// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $NonTrivialStruct):
+// CHECK:         [[SELF:%[^,]+]] = begin_borrow [[INSTANCE]]
+// CHECK:         [[RESULT:%[^,]+]] = apply {{%[^,]+}}([[SELF]])
+// CHECK:         end_borrow [[RESULT]]
+// CHECK:         br [[EXIT:bb[0-9]+]]([[SELF]] : $NonTrivialStruct)
+// CHECK:       [[EXIT]]([[SELF_2:%[^,]+]] : @reborrow $NonTrivialStruct):
+// CHECK:         [[R:%.*]] = borrowed [[SELF_2]] : $NonTrivialStruct from (%0 : $NonTrivialStruct)
+// CHECK:         end_borrow [[R]]
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'reborrowed_borrow_accessor_result'
+sil [ossa] @reborrowed_borrow_accessor_result : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %1 = begin_borrow %0
+  %2 = function_ref @borrow_nontrivialstruct_val : $@convention(method) (@guaranteed NonTrivialStruct) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed NonTrivialStruct) -> @guaranteed Klass
+  br bb1(%1, %3)
+
+bb1(%5 : @reborrow $NonTrivialStruct, %6 : @reborrow $Klass):
+  %7 = borrowed %6 from (%5)
+  %8 = borrowed %5 from (%0)
+  end_borrow %7
+  end_borrow %8
+  destroy_value %0
+  %12 = tuple ()
+  return %12
+}
+
 // CHECK-LABEL: sil [ossa] @reborrowed_guaranteed_phi : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @owned $Klass):
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
