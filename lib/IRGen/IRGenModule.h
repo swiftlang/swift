@@ -1504,8 +1504,14 @@ private:
   llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
   /// Cache of statically-instantiated key path objects (embedded Swift).
   /// Keyed by the (uniqued) `KeyPathPattern *` so multiple `keypath_inst`s
-  /// referring to the same pattern share one immortal global.
-  llvm::DenseMap<KeyPathPattern*, llvm::Constant*> StaticKeyPathInstances;
+  /// referring to the same pattern share one immortal global.  Also records
+  /// the argument data offsets of capturing components.
+  struct StaticKeyPathInstance {
+    llvm::Constant *Instance;
+    SmallVector<uint32_t, 2> ArgDataOffsets;
+  };
+  llvm::DenseMap<KeyPathPattern*, StaticKeyPathInstance>
+      StaticKeyPathInstances;
 
   /// Uniquing key for a fixed type layout record.
   struct FixedLayoutKey {
