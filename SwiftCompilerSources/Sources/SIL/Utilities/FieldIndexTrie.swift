@@ -20,6 +20,7 @@ import Basic
 // TODO: This should be instantiated per Module instead.
 public struct FieldIndexTrieCache {
   private var cache: Dictionary<Type, FieldIndexTrie> = [:]
+  private var classInstanceCache: Dictionary<Type, FieldIndexTrie> = [:]
   private let function: Function
   public init(for function: Function) {
     self.function = function
@@ -31,6 +32,15 @@ public struct FieldIndexTrieCache {
 
     let trie = FieldIndexTrie(of: type, in: function)
     cache[type] = trie
+    return trie
+  }
+  public mutating func fieldIndices(forClassInstance type: Type) -> FieldIndexTrie {
+    if let trie = classInstanceCache[type] {
+      return trie
+    }
+
+    let trie = FieldIndexTrie(ofClassInstance: type, in: function)
+    classInstanceCache[type] = trie
     return trie
   }
 }
@@ -60,6 +70,12 @@ public struct FieldIndexTrieCache {
 ///   t.0.1  -->   [1, 2)
 ///   t.1    -->   [2, 3)
 ///
+/// A class type is normally a single opaque leaf, since a value of that type is just a reference.
+/// A trie built for a class *instance* instead has a leaf for each of the class's own stored
+/// properties, reached through `.classField` projections. Inherited stored properties have no
+/// leaves; if there is a superclass, a single extra leaf after the fields, with no path, tracks
+/// whether the superclass part of the instance is initialized. Only the root is expanded this
+/// way; class-typed fields within it are still opaque leaves.
 public struct FieldIndexTrie: CustomStringConvertible {
   public typealias Path = SmallProjectionPath
   public typealias FieldKind = SmallProjectionPath.FieldKind
@@ -68,20 +84,44 @@ public struct FieldIndexTrie: CustomStringConvertible {
   // within this trie's index-space mapping.
   public typealias IndexRange = Range<Int>
 
+  /// A child of a node is identified by its *offset* within `children`. A projection into the node
+  /// instead uses a *field index*: the tuple element index, or the index given by `getIndexedField`,
+  /// which counts a class's inherited fields first. They coincide except for a class instance with
+  /// a superclass.
   private final class Node {
     let type: Type                // The type of the field this node represents.
     let range: IndexRange         // The contiguous index range of this node and its entire sub-tree.
     let childKind: FieldKind?     // The kind of projection into the `children`
-    let children: [Node]          // Index in this array corresponds to their field index.
+    let children: [Node]          // The fields, in field index order, followed by the superclass leaf, if any.
 
-    init(type: Type, range: Range<Int>, childKind: FieldKind?, children: [Node]) {
+    /// The field index of `children[0]`.
+    let firstFieldIndex: Int
+
+    /// The number of `children` reachable by a field index.
+    let fieldChildCount: Int
+
+    init(type: Type, range: Range<Int>, childKind: FieldKind?, children: [Node],
+         firstFieldIndex: Int = 0, fieldChildCount: Int? = nil) {
       self.type = type
       self.range = range
       self.childKind = childKind
       self.children = children
+      self.firstFieldIndex = firstFieldIndex
+      self.fieldChildCount = fieldChildCount ?? children.count
 
       assert((children.count > 0 && childKind != nil) ||
              (children.count == 0 && childKind == nil), "expected no children iff when childKind is nil")
+    }
+
+    /// The offset of the child selected by a field index, or nil if there is none.
+    func childOffset(forFieldIndex fieldIndex: Int) -> Int? {
+      let offset = fieldIndex - firstFieldIndex
+      return (0..<fieldChildCount).contains(offset) ? offset : nil
+    }
+
+    /// The field index selecting the child at `offset`, or nil for the superclass leaf.
+    func fieldIndex(ofChildAt offset: Int) -> Int? {
+      offset < fieldChildCount ? offset + firstFieldIndex : nil
     }
   }
 
@@ -99,6 +139,40 @@ public struct FieldIndexTrie: CustomStringConvertible {
   public init(of type: Type, in function: Function) {
     var cursor = 0
     self.root = Self.build(type, in: function, cursor: &cursor)
+  }
+
+  /// Builds the trie for an instance of the class `type`, rather than a reference to one.
+  public init(ofClassInstance type: Type, in function: Function) {
+    assert(type.isClass, "expected a class type: \(type)")
+    var cursor = 0
+    guard let fields = type.getNominalFields(in: function) else {
+      self.root = Self.build(type, in: function, cursor: &cursor)
+      return
+    }
+
+    let superclass = type.superClassType
+    let firstOwnField = superclass?.bridged.getNumNominalFields() ?? 0
+    var children: [Node] = []
+    for field in firstOwnField..<fields.count {
+      children.append(Self.build(fields[field], in: function, cursor: &cursor))
+    }
+    let ownFieldCount = children.count
+    if let superclass {
+      children.append(Node(type: superclass, range: cursor..<(cursor + 1), childKind: nil, children: []))
+      cursor += 1
+    }
+
+    if children.isEmpty {
+      self.root = Node(type: type, range: 0..<1, childKind: nil, children: [])
+    } else {
+      self.root = Node(type: type, range: 0..<cursor, childKind: .classField, children: children,
+                       firstFieldIndex: firstOwnField, fieldChildCount: ownFieldCount)
+    }
+  }
+
+  /// The leaf tracking whether the superclass part of a class instance is initialized, if any.
+  public var superclassLeaf: Int? {
+    root.children.count > root.fieldChildCount ? root.children.last!.range.lowerBound : nil
   }
 
   /// Depth-first construction that assigns contiguous ranges via a monotonically-increasing `cursor`.
@@ -131,14 +205,16 @@ public struct FieldIndexTrie: CustomStringConvertible {
   }
 
   /// The path of nodes from the root down to the node for `leaf`, excluding the root.
-  private func pathToLeaf(_ leaf: Int) -> [(kind: FieldKind, index: Int, node: Node)] {
+  /// The field index is nil for the superclass leaf.
+  private func pathToLeaf(_ leaf: Int) -> [(kind: FieldKind, fieldIndex: Int?, node: Node)] {
     assert(wholeRange.contains(leaf), "leaf \(leaf) out of range \(wholeRange)")
-    var path: [(kind: FieldKind, index: Int, node: Node)] = []
+    var path: [(kind: FieldKind, fieldIndex: Int?, node: Node)] = []
     var node = root
     while let kind = node.childKind {
-      let index = node.children.firstIndex(where: { $0.range.contains(leaf) })!
-      node = node.children[index]
-      path.append((kind, index, node))
+      let offset = node.children.firstIndex(where: { $0.range.contains(leaf) })!
+      let fieldIndex = node.fieldIndex(ofChildAt: offset)
+      node = node.children[offset]
+      path.append((kind, fieldIndex, node))
     }
     return path
   }
@@ -148,20 +224,35 @@ public struct FieldIndexTrie: CustomStringConvertible {
     (pathToLeaf(leaf).last?.node.type ?? root.type).objectType
   }
 
-  /// Emits the projections from `base`, an address of this trie's type, down to the field for `leaf`.
-  public func emitElementAddress(forLeaf leaf: Int, from base: Value, _ builder: Builder) -> Value {
+  /// Emits the projections from `base` down to the field for `leaf`, and passes its address to `body`.
+  /// The `base` is an address of this trie's type, or for a class instance, either the reference or
+  /// an address holding it. Any borrow scope needed for the projection ends after `body`.
+  public func withElementAddress(forLeaf leaf: Int, from base: Value, _ builder: Builder, _ body: (Value) -> ()) {
     var address = base
-    for (kind, index, _) in pathToLeaf(leaf) {
+    var borrow: Value? = nil
+    for (kind, fieldIndex, _) in pathToLeaf(leaf) {
+      guard let fieldIndex else {
+        fatalError("the superclass part of a class instance has no address")
+      }
       switch kind {
       case .structField:
-        address = builder.createStructElementAddr(structAddress: address, fieldIndex: index)
+        address = builder.createStructElementAddr(structAddress: address, fieldIndex: fieldIndex)
       case .tupleField:
-        address = builder.createTupleElementAddr(tupleAddress: address, elementIndex: index)
+        address = builder.createTupleElementAddr(tupleAddress: address, elementIndex: fieldIndex)
+      case .classField:
+        assert(address == base, "only the root of a trie is a class instance")
+        let instance: Value = base.type.isAddress ? builder.createLoadBorrow(fromAddress: base)
+                                                  : builder.createBeginBorrow(of: base)
+        borrow = instance
+        address = builder.createRefElementAddr(classReference: instance, fieldIndex: fieldIndex)
       default:
         fatalError("unexpected projection kind \(kind)")
       }
     }
-    return address
+    body(address)
+    if let borrow {
+      builder.createEndBorrow(of: borrow)
+    }
   }
 
   /// The half-open leaf range covered by `path` from the root.
@@ -176,11 +267,11 @@ public struct FieldIndexTrie: CustomStringConvertible {
 
       guard let nodeKind = node.childKind,
             nodeKind == kind,
-            index >= 0, index < node.children.count else {
+            let offset = node.childOffset(forFieldIndex: index) else {
         return node.range
       }
 
-      node = node.children[index]
+      node = node.children[offset]
     }
 
     return node.range
@@ -189,6 +280,7 @@ public struct FieldIndexTrie: CustomStringConvertible {
   /// Visits the largest subtrees whose leaves are all within `leaves`, in leaf order, passing the
   /// path from the root to each subtree. Together, the visited subtrees cover exactly `leaves`.
   /// With `excludingRoot`, a fully covered root is visited as its children instead.
+  /// The superclass leaf of a class instance has no path, so it is only visited as part of the root.
   public func forEachCoveringSubtree(of leaves: Set<Int>, excludingRoot: Bool = false, _ body: (Path) -> Void) {
     // Paths are built leaf-to-root, so record each step and assemble the path once a subtree is found.
     var steps: [(kind: FieldKind, index: Int)] = []
@@ -198,8 +290,9 @@ public struct FieldIndexTrie: CustomStringConvertible {
         return
       }
       guard let childKind = node.childKind else { return }
-      for (index, child) in node.children.enumerated() where child.range.contains(where: leaves.contains) {
-        steps.append((childKind, index))
+      for (offset, child) in node.children.enumerated() where child.range.contains(where: leaves.contains) {
+        guard let fieldIndex = node.fieldIndex(ofChildAt: offset) else { continue }
+        steps.append((childKind, fieldIndex))
         visit(child)
         steps.removeLast()
       }
@@ -215,8 +308,10 @@ public struct FieldIndexTrie: CustomStringConvertible {
 
       guard let childKind = node.childKind else { return }
 
-      for (index, child) in node.children.enumerated() {
-        let componentStr = FieldIndexTrie.Path(childKind, index: index).description
+      for (offset, child) in node.children.enumerated() {
+        let componentStr = node.fieldIndex(ofChildAt: offset).map {
+          FieldIndexTrie.Path(childKind, index: $0).description
+        } ?? "super"
         let childDisplay = display.isEmpty ? componentStr : "\(display).\(componentStr)"
         visit(child, childDisplay)
       }
@@ -247,7 +342,9 @@ let fieldIndexTrieTest = Test("field_index_trie") {
 
   let value = arguments.takeValue()
   let type = value.type.objectType
-  let trie = FieldIndexTrie(of: type, in: function)
+  let ofClassInstance = arguments.hasUntaken && arguments.takeBool()
+  let trie = ofClassInstance ? FieldIndexTrie(ofClassInstance: type, in: function)
+                             : FieldIndexTrie(of: type, in: function)
 
   print("type: \(type)")
   print(trie)
@@ -258,4 +355,11 @@ let fieldIndexTrieTest = Test("field_index_trie") {
   let whole = trie.wholeRange
   assert(trie.range(of: FieldIndexTrie.Path()) == whole)
   assert(trie.range(of: FieldIndexTrie.Path(.anything)) == whole)
+
+  if ofClassInstance, let fields = type.getNominalFields(in: function) {
+    print("superclassLeaf: \(trie.superclassLeaf.map { "\($0)" } ?? "none")")
+    for field in fields.indices {
+      print("field \(field) -> \(trie.range(of: FieldIndexTrie.Path(.classField, index: field)))")
+    }
+  }
 }

@@ -665,9 +665,10 @@ private struct Resolver {
   func initializeWithUndef(leaves: [Int], of root: ResolvableRoot, _ indices: FieldIndexTrie) {
     let builder = Builder(after: root.startInstruction, context)
     for leaf in leaves {
-      let address = indices.emitElementAddress(forLeaf: leaf, from: root.address, builder)
-      let undef = Undef.get(type: address.type.objectType, context)
-      builder.createAssign(source: undef, destination: address, ownership: .initialize)
+      indices.withElementAddress(forLeaf: leaf, from: root.address, builder) { address in
+        let undef = Undef.get(type: address.type.objectType, context)
+        builder.createAssign(source: undef, destination: address, ownership: .initialize)
+      }
     }
   }
 
@@ -906,7 +907,7 @@ private struct Resolver {
 
       if current[leaf] == .yes {
         let builder = Builder(before: inst, context)
-        builder.createDestroyAddr(address: indices.emitElementAddress(forLeaf: leaf, from: root.address, builder))
+        indices.withElementAddress(forLeaf: leaf, from: root.address, builder) { builder.createDestroyAddr(address: $0) }
         continue
       }
 
@@ -926,7 +927,9 @@ private struct Resolver {
       let falseBlock = context.createBlock(after: trueBlock)
 
       let trueBuilder = Builder(atEndOf: trueBlock, location: inst.location, context)
-      trueBuilder.createDestroyAddr(address: indices.emitElementAddress(forLeaf: leaf, from: root.address, trueBuilder))
+      indices.withElementAddress(forLeaf: leaf, from: root.address, trueBuilder) {
+        trueBuilder.createDestroyAddr(address: $0)
+      }
       trueBuilder.createBranch(to: cont)
 
       Builder(atEndOf: falseBlock, location: inst.location, context).createBranch(to: cont)
