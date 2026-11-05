@@ -1555,20 +1555,23 @@ public:
   /// Whether this declaration is never emitted into the client.
   bool isNeverEmitIntoClient() const;
 
-  /// If this function is the exported entry point of an @objcDirect method,
-  /// returns the declaration carrying the attribute; otherwise null. The AST
-  /// attribute stays the single source of truth, and every client resolves the
-  /// declaration the same way: prefer the SILDeclRef SILGen assigned, and fall
-  /// back to the location for functions that have no decl ref.
+  /// Returns the method or accessor if this function is the ObjC entry point
+  /// of an @objcDirect member, e.g. '-[Foo bar]D', otherwise null.
+  ///
+  /// Different from Sema where we test the presence of the attribute,
+  /// for SIL function, only the ObjC entry point is considered direct.
   AbstractFunctionDecl *getObjCDirectDecl() const {
+  /// The native entry point, witness thunks are not considered.
+    if (getRepresentation() != SILFunctionTypeRepresentation::ObjCMethod)
+      return nullptr;
     auto *AFD = getDeclRef().getAbstractFunctionDecl();
     if (!AFD && hasLocation())
       AFD = getLocation().getAsASTNode<AbstractFunctionDecl>();
     return (AFD && AFD->isObjCDirect()) ? AFD : nullptr;
   }
 
-  /// True if this function is the exported entry point of an @objcDirect
-  /// method.
+  /// True if this function is the Objective-C entry point of an @objcDirect
+  /// member. 
   bool isObjCDirect() const { return getObjCDirectDecl() != nullptr; }
 
   /// Return whether this function has attribute @used on it

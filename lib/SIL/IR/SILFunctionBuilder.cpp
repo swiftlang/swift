@@ -253,6 +253,11 @@ void SILFunctionBuilder::addFunctionAttributes(
     return;
   auto *decl = constant.getDecl();
 
+  // Only the ObjC entry thunk may be referenced by ObjC code, which the Swift
+  // compiler can't see.
+  if (decl->isObjCDirect() && constant.isForeign)
+    F->setHasCReferences(true);
+
   // Add section for anything that was originally a function.
   if (isa<AbstractFunctionDecl>(decl)) {
     if (auto sectionName = decl->getSection())

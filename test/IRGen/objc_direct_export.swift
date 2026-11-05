@@ -87,5 +87,28 @@ final class Inits: NSObject {
 
 // At -O, non-public direct symbols stay out of llvm.used so they can be stripped.
 // Not checked at -Onone, where they show up in llvm.used for an unknown reason.
+// They're still emitted, since ObjC callers in the module may use them.
 // OPT: @llvm.used = {{.*}}"-[Visibility publicDirect]D"
-// OPT: define void @"-[Visibility publicDirect]D"(
+// OPT-DAG: define void @"-[Visibility publicDirect]D"(
+// OPT-DAG: define hidden void @"-[Visibility internalDirect]D"(
+// OPT-DAG: define hidden void @"-[Visibility packageDirect]D"(
+
+// MARK: Linkage
+
+// Only the ObjC entry point gets the direct-implementation linkage; the native
+// one and witness thunks keep Swift linkage.
+internal protocol InternalP { func foo() -> Int }
+
+public class Linkage: NSObject, InternalP {
+  // The direct implementation is hidden unless the method is public...
+  // CHECK-DAG: define hidden {{.*}}@"-[Linkage pkg]D"(
+  // ...but another module in the package calls the native entry point, which
+  // must stay exported.
+  // CHECK-DAG: define swiftcc {{i32|i64}} @"$s{{.*}}7LinkageC3pkgSiyF"(
+  @objcDirect package final func pkg() -> Int { 1 }
+
+  // CHECK-DAG: define {{.*}}@"-[Linkage foo]D"(
+  // The witness thunk for an internal protocol must not be exported.
+  // CHECK-DAG: define {{internal|private}} swiftcc {{i32|i64}} @"$s{{.*}}7LinkageC{{.*}}InternalP{{.*}}3fooSiyFTW"(
+  @objcDirect public final func foo() -> Int { 1 }
+}

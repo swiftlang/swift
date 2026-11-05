@@ -549,8 +549,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
     // An @objcDirect method is deliberately *not* anchored by ObjC metadata --
     // its thunk is the exported implementation symbol -- so it keeps the
     // linkage implied by its Swift access level instead.
-    if (constant.isNativeToForeignThunk() &&
-        attrs.hasAttribute<ObjCDirectAttr>())
+    if (constant.isNativeToForeignThunk() && fn->isObjCDirect())
       return Limit::None;
     if (constant.isNativeToForeignThunk() &&
         !(attrs.hasAttribute<CDeclAttr>() && !fn->hasOnlyCEntryPoint())) {
@@ -1950,6 +1949,10 @@ SubclassScope SILDeclRef::getSubclassScope() const {
 
   // Default arg generators don't go in the vtable.
   if (isDefaultArgGenerator())
+    return SubclassScope::NotApplicable;
+
+  // direct methods are statically dispatched and have no vtable slot.
+  if (decl->isObjCDirect())
     return SubclassScope::NotApplicable;
 
   if (decl->isFinal()) {

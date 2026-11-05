@@ -564,16 +564,11 @@ public:
       addCoroFunctionPointer(SILDeclRef(accessor));
     }
 
-    // An @objcDirect method has no selector-based ObjC method-list entry, but
-    // IRGen does emit its exported direct implementation symbol as the
-    // native-to-foreign thunk. Register that foreign symbol so it lands in the
-    // TBD symbol set; otherwise TBD-vs-IR validation (on by default in +Asserts
-    // builds) flags the public direct symbol as present in the generated IR but
-    // missing from the TBD file. addFunction() applies its own access-level
-    // filter, so non-exported methods are still dropped. For an initializer the
-    // ObjC-facing entry point is the Kind::Initializer foreign thunk, matching
-    // what SILDeclRef::mangle() produces.
-    if (AFD->isObjCDirect()) {
+    // A direct method has no method-list entry, but IRGen exports its foreign
+    // thunk as the direct symbol, so the TBD must list it to match the IR.
+    // addFunction() drops non-exported ones. isObjC() skips _read and _modify,
+    // which ObjC can't call.
+    if (AFD->isObjCDirect() && AFD->isObjC()) {
       if (isa<ConstructorDecl>(AFD))
         addFunction(
             SILDeclRef(AFD, SILDeclRef::Kind::Initializer, /*isForeign=*/true));
