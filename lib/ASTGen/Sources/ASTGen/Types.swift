@@ -65,12 +65,43 @@ extension ASTGenVisitor {
     }
   }
 
+  /// `protocol<A, B>`, which was removed in favor of `A & B`. The parser reads
+  /// it as a generic type with an unexpected `protocol` keyword and diagnoses
+  /// it; build the composition it stands for.
+  func generate(legacyProtocolComposition node: IdentifierTypeSyntax, generics: GenericArgumentClauseSyntax) -> BridgedTypeRepr {
+    let protocolLoc = self.generateSourceLoc(node.unexpectedBetweenModuleSelectorAndName)
+    let components = generics.arguments.compactMap { argument -> TypeSyntax? in
+      if case .type(let type) = argument.argument, !type.is(MissingTypeSyntax.self) { return type }
+      return nil
+    }
+
+    if components.isEmpty {
+      return BridgedCompositionTypeRepr.createEmpty(self.ctx, anyKeywordLoc: protocolLoc).asTypeRepr
+    }
+    if components.count == 1 {
+      return self.generate(type: components[0])
+    }
+    return BridgedCompositionTypeRepr.createParsed(
+      self.ctx,
+      types: components.lazy.map { self.generate(type: $0) }.bridgedArray(in: self),
+      // The composition starts at `protocol`.
+      ampersandLoc: protocolLoc
+    ).asTypeRepr
+  }
+
   func generate(identifierType node: IdentifierTypeSyntax) -> BridgedTypeRepr {
     let loc = self.generateSourceLoc(node.name)
 
     // If this is the bare 'Any' keyword, produce an empty composition type.
     if node.name.keywordKind == .Any && node.genericArgumentClause == nil {
       return BridgedCompositionTypeRepr.createEmpty(self.ctx, anyKeywordLoc: loc).asTypeRepr
+    }
+    if let unexpected = node.unexpectedBetweenModuleSelectorAndName,
+      unexpected.count == 1, unexpected.first?.as(TokenSyntax.self)?.keywordKind == .protocol,
+      node.name.presence == .missing,
+      let generics = node.genericArgumentClause
+    {
+      return self.generate(legacyProtocolComposition: node, generics: generics)
     }
     if node.name.rawText == "_" {
       guard node.genericArgumentClause == nil else {
