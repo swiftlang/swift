@@ -1966,42 +1966,52 @@ extension ASTGenVisitor {
     }
   }
 
-  func generateMacroIntroducedDeclName(expr node: ExprSyntax) -> BridgedMacroIntroducedDeclName? {
-    let kind: BridgedMacroIntroducedDeclNameKind?
+  /// Generate one introduced name of an `@attached`/`@freestanding` attribute,
+  /// e.g., `named(foo)`, or diagnose it like `Parser::parseMacroRoleAttribute`.
+  /// Returns nil, after diagnosing, if the name makes the attribute invalid.
+  func generateMacroIntroducedDeclName(expr node: ExprSyntax, attrName: String) -> BridgedMacroIntroducedDeclName? {
+    let kindExpr: DeclReferenceExprSyntax
     let arguments: LabeledExprListSyntax?
-    if let kindExpr = node.as(DeclReferenceExprSyntax.self) {
-      kind = self.generateMacroIntroducedDeclNameKind(declReferenceExpr: kindExpr)
+    let call = node.as(FunctionCallExprSyntax.self)
+    if let ref = node.as(DeclReferenceExprSyntax.self) {
+      kindExpr = ref
       arguments = nil
-    } else if let callExpr =  node.as(FunctionCallExprSyntax.self) {
-      if let kindExpr = callExpr.calledExpression.as(DeclReferenceExprSyntax.self) {
-        kind = self.generateMacroIntroducedDeclNameKind(declReferenceExpr: kindExpr)
-      } else {
-        kind = nil
-      }
-      arguments = callExpr.arguments
+    } else if let call, let ref = call.calledExpression.as(DeclReferenceExprSyntax.self) {
+      kindExpr = ref
+      arguments = call.arguments
     } else {
-      kind = nil
-      arguments = nil
-    }
-    guard let kind else {
-      // TODO: Diagnose.
+      self.diagnose(.macro_attribute_unknown_argument_form, at: node)
       return nil
     }
+
+    guard kindExpr.argumentNames == nil, kindExpr.moduleSelector == nil,
+      let kind = self.generateMacroIntroducedDeclNameKind(declReferenceExpr: kindExpr)
+    else {
+      self.diagnose(
+        .macro_attribute_unknown_name_kind(self.generateIdentifier(kindExpr.baseName)),
+        at: self.generateSourceLoc(kindExpr.baseName)
+      )
+      return nil
+    }
+    let kindName = self.generateIdentifier(kindExpr.baseName)
 
     let name: BridgedDeclNameRef
     switch kind {
     case .named, .prefixed, .suffixed:
-      guard let arguments else {
-        // TODO: Diagnose
+      guard let call else {
+        self.diagnose(
+          .macro_attribute_introduced_name_requires_argument(kindName),
+          at: kindExpr.baseName.nextToken(viewMode: .sourceAccurate) ?? kindExpr.baseName
+        )
         return nil
       }
-      guard var arg = arguments.first?.expression else {
-        // TODO: Diagnose.
+      guard var arg = arguments?.first?.expression else {
+        self.diagnose(.macro_attribute_unknown_argument_form, at: call.rightParen ?? kindExpr.baseName)
         return nil
       }
-      if let call = arg.as(FunctionCallExprSyntax.self), call.arguments.isEmpty {
+      if let argCall = arg.as(FunctionCallExprSyntax.self), argCall.arguments.isEmpty {
         // E.g. 'named(foo())', use the callee to generate the name.
-        arg = call.calledExpression
+        arg = argCall.calledExpression
       }
 
       if let arg = arg.as(DeclReferenceExprSyntax.self) {
@@ -2013,19 +2023,18 @@ extension ASTGenVisitor {
           baseName: .init(self.ctx.getIdentifier("_"))
         )
       } else {
-        // TODO: Diagnose
-        fatalError("expected name")
-        //return nil
+        self.diagnose(.macro_attribute_unknown_argument_form, at: arg)
+        return nil
       }
 
-      if arguments.count >= 2 {
-        fatalError("unexpected arguments")
-        // TODO: Diagnose.
+      if let extra = arguments?.dropFirst().first {
+        self.diagnose(.attr_expected_rparen(attrName, false), at: extra)
       }
 
     case .overloaded, .arbitrary:
-      if arguments != nil {
-        // TODO: Diagnose
+      // The C++ parser diagnoses an argument here but keeps the name.
+      if let call {
+        self.diagnose(.macro_attribute_introduced_name_requires_no_argument(kindName), at: call.leftParen ?? kindExpr.baseName)
       }
       name = BridgedDeclNameRef()
     }
@@ -2045,31 +2054,54 @@ extension ASTGenVisitor {
       attrName == "freestanding" ? .freestanding : .attached;
     let isAttached = syntax == .attached
 
+    if node.arguments == nil {
+      // Unlike other attributes, the C++ parser points at the token after the
+      // attribute name.
+      let diagnostic = CompilerDiagnostic.attr_expected_lparen(String(syntaxText: attrName), false)
+      if let next = node.attributeName.lastToken(viewMode: .sourceAccurate)?.nextToken(viewMode: .sourceAccurate) {
+        self.diagnose(diagnostic, at: next)
+      } else {
+        self.diagnose(diagnostic, at: node.attributeName)
+      }
+      return nil
+    }
+
     return self.generateWithLabeledExprListArguments(attribute: node) { args in
-      // Macro role.
-      var roleToken: TokenSyntax?
-      let role = self.generateConsumingPlainIdentifierAttrOption(args: &args) {
-        roleToken = $0
-        return BridgedMacroRole(from: $0.rawText.bridged)
-      }
-      guard let role = role else {
+      // Macro role. Without a usable one there is no attribute.
+      guard let roleArg = args.first, roleArg.label == nil else {
+        let diagnostic = CompilerDiagnostic.macro_role_attr_expected_kind(isAttached)
+        if let leftParen = node.leftParen {
+          self.diagnose(diagnostic, at: leftParen)
+        } else {
+          self.diagnose(diagnostic, at: node.attributeName)
+        }
         return nil
       }
-      guard role != .none else {
-        // TODO: Diagnose.
-        return nil
-      }
-      if !role.isSupported(in: self.ctx) {
-        // The C++ parser reports it but still builds the attribute, so the
-        // macro does not also complain about having no roles.
+      args.removeFirst()
+      guard let roleToken = roleArg.expression.as(DeclReferenceExprSyntax.self)?.baseName else {
         self.diagnose(
-          .macro_experimental(roleToken!.text, ""),
-          at: roleToken!
+          isAttached ? .macro_role_attr_expected_attached_kind : .macro_role_attr_expected_freestanding_kind,
+          at: roleArg
         )
-      }
-      if role.isAttached != isAttached {
-        // TODO: Diagnose.
         return nil
+      }
+      let role = BridgedMacroRole(from: roleToken.rawText.bridged)
+      guard role != .none else {
+        self.diagnose(.macro_role_attr_expected_kind(isAttached), at: self.generateSourceLoc(roleToken))
+        return nil
+      }
+      // Like the C++ parser, diagnose a role that is unsupported or of the wrong
+      // syntax but still build the attribute; Sema then rejects it.
+      if !role.isSupported(in: self.ctx) {
+        self.diagnose(
+          .macro_experimental(roleToken.text, ""),
+          at: self.generateSourceLoc(roleToken)
+        )
+      } else if role.isAttached != isAttached {
+        self.diagnose(
+          .macro_role_syntax_mismatch(isAttached, self.generateIdentifier(roleToken)),
+          at: self.generateSourceLoc(roleToken)
+        )
       }
 
       var names: [BridgedMacroIntroducedDeclName] = []
@@ -2078,47 +2110,52 @@ extension ASTGenVisitor {
       enum Argument: UInt8 {
         case names
         case conformances
-        case invalid
       }
       // Assume we're in 'names:' arguments.
       var argState = AttrArgumentState<Argument, UInt8>(.names)
 
-      LOOP: while let arg = args.popFirst() {
+      while let arg = args.popFirst() {
         // Argument state.
         if let label = arg.label {
           switch label.tokenKind {
           case .identifier("names"):
             if argState.hasSeen(.names) {
-              // TODO: Diagnose duplicated 'names:'.
+              self.diagnose(.macro_attribute_duplicate_label(isAttached, "names"), at: self.generateSourceLoc(label))
             }
             argState.current = .names
           case .identifier("conformances"):
             if argState.hasSeen(.conformances) {
-              // TODO: Diagnose duplicated 'conformances:'.
+              self.diagnose(.macro_attribute_duplicate_label(isAttached, "conformances"), at: self.generateSourceLoc(label))
             }
             argState.current = .conformances
           default:
-            // Invalid label.
-            // TODO: Diagnose `no argument with label '\(label)'`.
-            argState.current = .invalid
+            self.diagnose(
+              .macro_attribute_unknown_label(isAttached, self.generateIdentifier(label)),
+              at: self.generateSourceLoc(label)
+            )
+            continue
           }
         } else if argState.current == .names && !argState.hasSeen(.names) {
           // E.g. `@attached(member, named(foo))` this is missing 'names:'
-          // TODO: Diagnose to insert 'names:'
+          self.diagnose(.macro_attribute_missing_label(isAttached, "names"), at: arg)
           argState.current = .names
         }
 
         // Argument values.
         switch argState.current {
         case .names:
-          if let name = self.generateMacroIntroducedDeclName(expr: arg.expression) {
-            names.append(name)
+          guard
+            let name = self.generateMacroIntroducedDeclName(
+              expr: arg.expression,
+              attrName: String(syntaxText: attrName)
+            )
+          else {
+            // Diagnosed. The C++ parser goes on to the next argument.
+            continue
           }
+          names.append(name)
         case .conformances:
           conformances.append(self.generate(expr: arg.expression))
-        case .invalid:
-          // Ignore the value.
-          break
         }
       }
 

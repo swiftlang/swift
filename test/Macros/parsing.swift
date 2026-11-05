@@ -17,8 +17,9 @@ protocol Q { associatedtype Assoc }
 @freestanding(expression) macro m5<T: P>(_: T) = #externalMacro(module: "A", type: "M4")
 // expected-warning@-1{{external macro implementation type 'A.M4' could not be found for macro 'm5'}}
 
-@freestanding(expression) macro m6 = A // expected-error{{expected '(' for macro parameters or ':' for a value-like macro}}
-// expected-error@-1{{by a macro expansion}}
+// The malformed macro declaration that used to be here is in
+// parsing_macro_signature.swift, because with ASTGen a syntax error in a file
+// suppresses the semantic diagnostics that the rest of this file checks.
 
 // expected-error @+2 {{expected '('}}
 // expected-error @+1 {{macro 'm7' must declare its applicable roles}}
