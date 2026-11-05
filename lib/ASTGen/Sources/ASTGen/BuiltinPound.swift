@@ -152,20 +152,136 @@ extension ASTGenVisitor {
       return
     }
 
-    guard node.arguments.count == 1,
-      let arg = node.arguments.first,
-      arg.label == nil,
-      let literal = arg.expression.as(StringLiteralExprSyntax.self)
+    // The C++ parser rejects attributes and modifiers, but still diagnoses the
+    // directive itself. swift-syntax diagnoses them already in a member list,
+    // but not among statements and top-level declarations.
+    if let decl = node.as(MacroExpansionDeclSyntax.self), node.parent?.kind != .memberBlockItem,
+      !decl.attributes.isEmpty || !decl.modifiers.isEmpty
+    {
+      self.diagnose(.expected_decl, at: decl.pound)
+    }
+
+    // Check the shape of the directive the way `Parser::parseDeclPoundDiagnostic`
+    // does. swift-syntax parses `#error` as a macro expansion, so the malformed
+    // forms the C++ parser rejects -- no parentheses, an unbalanced parenthesis,
+    // text that is not a string literal, trailing tokens -- come out as
+    // ordinary-looking expansions or as unrelated statements, and the tokens
+    // have to be examined directly.
+    func atStartOfLine(_ token: TokenSyntax) -> Bool {
+      token.leadingTrivia.contains { $0.isNewline }
+    }
+    func insertion(_ text: String, at position: AbsolutePosition) -> CompilerDiagnosticFixIt {
+      .init(replace: self.generateCharSourceRange(start: position, length: SourceLength(utf8Length: 0)), with: text)
+    }
+
+    let nameToken = node.macroName
+    guard var token = nameToken.nextToken(viewMode: .sourceAccurate), token.rawTokenKind != .endOfFile,
+      !atStartOfLine(token)
     else {
+      // E.g. `#warning` alone on its line.
+      let next = nameToken.nextToken(viewMode: .sourceAccurate) ?? nameToken
+      self.diagnose(
+        .pound_diagnostic_expected_parens(isError),
+        at: next,
+        fixIts: [insertion("(\"<#message#>\")", at: nameToken.endPositionBeforeTrailingTrivia)]
+      )
+      return
+    }
+
+    let lParen = token
+    var previous = nameToken
+    let hadLParen = token.rawTokenKind == .leftParen
+    if hadLParen {
+      previous = token
+      guard let next = token.nextToken(viewMode: .sourceAccurate) else { return }
+      token = next
+    }
+
+    // Anything but a string literal: `#warning(oops, forgot the quotes)`.
+    func isStringLiteralStart(_ token: TokenSyntax) -> Bool {
+      switch token.rawTokenKind {
+      case .stringQuote, .multilineStringQuote, .rawStringPoundDelimiter: return true
+      default: return false
+      }
+    }
+    guard isStringLiteralStart(token) else {
+      let wordsStart = token
+      var stopper = token
+      var lastConsumed = previous
+      while stopper.rawTokenKind != .endOfFile, stopper.rawTokenKind != .rightParen, !atStartOfLine(stopper) {
+        lastConsumed = stopper
+        guard let next = stopper.nextToken(viewMode: .sourceAccurate) else { break }
+        stopper = next
+      }
+      let wordsStartPosition = wordsStart.positionAfterSkippingLeadingTrivia
+      let wordsEndPosition = lastConsumed.endPositionBeforeTrailingTrivia
+      var fixIts: [CompilerDiagnosticFixIt] = []
+      if wordsEndPosition != wordsStartPosition {
+        fixIts.append(insertion(hadLParen ? "\"" : "(\"", at: wordsStartPosition))
+        fixIts.append(insertion(stopper.rawTokenKind == .rightParen ? "\"" : "\")", at: wordsEndPosition))
+      }
       self.diagnose(
         .pound_diagnostic_expected_string(isError),
-        at: node.arguments.first.map(Syntax.init) ?? Syntax(node.macroName)
+        at: SourceLoc(at: wordsStartPosition, in: self.base),
+        fixIts: fixIts
+      )
+      return
+    }
+
+    var literalAncestor: Syntax? = Syntax(token)
+    while let candidate = literalAncestor, !candidate.is(StringLiteralExprSyntax.self) {
+      literalAncestor = candidate.parent
+    }
+    guard let literal = literalAncestor?.as(StringLiteralExprSyntax.self),
+      let literalLast = literal.lastToken(viewMode: .sourceAccurate)
+    else {
+      return
+    }
+
+    var after = literalLast.nextToken(viewMode: .sourceAccurate)
+    var hadRParen = false
+    if let rParen = after, rParen.rawTokenKind == .rightParen {
+      hadRParen = true
+      after = rParen.nextToken(viewMode: .sourceAccurate)
+    }
+
+    if let after, after.rawTokenKind != .endOfFile, !atStartOfLine(after) {
+      self.diagnose(.extra_tokens_pound_diagnostic_directive(isError), at: after)
+      return
+    }
+
+    if !hadLParen && !hadRParen {
+      // E.g. `#warning "foo"`.
+      self.diagnose(
+        .pound_diagnostic_expected_parens(isError),
+        at: lParen,
+        highlight: Syntax(literal),
+        fixIts: [
+          insertion("(", at: literal.positionAfterSkippingLeadingTrivia),
+          insertion(")", at: literal.endPositionBeforeTrailingTrivia),
+        ]
+      )
+      return
+    } else if hadRParen && !hadLParen {
+      // E.g. `#warning "foo")`.
+      self.diagnose(
+        .pound_diagnostic_expected("(", isError),
+        at: literal,
+        fixIts: [insertion("(", at: literal.positionAfterSkippingLeadingTrivia)]
+      )
+      return
+    } else if hadLParen && !hadRParen {
+      // E.g. `#warning("foo"`.
+      self.diagnose(
+        .pound_diagnostic_expected(")", isError),
+        at: literalLast,
+        fixIts: [insertion(")", at: literal.endPositionBeforeTrailingTrivia)]
       )
       return
     }
 
     guard literal.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }) else {
-      self.diagnose(.pound_diagnostic_interpolation(isError), at: literal)
+      self.diagnose(.pound_diagnostic_interpolation(isError), at: literal, highlight: Syntax(literal))
       return
     }
 
