@@ -247,20 +247,29 @@ extension ASTGenVisitor {
   }
 
   func generateHasSymbolStmtCondition(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedStmtConditionElement {
+    // Check the shape the way `Parser::parseStmtConditionPoundHasSymbol` does.
+    if node.leftParen == nil {
+      // The C++ parser points at the token after `#_hasSymbol`.
+      self.diagnose(
+        .has_symbol_expected_lparen,
+        at: node.macroName.nextToken(viewMode: .sourceAccurate) ?? node.macroName
+      )
+    }
+
     var args = node.arguments[...]
     let symbol: BridgedExpr?
     if let arg = args.popFirst() {
       symbol = self.generate(expr: arg.expression)
-      if arg.label != nil {
-        // TODO: Diagnose
-        fatalError("unexpected label")
-      }
-      if !args.isEmpty {
-        // TODO: Diagnose
-        fatalError("extra args")
+      if let label = arg.label {
+        self.diagnose(.has_symbol_expected_rparen, at: label)
+      } else if let extra = args.first {
+        self.diagnose(.has_symbol_expected_rparen, at: extra)
       }
     } else {
       symbol = nil
+      if node.leftParen != nil {
+        self.diagnose(.has_symbol_expected_expr, at: node.rightParen ?? node.macroName)
+      }
     }
     return .createHasSymbol(
       self.ctx,
