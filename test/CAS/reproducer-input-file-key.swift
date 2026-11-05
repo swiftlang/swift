@@ -19,7 +19,7 @@
 // RUN:   -disable-implicit-swift-modules -module-cache-path %t/module-cache -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/Test.swift -cache-compile-job -cas-path %t/cas -swift-version 5 -enable-library-evolution -parse-stdlib \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import @%t/MyApp.cmd
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain -emit-module -emit-module-path %t/Test.swiftmodule -emit-module-interface-path %t/Test.swiftinterface \
 // RUN:   -disable-implicit-swift-modules -module-cache-path %t/module-cache -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   %t/Test.swift -cache-compile-job -cas-path %t/cas -swift-version 5 -enable-library-evolution -parse-stdlib \

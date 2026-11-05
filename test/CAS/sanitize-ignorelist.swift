@@ -20,7 +20,7 @@
 // CMD: -fsanitize-ignorelist={{.*}}asan_ignorelist.txt
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json A casFSRootID > %t/A.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/A.casid | %FileCheck %s --check-prefix=A-FS
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/A.casid | %FileCheck %s --check-prefix=A-FS
 // A-FS: asan_ignorelist.txt
 
 //--- main.swift

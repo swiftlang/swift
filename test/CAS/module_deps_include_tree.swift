@@ -19,7 +19,7 @@
 
 /// check cas-fs content
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/E_fs.casid | %FileCheck %s -check-prefix FS_ROOT_E
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json clang:F clangIncludeTree > %t/F_tree.casid
 // RUN: clang-cas-test --cas %t/cas --print-include-tree @%t/F_tree.casid | %FileCheck %s -check-prefix INCLUDE_TREE_F

@@ -10,7 +10,7 @@
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -b %t/Test-bridging.cmd -o %t/Test.cmd
 
 // RUN: %target-swift-frontend-plain @%t/Test-bridging.cmd %t/Bridging.h -disable-implicit-swift-modules -o %t/objc.pch
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain @%t/Test-bridging.cmd %t/Bridging.h -disable-implicit-swift-modules -o %t/objc.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
