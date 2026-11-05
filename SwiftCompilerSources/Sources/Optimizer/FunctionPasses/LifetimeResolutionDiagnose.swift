@@ -116,7 +116,7 @@ private struct Storage {
     while true {
       let (kind, index, rest) = remaining.pop()
       switch kind {
-      case .structField:
+      case .structField, .classField:
         guard let fields = type.getNominalFields(in: function), index < fields.count else { return name }
         let fieldName = fields.getUserFacingFieldDecl(withIndex: index)?.userFacingName
                           ?? fields.getNameOfField(withIndex: index)
@@ -136,15 +136,27 @@ private struct Storage {
 
   /// The stored property of `self` that `path` projects into, if any.
   func storedProperty(at path: SmallProjectionPath) -> VarDecl? {
-    guard case (.structField, let index, _) = path.pop(),
+    let (kind, index, _) = path.pop()
+    guard kind == .structField || kind == .classField,
           let fields = type.getNominalFields(in: function), index < fields.count else {
       return nil
     }
     return fields.getUserFacingFieldDecl(withIndex: index)
   }
+
+  /// The path of the first part of the storage among `leaves`, preferring a stored property of `self`
+  /// over all of `self`.
+  func firstPath(of leaves: Set<Int>) -> SmallProjectionPath {
+    var firstPath: SmallProjectionPath? = nil
+    indices.forEachCoveringSubtree(of: leaves, excludingRoot: root.isRootSelf) { path in
+      if firstPath == nil { firstPath = path }
+    }
+    return firstPath ?? SmallProjectionPath()
+  }
 }
 
-/// The storage allocation (`alloc_box`, `alloc_stack`, or argument) backing `address`, via its access path.
+/// The storage allocation (`alloc_box`, `alloc_stack`, or argument) backing `address`, via its access path,
+/// or the reference to the class instance whose stored property it is.
 private func allocation(backing address: Value) -> Value? {
   switch address.accessPath.base {
   case .box(let projectBox):
@@ -153,6 +165,9 @@ private func allocation(backing address: Value) -> Value? {
     return allocStack
   case .argument(let argument):
     return argument
+  case .class(let projection):
+    let reference = projection.instance.referenceRoot
+    return (reference as? MarkUninitializedInst)?.operand.value ?? reference
   default:
     return nil
   }
@@ -205,11 +220,28 @@ private struct UseMap {
 }
 
 /// Classifies the uses of some storage.
-private struct AddressUseClassifier: AddressDefUseWalker {
+private struct AddressUseClassifier: AddressDefUseWalker, ClassInstanceUseWalker {
   typealias Path = UnusedWalkingPath
   let demotedConsumes: Set<Instruction>
   let isInitSelf: Bool
   var uses = UseMap()
+
+  mutating func storedPropertyUse(_ projection: RefElementAddrInst) -> WalkResult {
+    return walkDownUses(ofAddress: projection, path: UnusedWalkingPath())
+  }
+
+  mutating func instanceUse(_ use: Operand) -> WalkResult {
+    let inst = use.instruction
+    switch inst {
+    case is DestroyValueInst, is DiagnoseInst:
+      break
+    case is PartialApplyInst:
+      uses.record(inst, .closureCapture)
+    default:
+      uses.record(inst, isInitSelf && flowsIntoReturn(use) ? .returnFromInit : .read)
+    }
+    return .continueWalk
+  }
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     let inst = address.instruction
@@ -314,20 +346,35 @@ private func isConsumingUse(_ use: Operand) -> Bool {
 
 /// Whether `value` is what the function returns, possibly wrapped in an Optional by a failable initializer.
 private func flowsIntoReturn(_ value: Value) -> Bool {
-  var current = value
-  while let use = current.uses.ignoreDebugUses.singleUse {
-    switch use.instruction {
-    case is ReturnInst:
-      return true
-    case let enumInst as EnumInst:
-      current = enumInst
-    case let branch as BranchInst:
-      current = branch.getArgument(for: use)
-    default:
-      return false
-    }
+  guard let use = value.uses.ignoreDebugUses.singleUse else {
+    return false
   }
-  return false
+  return flowsIntoReturn(use)
+}
+
+/// Whether the value used by `use` is what the function returns.
+private func flowsIntoReturn(_ use: Operand) -> Bool {
+  switch use.instruction {
+  case is ReturnInst:
+    return true
+  case let enumInst as EnumInst:
+    return flowsIntoReturn(enumInst)
+  case let branch as BranchInst:
+    return flowsIntoReturn(branch.getArgument(for: use))
+  default:
+    return false
+  }
+}
+
+/// The method or accessor called by `inst`, if it is a call.
+private func calledMethod(by inst: Instruction) -> FuncDecl? {
+  guard let apply = inst as? FullApplySite else {
+    return nil
+  }
+  if let classMethod = apply.callee as? ClassMethodInst {
+    return classMethod.member.decl as? FuncDecl
+  }
+  return apply.referencedFunction?.location.decl as? FuncDecl
 }
 
 /// The first use reachable from some starting instruction.
@@ -579,7 +626,11 @@ private struct Diagnoser {
       return uses
     }
     var classifier = AddressUseClassifier(demotedConsumes: demotedConsumes, isInitSelf: storage.initSelfKind != nil)
-    _ = classifier.walkDownUses(ofAddress: storage.root.address, path: UnusedWalkingPath())
+    if storage.root.isClassInstance {
+      _ = classifier.walkDownUses(ofClassInstance: storage.root.address)
+    } else {
+      _ = classifier.walkDownUses(ofAddress: storage.root.address, path: UnusedWalkingPath())
+    }
     var uses = classifier.uses
 
     // A box captured by a closure, rather than its projected address.
@@ -637,7 +688,7 @@ private struct Diagnoser {
         continue
       }
       let accessPath = marker.destination.accessPath
-      let leaves = storage.indices.range(of: accessPath.projectionPath)
+      let leaves = storage.indices.range(of: marker.destination.projectionPathFromRoot)
       let use = findOffendingUse(of: accessPath, in: uses(of: storage), after: marker, context)
 
       if let i = reports.firstIndex(where: { $0.storage.allocation == storage.allocation &&
@@ -669,6 +720,19 @@ private struct Diagnoser {
         } else {
           diagnostics.diagnose(.return_from_init_without_initing_stored_properties, at: location)
         }
+      } else if storage.root.isClassInstance {
+        guard shouldEmitError(for: storage.allocation, at: useLocation) else { return }
+        if use?.kind == .closureCapture {
+          diagnostics.diagnose(.self_closure_use_uninit, at: useLocation)
+        } else if let method = use.flatMap({ calledMethod(by: $0.instruction) }) {
+          let accessor = method as? AccessorDecl
+          let name = (accessor?.storage ?? method).baseIdentifier
+          diagnostics.diagnose(.self_use_before_fully_init, name, accessor != nil ? 1 : 0, 0, at: useLocation)
+        } else {
+          diagnostics.diagnose(.variable_used_before_initialized, storage.name(of: storage.firstPath(of: leaves)), 0,
+                               at: useLocation)
+          return
+        }
       } else {
         guard shouldEmitError(for: storage.allocation, at: useLocation) else { return }
         diagnostics.diagnose(.use_of_self_before_fully_init, at: useLocation)
@@ -690,11 +754,7 @@ private struct Diagnoser {
     }
 
     // Name the whole variable if it is entirely uninitialized, otherwise its first uninitialized part.
-    var firstPath: SmallProjectionPath? = nil
-    storage.indices.forEachCoveringSubtree(of: leaves) { path in
-      if firstPath == nil { firstPath = path }
-    }
-    let name = storage.name(of: firstPath ?? SmallProjectionPath())
+    let name = storage.name(of: storage.firstPath(of: leaves))
 
     let isLet = storage.root.isLet ? 1 : 0
     let id: DiagID
@@ -736,7 +796,7 @@ private struct Diagnoser {
       }
       guard shouldEmitError(for: storage.allocation, at: marker.location) else { continue }
 
-      let path = address.accessPath.projectionPath
+      let path = address.projectionPathFromRoot
       diagnostics.diagnose(.immutable_property_already_initialized, storage.name(of: path), at: marker.location)
 
       let decl = storage.root.isRootSelf ? storage.storedProperty(at: path) : storage.root.varDecl
