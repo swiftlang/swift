@@ -11,10 +11,10 @@
 
 // RUN: %target-swift-frontend-plain -emit-module -emit-module-path %t/test.module \
 // RUN:   -cache-compile-job -cas-path %t/cas @%t/MyApp.cmd %s 2>&1 | %FileCheck %s
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain -emit-module -emit-module-path %t/test.module -cache-compile-job -cas-path %t/cas \
 // RUN:   @%t/MyApp.cmd %s > %t/cache_key.json
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action render-diags %t/cache_key.json --  \
+// RUN: %cache-tool render-diags -cas-path %t/cas %t/cache_key.json --  \
 // RUN:   %target-swift-frontend-plain -emit-module -emit-module-path %t/test.module -cache-compile-job -cas-path %t/cas \
 // RUN:   @%t/MyApp.cmd %s 2>&1 | %FileCheck %s
 

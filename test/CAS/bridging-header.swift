@@ -42,7 +42,7 @@
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
 // RUN: %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
@@ -81,7 +81,7 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json bridgingHeader > %t/header1.cmd
 // RUN: %target-swift-frontend @%t/header1.cmd -disable-implicit-swift-modules -O -o %t/bridging1.pch
 
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend @%t/header1.cmd -disable-implicit-swift-modules -O -o %t/bridging1.pch > %t/keys1.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys1.json > %t/key1
 
@@ -112,7 +112,7 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps3.json bridgingHeader > %t/header2.cmd
 // RUN: %target-swift-frontend @%t/header2.cmd -disable-implicit-swift-modules -O -o %t/bridging2.pch
 
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend @%t/header2.cmd -disable-implicit-swift-modules -O -o %t/bridging2.pch > %t/keys2.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys2.json > %t/key2
 
@@ -139,7 +139,7 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps4.json bridgingHeader > %t/header3.cmd
 // RUN: %target-swift-frontend @%t/header3.cmd -disable-implicit-swift-modules -O -o %t/bridging3.pch
 
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend @%t/header3.cmd -disable-implicit-swift-modules -O -o %t/bridging3.pch > %t/keys3.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys3.json > %t/key3
 
@@ -173,7 +173,7 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps5.json bridgingHeader > %t/header4.cmd
 // RUN: %target-swift-frontend @%t/header4.cmd -disable-implicit-swift-modules -O -o %t/bridging4.pch
 
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend @%t/header4.cmd -disable-implicit-swift-modules -O -o %t/bridging4.pch > %t/keys4.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys4.json > %t/key4
 
