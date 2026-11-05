@@ -1296,6 +1296,13 @@ extension ASTGenVisitor {
     )
     subscriptDecl.asDecl.attachParsedAttrs(attrs.attributes)
 
+    // A subscript is only valid in a type; the C++ parser still builds it, but
+    // marks it invalid.
+    if !self.declContext.isTypeContext {
+      self.diagnose(.subscript_decl_wrong_scope, at: node.subscriptKeyword)
+      subscriptDecl.asDecl.setInvalid()
+    }
+
     if let accessors = node.accessorBlock {
       let storage = subscriptDecl.asAbstractStorageDecl
       storage.setAccessors(generate(accessorBlock: accessors, for: storage))

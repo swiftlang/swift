@@ -315,6 +315,15 @@ extension ASTGenVisitor {
     if let initializer = node.initializer {
       equalLoc = self.generateSourceLoc(initializer.equal)
       initExpr = self.generate(expr: initializer.value)
+    } else if node.hasError
+      || (node.parent?.parent?.as(ClosureCaptureClauseSyntax.self).map {
+        $0.unexpectedBetweenItemsAndRightSquare != nil && $0.items.last?.id == node.id
+      } ?? false)
+    {
+      // `[strong self]`: the parser has diagnosed the capture; looking up its
+      // first word as a name would only add "cannot find 'strong'".
+      equalLoc = nil
+      initExpr = BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     } else {
       // Otherwise, create an 'UnresolvedDeclRefExpr' with the name
       equalLoc = nil

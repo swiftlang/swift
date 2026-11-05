@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-additional-prefix no-weak-let-
-// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-upcoming-feature ImmutableWeakCaptures -verify-additional-prefix has-weak-let-
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -verify-additional-prefix no-weak-let- %if !parser_astgen %{ -verify-additional-prefix no-weak-letx-cparser- %}
+// RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-upcoming-feature ImmutableWeakCaptures -verify-additional-prefix has-weak-let- %if !parser_astgen %{ -verify-additional-prefix has-weak-letx-cparser- %}
 
 // REQUIRES: swift_feature_ImmutableWeakCaptures
 
@@ -370,39 +370,39 @@ extension SomeClass {
     doStuff { [weak xyz = self.field] in xyz!.foo() }
 
     // rdar://16889886 - Assert when trying to weak capture a property of self in a lazy closure
-    doStuff { [weak self.field] in field!.foo() }
-    // expected-error@-1{{fields may only be captured by assigning to a specific name}}{{21-21=field = }}
-    // expected-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    // expected-note@-3{{reference 'self.' explicitly}} {{36-36=self.}}
-    // expected-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+    doStuff { [weak self.field] in field!.foo() } //
+    // expected-cparser-error@-1{{fields may only be captured by assigning to a specific name}}{{21-21=field = }} expected-astgen-error@-1 {{unexpected code '.field' in closure capture clause}}
+    // expected-cparser-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    // expected-cparser-note@-3{{reference 'self.' explicitly}} {{36-36=self.}}
+    // expected-cparser-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
 
     doStuff { [self.field] in field!.foo() }
-    // expected-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=field = }}
-    // expected-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    // expected-note@-3{{reference 'self.' explicitly}} {{31-31=self.}}
-    // expected-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
+    // expected-cparser-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=field = }}
+    // expected-cparser-error@-2{{reference to property 'field' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-astgen-error@-2 {{unexpected code '.field' in closure capture clause}}
+    // expected-cparser-note@-3{{reference 'self.' explicitly}} {{31-31=self.}}
+    // expected-cparser-note@-4{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }}
 
-    doStuff { [self.field!.foo()] in 32 }
-    //expected-error@-1{{fields may only be captured by assigning to a specific name}}
+    doStuff { [self.field!.foo()] in 32 } //
+    //expected-cparser-error@-1{{fields may only be captured by assigning to a specific name}} expected-astgen-error@-1 {{unexpected code '.field!.foo()' in closure capture clause}}
 
     doStuff { [self.class] in self.class!.foo() }
-    //expected-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=`class` = }}
+    //expected-cparser-error@-1{{fields may only be captured by assigning to a specific name}}{{16-16=`class` = }} expected-astgen-error@-1 {{unexpected code '.class' in closure capture clause}}
 
     doStuff { [self.`in`] in `in` }
-    //expected-note@-1{{capture 'self' explicitly to enable implicit 'self' in this closure}}
-    //expected-error@-2{{fields may only be captured by assigning to a specific name}}{{16-16=`in` = }}
-    //expected-error@-3{{reference to property 'in' in closure requires explicit use of 'self' to make capture semantics explicit}}
-    //expected-note@-4{{reference 'self.' explicitly}}
+    //expected-cparser-note@-1{{capture 'self' explicitly to enable implicit 'self' in this closure}}
+    //expected-cparser-error@-2{{fields may only be captured by assigning to a specific name}}{{16-16=`in` = }}
+    //expected-cparser-error@-3{{reference to property 'in' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-astgen-error@-3 {{unexpected code '.`in`' in closure capture clause}}
+    //expected-cparser-note@-4{{reference 'self.' explicitly}}
 
-    // expected-no-weak-let-warning@+2 {{variable 'self' was written to, but never read}}
-    // expected-has-weak-let-warning@+1 {{capture 'self' was never used}}
-    doStuff { [weak self&field] in 42 }  // expected-error {{expected ']' at end of capture list}}
+    // expected-no-weak-letx-cparser-warning@+2 {{variable 'self' was written to, but never read}}
+    // expected-has-weak-letx-cparser-warning@+1 {{capture 'self' was never used}}
+    doStuff { [weak self&field] in 42 }  // expected-cparser-error {{expected ']' at end of capture list}} expected-astgen-error {{unexpected code '&field' in closure capture clause}}
 
   }
 
   func strong_in_capture_list() {
     // <rdar://problem/18819742> QOI: "[strong self]" in capture list generates unhelpful error message
-    _ = {[strong self] () -> () in return }  // expected-error {{expected 'weak', 'unowned', or no specifier in capture list}}
+    _ = {[strong self] () -> () in return }  // expected-cparser-error {{expected 'weak', 'unowned', or no specifier in capture list}} expected-astgen-error {{unexpected 'self' keyword in closure capture clause}}
   }
 }
 

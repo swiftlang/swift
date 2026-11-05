@@ -106,12 +106,12 @@ prefix func +// this should be a comment, not an operator
 prefix func -/* this also should be a comment, not an operator */
 (arg: Int) -> Int { return arg }
 
-func +*/ () {}   // expected-error {{expected identifier in function declaration}} expected-error {{unexpected end of block comment}}
+func +*/ () {}   // expected-cparser-error {{expected identifier in function declaration}} expected-cparser-error {{unexpected end of block comment}} expected-astgen-error {{'+*/' is not a valid identifier}}
 func errors() {
-  */    // expected-error {{unexpected end of block comment}}
+  */    // expected-cparser-error {{unexpected end of block comment}} expected-astgen-error {{unexpected code in function}}
   
   // rdar://12962712 - reject */ in an operator as it should end a block comment.
-  */+    // expected-error {{unexpected end of block comment}}
+  */+    // expected-cparser-error {{unexpected end of block comment}}
 }
 
 prefix operator ...
@@ -182,8 +182,8 @@ _ = x☃⃠y
 func test_14705150() {
   let a = 4
   var b! = a  // expected-error {{type annotation missing in pattern}}
-  // expected-error @-1 {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
-  // expected-error @-2 {{expected expression}}
+  // expected-cparser-error @-1 {{consecutive statements on a line must be separated by ';'}} {{8-8=;}}
+  // expected-cparser-error @-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code '! = a' in function}}
 
 }
 
@@ -193,7 +193,7 @@ prefix operator ++
 prefix postfix func ++(x: Int) {} // expected-error {{modifier 'postfix' contradicts previous modifier 'prefix'}} {{8-16=}}
 postfix prefix func ++(x: Float) {} // expected-error {{modifier 'prefix' contradicts previous modifier 'postfix'}} {{9-16=}}
 postfix prefix infix func ++(x: Double) {} // expected-error {{modifier 'prefix' contradicts previous modifier 'postfix'}} {{9-16=}} expected-error {{modifier 'infix' contradicts previous modifier 'postfix'}} {{16-22=}}
-infix prefix func +-+(x: Double, y: Double) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-error{{modifier 'prefix' contradicts previous modifier 'infix'}} {{7-14=}}
+infix prefix func +-+(x: Double, y: Double) {} // expected-error {{'infix' modifier is not required or allowed on func declarations}} {{1-7=}} expected-cparser-error{{modifier 'prefix' contradicts previous modifier 'infix'}} {{7-14=}} expected-astgen-error {{'prefix' requires a function with one argument}}
 
 // Don't allow one to define a postfix '!'; it's built into the
 // language. Also illegal to have any postfix operator starting with '!'.
@@ -256,7 +256,7 @@ protocol P0 {
 }
 
 protocol P1 {
-  func %%%(lhs: Self, rhs: Self) -> Self // expected-error{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }}
+  func %%%(lhs: Self, rhs: Self) -> Self // expected-cparser-error{{operator '%%%' declared in protocol must be 'static'}}{{3-3=static }} expected-astgen-error {{operator '%%%' declared in type 'P1' must be 'static'}}
 }
 
 struct S0 {
@@ -422,7 +422,7 @@ func testPrefixOperatorOnTuple() {
   let foo = (1, 2)
   _ = ∫foo
   _ = (∫)foo
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-warning@-2 {{expression of type '(Int, Int)' is unused}}
   (∫)(foo)
   _ = ∫(1, 2)
@@ -441,7 +441,7 @@ func testPostfixOperatorOnTuple<A, B>(a: A, b: B) {
 
   // FIX-ME: "...could not be inferred" is irrelevant
   _ = (§)foo
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{generic parameter 'T' could not be inferred}}
   // expected-error@-3 {{generic parameter 'U' could not be inferred}}
   // expected-warning@-4 {{expression of type '(A, (B, B), A)' is unused}}

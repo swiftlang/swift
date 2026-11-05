@@ -166,6 +166,13 @@ struct ASTGenVisitor {
       return self.generate(decl: node).map { .decl($0) }
 
     case .expr(let node):
+      // A top-level statement in a script cannot begin with a closure: that is
+      // ambiguous with a trailing closure.
+      if declContext.parentSourceFile.isScriptMode,
+        let first = node.firstToken(viewMode: .sourceAccurate), first.rawTokenKind == .leftBrace
+      {
+        self.diagnose(.statement_begins_with_closure, at: first)
+      }
       return maybeTopLevelCodeDecl {
         if let node = node.as(MacroExpansionExprSyntax.self) {
           switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {

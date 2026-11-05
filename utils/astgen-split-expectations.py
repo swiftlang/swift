@@ -404,12 +404,12 @@ def rewrite(path, lines, failures, report):
     return new_lines, changed
 
 
-def check_runnable(path):
+def check_runnable(path, allow_run_prefixes=False):
     with open(path, **FILE_MODE) as f:
         text = f.read()
     run_lines = [l for l in text.splitlines() if "RUN:" in l]
     reasons = []
-    if any("-verify-additional-prefix" in l for l in run_lines):
+    if not allow_run_prefixes and any("-verify-additional-prefix" in l for l in run_lines):
         reasons.append("a RUN line has its own -verify-additional-prefix")
     if any("ParserASTGen" in l for l in run_lines):
         reasons.append("a RUN line selects the parser itself")
@@ -421,7 +421,7 @@ def check_runnable(path):
 def process(path, args, build_dir, lit):
     rel = os.path.relpath(path, TEST_DIR)
     print("== %s" % rel)
-    reasons = check_runnable(path)
+    reasons = check_runnable(path, args.allow_run_prefixes)
     if reasons:
         print("   skipped: " + "; ".join(reasons))
         return False
@@ -510,6 +510,10 @@ def main():
                         help="with --dry-run, print the report but not the diff")
     parser.add_argument("--max-iterations", type=int, default=4)
     parser.add_argument("--force", action="store_true")
+    parser.add_argument("--allow-run-prefixes", action="store_true",
+                        help="also handle tests whose RUN lines add their own "
+                        "-verify-additional-prefix; new expectations apply to every "
+                        "RUN line, so they may need adjusting by hand")
     parser.add_argument("--keep-partial", action="store_true",
                         help="keep the rewritten test even if it still fails")
     args = parser.parse_args()
