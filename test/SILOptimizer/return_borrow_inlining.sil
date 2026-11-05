@@ -177,3 +177,46 @@ bb0(%0 : $*Container):
   return %3 : $Klass
 }
 
+
+public struct OptContainer {
+  var _k: Optional<Klass>
+}
+
+sil [ossa] @optional_borrow_accessor : $@convention(method) (@in_guaranteed OptContainer) -> @guaranteed Optional<Klass> {
+bb0(%0 : $*OptContainer):
+  %1 = struct_element_addr %0 : $*OptContainer, #OptContainer._k
+  %2 = load_borrow %1 : $*Optional<Klass>
+  return_borrow %2 : $Optional<Klass> from_scopes (%2)
+}
+
+// The borrow must also be ended on the edge into the payload-less case of a
+// switch_enum that forwards the inlined result.
+// CHECK-LABEL: sil [ossa] @test_switch_enum_none_edge :
+// CHECK:   [[BORROW:%.*]] = load_borrow
+// CHECK:   switch_enum [[BORROW]], case #Optional.some!enumelt: [[SOME:bb[0-9]+]], case #Optional.none!enumelt: [[NONE:bb[0-9]+]]
+// CHECK: [[SOME]](
+// CHECK:   end_borrow [[BORROW]]
+// CHECK: [[NONE]]:
+// CHECK-NEXT: end_borrow [[BORROW]]
+// CHECK: } // end sil function 'test_switch_enum_none_edge'
+sil [ossa] @test_switch_enum_none_edge : $@convention(thin) (@in_guaranteed OptContainer) -> Int {
+bb0(%0 : $*OptContainer):
+  %1 = function_ref @optional_borrow_accessor : $@convention(method) (@in_guaranteed OptContainer) -> @guaranteed Optional<Klass>
+  %2 = apply %1(%0) : $@convention(method) (@in_guaranteed OptContainer) -> @guaranteed Optional<Klass>
+  switch_enum %2 : $Optional<Klass>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%4 : @guaranteed $Klass):
+  %5 = ref_element_addr %4 : $Klass, #Klass.id
+  %6 = begin_access [read] [static] %5 : $*Int
+  %7 = load [trivial] %6 : $*Int
+  end_access %6 : $*Int
+  br bb3(%7 : $Int)
+
+bb2:
+  %9 = integer_literal $Builtin.Int64, 0
+  %10 = struct $Int (%9 : $Builtin.Int64)
+  br bb3(%10 : $Int)
+
+bb3(%12 : $Int):
+  return %12 : $Int
+}

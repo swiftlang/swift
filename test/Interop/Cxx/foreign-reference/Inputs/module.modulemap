@@ -79,6 +79,11 @@ module FunctionsAndMethodsReturningFRT {
   requires cplusplus
 }
 
+module BorrowAccessorOptionalClosure {
+  header "borrow-accessor-optional-closure.h"
+  requires cplusplus
+}
+
 module PassAsParameter {
   header "pass-as-parameter.h"
   requires cplusplus
