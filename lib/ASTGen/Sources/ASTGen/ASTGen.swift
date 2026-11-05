@@ -37,6 +37,10 @@ struct ASTGenVisitor {
 
   @Boxed private(set) var declContext: BridgedDeclContext
 
+  /// Whether a variable declaration should skip its `TopLevelCodeDecl` wrapper;
+  /// see `withTopLevelCodeSuppressed(_:)`.
+  @Boxed private(set) var suppressTopLevelCode: Bool = false
+
   /// The exposure kinds of the `@_expose` attributes seen so far in the
   /// attribute list being generated, to diagnose duplicates.
   @Boxed var seenExposureKinds: [UInt8] = []
@@ -511,6 +515,17 @@ extension ASTGenVisitor {
     self.declContext = declContext
     defer {
       self.declContext = oldDeclContext
+    }
+    return body()
+  }
+
+  /// Run `body` with top-level-code wrapping of variable declarations
+  /// suppressed, e.g., for declarations in a generated buffer.
+  func withTopLevelCodeSuppressed<T>(_ body: () -> T) -> T {
+    let old = self.suppressTopLevelCode
+    self.suppressTopLevelCode = true
+    defer {
+      self.suppressTopLevelCode = old
     }
     return body()
   }

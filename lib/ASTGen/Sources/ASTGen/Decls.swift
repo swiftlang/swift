@@ -1121,7 +1121,9 @@ extension ASTGenVisitor {
       || attrs.attributes.hasAttribute(.Extern)
 
     let topLevelDecl: BridgedTopLevelCodeDecl?
-    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst, !isABIOnly {
+    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst, !isABIOnly,
+      !self.suppressTopLevelCode
+    {
       topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
     } else {
       topLevelDecl = nil
