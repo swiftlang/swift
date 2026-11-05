@@ -35,6 +35,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
     SWIFT_COMPILE_FLAGS
       -parse-stdlib
+      -Xfrontend -enable-sil-opaque-values
     INSTALL_IN_COMPONENT stdlib
   )
 endif()

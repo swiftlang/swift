@@ -68,6 +68,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND TARGET embedded-libraries)
       ${SWIFT_CXX_SOURCES}
 
       SWIFT_COMPILE_FLAGS ${SWIFT_CXX_FLAGS}
+      -Xfrontend -enable-sil-opaque-values
 
       DEPENDS embedded-stdlib
       INSTALL_IN_COMPONENT stdlib
