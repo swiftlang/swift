@@ -229,6 +229,12 @@ extension ASTGenVisitor {
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
+    // SwiftParser parses `protocol P<> {}` as an empty list and leaves it to us.
+    if let clause = node.primaryAssociatedTypeClause, clause.primaryAssociatedTypes.isEmpty,
+      clause.rightAngle.presence == .present
+    {
+      self.diagnose(.expected_primary_associated_type_name, at: clause.rightAngle)
+    }
     let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
       self.generateLocatedIdentifier($0.name)
     }
@@ -917,6 +923,18 @@ extension ASTGenVisitor {
           rBraceLoc: rightBrace
         )
       }
+      // `var x: Int {}` in a protocol is an empty accessor list: there is no
+      // implicit getter to make of it, and the type checker asks for an explicit
+      // '{ get }'.
+      if inProtocol, codeBlock.isEmpty, !accessorBlock.hasError,
+        !(accessorBlock.parent?.is(SubscriptDeclSyntax.self) ?? false)
+      {
+        return BridgedAccessorRecord(
+          lBraceLoc: leftBrace,
+          accessors: .init(),
+          rBraceLoc: rightBrace
+        )
+      }
       // `subscript(i: Int) -> Int {}` in a protocol: an empty body is an empty
       // accessor list, and a subscript requirement needs a getter. (Elsewhere it
       // is an empty getter body.)
@@ -1171,6 +1189,30 @@ extension ASTGenVisitor {
         at: accessorBlock.leftBrace,
         fixIts: [.init(replace: self.generateCharSourceRange(node.bindingSpecifier), with: "var")]
       )
+    }
+
+    // Accessors need a single variable. (A pattern with no single variable is
+    // diagnosed with its entry; a parenthesized one has a single variable but
+    // is not a simple pattern to the C++ parser.)
+    var hasAccessors = false
+    for binding in node.bindings where binding.accessorBlock != nil {
+      hasAccessors = true
+      if var located = binding.pattern.as(TuplePatternSyntax.self).map({ Syntax($0) }) {
+        var isParenthesized = false
+        while let tuple = located.as(TuplePatternSyntax.self), tuple.elements.count == 1,
+          let only = tuple.elements.first, only.label == nil
+        {
+          isParenthesized = true
+          located = Syntax(only.pattern)
+        }
+        // The C++ parser locates a parenthesized pattern at its contents.
+        if isParenthesized {
+          self.diagnose(.getset_nontrivial_pattern, at: located)
+        }
+      }
+    }
+    if hasAccessors, node.bindings.count > 1 {
+      self.diagnose(.disallowed_var_multiple_getset, at: node.bindingSpecifier)
     }
 
     let decl = BridgedPatternBindingDecl.createParsed(
@@ -1829,6 +1871,12 @@ extension BridgedImportKind {
 
 extension ASTGenVisitor {
   func generate(importDecl node: ImportDeclSyntax) -> BridgedImportDecl? {
+    // An import is only valid at file scope; the C++ parser builds nothing for
+    // one that is not.
+    guard self.declContext.isModuleScopeContext else {
+      self.diagnose(.decl_inner_scope, at: node.importKeyword)
+      return nil
+    }
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let importKind: BridgedImportKind
     if let specifier = node.importKindSpecifier {

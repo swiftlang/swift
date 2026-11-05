@@ -4,7 +4,7 @@ import Foundation
 
 // REQUIRES: objc_interop
 
-@objc class A : NSObject {
+@objc class A : NSObject { // expected-astgen-note {{did you mean 'A'?}}
   @objc var propB: B = B()
   @objc var propString: String = "" // expected-note {{did you mean 'propString'}}
   @objc var propArray: [String] = []
@@ -23,13 +23,13 @@ import Foundation
   @objc var `repeat`: String?
 }
 
-@objc class B : NSObject  {
+@objc class B : NSObject  { // expected-astgen-note {{did you mean 'B'?}}
   @objc var propA: A?
 
   @objc var ambiguous: String? // expected-note{{'ambiguous' declared here}}
 }
 
-class C {
+class C { // expected-astgen-note {{did you mean 'C'?}}
   var nonObjC: String? // expected-note{{add '@objc' to expose this property to Objective-C}}{{3-3=@objc }}
 }
 
@@ -132,11 +132,11 @@ func testSemanticErrors() {
 }
 
 func testParseErrors() {
-  let _: String = #keyPath; // expected-error{{expected '(' following '#keyPath'}}
-  let _: String = #keyPath(123; // expected-error{{expected property or type name within '#keyPath(...)'}}
-  let _: String = #keyPath(a.123; // expected-error{{expected property or type name within '#keyPath(...)'}}
+  let _: String = #keyPath; // expected-cparser-error{{expected '(' following '#keyPath'}} expected-astgen-error {{expected property or type name within '#keyPath(...)'}}
+  let _: String = #keyPath(123; // expected-error{{expected property or type name within '#keyPath(...)'}} expected-astgen-note {{to match this opening '('}} expected-astgen-error {{expected ')' to end macro expansion}}
+  let _: String = #keyPath(a.123; // expected-cparser-error{{expected property or type name within '#keyPath(...)'}} expected-astgen-error {{expected ')' to end macro expansion}} expected-astgen-note {{to match this opening '('}} expected-astgen-error {{cannot find 'a' in scope}}
   let _: String = #keyPath(A(b:c:d:).propSet); // expected-error{{an Objective-C key path cannot reference a declaration with a compound name}}
-  let _: String = #keyPath(A.propString; // expected-error{{expected ')' to complete '#keyPath' expression}}
+  let _: String = #keyPath(A.propString; // expected-cparser-error{{expected ')' to complete '#keyPath' expression}} expected-astgen-error {{expected ')' to end macro expansion}}
     // expected-note@-1{{to match this opening '('}}
   let _: String = #keyPath(A.propB(x:).propA)
   // expected-error@-1:30 {{an Objective-C key path cannot reference a declaration with a compound name}}
@@ -145,25 +145,25 @@ func testParseErrors() {
   // FIXME: Recovery should skip to the matching ')' instead of applying the
   // rest of the path to the String and leaving a stray ')'.
   let _ = #keyPath(A.propB?.propA)
-  // expected-error@-1:27 {{expected ')' to complete '#keyPath' expression}}
-  // expected-note@-2:19 {{to match this opening '('}}
-  // expected-error@-3:27 {{cannot use optional chaining on non-optional value of type 'String'}}
-  // expected-error@-4:29 {{value of type 'String' has no member 'propA'}}
-  // expected-error@-5:34 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-6:34 {{expected expression}}
+  // expected-cparser-error@-1:27 {{expected ')' to complete '#keyPath' expression}}
+  // expected-cparser-note@-2:19 {{to match this opening '('}}
+  // expected-cparser-error@-3:27 {{cannot use optional chaining on non-optional value of type 'String'}}
+  // expected-cparser-error@-4:29 {{value of type 'String' has no member 'propA'}}
+  // expected-cparser-error@-5:34 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-6:34 {{expected expression}} expected-astgen-error@-6 {{expected property or type name within '#keyPath(...)'}}
   let _ = #keyPath(A.propB!.propA)
-  // expected-error@-1:27 {{expected ')' to complete '#keyPath' expression}}
-  // expected-note@-2:19 {{to match this opening '('}}
-  // expected-error@-3:27 {{cannot force unwrap value of non-optional type 'String'}}
-  // expected-error@-4:29 {{value of type 'String' has no member 'propA'}}
-  // expected-error@-5:34 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-6:34 {{expected expression}}
+  // expected-cparser-error@-1:27 {{expected ')' to complete '#keyPath' expression}}
+  // expected-cparser-note@-2:19 {{to match this opening '('}}
+  // expected-cparser-error@-3:27 {{cannot force unwrap value of non-optional type 'String'}}
+  // expected-cparser-error@-4:29 {{value of type 'String' has no member 'propA'}}
+  // expected-cparser-error@-5:34 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-6:34 {{expected expression}} expected-astgen-error@-6 {{expected property or type name within '#keyPath(...)'}}
   let _ = #keyPath(A.propArray[0].propA)
-  // expected-error@-1:31 {{expected ')' to complete '#keyPath' expression}}
-  // expected-note@-2:19 {{to match this opening '('}}
-  // expected-error@-3:35 {{value of type 'Character' has no member 'propA'}}
-  // expected-error@-4:40 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-5:40 {{expected expression}}
+  // expected-cparser-error@-1:31 {{expected ')' to complete '#keyPath' expression}}
+  // expected-cparser-note@-2:19 {{to match this opening '('}}
+  // expected-cparser-error@-3:35 {{value of type 'Character' has no member 'propA'}}
+  // expected-cparser-error@-4:40 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-5:40 {{expected expression}} expected-astgen-error@-5 {{expected property or type name within '#keyPath(...)'}}
 }
 
 func testTypoCorrection() {

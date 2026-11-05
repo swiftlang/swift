@@ -122,12 +122,12 @@ func testConversion() {
 }
 
 // Test the parser's splitting of >= into > and =.
-var x : protocol<P5>= 17 // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{9-22=P5=}} expected-error {{'=' must have consistent whitespace on both sides}}
-var y : protocol<P5, P7>= 17 // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{9-26=P5 & P7=}} expected-error {{'=' must have consistent whitespace on both sides}}
-var z : protocol<P5, P7>?=17 // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{9-27=(P5 & P7)?=}}
+var x : protocol<P5>= 17 // expected-cparser-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{9-22=P5=}} expected-astgen-error {{'protocol<...>' composition syntax has been removed and is not needed here}}{{9-21=P5}} expected-error {{'=' must have consistent whitespace on both sides}}
+var y : protocol<P5, P7>= 17 // expected-cparser-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{9-26=P5 & P7=}} expected-astgen-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}}{{9-25=P5 & P7}} expected-error {{'=' must have consistent whitespace on both sides}}
+var z : protocol<P5, P7>?=17 // expected-cparser-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{9-27=(P5 & P7)?=}} expected-astgen-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}}{{9-25=(P5 & P7)}}
 
 typealias A1 = protocol<> // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}} {{16-26=Any}}
-typealias A2 = protocol<>? // expected-error {{'protocol<>' syntax has been removed; use 'Any' instead}} {{16-27=Any?}}
+typealias A2 = protocol<>? // expected-cparser-error {{'protocol<>' syntax has been removed; use 'Any' instead}} {{16-27=Any?}} expected-astgen-error {{'protocol<>' syntax has been removed; use 'Any' instead}}{{16-26=Any}}
 typealias B1 = protocol<P1,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{16-31=P1 & P2}}
 typealias B2 = protocol<P1, P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{16-32=P1 & P2}}
 typealias B3 = protocol<P1 ,P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{16-32=P1 & P2}}
@@ -138,66 +138,66 @@ typealias D = protocol<P1> // expected-error {{'protocol<...>' composition synta
 typealias E = protocol<Any> // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=Any}}
 typealias F = protocol<Any, Any> // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-33=Any & Any}}
 typealias G = protocol<P1>.Type // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
-typealias H = protocol<P1>! // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=P1!}}
+typealias H = protocol<P1>! // expected-cparser-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=P1!}} expected-astgen-error {{'protocol<...>' composition syntax has been removed and is not needed here}}{{15-27=P1}}
 // expected-warning@-1 {{using '!' here is deprecated}}
 // expected-note@-2:27 {{use '?' instead}}{{27-28=?}}
 typealias J = protocol<P1, P2>.Protocol // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-31=(P1 & P2)}}
-typealias K = protocol<P1, P2>? // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-32=(P1 & P2)?}}
+typealias K = protocol<P1, P2>? // expected-cparser-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-32=(P1 & P2)?}} expected-astgen-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}}{{15-31=(P1 & P2)}}
 typealias L = protocol<(P1), P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-33=(P1) & P2}}
 
 // Deprecated protocol composition syntax in expression context.
-do {
+do { // expected-astgen-note {{to match this opening '{'}}
   func typesAreEqual<T>(_: T.Type, _: T.Type) {}
 
-  typesAreEqual(Optional<P1 & P2>.self,
-                Optional<protocol<P1, P2>>.self)
-  // expected-error@-1 {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{26-43=P1 & P2>}}
+  typesAreEqual(Optional<P1 & P2>.self, // expected-astgen-note {{to match this opening '('}}
+                Optional<protocol<P1, P2>>.self) // expected-astgen-error {{expected ')' to end function call}} expected-astgen-error {{expected identifier in protocol}} expected-astgen-error {{expected '{' in protocol}} expected-astgen-error {{unexpected code '>.self)' in protocol}}
+  // expected-cparser-error@-1 {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{26-43=P1 & P2>}} expected-astgen-error@-1 {{expected expression after operator}}
 
   // Test that we parse non-identifier components.
-  typesAreEqual(Optional<P1 & P2>.self,
-                Optional<protocol<P1, (P2)>>.self)
-  // expected-error@-1 {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{26-45=P1 & (P2)>}}
+  typesAreEqual(Optional<P1 & P2>.self, // expected-astgen-error {{expected 'func' in function}} expected-astgen-note {{to match this opening '('}} expected-astgen-error {{expected identifier and ':' in parameter}}
+                Optional<protocol<P1, (P2)>>.self) // expected-astgen-error {{expected ')' to end parameter clause}} expected-astgen-error {{unexpected code '<' in protocol}} expected-astgen-error {{expected identifier in protocol}} expected-astgen-note {{to match this opening '<'}} expected-astgen-error {{expected name in primary associated type clause}} expected-astgen-error {{expected '>' to end primary associated type clause}} expected-astgen-error {{expected ':' to begin inheritance clause}} expected-astgen-error {{expected '{' in protocol}} expected-astgen-error {{unexpected code '>>.self)' in protocol}}
+  // expected-cparser-error@-1 {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{26-45=P1 & (P2)>}} expected-astgen-error@-1 {{expected ':' and type in parameter}}
 }
 
-typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol, non-class type '(any P1).Type' cannot be used within a protocol-constrained type}}
-typealias T02 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'any P1.Type' cannot be used within a protocol-constrained type}}
-typealias T03 = P1? & P2 // expected-error {{non-protocol, non-class type '(any P1)?' cannot be used within a protocol-constrained type}}
+typealias T01 = P1.Protocol & P2 // expected-cparser-error {{non-protocol, non-class type '(any P1).Type' cannot be used within a protocol-constrained type}}
+typealias T02 = P1.Type & P2 // expected-cparser-error {{non-protocol, non-class type 'any P1.Type' cannot be used within a protocol-constrained type}}
+typealias T03 = P1? & P2 // expected-cparser-error {{non-protocol, non-class type '(any P1)?' cannot be used within a protocol-constrained type}}
 // FIXME: '!' diagnostic is superfluous here.
-typealias T04 = P1 & P2! // expected-error {{non-protocol, non-class type '(any P2)?' cannot be used within a protocol-constrained type}}
-// expected-warning@-1 {{using '!' here is deprecated}}
-// expected-note@-2:24 {{use '?' instead}}
-typealias T05 = P1 & P2 -> P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}}
-typealias T06 = P1 -> P2 & P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}}
+typealias T04 = P1 & P2! // expected-cparser-error {{non-protocol, non-class type '(any P2)?' cannot be used within a protocol-constrained type}}
+// expected-cparser-warning@-1 {{using '!' here is deprecated}}
+// expected-cparser-note@-2:24 {{use '?' instead}}
+typealias T05 = P1 & P2 -> P3 // expected-cparser-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
+typealias T06 = P1 -> P2 & P3 // expected-cparser-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
 typealias T07 = P1 & protocol<P2, P3> // expected-error {{protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{22-38=P2 & P3}}
 func fT07(x: T07) -> P1 & P2 & P3 { return x } // OK, 'P1 & protocol<P2, P3>' is parsed as 'P1 & P2 & P3'.
-let _: P1 & P2 & P3 -> P1 & P2 & P3 = fT07 // expected-error {{single argument function types require parentheses}} {{8-8=(}} {{20-20=)}}
+let _: P1 & P2 & P3 -> P1 & P2 & P3 = fT07 // expected-cparser-error {{single argument function types require parentheses}} {{8-8=(}} {{20-20=)}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
 
 struct S01: P5 & P6 {}
-struct S02: P5? & P6 {} // expected-error {{non-protocol, non-class type '(any P5)?' cannot be used within a protocol-constrained type}}
-struct S03: Optional<P5> & P6 {} // expected-error {{non-protocol, non-class type 'Optional<any P5>' cannot be used within a protocol-constrained type}}
+struct S02: P5? & P6 {} // expected-cparser-error {{non-protocol, non-class type '(any P5)?' cannot be used within a protocol-constrained type}}
+struct S03: Optional<P5> & P6 {} // expected-cparser-error {{non-protocol, non-class type 'Optional<any P5>' cannot be used within a protocol-constrained type}}
 struct S04<T : P5 & (P6)> {}
-struct S05<T> where T : P5? & P6 {} // expected-error {{non-protocol, non-class type '(any P5)?' cannot be used within a protocol-constrained type}}
+struct S05<T> where T : P5? & P6 {} // expected-cparser-error {{non-protocol, non-class type '(any P5)?' cannot be used within a protocol-constrained type}}
 
 // https://github.com/apple/swift/issues/45712
 // Protocol Composition Often Migrated Incorrectly
-struct S_45712<T: protocol<P1, P3>> {} // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{19-36=P1 & P3>}}
-func f1_45712<U where U: protocol<P1, P3>>(_: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{26-43=P1 & P3>}} // expected-error {{'where' clause}}
-func f2_45712<U : protocol<P1>>(_: U)  {} // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{19-32=P1>}}
+struct S_45712<T: protocol<P1, P3>> {} // expected-cparser-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{19-36=P1 & P3>}} expected-astgen-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}}{{19-35=P1 & P3}}
+func f1_45712<U where U: protocol<P1, P3>>(_: U)  {} // expected-cparser-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{26-43=P1 & P3>}} expected-astgen-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}}{{26-42=P1 & P3}} // expected-cparser-error {{'where' clause}}
+func f2_45712<U : protocol<P1>>(_: U)  {} // expected-cparser-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{19-32=P1>}} expected-astgen-error {{'protocol<...>' composition syntax has been removed and is not needed here}}{{19-31=P1}}
 
 // Make sure we correctly form compositions in expression context
 func takesP1AndP2(_: [AnyObject & P1 & P2]) {}
 
-takesP1AndP2([AnyObject & P1 & P2]())
-takesP1AndP2([Swift.AnyObject & P1 & P2]())
-takesP1AndP2([AnyObject & protocol_composition.P1 & P2]())
-takesP1AndP2([AnyObject & P1 & protocol_composition.P2]())
-takesP1AndP2([DoesNotExist & P1 & P2]())
-// expected-error@-1 {{cannot find 'DoesNotExist' in scope}}
-// expected-error@-2 {{cannot call value of non-function type '[Element]'}}
-takesP1AndP2([Swift.DoesNotExist & P1 & P2]())
-// expected-error@-1 {{module 'Swift' has no member named 'DoesNotExist'}}
-// expected-error@-2 {{cannot call value of non-function type '[Element]'}}
+takesP1AndP2([AnyObject & P1 & P2]()) // expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected identifier and ':' in parameter}} expected-astgen-error {{unexpected code '()' in parameter clause}}
+takesP1AndP2([Swift.AnyObject & P1 & P2]()) // expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected identifier and ':' in parameter}} expected-astgen-error {{unexpected code '()' in parameter clause}}
+takesP1AndP2([AnyObject & protocol_composition.P1 & P2]()) // expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected identifier and ':' in parameter}} expected-astgen-error {{unexpected code '()' in parameter clause}}
+takesP1AndP2([AnyObject & P1 & protocol_composition.P2]()) // expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected identifier and ':' in parameter}} expected-astgen-error {{unexpected code '()' in parameter clause}}
+takesP1AndP2([DoesNotExist & P1 & P2]()) // expected-astgen-error {{unexpected code '()' in parameter clause}}
+// expected-cparser-error@-1 {{cannot find 'DoesNotExist' in scope}} expected-astgen-error@-1 {{expected identifier and ':' in parameter}}
+// expected-cparser-error@-2 {{cannot call value of non-function type '[Element]'}} expected-astgen-error@-2 {{expected 'func' in function}}
+takesP1AndP2([Swift.DoesNotExist & P1 & P2]()) // expected-astgen-error {{unexpected code '()' in parameter clause}}
+// expected-cparser-error@-1 {{module 'Swift' has no member named 'DoesNotExist'}} expected-astgen-error@-1 {{expected identifier and ':' in parameter}}
+// expected-cparser-error@-2 {{cannot call value of non-function type '[Element]'}} expected-astgen-error@-2 {{expected 'func' in function}}
 
-typealias T08 = P1 & inout P2 // expected-error {{'inout' may only be used on parameters}}
-typealias T09 = P1 & __shared P2 // expected-error {{'__shared' may only be used on parameters}}
-typealias T10 = P1 & __owned P2 // expected-error {{'__owned' may only be used on parameters}}
+typealias T08 = P1 & inout P2 // expected-cparser-error {{'inout' may only be used on parameters}} expected-astgen-error {{expected type in type composition}}
+typealias T09 = P1 & __shared P2 // expected-cparser-error {{'__shared' may only be used on parameters}} expected-astgen-error {{unexpected code 'P2' in protocol}}
+typealias T10 = P1 & __owned P2 // expected-cparser-error {{'__owned' may only be used on parameters}} expected-astgen-error {{unexpected code 'P2' in protocol}} expected-astgen-error {{expected '}' to end protocol}} expected-astgen-error {{expected '}' to end 'do' statement}}

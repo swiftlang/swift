@@ -39,18 +39,18 @@ protocol Q : A { }
 extension C : A { } // expected-error{{inheritance from non-protocol type 'A'}}
 
 // Keywords in inheritance clauses
-struct S2 : struct { } // expected-error{{expected type}}
+struct S2 : struct { } // expected-error{{expected type}} expected-astgen-error {{expected '{' in struct}} expected-astgen-error {{expected identifier in struct}}
 
 // Protocol composition in inheritance clauses
-struct S3 : P, P & Q { } // expected-error {{redundant conformance of 'S3' to protocol 'P'}}
-                         // expected-error @-1 {{non-class type 'S3' cannot conform to class protocol 'Q'}}
-                         // expected-note @-2 {{'S3' declares conformance to protocol 'P' here}}
+struct S3 : P, P & Q { } // expected-cparser-error {{redundant conformance of 'S3' to protocol 'P'}} expected-astgen-error {{redundant conformance of 'S2.S3' to protocol 'P'}}
+                         // expected-cparser-error @-1 {{non-class type 'S3' cannot conform to class protocol 'Q'}} expected-astgen-error@-1 {{non-class type 'S2.S3' cannot conform to class protocol 'Q'}}
+                         // expected-cparser-note @-2 {{'S3' declares conformance to protocol 'P' here}} expected-astgen-note@-2 {{'S2.S3' declares conformance to protocol 'P' here}}
 struct S4 : P, P { }
-// expected-error@-1{{redundant conformance of 'S4' to protocol 'P'}}
-// expected-note@-2{{'S4' declares conformance to protocol 'P' here}}
-struct S6 : P & { }      // expected-error {{expected identifier for type name}}
+// expected-cparser-error@-1{{redundant conformance of 'S4' to protocol 'P'}} expected-astgen-error@-1 {{redundant conformance of 'S2.S4' to protocol 'P'}}
+// expected-cparser-note@-2{{'S4' declares conformance to protocol 'P' here}} expected-astgen-note@-2 {{'S2.S4' declares conformance to protocol 'P' here}}
+struct S6 : P & { }      // expected-cparser-error {{expected identifier for type name}} expected-astgen-error {{expected type in type composition}}
 struct S7 : protocol<P, Q> { }  // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}}
-                                // expected-error @-1 {{non-class type 'S7' cannot conform to class protocol 'Q'}}
+                                // expected-cparser-error @-1 {{non-class type 'S7' cannot conform to class protocol 'Q'}} expected-astgen-error@-1 {{non-class type 'S2.S7' cannot conform to class protocol 'Q'}}
 
 class GenericBase<T> {}
 
@@ -62,4 +62,4 @@ class InheritBody : T { // expected-error {{cannot find type 'T' in scope}}
 }
 class InheritBodyBad : fn { // expected-error {{cannot find type 'fn' in scope}}
   func fn() {}
-}
+} // expected-astgen-error {{expected '}' to end struct}}

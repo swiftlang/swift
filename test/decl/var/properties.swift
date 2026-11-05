@@ -268,7 +268,7 @@ class CT<T : TrivialInit> {
 
 var computed_prop_with_init_1: X {
   get {}
-} = X()  // expected-error {{expected expression}} expected-error {{consecutive statements on a line must be separated by ';'}} {{2-2=;}}
+} = X()  // expected-cparser-error {{expected expression}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} {{2-2=;}} expected-astgen-error {{unexpected code '= X()' in source file}}
 
 var x2 { // expected-error{{computed property must have an explicit type}} {{7-7=: <# Type #>}} expected-error{{type annotation missing in pattern}}
   get {
@@ -276,7 +276,7 @@ var x2 { // expected-error{{computed property must have an explicit type}} {{7-7
   }
 }
 
-var (x3): X { // expected-error{{getter/setter can only be defined for a single variable}}
+var (x3): X { // expected-cparser-error{{getter/setter can only be defined for a single variable}} expected-astgen-error {{getter/setter can only be defined for a single variable}}
   get {
     return _x
   }
@@ -310,31 +310,31 @@ var duplicateAccessors2: Int = 0 {
 
 var extraTokensInAccessorBlock1: X {
   get {}
-  a // expected-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}}
+  a // expected-cparser-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}} expected-astgen-error {{unexpected code 'a' in variable}}
 }
 var extraTokensInAccessorBlock2: X {
   get {}
-  weak // expected-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}}
+  weak // expected-cparser-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}} expected-astgen-error {{unexpected code in variable}}
   a
 }
 var extraTokensInAccessorBlock3: X {
   get {}
-  a = b // expected-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}}
+  a = b // expected-cparser-error {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}} expected-astgen-error {{unexpected code in variable}}
   set {}
   get {}
 }
 
 var extraTokensInAccessorBlock4: X {
-  get blah wibble // expected-error{{expected '{' to start getter definition}}
+  get blah wibble // expected-cparser-error{{expected '{' to start getter definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
 }
 var extraTokensInAccessorBlock5: X {
-  set blah wibble // expected-error{{expected '{' to start setter definition}}
+  set blah wibble // expected-cparser-error{{expected '{' to start setter definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
 }
 var extraTokensInAccessorBlock6: X { // expected-error{{non-member observing properties require an initializer}}
-  willSet blah wibble // expected-error{{expected '{' to start 'willSet' definition}}
+  willSet blah wibble // expected-cparser-error{{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
 }
 var extraTokensInAccessorBlock7: X { // expected-error{{non-member observing properties require an initializer}}
-  didSet blah wibble // expected-error{{expected '{' to start 'didSet' definition}}
+  didSet blah wibble // expected-cparser-error{{expected '{' to start 'didSet' definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
 }
 
 var extraTokensInAccessorBlock8: X {
@@ -344,26 +344,26 @@ var extraTokensInAccessorBlock8: X {
 }
 
 var extraTokensInAccessorBlock9: Int {
-  get // expected-error {{expected '{' to start getter definition}}
-    var a = b
+  get // expected-cparser-error {{expected '{' to start getter definition}}
+    var a = b // expected-astgen-error {{unexpected code 'var a = b' in variable}}
 }
 
 struct extraTokensInAccessorBlock10 {
   var x: Int {
-    get // expected-error {{expected '{' to start getter definition}}
-      var a = b
+    get // expected-cparser-error {{expected '{' to start getter definition}}
+      var a = b // expected-astgen-error {{unexpected code 'var a = b' in variable}}
   }
 
   init() {}
 }
 
 var x9: X {
-  get ( ) { // expected-error{{expected '{' to start getter definition}}
+  get ( ) { // expected-cparser-error{{expected '{' to start getter definition}} expected-astgen-error {{unexpected code '( )' in accessor}}
   }
 }
 
 var x10: X {
-  set ( : ) { // expected-error{{expected setter parameter name}}
+  set ( : ) { // expected-cparser-error{{expected setter parameter name}} expected-astgen-error {{expected name in accessor}} expected-astgen-error {{unexpected code ':' in accessor}}
   }
   get {}
 }
@@ -374,8 +374,8 @@ var x11 : X {
 }
 
 var x12: X {
-  set(newValue %) { // expected-error {{expected ')' after setter parameter name}} expected-note {{to match this opening '('}}
-  // expected-error@-1 {{expected '{' to start setter definition}}
+  set(newValue %) { // expected-cparser-error {{expected ')' after setter parameter name}} expected-cparser-note {{to match this opening '('}}
+  // expected-cparser-error@-1 {{expected '{' to start setter definition}} expected-astgen-error@-1 {{unexpected code '%' in accessor}}
   }
 }
 
@@ -408,11 +408,11 @@ var x21: X {
   }
 }
 
-var x23: Int, x24: Int { // expected-error{{'var' declarations with multiple variables cannot have explicit getters/setters}}
+var x23: Int, x24: Int { // expected-cparser-error{{'var' declarations with multiple variables cannot have explicit getters/setters}} expected-astgen-error {{'var' declarations with multiple variables cannot have explicit getters/setters}}
   return 42
 }
 
-var x25: Int { // expected-error{{'var' declarations with multiple variables cannot have explicit getters/setters}}
+var x25: Int { // expected-cparser-error{{'var' declarations with multiple variables cannot have explicit getters/setters}} expected-astgen-error {{'var' declarations with multiple variables cannot have explicit getters/setters}}
   return 42
 }, x26: Int // expected-warning{{variable 'x26' was never used; consider replacing with '_' or removing it}}
 
@@ -758,17 +758,17 @@ struct WillSetDidSetProperties {
   }
 
   var f: Int {
-    willSet(5) {} // expected-error {{expected willSet parameter name}}
-    didSet(^) {} // expected-error {{expected didSet parameter name}}
+    willSet(5) {} // expected-cparser-error {{expected willSet parameter name}} expected-astgen-error {{name can only start with a letter or underscore, not a number}}
+    didSet(^) {} // expected-cparser-error {{expected didSet parameter name}} expected-astgen-error {{expected name in accessor}} expected-astgen-error {{unexpected code '^' in accessor}}
   }
 
   var g: Int {
-    willSet(newValue 5) {} // expected-error {{expected ')' after willSet parameter name}} expected-note {{to match this opening '('}}
-    // expected-error@-1 {{expected '{' to start 'willSet' definition}}
+    willSet(newValue 5) {} // expected-cparser-error {{expected ')' after willSet parameter name}} expected-cparser-note {{to match this opening '('}}
+    // expected-cparser-error@-1 {{expected '{' to start 'willSet' definition}} expected-astgen-error@-1 {{unexpected code '5' in accessor}}
   }
   var h: Int {
-    didSet(oldValue ^) {} // expected-error {{expected ')' after didSet parameter name}} expected-note {{to match this opening '('}}
-    // expected-error@-1 {{expected '{' to start 'didSet' definition}}
+    didSet(oldValue ^) {} // expected-cparser-error {{expected ')' after didSet parameter name}} expected-cparser-note {{to match this opening '('}}
+    // expected-cparser-error@-1 {{expected '{' to start 'didSet' definition}} expected-astgen-error@-1 {{unexpected code '^' in accessor}}
   }
 
   // didSet/willSet with initializers.
@@ -833,13 +833,13 @@ struct WillSetDidSetProperties {
 struct WillSetDidSetDisambiguate1 {
   var willSet: Int
   var x: (() -> ()) -> Int = takeTrailingClosure {
-    willSet = 42 // expected-error {{expected '{' to start 'willSet' definition}}
+    willSet = 42 // expected-cparser-error {{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code '= 42' in variable}}
   }
 }
 struct WillSetDidSetDisambiguate1Attr {
   var willSet: Int
   var x: (() -> ()) -> Int = takeTrailingClosure {
-    willSet = 42 // expected-error {{expected '{' to start 'willSet' definition}}
+    willSet = 42 // expected-cparser-error {{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code '= 42' in variable}}
   }
 }
 
@@ -869,7 +869,7 @@ protocol ProtocolGetSet1 {
   var a: Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{13-13= { get <#set#> \}}}
 }
 protocol ProtocolGetSet2 {
-  var a: Int {} // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-16={ get <#set#> \}}}
+  var a: Int {} // expected-cparser-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-16={ get <#set#> \}}} expected-astgen-error {{property in protocol must have explicit { get } or { get set } specifier}}
 }
 protocol ProtocolGetSet3 {
   var a: Int { get }
@@ -898,7 +898,7 @@ protocol ProtocolWillSetDidSet4 {
   var a: Int { didSet willSet } // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-32={ get <#set#> \}}} expected-error 2 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
 }
 protocol ProtocolWillSetDidSet5 {
-  let a: Int { didSet willSet }  // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{3-6=var}} {{13-13= { get \}}} {{none}} expected-error 2 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-error {{'let' declarations cannot be computed properties}} {{3-6=var}}
+  let a: Int { didSet willSet }  // expected-error {{protocols cannot require properties to be immutable; declare read-only properties by using 'var' with a '{ get }' specifier}} {{3-6=var}} {{13-13= { get \}}} {{none}} expected-error 2 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-cparser-error {{'let' declarations cannot be computed properties}} {{3-6=var}} expected-astgen-error {{'let' declarations cannot be observing properties}}
 }
 
 var globalDidsetWillSet: Int {  // expected-error {{non-member observing properties require an initializer}}
