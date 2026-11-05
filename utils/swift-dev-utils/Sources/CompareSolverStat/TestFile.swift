@@ -46,6 +46,11 @@ extension TestFile {
     var files: [TestFile] = []
     for subpath in subpaths {
       let name = RelativePath(FilePath(subpath))
+      // As in lit, files in Inputs directories are helpers of tests, not
+      // tests themselves.
+      if name.components.contains(where: { $0.string == "Inputs" }) {
+        continue
+      }
       let path = directory.appending(name)
       if name.hasExtension(.swift), !path.isDirectory {
         files.append(TestFile(path: path, name: name))
@@ -131,10 +136,21 @@ extension TestFile {
     public var arguments: [Argument]
     /// The -solver-scope-threshold value of the line, if it has one.
     public var scopeThreshold: Int?
+    /// Whether the line asked for an -emit- mode, such as -emit-sil, which
+    /// -typecheck replaces.
+    public var replacesEmitMode: Bool
+    /// Whether the line compiles the test file. A line that does not builds
+    /// other files, such as a module that later lines import.
+    public var compilesTestFile: Bool
 
-    public init(arguments: [Argument], scopeThreshold: Int?) {
+    public init(
+      arguments: [Argument], scopeThreshold: Int?,
+      replacesEmitMode: Bool = false, compilesTestFile: Bool = true
+    ) {
       self.arguments = arguments
       self.scopeThreshold = scopeThreshold
+      self.replacesEmitMode = replacesEmitMode
+      self.compilesTestFile = compilesTestFile
     }
   }
 }
@@ -170,14 +186,16 @@ extension TestFile.RunLine {
 
 extension TestFile.RunLine {
   /// Translates the text of a RUN line. Everything after a pipe is ignored,
-  /// as are `not` and `2>&1`; %target-cpu becomes `targetCPU`.
+  /// as are `not`, `2>&1` and -emit- flags, for which -typecheck stands; %S
+  /// and %p become `testDirectory`, and %target-cpu becomes `targetCPU`.
   ///
   /// - Throws: `Unsupported` when the line runs something other than the
   ///   frontend, uses a lit substitution that has no meaning outside lit, or
   ///   cannot be split into words.
-  public init(parsing text: String, targetCPU: String = Self.hostCPU)
-    throws(Unsupported)
-  {
+  public init(
+    parsing text: String, testDirectory: AbsolutePath,
+    targetCPU: String = Self.hostCPU
+  ) throws(Unsupported) {
     // What follows a pipe, such as FileCheck, checks the output, which the
     // comparison has no use for.
     let command = String(text.prefix { $0 != "|" })
@@ -201,6 +219,8 @@ extension TestFile.RunLine {
     }
 
     var arguments: [Argument]
+    // The verify substitution ends in %s, so it always compiles the test.
+    var compilesTestFile = program == "%target-typecheck-verify-swift"
     switch program {
     case "%target-typecheck-verify-swift":
       // The flags of the substitution, apart from -verify.
@@ -215,12 +235,26 @@ extension TestFile.RunLine {
     }
 
     var scopeThreshold: Int?
+    var replacesEmitMode = false
+    var dropsNextWord = false
     for word in words.dropFirst() {
+      if dropsNextWord {
+        dropsNextWord = false
+        continue
+      }
+      if word.hasPrefix("-emit-") {
+        // Only type checking is measured, so an -emit- mode or output is
+        // dropped, along with the path an -emit-...-path flag takes.
+        replacesEmitMode = true
+        dropsNextWord = word.hasSuffix("-path")
+        continue
+      }
       if let threshold = Self.scopeThreshold(in: word) {
         scopeThreshold = threshold
         continue
       }
-      if word == "%s" {
+      if word == "%s" || word == "%/s" {
+        compilesTestFile = true
         // A plain %s is the input, which the run adds itself. After a flag
         // that takes a file it is that flag's value, so it stays.
         if case .text(let previous) = arguments.last,
@@ -233,8 +267,11 @@ extension TestFile.RunLine {
       if Self.droppedFlags.contains(word) {
         continue
       }
-      let translated = word.replacingOccurrences(
-        of: "%target-cpu", with: targetCPU)
+      // %S and %p, and their %/ forms, are the test's directory, as in a
+      // helper file next to the test: %S/Inputs/other.swift.
+      let translated = word.replacing(
+        #/%\/?[Sp](?![A-Za-z0-9_])/#, with: testDirectory.rawPath
+      ).replacingOccurrences(of: "%target-cpu", with: targetCPU)
       guard !translated.contains("%") else {
         throw .substitution(translated)
       }
@@ -243,7 +280,9 @@ extension TestFile.RunLine {
     if !arguments.contains(.text("-typecheck")) {
       arguments.insert(.text("-typecheck"), at: 0)
     }
-    self.init(arguments: arguments, scopeThreshold: scopeThreshold)
+    self.init(
+      arguments: arguments, scopeThreshold: scopeThreshold,
+      replacesEmitMode: replacesEmitMode, compilesTestFile: compilesTestFile)
   }
 
   /// Flags that only matter to lit's checking of the output.
@@ -428,7 +467,9 @@ extension TestFile.Plan {
   }
 
   /// Adds the runs of one file. A file without RUN lines gets one run with
-  /// -typecheck alone.
+  /// -typecheck alone. A line that does not compile the test file, and a line
+  /// whose emit mode was replaced and that then repeats an earlier line of
+  /// the file, are left out without a note.
   mutating func add(
     _ file: TestFile, runLineTexts texts: [String], targetCPU: String
   ) {
@@ -440,10 +481,28 @@ extension TestFile.Plan {
             arguments: [.text("-typecheck")], scopeThreshold: nil)))
       return
     }
+    var planned: [TestFile.RunLine] = []
     for (offset, text) in texts.enumerated() {
       let index = texts.count == 1 ? nil : offset + 1
       do throws(TestFile.RunLine.Unsupported) {
-        let line = try TestFile.RunLine(parsing: text, targetCPU: targetCPU)
+        let line = try TestFile.RunLine(
+          parsing: text, testDirectory: file.path.dropLast(),
+          targetCPU: targetCPU)
+        // A line that builds other files is a step towards a later line, not
+        // a test of the file.
+        if !line.compilesTestFile {
+          continue
+        }
+        // With its emit mode replaced, a line can repeat an earlier one, which
+        // would measure the same compile twice.
+        let repeatsEarlierLine = planned.contains {
+          $0.arguments == line.arguments
+            && $0.scopeThreshold == line.scopeThreshold
+        }
+        if line.replacesEmitMode && repeatsEarlierLine {
+          continue
+        }
+        planned.append(line)
         runs.append(TestFile.Run(file: file, index: index, line: line))
       } catch {
         skippedLines.append(

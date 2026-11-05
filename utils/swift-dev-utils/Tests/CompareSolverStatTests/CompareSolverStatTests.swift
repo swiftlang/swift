@@ -55,24 +55,27 @@ struct ConfigurationTests {
   }
 
   @Test
-  func scopeStatisticIsAlwaysIncluded() {
+  func givenStatisticsReplaceTheDefault() {
     var configuration = Configuration()
     configuration.statistics = [Statistic(name: "NumLeafScopes")]
     #expect(
-      configuration.effectiveStatistics == [
-        .constraintScopes, Statistic(name: "NumLeafScopes"),
-      ])
+      configuration.effectiveStatistics == [Statistic(name: "NumLeafScopes")])
   }
 
   @Test
-  func scopeStatisticIsNotRepeated() {
+  func largerIsBetterFlagsMatchWithOrWithoutTheGroup() {
     var configuration = Configuration()
     configuration.statistics = [
-      Statistic(name: "NumLeafScopes"), .constraintScopes,
+      Statistic(name: "Sema.NumLeafScopes"),
+      Statistic(name: "OverallNumTrailSteps"), .constraintScopes,
+    ]
+    configuration.largerIsBetter = [
+      Statistic(name: "NumLeafScopes"),
+      Statistic(name: "Constraint solver overall.OverallNumTrailSteps"),
     ]
     #expect(
-      configuration.effectiveStatistics == [
-        Statistic(name: "NumLeafScopes"), .constraintScopes,
+      configuration.effectiveStatistics.map(\.largerIsBetter) == [
+        true, false, false,
       ])
   }
 
@@ -217,6 +220,7 @@ struct RunLineTests {
   func verifySubstitution() throws {
     let line = try TestFile.RunLine(
       parsing: "%target-typecheck-verify-swift -solver-scope-threshold=1000",
+      testDirectory: "/tests",
       targetCPU: "arm64")
     #expect(
       line.arguments == [
@@ -231,6 +235,7 @@ struct RunLineTests {
     let line = try TestFile.RunLine(
       parsing:
         "%target-swift-frontend -typecheck -verify -verify-ignore-unrelated -primary-file %s",
+      testDirectory: "/tests",
       targetCPU: "arm64")
     #expect(
       line.arguments == [
@@ -245,6 +250,7 @@ struct RunLineTests {
     let line = try TestFile.RunLine(
       parsing:
         "not %target-swift-frontend -typecheck %s -solver-scope-threshold=100 -diagnostic-style llvm 2>&1 | %FileCheck %s",
+      testDirectory: "/tests",
       targetCPU: "arm64")
     #expect(
       line.arguments == [
@@ -259,6 +265,7 @@ struct RunLineTests {
     let line = try TestFile.RunLine(
       parsing:
         "%target-typecheck-verify-swift -target %target-cpu-apple-macosx12 -swift-version 5",
+      testDirectory: "/tests",
       targetCPU: "arm64")
     #expect(
       line.arguments == [
@@ -273,6 +280,7 @@ struct RunLineTests {
   func typecheckIsAddedWhenMissing() throws {
     let line = try TestFile.RunLine(
       parsing: "%target-swift-frontend %s -solver-scope-threshold=2000",
+      testDirectory: "/tests",
       targetCPU: "arm64")
     #expect(line.arguments == [.text("-typecheck")])
     #expect(line.scopeThreshold == 2000)
@@ -302,7 +310,9 @@ struct RunLineTests {
   @Test(arguments: unsupportedCases)
   func unsupported(_ unsupportedCase: UnsupportedCase) {
     #expect(throws: unsupportedCase.reason) {
-      try TestFile.RunLine(parsing: unsupportedCase.text, targetCPU: "arm64")
+      try TestFile.RunLine(
+        parsing: unsupportedCase.text, testDirectory: "/tests",
+        targetCPU: "arm64")
     }
   }
 
@@ -314,6 +324,7 @@ struct RunLineTests {
     ) {
       try TestFile.RunLine(
         parsing: #"%target-swift-frontend -module-name "Foo"#,
+        testDirectory: "/tests",
         targetCPU: "arm64")
     }
   }
@@ -585,15 +596,15 @@ struct ReportTests {
     - main: af474300fcd0
     - wip: an empty change on 588ffd59
     - percentages are relative to the baseline, main-off
-    - ▼ smaller  ▲ larger  ± mixed (compared with the baseline)
+    - ✓ better  ✗ worse  ± mixed (compared with the baseline)
 
     ## Runs
 
     ```text
-       run        threshold  main-off  main-on            wip-off            wip-on
-    ▼  a.swift    65         70 over   60 (-14.3%) under  60 (-14.3%) under  50 (-28.6%) under
-    ▼  x/b.swift  65         70 over   60 (-14.3%) under  60 (-14.3%) under  50 (-28.6%) under
-       total                 140       120 (-14.3%)       120 (-14.3%)       100 (-28.6%)
+       run        threshold  main-off  main-on              wip-off              wip-on
+    ✓  a.swift    65         70 over   60 (-14.3%) ✓ under  60 (-14.3%) ✓ under  50 (-28.6%) ✓ under
+    ✓  x/b.swift  65         70 over   60 (-14.3%) ✓ under  60 (-14.3%) ✓ under  50 (-28.6%) ✓ under
+       total                 140       120 (-14.3%)         120 (-14.3%)         100 (-28.6%)
     ```
 
     ## NumConstraintScopes: measured vs baseline main-off, 2 runs
@@ -612,8 +623,6 @@ struct ReportTests {
                        smaller  larger  same  fail  skip  |  over  newly over  newly under
     wip-on vs main-on        2       0     0     0     0  |     0           0            0
     ```
-
-    A threshold limits one expression, but NumConstraintScopes counts the whole file, so 'over' can overstate a file with many expressions.
     """
 
   @Test
@@ -1042,7 +1051,7 @@ struct ComparisonRunTests {
         if [ "$argument" = "-solver-enable-promote-supertypes" ]; then n=$((n - 10)); fi
         previous="$argument"
       done
-      printf '{"Sema.NumConstraintScopes": %d}' "$n" > "$stats/stats.json"
+      printf '{"Sema.NumConstraintScopes": %d, "Sema.NumLazyIterableDeclContexts": 3, "Name lookup.NumLazyIterableDeclContexts": 4}' "$n" > "$stats/stats.json"
       exit 1
 
       """)
@@ -1086,7 +1095,7 @@ struct ComparisonRunTests {
       markdown.contains("- main: position of main\n- wip: position of wip\n"))
     #expect(
       markdown.contains(
-        "▼  a.swift    65         70 over   60 (-14.3%) under  60 (-14.3%) under  50 (-28.6%) under\n"
+        "✓  a.swift    65         70 over   60 (-14.3%) ✓ under  60 (-14.3%) ✓ under  50 (-28.6%) ✓ under\n"
       ))
     #expect(
       markdown.contains(
@@ -1119,5 +1128,453 @@ struct ComparisonRunTests {
       try await ComparisonRun(configuration: configuration).run()
     }
     #expect(!tmp.root.appending("out/stats").exists)
+  }
+}
+
+@Suite
+struct StatisticKindTests {
+  @Test
+  func knownStatisticsAreBetterWhenLarger() {
+    #expect(Statistic(name: "NumDisjunctionsPruned").largerIsBetter)
+    #expect(
+      Statistic(name: "CSLookahead.NumDisjunctionsSkipped").largerIsBetter)
+    #expect(
+      Statistic(name: "PotentialBindings.NumBindingSetsSkipped").largerIsBetter)
+    #expect(!Statistic.constraintScopes.largerIsBetter)
+    #expect(
+      !Statistic(name: "NumDisjunctionsPruned", largerIsBetter: false)
+        .largerIsBetter)
+  }
+
+  @Test
+  func maximaAreRecognisedByName() {
+    #expect(Statistic(name: "LargestNumSolverScopes").isMaximum)
+    #expect(
+      Statistic(
+        name: "Constraint solver largest system.LargestSolutionAttemptNumber"
+      ).isMaximum)
+    #expect(Statistic(name: "Sema.MaxSolverBytesAllocated").isMaximum)
+    #expect(!Statistic(name: "NumLeafScopes").isMaximum)
+  }
+
+  @Test
+  func scopeCountWithOrWithoutTheGroup() {
+    #expect(Statistic.constraintScopes.isScopeCount)
+    #expect(Statistic(name: "Sema.NumConstraintScopes").isScopeCount)
+    #expect(!Statistic(name: "OverallNumSolverScopes").isScopeCount)
+  }
+
+  @Test
+  func countersCombineMaximaAsMaxima() throws {
+    let tmp = try TemporaryDirectory()
+    let directory = tmp.root
+    try directory.appending("one.json").write(
+      #"{"Constraint solver largest system.LargestNumSolverScopes": 5, "Sema.NumLeafScopes": 2}"#
+    )
+    try directory.appending("two.json").write(
+      #"{"Constraint solver largest system.LargestNumSolverScopes": 9, "Sema.NumLeafScopes": 3}"#
+    )
+    let counters = try #require(try Statistic.Counters(directory: directory))
+    #expect(counters.value(of: Statistic(name: "LargestNumSolverScopes")) == 9)
+    #expect(counters.value(of: Statistic(name: "NumLeafScopes")) == 5)
+  }
+
+  @Test
+  func comparisonFindsEveryMatchingKey() {
+    let counters = Statistic.Counters(values: [
+      "Sema.NumLazyIterableDeclContexts": 3,
+      "Name lookup.NumLazyIterableDeclContexts": 4,
+    ])
+    let comparison = Comparison(
+      columns: [ComparisonFixture.mainOff],
+      rows: [
+        Comparison.Row(
+          run: ComparisonFixture.run("a.swift", threshold: nil),
+          results: [ComparisonFixture.mainOff: .measured(counters)])
+      ])
+    #expect(
+      comparison.keys(matching: Statistic(name: "NumLazyIterableDeclContexts"))
+        .count == 2)
+    #expect(
+      comparison.keys(
+        matching: Statistic(name: "Sema.NumLazyIterableDeclContexts")) == [
+          "Sema.NumLazyIterableDeclContexts"
+        ])
+  }
+}
+
+@Suite
+struct JudgementTests {
+  /// A one-run comparison of a statistic, with a value per column.
+  static func comparison(
+    of key: String, _ values: [Column: Int], threshold: Int? = nil
+  ) -> Comparison {
+    let results = values.mapValues {
+      Comparison.Result.measured(Statistic.Counters(values: [key: $0]))
+    }
+    return Comparison(
+      columns: ComparisonFixture.columns,
+      rows: [
+        Comparison.Row(
+          run: ComparisonFixture.run("a.swift", threshold: threshold),
+          results: results)
+      ])
+  }
+
+  static func settings(for statistic: Statistic) -> Report.Settings {
+    var settings = ComparisonFixture.settings()
+    settings.statistics = [statistic]
+    return settings
+  }
+
+  @Test
+  func largerIsBetterTurnsTheJudgementAround() throws {
+    let statistic = Statistic(name: "NumDisjunctionsPruned")
+    let comparison = Self.comparison(
+      of: "CSLookahead.NumDisjunctionsPruned",
+      [
+        ComparisonFixture.mainOff: 10, ComparisonFixture.mainOn: 12,
+        ComparisonFixture.wipOff: 8, ComparisonFixture.wipOn: 12,
+      ])
+    let lines = try Report(
+      comparison: comparison, settings: Self.settings(for: statistic)
+    ).markdownLines
+    let row = try #require(lines.first { $0.contains("a.swift") })
+    #expect(row.hasPrefix("±"))
+    #expect(row.contains("12 (+20.0%) ✓"))
+    #expect(row.contains("8 (-20.0%) ✗"))
+    #expect(
+      lines.contains(
+        "- ✓ better  ✗ worse  ± mixed (compared with the baseline; larger is better for NumDisjunctionsPruned)"
+      ))
+    #expect(
+      lines.contains(
+        "## NumDisjunctionsPruned (larger is better): measured vs baseline main-off, 1 runs"
+      ))
+  }
+
+  @Test
+  func smallerIsBetterByDefault() throws {
+    let comparison = Self.comparison(
+      of: "Sema.NumLeafScopes",
+      [
+        ComparisonFixture.mainOff: 10, ComparisonFixture.mainOn: 12,
+        ComparisonFixture.wipOff: 10, ComparisonFixture.wipOn: 12,
+      ])
+    let lines = try Report(
+      comparison: comparison,
+      settings: Self.settings(for: Statistic(name: "NumLeafScopes"))
+    ).markdownLines
+    let row = try #require(lines.first { $0.contains("a.swift") })
+    #expect(row.hasPrefix("✗"))
+    #expect(row.contains("12 (+20.0%) ✗"))
+    #expect(
+      lines.contains(
+        "- ✓ better  ✗ worse  ± mixed (compared with the baseline)"))
+  }
+
+  @Test
+  func thresholdsOnlyNextToTheScopeCount() throws {
+    let comparison = Self.comparison(
+      of: "Sema.NumLeafScopes",
+      [
+        ComparisonFixture.mainOff: 10, ComparisonFixture.mainOn: 10,
+        ComparisonFixture.wipOff: 10, ComparisonFixture.wipOn: 10,
+      ], threshold: 5)
+    let lines = try Report(
+      comparison: comparison,
+      settings: Self.settings(for: Statistic(name: "NumLeafScopes"))
+    ).markdownLines
+    #expect(
+      !lines.contains {
+        $0.contains("threshold") || $0.contains(" over")
+          || $0.contains("newly over")
+      })
+  }
+
+  @Test
+  func maximumTotalIsTheLargestValue() throws {
+    let key = "Constraint solver largest system.LargestNumSolverScopes"
+    let small = [
+      ComparisonFixture.mainOff: 5, ComparisonFixture.mainOn: 5,
+      ComparisonFixture.wipOff: 5, ComparisonFixture.wipOn: 5,
+    ]
+    let large = [
+      ComparisonFixture.mainOff: 9, ComparisonFixture.mainOn: 9,
+      ComparisonFixture.wipOff: 9, ComparisonFixture.wipOn: 9,
+    ]
+    let rows = [small, large].enumerated().map { index, values in
+      Comparison.Row(
+        run: ComparisonFixture.run(
+          RelativePath(FilePath("run\(index).swift")), threshold: nil),
+        results: values.mapValues {
+          .measured(Statistic.Counters(values: [key: $0]))
+        })
+    }
+    let comparison = Comparison(columns: ComparisonFixture.columns, rows: rows)
+    let lines = try Report(
+      comparison: comparison,
+      settings: Self.settings(for: Statistic(name: "LargestNumSolverScopes"))
+    ).markdownLines
+    let total = try #require(lines.first { $0.contains("total") })
+    #expect(total.contains("9"))
+    #expect(!total.contains("14"))
+  }
+
+  @Test
+  func noThresholdFootnote() throws {
+    let report = try Report(
+      comparison: ReportTests.twoRunComparison(),
+      settings: ComparisonFixture.settings())
+    #expect(
+      !report.markdownLines.contains { $0.contains("A threshold limits") })
+    #expect(
+      !report.terminalLines.contains { $0.contains("A threshold limits") })
+  }
+}
+
+@Suite
+struct StatisticNameTests {
+  @Test
+  func ambiguousNameFails() async throws {
+    let tmp = try TemporaryDirectory()
+    var configuration = try ComparisonRunTests.configuration(in: tmp)
+    configuration.statistics = [Statistic(name: "NumLazyIterableDeclContexts")]
+    await #expect(throws: ComparisonRun.Failure.self) {
+      try await ComparisonRun(configuration: configuration).run()
+    }
+  }
+
+  @Test
+  func groupedNameIsNotAmbiguous() async throws {
+    let tmp = try TemporaryDirectory()
+    var configuration = try ComparisonRunTests.configuration(in: tmp)
+    configuration.statistics = [
+      Statistic(name: "Sema.NumLazyIterableDeclContexts")
+    ]
+    try await ComparisonRun(configuration: configuration).run()
+    let markdown = try String(
+      contentsOfFile: tmp.root.appending("out/report.md").rawPath,
+      encoding: .utf8)
+    #expect(
+      markdown.contains(
+        "## Sema.NumLazyIterableDeclContexts: measured vs baseline main-off, 2 runs"
+      ))
+    #expect(!markdown.contains("threshold"))
+  }
+}
+
+@Suite
+struct MultiFileTests {
+  static func line(_ text: String) throws -> TestFile.RunLine {
+    try TestFile.RunLine(
+      parsing: text, testDirectory: "/tests/sub", targetCPU: "arm64")
+  }
+
+  @Test
+  func helperFilesNextToTheTest() throws {
+    let line = try Self.line(
+      "%target-swift-frontend -typecheck -primary-file %s %S/Inputs/other.swift -verify"
+    )
+    #expect(
+      line.arguments == [
+        .text("-typecheck"), .text("-primary-file"), .testFile,
+        .text("/tests/sub/Inputs/other.swift"),
+      ])
+  }
+
+  @Test
+  func everyFormOfTheTestDirectory() throws {
+    let line = try Self.line(
+      "%target-typecheck-verify-swift %p/a.swift %/S/b.swift %/p/c.swift -I%S/Inputs -I %S"
+    )
+    #expect(
+      line.arguments == [
+        .text("-typecheck"),
+        .text("-disable-objc-attr-requires-foundation-module"),
+        .text("/tests/sub/a.swift"), .text("/tests/sub/b.swift"),
+        .text("/tests/sub/c.swift"), .text("-I/tests/sub/Inputs"), .text("-I"),
+        .text("/tests/sub"),
+      ])
+  }
+
+  @Test
+  func slashFormOfTheTestFile() throws {
+    let line = try Self.line(
+      "%target-swift-frontend -typecheck %/s %S/other.swift")
+    #expect(
+      line.arguments == [.text("-typecheck"), .text("/tests/sub/other.swift")])
+    #expect(!line.namesTestFile)
+  }
+
+  @Test
+  func similarSubstitutionsStayUnsupported() {
+    #expect(
+      throws: TestFile.RunLine.Unsupported.substitution("%swift-plugin-dir")
+    ) {
+      try Self.line(
+        "%target-swift-frontend -typecheck %s -plugin-path %swift-plugin-dir")
+    }
+  }
+
+  @Test
+  func planUsesTheTestFilesDirectory() throws {
+    var plan = TestFile.Plan()
+    plan.add(
+      TestFile(path: "/tests/fast/a.swift", name: "fast/a.swift"),
+      runLineTexts: ["%target-swift-frontend -typecheck %s %S/Inputs/b.swift"],
+      targetCPU: "arm64")
+    let run = try #require(plan.runs.first)
+    #expect(run.lineArguments == ["-typecheck", "/tests/fast/Inputs/b.swift"])
+    #expect(run.input == "/tests/fast/a.swift")
+  }
+
+  @Test
+  func inputsDirectoriesAreNotTests() throws {
+    let tmp = try TemporaryDirectory()
+    for name in [
+      "a.swift", "Inputs/helper.swift", "sub/Inputs/other.swift", "sub/b.swift",
+    ] {
+      try tmp.root.appending(name).write("")
+    }
+    #expect(
+      try TestFile.all(in: tmp.root).map(\.name.description) == [
+        "a.swift", "sub/b.swift",
+      ])
+  }
+
+  @Test
+  func unmatchedStatisticIsLeftOut() async throws {
+    let tmp = try TemporaryDirectory()
+    var configuration = try ComparisonRunTests.configuration(in: tmp)
+    configuration.statistics = [
+      .constraintScopes, Statistic(name: "NoSuchStatistic"),
+    ]
+    try await ComparisonRun(configuration: configuration).run()
+    let markdown = try String(
+      contentsOfFile: tmp.root.appending("out/report.md").rawPath,
+      encoding: .utf8)
+    #expect(!markdown.contains("NoSuchStatistic"))
+    #expect(
+      markdown.contains(
+        "## NumConstraintScopes: measured vs baseline main-off, 2 runs"))
+  }
+
+  @Test
+  func onlyUnmatchedStatisticsFail() async throws {
+    let tmp = try TemporaryDirectory()
+    var configuration = try ComparisonRunTests.configuration(in: tmp)
+    configuration.statistics = [Statistic(name: "NoSuchStatistic")]
+    await #expect(throws: ComparisonRun.Failure.self) {
+      try await ComparisonRun(configuration: configuration).run()
+    }
+  }
+}
+
+@Suite
+struct EmitModeTests {
+  static func line(_ text: String) throws -> TestFile.RunLine {
+    try TestFile.RunLine(
+      parsing: text, testDirectory: "/tests", targetCPU: "arm64")
+  }
+
+  static func plan(_ texts: [String]) -> TestFile.Plan {
+    var plan = TestFile.Plan()
+    plan.add(
+      TestFile(path: "/tests/fast/a.swift", name: "fast/a.swift"),
+      runLineTexts: texts, targetCPU: "arm64")
+    return plan
+  }
+
+  @Test
+  func emitModeBecomesTypecheck() throws {
+    let line = try Self.line("%target-swift-frontend -emit-sil -verify %s")
+    #expect(line.arguments == [.text("-typecheck")])
+    #expect(line.replacesEmitMode)
+  }
+
+  @Test
+  func emitPathIsDroppedWithItsValue() throws {
+    let line = try Self.line(
+      "%target-swift-frontend -emit-module -emit-module-path %t/Foo.swiftmodule -module-name Foo %s"
+    )
+    #expect(
+      line.arguments == [
+        .text("-typecheck"), .text("-module-name"), .text("Foo"),
+      ])
+  }
+
+  @Test
+  func otherFlagsAreKept() throws {
+    let line = try Self.line(
+      "%target-swift-frontend -Xllvm -sil-print-types -emit-sil -Xllvm -sil-disable-pass=simplification -solver-disable-enumerate-supertypes %s"
+    )
+    #expect(
+      line.arguments == [
+        .text("-typecheck"), .text("-Xllvm"), .text("-sil-print-types"),
+        .text("-Xllvm"), .text("-sil-disable-pass=simplification"),
+        .text("-solver-disable-enumerate-supertypes"),
+      ])
+  }
+
+  @Test
+  func lineRepeatingAnEarlierOneIsDroppedSilently() {
+    let plan = Self.plan([
+      "%target-swift-frontend -typecheck %s",
+      "%target-swift-frontend -emit-ir %s",
+    ])
+    #expect(plan.runs.map(\.name.description) == ["fast/a.swift#1"])
+    #expect(plan.skippedLines.isEmpty)
+  }
+
+  @Test
+  func differentEmitLinesAreAllKept() {
+    let plan = Self.plan([
+      "%target-swift-frontend -emit-sil -solver-disable-enumerate-supertypes %s",
+      "%target-swift-frontend -emit-sil -solver-enable-enumerate-supertypes %s",
+    ])
+    #expect(plan.runs.count == 2)
+  }
+
+  @Test
+  func repeatedLinesWithoutAnEmitModeAreKept() {
+    let plan = Self.plan([
+      "%target-swift-frontend -typecheck %s",
+      "%target-swift-frontend -typecheck %s",
+    ])
+    #expect(plan.runs.count == 2)
+  }
+}
+
+@Suite
+struct OtherFileBuildTests {
+  @Test
+  func lineWithoutTheTestBuildsOtherFiles() throws {
+    let line = try TestFile.RunLine(
+      parsing:
+        "%target-swift-frontend -module-name COM -emit-module-path %t/COM.swiftmodule %S/../Inputs/COM.swift",
+      testDirectory: "/tests/Sema", targetCPU: "arm64")
+    #expect(!line.compilesTestFile)
+  }
+
+  @Test
+  func verifySubstitutionCompilesTheTest() throws {
+    let line = try TestFile.RunLine(
+      parsing: "%target-typecheck-verify-swift -I %S/Inputs",
+      testDirectory: "/tests", targetCPU: "arm64")
+    #expect(line.compilesTestFile)
+  }
+
+  @Test
+  func otherFileBuildsAreLeftOutSilently() {
+    var plan = TestFile.Plan()
+    plan.add(
+      TestFile(path: "/tests/a.swift", name: "a.swift"),
+      runLineTexts: [
+        "%target-swift-frontend -emit-module -module-name Helper %S/Inputs/helper.swift",
+        "%target-swift-frontend -typecheck -primary-file %s %S/Inputs/helper.swift",
+      ], targetCPU: "arm64")
+    #expect(plan.runs.map(\.name.description) == ["a.swift#2"])
+    #expect(plan.skippedLines.isEmpty)
   }
 }

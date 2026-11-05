@@ -53,6 +53,21 @@ extension Comparison.Row {
   }
 }
 
+// MARK: - Keys
+
+extension Comparison {
+  /// The keys that name a statistic in any measured run of any column.
+  public func keys(matching statistic: Statistic) -> Set<String> {
+    var keys: Set<String> = []
+    for row in rows {
+      for case .measured(let counters) in row.results.values {
+        keys.formUnion(counters.keys(matching: statistic))
+      }
+    }
+    return keys
+  }
+}
+
 // MARK: - Result
 
 extension Comparison {
@@ -105,8 +120,8 @@ extension Comparison {
 
 extension Comparison.Counts {
   /// Counts how the measured column compares with the reference column over
-  /// the rows. The threshold counts are only kept for the scope statistic,
-  /// which the thresholds limit.
+  /// the rows. The threshold counts are only kept for the scope count, which
+  /// the thresholds limit.
   public init(
     statistic: Statistic, measured: Column, reference: Column,
     rows: [Comparison.Row]
@@ -133,9 +148,7 @@ extension Comparison.Counts {
       } else {
         same += 1
       }
-      if statistic == .constraintScopes,
-        let threshold = row.run.line.scopeThreshold
-      {
+      if statistic.isScopeCount, let threshold = row.run.line.scopeThreshold {
         let isOver = value > threshold
         let wasOver = base > threshold
         if isOver {

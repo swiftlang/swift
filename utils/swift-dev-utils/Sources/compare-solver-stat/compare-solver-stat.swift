@@ -42,8 +42,17 @@ struct CompareSolverStatCommand: AsyncParsableCommand {
 
   @Option(
     help: """
-      Compiler/settings regressions/improvements are relative to, for example \
-      snap1-off. (default: main-off).
+      Statistic for which a larger value is better, repeatable. \
+      NumBindingSetsSkipped, NumDisjunctionsPruned and NumDisjunctionsSkipped \
+      are defaults.
+      """)
+  var largerIsBetter: [Statistic] = []
+
+  @Option(
+    help: """
+       Column any performance change is relative to, for example \
+       snap1-off. A compiler name stands for its off column (default: \
+       main-off).
       """)
   var baseline: Column?
 
@@ -150,6 +159,7 @@ struct CompareSolverStatCommand: AsyncParsableCommand {
     configuration.file = file
     configuration.directory = dir
     configuration.statistics = stat
+    configuration.largerIsBetter = largerIsBetter
     configuration.baseline = baseline
     configuration.onlyChanged = onlyChanged
     configuration.saveReport = report

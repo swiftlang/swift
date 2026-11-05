@@ -24,8 +24,11 @@ public struct Configuration: Sendable {
   /// The directory whose .swift files are compiled, including subdirectories.
   public var directory: AnyPath?
   /// The statistics to compare, as given. Read them through
-  /// `effectiveStatistics`, which always includes the scope count.
+  /// `effectiveStatistics`.
   public var statistics: [Statistic] = []
+  /// Statistics for which a larger value is better, besides the ones the tool
+  /// knows. A name without a group means the statistic in any group.
+  public var largerIsBetter: [Statistic] = []
   /// The column the percentages and the summary are relative to.
   public var baseline: Column?
   /// Hide the rows where no column differs from the baseline.
@@ -71,14 +74,17 @@ public struct Configuration: Sendable {
 // MARK: - Effective settings
 
 extension Configuration {
-  /// The statistics to compare. The scope count is always included, because
-  /// the scope thresholds in the RUN lines refer to it.
+  /// The statistics to compare: the given ones, or the scope count when none
+  /// are given. Those named in `largerIsBetter` are marked so.
   public var effectiveStatistics: [Statistic] {
-    var result = statistics.isEmpty ? [.constraintScopes] : statistics
-    if !result.contains(.constraintScopes) {
-      result.insert(.constraintScopes, at: 0)
+    let chosen = statistics.isEmpty ? [.constraintScopes] : statistics
+    return chosen.map { statistic in
+      var result = statistic
+      if largerIsBetter.contains(where: statistic.isFlagged(by:)) {
+        result.largerIsBetter = true
+      }
+      return result
     }
-    return result
   }
 
   /// The baseline column, main-off unless one is set.

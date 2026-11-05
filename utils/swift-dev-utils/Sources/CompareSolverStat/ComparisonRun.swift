@@ -91,10 +91,12 @@ extension ComparisonRun {
       rows: plan.runs.map {
         Comparison.Row(run: $0, results: results[$0.name] ?? [:])
       })
+    let statistics = try matchedStatistics(in: comparison)
     let report = try Report(
       comparison: comparison,
       settings: reportSettings(
-        outputDirectory: outputDirectory, omitted: omitted))
+        statistics: statistics, outputDirectory: outputDirectory,
+        omitted: omitted))
     for pair in report.leftOutPairs {
       Self.log("Left out \(pair): a column was skipped entirely.")
     }
@@ -122,6 +124,40 @@ extension ComparisonRun {
     return try TestFile.all(in: configuration.effectiveTestDirectory)
   }
 
+  /// The statistics to report: those that name a counter of some stats file.
+  /// A statistic that names none, most likely a typo, gets a warning and is
+  /// left out.
+  ///
+  /// - Throws: `ComparisonRun.Failure` when a name without a group matches
+  ///   counters in several groups, or when no statistic is left.
+  private func matchedStatistics(in comparison: Comparison) throws
+    -> [Statistic]
+  {
+    var matched: [Statistic] = []
+    for statistic in configuration.effectiveStatistics {
+      let keys = comparison.keys(matching: statistic)
+      if keys.isEmpty {
+        Self.log(
+          "warning: no stats file has a statistic named '\(statistic)'; it is left out."
+        )
+        continue
+      }
+      if statistic.isBare && keys.count > 1 {
+        let names = keys.sorted().map { "'\($0)'" }.joined(separator: ", ")
+        throw Failure(
+          """
+          '\(statistic)' names more than one statistic: \(names). Pass one of \
+          them to --stat instead.
+          """)
+      }
+      matched.append(statistic)
+    }
+    guard !matched.isEmpty else {
+      throw Failure("None of the statistics names a counter of any stats file.")
+    }
+    return matched
+  }
+
   /// Checks the baseline and the pairs before anything is built.
   private func checkColumnNames() throws {
     let compilerNames = ["main", "wip"] + configuration.snapshots.map(\.name)
@@ -138,16 +174,16 @@ extension ComparisonRun {
     }
   }
 
-  private func reportSettings(outputDirectory: AbsolutePath, omitted: [Column])
-    -> Report.Settings
-  {
+  private func reportSettings(
+    statistics: [Statistic], outputDirectory: AbsolutePath, omitted: [Column]
+  ) -> Report.Settings {
     let testSource =
       configuration.file?.absoluteInWorkingDir
       ?? configuration.effectiveTestDirectory
     var settings = Report.Settings(
       baseline: configuration.effectiveBaseline,
       pairs: configuration.effectivePairs,
-      statistics: configuration.effectiveStatistics, date: Date(),
+      statistics: statistics, date: Date(),
       commandLine: CommandLine.arguments, testSource: AnyPath(testSource))
     settings.onlyChanged = configuration.onlyChanged
     settings.byDirectory = configuration.byDirectory

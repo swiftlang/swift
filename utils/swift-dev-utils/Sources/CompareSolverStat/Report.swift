@@ -115,11 +115,6 @@ extension Report {
         addNote("--by-dir: there are no subdirectories to break down.")
       }
     }
-    addNote(
-      """
-      A threshold limits one expression, but NumConstraintScopes counts the \
-      whole file, so 'over' can overstate a file with many expressions.
-      """)
   }
 }
 
@@ -149,7 +144,13 @@ extension Report {
       addFact("wip: \(wipPosition)")
     }
     addFact("percentages are relative to the baseline, \(settings.baseline)")
-    addFact("▼ smaller  ▲ larger  ± mixed (compared with the baseline)")
+    var legend = "✓ better  ✗ worse  ± mixed (compared with the baseline"
+    if settings.statistics.count == 1, let only = settings.statistics.first,
+      only.largerIsBetter
+    {
+      legend += "; larger is better for \(only)"
+    }
+    addFact(legend + ")")
     if !settings.omittedColumns.isEmpty {
       let omitted = settings.omittedColumns.map(\.description).joined(
         separator: ", ")
@@ -162,16 +163,21 @@ extension Report {
     let columns = comparison.columns
     let baseline = settings.baseline
     let labelsStatistic = settings.statistics.count > 1
+    // The threshold column only means something next to the scope count.
+    let showsThresholds = settings.statistics.contains(where: \.isScopeCount)
+    var header = [TextCell(""), TextCell("run")]
+    if showsThresholds {
+      header.append(TextCell("threshold"))
+    }
     var table: [[TextCell]] = [
-      [TextCell(""), TextCell("run"), TextCell("threshold")]
-        + columns.map { TextCell($0.description) }
+      header + columns.map { TextCell($0.description) }
     ]
     var totals: [Statistic: [Column: Int]] = [:]
     for row in comparison.rows {
       for statistic in settings.statistics {
         let base = row.value(of: statistic, in: baseline)
         let threshold =
-          statistic == .constraintScopes ? row.run.line.scopeThreshold : nil
+          statistic.isScopeCount ? row.run.line.scopeThreshold : nil
         var cells: [TextCell] = []
         var values: [Column: Int] = [:]
         for column in columns {
@@ -181,7 +187,11 @@ extension Report {
             row.result(in: column) == .skipped
             ? TextCell("skip")
             : Self.cell(
-              value: value, base: base, isBaseline: column == baseline)
+              value: value, base: base, isBaseline: column == baseline,
+              statistic: statistic)
+          if let verdict = cell.verdict {
+            cell.text += " \(verdict.symbol)"
+          }
           if let threshold, let value {
             cell.text += value > threshold ? " over" : " under"
           }
@@ -190,35 +200,43 @@ extension Report {
         // Only runs that every column measured count towards the totals.
         if values.count == columns.count {
           for (column, value) in values {
-            totals[statistic, default: [:]][column, default: 0] += value
+            let total = totals[statistic]?[column]
+            totals[statistic, default: [:]][column] =
+              total.map { statistic.isMaximum ? max($0, value) : $0 + value }
+              ?? value
           }
         }
-        let directions = Set(cells.compactMap(\.direction))
-        if settings.onlyChanged && directions.isEmpty {
+        let verdicts = Set(cells.compactMap(\.verdict))
+        if settings.onlyChanged && verdicts.isEmpty {
           continue
         }
         let label =
           labelsStatistic
           ? "\(row.run.name) [\(statistic)]" : row.run.name.description
-        table.append(
-          [
-            TextCell(Self.marker(for: directions)), TextCell(label),
-            TextCell(threshold.map(Self.grouped) ?? ""),
-          ] + cells)
+        var leading = [TextCell(Self.marker(for: verdicts)), TextCell(label)]
+        if showsThresholds {
+          leading.append(TextCell(threshold.map(Self.grouped) ?? ""))
+        }
+        table.append(leading + cells)
       }
     }
     for statistic in settings.statistics {
+      // A maximum's total is the largest value of any run.
       let label = labelsStatistic ? "total [\(statistic)]" : "total"
       let base = totals[statistic]?[baseline] ?? 0
-      // The totals are not coloured.
+      // The totals are neither coloured nor marked.
       let cells = columns.map { column in
         TextCell(
           Self.cell(
             value: totals[statistic]?[column] ?? 0, base: base,
-            isBaseline: column == baseline
+            isBaseline: column == baseline, statistic: statistic
           ).text)
       }
-      table.append([TextCell(" "), TextCell(label), TextCell("")] + cells)
+      var leading = [TextCell(" "), TextCell(label)]
+      if showsThresholds {
+        leading.append(TextCell(""))
+      }
+      table.append(leading + cells)
     }
     addSection("Runs", showInTerminal: false)
     addBlock(
@@ -234,8 +252,11 @@ extension Report {
     let baseline = settings.baseline
     for statistic in settings.statistics {
       let withThresholds =
-        statistic == .constraintScopes
+        statistic.isScopeCount
         && rows.contains { $0.run.line.scopeThreshold != nil }
+      let name =
+        statistic.largerIsBetter
+        ? "\(statistic) (larger is better)" : statistic.description
       let baselineRows = columns.map { column in
         MatrixRow(
           label: column == baseline
@@ -245,7 +266,7 @@ extension Report {
             rows: rows), isBaseline: column == baseline)
       }
       addSection(
-        "\(statistic): measured vs baseline \(baseline), \(rows.count) runs\(suffix)"
+        "\(name): measured vs baseline \(baseline), \(rows.count) runs\(suffix)"
       )
       addBlock(Self.matrixLines(baselineRows, withThresholds: withThresholds))
       if !pairs.isEmpty {
@@ -257,7 +278,7 @@ extension Report {
               reference: pair.reference, rows: rows), isBaseline: false)
         }
         addSection(
-          "\(statistic): measured vs reference, \(rows.count) runs\(suffix)")
+          "\(name): measured vs reference, \(rows.count) runs\(suffix)")
         addBlock(Self.matrixLines(pairRows, withThresholds: withThresholds))
       }
     }
@@ -303,20 +324,30 @@ extension Report {
 // MARK: - Cells
 
 extension Report {
-  /// Whether a value is smaller or larger than the baseline.
-  private enum Direction: Sendable, Hashable {
-    case smaller
-    case larger
+  /// Whether a value is better or worse than the baseline.
+  private enum Verdict: Sendable, Hashable {
+    case better
+    case worse
+
+    /// The symbol that marks a better or worse value. It differs in shape, so
+    /// that it does not depend on colour.
+    var symbol: String {
+      switch self {
+      case .better: "✓"
+      case .worse: "✗"
+      }
+    }
   }
 
-  /// The text of a table cell, and how it differs from the baseline.
+  /// The text of a table cell, and whether it is better or worse than the
+  /// baseline.
   private struct TextCell: Sendable {
     var text: String
-    var direction: Direction?
+    var verdict: Verdict?
 
-    init(_ text: String, direction: Direction? = nil) {
+    init(_ text: String, verdict: Verdict? = nil) {
       self.text = text
-      self.direction = direction
+      self.verdict = verdict
     }
   }
 
@@ -330,10 +361,11 @@ extension Report {
   }
 
   /// The cell for a value: fail when there is none, and the percentage change
-  /// from the baseline when it differs.
-  private static func cell(value: Int?, base: Int?, isBaseline: Bool)
-    -> TextCell
-  {
+  /// from the baseline when it differs, judged better or worse by whether the
+  /// statistic is better when smaller or when larger.
+  private static func cell(
+    value: Int?, base: Int?, isBaseline: Bool, statistic: Statistic
+  ) -> TextCell {
     guard let value else {
       return TextCell("fail")
     }
@@ -341,21 +373,22 @@ extension Report {
     guard !isBaseline, let base, value != base else {
       return TextCell(text)
     }
-    let direction: Direction = value < base ? .smaller : .larger
+    let verdict: Verdict =
+      (value < base) != statistic.largerIsBetter ? .better : .worse
     guard base != 0 else {
-      return TextCell(text, direction: direction)
+      return TextCell(text, verdict: verdict)
     }
     let change = String(
       format: "%+.1f", Double(value - base) / Double(base) * 100)
-    return TextCell("\(text) (\(change)%)", direction: direction)
+    return TextCell("\(text) (\(change)%)", verdict: verdict)
   }
 
-  /// The marker of a run row: ▼ when every change is smaller, ▲ when every
-  /// change is larger, ± when they are mixed, and blank when nothing changed.
-  private static func marker(for directions: Set<Direction>) -> String {
-    switch directions {
-    case [.smaller]: "▼"
-    case [.larger]: "▲"
+  /// The marker of a run row: ✓ when every change is better, ✗ when every
+  /// change is worse, ± when they are mixed, and blank when nothing changed.
+  private static func marker(for verdicts: Set<Verdict>) -> String {
+    switch verdicts {
+    case [.better]: Verdict.better.symbol
+    case [.worse]: Verdict.worse.symbol
     case []: " "
     default: "±"
     }
@@ -389,10 +422,10 @@ extension Report {
         let padded =
           cell.text
           + String(repeating: " ", count: widths[index] - cell.text.count)
-        guard useColor, let direction = cell.direction else {
+        guard useColor, let verdict = cell.verdict else {
           return padded
         }
-        let color: AnsiColor = direction == .smaller ? .green : .red
+        let color: AnsiColor = verdict == .better ? .green : .red
         return "\(ansi: .fg(color))\(padded)\(ansi: .fg(.normal))"
       }.joined(separator: "  ")
       while line.hasSuffix(" ") {

@@ -10,7 +10,8 @@ utils/swift-dev-utils/run compare-solver-stat --out ../compare_stats --dir test/
 
 By default it compiles every `.swift` file under
 `validation-test/Sema/type_checker_perf`. `--dir` picks another directory, and
-a file argument compiles just that file.
+a file argument compiles just that file. As in lit, files in `Inputs`
+directories are not tests themselves.
 
 ## Columns
 
@@ -25,6 +26,26 @@ Percentages and the summary are relative to the baseline column, `main-off`
 unless `--baseline` says otherwise. A second summary compares pairs of columns,
 `wip-on` against `main-on` unless `--compare MEASURED:REFERENCE` says
 otherwise.
+
+## Statistics
+
+The report compares `NumConstraintScopes` by default. `--stat`, repeatable,
+compares any other whole-number counter of the stats files instead, such as
+`OverallNumTrailSteps` or `LargestNumSolverScopes`; the statistics given
+replace the default. A name works with or without its group (`NumLeafScopes`
+or `Sema.NumLeafScopes`). A name without a group that matches counters in
+several groups is an error that lists the grouped names to use, and a name
+that matches no counter gets a warning and is left out of the report.
+
+Statistics whose names start with `Largest` or `Max` are maxima: their total
+is the largest value of any run, not the sum.
+
+Each changed value is judged better or worse than the baseline. Smaller is
+better, except for `NumBindingSetsSkipped`, `NumDisjunctionsPruned`,
+`NumDisjunctionsSkipped` and anything named with `--larger-is-better`.
+Changed cells carry `✓` (better) or `✗` (worse), and each row is marked `✓`,
+`✗`, or `±` when it is mixed. On a terminal the cells are also green or red,
+but the symbols do not depend on colour.
 
 ## Building
 
@@ -46,10 +67,20 @@ Each `RUN:` line at the top of a test file is one run, with that line's flags.
 A file with several RUN lines has one row per line, named `file#1`, `file#2`,
 and so on.
 
-- `-verify` is dropped, and `-solver-scope-threshold=N` is not passed. N is
-  shown instead, and each scope count is marked `over` or `under` it.
-- Lines that run something other than the frontend, or that use substitutions
-  such as `%t`, are skipped and listed when the tool starts.
+- Only type checking is measured: an `-emit-` mode such as `-emit-sil` or
+  `-emit-ir` is replaced by `-typecheck`, and other `-emit-` flags are dropped
+  with their values. A line that then repeats an earlier line of the file is
+  left out.
+- A line that does not compile the test file, because it only builds helper
+  files such as a module for later lines, is left out.
+- `-verify` is dropped, and `-solver-scope-threshold=N` is not passed. When
+  `NumConstraintScopes` is compared, N is shown instead, and each scope count
+  is marked `over` or `under` it.
+- `%S` and `%p`, and their `%/` forms, are the test's directory, so a line can
+  compile the test together with helper files, as in
+  `-primary-file %s %S/Inputs/other.swift`.
+- Lines that run something other than the frontend, or that use other
+  substitutions such as `%t`, are skipped and listed when the tool starts.
 - A compile that exits with an error still counts; the tests expect errors. A
   compile that writes no statistics shows `fail`, and one that the compiler
   rejects with an unknown argument shows `skip`. A column that skips every run
