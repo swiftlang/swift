@@ -38,6 +38,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/KnownProtocols.h"
@@ -1850,25 +1851,65 @@ static ManagedValue createValueConversionThunk(SILGenFunction &SGF,
   CanGenericSignature genericSig;
   GenericEnvironment *genericEnv = nullptr;
   SubstitutionMap interfaceSubs;
+  CanType manglingFromType = fromType;
+  CanType manglingToType = toType;
 
   bool hasArchetypes = fromType->hasArchetype() || toType->hasArchetype();
   if (hasArchetypes) {
-    genericSig = SGF.F.getLoweredFunctionType()
+    SmallVector<GenericEnvironment *, 2> capturedEnvs;
+    auto collectLocalArchetypes = [&](CanType t) {
+      if (auto local = dyn_cast<LocalArchetypeType>(t)) {
+        auto *env = local->getGenericEnvironment();
+        if (std::find(capturedEnvs.begin(), capturedEnvs.end(), env)
+              == capturedEnvs.end())
+          capturedEnvs.push_back(env);
+      }
+    };
+    fromType.visit(collectLocalArchetypes);
+    toType.visit(collectLocalArchetypes);
+
+    auto baseGenericSig = SGF.F.getLoweredFunctionType()
         ->getInvocationGenericSignature();
-    genericEnv = SGF.F.getGenericEnvironment();
-    interfaceSubs = SGF.F.getForwardingSubstitutionMap();
 
-    // Map types to interface types for the thunk signature.
+    if (capturedEnvs.empty()) {
+      genericSig = baseGenericSig;
+      genericEnv = SGF.F.getGenericEnvironment();
+      interfaceSubs = SGF.F.getForwardingSubstitutionMap();
+    } else {
+      genericSig = buildGenericSignatureWithCapturedEnvironments(
+          ctx, baseGenericSig, capturedEnvs).getCanonicalSignature();
+      genericEnv = genericSig.getGenericEnvironment();
+      interfaceSubs = buildSubstitutionMapWithCapturedEnvironments(
+          SGF.F.getForwardingSubstitutionMap(), genericSig, capturedEnvs);
+    }
+
+    auto mapToInterface = [&](CanType t) -> CanType {
+      auto mapped = mapLocalArchetypesOutOfContext(
+          t, baseGenericSig, capturedEnvs);
+      if (mapped->hasArchetype())
+        mapped = mapped->mapTypeOutOfEnvironment();
+      return mapped->getCanonicalType();
+    };
+    manglingFromType = mapToInterface(fromType);
+    manglingToType = mapToInterface(toType);
+
     auto interfaceFromTy = SGF.getLoweredType(
-        AbstractionPattern(genericSig, fromType->mapTypeOutOfEnvironment()
-                                           ->getCanonicalType()),
-        fromType);
+        AbstractionPattern(genericSig, manglingFromType), fromType);
     auto interfaceToTy = SGF.getLoweredType(
-        AbstractionPattern(genericSig, toType->mapTypeOutOfEnvironment()
-                                           ->getCanonicalType()),
-        toType);
+        AbstractionPattern(genericSig, manglingToType), toType);
 
-    param = {interfaceFromTy.getASTType(),
+    auto interfaceFromLowered =
+        SGF.SGM.Types
+            .getLoweredType(AbstractionPattern(genericSig, manglingFromType),
+                            manglingFromType, TypeExpansionContext::minimal())
+            .getASTType();
+    auto interfaceToLowered =
+        SGF.SGM.Types
+            .getLoweredType(AbstractionPattern(genericSig, manglingToType),
+                            manglingToType, TypeExpansionContext::minimal())
+            .getASTType();
+
+    param = {interfaceFromLowered,
              interfaceFromTy.isAddressOnly(SGF.F)
                  ? ParameterConvention::Indirect_In
                  : ParameterConvention::Direct_Owned};
@@ -1876,7 +1917,7 @@ static ManagedValue createValueConversionThunk(SILGenFunction &SGF,
         ? ResultConvention::Indirect
         : ResultConvention::Owned;
     results.clear();
-    results.push_back({interfaceToTy.getASTType(), resConv});
+    results.push_back({interfaceToLowered, resConv});
   }
 
   auto thunkType = SILFunctionType::get(
@@ -1885,18 +1926,30 @@ static ManagedValue createValueConversionThunk(SILGenFunction &SGF,
       results, /*errorResult*/ std::nullopt,
       SubstitutionMap(), SubstitutionMap(), ctx);
 
-  // Get or create the thunk SIL function.
   SILFunction *thunk = SGM.getOrCreateConversionThunk(
-      thunkType, fromType, toType);
+      thunkType, manglingFromType, manglingToType);
 
   // Fill the body if it's newly created.
   if (thunk->empty()) {
     if (genericEnv)
       thunk->setGenericEnvironment(genericEnv);
 
+    // Map types into the thunk's generic environment so that opened
+    // existential archetypes from the outer scope become archetypes of
+    // the thunk's own generic environment.
+    CanType thunkFromType = fromType;
+    CanType thunkToType = toType;
+    if (genericEnv) {
+      thunkFromType = genericEnv->mapTypeIntoEnvironment(manglingFromType)
+                          ->getCanonicalType();
+      thunkToType = genericEnv->mapTypeIntoEnvironment(manglingToType)
+                        ->getCanonicalType();
+    }
+
     SILGenFunction thunkSGF(SGM, *thunk, SGF.FunctionDC);
     auto thunkLoc = RegularLocation::getAutoGeneratedLocation();
-    buildValueConversionThunkBody(thunkSGF, thunkLoc, fromType, toType);
+    buildValueConversionThunkBody(thunkSGF, thunkLoc, thunkFromType,
+                                  thunkToType);
     SGM.emitLazyConformancesForFunction(thunk);
   }
 

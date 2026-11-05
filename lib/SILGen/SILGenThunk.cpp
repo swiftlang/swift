@@ -743,19 +743,15 @@ static SILValue joinElements(ArrayRef<SILValue> elements, SILBuilder &builder,
 }
 
 SILFunction *SILGenModule::getOrCreateConversionThunk(CanSILFunctionType thunkType,
-                                                      Type fromType,
-                                                      Type toType) {
-  // The reference to the thunk is likely @noescape, but declarations are always
-  // escaping.
+                                                      CanType fromInterfaceType,
+                                                      CanType toInterfaceType) {
+  assert(!fromInterfaceType->hasArchetype() &&
+         "from type must be an interface type");
+  assert(!toInterfaceType->hasArchetype() &&
+         "to type must be an interface type");
+
   auto thunkDeclType =
       thunkType->getWithExtInfo(thunkType->getExtInfo().withNoEscape(false));
-
-  // Mangle the reabstraction thunk.
-  // Substitute context parameters out of the "from" and "to" types.
-  auto fromInterfaceType = fromType->mapTypeOutOfEnvironment()
-    ->getCanonicalType();
-  auto toInterfaceType = toType->mapTypeOutOfEnvironment()
-    ->getCanonicalType();
 
   Mangle::ASTMangler NewMangler(thunkType->getASTContext());
   std::string name = NewMangler.mangleConversionThunk(thunkType,

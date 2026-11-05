@@ -831,6 +831,37 @@ ArrayCasts.testSync("Tuple Re-labelling") {
   expectEqual(d![2].1, "ijk")
 }
 
+protocol Greeter {
+  func greetings() -> [() -> Self]
+  func greetingsByName() -> [String: () -> Self]
+}
+
+struct HelloGreeter: Greeter {
+  var name: String
+  func greetings() -> [() -> HelloGreeter] {
+    return [
+      { self },
+      { HelloGreeter(name: self.name.uppercased()) },
+    ]
+  }
+  func greetingsByName() -> [String: () -> HelloGreeter] {
+    return [
+      "normal": { self },
+      "loud": { HelloGreeter(name: self.name.uppercased()) },
+    ]
+  }
+}
+
+ArrayCasts.testSync("Opened existential erasure") {
+  let greeter: any Greeter = HelloGreeter(name: "world")
+  let fns: [() -> any Greeter] = greeter.greetings()
+  expectEqual(fns.count, 2)
+  let g1 = fns[0]() as! HelloGreeter
+  expectEqual(g1.name, "world")
+  let g2 = fns[1]() as! HelloGreeter
+  expectEqual(g2.name, "WORLD")
+}
+
 let DictionaryCasts = TestSuite("DictionaryCasts")
 
 DictionaryCasts.testSync("Derived to Base") {
@@ -1571,6 +1602,16 @@ DictionaryCasts.testSync("Preconcurrency") {
 
   let d = (a as Any) as? Y
   expectNil(d)
+}
+
+DictionaryCasts.testSync("Opened existential erasure") {
+  let greeter: any Greeter = HelloGreeter(name: "world")
+  let fns: [String: () -> any Greeter] = greeter.greetingsByName()
+  expectEqual(fns.count, 2)
+  let g1 = fns["normal"]!() as! HelloGreeter
+  expectEqual(g1.name, "world")
+  let g2 = fns["loud"]!() as! HelloGreeter
+  expectEqual(g2.name, "WORLD")
 }
 
 let SetCasts = TestSuite("SetCasts")
