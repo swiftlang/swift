@@ -52,9 +52,9 @@ SwiftMod::Container<> createAnyContainer();
 // Nested existential PAT arg
 SwiftMod::Container<SwiftMod::Drawable> createDrawableContainer();
 
-// INTERFACE: func createIntContainer() -> any Container<Int>
-// INTERFACE: func passIntContainer(_ c: any Container<Int>)
-// INTERFACE: func firstIntContainer(_ a: any Container<Int>, _ b: any Container<Int>) -> any Container<Int>
+// INTERFACE: func createIntContainer() -> any Container<CLong>
+// INTERFACE: func passIntContainer(_ c: any Container<CLong>)
+// INTERFACE: func firstIntContainer(_ a: any Container<CLong>, _ b: any Container<CLong>) -> any Container<CLong>
 // INTERFACE: func createAnyContainer() -> any Container
 // INTERFACE: func createDrawableContainer() -> any Container<any Drawable>
 
