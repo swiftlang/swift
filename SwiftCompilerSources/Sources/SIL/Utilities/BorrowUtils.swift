@@ -580,9 +580,6 @@ public final class EnclosingValueIterator : IteratorProtocol {
           // Recurse through guaranteed forwarding non-phi instructions.
           let ops = forwardingInst.forwardedOperands
           worklist.pushIfNotVisited(contentsOf: ops.values)
-        } else if value.isGuaranteedApplyResult {
-          let selfArgument = (value as! ApplyInst).arguments.last!
-          worklist.pushIfNotVisited(selfArgument)
         } else {
           fatalError("cannot get borrow introducers for unknown guaranteed value")
         }

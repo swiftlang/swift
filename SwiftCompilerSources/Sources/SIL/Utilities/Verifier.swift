@@ -121,7 +121,7 @@ private extension Instruction {
 
   func checkGuaranteedResults() {
     for result in results where result.ownership == .guaranteed {
-      require(BeginBorrowValue(result) != nil || self is ForwardingInstruction || result.isGuaranteedApplyResult,
+      require(BeginBorrowValue(result) != nil || self is ForwardingInstruction,
               "\(result) must either be a BeginBorrowValue or a ForwardingInstruction",
               atInstruction: self)
     }

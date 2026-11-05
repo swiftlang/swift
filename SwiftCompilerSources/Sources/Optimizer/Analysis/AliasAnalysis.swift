@@ -343,6 +343,14 @@ struct AliasAnalysis {
           return .worstEffects
         }
         return borrowEffects
+      case let apply as ApplyInst:
+        // Model the end_borrow of a borrow accessor with @guaranteed result similar to an end_borrow of a load_borrow.
+        let borrowEffects = getBorrowEffects(of: endBorrow, on: memLoc)
+        if borrowEffects != .worstEffects, let selfAddress = apply.selfAddressOfGuaranteedBorrowAccessorResult,
+           memLoc.mayAlias(with: selfAddress, self) {
+          return .worstEffects
+        }
+        return borrowEffects
       case let borrowedFrom as BorrowedFromInst where borrowedFrom.borrowedPhi.isReborrow:
         // A reborrow continues the borrow scope of the incoming borrow(s). If one of those is a
         // `load_borrow`, the `end_borrow` has the same effects on the loaded memory location as an
@@ -404,13 +412,13 @@ struct AliasAnalysis {
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
       // Check if the memLoc is "derived" from the begin_borrow, i.e. is an interior pointer.
-      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow as! BeginBorrowInstruction)
+      var walker = FindBeginBorrowWalker(beginBorrow: endBorrow.borrow)
       return walker.visitAccessStorageRoots(of: accessPath) ? .noEffects : .worstEffects
     }
   }
 
-  /// Returns true if the reborrow of `borrowedFrom` (transitively) reborrows a `load_borrow` whose
-  /// address may alias with `memLoc`.
+  /// Returns true if the reborrow of `borrowedFrom` (transitively) reborrows a `load_borrow`, or a borrow accessor
+  /// result with an address self.
   private func isEndOfReborrowedLoadBorrow(_ borrowedFrom: BorrowedFromInst,
                                            aliasingWith memLoc: MemoryLocation) -> Bool {
     var worklist = ValueWorklist(context)
@@ -421,6 +429,11 @@ struct AliasAnalysis {
       switch value {
       case let loadBorrow as LoadBorrowInst:
         if memLoc.mayAlias(with: loadBorrow.address, self) {
+          return true
+        }
+      case let apply as ApplyInst:
+        if let selfAddress = apply.selfAddressOfGuaranteedBorrowAccessorResult,
+           memLoc.mayAlias(with: selfAddress, self) {
           return true
         }
       case let bf as BorrowedFromInst:
@@ -796,7 +809,7 @@ private enum ImmutableScope {
 }
 
 private struct FindBeginBorrowWalker : ValueUseDefWalker {
-  let beginBorrow: BeginBorrowInstruction
+  let beginBorrow: Value
   var walkUpCache = WalkerCache<Path>()
 
   mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {

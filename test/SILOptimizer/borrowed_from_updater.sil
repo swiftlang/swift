@@ -298,9 +298,13 @@ bb0(%0 : @guaranteed $Wrapper):
   return %2
 }
 
+// The result of a borrow accessor is a borrow introducer nested in the scope of
+// its @guaranteed self.
+//
 // CHECK-LABEL: sil [ossa] @test_borrow_accessor :
-// CHECK: bb3([[PHI:%.*]] : @guaranteed $Klass):
+// CHECK: bb3([[PHI:%.*]] : @reborrow $Klass):
 // CHECK: [[B:%.*]] = borrowed [[PHI]] : $Klass from (%1 : $Wrapper)
+// CHECK: end_borrow [[B]]
 // CHECK-LABEL: } // end sil function 'test_borrow_accessor'
 sil [ossa] @test_borrow_accessor : $@convention(thin) (@owned Wrapper) -> () {
 bb0(%0 : @owned $Wrapper):
@@ -317,7 +321,8 @@ bb2:
   %5 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   br bb3(%5)
 
-bb3(%7 : @guaranteed $Klass):
+bb3(%7 : @reborrow $Klass):
+  end_borrow %7
   end_borrow %1
   destroy_value %0
   %t = tuple ()

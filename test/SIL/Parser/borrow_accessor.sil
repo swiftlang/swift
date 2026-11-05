@@ -50,6 +50,7 @@ bb0(%0 : @owned $Wrapper):
   %2 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   %4 = copy_value %3
+  end_borrow %3
   %5 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %4

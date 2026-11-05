@@ -1680,6 +1680,7 @@ bb0(%0 : @guaranteed $Wrapper):
   %func = function_ref @borrow_accessor : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
   %k = apply %func(%sbi) : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
   %copy = copy_value %k
+  end_borrow %k
   end_borrow %sbi
   %f = function_ref @guaranteed_klass_user : $@convention(thin) (@guaranteed Klass) -> ()
   apply %f(%copy) : $@convention(thin) (@guaranteed Klass) -> ()

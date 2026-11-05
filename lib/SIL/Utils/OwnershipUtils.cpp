@@ -476,6 +476,7 @@ bool swift::findUsesOfSimpleValue(SILValue value,
 bool swift::visitGuaranteedForwardingPhisForSSAValue(
     SILValue value, function_ref<bool(Operand *)> visitor) {
   assert(isa<BeginBorrowInst>(value) || isa<LoadBorrowInst>(value) ||
+         BorrowedValue(value).kind == BorrowedValueKind::BorrowAccessor ||
          (isa<SILPhiArgument>(value) &&
           value->getOwnershipKind() == OwnershipKind::Guaranteed));
   // guaranteedForwardingOps is a collection of all transitive
@@ -1694,7 +1695,8 @@ void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
                               visitGuaranteedForwardingPhiBaseValuePair) {
   assert(borrow.kind == BorrowedValueKind::BeginBorrow ||
          borrow.kind == BorrowedValueKind::LoadBorrow ||
-         borrow.kind == BorrowedValueKind::DereferenceBorrow);
+         borrow.kind == BorrowedValueKind::DereferenceBorrow ||
+         borrow.kind == BorrowedValueKind::BorrowAccessor);
   // A GuaranteedForwardingPhi can have different base values on different
   // control flow paths.
   // For that reason, worklist stores (GuaranteedForwardingPhi operand, base

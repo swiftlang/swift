@@ -93,6 +93,7 @@ bb0(%0 : @guaranteed $Root):
   %5 = function_ref @span_getter : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
   %6 = apply %5(%4) : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
   %7 = mark_dependence [unresolved] %6 on %4
+  end_borrow %4
   return %7
 }
 
@@ -107,6 +108,7 @@ bb0(%0 : @guaranteed $Root):
   %7 = apply %6(%5) : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
   %8 = mark_dependence [unresolved] %7 on %4
   end_borrow %5
+  end_borrow %2
   return %8
 }
 
@@ -119,6 +121,8 @@ bb0(%0 : @guaranteed $Root):
   %5 = function_ref @span_getter : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
   %6 = apply %5(%4) : $@convention(method) (@guaranteed Leaf) -> @lifetime(borrow 0) @owned Span<Int>
   %7 = mark_dependence [unresolved] %6 on %4
+  end_borrow %4
+  end_borrow %2
   return %7
 }
 
