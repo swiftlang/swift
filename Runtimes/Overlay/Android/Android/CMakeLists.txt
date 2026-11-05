@@ -11,6 +11,8 @@ set_target_properties(swiftAndroid PROPERTIES
   Swift_MODULE_NAME Android)
 target_compile_definitions(swiftAndroid PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
+target_compile_options(swiftAndroid PRIVATE
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>")
 target_link_libraries(swiftAndroid PUBLIC
   SwiftAndroid)
 target_link_libraries(swiftAndroid PRIVATE
