@@ -194,8 +194,12 @@ struct ASTGenVisitor {
     }
   }
 
-  func generateTopLevel(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
+  func generateTopLevel(
+    codeBlockItemList node: CodeBlockItemListSyntax,
+    skippingLeadingExpressions: Bool = false
+  ) -> [BridgedASTNode] {
     var out = [BridgedASTNode]()
+    var skipping = skippingLeadingExpressions
 
     /// Whether a top-level 'guard' has been seen. Such a statement introduces
     /// bindings that the rest of the file can use, so every function after it has
@@ -210,10 +214,18 @@ struct ASTGenVisitor {
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
+      // After a stray label, the C++ parser skips to the start of the next
+      // statement or declaration, dropping leading expressions.
+      if skipping {
+        if case .expr = element.item {
+          return
+        }
+        skipping = false
+      }
       // The statements of a 'case' outside of a 'switch' belong after it.
       defer {
         if let body = element.strayCaseBody {
-          out.append(contentsOf: self.generateTopLevel(codeBlockItemList: body))
+          out.append(contentsOf: self.generateTopLevel(codeBlockItemList: body, skippingLeadingExpressions: true))
         }
       }
       guard let item = self.generateTopLevel(codeBlockItem: element) else {

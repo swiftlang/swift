@@ -142,17 +142,29 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
+  func generate(
+    codeBlockItemList node: CodeBlockItemListSyntax,
+    skippingLeadingExpressions: Bool = false
+  ) -> [BridgedASTNode] {
     var allItems: [BridgedASTNode] = []
+    var skipping = skippingLeadingExpressions
     visitIfConfigElements(
       node,
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { codeBlockItem in
+      // After a stray label, the C++ parser skips to the start of the next
+      // statement or declaration, dropping leading expressions.
+      if skipping {
+        if case .expr = codeBlockItem.item {
+          return
+        }
+        skipping = false
+      }
       // The statements of a 'case' outside of a 'switch' belong after it.
       defer {
         if let body = codeBlockItem.strayCaseBody {
-          allItems.append(contentsOf: self.generate(codeBlockItemList: body))
+          allItems.append(contentsOf: self.generate(codeBlockItemList: body, skippingLeadingExpressions: true))
         }
       }
       guard let item = self.generate(codeBlockItem: codeBlockItem) else {
@@ -925,15 +937,7 @@ extension CodeBlockItemSyntax {
     guard !statements.hasError else {
       return nil
     }
-    // After the label, the C++ parser skips to the start of the next statement
-    // or declaration, so leading expressions are dropped.
-    let skipped = statements.prefix { element in
-      if case .expr = element.item {
-        return true
-      }
-      return false
-    }
-    return CodeBlockItemListSyntax(statements.dropFirst(skipped.count))
+    return statements
   }
 }
 
