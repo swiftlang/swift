@@ -3382,7 +3382,7 @@ public:
 /// which might involve renaming the parameters or handling substitutions
 /// of subtypes (in the return) or supertypes (in the input).
 class FunctionConversionExpr : public ImplicitConversionExpr {
-  bool WithoutActuallyDiscarding = false;
+  bool WithoutActuallyDeiniting = false;
 
 public:
   FunctionConversionExpr(Expr *subExpr, Type type)
@@ -3390,10 +3390,10 @@ public:
 
   /// Whether this conversion deliberately drops the exactly-once guarantee of
   /// the operand. Sema only forms such a conversion for a call to
-  /// \c withoutActuallyDiscarding(_:do:).
-  bool isWithoutActuallyDiscarding() const { return WithoutActuallyDiscarding; }
-  void setWithoutActuallyDiscarding(bool value = true) {
-    WithoutActuallyDiscarding = value;
+  /// \c withoutActuallyDeiniting(_:do:).
+  bool isWithoutActuallyDeiniting() const { return WithoutActuallyDeiniting; }
+  void setWithoutActuallyDeiniting(bool value = true) {
+    WithoutActuallyDeiniting = value;
   }
 
   static bool classof(const Expr *E) {

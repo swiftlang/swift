@@ -954,7 +954,7 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   // Don't bypass a conversion that discards. The converted value's execution
   // semantics would no longer be a valid conversion of x without the flag.
   if (auto *subCFI = dyn_cast<ConvertFunctionInst>(cfi->getOperand());
-      subCFI && !subCFI->withoutActuallyDiscarding()) {
+      subCFI && !subCFI->withoutActuallyDeiniting()) {
     // We handle the case of an identity conversion in inst simplify, so if we
     // see this pattern then we know that we don't have a round trip and thus
     // should just bypass the intermediate conversion.

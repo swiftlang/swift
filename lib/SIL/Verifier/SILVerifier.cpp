@@ -5771,11 +5771,11 @@ public:
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
 
-    if (ICI->withoutActuallyDiscarding()) {
+    if (ICI->withoutActuallyDeiniting()) {
       require(opTI->isCalledOnce() &&
                   resTI->getExecutionSemantics() ==
                       std::optional(ExecutionSemantics::AtMostOnce),
-              "convert_function [without_actually_discarding] must convert an "
+              "convert_function [without_actually_deiniting] must convert an "
               "exactly-once function to an at-most-once function");
       return;
     }

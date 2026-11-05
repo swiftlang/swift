@@ -1532,12 +1532,12 @@ class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {
     case withoutActuallyEscaping = 1
 
     /// The conversion turns an exactly-once function into an at-most-once function.
-    case withoutActuallyDiscarding = 2
+    case withoutActuallyDeiniting = 2
   }
 
   public var conversionKind: Kind { Kind(rawValue: bridged.ConvertFunctionInst_getConversionKind())! }
   public var withoutActuallyEscaping: Bool { conversionKind == .withoutActuallyEscaping }
-  public var withoutActuallyDiscarding: Bool { conversionKind == .withoutActuallyDiscarding }
+  public var withoutActuallyDeiniting: Bool { conversionKind == .withoutActuallyDeiniting }
 }
 
 final public

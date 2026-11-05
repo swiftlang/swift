@@ -3398,14 +3398,14 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose an argument to \c withoutActuallyDiscarding(_:do:) that isn't an
+/// Diagnose an argument to \c withoutActuallyDeiniting(_:do:) that isn't an
 /// exactly-once function.
-class NonExactlyOnceDiscardArgumentFailure final : public FailureDiagnostic {
+class NonExactlyOnceDeinitArgumentFailure final : public FailureDiagnostic {
   Type ArgType;
 
 public:
-  NonExactlyOnceDiscardArgumentFailure(const Solution &solution, Type argType,
-                                       ConstraintLocator *locator)
+  NonExactlyOnceDeinitArgumentFailure(const Solution &solution, Type argType,
+                                      ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), ArgType(resolveType(argType)) {}
 
   bool diagnoseAsError() override;

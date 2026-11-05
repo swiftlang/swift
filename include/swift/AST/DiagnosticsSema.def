@@ -1482,8 +1482,8 @@ ERROR(cannot_jump_in_single_value_stmt,none,
       (StmtKind, StmtKind))
 WARNING(effect_marker_on_single_value_stmt,none,
       "'%0' has no effect on '%1' expression", (StringRef, StmtKind))
-ERROR(without_actually_discarding_requires_exactly_once,none,
-      "'withoutActuallyDiscarding' requires a '@once' function, "
+ERROR(without_actually_deiniting_requires_exactly_once,none,
+      "'withoutActuallyDeiniting' requires a '@once' function, "
       "but argument has type %0", (Type))
 ERROR(out_of_place_then_stmt,none,
       "'then' may only appear as the last statement in an 'if', 'switch', or "
