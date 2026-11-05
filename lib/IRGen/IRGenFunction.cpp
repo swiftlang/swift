@@ -172,7 +172,12 @@ llvm::Value *IRGenFunction::emitAllocRawTypedCall(
 /// Emit a heap allocation.
 llvm::Value *IRGenFunction::emitAllocObjectCall(
     llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
-    std::optional<uint64_t> mallocTypeId, const llvm::Twine &name) {
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &name,
+    bool maybeClassAllocated) {
+  if (maybeClassAllocated)
+    return emitAllocatingCall(
+        *this, IGM.getAllocObjectMaybeClassAllocatedFunctionPointer(),
+        {metadata, size, alignMask}, name);
   if (mallocTypeId) {
     auto descriptorConst = llvm::ConstantInt::get(IGM.Int64Ty, *mallocTypeId);
     return emitAllocObjectTypedCall(metadata, size, alignMask, descriptorConst,

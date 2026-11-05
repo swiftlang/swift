@@ -863,6 +863,12 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
 
   P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
 
+  // Call the allocators of classes with an `@allocator` directly. After the
+  // StackPromotion runs that precede it (so non-escaping objects stay on the
+  // stack) and after ownership elimination; this pipeline then specializes
+  // and inlines the stdlib helpers it calls.
+  P.addDirectClassAlloc();
+
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addClassDestroyDevirtualizer(); // currently a no-op in non-OSSA
   // TODO: remove the ReleaseDevirtualizer once we have OSSA at this place in the pipeline.

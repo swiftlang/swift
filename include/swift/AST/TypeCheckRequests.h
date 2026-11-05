@@ -3976,6 +3976,28 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Resolve the allocator type of an \c @allocator attribute.
+class ResolveClassAllocatorTypeRequest
+    : public SimpleRequest<ResolveClassAllocatorTypeRequest,
+                           Type (ClassDecl *, AllocatorAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, ClassDecl *CD,
+                AllocatorAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
 class ResolveTypeEraserTypeRequest
     : public SimpleRequest<ResolveTypeEraserTypeRequest,
                            Type (ProtocolDecl *, TypeEraserAttr *),

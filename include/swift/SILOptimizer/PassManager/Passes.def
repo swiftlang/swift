@@ -305,6 +305,8 @@ LEGACY_PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
 LEGACY_PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
+LEGACY_PASS(DirectClassAlloc, "direct-class-alloc",
+     "Call the allocators of classes with an @allocator directly")
 LEGACY_PASS(DiagnoseInvalidEscapingCaptures, "diagnose-invalid-escaping-captures",
      "Diagnose Invalid Escaping Captures")
 LEGACY_PASS(DiagnoseLifetimeIssues, "diagnose-lifetime-issues",

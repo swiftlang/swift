@@ -200,9 +200,11 @@ static SwiftObject *_allocHelper(Class cls) {
 #else
   const size_t mask = 16 - 1;
 #endif
-  return reinterpret_cast<SwiftObject *>(swift::swift_allocObject(
-    reinterpret_cast<HeapMetadata const *>(cls),
-    class_getInstanceSize(cls), mask));
+  // Not compiler-controlled, so the class may have an allocator.
+  return reinterpret_cast<SwiftObject *>(
+      swift::swift_allocObjectMaybeClassAllocated(
+          reinterpret_cast<HeapMetadata const *>(cls),
+          class_getInstanceSize(cls), mask));
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API

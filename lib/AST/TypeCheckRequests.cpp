@@ -1710,6 +1710,28 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
 }
 
 //----------------------------------------------------------------------------//
+// ResolveClassAllocatorTypeRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<Type> ResolveClassAllocatorTypeRequest::getCachedResult() const {
+  auto *TyExpr = std::get<1>(getStorage())->AllocatorExpr;
+  if (!TyExpr || !TyExpr->getType())
+    return std::nullopt;
+  return TyExpr->getInstanceType();
+}
+
+void ResolveClassAllocatorTypeRequest::cacheResult(Type value) const {
+  assert(value && "Resolved allocator type to null type!");
+  auto *attr = std::get<1>(getStorage());
+  if (attr->AllocatorExpr) {
+    attr->AllocatorExpr->setType(MetatypeType::get(value));
+  } else {
+    attr->AllocatorExpr = TypeExpr::createImplicit(value,
+                                                   value->getASTContext());
+  }
+}
+
+//----------------------------------------------------------------------------//
 // ResolvePreInverseGenericsRequest computation.
 //----------------------------------------------------------------------------//
 

@@ -882,6 +882,23 @@ irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
 }
 
 
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitClassInstanceSizeAndAlignMask(IRGenFunction &IGF,
+                                         SILType selfType) {
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                             /*forBackwardDeployment=*/false);
+  if (classLayout.isFixedSize())
+    return {IGF.IGM.getSize(classLayout.getSize()),
+            IGF.IGM.getSize(classLayout.getAlignMask())};
+  llvm::Value *metadata =
+    emitClassHeapMetadataRef(IGF, selfType.getASTType(),
+                             MetadataValueType::TypeMetadata,
+                             MetadataState::Complete);
+  return emitClassResilientInstanceSizeAndAlignMask(
+      IGF, selfType.getClassDecl(), metadata);
+}
+
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
                                         bool objc, bool isBare,
@@ -941,8 +958,12 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     auto maybeDescriptor =
         classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
 
+    // Classes with an `@allocator` go through the entry point that looks up
+    // the class's allocator.
+    bool maybeClassAllocated =
+        bool(selfType.getClassDecl()->getAllocatorType());
     val = IGF.emitAllocObjectCall(metadata, size, alignMask, maybeDescriptor,
-                                  "reference.new");
+                                  "reference.new", maybeClassAllocated);
     StackAllocSize = -1;
   }
   return IGF.Builder.CreateBitCast(val, IGF.IGM.PtrTy);
@@ -987,9 +1008,65 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   std::tie(size, alignMask)
     = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
 
-  llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
-                                             std::nullopt, "reference.new");
   StackAllocSize = -1;
+
+  // If the static class has an `@allocator`, so does the dynamic class.
+  // Otherwise, the dynamic class may be a subclass with one unless the static
+  // class is final.
+  auto *staticClass = selfType.getClassDecl();
+  if (staticClass && staticClass->getAllocatorType()) {
+    llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
+                                               std::nullopt, "reference.new",
+                                               /*maybeClassAllocated=*/true);
+    return IGF.Builder.CreateBitCast(val, destType);
+  }
+  if (staticClass && staticClass->isSemanticallyFinal()) {
+    llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
+                                               std::nullopt, "reference.new");
+    return IGF.Builder.CreateBitCast(val, destType);
+  }
+
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGF.IGM.Context);
+  if (deploymentAvailability.isContainedIn(
+          IGF.IGM.Context.getClassAllocatorsAvailability())) {
+    llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
+                                               std::nullopt, "reference.new",
+                                               /*maybeClassAllocated=*/true);
+    return IGF.Builder.CreateBitCast(val, destType);
+  }
+
+  // The deployment target predates class allocators, so the runtime entry
+  // point is weakly linked. A class with an `@allocator` can only exist if the
+  // runtime has it, so use it if it is present.
+  auto *maybeClassAllocatedFn = cast<llvm::Function>(
+      IGF.IGM.getAllocObjectMaybeClassAllocatedFn());
+  llvm::Value *runtimeHasClassAllocators = IGF.Builder.CreateICmpNE(
+      maybeClassAllocatedFn,
+      llvm::ConstantPointerNull::get(maybeClassAllocatedFn->getType()));
+  auto *maybeClassAllocatedBB = IGF.createBasicBlock("class-allocator");
+  auto *plainBB = IGF.createBasicBlock("no-class-allocator");
+  auto *contBB = IGF.createBasicBlock("allocated");
+  IGF.Builder.CreateCondBr(runtimeHasClassAllocators, maybeClassAllocatedBB,
+                           plainBB);
+
+  IGF.Builder.emitBlock(maybeClassAllocatedBB);
+  llvm::Value *classAllocated = IGF.emitAllocObjectCall(
+      metadata, size, alignMask, std::nullopt, "reference.new",
+      /*maybeClassAllocated=*/true);
+  auto *classAllocatedPredBB = IGF.Builder.GetInsertBlock();
+  IGF.Builder.CreateBr(contBB);
+
+  IGF.Builder.emitBlock(plainBB);
+  llvm::Value *plain = IGF.emitAllocObjectCall(metadata, size, alignMask,
+                                               std::nullopt, "reference.new");
+  auto *plainPredBB = IGF.Builder.GetInsertBlock();
+  IGF.Builder.CreateBr(contBB);
+
+  IGF.Builder.emitBlock(contBB);
+  auto *val = IGF.Builder.CreatePHI(classAllocated->getType(), 2);
+  val->addIncoming(classAllocated, classAllocatedPredBB);
+  val->addIncoming(plain, plainPredBB);
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
@@ -1068,7 +1145,11 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
                                              /*forBackwardDeployment=*/false);
   auto maybeDescriptor =
       classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
-  emitDeallocateClassInstance(IGF, selfValue, size, alignMask, maybeDescriptor);
+  // Free instances of classes with an `@allocator` through the entry point
+  // that looks up the class's allocator. (The deallocating deinit belongs to
+  // the dynamic class, so its static type decides.)
+  emitDeallocateClassInstance(IGF, selfValue, size, alignMask, maybeDescriptor,
+                              bool(theClass->getAllocatorType()));
 }
 
 void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,

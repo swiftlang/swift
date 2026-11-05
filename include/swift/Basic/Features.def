@@ -580,6 +580,10 @@ EXPERIMENTAL_FEATURE(ConcurrencySyntaxSugar, true)
 /// Allow declaration of compile-time values
 EXPERIMENTAL_FEATURE(CompileTimeValues, true)
 
+/// Allow `@allocator(A)` on class declarations to allocate and free the
+/// class's instances through the `ClassAllocator` type `A`.
+EXPERIMENTAL_FEATURE(ClassAllocators, true)
+
 /// Allow declaration of compile-time values bypassing
 /// syntactic legality checking
 EXPERIMENTAL_FEATURE(CompileTimeValuesPreview, false)

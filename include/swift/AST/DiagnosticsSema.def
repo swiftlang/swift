@@ -7670,6 +7670,39 @@ ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
       "replaced initializer %0 is not marked as convenience", (DeclNameRef))
 
 //------------------------------------------------------------------------------
+// MARK: @allocator()
+//------------------------------------------------------------------------------
+
+ERROR(allocator_attr_on_actor,none,
+      "'@allocator' cannot be applied to actor %0; actor instances are "
+      "allocated by the concurrency runtime",
+      (const ValueDecl *))
+ERROR(allocator_attr_on_objc_class,none,
+      "'@allocator' cannot be applied to class %0 because it inherits from an "
+      "Objective-C class",
+      (const ValueDecl *))
+ERROR(allocator_attr_in_embedded,none,
+      "'@allocator' is not supported in Embedded Swift", ())
+ERROR(allocator_attr_missing_protocol,none,
+      "'@allocator' requires the standard library protocol 'ClassAllocator'",
+      ())
+ERROR(allocator_attr_unavailable,none,
+      "'@allocator' is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+ERROR(allocator_type_does_not_conform,none,
+      "allocator type %0 does not conform to protocol 'ClassAllocator'",
+      (Type))
+ERROR(allocator_type_depends_on_generic_parameter,none,
+      "allocator type %0 cannot depend on the generic parameters of %1",
+      (Type, const ValueDecl *))
+ERROR(allocator_type_not_exported,none,
+      "allocator type %0 of "
+      "%select{private|fileprivate|internal|package|public|open}1 class %2 "
+      "must be '@usableFromInline' or public because %3 is "
+      "%select{private|fileprivate|internal|package|public|open}4",
+      (Type, AccessLevel, const ValueDecl *, const ValueDecl *, AccessLevel))
+
+//------------------------------------------------------------------------------
 // MARK: @_typeEraser()
 //------------------------------------------------------------------------------
 

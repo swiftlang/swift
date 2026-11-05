@@ -121,6 +121,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::IsSameMetatype:
     case BuiltinValueKind::Alignof:
     case BuiltinValueKind::TypedAllocationID:
+    case BuiltinValueKind::ClassInstanceSize:
+    case BuiltinValueKind::ClassInstanceAlignMask:
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:

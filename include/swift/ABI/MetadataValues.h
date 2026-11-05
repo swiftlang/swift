@@ -374,6 +374,12 @@ enum class ClassFlags : uint32_t {
   /// which was created during compilation and made to be canonical by
   /// modifying the metadata accessor.
   IsCanonicalStaticSpecialization = 0x10,
+
+  /// Instances of this class are allocated by a custom allocator, declared
+  /// with `@allocator` on this class or inherited from a superclass. The
+  /// runtime only looks for a class allocator (see
+  /// TargetClassAllocatorDescriptor) in classes with this flag set.
+  HasCustomAllocator = 0x20,
 };
 inline bool operator&(ClassFlags a, ClassFlags b) {
   return (uint32_t(a) & uint32_t(b)) != 0;
@@ -2006,6 +2012,15 @@ public:
     return (Value & 0x20u) != 0;
   }
 
+  /// Whether the class declares a custom allocator with `@allocator`, which
+  /// will show up as a trailing TargetClassAllocatorDescriptor in the class
+  /// context descriptor.
+  ///
+  /// Only meaningful for class descriptors.
+  constexpr bool hasClassAllocator() const {
+    return (Value & 0x100u) != 0;
+  }
+
   /// The most significant two bytes of the flags word, which can have
   /// kind-specific meaning.
   constexpr uint16_t getKindSpecificFlags() const {
@@ -2032,6 +2047,12 @@ public:
   ) const {
     return ContextDescriptorFlags((Value & ~0x20u)
                                   | (hasInvertibleProtocols ? 0x20u : 0));
+  }
+
+  constexpr ContextDescriptorFlags
+  withClassAllocator(bool hasClassAllocator) const {
+    return ContextDescriptorFlags((Value & ~0x100u)
+                                  | (hasClassAllocator ? 0x100u : 0));
   }
 
   constexpr ContextDescriptorFlags

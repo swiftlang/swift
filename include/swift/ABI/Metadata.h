@@ -721,6 +721,28 @@ struct TargetMethodDefaultOverrideTableHeader {
   uint32_t NumEntries;
 };
 
+/// The result of a class allocator access function: the metadata of a
+/// `ClassAllocator` type and the witness table of its conformance to
+/// `ClassAllocator`.
+struct ClassAllocatorAccessResult {
+  const void *AllocatorType;
+  const void *ClassAllocatorConformance;
+};
+
+/// Trailing record of the context descriptor of a class declared with
+/// `@allocator(A)`; present if the descriptor's flags have
+/// hasClassAllocator() set. Subclasses that inherit their allocator have
+/// ClassFlags::HasCustomAllocator set but no record of their own.
+template <typename Runtime>
+struct TargetClassAllocatorDescriptor {
+  using AccessFunction = SWIFT_CC(swift) ClassAllocatorAccessResult();
+
+  /// Returns `A` and its conformance to `ClassAllocator`.
+  TargetCompactFunctionPointer<Runtime, AccessFunction, /*Nullable*/ false>
+      Accessor;
+};
+using ClassAllocatorDescriptor = TargetClassAllocatorDescriptor<InProcess>;
+
 /// An entry in the method override table, referencing a method from one of our
 /// ancestor classes, together with an implementation.
 template <typename Runtime>
@@ -969,7 +991,8 @@ struct TargetClassMetadata : public TargetAnyClassMetadataVariant {
   /// The alignment mask of the address point of instances of this type.
   uint16_t InstanceAlignMask;
 
-  /// Reserved for runtime use.
+  /// Reserved for runtime use. In classes with ClassFlags::HasCustomAllocator,
+  /// the runtime caches the class's allocator here.
   uint16_t Reserved;
 
   /// The total size of the class object, including prefix and suffix
@@ -4394,6 +4417,7 @@ class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
           TargetSingletonMetadataPointer<Runtime>,
           TargetMethodDefaultOverrideTableHeader<Runtime>,
           TargetMethodDefaultOverrideDescriptor<Runtime>,
+          TargetClassAllocatorDescriptor<Runtime>,
           TargetClassInstancePrefixDescriptor<Runtime>> {
 private:
   using TrailingGenericContextObjects = swift::TrailingGenericContextObjects<
@@ -4415,6 +4439,7 @@ private:
       TargetSingletonMetadataPointer<Runtime>,
       TargetMethodDefaultOverrideTableHeader<Runtime>,
       TargetMethodDefaultOverrideDescriptor<Runtime>,
+      TargetClassAllocatorDescriptor<Runtime>,
       TargetClassInstancePrefixDescriptor<Runtime>>;
 
   using TrailingObjects =
@@ -4451,6 +4476,7 @@ public:
       TargetMethodDefaultOverrideTableHeader<Runtime>;
   using DefaultOverrideDescriptor =
       TargetMethodDefaultOverrideDescriptor<Runtime>;
+  using AllocatorDescriptor = TargetClassAllocatorDescriptor<Runtime>;
   using InstancePrefixDescriptor = TargetClassInstancePrefixDescriptor<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
@@ -4607,6 +4633,10 @@ private:
     return getDefaultOverrideTable()->NumEntries;
   }
 
+  size_t numTrailingObjects(OverloadToken<AllocatorDescriptor>) const {
+    return hasClassAllocator() ? 1 : 0;
+  }
+
   size_t numTrailingObjects(OverloadToken<InstancePrefixDescriptor>) const {
     return hasInstancePrefix() ? 1 : 0;
   }
@@ -4644,6 +4674,18 @@ public:
 
   bool hasDefaultOverrideTable() const {
     return getTypeContextDescriptorFlags().class_hasDefaultOverrideTable();
+  }
+
+  /// Whether this class declares its own allocator with `@allocator`.
+  bool hasClassAllocator() const {
+    return this->Flags.hasClassAllocator();
+  }
+
+  /// The allocator declared by this class with `@allocator`, or null.
+  const AllocatorDescriptor *getClassAllocator() const {
+    if (!hasClassAllocator())
+      return nullptr;
+    return this->template getTrailingObjects<AllocatorDescriptor>();
   }
 
   bool hasInstancePrefix() const {

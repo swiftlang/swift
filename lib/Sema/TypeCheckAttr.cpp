@@ -482,6 +482,7 @@ public:
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
   void visitTypeEraserAttr(TypeEraserAttr *attr);
+  void visitAllocatorAttr(AllocatorAttr *attr);
   void visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr);
   void visitImplementsAttr(ImplementsAttr *attr);
   void visitNoMetadataAttr(NoMetadataAttr *attr);
@@ -4940,6 +4941,36 @@ ResolveTypeEraserTypeRequest::evaluate(Evaluator &evaluator,
 }
 
 Type
+ResolveClassAllocatorTypeRequest::evaluate(Evaluator &evaluator,
+                                           ClassDecl *CD,
+                                           AllocatorAttr *attr) const {
+  if (auto *allocatorRepr = attr->getParsedAllocatorTypeRepr()) {
+    // Resolve in the context of the class, so that its nested types can be
+    // named. References to its generic parameters are diagnosed by the
+    // attribute checker.
+    Type type = TypeResolution::resolveContextualType(
+        allocatorRepr, CD, std::nullopt,
+        // Unbound generics and placeholders are not allowed within this
+        // attribute.
+        /*unboundTyOpener*/ nullptr,
+        /*placeholderHandler*/ nullptr,
+        /*packElementOpener*/ nullptr);
+    if (type->hasArchetype())
+      type = type->mapTypeOutOfEnvironment();
+    return type;
+  }
+
+  auto *LazyResolver = attr->Resolver;
+  assert(LazyResolver && "allocator was neither parsed nor deserialized?");
+  auto ty =
+      LazyResolver->loadClassAllocatorType(attr, attr->ResolverContextData);
+  attr->Resolver = nullptr;
+  if (!ty)
+    return ErrorType::get(CD->getASTContext());
+  return ty;
+}
+
+Type
 ResolveRawLayoutTypeRequest::evaluate(Evaluator &evaluator, StructDecl *sd,
                                       RawLayoutAttr *attr,
                                       bool isLikeType) const {
@@ -5152,6 +5183,97 @@ void AttributeChecker::visitTypeEraserAttr(TypeEraserAttr *attr) {
   assert(isa<ProtocolDecl>(D));
   // Invoke the request.
   (void)attr->hasViableTypeEraserInit(cast<ProtocolDecl>(D));
+}
+
+void AttributeChecker::visitAllocatorAttr(AllocatorAttr *attr) {
+  auto *classDecl = cast<ClassDecl>(D);
+
+  if (Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    diagnoseAndRemoveAttr(attr, diag::allocator_attr_in_embedded);
+    return;
+  }
+
+  // Actors are allocated and freed by the concurrency runtime
+  // (swift_deallocDefaultActor); Objective-C classes by the Objective-C
+  // runtime (+alloc / -dealloc).
+  if (classDecl->isAnyActor()) {
+    diagnoseAndRemoveAttr(attr, diag::allocator_attr_on_actor, classDecl);
+    return;
+  }
+  if (classDecl->checkAncestry(AncestryFlags::ObjC)) {
+    diagnoseAndRemoveAttr(attr, diag::allocator_attr_on_objc_class, classDecl);
+    return;
+  }
+
+  auto *proto = Ctx.getProtocol(KnownProtocolKind::ClassAllocator);
+  if (!proto) {
+    diagnoseAndRemoveAttr(attr, diag::allocator_attr_missing_protocol);
+    return;
+  }
+
+  Type allocatorType = attr->getResolvedType(classDecl);
+  if (!allocatorType || allocatorType->hasError()) {
+    attr->setInvalid();
+    return;
+  }
+
+  // The allocator is recorded once per class declaration, so it cannot vary
+  // between specializations of a generic class.
+  if (allocatorType->hasTypeParameter()) {
+    diagnoseAndRemoveAttr(attr,
+                          diag::allocator_type_depends_on_generic_parameter,
+                          allocatorType, classDecl);
+    return;
+  }
+
+  auto conformance = checkConformance(allocatorType, proto);
+  if (conformance.isInvalid()) {
+    diagnoseAndRemoveAttr(attr, diag::allocator_type_does_not_conform,
+                          allocatorType);
+    return;
+  }
+
+  // The allocator is used wherever the class is: its availability and
+  // exportability are part of the class's signature.
+  auto where = ExportContext::forDeclSignature(classDecl);
+  diagnoseTypeAvailability(attr->getParsedAllocatorTypeRepr(), allocatorType,
+                           attr->getLocation(), where);
+  diagnoseConformanceAvailability(attr->getLocation(), conformance, where);
+
+  // Clients of a public class see its allocator: they allocate instances of
+  // the class in inlinable code, subclass it, and print it in module
+  // interfaces. Every type the allocator type names must be visible to them.
+  auto classScope = classDecl->getFormalAccessScope(
+      /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true);
+  if (classScope.isPublic()) {
+    allocatorType.findIf([&](Type type) {
+      auto *nominal = type->getAnyNominal();
+      if (!nominal)
+        return false;
+      if (nominal->getFormalAccessScope(
+                  /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true)
+              .isPublic())
+        return false;
+      diagnoseAndRemoveAttr(attr, diag::allocator_type_not_exported,
+                            allocatorType, classDecl->getFormalAccess(),
+                            classDecl, nominal, nominal->getFormalAccess());
+      return true;
+    });
+    if (attr->isInvalid())
+      return;
+  }
+
+  // The runtime support for per-class allocators is new.
+  if (!Ctx.LangOpts.DisableAvailabilityChecking) {
+    auto required = Ctx.getClassAllocatorsAvailability();
+    auto declAvailability =
+        AvailabilityContext::forDeclSignature(classDecl).getPlatformRange();
+    if (!declAvailability.isContainedIn(required)) {
+      diagnoseAndRemoveAttr(attr, diag::allocator_attr_unavailable,
+                            Ctx.getTargetAvailabilityDomain(), required);
+      return;
+    }
+  }
 }
 
 void AttributeChecker::visitStorageRestrictionsAttr(StorageRestrictionsAttr *attr) {

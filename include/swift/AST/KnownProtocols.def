@@ -107,6 +107,7 @@ PROTOCOL(TaskExecutor)
 PROTOCOL(Clock)
 PROTOCOL(GlobalActor)
 PROTOCOL(ExecutorFactory)
+PROTOCOL(ClassAllocator)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)

@@ -234,6 +234,19 @@ classes.
 - The **class flags** are a 32-bit field at **offset 5** on platforms which 
   support Objective-C interoperability; on other platforms, the field is at 
   **offset 2**.
+
+  If the **has custom allocator** flag (``0x20``) is set, instances of the
+  class are allocated and freed by a class allocator declared with
+  ``@allocator``, either by this class or by a superclass. The context
+  descriptor of each class that declares one has the **has class allocator**
+  context descriptor flag (``0x100``) set and ends with a 32-bit relative
+  reference to an access function. The access function uses the Swift calling
+  convention, takes no arguments, and returns the type metadata of the
+  allocator type and the witness table for its conformance to
+  ``ClassAllocator``. The runtime finds the allocator of an object by walking
+  its class's superclass chain to the nearest class that declares one, stopping
+  at a class without the flag, and caches the result in the runtime-reserved
+  field.
 - The **instance address point** is a 32-bit field following the class flags.
   A pointer to an instance of this class points this number of bytes after the
   beginning of the instance.
