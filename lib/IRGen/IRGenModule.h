@@ -2065,7 +2065,8 @@ public:
                                      ForDefinition_t forDefinition);
   llvm::Constant *getGlobalInitValue(SILGlobalVariable *var,
                                      llvm::Type *storageType,
-                                     Alignment alignment);
+                                     Alignment alignment,
+                                     llvm::GlobalVariable *global);
   llvm::Constant *getConstantValue(Explosion &&initExp, Size::int_type paddingBytes);
   llvm::Function *getAddrOfWitnessTableLazyAccessFunction(
                                                const NormalProtocolConformance *C,

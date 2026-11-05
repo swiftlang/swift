@@ -31,7 +31,7 @@ struct Z: P2 {
 }
 
 // CHECK: @"$s35witness_table_indirect_conformances1WVAA2P3AAWP" = hidden global [5 x ptr] [
-// CHECK-SAME: @"$s35witness_table_indirect_conformances1WVAA2P3AAMc"
+// CHECK-SAME: @"$s35witness_table_indirect_conformances1WVAA2P3AAMc{{(\.ptrauth(\.[0-9]+)?)?}}"
 // CHECK-SAME: {{(associated conformance 35witness_table_indirect_conformances1WVAA2P3AA05AssocE0AaDP_AA2P2|.ptrauth)}}
 // CHECK-SAME: @"$s35witness_table_indirect_conformances1WVAA2P3A2aDP08getAssocE00gE0QzyFTW{{(\.ptrauth)?}}"
 struct W: P3 {

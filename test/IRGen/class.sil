@@ -39,7 +39,7 @@ sil_vtable C {}
 // CHECK-INDIRECT-SAME:   ptr null,
 // CHECK-SAME:   ptr @_objc_empty_cache,
 // CHECK-SAME:   ptr null,
-// CHECK-SAME:   i64 add (i64 ptrtoint (ptr @_DATA__TtC5class1C to i64), i64 [[IS_SWIFT_BIT:1|2]])
+// CHECK-SAME:   ptr getelementptr (i8, ptr @_DATA__TtC5class1C, i64 [[IS_SWIFT_BIT:1|2]])
 // CHECK-SAME: }>
 
 // Destroying destructor

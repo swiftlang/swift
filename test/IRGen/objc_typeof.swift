@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-%target-ptrauth
 // REQUIRES: objc_interop
 
 import Foundation
@@ -10,6 +10,7 @@ open class Mixed: NSObject {}
 // CHECK-LABEL: define{{.*@.*}}14typeOfAllSwift
 public func typeOfAllSwift(_ x: AllSwift) -> AllSwift.Type {
   // CHECK: [[ISA:%.*]] = load ptr
+  // CHECK-ptrauth: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
   // CHECK: ret ptr [[ISA]]
   return type(of: x)
 }

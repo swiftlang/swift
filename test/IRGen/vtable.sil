@@ -24,7 +24,7 @@ sil @$s6vtable1CCfD : $@convention(method) (@owned C) -> ()
 // CHECK-INDIRECT-objc: ptr null,
 // CHECK-objc:          ptr @_objc_empty_cache,
 // CHECK-objc:          ptr null,
-// CHECK-objc:          i64 add (i64 ptrtoint (ptr @_DATA__TtC6vtable1C to i64), i64 {{1|2}}),
+// CHECK-objc:          ptr getelementptr (i8, ptr @_DATA__TtC6vtable1C, i64 {{1|2}}),
 // CHECK-objc:          i32 {{3|2}}, i32 0, i32 16, i16 7, i16 0,
 // CHECK-objc:          i32 112, i32 24,
 // CHECK-objc:          @"$s6vtable1CCMn"

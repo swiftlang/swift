@@ -1752,6 +1752,14 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t ConformanceCacheStorageGlobalActorType = 0x31dc; // = 12764
   const uint16_t ConformanceCacheStorageNext = 0x5664; // = 22116
 
+  /// Protocol requirement descriptors referenced indirectly, by the resilient
+  /// witnesses of a conformance.
+  const uint16_t ProtocolRequirement = 0x7d4c; // = 32076
+
+  /// Class method descriptors referenced indirectly, by the method overrides
+  /// of a class.
+  const uint16_t ClassMethodDescriptor = 0x675a; // = 26458
+
   // Type descriptors as arguments.
   const uint16_t OpaqueTypeDescriptor = 0xbdd1; // = 48593
   const uint16_t ContextDescriptor = 0xb5e3; // = 46563

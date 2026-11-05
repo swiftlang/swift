@@ -102,7 +102,7 @@ import Swift
 // CHECK-DIRECT-SAME:         ptr {{.*}}@"$sBoWV{{(\.[^"]*)?}}",
 // CHECK-INDIRECT-SAME:       ptr null,
 // -- swift object type
-// CHECK-objc-SAME:           i64 {{.*}}@"$s15generic_classes14RootNonGenericCMm{{(\.[^"]*)?}}"
+// CHECK-objc-SAME:           {{i64|ptr}} {{.*}}@"$s15generic_classes14RootNonGenericCMm{{(\.[^"]*)?}}"
 // CHECK-native-SAME:         i64 0,
 // -- superclass
 // CHECK-DIRECT-objc-SAME:    ptr {{.*}}@"OBJC_CLASS_$_{{(_TtCs12_)?}}SwiftObject{{(.ptrauth)?}}"

@@ -2305,6 +2305,35 @@ llvm::Value *IRGenFunction::getDynamicSelfMetadata() {
   return SelfValue;
 }
 
+/// Whether to authenticate the signed class pointer in the isa of an object,
+/// rather than just strip its signature. Xcode's Swift compiler only
+/// authenticates it when the deployment target is at least iOS 14.5,
+/// tvOS 14.5 or watchOS 7.3.
+static bool shouldAuthenticateIsa(IRGenModule &IGM) {
+  const llvm::Triple &triple = IGM.Triple;
+  if (triple.isMacCatalystEnvironment())
+    return true;
+  if (triple.isWatchOS())
+    return !triple.isOSVersionLT(7, 3);
+  if (triple.isiOS())
+    return !triple.isOSVersionLT(14, 5);
+  return true;
+}
+
+/// The class pointer in the isa of an object is signed with the address of
+/// the object. Authenticate it, or strip its signature.
+static llvm::Value *emitAuthOrStripIsa(IRGenFunction &IGF, llvm::Value *isa,
+                                       llvm::Value *object) {
+  auto &schema = IGF.getOptions().PointerAuth.ObjCIsaPointers;
+  if (!schema)
+    return isa;
+  if (!shouldAuthenticateIsa(IGF.IGM))
+    return emitPointerAuthStrip(IGF, isa, schema.getKey());
+  auto authInfo =
+      PointerAuthInfo::emit(IGF, schema, object, PointerAuthEntity());
+  return emitPointerAuthAuth(IGF, isa, authInfo);
+}
+
 /// Given a non-tagged object pointer, load a pointer to its class object.
 llvm::Value *irgen::emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
                                                   llvm::Value *object) {
@@ -2315,7 +2344,7 @@ llvm::Value *irgen::emitLoadOfObjCHeapMetadataRef(IRGenFunction &IGF,
     llvm::Value *mask = IGF.Builder.CreateLoad(IGF.IGM.getAddrOfObjCISAMask());
     metadata = IGF.Builder.CreateAnd(metadata, mask);
     metadata = IGF.Builder.CreateIntToPtr(metadata, IGF.IGM.TypeMetadataPtrTy);
-    return metadata;
+    return emitAuthOrStripIsa(IGF, metadata, object);
   } else if (IGF.IGM.TargetInfo.hasOpaqueISAs()) {
     return emitHeapMetadataRefForUnknownHeapObject(IGF, object);
   } else {
@@ -2340,7 +2369,8 @@ static llvm::Value *emitLoadOfHeapMetadataRef(IRGenFunction &IGF,
         slot, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment()));
     if (IGF.IGM.EnableValueNames && object->hasName())
       metadata->setName(llvm::Twine(object->getName()) + ".metadata");
-    return metadata;
+    // HeapObject::metadata is an __ptrauth_objc_isa_pointer.
+    return emitAuthOrStripIsa(IGF, metadata, object);
   }
       
   case IsaEncoding::ObjC: {

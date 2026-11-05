@@ -224,7 +224,7 @@ public func concrete_concrete() {
 // CHECK-NEXT:    store ptr @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", ptr [[B_AT2_AT2_AT3_P3_PTR]], align 8
 // CHECK-NEXT:    [[Double_P1:%.*]] = call ptr @swift_getWitnessTable(
 // CHECK-SAME:        ptr
-// CHECK-SAME:        @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlMc"
+// CHECK-SAME:        @"$s34conditional_conformance_with_assoc6DoubleVyxq_GAA2P1A2A2P3R_AA2P23AT2RpzAafH_AhaGP3AT3RPzrlMc{{(\.ptrauth(\.[0-9]+)?)?}}"
 // CHECK-SAME:      ptr getelementptr inbounds (
 // CHECK-SAME:        %swift.full_type,
 // CHECK-SAME:        ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMf"
