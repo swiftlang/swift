@@ -329,6 +329,12 @@ extension ASTGenVisitor {
     return self.generateSourceLoc(node)
   }
 
+  /// The location of a closing parenthesis or bracket, which may have been
+  /// synthesized: see `generateRBraceLoc(_:of:)`.
+  func generateClosingDelimiterLoc(_ token: TokenSyntax, of node: some SyntaxProtocol) -> SourceLoc {
+    self.generateRBraceLoc(token, of: node)
+  }
+
   /// Obtains the C++ start location of `token`, or an invalid location if the
   /// parser synthesized it during recovery.
   ///

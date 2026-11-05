@@ -271,7 +271,7 @@ extension ASTGenVisitor {
       lSquareLoc: self.generateSourceLoc(node.leftSquare),
       elements: expressions.bridgedArray(in: self),
       commaLocs: commaLocations,
-      rSquareLoc: self.generateSourceLoc(node.rightSquare)
+      rSquareLoc: self.generateClosingDelimiterLoc(node.rightSquare, of: node)
     )
   }
 
@@ -285,7 +285,7 @@ extension ASTGenVisitor {
 
   public func generate(dictionaryExpr node: DictionaryExprSyntax) -> BridgedDictionaryExpr {
     let lBracketLoc = self.generateSourceLoc(node.leftSquare)
-    let rBracketLoc = self.generateSourceLoc(node.rightSquare)
+    let rBracketLoc = self.generateClosingDelimiterLoc(node.rightSquare, of: node)
     let elements: BridgedArrayRef
     let colonLocs: BridgedArrayRef
 

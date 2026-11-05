@@ -1367,7 +1367,7 @@ extension ASTGenVisitor {
         self.ctx,
         leftParenLoc: self.generateSourceLoc(node.leftParen),
         expr: self.generate(expr: node.elements.first!.expression),
-        rightParenLoc: self.generateSourceLoc(node.rightParen)
+        rightParenLoc: self.generateClosingDelimiterLoc(node.rightParen, of: node)
       ).asExpr
     }
 
@@ -1391,7 +1391,7 @@ extension ASTGenVisitor {
       exprs: expressions.bridgedArray(in: self),
       labels: labels.bridgedArray(in: self),
       labelLocs: labelLocations.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: self.generateClosingDelimiterLoc(node.rightParen, of: node)
     ).asExpr
   }
 
