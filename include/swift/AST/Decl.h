@@ -7119,6 +7119,12 @@ public:
     return getIntroducerStringRef(getIntroducer());
   }
 
+  /// Returns the ownership that binding this variable requires of the value
+  /// that its pattern matches, or \c std::nullopt if the binding works with
+  /// whatever ownership the match as a whole has, as a `let` binding does.
+  /// See \c Pattern::getOwnership().
+  std::optional<LoweredOwnership> getBindingOwnership() const;
+
   CaptureListExpr *getParentCaptureList() const {
     if (!Parent)
       return nullptr;

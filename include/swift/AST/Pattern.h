@@ -249,8 +249,8 @@ public:
   /// \c mostRestrictiveSubpatterns is non-null, the pointed-to vector will be
   /// populated with references to the subpatterns that cause the pattern to
   /// have stricter than "shared" ownership behavior for diagnostic purposes.
-  ValueOwnership getOwnership(
-    SmallVectorImpl<Pattern*> *mostRestrictiveSubpatterns = nullptr) const;
+  LoweredOwnership getOwnership(
+      SmallVectorImpl<Pattern *> *mostRestrictiveSubpatterns = nullptr) const;
 
   static bool classof(const Pattern *P) { return true; }
 
