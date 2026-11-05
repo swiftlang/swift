@@ -7312,6 +7312,18 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Instrumentation_DECL_ATTR: {
+        bool isImplicit;
+        bool isDefault;
+        unsigned disabledKinds;
+        serialization::decls_block::InstrumentationDeclAttrLayout::readRecord(
+            scratch, isImplicit, isDefault, disabledKinds);
+        Attr = new (ctx) InstrumentationAttr(
+            SourceLoc(), SourceRange(), isDefault,
+            InstrumentationMask(disabledKinds), isImplicit);
+        break;
+      }
+
       case decls_block::Section_DECL_ATTR: {
         bool isImplicit;
         bool isDefault;

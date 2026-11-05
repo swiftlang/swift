@@ -13,6 +13,7 @@
 #include "swift/AST/ASTBridging.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/Bridging/BasicSwift.h"
@@ -36,6 +37,19 @@ Identifier BridgedASTContext__getIdentifier(BridgedASTContext cContext,
 Identifier BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext,
                                                  size_t idx) {
   return cContext.unbridged().getDollarIdentifier(idx);
+}
+
+BridgedOptionalInstrumentationKind
+BridgedOptionalInstrumentationKind_fromString(BridgedStringRef cStr) {
+  if (auto kind = parseInstrumentationKind(cStr.unbridged()))
+    return *kind;
+  return BridgedOptionalInstrumentationKind();
+}
+
+bool BridgedASTContext_isModuleInstrumentationEnabled(
+    BridgedASTContext cContext, InstrumentationKind kind) {
+  return cContext.unbridged().SILOpts.getEnabledInstrumentation() &
+         getInstrumentationMask(kind);
 }
 
 BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext) {

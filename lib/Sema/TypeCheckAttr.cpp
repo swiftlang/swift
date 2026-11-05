@@ -474,6 +474,7 @@ public:
   void visitUsableFromInlineAttr(UsableFromInlineAttr *attr);
   void visitInlinableAttr(InlinableAttr *attr);
   void visitInlineAttr(InlineAttr *attr);
+  void visitInstrumentationAttr(InstrumentationAttr *attr) {}
   void visitOptimizeAttr(OptimizeAttr *attr);
   void visitExclusivityAttr(ExclusivityAttr *attr);
   void visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr);
@@ -4199,6 +4200,37 @@ void AttributeChecker::visitInlineAttr(InlineAttr *attr) {
 
   if (attr->getKind() != InlineKind::Always)
     return;
+
+  // '@inline(always)' demands that the function be inlined into every caller,
+  // while '@instrumentation(disable:)' demands that its body stay
+  // uninstrumented even when the caller is instrumented.
+  {
+    const InstrumentationAttr *disableAttr = nullptr;
+    auto findDisableAttr = [&](const Decl *decl) {
+      for (auto *instr : decl->getAttrs().getAttributes<InstrumentationAttr>()) {
+        if (instr->DisabledKinds) {
+          disableAttr = instr;
+          return;
+        }
+      }
+    };
+    findDisableAttr(D);
+    if (!disableAttr) {
+      if (auto *accessor = dyn_cast<AccessorDecl>(D))
+        findDisableAttr(accessor->getStorage());
+    }
+    if (disableAttr) {
+      diagnose(attr->getLocation(),
+               diag::attr_inline_always_with_instrumentation_disable)
+          .highlight(attr->getRangeWithAt());
+      diagnose(disableAttr->getLocation(),
+               diag::attr_instrumentation_disable_here)
+          .highlight(disableAttr->getRangeWithAt());
+      diagnose(attr->getLocation(),
+               diag::attr_instrumentation_inline_always_alternative);
+      return;
+    }
+  }
 
   // Can't have @inline(always) on @usableFromInline.
   auto *VD = cast<ValueDecl>(D);
@@ -9775,6 +9807,10 @@ public:
     // The name must not be empty.
     if (attr->Name && attr->Name->empty())
       ctx.Diags.diagnose(attr->getLocation(), diag::section_empty_name);
+  }
+
+  void visitInstrumentationAttr(InstrumentationAttr *attr) {
+    // Nothing else to check.
   }
 
   void checkExecutionBehaviorAttribute(DeclAttribute *attr) {

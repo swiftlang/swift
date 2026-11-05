@@ -1173,6 +1173,11 @@ public:
   /// belongs in the platform-appropriate default section.
   std::optional<StringRef> getSection() const;
 
+  /// Determine the kinds of compiler-inserted instrumentation that are
+  /// disabled for this declaration, based on explicit `@instrumentation`
+  /// attributes and the propagation rules for them.
+  InstrumentationMask getDisabledInstrumentation() const;
+
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
   /// Iterate over the auxiliary declarations for this declaration,

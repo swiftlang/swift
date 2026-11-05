@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1043; // widen remaining 16-bit hash table dataLengths to uint32
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1044; // @instrumentation attribute, SIL function instrumentation mask
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2326,6 +2326,13 @@ namespace decls_block {
     SILGenName_DECL_ATTR,
     BCFixed<1>, // implicit flag
     BCBlob      // _silgen_name
+  >;
+
+  using InstrumentationDeclAttrLayout = BCRecordLayout<
+    Instrumentation_DECL_ATTR,
+    BCFixed<1>, // implicit flag
+    BCFixed<1>, // default flag
+    BCFixed<8>  // disabled instrumentation kinds
   >;
 
   using SectionDeclAttrLayout = BCRecordLayout<

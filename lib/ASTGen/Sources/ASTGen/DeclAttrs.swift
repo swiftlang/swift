@@ -164,6 +164,8 @@ extension ASTGenVisitor {
         return handle(self.generateImplementsAttr(attribute: node)?.asDeclAttribute)
       case .Inline:
         return handle(self.generateInlineAttr(attribute: node)?.asDeclAttribute)
+      case .Instrumentation:
+        return handle(self.generateInstrumentationAttr(attribute: node)?.asDeclAttribute)
       case .Lifetime:
         return handle(self.generateLifetimeAttr(attribute: node)?.asDeclAttribute)
       case .MacroRole:
@@ -1275,6 +1277,56 @@ extension ASTGenVisitor {
       range: self.generateAttrSourceRange(node),
       kind: kind
     )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @instrumentation(disable: address, thread)
+  ///   @instrumentation(default)
+  ///   @instrumentation(default, disable: thread)
+  ///   ```
+  func generateInstrumentationAttr(attribute node: AttributeSyntax) -> BridgedInstrumentationAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      var isDefault = false
+      var disabledKinds: UInt8 = 0
+      var inDisableList = false
+      while let arg = args.first {
+        guard let declRef = arg.expression.as(DeclReferenceExprSyntax.self),
+          declRef.argumentNames == nil, declRef.moduleSelector == nil
+        else {
+          self.diagnose(.invalidArgumentInAttribute(node, arg.expression))
+          return nil
+        }
+        let name = declRef.baseName.rawText
+        if arg.label?.rawText == "disable" {
+          inDisableList = true
+        } else if arg.label != nil || !inDisableList {
+          if arg.label == nil && name == "default" {
+            isDefault = true
+            inDisableList = false
+            args.removeFirst()
+            continue
+          }
+          self.diagnose(.invalidArgumentInAttribute(node, arg.expression))
+          return nil
+        }
+        let optionalKind = BridgedOptionalInstrumentationKind(from: declRef.baseName.rawText.bridged)
+        guard optionalKind.hasValue else {
+          self.diagnose(.invalidArgumentInAttribute(node, arg.expression))
+          return nil
+        }
+        let kind = optionalKind.value
+        disabledKinds |= 1 << UInt8(kind.rawValue)
+        args.removeFirst()
+      }
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        isDefault: isDefault,
+        disabledKinds: disabledKinds
+      )
+    }
   }
 
   func generateLifetimeDescriptor(nameToken node: TokenSyntax, lifetimeDependenceKind: BridgedParsedLifetimeDependenceKind = .default) -> BridgedLifetimeDescriptor {

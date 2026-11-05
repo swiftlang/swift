@@ -81,6 +81,7 @@ SILFunction *GenericCloner::createDeclaration(
   }
 
   NewF->setOptimizationMode(Orig->getOptimizationMode());
+  NewF->setDisabledInstrumentation(Orig->getDisabledInstrumentation());
   if (!Orig->hasOwnership()) {
     NewF->setOwnershipEliminated();
   }

@@ -970,7 +970,12 @@ DECL_ATTR(_cArrayProjection, CArrayProjection,
   UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   183)
 
-LAST_DECL_ATTR(CArrayProjection)
+DECL_ATTR(instrumentation, Instrumentation,
+  OnAbstractFunction | OnSubscript,
+  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  184)
+
+LAST_DECL_ATTR(Instrumentation)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

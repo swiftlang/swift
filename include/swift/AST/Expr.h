@@ -4229,6 +4229,11 @@ public:
   /// belongs in the platform-appropriate default section.
   std::optional<StringRef> getSection() const;
 
+  /// Determine the kinds of compiler-inserted instrumentation that are
+  /// disabled for this closure, based on an explicit `@instrumentation`
+  /// attribute or the one on the enclosing function or closure.
+  InstrumentationMask getDisabledInstrumentation() const;
+
   static bool classof(const Expr *E) {
     return E->getKind() >= ExprKind::First_AbstractClosureExpr &&
            E->getKind() <= ExprKind::Last_AbstractClosureExpr;

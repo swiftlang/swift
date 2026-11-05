@@ -279,6 +279,8 @@ void SILFunctionBuilder::addFunctionAttributes(
   if (isa<AbstractFunctionDecl>(decl)) {
     if (auto sectionName = decl->getSection())
       F->setSection(*sectionName);
+
+    F->setDisabledInstrumentation(decl->getDisabledInstrumentation());
   }
 
   if (auto *TA = decl->getAttrs().getAttribute<TargetAttr>())
@@ -490,6 +492,8 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
     // inferred from the enclosing function or closure.
     if (auto sectionName = ce->getSection())
       F->setSection(*sectionName);
+
+    F->setDisabledInstrumentation(ce->getDisabledInstrumentation());
 
     if (mod.getOptions().EnableGlobalAssemblyVision) {
       F->addSemanticsAttr(semantics::FORCE_EMIT_OPT_REMARK_PREFIX);

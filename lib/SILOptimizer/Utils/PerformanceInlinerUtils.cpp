@@ -826,6 +826,17 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
 
   SILFunction *Caller = AI.getFunction();
 
+  // Refuse to inline a callee that disables some instrumentation into a caller
+  // that doesn't also disable it: IRGen would otherwise instrument the
+  // callee's body as part of the caller's LLVM function, defeating
+  // @instrumentation(disable:). The reverse direction is fine, because the
+  // callee never asked for its body to be left uninstrumented.
+  if (Callee->getDisabledInstrumentation() &
+      ~Caller->getDisabledInstrumentation() &
+      Callee->getModule().getOptions().getEnabledInstrumentation()) {
+    return nullptr;
+  }
+
   // @_target requires an exact match between caller and callee.
   if (Caller->targetFeatures() != Callee->targetFeatures()) {
     return nullptr;

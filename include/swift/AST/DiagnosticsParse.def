@@ -1564,6 +1564,11 @@ ERROR(attr_expected_semi,none,
 ERROR(attr_expected_comma,none,
 "expected ',' in '%0' %select{attribute|modifier}1", (StringRef, bool))
 
+ERROR(attr_instrumentation_expected_default_or_disable,none,
+"expected 'default' or 'disable:' in '@instrumentation' attribute", ())
+ERROR(attr_instrumentation_expected_kind,none,
+"expected instrumentation kind in '@instrumentation' attribute", ())
+
 ERROR(attr_expected_string_literal,none,
 "expected string literal in '%0' attribute", (StringRef))
 

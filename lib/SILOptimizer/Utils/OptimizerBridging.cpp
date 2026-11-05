@@ -637,6 +637,8 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   // A specialization of a function goes into the same section as the original
   // function.
   specializedApplySiteCallee->setSection(original->section());
+  specializedApplySiteCallee->setDisabledInstrumentation(
+      original->getDisabledInstrumentation());
 
   specializedApplySiteCallee->inheritDerivedFrom(original);
 

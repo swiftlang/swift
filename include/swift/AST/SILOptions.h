@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_SILOPTIONS_H
 #define SWIFT_AST_SILOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/OptionSet.h"
@@ -25,6 +26,9 @@
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Remarks/RemarkFormat.h"
+// FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
+// split the header upstream so we don't include so much.
+#include "llvm/Transforms/Utils/Instrumentation.h"
 #include <climits>
 #include <string>
 
@@ -263,6 +267,27 @@ public:
 
   /// Indicates which sanitizer is turned on.
   OptionSet<SanitizerKind> Sanitizers;
+
+  /// Which kinds of SanitizerCoverage instrumentation are enabled.
+  llvm::SanitizerCoverageOptions SanitizeCoverage;
+
+  /// The kinds of compiler-inserted instrumentation that are enabled for the
+  /// module being compiled, derived from \c Sanitizers and
+  /// \c SanitizeCoverage. This is what \c moduleInstrumentation(...) tests,
+  /// and what \c @instrumentation(disable:) can opt out of.
+  InstrumentationMask getEnabledInstrumentation() const {
+    InstrumentationMask mask = 0;
+    if (Sanitizers & SanitizerKind::Address)
+      mask |= getInstrumentationMask(InstrumentationKind::Address);
+    if (Sanitizers & SanitizerKind::Thread)
+      mask |= getInstrumentationMask(InstrumentationKind::Thread);
+    if (Sanitizers & SanitizerKind::MemTagStack)
+      mask |= getInstrumentationMask(InstrumentationKind::MemTagStack);
+    if (SanitizeCoverage.CoverageType !=
+        llvm::SanitizerCoverageOptions::SCK_None)
+      mask |= getInstrumentationMask(InstrumentationKind::Coverage);
+    return mask;
+  }
 
   /// Emit compile-time diagnostics when the law of exclusivity is violated.
   bool EnforceExclusivityStatic = true;

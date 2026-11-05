@@ -3657,6 +3657,15 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Instrumentation: {
+      auto *theAttr = cast<InstrumentationAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[InstrumentationDeclAttrLayout::Code];
+      InstrumentationDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          theAttr->IsDefault, theAttr->DisabledKinds);
+      return;
+    }
+
     case DeclAttrKind::Target: {
       auto *theAttr = cast<TargetAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[TargetDeclAttrLayout::Code];

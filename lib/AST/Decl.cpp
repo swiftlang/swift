@@ -2856,6 +2856,11 @@ std::optional<StringRef> Decl::getSection() const {
                            SectionForDeclRequest{this}, std::nullopt);
 }
 
+InstrumentationMask Decl::getDisabledInstrumentation() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DisabledInstrumentationForDeclRequest{this}, 0);
+}
+
 bool ValueDecl::hasNonUniqueDefinition() const {
   // This only forces the issue in embedded Swift.
   if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
