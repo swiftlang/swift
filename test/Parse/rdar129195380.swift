@@ -1,5 +1,9 @@
 // RUN: not %target-swift-frontend -experimental-skip-all-function-bodies -dump-parse %s | %FileCheck %s
 
+// This checks how the C++ parser recovers from an unterminated '#if' (it swallows
+// the rest of the file); SwiftParser keeps the declarations inside the clause.
+// UNSUPPORTED: parser_astgen
+
 // rdar://129195380 - Make sure the skipping logic can handle #if.
 struct S {
   // CHECK: func_decl{{.*}}:[[@LINE+1]]:3 - line:[[@LINE+11]]:3{{.*}}"foo()"
