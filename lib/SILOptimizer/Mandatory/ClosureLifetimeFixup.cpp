@@ -1360,8 +1360,7 @@ static bool trySwitchEnumPeephole(ConvertEscapeToNoEscapeInst *cvt) {
     SILInstruction *lastDestroy = nullptr;
     for (auto *use : diamondSucc2->getArgument(0)->getUses()) {
       SILInstruction *user = use->getUser();
-      if (isa<ReleaseValueInst>(user) || isa<StrongReleaseInst>(user) ||
-          isa<DestroyValueInst>(user)) {
+      if (isa<DestroyValueInst>(user)) {
         if (lastDestroy)
           return nullptr;
         lastDestroy = user;
@@ -1417,8 +1416,7 @@ static SILInstruction *getOnlyDestroy(CopyBlockWithoutEscapingInst *cb) {
     if (onlyDestroy)
       return nullptr;
 
-    if (isa<DestroyValueInst>(inst) || isa<ReleaseValueInst>(inst) ||
-        isa<StrongReleaseInst>(inst)) {
+    if (isa<DestroyValueInst>(inst)) {
       onlyDestroy = inst;
       continue;
     }
@@ -1562,9 +1560,7 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
 
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
-  updater.initialize(&fn, optionalEscapingClosureTy,
-                     fn.hasOwnership() ? OwnershipKind::Owned
-                                       : OwnershipKind::None);
+  updater.initialize(&fn, optionalEscapingClosureTy, OwnershipKind::Owned);
 
   // Create the Optional.none as the beginning available value.
   SILValue entryBlockOptionalNone;
@@ -1729,6 +1725,12 @@ class ClosureLifetimeFixup : public SILFunctionTransform {
     // Don't rerun diagnostics on deserialized functions.
     if (getFunction()->wasDeserializedCanonical())
       return;
+
+    // SILGen only emits OSSA, but raw SIL parsed from .sil files can contain
+    // non-OSSA functions which still go through the mandatory pipeline.
+    if (!getFunction()->hasOwnership()) {
+      return;
+    }
 
     // Fixup convert_escape_to_noescape [not_guaranteed] and
     // copy_block_without_escaping instructions.

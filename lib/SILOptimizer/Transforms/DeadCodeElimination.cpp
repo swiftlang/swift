@@ -145,29 +145,18 @@ class DCE {
   llvm::DenseMap<SILValue, SmallPtrSet<SILInstruction *, 4>>
       ReverseDependencies;
 
-  // guaranteedPhiDependencies tracks the dependency of reborrows and
-  // @guaranteed forwarding phis with its base value.
-  // If the base value is also passed along as a phi operand with the reborrow
-  // operand/GuaranteedForwardingPhi operand, we will have a new base value
-  // for the reborrow phi/@guaranteed forwarding phi.
-  using BaseValueSet = SmallPtrSet<SILValue, 8>;
-  llvm::DenseMap<SILPhiArgument *, BaseValueSet> guaranteedPhiDependencies;
-
   /// Tracks if the pass changed branches.
   bool BranchesChanged = false;
   /// Tracks if the pass changed ApplyInsts.
   bool CallsChanged = false;
 
   bool precomputeControlInfo();
-  /// Populates borrow dependencies and disables DCE if needed.
+  /// Disables DCE of the borrow scopes enclosing \p borrow if needed.
   void processBorrow(BorrowedValue borrow);
   void markLive();
   /// Record a reverse dependency from \p from to \p to meaning \p to is live
   /// if \p from is also live.
   void addReverseDependency(SILValue from, SILInstruction *to);
-  /// Starting from \p borrow find all reborrow and guaranteed phi dependencies
-  /// along with their base values.
-  void findGuaranteedPhiDependencies(BorrowedValue borrow);
   bool removeDead();
 
   void computeLevelNumbers(PostDomTreeNode *root);
@@ -272,45 +261,36 @@ static BuiltinInst *getProducer(CondFailInst *CFI) {
 }
 
 void DCE::processBorrow(BorrowedValue borrow) {
-  // Populate guaranteedPhiDependencies for this borrow
-  findGuaranteedPhiDependencies(borrow);
   if (!borrow.hasReborrow()) {
     return;
   }
 
-  // If the borrow was not computed from another
-  // borrow, return.
-  SILValue baseValue;
-  if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(*borrow)) {
-    auto borrowOp = beginBorrow->getOperand();
-    if (borrowOp->getOwnershipKind() != OwnershipKind::Guaranteed) {
-      return;
-    }
-    baseValue = borrowOp;
-  } else {
-    auto *loadBorrow = cast<LoadBorrowInst>(*borrow);
-    auto accessBase = AccessBase::compute(loadBorrow->getOperand());
-    if (!accessBase.isReference()) {
-      return;
-    }
-    baseValue = accessBase.getReference();
-  }
-  // If the borrow was computed from another
-  // borrow, disable DCE of the outer borrow.
+  // If the borrow is nested in other borrow scopes, disable DCE of those outer
+  // borrows by marking their end_borrows live.
   // This is because, when a reborrow is dead, DCE has to insert
   // end_borrows in predecessor blocks and it cannot yet handle borrow
   // nesting.
   // TODO: Instead of disabling DCE of outer borrow, consider inserting
   // end_borrows inside-out.
-  SmallVector<SILValue, 4> roots;
-  findGuaranteedReferenceRoots(baseValue,
-                               /*lookThroughNestedBorrows=*/false, roots);
-  // Visit the end_borrows of all the borrow scopes that this
-  // begin_borrow could be borrowing, and mark them live.
-  for (auto root : roots) {
-    visitTransitiveEndBorrows(root, [&](EndBorrowInst *endBorrow) {
+  auto disableOuterBorrow = [&](SILValue outerBorrow) {
+    // An owned value is not a borrow scope.
+    if (outerBorrow->getOwnershipKind() != OwnershipKind::Guaranteed) {
+      return true;
+    }
+    visitTransitiveEndBorrows(outerBorrow, [&](EndBorrowInst *endBorrow) {
       markInstructionLive(endBorrow);
     });
+    return true;
+  };
+  visitEnclosingDefs(*borrow, disableOuterBorrow);
+
+  // A load_borrow of a class field is nested in the borrow scope of the class
+  // reference.
+  if (auto *loadBorrow = dyn_cast<LoadBorrowInst>(*borrow)) {
+    auto accessBase = AccessBase::compute(loadBorrow->getOperand());
+    if (accessBase.isReference()) {
+      visitBorrowIntroducers(accessBase.getReference(), disableOuterBorrow);
+    }
   }
 }
 
@@ -399,26 +379,6 @@ void DCE::addReverseDependency(SILValue from, SILInstruction *to) {
   ReverseDependencies[from].insert(to);
 }
 
-void DCE::findGuaranteedPhiDependencies(BorrowedValue borrow) {
-  assert(borrow.kind == BorrowedValueKind::BeginBorrow ||
-         borrow.kind == BorrowedValueKind::DereferenceBorrow ||
-         borrow.kind == BorrowedValueKind::LoadBorrow);
-  LLVM_DEBUG(llvm::dbgs() << "Finding @guaranteed phi dependencies of "
-                          << borrow << "\n");
-  auto visitDependentPhiBaseValuePair = [&](SILPhiArgument *phiArg,
-                                            SILValue baseValue) {
-    guaranteedPhiDependencies[phiArg].insert(baseValue);
-  };
-  // Find all dependencies starting from \p borrowInst and populate
-  // them in guaranteedPhiDependencies
-  if (borrow.kind == BorrowedValueKind::BeginBorrow) {
-    visitExtendedReborrowPhiBaseValuePairs(cast<BeginBorrowInst>(borrow.value),
-                                           visitDependentPhiBaseValuePair);
-  }
-  visitExtendedGuaranteedForwardingPhiBaseValuePairs(
-      borrow, visitDependentPhiBaseValuePair);
-}
-
 // Mark as live the terminator argument at index ArgIndex in Pred that
 // targets Succ.
 void DCE::markTerminatorArgsLive(SILBasicBlock *Pred,
@@ -483,9 +443,11 @@ void DCE::propagateLiveBlockArgument(SILArgument *Arg) {
   }
   markReborrowBlocksLive(Arg);
 
-  if (auto *phi = dyn_cast<SILPhiArgument>(Arg)) {
-    for (auto depVal : guaranteedPhiDependencies.lookup(phi)) {
-      markValueLive(depVal);
+  // A guaranteed phi depends on the enclosing values of its borrowed_from.
+  if (auto *borrowedFrom =
+          dyn_cast<BorrowedFromInst>(lookThroughBorrowedFromUser(Arg))) {
+    for (SILValue enclosingValue : borrowedFrom->getEnclosingValues()) {
+      markValueLive(enclosingValue);
     }
   }
 
