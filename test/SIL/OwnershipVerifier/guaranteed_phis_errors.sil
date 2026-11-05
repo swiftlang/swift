@@ -67,7 +67,7 @@ bb2(%phi : @guaranteed $SuperKlass):
 // CHECK: Found outside of lifetime use?!
 // CHECK: Value: %9 = argument of bb3 : $Klass
 // CHECK: Consuming User:   destroy_value %9 : $Klass
-// CHECK: Non Consuming User:   end_borrow %10 : $Klass
+// CHECK: Non Consuming User:   end_borrow %11 : $Klass
 // CHECK: Block: bb3
 // CHECK: Error#: 0. End Error in Function: 'test3'
 sil [ossa] @test3 : $@convention(thin) (@guaranteed Klass, @guaranteed Klass) -> () {
@@ -84,11 +84,12 @@ bb2:
   %borrow1 = begin_borrow %copy1 : $Klass
   br bb3(%copy1 : $Klass, %borrow1 : $Klass)
 
-bb3(%phi : @owned $Klass, %gphi : @guaranteed $Klass):
+bb3(%phi : @owned $Klass, %gphi : @reborrow $Klass):
+  %gphibf = borrowed %gphi : $Klass from (%phi : $Klass)
   %func = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   apply %func(%phi) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %phi : $Klass
-  end_borrow %gphi : $Klass
+  end_borrow %gphibf : $Klass
   %9999 = tuple()
   return %9999 : $()
 }
