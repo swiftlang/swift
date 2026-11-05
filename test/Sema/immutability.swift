@@ -384,8 +384,9 @@ func testSelectorStyleArguments1(_ x: Int, bar y: Int) {
 
 func testSelectorStyleArguments2(let x: Int, // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
                                  let bar y: Int) { // expected-warning {{'let' in this position is interpreted as an argument label}}{{34-37=`let`}}
-// expected-error @-1 {{expected ',' separator}}
-// expected-error @-2 {{expected ':' following argument label and parameter name}}
+// expected-cparser-error @-1 {{expected ',' separator}}
+// expected-cparser-error @-2 {{expected ':' following argument label and parameter name}}
+// expected-astgen-error @-3 {{unexpected code 'y' in parameter}}
 }
 func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
   ++x  // expected-error {{cannot pass immutable value to mutating operator: 'x' is a 'let' constant}}
@@ -393,7 +394,8 @@ func testSelectorStyleArguments3(_ x: Int, bar y: Int) {
 }
 
 func invalid_inout(inout var x : Int) { // expected-warning {{'var' in this position is interpreted as an argument label}} {{26-29=`var`}}
-// expected-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{20-25=}} {{34-34=inout }}
+// expected-cparser-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{20-25=}} {{34-34=inout }}
+// expected-astgen-error @-2 {{'inout' before a parameter name is not allowed}}
 }
 
 class VarTester {
@@ -531,12 +533,17 @@ struct StructWithDelegatingInit {
 
 // <rdar://problem/16792027> compiler infinite loops on a really mutating function
 struct F {
+  // swift-syntax makes the modifiers of 'g' below part of this declaration, so
+  // it diagnoses a third duplicate there and the conflict at this location.
   mutating mutating mutating f() { // expected-error 2 {{duplicate modifier}}
-                                   // expected-note@-1 2 {{modifier already specified here}}
-                                   // expected-error@-2 {{expected 'func' keyword in instance method declaration}}
+                                   // expected-cparser-note@-1 2 {{modifier already specified here}}
+                                   // expected-cparser-error@-2 {{expected 'func' keyword in instance method declaration}}
+                                   // expected-astgen-note@-3 3 {{modifier already specified here}}
+                                   // expected-astgen-error@-4 {{unexpected code before modifier}}
+                                   // expected-astgen-error@-5 {{method must not be declared both 'mutating' and 'nonmutating'}}
   }
   
-  mutating nonmutating func g() {}  // expected-error {{method must not be declared both 'mutating' and 'nonmutating'}}
+  mutating nonmutating func g() {}  // expected-cparser-error {{method must not be declared both 'mutating' and 'nonmutating'}} expected-astgen-error {{duplicate modifier}}
   __consuming nonmutating func h() {}  // expected-error {{method must not be declared both '__consuming' and 'nonmutating'}}
   __consuming mutating func i() {}  // expected-error {{method must not be declared both '__consuming' and 'mutating'}}
   nonmutating mutating func j() {}  // expected-error {{method must not be declared both 'nonmutating' and 'mutating'}}
