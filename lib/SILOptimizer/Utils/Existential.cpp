@@ -245,8 +245,16 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
-      [&](InFlightSubstitution &, Type, ProtocolDecl *proto)
+      [&](InFlightSubstitution &IFS, Type origType, ProtocolDecl *proto)
           -> ProtocolConformanceRef {
+        // Requirements on associated types of the opened existential, e.g.
+        // the default `Self.A: Copyable` for a suppressed primary associated
+        // type `A`, are not part of the existential's conformances. Look them
+        // up on the concrete type. This can fail, e.g. if the concrete type's
+        // associated type is not Copyable.
+        if (!origType->is<GenericTypeParamType>())
+          return lookupConformance(origType.subst(IFS), proto);
+
         // Directly providing ExistentialConformances to the SubstitutionMap will
         // fail because of the mismatch between opened archetype conformance and
         // existential value conformance. Instead, provide a conformance lookup
@@ -261,6 +269,13 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
         assert(iter != ExistentialConformances.end() && "missing conformance");
         return *iter;
       });
+
+  for (ProtocolConformanceRef conformance : ExistentialSubs.getConformances()) {
+    if (conformance.isInvalid()) {
+      ExistentialSubs = SubstitutionMap();
+      return;
+    }
+  }
   assert(isValid());
 }
 
@@ -268,10 +283,8 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
 /// ConcreteTypeDef to the definition of that type.
 void ConcreteExistentialInfo::initializeConcreteTypeDef(
     SILInstruction *typeConversionInst) {
-  if (!isa<ExistentialArchetypeType>(ConcreteType))
+  if (!isValid() || !isa<ExistentialArchetypeType>(ConcreteType))
     return;
-
-  assert(isValid());
 
   // If the concrete type is another existential, we're "forwarding" an
   // opened existential type, so we must keep track of the original
@@ -387,8 +400,6 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
   /// Determine the ExistentialConformances and SubstitutionMap.
   ExistentialType = Protocol->getDeclaredInterfaceType()->getCanonicalType();
   initializeSubstitutionMap(ProtocolConformanceRef(ConcreteConformance), M);
-
-  assert(isValid());
 }
 
 ConcreteOpenedExistentialInfo::ConcreteOpenedExistentialInfo(Operand &use)
