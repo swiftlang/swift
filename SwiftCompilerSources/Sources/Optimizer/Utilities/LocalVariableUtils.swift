@@ -283,6 +283,9 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
 
   let isLiveIn: Bool
   let isLiveOut: Bool
+  // True if the variable's memory is visible to the caller after a throw or unwind. An @out result is uninitialized
+  // on the error path, but an @inout argument or captured variable remains live.
+  let isLiveOutOnError: Bool
 
   // All mapped accesses have a valid instruction.
   //
@@ -309,20 +312,25 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
     case is AllocBoxInst, is AllocStackInst:
       self.isLiveIn = false
       self.isLiveOut = false
+      self.isLiveOutOnError = false
     case let arg as FunctionArgument:
       switch arg.convention {
       case .indirectIn:
         self.isLiveIn = true
         self.isLiveOut = false
+        self.isLiveOutOnError = false
       case .indirectInout, .indirectInoutAliasable:
         self.isLiveIn = true
         self.isLiveOut = true
+        self.isLiveOutOnError = true
       case .indirectOut:
         self.isLiveIn = false
         self.isLiveOut = true
+        self.isLiveOutOnError = false
       case .directGuaranteed: // Box captured by closure
         self.isLiveIn = true
         self.isLiveOut = true
+        self.isLiveOutOnError = true
       default:
         return nil
       }
@@ -985,10 +993,12 @@ extension LocalVariableReachableAccess {
       if let blockInfo, blockInfo.hasDealloc {
         break
       }
-      // Assume that only a ReturnInst can return a live-out value.
-      // All other function exits are considered dead-ends.
-      if block.terminator is ReturnInstruction, accessMap.isLiveOut {
-        accessStack.push(LocalVariableAccess(.outgoingArgument, block.terminator))
+      // A ReturnInst returns all live-out values. A throw or unwind returns live-out values that remain initialized
+      // on the error path (@inout, @inout_aliasable, and captured boxes, but not @out). 'unreachable' is a dead-end.
+      let terminator = block.terminator
+      if terminator is ReturnInstruction ? accessMap.isLiveOut
+                                         : terminator.isFunctionExiting && accessMap.isLiveOutOnError {
+        accessStack.push(LocalVariableAccess(.outgoingArgument, terminator))
       } else if block.successors.isEmpty, mode == .livenessUses {
         accessStack.push(LocalVariableAccess(.deadEnd, block.terminator))
       } else {
