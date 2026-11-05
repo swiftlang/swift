@@ -194,7 +194,20 @@ public func parseSourceFile(
     parsed = Syntax(AttributeClauseFileSyntax.parse(from: &parser))
 
   case .bodyMacroExpansion:
-    parsed = Syntax(CodeBlockFileSyntax.parse(from: &parser))
+    let block = CodeBlockFileSyntax.parse(from: &parser)
+    if block.body.leftBrace.presence == .present {
+      parsed = Syntax(block)
+    } else {
+      // The C++ parser produces no body, and no diagnostics, for an expansion
+      // that does not start with '{' (such as an empty one). Model that with an
+      // empty source file rather than a code block missing its braces.
+      var emptyParser = Parser(
+        "",
+        swiftVersion: Parser.SwiftVersion(from: ctx),
+        languageFeatures: Parser.LanguageFeatures(from: ctx)
+      )
+      parsed = Syntax(SourceFileSyntax.parse(from: &emptyParser))
+    }
   }
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
