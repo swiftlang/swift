@@ -943,8 +943,10 @@ static const clang::CXXRecordDecl *
 getForeignReferenceSubclassShim(IRGenFunction &IGF, SILType selfType,
                                 const ClassLayout &classLayout) {
   auto &IGM = IGF.IGM;
-  ASSERT(classLayout.isFixedLayout() &&
-         "foreign reference subclass without a fixed layout");
+  if (!classLayout.isFixedLayout())
+    // This has been diagnosed already.
+    return nullptr;
+
   auto classDecl = selfType.getASTType()->getClassDecl();
   auto baseFRT = classDecl->getForeignReferenceSuperclassOrSelf();
   auto baseRecord =
@@ -1005,6 +1007,9 @@ static llvm::Value *
 emitCXXForeignReferenceSubclassAllocation(IRGenFunction &IGF, SILType selfType,
                                           const ClassLayout &classLayout) {
   auto shim = getForeignReferenceSubclassShim(IGF, selfType, classLayout);
+  if (!shim)
+    return llvm::PoisonValue::get(IGF.IGM.PtrTy);
+
   auto allocFn = getShimMethod(IGF.IGM, shim, "__swift_allocate");
   ASSERT(allocFn && "subclass shim is missing __swift_allocate");
   auto call = IGF.Builder.CreateCall(allocFn->getFunctionType(), allocFn, {});
@@ -1018,6 +1023,8 @@ void irgen::emitCXXForeignReferenceSubclassVTablesInitialization(
   auto &classLayout = classTI.getClassLayout(IGM, selfType,
                                              /*forBackwardDeployment=*/false);
   auto shim = getForeignReferenceSubclassShim(IGF, selfType, classLayout);
+  if (!shim)
+    return;
 
   // The v-tables of the subclass are those of its shim. Ask Clang to initialize
   // the v-table pointers the same way as a constructor of the shim class would.
@@ -1261,6 +1268,33 @@ void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                      size, alignMask, maybeDescriptor);
 }
 
+/// The storage of a Swift subclass of a C++ foreign reference type is allocated
+/// with a size that is fixed at compile time, so the size of each of its stored
+/// properties must be known at compile time.
+static void
+diagnoseNonFixedSizeForeignReferenceSubclassFields(IRGenModule &IGM,
+                                                   ClassDecl *classDecl) {
+  SILType selfType = getSelfType(classDecl);
+  auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &layout = classTI.getClassLayout(IGM, selfType,
+                                        /*forBackwardDeployment=*/false);
+  if (layout.isFixedSize())
+    return;
+
+  forEachField(IGM, classDecl, [&](Field field) {
+    if (field.getKind() != Field::Kind::Var)
+      return;
+    auto elemLayout = layout.getFieldAccessAndElement(field).second;
+    if (elemLayout.getType().isFixedSize())
+      return;
+
+    auto var = field.getVarDecl();
+    IGM.Context.Diags.diagnose(
+        var, diag::foreign_reference_subclass_field_not_fixed_size, var,
+        var->getInterfaceType());
+  });
+}
+
 /// emitClassDecl - Emit all the declarations associated with this class type.
 void IRGenModule::emitClassDecl(ClassDecl *D) {
   PrettyStackTraceDecl prettyStackTrace("emitting class metadata for", D);
@@ -1268,6 +1302,7 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   // A Swift class that subclasses a C++ foreign reference type does not get
   // Swift class metadata.
   if (!D->isForeignReferenceType() && D->getForeignReferenceSuperclassOrSelf()) {
+    diagnoseNonFixedSizeForeignReferenceSubclassFields(*this, D);
     emitForeignReferenceSubclassMetadata(*this, D);
     emitNestedTypeDecls(D->getMembers());
     return;
