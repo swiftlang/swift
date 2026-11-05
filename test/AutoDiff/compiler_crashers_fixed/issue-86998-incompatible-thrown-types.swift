@@ -32,7 +32,14 @@ extension Array where Element: Differentiable {
             pullbacks.append(pb)
         }
         func pullback(_ tans: Array<Result>.TangentVector) -> Array.TangentVector {
-            .init(zip(tans.base, pullbacks).map { tan, pb in pb(tan) })
+          switch tans.storage {
+          case .zero:
+            return .zero
+          case .oneHot(let index, let value, let count):
+            return .init(.oneHot(index: index, value: pullbacks[index](value), count: count))
+          case .full(let arr):
+            return .init(.full(zip(arr, pullbacks).map { tan, pb in pb(tan) }))
+          }
         }
         return (value: values, pullback: pullback)
     }
