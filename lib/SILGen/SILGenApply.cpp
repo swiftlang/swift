@@ -192,7 +192,10 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
 
   if (funcDecl->isFinal())
     return true;
-  
+
+  if (funcDecl->isObjCDirect())
+    return true;
+
   // Native initializing entry points are always statically dispatched.
   if (constant.kind == SILDeclRef::Kind::Initializer
       && !constant.isForeign)

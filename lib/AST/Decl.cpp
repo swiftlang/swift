@@ -3454,8 +3454,8 @@ static bool isPolymorphic(const AbstractStorageDecl *storage) {
     // Accesses to members of foreign reference types should be made directly
     // to storage as these are references to clang records which are not allowed
     // to have dynamic dispatch.
-    if (storage->isFinal() || classDecl->isFinal() ||
-        classDecl->isForeignReferenceType())
+    if (storage->isFinal() || storage->isObjCDirect() ||
+        classDecl->isFinal() || classDecl->isForeignReferenceType())
       return false;
 
     return true;

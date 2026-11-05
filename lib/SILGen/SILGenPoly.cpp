@@ -7422,6 +7422,7 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness,
   }
 
   bool isFinal = (decl->isFinal() || C->isFinal());
+  bool isObjCDirect = decl->isObjCDirect();
   if (auto fnDecl = dyn_cast<AbstractFunctionDecl>(witness.getDecl()))
     isFinal |= fnDecl->hasForcedStaticDispatch();
 
@@ -7432,7 +7433,8 @@ static WitnessDispatchKind getWitnessDispatchKind(SILDeclRef witness,
   // A natively ObjC method witness referenced this way will end up going
   // through its native thunk, which will redispatch the method after doing
   // bridging just like we want.
-  if (isFinal || isExtension || witness.isForeignToNativeThunk())
+  // @objcDirect implies static dispatch.
+  if (isFinal || isExtension || isObjCDirect || witness.isForeignToNativeThunk())
     return WitnessDispatchKind::Static;
 
   if (witness.kind == SILDeclRef::Kind::Allocator) {
