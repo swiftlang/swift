@@ -1,4 +1,4 @@
 // RUN: %target-typecheck-verify-swift
 
-/* unterminated block comment expected-note{{comment started here}}
-   expected-error{{unterminated '/*' comment}} {{60-60=*/}}
+/* unterminated block comment expected-cparser-note{{comment started here}} expected-astgen-error{{unterminated}}
+   expected-cparser-error{{unterminated '/*' comment}} {{68-68=*/}}
