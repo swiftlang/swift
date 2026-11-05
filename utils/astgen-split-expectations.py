@@ -145,7 +145,8 @@ def parse_directives(lines):
                 fclose = text.find("}}", fm.end())
                 if fclose < 0:
                     break
-                fixits.append((fm.end() + 1, text[fm.end():fclose]))
+                # The verifier reports a fix-it at its opening braces.
+                fixits.append((fm.end() - 1, text[fm.end():fclose]))
                 end = fclose + 2
             result.append(Directive(i, m.start(), end, m, message,
                                     msg_start + 1, fixits))
@@ -376,6 +377,10 @@ def rewrite(path, lines, failures, report):
             report.reworded.append((d.target_line(), d.kind, d.message, f.actual))
         else:  # fixit
             astgen_fixits = [(0, t) for t in f.actual]
+            # A fix-it whose text contains braces or spans lines, like those
+            # that move a token across lines, cannot be written in a directive.
+            if any("{{" in t or "}}" in t or "\n" in t or re.match(r"\d+:\d+", t) for _, t in astgen_fixits):
+                astgen_fixits = []
             replacement = cparser_copy(d) + " " + d.render("astgen", fixits=astgen_fixits)
             report.reworded.append((d.target_line(), d.kind, d.message, d.message + " (fix-its)"))
         edits.setdefault(d.line, []).append((d.start, d.end, replacement))

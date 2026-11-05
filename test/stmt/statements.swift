@@ -10,7 +10,7 @@ func f2() {}
 func f3() -> Int {}
 
 func invalid_semi() {
-  ; // expected-error {{';' statements are not allowed}} {{3-5=}}
+  ; // expected-cparser-error {{';' statements are not allowed}} {{3-5=}} expected-astgen-error {{';' statements are not allowed}}
 }
 
 func nested1(_ x: Int) {
@@ -165,12 +165,12 @@ func tuple_assign() {
 func missing_semicolons() {
   var w = 321
   func g() {}
-  g() w += 1             // expected-error{{consecutive statements}} {{6-6=;}}
-  var z = w"hello"    // expected-error{{consecutive statements}} {{12-12=;}} expected-warning {{string literal is unused}}
+  g() w += 1             // expected-cparser-error{{consecutive statements}} {{6-6=;}} expected-astgen-error {{consecutive statements}}{{6-7= \n  }}
+  var z = w"hello"    // expected-cparser-error{{consecutive statements}} {{12-12=;}} expected-astgen-error {{consecutive statements}}{{12-12=\n  }} expected-warning {{string literal is unused}}
   // expected-warning@-1 {{initialization of variable 'z' was never used; consider replacing with assignment to '_' or removing it}}
-  class  C {}class  C2 {} // expected-error{{consecutive statements}} {{14-14=;}}
-  struct S {}struct S2 {} // expected-error{{consecutive statements}} {{14-14=;}}
-  func j() {}func k() {}  // expected-error{{consecutive statements}} {{14-14=;}}
+  class  C {}class  C2 {} // expected-cparser-error{{consecutive statements}} {{14-14=;}} expected-astgen-error {{consecutive statements}}{{14-14=\n  }}
+  struct S {}struct S2 {} // expected-cparser-error{{consecutive statements}} {{14-14=;}} expected-astgen-error {{consecutive statements}}{{14-14=\n  }}
+  func j() {}func k() {}  // expected-cparser-error{{consecutive statements}} {{14-14=;}} expected-astgen-error {{consecutive statements}}{{14-14=\n  }}
 }
 
 //===--- Return statement.
@@ -188,7 +188,7 @@ func NonVoidReturn1() -> Int {
 
 func NonVoidReturn2() -> Int {
   // FIXME: Bad diagnostic
-  return + // expected-error {{unary operator cannot be separated from its operand}} {{11-+1:1=}} expected-error {{expected expression in 'return' statement}}
+  return + // expected-cparser-error {{unary operator cannot be separated from its operand}} {{11-+1:1=}} expected-astgen-error {{unexpected code '+' in function}} expected-error {{expected expression in 'return' statement}}
 }
 
 func VoidReturn1() {
@@ -208,28 +208,28 @@ func VoidReturn3() {
 //===--- If statement.
 
 func IfStmt1() {
-  if 1 > 0 // expected-error {{expected '{' after 'if' condition}}
-  _ = 42
+  if 1 > 0 // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}}
+  _ = 42 // expected-astgen-error {{expected '}' to end 'if' statement}}
 }
 
 func IfStmt2() {
   if 1 > 0 {
   } else // expected-error {{expected '{' or 'if' after 'else'}}
-  _ = 42
+  _ = 42 // expected-astgen-error {{expected '}' to end 'if' statement}}
 }
 func IfStmt3() {
   if 1 > 0 {
-  } else 1 < 0 { // expected-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}}
+  } else 1 < 0 { // expected-cparser-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}} expected-astgen-error {{unexpected code '1 < 0' in 'if' statement}}
     _ = 42
-  } else {
+  } else { // expected-astgen-error {{unexpected code in function}}
   }
 }
 
 //===--- While statement.
 
 func WhileStmt1() {
-  while 1 > 0 // expected-error {{expected '{' after 'while' condition}}
-  _ = 42
+  while 1 > 0 // expected-cparser-error {{expected '{' after 'while' condition}} expected-astgen-error {{expected '{' in 'while' statement}}
+  _ = 42 // expected-astgen-error {{expected '}' to end 'while' statement}}
 }
 
 //===-- Do statement.
@@ -240,11 +240,11 @@ func DoStmt() {
 }
 
 
-func DoWhileStmt1() {
-  // expected-note@+2 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
-  // expected-note@+1 {{did you mean separate 'do' and 'while' statements?}} {{+1:5-5=\n}}
-  do { // expected-error {{'do-while' statement is not allowed}}
-  } while true
+func DoWhileStmt1() { // expected-astgen-note {{to match this opening '{'}}
+  // expected-cparser-note@+2 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
+  // expected-cparser-note@+1 {{did you mean separate 'do' and 'while' statements?}} {{+1:5-5=\n}}
+  do { // expected-cparser-error {{'do-while' statement is not allowed}}
+  } while true // expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{expected '{' in 'while' statement}}
 }
 
 func DoWhileStmt2() {
@@ -257,7 +257,7 @@ func DoWhileStmt2() {
 }
 
 func LabeledDoStmt() {
-  LABEL: { // expected-error {{labeled block needs 'do'}} {{10-10=do }}
+  LABEL: { // expected-cparser-error {{labeled block needs 'do'}} {{10-10=do }} expected-astgen-error {{unexpected code in function}} expected-astgen-error {{cannot find 'LABEL' in scope}}
   }
 }
 
@@ -273,13 +273,13 @@ func RepeatWhileStmt1() {
 }
 
 func RepeatWhileStmt2() {
-  repeat // expected-error@+1 {{expected expression}}
+  repeat // expected-cparser-error@+1 {{expected expression}} expected-astgen-error {{value pack expansion must contain at least one pack reference}} expected-astgen-error {{expected expression in function}}
 }
 
 func RepeatWhileStmt4() {
   // FIXME: Bad diagnostic
   repeat {
-  } while + // expected-error {{unary operator cannot be separated from its operand}} {{12-+1:1=}} expected-error {{expected expression in 'repeat-while' condition}}
+  } while + // expected-cparser-error {{unary operator cannot be separated from its operand}} {{12-+1:1=}} expected-astgen-error {{unexpected code '+' in function}} expected-cparser-error {{expected expression in 'repeat-while' condition}} expected-astgen-error {{expected condition in 'repeat' statement}}
 }
 
 func brokenSwitch(_ x: Int) -> Int {
@@ -373,14 +373,14 @@ func test_guard(_ x : Int, y : Int??, z: Int?, cond : Bool) {
   guard let z, cond else {}
   
   
-  guard case let f? : Int?, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
+  guard case let f? : Int?, cond else {}    // expected-cparser-error {{variable binding in a condition requires an initializer}} expected-astgen-error {{expected '=' and expression in pattern matching}}
 
   // FIXME: Bring back the tailored diagnostic
   guard let g = y else {
     markUsed(g)  // expected-error {{cannot find 'g' in scope}}
   }
 
-  guard let h = y, cond {}  // expected-error {{expected 'else' after 'guard' condition}} {{25-25=else }}
+  guard let h = y, cond {}  // expected-cparser-error {{expected 'else' after 'guard' condition}} {{25-25=else }} expected-astgen-error {{expected 'else' in 'guard' statement}}
 
 
   guard case _ = x else {}  // expected-warning {{'guard' condition is always true, body is unreachable}}
@@ -445,13 +445,13 @@ func r23684220(_ b: Any) {
 
 // <rdar://problem/21080671> QoI: try/catch (instead of do/catch) creates silly diagnostics
 func f21080671() {
-  try {  // expected-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}}
-  } catch { }
+  try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{function is unused}} expected-astgen-warning {{no calls to throwing functions occur within 'try' expression}}
+  } catch { } // expected-astgen-error {{unexpected code 'catch { }' in function}}
   
   
-  try {  // expected-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}}
+  try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{function is unused}} expected-astgen-warning {{no calls to throwing functions occur within 'try' expression}}
     f21080671()
-  } catch let x as Int {
+  } catch let x as Int { // expected-astgen-error {{unexpected 'catch' keyword in function}} expected-astgen-error {{type annotation missing in pattern}} expected-astgen-error {{unexpected code in function}}
   } catch {
   }
 }
@@ -459,12 +459,12 @@ func f21080671() {
 // <rdar://problem/24467411> QoI: Using "&& #available" should fixit to comma
 // https://twitter.com/radexp/status/694561060230184960
 func f(_ x : Int, y : Int) {
-  if x == y && #available(iOS 52, *) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}}
-  if #available(iOS 52, *) && x == y {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{27-30=,}}
+  if x == y && #available(iOS 52, *) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}} expected-astgen-error {{availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'}} expected-astgen-error {{cannot convert value of type '_' to expected argument type 'Bool'}}
+  if #available(iOS 52, *) && x == y {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{27-30=,}} expected-astgen-error {{expected ',' joining parts of a multi-clause condition}}{{27-28=}}{{31-31=, }}{{28-31=}}
 
   // https://twitter.com/radexp/status/694790631881883648
-  if x == y && let _ = Optional(y) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}}
-  if x == y&&let _ = Optional(y) {}  // expected-error {{expected ',' joining parts of a multi-clause condition}} {{12-14=,}}
+  if x == y && let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{cannot convert value of type '_' to expected argument type 'Bool'}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{extra trailing closure passed in call}}
+  if x == y&&let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-14=,}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{cannot convert value of type '_' to expected argument type 'Bool'}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{extra trailing closure passed in call}} expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end 'if' statement}}
 }
 
 
@@ -630,7 +630,7 @@ outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{+2:14-23=
 } while true
 
 // Errors in case syntax
-class
-case, // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{expected identifier after comma in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
-case  // expected-error {{expected identifier in enum 'case' declaration}} expected-error {{enum 'case' is not allowed outside of an enum}}
+class // expected-astgen-error {{expected identifier and member block in class}}
+case, // expected-cparser-error {{expected identifier in enum 'case' declaration}} expected-cparser-error {{expected identifier after comma in enum 'case' declaration}} expected-cparser-error {{enum 'case' is not allowed outside of an enum}} expected-astgen-error {{'case' can only appear inside a 'switch' statement or 'enum' declaration}}
+case  // expected-cparser-error {{expected identifier in enum 'case' declaration}} expected-cparser-error {{enum 'case' is not allowed outside of an enum}} expected-astgen-error {{expected '}' to end function}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser

@@ -67,8 +67,8 @@ struct S {
 
   mutating func testThenAsMember() -> Int {
     do {
-      then  // expected-error {{'then' may only appear as the last statement in an 'if', 'switch', or 'do' expression}}
-    } // expected-error {{expected expression after 'then'}}
+      then  // expected-cparser-error {{'then' may only appear as the last statement in an 'if', 'switch', or 'do' expression}} expected-astgen-warning {{property is accessed but result is unused}}
+    } // expected-cparser-error {{expected expression after 'then'}}
     then // expected-error {{'then' may only appear as the last statement in an 'if', 'switch', or 'do' expression}}
     0 // expected-warning {{expression following 'then' is treated as an argument of the 'then'}}
     // expected-note@-1 {{indent the expression to silence this warning}}
@@ -77,9 +77,9 @@ struct S {
     then // expected-error {{'then' may only appear as the last statement in an 'if', 'switch', or 'do' expression}}
       0
 
-    then;
-    // expected-error@-1 {{'then' may only appear as the last statement in an 'if', 'switch', or 'do' expression}}
-    // expected-error@-2 {{expected expression after 'then'}}
+    then; // expected-astgen-warning {{property is accessed but result is unused}}
+    // expected-cparser-error@-1 {{'then' may only appear as the last statement in an 'if', 'switch', or 'do' expression}}
+    // expected-cparser-error@-2 {{expected expression after 'then'}}
 
     then . foo
     // expected-error@-1 {{'then' may only appear as the last statement in an 'if', 'switch', or 'do' expression}}
@@ -209,7 +209,7 @@ func testTryOnThen() throws -> Int {
     try then {} // expected-warning {{no calls to throwing functions occur within 'try' expression}}
 
     try then throwingFn()
-    // expected-error@-1 {{'try' must be placed on the produced expression}} {{5-9=}} {{14-14=try }}
+    // expected-cparser-error@-1 {{'try' must be placed on the produced expression}} {{5-9=}} {{14-14=try }} expected-astgen-error@-1 {{'try' must be placed on the produced expression}}
   }
 }
 

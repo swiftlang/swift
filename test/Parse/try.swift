@@ -83,21 +83,21 @@ _ = (try? foo()) == (try? bar())
 let j = true ? try? foo() : try? bar() + 0
 let k = true ? try? foo() : try? bar() %%% 0 // expected-error {{'try?' following conditional operator does not cover everything to its right}}
 
-try let singleLet = foo() // expected-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{21-21=try }}
-try var singleVar = foo() // expected-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{21-21=try }}
+try let singleLet = foo() // expected-cparser-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{21-21=try }} expected-astgen-error {{'try' must be placed on the initial value expression}}
+try var singleVar = foo() // expected-cparser-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{21-21=try }} expected-astgen-error {{'try' must be placed on the initial value expression}}
 try let uninit: Int // expected-error {{'try' must be placed on the initial value expression}}
-try let (destructure1, destructure2) = (foo(), bar()) // expected-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{40-40=try }}
+try let (destructure1, destructure2) = (foo(), bar()) // expected-cparser-error {{'try' must be placed on the initial value expression}} {{1-5=}} {{40-40=try }} expected-astgen-error {{'try' must be placed on the initial value expression}}
 try let multi1 = foo(), multi2 = bar() // expected-error {{'try' must be placed on the initial value expression}} expected-error 2 {{call can throw but is not marked with 'try'}}
                                        // expected-note@-1 {{did you mean to use 'try'?}} {{18-18=try }} expected-note@-1 {{did you mean to use 'try'?}} {{34-34=try }}
                                        // expected-note@-2 {{did you mean to handle error as optional value?}} {{18-18=try? }} expected-note@-2 {{did you mean to handle error as optional value?}} {{34-34=try? }}
                                        // expected-note@-3 {{did you mean to disable error propagation?}} {{18-18=try! }} expected-note@-3 {{did you mean to disable error propagation?}} {{34-34=try! }}
-class TryDecl { // expected-note {{in declaration of 'TryDecl'}}
-  try let singleLet = foo() // expected-error {{'try' must be placed on the initial value expression}} {{3-7=}} {{23-23=try }}
+class TryDecl { // expected-cparser-note {{in declaration of 'TryDecl'}}
+  try let singleLet = foo() // expected-cparser-error {{'try' must be placed on the initial value expression}} {{3-7=}} {{23-23=try }} expected-astgen-error {{'try' must be placed on the initial value expression}}
                             // expected-error @-1 {{call can throw, but errors cannot be thrown out of a property initializer}}
-  try var singleVar = foo() // expected-error {{'try' must be placed on the initial value expression}} {{3-7=}} {{23-23=try }}
+  try var singleVar = foo() // expected-cparser-error {{'try' must be placed on the initial value expression}} {{3-7=}} {{23-23=try }} expected-astgen-error {{'try' must be placed on the initial value expression}}
                             // expected-error @-1 {{call can throw, but errors cannot be thrown out of a property initializer}}
 
-  try // expected-error {{expected declaration}}
+  try // expected-cparser-error {{expected declaration}} expected-astgen-error {{'try' cannot be used with 'func'}}
   func method() {}
 }
 
@@ -106,15 +106,15 @@ func test() throws -> Int {
     try break // expected-error {{'try' cannot be used with 'break'}}
   }
   
-  try throw // expected-error {{'try' must be placed on the thrown expression}} {{+1:3-3=try }} {{3-7=}} expected-error {{expected expression in 'throw' statement}}
+  try throw // expected-cparser-error {{'try' must be placed on the thrown expression}} {{+1:3-3=try }} {{3-7=}} expected-astgen-error {{'try' must be placed on the thrown expression}} expected-cparser-error {{expected expression in 'throw' statement}} expected-astgen-error {{expected expression after 'try'}}
   ; // Reset parser.
   
   try return // expected-error {{'try' cannot be used with 'return'}} expected-error {{non-void function should return a value}}
   ; // Reset parser.
 
-  try throw foo() // expected-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{13-13=try }}
+  try throw foo() // expected-cparser-error {{'try' must be placed on the thrown expression}} {{3-7=}} {{13-13=try }} expected-astgen-error {{'try' must be placed on the thrown expression}}
   // expected-error@-1 {{thrown expression type 'Int' does not conform to 'Error'}}
-  try return foo() // expected-error {{'try' must be placed on the returned expression}} {{3-7=}} {{14-14=try }}
+  try return foo() // expected-cparser-error {{'try' must be placed on the returned expression}} {{3-7=}} {{14-14=try }} expected-astgen-error {{'try' must be placed on the returned expression}}
 }
 
 // Test operators.

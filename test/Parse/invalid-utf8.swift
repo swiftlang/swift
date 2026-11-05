@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-var x = "" // expected-error{{invalid UTF-8 found in source file}} {{5-6= }} 
+var x = "" // expected-cparser-error{{invalid UTF-8 found in source file}} {{5-6= }} expected-astgen-error {{invalid UTF-8 found in source file}} 
 
 // Make sure we don't stop processing the whole file.
 static func foo() {} // expected-error{{static methods may only be declared on a type}} {{1-8=}}
@@ -14,23 +14,23 @@ static func foo() {} // expected-error{{static methods may only be declared on a
 // 0xC0
 À // expected-error {{invalid UTF-8 found in source file}}
 // 0xC1
-Á // expected-error {{invalid UTF-8 found in source file}}
+Á // expected-cparser-error {{invalid UTF-8 found in source file}}
 // 0xF5
-õ // expected-error {{invalid UTF-8 found in source file}}
+õ // expected-cparser-error {{invalid UTF-8 found in source file}}
 // 0xF6
-ö // expected-error {{invalid UTF-8 found in source file}}
+ö // expected-cparser-error {{invalid UTF-8 found in source file}}
 // 0xF7
-÷ // expected-error {{invalid UTF-8 found in source file}}
+÷ // expected-cparser-error {{invalid UTF-8 found in source file}}
 // 0xF8
-ø // expected-error {{invalid UTF-8 found in source file}}
+ø // expected-cparser-error {{invalid UTF-8 found in source file}}
 // 0xF9
-ù // expected-error {{invalid UTF-8 found in source file}}
+ù // expected-cparser-error {{invalid UTF-8 found in source file}}
 // 0xFB
-û // expected-error {{invalid UTF-8 found in source file}}
+û // expected-cparser-error {{invalid UTF-8 found in source file}}
 // 0xFC
-ü // expected-error {{invalid UTF-8 found in source file}}
+ü // expected-cparser-error {{invalid UTF-8 found in source file}}
 // 0xFD
-ı // expected-error {{invalid UTF-8 found in source file}}
+ı // expected-cparser-error {{invalid UTF-8 found in source file}}
 // End magic UTF-8 values
 
 // Make sure we don't stop processing the whole file.

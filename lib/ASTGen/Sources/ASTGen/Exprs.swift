@@ -1267,6 +1267,35 @@ extension ASTGenVisitor {
     // would wrap -- giving the Try expression an inverted range. The C++ parser
     // never builds one of these without consuming a 'try', so neither should we.
     guard node.tryKeyword.presence == .present else {
+      // `try let x = foo()` and `try return foo()`: the parser moved the
+      // misplaced 'try' onto the value and diagnosed it. As the C++ parser does,
+      // wrap the value in a 'try' that starts where it does, so that the call is
+      // not reported as unmarked.
+      func isTry(_ unexpected: UnexpectedNodesSyntax?) -> Bool {
+        unexpected?.contains(where: { $0.as(TokenSyntax.self)?.tokenKind == .keyword(.try) }) == true
+      }
+      let hasMisplacedTry: Bool
+      if node.parent?.is(InitializerClauseSyntax.self) == true,
+        let variable = sequence(first: Syntax(node).parent, next: { $0?.parent }).lazy.compactMap({ $0?.as(VariableDeclSyntax.self) }).first,
+        variable.bindings.count == 1
+      {
+        hasMisplacedTry = isTry(variable.unexpectedBetweenModifiersAndBindingSpecifier)
+      } else if let stmt = node.parent?.as(ReturnStmtSyntax.self) {
+        hasMisplacedTry = isTry(stmt.unexpectedBeforeReturnKeyword)
+      } else if let stmt = node.parent?.as(ThrowStmtSyntax.self) {
+        hasMisplacedTry = isTry(stmt.unexpectedBeforeThrowKeyword)
+      } else if let stmt = node.parent?.as(ThenStmtSyntax.self) {
+        hasMisplacedTry = isTry(stmt.unexpectedBeforeThenKeyword)
+      } else {
+        hasMisplacedTry = false
+      }
+      if hasMisplacedTry, !node.expression.is(MissingExprSyntax.self) {
+        return BridgedTryExpr.createParsed(
+          self.ctx,
+          tryLoc: self.generateSourceLoc(node.expression),
+          subExpr: subExpr
+        ).asExpr
+      }
       return subExpr
     }
     let tryLoc = self.generateSourceLoc(node.tryKeyword)

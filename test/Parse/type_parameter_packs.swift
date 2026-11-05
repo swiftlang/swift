@@ -4,13 +4,13 @@ protocol P {}
 
 protocol P1 {
   associatedtype each A // expected-error {{associated types cannot be variadic}}{{18-23=}}
-  associatedtype each B<U>
+  associatedtype each B<U> // expected-astgen-error {{expected parameter clause in function signature}}
   // expected-error@-1 {{associated types cannot be variadic}}{{18-23=}}
-  // expected-error@-2 {{associated types must not have a generic parameter list}}{{24-27=}}
-  associatedtype C... // expected-error {{associated types cannot be variadic}}{{19-22=}}
-  associatedtype D<U>...
-  // expected-error@-1 {{associated types cannot be variadic}}{{22-25=}}
-  // expected-error@-2 {{associated types must not have a generic parameter list}}{{19-22=}}
+  // expected-cparser-error@-2 {{associated types must not have a generic parameter list}}{{24-27=}} expected-astgen-error@-2 {{expected 'func' in function}}
+  associatedtype C... // expected-cparser-error {{associated types cannot be variadic}}{{19-22=}} expected-astgen-error {{associated types cannot be variadic}}
+  associatedtype D<U>... // expected-astgen-error {{expected parameter clause in function signature}} expected-astgen-error {{unexpected code '...' in protocol}}
+  // expected-cparser-error@-1 {{associated types cannot be variadic}}{{22-25=}} expected-astgen-error@-1 {{expected 'func' in function}}
+  // expected-cparser-error@-2 {{associated types must not have a generic parameter list}}{{19-22=}} expected-astgen-error@-2 {{consecutive declarations on a line must be separated by newline or ';'}}
 }
 
 typealias Alias<each T> = (repeat each T)
@@ -37,7 +37,7 @@ func fooqux<each T, each U, each V>(x: repeat each T, y: repeat each U, z: repea
 
 func ellipsis<T...>(_ x: repeat each T) {}
 // expected-error@-1 {{ellipsis operator cannot be used with a type parameter pack}}{{16-19=}}{{15-15=each }}
-// expected-error@-2 {{cannot find type 'T' in scope}}
+// expected-cparser-error@-2 {{cannot find type 'T' in scope}}
 func eachEllipsis<each T...>(_ x: repeat each T) {}
 // expected-error@-1 {{ellipsis operator cannot be used with a type parameter pack}}{{25-28=}}
-// expected-error@-2 {{cannot find type 'T' in scope}}
+// expected-cparser-error@-2 {{cannot find type 'T' in scope}}
