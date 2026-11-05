@@ -1161,10 +1161,10 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     // lifetime is managed outside of the closure and there's nothing to do
     // here.
 
-    // An at-most-once on-stack closure can also own (consume) its
+    // A noncopyable on-stack closure can also own (consume) its
     // captures, and is responsible for releasing them via its destructor.
     // Release such captures here to make up for that.
-    if (pa->hasCalledAtMostOnceSemantics()) {
+    if (pa->isNoncopyable()) {
       SILBuilderContext builderCtxt(pa->getModule());
       for (Operand &argOp : pa->getArgumentOperands()) {
         if (!argOp.isConsuming() &&

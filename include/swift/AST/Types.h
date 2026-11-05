@@ -4118,6 +4118,22 @@ public:
     return getExecutionSemantics() == ExecutionSemantics::Once;
   }
 
+  /// Returns true if values of this function type can't be copied.
+  bool isNoncopyable() const {
+    return getSuppressedInvertibleProtocols(getExecutionSemantics())
+        .contains(InvertibleProtocolKind::Copyable);
+  }
+
+  /// Returns true if values of this function type can't be destroyed
+  /// implicitly.
+  bool isNondeinitable() const {
+    return getSuppressedInvertibleProtocols(getExecutionSemantics())
+        .contains(InvertibleProtocolKind::Deinitable);
+  }
+
+  /// Returns true if calling a value of this function type consumes the value.
+  bool isCallConsuming() const { return hasCalledAtMostOnceSemantics(); }
+
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
   AnyFunctionType *withExtInfo(ExtInfo info) const;
@@ -5657,6 +5673,13 @@ public:
   /// Returns true if values of this function type must be called exactly
   /// once, which is true only for exactly-once function types.
   bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
+  /// Returns true if values of this function type can't be copied.
+  bool isNoncopyable() const { return getExtInfo().isNoncopyable(); }
+  /// Returns true if values of this function type can't be destroyed
+  /// implicitly.
+  bool isNondeinitable() const { return getExtInfo().isNondeinitable(); }
+  /// Returns true if calling a value of this function type consumes the value.
+  bool isCallConsuming() const { return getExtInfo().isCallConsuming(); }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();
   }
@@ -6299,7 +6322,7 @@ public:
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
            getRepresentation() == SILFunctionTypeRepresentation::Thick &&
-           !hasCalledAtMostOnceSemantics();
+           !isNoncopyable();
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }

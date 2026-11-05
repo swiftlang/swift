@@ -900,11 +900,11 @@ static bool capturesIndirectArgumentByAddress(CanSILFunctionType outType,
   if (!outType->isNoEscape())
     return false;
 
-  // A closure that is called at most once is the exception for a noncopyable
-  // argument that it consumes. Like the other consumed captures of such a
-  // closure, its context owns the value.
+  // A noncopyable closure is the exception for a noncopyable argument that it
+  // consumes. Like the other consumed captures of such a closure, its context
+  // owns the value.
   if (convention == ParameterConvention::Indirect_In &&
-      outType->hasCalledAtMostOnceSemantics() && argType.isMoveOnly())
+      outType->isNoncopyable() && argType.isMoveOnly())
     return false;
 
   // A stack-promoted closure doesn't own most of its indirect arguments, so it
@@ -1905,20 +1905,20 @@ void destroyClosureContext(IRGenModule &IGM, IRGenFunction &forwarder,
                            Address contextPtr,
                            const llvm::BitVector &consumedFields,
                            const llvm::BitVector &unownedFields,
-                           bool contextIsOnStack, bool isCalledOnce) {
+                           bool contextIsOnStack, bool trapsOnDestroy) {
   if (!layout) {
-    assert(!isCalledOnce && "exactly-once contexts always have a layout");
+    assert(!trapsOnDestroy && "trapping contexts always have a layout");
     forwarder.emitNativeStrongRelease(rawContextPtr,
                                       forwarder.getDefaultAtomicity());
     return;
   }
 
   // For a closure that doesn't have any owned fields to destroy, just
-  // release the context object. We can't do that for exaclty-once closures,
-  // though, because the destructor of an exactly-once context traps since
-  // reaching indicates that the closure was dropped. Proceed to deallocating
-  // the context as uninitialized instead of releasing it in that case.
-  if (!isCalledOnce && (consumedFields.empty() || consumedFields.none())) {
+  // release the context object. We can't do that for a context whose
+  // destructor traps, though, because reaching the destructor indicates that
+  // the closure was dropped. Proceed to deallocating the context as
+  // uninitialized instead of releasing it in that case.
+  if (!trapsOnDestroy && (consumedFields.empty() || consumedFields.none())) {
     if (!contextIsOnStack) {
       forwarder.emitNativeStrongRelease(rawContextPtr,
                                         forwarder.getDefaultAtomicity());
@@ -2319,10 +2319,10 @@ static llvm::Value *emitPartialApplicationForwarder(
           fieldAddr =
               newFieldTI.getAddressForPointer(addressExplosion.claimNext());
           initStackCopy(newFieldTI, newFieldTy, fieldAddr, /*isTake=*/false);
-        } else if (outType->hasCalledAtMostOnceSemantics() &&
+        } else if (outType->isCallConsuming() &&
                    fieldConvention == ParameterConvention::Indirect_In &&
                    fieldTy.isMoveOnly()) {
-          // The closure is called at most once, so move the value out of the
+          // The call consumes the closure, so move the value out of the
           // context, which then must not destroy it.
           initStackCopy(fieldTI, fieldTy, fieldAddr, /*isTake=*/true);
           consumedFields.set(fieldIndex);
@@ -2363,7 +2363,7 @@ static llvm::Value *emitPartialApplicationForwarder(
         cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
         break;
       case ParameterConvention::Direct_Owned:
-        if (outType->hasCalledAtMostOnceSemantics()) {
+        if (outType->isCallConsuming()) {
           // Move value into the apply.
           cast<LoadableTypeInfo>(fieldTI).loadAsTake(subIGF, fieldAddr, param);
           consumedFields.set(fieldIndex);
@@ -2427,7 +2427,7 @@ static llvm::Value *emitPartialApplicationForwarder(
              "Trivial closure context must not be released");
       destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
                             unownedFields, outType->isNoEscape(),
-                            outType->isCalledOnce());
+                            outType->isNondeinitable());
     }
 
     // Now that we have bound generic parameters from the captured arguments
@@ -2551,7 +2551,7 @@ static llvm::Value *emitPartialApplicationForwarder(
            "Trivial closure context must not be released");
     destroyClosureContext(IGM, subIGF, layout, rawData, data, consumedFields,
                           unownedFields, outType->isNoEscape(),
-                          outType->isCalledOnce());
+                          outType->isNondeinitable());
   }
 
   emission->createReturn(call);
@@ -2739,10 +2739,10 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
     }
   }
 
-  // An exactly-once closure always gets a context of its own so that its
+  // A nondeinitable closure always gets a context of its own so that its
   // destructor can trap when the closure is dropped. That means it can't take
   // advantage of the single ref-counted object optimization.
-  if (outType->isCalledOnce())
+  if (outType->isNondeinitable())
     hasSingleSwiftRefcountedContext = No;
 
   auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
@@ -2846,7 +2846,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   if (args.empty() && layout.isKnownEmpty() &&
       layout.isTriviallyDestroyable()) {
-    if (outType->isCalledOnce())
+    if (outType->isNondeinitable())
       data = IGF.IGM.getAddrOfExactlyOnceSharedContext();
     else if (outType->isNoEscape())
       data = llvm::ConstantPointerNull::get(IGF.IGM.OpaquePtrTy);
@@ -2864,9 +2864,9 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
           stackAddr->getAddress(), IGF.IGM.OpaqueTy));
       data = stackAddr->getAddress().getAddress();
 
-      // at-most-once closures always get a context even if they are
+      // Noncopyable closures always get a context even if they are
       // stack promoted because they can have consuming captures.
-      if (outType->hasCalledAtMostOnceSemantics()) {
+      if (outType->isNoncopyable()) {
         assert(!outType->isTrivialNoEscape());
 
         // Borrowed `~Copyable` captures aren't owned by stack-promoted closures
@@ -2880,7 +2880,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
         auto maybeDescriptor = layout.computeTypedMallocTypeDescriptor(IGF.IGM);
         auto metadata = layout.getPrivateMetadata(
             IGF.IGM, descriptor, maybeDescriptor, "closure", unownedFields,
-            /*isStackAllocated=*/true, outType->isCalledOnce());
+            /*isStackAllocated=*/true, outType->isNondeinitable());
         auto object = IGF.Builder.CreateBitCast(data, IGF.IGM.RefCountedPtrTy);
         object = IGF.emitInitStackObjectCall(metadata, object, "closure");
         data = IGF.Builder.CreateBitCast(object, IGF.IGM.OpaquePtrTy);
@@ -2891,7 +2891,7 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
                                                        layout);
 
         data = IGF.emitUnmanagedAlloc(layout, "closure", descriptor, &offsets,
-                                      outType->isCalledOnce());
+                                      outType->isNondeinitable());
     }
     Address dataAddr = layout.emitCastTo(IGF, data);
     

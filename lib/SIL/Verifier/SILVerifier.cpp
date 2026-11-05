@@ -2063,22 +2063,22 @@ public:
       return checkLegalSILType(F, objectType, I);
     }
 
-    // Function values with execution semantics have a context. Thin
-    // functions, including closure bodies and thunks, never have execution
-    // semantics themselves; `partial_apply` or `thin_to_thick_function` adds
-    // them to the value. Calling an escaping value with execution semantics
-    // consumes its context; only a non-escaping one, such as a stack-promoted
-    // closure, can be `@callee_guaranteed`.
+    // Noncopyable function values have a context. Thin functions, including
+    // closure bodies and thunks, are never noncopyable themselves;
+    // `partial_apply` or `thin_to_thick_function` makes the value
+    // noncopyable. Calling an escaping value whose call consumes it consumes
+    // its context; only a non-escaping one, such as a stack-promoted closure,
+    // can be `@callee_guaranteed`.
     if (auto fnTy = dyn_cast<SILFunctionType>(rvalueType)) {
-      if (fnTy->hasCalledAtMostOnceSemantics()) {
+      if (fnTy->isNoncopyable())
         require(fnTy->getRepresentation() ==
                     SILFunctionTypeRepresentation::Thick,
-                "function types with execution semantics must be thick");
+                "noncopyable function types must be thick");
+      if (fnTy->isCallConsuming())
         require(fnTy->isNoEscape() || fnTy->getCalleeConvention() ==
                                           ParameterConvention::Direct_Owned,
-                "escaping function types with execution semantics must be "
+                "escaping function types whose call consumes them must be "
                 "@callee_owned");
-      }
     }
 
     // Metatypes should have explicit representations.
@@ -2581,21 +2581,21 @@ public:
           substConv.getSILArgumentType(argIdx, F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
-      // Only an exactly-once closure can capture an exactly-once value. The
-      // move checker diagnoses consumption of a value that is captured by
-      // address instead.
+      // Only a nondeinitable closure can capture a nondeinitable function
+      // value. The move checker diagnoses consumption of a value that is
+      // captured by address instead.
       if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
         require(p.value()->getType().isAddress() ||
-                    !argFnTy->isCalledOnce() ||
-                    PAI->getFunctionType()->isCalledOnce(),
-                "only an exactly-once closure can capture an exactly-once "
-                "value");
+                    !argFnTy->isNondeinitable() ||
+                    PAI->getFunctionType()->isNondeinitable(),
+                "only a nondeinitable closure can capture a nondeinitable "
+                "function value");
       }
       if (PAI->isOnStack()) {
-        // An at-most-once closure is allowed to have consuming captures
+        // A noncopyable closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
         // non-escaping) which is responsible for destroying them.
-        require(PAI->hasCalledAtMostOnceSemantics() ||
+        require(PAI->isNoncopyable() ||
                     !substConv.getSILArgumentConvention(argIdx)
                          .isOwnedConventionInCaller(),
                 "on-stack closures do not support owned arguments");
@@ -5783,8 +5783,8 @@ public:
     require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
                                          resTI->getExecutionSemantics()),
             "convert_function cannot drop execution semantics");
-    require(!resTI->isCalledOnce() || opTI->isCalledOnce(),
-            "convert_function cannot form an exactly-once value; a thunk "
+    require(!resTI->isNondeinitable() || opTI->isNondeinitable(),
+            "convert_function cannot form a nondeinitable value; a thunk "
             "must form it");
   }
 

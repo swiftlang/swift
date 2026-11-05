@@ -481,8 +481,8 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
   if (!inst->isOnStack())
     return false;
 
-  // A nonescaping closure borrows its captures (note that
-  // at-most-once, is allowed to also consume its captures), but now
+  // A nonescaping closure borrows its captures (note that a noncopyable
+  // closure is allowed to also consume its captures), but now
   // that we've lowered those borrows away, we need to make those dependence
   // relationships explicit so that the optimizer continues respecting them.
   ApplySite applySite(inst);
@@ -502,10 +502,10 @@ bool OwnershipModelEliminatorVisitor::visitPartialApplyInst(
         break;
       }
 
-      // In at-most-once case, consumed captures don't need the
+      // In the noncopyable case, consumed captures don't need the
       // dependence but the borrowed ones still do i.e. a non-Copyable borrowed
       // value.
-      if (inst->hasCalledAtMostOnceSemantics()) {
+      if (inst->isNoncopyable()) {
         auto argConv = applySite.getArgumentConvention(argOp);
         if (!(op->getType().isMoveOnly() &&
               !argConv.isOwnedConventionInCaller()))

@@ -1730,9 +1730,8 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
     return semantics.hasValue ? semantics.value : nil
   }
 
-  /// True if the resulting closure can be called at most once, which is the case
-  /// for every kind of execution semantics.
-  public var hasCalledAtMostOnceSemantics: Bool { executionSemantics != nil }
+  /// True if the resulting closure can't be copied.
+  public var isNoncopyable: Bool { type.isMoveOnly }
 
   /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack
   /// addresses and need to be diagnosed as non-escaping closures. Use mayEscape to determine whether a closure is
