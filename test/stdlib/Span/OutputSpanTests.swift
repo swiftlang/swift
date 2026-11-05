@@ -80,6 +80,32 @@ suite.test("Create OutputSpan")
   expectEqual(initialized, 0)
 }
 
+suite.test("init with invalid initializedCount")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
+  defer { b.deallocate() }
+
+  expectCrashLater(
+    withDebugMessage: "OutputSpan count is invalid or greater than capacity"
+  )
+  _ = unsafe OutputSpan(buffer: b, initializedCount: -1)
+}
+
+suite.test("init with invalid buffer")
+.require(.crashTesting)
+.require(.stdlib_6_2).code {
+  guard #available(SwiftStdlib 6.5, *) else { return }
+
+  // cause an internal initializer to return an invalid UMBP
+  let invalid = UnsafeMutableBufferPointer<Int>(_uncheckedStart: nil, count: 1)
+
+  expectCrashLater()
+  _ = unsafe OutputSpan(buffer: invalid, initializedCount: 0)
+}
+
 suite.test("deinit without relinquishing memory")
 .require(.stdlib_6_2).code {
   guard #available(SwiftStdlib 6.2, *) else { return }

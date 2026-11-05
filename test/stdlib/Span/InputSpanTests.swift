@@ -83,7 +83,9 @@ suite.test("init with invalid initializedCount")
   let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 4)
   defer { b.deallocate() }
 
-  expectCrashLater(withDebugMessage: "InputSpan count is not within capacity")
+  expectCrashLater(
+    withDebugMessage: "InputSpan count is invalid or greater than capacity"
+  )
   _ = unsafe InputSpan(buffer: b, initializedCount: -1)
 }
 

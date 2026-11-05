@@ -145,10 +145,12 @@ extension OutputSpan where Element: ~Copyable  {
         unsafe baseAddress.advanced(by: buffer.count) >= baseAddress,
         "Buffer must not wrap around the address space"
       )
+    } else {
+      _precondition(buffer.count == 0)
     }
     _precondition(
-      0 <= initializedCount && initializedCount <= buffer.count,
-      "OutputSpan count is not within capacity"
+      UInt(bitPattern: initializedCount) <= UInt(bitPattern: buffer.count),
+      "OutputSpan count is invalid or greater than capacity."
     )
     unsafe self.init(
       _uncheckedBuffer: buffer, initializedCount: initializedCount

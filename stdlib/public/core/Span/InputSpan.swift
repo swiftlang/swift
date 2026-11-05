@@ -173,7 +173,7 @@ extension InputSpan where Element: ~Copyable {
     }
     _precondition(
       UInt(bitPattern: initializedCount) <= UInt(bitPattern: buffer.count),
-      "InputSpan count is not within capacity"
+      "InputSpan count is invalid or greater than capacity."
     )
     unsafe self.init(
       _uncheckedBuffer: buffer, initializedCount: initializedCount
