@@ -815,7 +815,8 @@ private struct Resolver {
           }
 
           // If completely unavailable (consumed), it's lifetime ended earlier, so delete this one.
-          if summary == .no {
+          // A class instance must still be deallocated, though.
+          if summary == .no && !root.isClassInstance {
             context.erase(instruction: op.instruction)
             didDelete = true
             break
@@ -860,6 +861,10 @@ private struct Resolver {
     }
 
     for (destroy, avail, range) in partialDestroys {
+      if root.isClassInstance {
+        endInstanceLifetime(at: destroy, avail, root, indices, controlVar)
+        continue
+      }
       destroyAvailableFields(avail, range, before: destroy, root, indices, controlVar)
 
       // Everything in range is now uninitialized.
@@ -924,6 +929,50 @@ private struct Resolver {
         }
       }
     }
+  }
+
+  // Ends the lifetime of a class instance that may not be fully initialized at `destroy`. Unless all of its
+  // stored properties turn out to be initialized, in which case the destroy runs its deinit, the initialized
+  // ones are destroyed and the instance is deallocated without running its deinit.
+  func endInstanceLifetime(at destroy: Instruction, _ avail: [Availability], _ root: ResolvableRoot,
+                           _ indices: FieldIndexTrie, _ controlVar: ControlVariable?) {
+    let instance = destroy.operands[0].value
+    let partialLeaves = indices.wholeRange.filter { avail[$0] == .partial }
+    var deallocPoint = destroy
+    var deallocAvail = avail
+
+    if !partialLeaves.isEmpty && indices.wholeRange.allSatisfy({ avail[$0] != .no }) {
+      guard let controlVar else { fatalError("missing control variable for conditional destroy") }
+
+      //   start:        cond_br (test bits), keepBlock, deallocBlock
+      //   keepBlock:    destroy_value instance; br cont
+      //   deallocBlock: <destroy fields>; dealloc_partial_ref instance; br cont
+      //   cont:         <destroy> ...
+      let isFullyInitialized = controlVar.testAll(partialLeaves, before: destroy)
+      let start = destroy.parentBlock
+      let cont = context.splitBlock(before: destroy)
+      let keepBlock = context.createBlock(after: start)
+      let deallocBlock = context.createBlock(after: keepBlock)
+
+      let keepBuilder = Builder(atEndOf: keepBlock, location: destroy.location, context)
+      keepBuilder.createDestroyValue(operand: instance)
+      keepBuilder.createBranch(to: cont)
+
+      deallocPoint = Builder(atEndOf: deallocBlock, location: destroy.location, context).createBranch(to: cont)
+      Builder(atEndOf: start, location: destroy.location, context)
+        .createCondBranch(condition: isFullyInitialized, trueBlock: keepBlock, falseBlock: deallocBlock)
+
+      // A sole conditionally initialized property is known to be uninitialized when deallocating.
+      if partialLeaves.count == 1 {
+        deallocAvail[partialLeaves[0]] = .no
+      }
+    }
+
+    destroyAvailableFields(deallocAvail, indices.wholeRange, before: deallocPoint, root, indices, controlVar)
+    let builder = Builder(before: deallocPoint, location: destroy.location, context)
+    let metatype = builder.createMetatype(ofInstanceType: instance.type.canonicalType, representation: .thick)
+    builder.createDeallocPartialRef(instance, metatype: metatype)
+    context.erase(instruction: destroy)
   }
 
   // Destroys only the available fields of partially available memory, testing the control variable
@@ -1048,11 +1097,11 @@ private struct Resolver {
     }
 
     mutating func instanceUse(_ use: Operand) -> WalkResult {
-      // TODO: end the lifetime of a partially initialized instance.
       if use.instruction is DestroyValueInst {
-        return .continueWalk
+        addUse(.end(use), indices.wholeRange)
+      } else {
+        addUse(.liveness(use.instruction), indices.wholeRange)
       }
-      addUse(.liveness(use.instruction), indices.wholeRange)
       return .continueWalk
     }
 
@@ -2063,6 +2112,21 @@ private struct ControlVariable {
                                                      arguments: [oldValue, operand])
     }
     builder.createStore(source: newValue, destination: address, ownership: .trivial)
+  }
+
+  /// Returns a `Builtin.Int1` that is true iff all of `bits` are set, computed just before `inst`.
+  func testAll(_ bits: [Int], before inst: Instruction) -> Value {
+    if bits.count == 1 {
+      return test(bits[0], before: inst)
+    }
+    let builder = builder(before: inst)
+    let value = builder.createLoad(fromAddress: address, ownership: .trivial)
+    let mask = builder.createIntegerLiteral(bits.reduce(0) { $0 | Self.mask(of: $1..<($1 + 1)) }, type: intType)
+    let boolType = context.getBuiltinIntegerType(bitWidth: 1)
+    let selected = builder.createBuiltinBinaryFunction(name: "and", operandType: intType, resultType: intType,
+                                                       arguments: [value, mask])
+    return builder.createBuiltinBinaryFunction(name: "cmp_eq", operandType: intType, resultType: boolType,
+                                               arguments: [selected, mask])
   }
 
   /// Returns a `Builtin.Int1` that is true iff `bit` is set, computed just before `inst`.
