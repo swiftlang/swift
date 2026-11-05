@@ -197,6 +197,15 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
         paramInfo.getSILStorageInterfaceType().isMoveOnly())
       continue;
 
+    // The result of a borrow accessor borrows from self's memory location,
+    // but the ExistentialSpecializerCloner copies self into a local
+    // existential that is destroyed before the return.
+    if (F->hasSelfParam() && CalleeArg == F->getSelfArgument() &&
+        (F->getConventions().hasGuaranteedResult() ||
+         F->getConventions().hasGuaranteedAddressResult())) {
+      continue;
+    }
+
     ETAD.AccessType = paramInfo.isConsumedInCallee()
                           ? OpenedExistentialAccess::Mutable
                           : OpenedExistentialAccess::Immutable;

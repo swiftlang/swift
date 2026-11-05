@@ -706,7 +706,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   if (NewF->isNoReturnFunction(Builder.getTypeExpansionContext())) {
     Builder.createUnreachable(Loc);
   } else {
-    Builder.createReturn(Loc, ReturnValue);
+    createThunkReturn(Builder, Loc, ReturnValue);
   }
 
   // Do the last bit work to finalize the thunk.
