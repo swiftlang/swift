@@ -414,24 +414,6 @@ void DifferentiableActivityInfo::propagateUseful(
   }
 }
 
-// Given a pointer_to_address instruction, return corresponding
-// startAsyncLetWithLocalBuffer provided that input instruction
-// is the address of the async let result buffer (so, the last operand)
-static BuiltinInst *getAsyncLetStart(const PointerToAddressInst *pta) {
-  for (auto use : pta->getOperand()->getUses()) {
-    auto *bi = dyn_cast<BuiltinInst>(use->getUser());
-    if (!bi)
-      continue;
-
-    if (bi->getBuiltinKind() ==
-            BuiltinValueKind::StartAsyncLetWithLocalBuffer &&
-        use->getOperandNumber() == bi->getNumOperands() - 1)
-      return bi;
-  }
-
-  return nullptr;
-}
-
 void DifferentiableActivityInfo::propagateUsefulThroughAddress(
     SILValue value, unsigned dependentVariableIndex) {
   assert(value->getType().isAddress() ||

@@ -178,10 +178,38 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   SILFunctionConventions toConv(toType, silConv);
   assert(toConv.useLoweredAddresses());
 
-  // Forward thunk arguments, handling ownership convention mismatches.
+  SmallVector<SILResultInfo, 4> toResults(toConv.getResults().begin(),
+                                          toConv.getResults().end());
   SmallVector<SILValue, 4> forwardedArgs;
-  for (auto indRes : thunk->getIndirectResults())
-    forwardedArgs.push_back(indRes);
+  if (fromType->getNumResults() != toResults.size()) {
+    // Pack source results into fields of the indirect tuple result.
+    if (toResults.size() != 1 || !toResults.front().isFormalIndirect() ||
+        toConv.getSILType(toResults.front(), builder.getTypeExpansionContext())
+                .getObjectType() !=
+            fromType->getAllResultsSubstType(module,
+                                             builder.getTypeExpansionContext()))
+      llvm::report_fatal_error("unsupported reabstraction result grouping");
+    auto output = *thunk->getIndirectResults().begin();
+    toResults.clear();
+    for (auto result : fromConv.getResults()) {
+      // A nontrivial borrowed result cannot initialize an owned tuple field.
+      if (result.isFormalDirect() &&
+          result.getConvention() != ResultConvention::Owned &&
+          !fromConv.getSILType(result, builder.getTypeExpansionContext())
+               .isTrivial(*thunk))
+        llvm::report_fatal_error("result packing requires owned values");
+      auto field =
+          builder.createTupleElementAddr(loc, output, toResults.size());
+      forwardedArgs.push_back(field);
+      toResults.emplace_back(field->getType().getASTType(),
+                             ResultConvention::Indirect);
+    }
+  } else {
+    for (auto result : thunk->getIndirectResults())
+      forwardedArgs.push_back(result);
+  }
+
+  // Forward thunk arguments, handling ownership convention mismatches.
   SmallVector<AllocStackInst *, 4> localAllocations;
   SmallVector<SILValue, 4> valuesToCleanup;
   forwardFunctionArgumentsConvertingOwnership(
@@ -200,10 +228,10 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   };
 
   // Handle indirect results.
-  assert(fromType->getNumResults() == toType->getNumResults());
-  for (unsigned resIdx : range(toType->getNumResults())) {
+  assert(fromType->getNumResults() == toResults.size());
+  for (unsigned resIdx : range(toResults.size())) {
     auto fromRes = fromConv.getResults()[resIdx];
-    auto toRes = toConv.getResults()[resIdx];
+    auto toRes = toResults[resIdx];
     // No abstraction mismatch.
     if (fromRes.isFormalIndirect() == toRes.isFormalIndirect()) {
       // If result types are indirect, directly pass as next argument.
@@ -261,21 +289,60 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   }
 
   auto *fnArg = thunk->getArgumentsWithoutIndirectResults().back();
-  auto *apply = builder.createApply(loc, fnArg, SubstitutionMap(), arguments);
+  SILValue applyResult;
+  SILBasicBlock *errorBB = nullptr;
+  if (fromType->hasErrorResult()) {
+    // Even nonthrowing async-let expressions have an error-bearing initializer.
+    assert(fromType->getOptionalErrorResult() ==
+               toType->getOptionalErrorResult() &&
+           "error reabstraction is not supported");
+    assert(!fromConv.hasIndirectSILErrorResults() &&
+           "indirect errors are not supported");
+    assert(llvm::all_of(
+               fromType->getResults(),
+               [&](SILResultInfo result) {
+                 return result.isFormalIndirect() ||
+                        result.getConvention() == ResultConvention::Owned ||
+                        fromConv
+                            .getSILType(result,
+                                        builder.getTypeExpansionContext())
+                            .isTrivial(*thunk);
+               }) &&
+           "nontrivial direct results must be owned");
+    auto *normalBB = thunk->createBasicBlock();
+    errorBB = thunk->createBasicBlock();
+    auto resultType =
+        fromConv.getSILResultType(builder.getTypeExpansionContext());
+    applyResult = normalBB->createPhiArgument(
+        resultType, resultType.isTrivial(*thunk) ? OwnershipKind::None
+                                                 : OwnershipKind::Owned);
+    auto errorType =
+        fromConv.getSILErrorType(builder.getTypeExpansionContext());
+    errorBB->createPhiArgument(errorType, errorType.isTrivial(*thunk)
+                                              ? OwnershipKind::None
+                                              : OwnershipKind::Owned);
+    builder.createTryApply(loc, fnArg, SubstitutionMap(), arguments, normalBB,
+                           errorBB);
+    builder.setInsertionPoint(normalBB);
+  } else {
+    applyResult = builder.createApply(loc, fnArg, SubstitutionMap(), arguments);
+  }
 
   // Get return elements.
   SmallVector<SILValue, 4> results;
   // Extract all direct results.
   SmallVector<SILValue, 4> directResults;
-  extractAllElements(apply, builder, directResults);
+  extractAllElements(applyResult, builder, directResults);
 
   auto fromDirResultsIter = directResults.begin();
-  auto fromIndResultsIter = apply->getIndirectSILResults().begin();
-  auto toIndResultsIter = thunk->getIndirectResults().begin();
+  auto fromIndirectResults = ArrayRef<SILValue>(arguments).take_front(
+      fromConv.getNumIndirectSILResults());
+  auto fromIndResultsIter = fromIndirectResults.begin();
+  auto toIndResultsIter = forwardedArgs.begin();
   // Reabstract results.
-  for (unsigned resIdx : range(toType->getNumResults())) {
+  for (unsigned resIdx : range(toResults.size())) {
     auto fromRes = fromConv.getResults()[resIdx];
-    auto toRes = toConv.getResults()[resIdx];
+    auto toRes = toResults[resIdx];
     // Check function-typed results.
     if (isa<SILFunctionType>(fromRes.getInterfaceType()) &&
         isa<SILFunctionType>(toRes.getInterfaceType())) {
@@ -327,30 +394,39 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   }
   auto retVal = joinElements(results, builder, loc);
 
-  // Clean up local values.
-  // Guaranteed values need an `end_borrow`.
-  // Owned values need to be destroyed.
-  for (auto arg : valuesToCleanup) {
-    switch (arg->getOwnershipKind()) {
-    case OwnershipKind::Any:
-      llvm_unreachable("value with any ownership kind?!");
-    case OwnershipKind::Guaranteed:
-      builder.emitEndBorrowOperation(loc, arg);
-      break;
-    case OwnershipKind::Owned:
-    case OwnershipKind::Unowned:
-    case OwnershipKind::None:
-      builder.emitDestroyOperation(loc, arg);
-      break;
+  auto emitCleanup = [&]() {
+    // Clean up local values.
+    // Guaranteed values need an `end_borrow`.
+    // Owned values need to be destroyed.
+    for (auto arg : valuesToCleanup) {
+      switch (arg->getOwnershipKind()) {
+      case OwnershipKind::Any:
+        llvm_unreachable("value with any ownership kind?!");
+      case OwnershipKind::Guaranteed:
+        builder.emitEndBorrowOperation(loc, arg);
+        break;
+      case OwnershipKind::Owned:
+      case OwnershipKind::Unowned:
+      case OwnershipKind::None:
+        builder.emitDestroyOperation(loc, arg);
+        break;
+      }
     }
-  }
 
-  // Deallocate local allocations.
-  for (auto *alloc : llvm::reverse(localAllocations))
-    builder.createDeallocStack(loc, alloc);
+    // Deallocate local allocations.
+    for (auto *alloc : llvm::reverse(localAllocations))
+      builder.createDeallocStack(loc, alloc);
+  };
+  emitCleanup();
 
   // Create return.
   builder.createReturn(loc, retVal);
+  if (errorBB) {
+    builder.setInsertionPoint(errorBB);
+    // Normal results are uninitialized on the error edge.
+    emitCleanup();
+    builder.createThrow(loc, errorBB->getArgument(0));
+  }
 
   LLVM_DEBUG(auto &s = getADDebugStream() << "Created reabstraction thunk.\n";
              s << "  From type: " << fromType << '\n';
