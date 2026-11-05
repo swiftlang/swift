@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify %s
 
 // Use-after-consume diagnostics from LifetimeResolution. Each error is reported at
 // the offending use, with notes at every consume that reaches it explaining why it

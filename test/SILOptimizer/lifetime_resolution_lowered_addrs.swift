@@ -1,11 +1,12 @@
 // Coverage for LifetimeResolution when functions are not [opaque], i.e., address-only types are lowered to addresses.
 // For code that only works when opaque values is enabled, see sibling file without `lowered_addrs` in its name.
 
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -disable-sil-opaque-values -verify \
-// RUN:   -enable-experimental-feature LifetimeDependence %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -disable-sil-opaque-values -verify \
+// RUN:   -Xllvm -sil-print-after=lifetime-resolution-diagnose -o /dev/null \
+// RUN:   -enable-experimental-feature LifetimeDependence %s 2>&1 | %FileCheck %s
 
 // For extra coverage, compile with opaque values, but skip FileCheck.
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -enable-sil-opaque-values -verify \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -enable-sil-opaque-values -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence %s -o /dev/null
 
 // REQUIRES: swift_feature_LifetimeDependence
@@ -174,10 +175,10 @@ func NEDependent() {
 // CHECK:      store {{.*}} to [init] [[FIRST]]
 // CHECK:      [[SECOND:%.*]] = alloc_stack [var_decl] $String, var, name "str"
 
-// CHECK:      [[FIRST_BA:%.*]] = begin_access [read] [unknown] [[FIRST]]
+// CHECK:      [[FIRST_BA:%.*]] = begin_access [deinit] [static] [[FIRST]]
 // CHECK:      copy_addr [take] [[FIRST_BA]] to [init] [[SECOND]]
 
-// CHECK:      [[SECOND_BA:%.*]] = begin_access [read] [unknown] [[SECOND]]
+// CHECK:      [[SECOND_BA:%.*]] = begin_access [deinit] [static] [[SECOND]]
 // CHECK:      [[STR:%.*]] = load [take] [[SECOND_BA]]
 
 // CHECK-NOT:  destroy_addr
@@ -193,11 +194,11 @@ func take_sequence_vars() -> String {
 // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}copyVarThenUseSource
 // CHECK:      [[A:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "a"
 // CHECK:      [[B:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "b"
-// CHECK:      [[A_BA:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK:      [[A_BA:%.*]] = begin_access [read] [static] [[A]]
 // CHECK-NEXT: copy_addr [[A_BA]] to [init] [[B]]
-// CHECK:      [[B_BA:%.*]] = begin_access [read] [unknown] [[B]]
+// CHECK:      [[B_BA:%.*]] = begin_access [deinit] [static] [[B]]
 // CHECK-NEXT: load [take] [[B_BA]]
-// CHECK:      [[A_BA2:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK:      [[A_BA2:%.*]] = begin_access [deinit] [static] [[A]]
 // CHECK-NEXT: [[RET:%.*]] = load [take] [[A_BA2]]
 // CHECK-NOT:  destroy_addr
 // CHECK:      return [[RET]]
@@ -213,17 +214,17 @@ func copyVarThenUseSource() -> Kl {
 // CHECK-LABEL: sil hidden [ossa] @$s{{.*}}copyVarBranchReturn
 // CHECK:      [[A:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "a"
 // CHECK:      [[B:%.*]] = alloc_stack [lexical] [var_decl] $Kl, var, name "b"
-// CHECK:      [[A_BA:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK:      [[A_BA:%.*]] = begin_access [read] [static] [[A]]
 // CHECK-NEXT: copy_addr [[A_BA]] to [init] [[B]]
 // CHECK:      cond_br
 
-// CHECK:      [[B_BA:%.*]] = begin_access [read] [unknown] [[B]]
+// CHECK:      [[B_BA:%.*]] = begin_access [deinit] [static] [[B]]
 // CHECK-NEXT: load [take] [[B_BA]]
 // CHECK-NOT:  destroy_addr [[B]]
 // CHECK:      destroy_addr [[A]]
 // CHECK:      br
 
-// CHECK:      [[A_BA2:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK:      [[A_BA2:%.*]] = begin_access [deinit] [static] [[A]]
 // CHECK-NEXT: load [take] [[A_BA2]]
 // CHECK-NOT:  destroy_addr [[A]]
 // CHECK:      destroy_addr [[B]]

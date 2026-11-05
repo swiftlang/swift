@@ -250,6 +250,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
+  public func addSemanticsAttribute(_ attr: StaticString, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
+      bridged.addSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
+    }
+  }
+
   public var isSerialized: Bool {
     switch serializedKind {
     case .notSerialized, .serializedForPackage:

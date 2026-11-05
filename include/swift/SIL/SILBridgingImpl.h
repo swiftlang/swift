@@ -1173,6 +1173,10 @@ void BridgedFunction::setIsPerformanceConstraint(bool isPerfConstraint) const {
   getFunction()->setIsPerformanceConstraint(isPerfConstraint);
 }
 
+void BridgedFunction::addSemanticsAttr(BridgedStringRef attrName) const {
+  getFunction()->addSemanticsAttr(attrName.unbridged());
+}
+
 bool BridgedFunction::hasOwnershipForTrivialValues() const {
   return getFunction()->hasOwnershipForTrivialValues();
 }
@@ -1476,6 +1480,10 @@ SwiftInt BridgedInstruction::LoadInst_getLoadOwnership() const {
 
 bool BridgedInstruction::LoadBorrowInst_isUnchecked() const {
   return (SwiftInt)getAs<swift::LoadBorrowInst>()->isUnchecked();
+}
+
+void BridgedInstruction::LoadBorrowInst_setUnchecked(bool unchecked) const {
+  getAs<swift::LoadBorrowInst>()->setUnchecked(unchecked);
 }
 
 BridgedInstruction::BuiltinValueKind BridgedInstruction::BuiltinInst_getID() const {

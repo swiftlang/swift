@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify %s
 
 // Diagnostics from LifetimeResolution for implicit copies of Copyable values.
 

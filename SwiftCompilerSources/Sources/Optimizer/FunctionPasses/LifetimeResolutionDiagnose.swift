@@ -40,6 +40,13 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
       }
     case let assign as AssignInst where assign.assignOwnership == .initialize && assign.source is Undef:
       undefInits.append(assign)
+
+    // Borrows of memory have now been checked by LifetimeResolution, so the `load_borrow` invariants can be enforced.
+    case let loadBorrow as LoadBorrowInst where loadBorrow.isUnchecked:
+      loadBorrow.set(isUnchecked: false, context)
+
+    // TODO: add missed copy of noncopyable backstop
+
     default:
       break
     }
@@ -52,6 +59,16 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
 
   for marker in unpermittedCopies + letReinits {
     context.erase(instruction: marker)
+  }
+
+  if !unpermittedCopies.isEmpty || !letReinits.isEmpty || !undefInits.isEmpty {
+    // Ensure we actually did emit an error.
+    guard context.hadError else {
+      fatalError("LifetimeResolutionDiagnose didn't emit an error when it should have! \n\(function)")
+    }
+
+    // Like DefiniteInitialization, silence later diagnostics like ImplicitDestroyChecker's after reporting an error.
+    function.addSemanticsAttribute("sil.optimizer.moveonly.diagnostic.ignore", context)
   }
 }
 
