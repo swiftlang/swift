@@ -76,6 +76,11 @@ enum E {
   case B(Z)
 }
 
+struct NCWithDeinit: ~Copyable {
+  @_hasStorage var y: Y
+  deinit
+}
+
 sil @escaping_argument : $@convention(thin) (@guaranteed Y) -> ()
 
 sil @not_escaping_argument : $@convention(thin) (@guaranteed Z) -> () {
@@ -1674,3 +1679,38 @@ bb0:
   return %r
 }
 
+
+sil @nc_deinit : $@convention(method) (@owned NCWithDeinit) -> ()
+
+sil_moveonlydeinit NCWithDeinit {
+  @nc_deinit
+}
+
+// CHECK-LABEL: Escape information for test_destroy_value_of_noncopyable_with_deinit:
+// CHECK: global:   %0 = alloc_ref $Y
+// CHECK: End function test_destroy_value_of_noncopyable_with_deinit
+sil [ossa] @test_destroy_value_of_noncopyable_with_deinit : $@convention(thin) () -> () {
+bb0:
+  specify_test "escape_info"
+  %0 = alloc_ref $Y
+  %1 = struct $NCWithDeinit (%0)
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: Escape information for test_destroy_addr_of_noncopyable_with_deinit:
+// CHECK: global:   %0 = alloc_ref $Y
+// CHECK: End function test_destroy_addr_of_noncopyable_with_deinit
+sil [ossa] @test_destroy_addr_of_noncopyable_with_deinit : $@convention(thin) () -> () {
+bb0:
+  specify_test "escape_info"
+  %0 = alloc_ref $Y
+  %1 = alloc_stack $NCWithDeinit
+  %2 = struct $NCWithDeinit (%0)
+  store %2 to [init] %1
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
