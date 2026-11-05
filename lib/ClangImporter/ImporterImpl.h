@@ -740,6 +740,11 @@ public:
   /// is generated, keep track of the original C++ method.
   llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
 
+  /// For constructors of foreign reference types, whenever a static factory
+  /// is synthesized, keep track of the C++ constructor it calls.
+  llvm::DenseMap<const clang::CXXMethodDecl *, const clang::CXXConstructorDecl *>
+      foreignReferenceFactoryToOriginalConstructor;
+
   /// Accessors and operator functions synthesized around an imported function,
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;

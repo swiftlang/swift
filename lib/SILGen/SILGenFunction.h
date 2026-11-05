@@ -704,6 +704,12 @@ public:
                                                            CanType refType,
                                                            SILValue addr,
                                                            SGFContext C);
+
+  /// Whether the initializer that the current `self.init` or `super.init`
+  /// delegates to borrows `self` rather than consuming it. This is the case for
+  /// the C++ constructor of a C++ foreign reference type.
+  bool isInitDelegationBorrowingSelf() const;
+
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
