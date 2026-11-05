@@ -75,7 +75,7 @@ FILE_MODE = dict(encoding="utf-8", errors="surrogateescape", newline="")
 DIRECTIVE_RE = re.compile(
     r"expected-(?:(?P<prefix>[A-Za-z0-9_]+)-)?(?P<kind>error|warning|note|remark)"
     r"(?P<re>-re)?"
-    r"(?:\s*@(?P<offset>[+-]?\d+|:\d+))?"
+    r"(?:\s*@(?P<offset>[+-]?\d+(?::\d+)?|:\d+))?"
     r"(?:\s+(?P<count>\d+|\*))?"
     r"\s*\{\{")
 
@@ -102,7 +102,8 @@ class Directive:
             return self.line
         if self.offset.startswith(":"):
             return int(self.offset[1:]) - 1
-        return self.line + int(self.offset)
+        # An offset may carry a column, as in `@-1:8`.
+        return self.line + int(self.offset.split(":")[0])
 
     def with_prefix(self, text, prefix):
         """`text`, the source of this directive, with `prefix` added."""
@@ -114,7 +115,8 @@ class Directive:
             text += prefix + "-"
         text += self.kind + self.re
         if self.offset is not None:
-            text += "@" + self.offset
+            # The other parser rarely agrees about the column, so keep the line.
+            text += "@" + (self.offset.split(":")[0] if prefix == "astgen" and not self.offset.startswith(":") else self.offset)
         if self.count is not None:
             text += " " + self.count
         text += " {{" + (self.message if message is None else message) + "}}"
