@@ -463,8 +463,8 @@ func f(_ x : Int, y : Int) {
   if #available(iOS 52, *) && x == y {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{27-30=,}} expected-astgen-error {{expected ',' joining parts of a multi-clause condition}}{{27-28=}}{{31-31=, }}{{28-31=}}
 
   // https://twitter.com/radexp/status/694790631881883648
-  if x == y && let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{cannot convert value of type '_' to expected argument type 'Bool'}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{extra trailing closure passed in call}}
-  if x == y&&let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-14=,}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{cannot convert value of type '_' to expected argument type 'Bool'}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{extra trailing closure passed in call}} expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end 'if' statement}}
+  if x == y && let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{extra trailing closure passed in call}}
+  if x == y&&let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-14=,}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{extra trailing closure passed in call}} expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end 'if' statement}}
 }
 
 

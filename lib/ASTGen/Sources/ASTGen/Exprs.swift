@@ -1178,6 +1178,16 @@ extension ASTGenVisitor {
     // SwiftSyntax.SequenceExprSyntax and swift::SequenceExpr has mismatch in the
     // element representations. e.g. 'as' and 'is'.
 
+    // An operator with no operand after it: `Parser::parseExprSequence` fails
+    // the whole sequence when an element is missing, so the enclosing expression
+    // is an ErrorExpr. The parser has already reported the missing operand, and
+    // keeping the operands that were parsed would only produce follow-on
+    // diagnostics, e.g., "cannot find" for an operand that was never meant to be
+    // a complete expression.
+    if let last = node.elements.last, last.is(MissingExprSyntax.self) {
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
+    }
+
     // FIXME: Avoid Swift.Array.
     var elements: [BridgedExpr] = []
     elements.reserveCapacity(node.elements.count)
