@@ -3269,6 +3269,8 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     synthCxxMethodDecl->setImplicit();
     synthCxxMethodDecl->setImplicitlyInline();
 
+    ImporterImpl.foreignReferenceFactoryToOriginalConstructor[synthCxxMethodDecl] =
+        selectedCtorDecl;
     synthesizedFactories.push_back(synthCxxMethodDecl);
   }
 
