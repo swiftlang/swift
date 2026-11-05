@@ -235,6 +235,15 @@ VersionParser::parseVersionString(StringRef VersionString, SourceLoc Loc,
   return isValidVersion ? std::optional<Version>(TheVersion) : std::nullopt;
 }
 
+std::optional<Version>
+VersionParser::parseLanguageMode(StringRef ModeString,
+                                 DiagnosticEngine *Diags) {
+  if (ModeString == "future")
+    return Version{Version::getFutureMajorLanguageVersion()};
+
+  return parseVersionString(ModeString, SourceLoc(), Diags);
+}
+
 std::optional<llvm::VersionTuple>
 VersionParser::parseUserModuleVersion(StringRef VersionString) {
   // llvm::VersionTuple supports a maximum of five components.

@@ -39,7 +39,7 @@ import SIL
 // %elt = tuple_element_addr %tuple, 1
 // %addr = unchecked_addr_cast %elt to $*@pack_element("...") T
 //
-extension TuplePackElementAddrInst : Simplifiable, SILCombineSimplifiable {
+extension TuplePackElementAddrInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     guard !self.tupleOperand.value.type.tupleContainsPackExpansionType,
           let packIndex = self.indexOperand.value as? AnyPackIndexInst,

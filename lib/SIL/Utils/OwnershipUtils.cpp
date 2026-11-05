@@ -1678,64 +1678,6 @@ bool ForwardingOperand::visitForwardedValues(
   return visitor(succArg);
 }
 
-void swift::visitExtendedReborrowPhiBaseValuePairs(
-    BeginBorrowInst *borrowInst, function_ref<void(SILPhiArgument *, SILValue)>
-                                     visitReborrowPhiBaseValuePair) {
-  // A Reborrow can have different base values on different control flow
-  // paths.
-  // For that reason, worklist stores (reborrow, base value) pairs.
-  // We need a SetVector to make sure we don't revisit the same pair again.
-  llvm::SmallSetVector<std::tuple<PhiOperand, SILValue>, 4> worklist;
-
-  // Find all reborrows of value and insert the (reborrow, base value) pair into
-  // the worklist.
-  auto collectReborrows = [&](SILValue value, SILValue baseValue) {
-    BorrowedValue(value).visitLocalScopeEndingUses([&](Operand *op) {
-      if (op->getOperandOwnership() == OperandOwnership::Reborrow) {
-        worklist.insert(std::make_tuple(PhiOperand(op), baseValue));
-      }
-      return true;
-    });
-  };
-
-  // Initialize the worklist.
-  collectReborrows(borrowInst, borrowInst->getOperand());
-
-  // For every (reborrow, base value) pair in the worklist:
-  // - Find phi value and new base value
-  // - Call the visitor on the phi value and new base value pair
-  // - Populate the worklist with pairs of reborrows of phi value and the new
-  // base.
-  for (unsigned idx = 0; idx < worklist.size(); idx++) {
-    PhiOperand phiOp;
-    SILValue currentBaseValue;
-    std::tie(phiOp, currentBaseValue) = worklist[idx];
-
-    auto *phiValue = phiOp.getValue();
-    SILValue newBaseValue = currentBaseValue;
-
-    // If the previous base value was also passed as a phi operand along with
-    // the reborrow, its phi value will be the new base value.
-    for (auto &op : phiOp.getBranch()->getAllOperands()) {
-      PhiOperand otherPhiOp(&op);
-      auto *borrowedFromUser = getBorrowedFromUser(currentBaseValue);
-      if (borrowedFromUser && borrowedFromUser == otherPhiOp.getSource()) {
-        newBaseValue = otherPhiOp.getValue();
-        continue;
-      }
-      if (otherPhiOp.getSource() == currentBaseValue) {
-        newBaseValue = otherPhiOp.getValue();
-        continue;
-      }
-    }
-
-    // Call the visitor function
-    visitReborrowPhiBaseValuePair(phiValue, newBaseValue);
-
-    collectReborrows(phiValue, newBaseValue);
-  }
-}
-
 void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
     BorrowedValue borrow, function_ref<void(SILPhiArgument *, SILValue)>
                               visitGuaranteedForwardingPhiBaseValuePair) {

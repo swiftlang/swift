@@ -260,6 +260,10 @@ private struct FunctionChecker {
         break
       }
 
+    case is TuplePackElementAddrInst,
+         is OpenPackElementInst:
+      throw Violation(.embedded_variadic_generic, in: instruction)
+
     default:
       break
     }

@@ -1018,6 +1018,16 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       case SILLinkage::PublicExternal:
       case SILLinkage::PackageExternal:
       case SILLinkage::HiddenExternal:
+        // The client's declaration says the function is emitted into the
+        // client even though the serialized function is public, as for a
+        // member of a back-deployed type whose original might not exist.
+        if (fn->getLinkage() == SILLinkage::HiddenExternal &&
+            fn->getDeclRef() &&
+            fn->getDeclRef().getDefinitionLinkage() ==
+                SILLinkage::PublicNonABI) {
+          fn->setLinkage(SILLinkage::Shared);
+          break;
+        }
         if (hasPublicVisibility(linkage)) {
           // Cross-module-optimization can change the linkage to public. In this
           // case we need to update the linkage of the function (which is

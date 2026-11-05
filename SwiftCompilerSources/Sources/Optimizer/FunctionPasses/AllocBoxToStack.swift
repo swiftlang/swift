@@ -84,7 +84,10 @@ let mandatoryAllocBoxToStack = ModulePass(name: "mandatory-allocbox-to-stack") {
 
   /// This is needed because box-promotion is mandatory for non-copyable types. Without removing the
   /// original, un-specialized versions of closures we risk getting false errors in diagnostic passes.
-  eraseIfDead(functions: originalsOfSpecializedFunctions.functions, moduleContext)
+  /// At -Onone, closures and local functions are kept for the debugger. Erase them anyway, so that
+  /// diagnostics don't differ between -Onone and -O.
+  eraseIfDead(functions: originalsOfSpecializedFunctions.functions, moduleContext,
+              ignoringDebuggerPreservation: true)
 }
 
 /// Converts all non-escaping `alloc_box` to `alloc_stack` and specializes called functions if a
@@ -144,7 +147,7 @@ private func findPromotableBoxes(in function: Function, isMandatory: Bool, _ con
 /// Promotion is mandatory for noncopyable variables, because the move-only checker runs after
 /// MandatoryAllocBoxToStack and requires it.
 ///
-/// FIXME: DiagnoseStaticExclusivity may then reject a conflict on a noncopyable variable that only
+/// FIXME: DiagnoseStaticExclusivity may now reject a conflict on a noncopyable variable that only
 /// happens on some paths (test/SILOptimizer/exclusivity_static_diagnostics_noncopyable_box.swift).
 /// Running the new move checker before MandatoryAllocBoxToStack would remove this exception.
 private func isNoncopyable(_ allocBox: AllocBoxInst) -> Bool {
@@ -275,7 +278,7 @@ private struct FunctionSpecializations {
       case let debugValue as DebugValueInst:
         if debugValue.debugReconstructionBlock != nil {
           // A box cannot be salvaged.
-          debugValue.killOperand(index: use.index)
+          debugValue.killOperand(index: use.index, context)
         } else {
           // A bare debug_value on an alloc_box describes the box content: repoint it to the alloc_stack with a deref.
           use.set(to: stack, context)
@@ -502,13 +505,16 @@ private extension ApplySite {
        callee.isDefinition,
        callee.canBeInlinedIntoCaller(withSerializedKind: parentFunction.serializedKind)
     {
-      if self is FullApplySite,
-         // If the function is inlined later, there is no point in specializing it.
-         !callee.shouldOptimize || callee.inlineStrategy == .heuristicAlways ||
-         callee.inlineStrategy == .always
-      {
-        return nil
-      }
+      // Always specialize the callee, regardless of the optimization mode or inlining strategy
+      // (`shouldOptimize`, `inlineStrategy`).
+      //
+      // This is extra work if the callee will be inlined later anyway. We do it to signify to
+      // downstream diagnostics (DiagnoseStaticExclusivity) that the argument was already assumed
+      // to be non-escaping: the specialized function takes the captured address as
+      // `@inout_aliasable`.
+      //
+      // This must not depend on optimization options. SIL in the diagnostic pipeline cannot
+      // deviate based on -O options, otherwise diagnostics would differ between -Onone and -O.
       return callee
     }
     return nil

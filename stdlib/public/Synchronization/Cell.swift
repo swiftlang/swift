@@ -12,32 +12,29 @@
 
 import Builtin
 
-@available(SwiftStdlib 6.0, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 6.0)
 @frozen
 @_rawLayout(like: Value, movesAsLike)
 public struct _Cell<Value: ~Copyable>: ~Copyable {
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public var _address: UnsafeMutablePointer<Value> {
     unsafe UnsafeMutablePointer<Value>(_rawAddress)
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   internal var _rawAddress: Builtin.RawPointer {
     Builtin.addressOfRawLayout(self)
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   @_transparent
   public init(_ initialValue: consuming Value) {
     unsafe _address.initialize(to: initialValue)
   }
 
-  @available(SwiftStdlib 6.0, *)
   @export(implementation)
   deinit {
     unsafe _address.deinitialize(count: 1)

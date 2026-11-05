@@ -12,6 +12,12 @@ struct X {
   init()
 }
 
+class C {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var next: C { get set }
+  init()
+}
+
 var globalX: X
 
 sil_global hidden @globalX : $X
@@ -235,7 +241,7 @@ bb3:
 }
 
 // public func dont_hoist_access_static_and_dynamic() {
-// Tests bailing out when there's a static and non-distinct dynamic access
+// Tests bailing out when there's a static and non-distinct conflicting dynamic access
 //
 // CHECK-LABEL: sil @dont_hoist_access_static_and_dynamic : $@convention(thin) () -> () {
 // CHECK: [[GLOBAL:%.*]] = global_addr @globalX : $*X
@@ -244,7 +250,7 @@ bb3:
 // CHECK: [[BEGIN:%.*]] = begin_access [read] [static] [[GLOBAL]] : $*X
 // CHECK-NEXT: load
 // CHECK: end_access [[BEGIN]]
-// CHECK: [[BEGINX:%.*]] = begin_access [read] [dynamic] [[GLOBALX]] : $*X
+// CHECK: [[BEGINX:%.*]] = begin_access [modify] [dynamic] [[GLOBALX]] : $*X
 // CHECK-NEXT: load
 // CHECK: end_access [[BEGINX]]
 // CHECK: cond_br
@@ -261,7 +267,7 @@ bb1:
   %x3 = begin_access [read] [static] %0 : $*X
   %x4 = load %x3 : $*X
   end_access %x3 : $*X
-  %y3 = begin_access [read] [dynamic] %1 : $*X
+  %y3 = begin_access [modify] [dynamic] %1 : $*X
   %y4 = load %y3 : $*X
   end_access %y3 : $*X
   cond_br undef, bb3, bb2
@@ -303,4 +309,143 @@ bb5:
 bb6:
   %10 = tuple ()
   return %10
+}
+
+// Two read accesses don't conflict, even if they may access the same memory
+// (%0 and %1 may be the same object).
+//
+// CHECK-LABEL: sil [ossa] @hoist_overlapping_read_accesses :
+// CHECK:         [[A:%.*]] = begin_access [read] [dynamic] {{%.*}} : $*Int64
+// CHECK:         [[B:%.*]] = begin_access [read] [dynamic] {{%.*}} : $*Int64
+// CHECK:         br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    cond_br
+// CHECK:       bb2:
+// CHECK-DAG:     end_access [[A]]
+// CHECK-DAG:     end_access [[B]]
+// CHECK-LABEL: } // end sil function 'hoist_overlapping_read_accesses'
+sil [ossa] @hoist_overlapping_read_accesses : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  %2 = ref_element_addr %0, #C.x
+  %3 = ref_element_addr %1, #C.x
+  br bb1
+
+bb1:
+  %5 = begin_access [read] [dynamic] %2
+  %6 = load [trivial] %5
+  end_access %5
+  %8 = begin_access [read] [dynamic] %3
+  %9 = load [trivial] %8
+  end_access %8
+  cond_br undef, bb3, bb2
+
+bb2:
+  %10 = tuple ()
+  return %10
+
+bb3:
+  br bb1
+}
+
+// A read access conflicts with a modify access to the same memory.
+//
+// CHECK-LABEL: sil [ossa] @dont_hoist_overlapping_read_and_modify_accesses :
+// CHECK:       bb1:
+// CHECK-NEXT:    begin_access [read] [dynamic]
+// CHECK:         begin_access [modify] [dynamic]
+// CHECK:         cond_br
+// CHECK-LABEL: } // end sil function 'dont_hoist_overlapping_read_and_modify_accesses'
+sil [ossa] @dont_hoist_overlapping_read_and_modify_accesses : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  %2 = ref_element_addr %0, #C.x
+  %3 = ref_element_addr %1, #C.x
+  br bb1
+
+bb1:
+  %5 = begin_access [read] [dynamic] %2
+  %6 = load [trivial] %5
+  end_access %5
+  %8 = begin_access [modify] [dynamic] %3
+  %9 = load [trivial] %8
+  end_access %8
+  cond_br undef, bb3, bb2
+
+bb2:
+  %10 = tuple ()
+  return %10
+
+bb3:
+  br bb1
+}
+
+// A load_borrow doesn't conflict with a read access, even if they may access
+// the same memory.
+//
+// CHECK-LABEL: sil [ossa] @hoist_load_borrow_overlapping_read_access :
+// CHECK:         [[LB:%.*]] = load_borrow {{%.*}} : $*C
+// CHECK:         [[A:%.*]] = begin_access [read] [dynamic] {{%.*}} : $*C
+// CHECK:         br bb1
+// CHECK:       bb1:
+// CHECK-NEXT:    fix_lifetime [[LB]]
+// CHECK-NEXT:    cond_br
+// CHECK:       bb2:
+// CHECK-DAG:     end_access [[A]]
+// CHECK-DAG:     end_borrow [[LB]]
+// CHECK-LABEL: } // end sil function 'hoist_load_borrow_overlapping_read_access'
+sil [ossa] @hoist_load_borrow_overlapping_read_access : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+bb0(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  %2 = ref_element_addr %0, #C.next
+  %3 = ref_element_addr %1, #C.next
+  br bb1
+
+bb1:
+  %5 = load_borrow %2
+  fix_lifetime %5
+  end_borrow %5
+  %8 = begin_access [read] [dynamic] %3
+  end_access %8
+  cond_br undef, bb3, bb2
+
+bb2:
+  %10 = tuple ()
+  return %10
+
+bb3:
+  br bb1
+}
+
+sil [ossa] @potential_read_access : $@convention(thin) (@guaranteed C) -> () {
+[%0: read c0.v**]
+[global:]
+}
+
+// A modify access conflicts with a read access in a called function.
+//
+// CHECK-LABEL: sil [ossa] @conflict_with_read_access_in_called_function :
+// CHECK:       bb1:
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    begin_access [modify] [dynamic]
+// CHECK:         end_access
+// CHECK:         cond_br
+// CHECK-LABEL: } // end sil function 'conflict_with_read_access_in_called_function'
+sil [ossa] @conflict_with_read_access_in_called_function : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = ref_element_addr %0, #C.x
+  %f = function_ref @potential_read_access : $@convention(thin) (@guaranteed C) -> ()
+  br bb1
+
+bb1:
+  %a = apply %f(%0) : $@convention(thin) (@guaranteed C) -> ()
+  %2 = begin_access [dynamic] [modify] %1
+  %3 = load [trivial] %2
+  fix_lifetime %3
+  end_access %2
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
 }

@@ -241,7 +241,7 @@ class MultiStreamFile {
             let chunkSize = min(remaining, pageSize / MemoryLayout<UPN>.stride)
 
             try with(page: page) {
-              let pageNumbers = Span<UPN>(_bytes: $0)
+              let pageNumbers = Span<UPN>(viewing: $0)
 
               for n in 0..<chunkSize {
                 pages.append(Int(pageNumbers[n]))

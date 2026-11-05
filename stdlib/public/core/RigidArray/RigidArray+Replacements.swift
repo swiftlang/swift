@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Replaces the specified range of elements by a given count of new items,
   /// using a callback to directly initialize array storage by populating
@@ -52,7 +51,6 @@ extension _RigidArray where Element: ~Copyable {
   ///
   /// - Complexity: O(`self.count` + `newItemCount`) in addition to the complexity
   ///    of the callback invocations.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func replaceSubrange<E: Error>(
     _ subrange: Range<Int>,
@@ -94,7 +92,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   /// Replaces the specified range of elements by moving the elements of a
   /// fully initialized buffer into their place. On return, the buffer is left
@@ -124,7 +121,6 @@ extension _RigidArray where Element: ~Copyable {
   ///     the array.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
@@ -163,7 +159,6 @@ extension _RigidArray where Element: ~Copyable {
   ///   - items: An output span whose contents are to be moved into the array.
   ///
   /// - Complexity: O(`self.count` + `items.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
@@ -177,7 +172,6 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: Copyable {
   /// Replaces the specified subrange of elements by copying the elements of
   /// the given buffer pointer, which must be fully initialized.
@@ -205,7 +199,6 @@ extension _RigidArray where Element: Copyable {
   ///   - newElements: The new elements to copy into the collection.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
@@ -244,7 +237,6 @@ extension _RigidArray where Element: Copyable {
   ///   - newElements: The new elements to copy into the collection.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
@@ -281,7 +273,6 @@ extension _RigidArray where Element: Copyable {
   ///   - newElements: The new elements to copy into the collection.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
@@ -344,7 +335,6 @@ extension _RigidArray where Element: Copyable {
   ///   - newElements: The new elements to copy into the collection.
   ///
   /// - Complexity: O(`self.count` + `newElements.count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,

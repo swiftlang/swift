@@ -31,6 +31,10 @@ final class TestNonsendable { // expected-note 3{{class 'TestNonsendable' does n
 
 nonisolated(unsafe) let immutableNonisolatedUnsafeTopLevelGlobal = TestNonsendable()
 
+// The counterpart in an @abi attribute isn't checked as storage of its own.
+@abi(var abiMainActorGlobal: Int)
+@MainActor var mainActorGlobal = 1
+
 @propertyWrapper
 public struct TestWrapper {
   public init() {}

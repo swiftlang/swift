@@ -34,6 +34,7 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
+#include "swift/SILOptimizer/PassManager/PassManager.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
@@ -1131,6 +1132,53 @@ static bool keepArgsOfPartialApplyAlive(PartialApplyInst *pai,
   return true;
 }
 
+/// Returns true if each use of the on-stack closure \p value, which is the
+/// closure itself or a mark_dependence of it, is removed or dead.
+static bool areOnStackClosureUsesDeadOrRemoved(
+    SingleValueInstruction *value,
+    function_ref<bool(SILInstruction *)> isRemoved) {
+  for (auto *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (isRemoved(user) || isDeadOnStackClosureUser(user))
+      continue;
+    // See deadMarkDependenceUser().
+    auto *mdi = dyn_cast<MarkDependenceInst>(user);
+    if (!mdi || use->getOperandNumber() != MarkDependenceInst::Dependent ||
+        !areOnStackClosureUsesDeadOrRemoved(mdi, isRemoved))
+      return false;
+  }
+  return true;
+}
+
+/// Returns true if each use of \p value, which is the closure or a value with
+/// transitive ownership of it, is removed or doesn't keep it alive.
+static bool
+areClosureUsesDeadOrRemoved(SingleValueInstruction *value,
+                            function_ref<bool(SILInstruction *)> isRemoved) {
+  // See collectDestroysRecursively().
+  for (auto *use : value->getUses()) {
+    auto *user = use->getUser();
+    if (isRemoved(user) || useDoesNotKeepValueAlive(user))
+      continue;
+    if (!useHasTransitiveOwnership(user) ||
+        !areClosureUsesDeadOrRemoved(cast<SingleValueInstruction>(user),
+                                     isRemoved))
+      return false;
+  }
+  return true;
+}
+
+bool swift::canDeleteDeadClosure(
+    SingleValueInstruction *closure,
+    function_ref<bool(SILInstruction *)> isRemoved) {
+  auto *pa = dyn_cast<PartialApplyInst>(closure);
+  if (!pa && !isa<ThinToThickFunctionInst>(closure))
+    return false;
+  if (pa && pa->isOnStack())
+    return areOnStackClosureUsesDeadOrRemoved(pa, isRemoved);
+  return areClosureUsesDeadOrRemoved(closure, isRemoved);
+}
+
 bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
                                  InstModCallbacks callbacks,
                                  bool needKeepArgsAlive) {
@@ -1563,11 +1611,8 @@ void swift::insertDeallocOfCapturedArguments(
   ApplySite site(pai);
   for (auto &arg : pai->getArgumentOperands()) {
     auto paramInfo = site.getParamInfoForOperand(arg);
-    if (!paramInfo.isIndirectInGuaranteed())
-      continue;
-    // With opaque values, an in_guaranteed capture is an object; there is no
-    // stack slot to deallocate.
-    if (!arg.get()->getType().isAddress())
+    if (!paramInfo.isIndirectInGuaranteed() ||
+        !site.getSubstCalleeConv().isSILIndirect(paramInfo))
       continue;
 
     SILValue argValue = getAddressToDealloc(arg.get());
@@ -2985,4 +3030,45 @@ bool swift::shouldRemoveCondFail(StringRef withMessage, StringRef functionName) 
 
   // Check whether the cond_fail's message was listed in the config file.
   return CondFailsToRemove.find(withMessage.str()) != CondFailsToRemove.end();
+}
+
+//===----------------------------------------------------------------------===//
+//                              Swift Bridging
+//===----------------------------------------------------------------------===//
+
+static BridgedOptimizerUtilities::UpdateFunctionFn
+    simplifyDebugReconstructionBlocksFunction;
+static BridgedOptimizerUtilities::UpdateInstructionFn
+    simplifyDebugReconstructionBlockFunction;
+
+void BridgedOptimizerUtilities::registerDebugReconstructionSimplification(
+    UpdateFunctionFn simplifyDebugReconstructionBlocksFn,
+    UpdateInstructionFn simplifyDebugReconstructionBlockFn) {
+  simplifyDebugReconstructionBlocksFunction =
+      simplifyDebugReconstructionBlocksFn;
+  simplifyDebugReconstructionBlockFunction = simplifyDebugReconstructionBlockFn;
+}
+
+// Both run on an invocation of their own, so that the change notifications are
+// dropped with it: debug reconstruction blocks are not part of the function,
+// so nothing an analysis knows about changes. This also keeps the erased
+// instructions out of the worklist of a pass which may be running.
+
+void swift::simplifyDebugReconstructionBlocks(SILPassManager *pm,
+                                              SILFunction *f) {
+  if (!simplifyDebugReconstructionBlocksFunction)
+    return;
+  SwiftPassInvocation invocation(pm, /*transform=*/nullptr, f);
+  simplifyDebugReconstructionBlocksFunction({&invocation}, {f});
+}
+
+DebugValueInst *
+swift::simplifyDebugReconstructionBlock(SILPassManager *pm,
+                                        DebugValueInst *dvi) {
+  if (!simplifyDebugReconstructionBlockFunction)
+    return dvi;
+  SwiftPassInvocation invocation(pm, /*transform=*/nullptr, dvi->getFunction());
+  return simplifyDebugReconstructionBlockFunction({&invocation},
+                                                  {dvi->asSILNode()})
+      .getAs<DebugValueInst>();
 }

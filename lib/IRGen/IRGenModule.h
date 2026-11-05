@@ -1223,6 +1223,10 @@ public:
                               bool disableOptimizations = false);
   bool isDependentConformance(const RootProtocolConformance *conformance);
 
+  /// Whether the specialized witness table \p wt can be emitted as a static
+  /// witness table, which is directly referenced.
+  bool canEmitStaticSpecializedWitnessTable(SILWitnessTable *wt);
+
   Alignment getCappedAlignment(Alignment alignment);
 
   SpareBitVector getSpareBitsForType(llvm::Type *scalarTy, Size size);
@@ -1249,6 +1253,9 @@ private:
 
   llvm::DenseMap<const ProtocolConformance *,
                  std::unique_ptr<const ConformanceInfo>> Conformances;
+
+  /// Caches the results of canEmitStaticSpecializedWitnessTable.
+  llvm::DenseMap<SILWitnessTable *, bool> StaticSpecializedWitnessTables;
 
   friend class GenericContextScope;
   friend class LoweringModeScope;
@@ -1497,8 +1504,14 @@ private:
   llvm::DenseMap<KeyPathPattern*, llvm::GlobalVariable*> KeyPathPatterns;
   /// Cache of statically-instantiated key path objects (embedded Swift).
   /// Keyed by the (uniqued) `KeyPathPattern *` so multiple `keypath_inst`s
-  /// referring to the same pattern share one immortal global.
-  llvm::DenseMap<KeyPathPattern*, llvm::Constant*> StaticKeyPathInstances;
+  /// referring to the same pattern share one immortal global.  Also records
+  /// the argument data offsets of capturing components.
+  struct StaticKeyPathInstance {
+    llvm::Constant *Instance;
+    SmallVector<uint32_t, 2> ArgDataOffsets;
+  };
+  llvm::DenseMap<KeyPathPattern*, StaticKeyPathInstance>
+      StaticKeyPathInstances;
 
   /// Uniquing key for a fixed type layout record.
   struct FixedLayoutKey {
@@ -2202,6 +2215,11 @@ private:
   void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
   bool isConcurrencyAvailable();
+
+  /// Whether the runtime support for `Builtin.Borrow` of a non-fixed referent
+  /// (swift_getBorrowTypeMetadata and friends) is guaranteed to exist at the
+  /// deployment target. If not, IRGen computes that layout inline.
+  bool isBorrowRuntimeAvailable();
   bool isTypedAllocationAvailable();
   void noteSwiftAsyncFunctionDef() {
     hasSwiftAsyncFunctionDef = true;

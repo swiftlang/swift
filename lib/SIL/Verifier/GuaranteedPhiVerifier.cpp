@@ -45,14 +45,6 @@ bool GuaranteedPhiVerifier::verifyDependentPhiLifetime(SILPhiArgument *phi,
   return linearLifetimeResult.getFoundError();
 }
 
-void GuaranteedPhiVerifier::verifyReborrows(BeginBorrowInst *borrow) {
-  auto visitReborrowPhiBaseValuePair = [&](SILPhiArgument *phi,
-                                           SILValue baseValue) {
-    verifyDependentPhiLifetime(phi, baseValue);
-  };
-  visitExtendedReborrowPhiBaseValuePairs(borrow, visitReborrowPhiBaseValuePair);
-}
-
 void GuaranteedPhiVerifier::verifyGuaranteedForwardingPhis(
     BorrowedValue borrow) {
   auto visitGuaranteedPhiBaseValuePair = [&](SILPhiArgument *phi,

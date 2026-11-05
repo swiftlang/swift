@@ -1356,13 +1356,6 @@ OwnedValueIntroducer getSingleOwnedValueIntroducer(SILValue value);
 
 using BaseValueSet = SmallPtrSet<SILValue, 8>;
 
-/// Starting from \p borrowInst, find all reborrows along with their base
-/// values, and run the visitor function \p visitReborrowPhiBaseValuePair on
-/// them.
-void visitExtendedReborrowPhiBaseValuePairs(
-    BeginBorrowInst *borrowInst, function_ref<void(SILPhiArgument *, SILValue)>
-                                     visitReborrowPhiBaseValuePair);
-
 /// Starting from \p borrow, find all GuaranteedForwardingPhi uses along with
 /// their base values, and run the visitor function \p
 /// visitGuaranteedForwardingPhiBaseValuePair on them.

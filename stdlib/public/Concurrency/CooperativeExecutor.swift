@@ -313,10 +313,12 @@ extension CooperativeExecutor: RunLoopExecutor {
         }
       }
 
-      if let toWait {
+      if !runQueue.isEmpty {
+        // There is more to run, so don't wait for a timer
+      } else if let toWait {
         _sleep(seconds: toWait.seconds,
                nanoseconds: toWait.nanoseconds)
-      } else if runQueue.isEmpty {
+      } else {
         // Stop if no more jobs are available
         break
       }

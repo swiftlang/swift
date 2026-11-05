@@ -427,11 +427,15 @@ using ScopeRequiringFinalInit = DiagnosticEmitter::ScopeRequiringFinalInit;
 ///     ...
 ///     end_apply %token // %addr must be initialized here
 ///
+///     The scope of self begins before the accessor is applied, so it may also
+///     end on paths that never reach the apply. Only the scope ends dominated
+///     by the apply are visited.
+///
 /// To enforce this requirement, function exiting instructions are treated as
 /// liveness uses of such addresses, ensuring that the address is initialized at
 /// that point.
 static bool visitScopeEndsRequiringInit(
-    MarkUnresolvedNonCopyableValueInst *markedAddr,
+    MarkUnresolvedNonCopyableValueInst *markedAddr, DominanceInfo *domTree,
     llvm::function_ref<void(SILInstruction *, ScopeRequiringFinalInit)> visit) {
   SILValue operand = markedAddr->getOperand();
 
@@ -506,12 +510,20 @@ static bool visitScopeEndsRequiringInit(
   if (auto ai =
           dyn_cast_or_null<ApplyInst>(operand->getDefiningInstruction())) {
     if (ai->hasInoutResult()) {
+      // The result is defined only on paths through the apply. A scope end
+      // that the apply does not dominate should not be visited.
+      auto visitDominated = [&](SILInstruction *inst,
+                                ScopeRequiringFinalInit kind) {
+        if (domTree->properlyDominates(ai, inst)) {
+          visit(inst, kind);
+        }
+      };
       auto *access =
           dyn_cast<BeginAccessInst>(getAccessScope(ai->getSelfArgument()));
       if (access) {
         assert(access->getAccessKind() == SILAccessKind::Modify);
         for (auto *inst : access->getEndAccesses()) {
-          visit(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
+          visitDominated(inst, ScopeRequiringFinalInit::ModifyMemoryAccess);
         }
         return true;
       }
@@ -519,7 +531,7 @@ static bool visitScopeEndsRequiringInit(
       // inout argument whose scope ends are those of its marker.
       if (auto *selfMark = dyn_cast<MarkUnresolvedNonCopyableValueInst>(
               stripAddressProjections(ai->getSelfArgument()))) {
-        return visitScopeEndsRequiringInit(selfMark, visit);
+        return visitScopeEndsRequiringInit(selfMark, domTree, visitDominated);
       }
       return false;
     }
@@ -868,7 +880,7 @@ struct UseState {
   initializeLiveness(FieldSensitiveMultiDefPrunedLiveRange &prunedLiveness);
 
   void initializeImplicitEndOfLifetimeLivenessUses() {
-    visitScopeEndsRequiringInit(address, [&](auto *inst, auto kind) {
+    visitScopeEndsRequiringInit(address, domTree, [&](auto *inst, auto kind) {
       LLVM_DEBUG(llvm::dbgs()
                  << "    Adding scope end as liveness user: " << *inst);
       scopeEndsRequiringInit[inst] = kind;
@@ -4059,6 +4071,12 @@ void ExtendUnconsumedLiveness::runOnField(
   for (auto *block : consumedAtEntryBlocks) {
     for (auto *predecessor : block->getPredecessorBlocks()) {
       if (consumedAtExitBlocks.contains(predecessor))
+        continue;
+      // A predecessor that wasn't originally live isn't on that boundary. For
+      // example, when the field is defined in a loop header and consumed in the
+      // loop, the header is consumed at entry along the back edge, but the
+      // field isn't live in the loop's preheader at all.
+      if (!originalLiveBlocks.contains(predecessor))
         continue;
       // Add "the instruction(s) before the terminator" of the predecessor to
       // liveness.

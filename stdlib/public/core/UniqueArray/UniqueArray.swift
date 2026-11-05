@@ -31,23 +31,21 @@
 ///
 /// For copyable elements, the copy-on-write `Array` type is still a more
 /// convenient and expressive choice.
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 6.4)
 @frozen
 public struct UniqueArray<Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal var _storage: _RigidArray<Element>
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray: Sendable where Element: Sendable & ~Copyable {}
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// The maximum number of elements this array can hold without having to
   /// reallocate its storage.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public var capacity: Int {
@@ -58,7 +56,6 @@ extension UniqueArray where Element: ~Copyable {
   /// reallocating its storage.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public var freeCapacity: Int {
@@ -66,12 +63,10 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// A span over the elements of this array, providing direct read-only access.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public var span: Span<Element> {
     @_lifetime(borrow self)
@@ -85,7 +80,6 @@ extension UniqueArray where Element: ~Copyable {
   /// mutating access.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
@@ -96,7 +90,6 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Arbitrarily edit the storage underlying this array by invoking a
   /// user-supplied closure with a mutable `OutputSpan` view over it.
@@ -115,7 +108,6 @@ extension UniqueArray where Element: ~Copyable {
   /// - Returns: This method returns the result of its function argument.
   /// - Complexity: Adds O(1) overhead to the complexity of the function
   ///    argument.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public mutating func edit<E: Error, R: ~Copyable>(
@@ -134,7 +126,6 @@ internal func _growUniqueArrayCapacity(_ capacity: Int) -> Int {
   return Int(bitPattern: c)
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
   /// Grow or shrink the capacity of a unique array instance without discarding
   /// its contents.
@@ -147,7 +138,6 @@ extension UniqueArray where Element: ~Copyable {
   ///    greater than or equal to the current count.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func setCapacity(_ newCapacity: Int) {
     _storage.setCapacity(newCapacity)
@@ -161,7 +151,6 @@ extension UniqueArray where Element: ~Copyable {
   /// Otherwise the array is left as is.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public mutating func reserveCapacity(_ n: Int) {
     _storage.reserveCapacity(n)
@@ -189,13 +178,11 @@ extension UniqueArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueArray {
   /// Copy the contents of this array into a newly allocated unique array
   /// instance with just enough capacity to hold all its elements.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public func clone() -> Self {
     UniqueArray(consuming: _storage.clone())
@@ -208,7 +195,6 @@ extension UniqueArray {
   ///    `capacity` must be greater than or equal to `count`.
   ///
   /// - Complexity: O(`count`)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public func clone(capacity: Int) -> Self {
     UniqueArray(consuming: _storage.clone(capacity: capacity))
@@ -217,20 +203,16 @@ extension UniqueArray {
 
 @available(SwiftStdlib 6.4, *)
 extension UniqueArray: Iterable where Element: ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   public typealias BorrowingIterator = Span<Element>.BorrowingIterator
 
-  @available(SwiftStdlib 6.4, *)
   public typealias Failure = Never
 
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public var underestimatedCount: Int {
     self.count
   }
 
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_lifetime(borrow self)
   public func makeBorrowingIterator() -> BorrowingIterator {

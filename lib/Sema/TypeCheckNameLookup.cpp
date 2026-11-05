@@ -853,6 +853,15 @@ public:
     if (existing != infos.end())
       return existing->getSecond();
 
+    auto info = computeFixItInfo(mod, sf.getMaxAccessLevelUsingImport(mod));
+    infos[mod] = info;
+    return info;
+  }
+
+  /// Computes the fix-it for an import of \p mod that is at least as
+  /// permissive as \p requiredAccessLevel.
+  MissingImportFixItInfo computeFixItInfo(ModuleDecl *mod,
+                                          AccessLevel requiredAccessLevel) {
     MissingImportFixItInfo info;
     info.moduleToImport = mod;
 
@@ -879,20 +888,18 @@ public:
     // Add an appropriate access level as long as it would not conflict with
     // existing imports that lack access levels.
     auto accessLevelForImport = [&]() -> std::optional<AccessLevel> {
-      auto maxAccessLevel = sf.getMaxAccessLevelUsingImport(mod);
       if (internalImportsByDefaultEnabled) {
-        if (!foundImport && maxAccessLevel <= AccessLevel::Internal)
+        if (!foundImport && requiredAccessLevel <= AccessLevel::Internal)
           return std::nullopt;
       }
 
       if (foundImport && !anyImportHasAccessLevel)
         return std::nullopt;
 
-      return maxAccessLevel;
+      return requiredAccessLevel;
     };
 
     info.accessLevel = accessLevelForImport();
-    infos[mod] = info;
     return info;
   }
 
@@ -971,6 +978,23 @@ static void emitMissingImportNoteAndFixIt(
   ctx.Diags
       .diagnose(loc, diag::candidate_add_import, fixItInfo.moduleToImport)
       .fixItInsert(loc, importText);
+}
+
+void swift::noteAddImportOfModule(SourceFile &sf, ModuleDecl *mod,
+                                  AccessLevel requiredAccessLevel) {
+  auto &ctx = sf.getASTContext();
+  SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(&sf);
+  if (bestLoc.isInvalid())
+    return;
+
+  // An implementation-only import, required for consistency with the imports
+  // in other files, would not make the module a dependency for clients.
+  MissingImportFixItCache fixItCache(sf);
+  auto fixItInfo = fixItCache.computeFixItInfo(mod, requiredAccessLevel);
+  if (fixItInfo.flags.contains(ImportFlags::ImplementationOnly))
+    return;
+
+  emitMissingImportNoteAndFixIt(bestLoc, fixItInfo, ctx);
 }
 
 static void

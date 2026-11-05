@@ -1,10 +1,9 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-ide-test -print-ast-typechecked -print-access -source-filename=%s | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-COMPAT -implicit-check-not='init('
-// RUN: %target-swift-ide-test -swift-version 7 -print-ast-typechecked -print-access -enable-experimental-feature DeprecateCompatMemberwiseInit -source-filename=%s | %FileCheck %s -check-prefix=CHECK -implicit-check-not='init('
+// RUN: %if swift_future %{ %target-swift-ide-test -swift-version future -print-ast-typechecked -print-access -enable-experimental-feature DeprecateCompatMemberwiseInit -source-filename=%s | %FileCheck %s -check-prefix=CHECK -implicit-check-not='init(' %}
 // RUN: %target-swift-frontend -emit-sil -DFORCE -primary-file %s > /dev/null
 
 // REQUIRES: swift_feature_DeprecateCompatMemberwiseInit
-// REQUIRES: swift7
 
 // - CHECK matches before and after the compatibility overload is removed
 // - CHECK-COMPAT only matches before the compatibility overload is removed

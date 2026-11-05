@@ -96,6 +96,10 @@ namespace irgen {
                                                    bool isOutlined);
   /// Deallocate the storage for an opaque existential in the existential
   /// container.
+  /// Define the helper that the Embedded casting runtime uses to free the box
+  /// of an opaque existential. Does nothing outside Embedded Swift.
+  void emitEmbeddedExistentialBoxDeallocator(IRGenModule &IGM);
+
   /// If the value is not stored inline, this will deallocate the box for the
   /// value.
   void emitDeallocateBoxedOpaqueExistentialBuffer(IRGenFunction &IGF,

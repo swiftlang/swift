@@ -113,6 +113,16 @@ struct FunctionPassContext : MutatingContext {
     return false
   }
 
+  func unrollPackLoops(in function: Function) -> Bool {
+    if bridgedPassContext.unrollPackLoopsInFunction(function.bridged) {
+      notifyInstructionsChanged()
+      notifyBranchesChanged()
+      notifyCallsChanged()
+      return true
+    }
+    return false
+  }
+
   func specialize(function: Function,
                   for substitutions: SubstitutionMap,
                   convertIndirectToDirect: Bool,

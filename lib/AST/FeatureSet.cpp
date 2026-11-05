@@ -446,6 +446,11 @@ static bool usesFeatureAddressableParameters(Decl *d) {
   return false;
 }
 
+static bool usesFeatureBackDeployFrozenValueTypes(Decl *d) {
+  return (isa<StructDecl>(d) || isa<EnumDecl>(d)) &&
+         d->getAttrs().hasAttribute<BackDeployedAttr>();
+}
+
 static bool usesFeatureAddressableTypes(Decl *d) {
   if (d->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
     return true;
@@ -473,10 +478,6 @@ static ABIAttr *getABIAttr(Decl *decl) {
   // FIXME: EnumCaseDecl/EnumElementDecl
 
   return decl->getAttrs().getAttribute<ABIAttr>();
-}
-
-static bool usesFeatureABIAttributeSE0479(Decl *decl) {
-  return getABIAttr(decl) != nullptr;
 }
 
 static bool usesFeatureIsolatedConformances(Decl *decl) {

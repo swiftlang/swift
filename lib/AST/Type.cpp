@@ -3928,6 +3928,9 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       
       // Inputs are contravariant.
       for (auto i : indices(fn2.getParams())) {
+        if (fn1Params[i].isVariadic() != fn2Params[i].isVariadic())
+          return false;
+
         if (!matches(fn2Params[i].getOldType(), fn1Params[i].getOldType(),
                      matchMode, ParameterPosition::ParameterTupleElement,
                      OptionalUnwrapping::None)) {
@@ -4990,12 +4993,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   CanType type = getCanonicalType();
   ASTContext &ctx = type->getASTContext();
 
-  if (isForeignReferenceType())
-    return lookThroughAllOptionalTypes()
-                   ->getClassDecl()
-                   ->hasRefCountingAnnotations()
-               ? ReferenceCounting::Custom
-               : ReferenceCounting::None;
+  if (auto classDecl =
+          lookThroughAllOptionalTypes()->getClassDecl()) {
+    if (auto frtBase = classDecl->getForeignReferenceSuperclassOrSelf())
+      return frtBase->hasRefCountingAnnotations() ? ReferenceCounting::Custom
+                                                  : ReferenceCounting::None;
+  }
 
   ReferenceCounting defaultRefCounting = ReferenceCounting::Unknown;
 

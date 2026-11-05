@@ -333,6 +333,9 @@ target_compile_definitions(swiftCore
     $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
     $<$<BOOL:${SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS}>:-DSWIFT_COMPACT_ABSOLUTE_FUNCTION_POINTER>
     $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_TARGET_LIBRARY_NAME=swiftCore>
+    # Low-address heap pointers can overlap the inline UTF-16 count encoding.
+    # TODO: Remove this when https://github.com/swiftlang/swift/issues/93680 is fixed.
+    $<$<AND:$<PLATFORM_ID:Windows>,$<COMPILE_LANGUAGE:Swift>>:-DWORKAROUND_LOW_ENTROPY_VA_BREADCRUMBS>
   INTERFACE
     $<$<BOOL:${SwiftCore_ENABLE_VECTOR_TYPES}>:-DSWIFT_STDLIB_ENABLE_VECTOR_TYPES>)
 
@@ -346,6 +349,7 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowAndMutateAccessors>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowInout>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature RawLayout>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BackDeployFrozenValueTypes>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"

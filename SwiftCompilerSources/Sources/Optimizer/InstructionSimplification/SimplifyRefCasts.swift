@@ -32,6 +32,20 @@ extension UncheckedRefCastInst : OnoneSimplifiable {
   }
 }
 
+extension UncheckedRefCastInst : DebugReconstructionBlockSimplifiable {
+  /// Folds undef, and runs simplifications.
+  func simplifyForDebugReconstructionBlock(_ context: SimplifyContext) {
+    if foldUndefOperands(context) {
+      return
+    }
+    simplify(context)
+    // This extra simplification comes from SILCombine (cast of a cast).
+    if let refCast = fromInstance as? UncheckedRefCastInst {
+      operand.set(to: refCast.fromInstance, context)
+    }
+  }
+}
+
 private extension CheckedCastBranchInst {
 
   /// Removes the `checked_cast_br` if it is dead:

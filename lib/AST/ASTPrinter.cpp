@@ -1471,18 +1471,6 @@ static bool hasLessAccessibleSetter(const AbstractStorageDecl *ASD) {
   return ASD->getSetterFormalAccess() < ASD->getFormalAccess();
 }
 
-bool canPrintSyntheticSILGenName(const Decl *D) {
-  ASSERT(!D->getAttrs().hasAttribute<SILGenNameAttr>());
-
-  // Only print on functions, and only those functions with no barriers to use.
-  if (auto FD = dyn_cast<AbstractFunctionDecl>(D); !FD
-        || FD->getAttrs().hasAttribute<BackDeployedAttr>()
-        || FD->getOpaqueResultTypeDecl())
-    return false;
-
-  return true;
-}
-
 /// Whether the given declaration has an attached global actor attribute.
 ///
 /// Unlike \c Decl::getGlobalActorAttr() this inspects the attribute list
@@ -1527,27 +1515,6 @@ void PrintAST::printAttributes(const Decl *D) {
     if (Options.PrintImplicitAttrs && !Options.excludeAttr(abiAttr)) {
       abiAttr->print(Printer, Options, D);
       scope.Options.ExcludeAttrList.push_back(DeclAttrKind::ABI);
-    }
-  }
-
-  if (Options.PrintSyntheticSILGenName
-        && !D->getAttrs().hasAttribute<SILGenNameAttr>()) {
-    if (canPrintSyntheticSILGenName(D)) {
-      auto mangledName =
-          Mangle::ASTMangler(D->getASTContext())
-              .mangleAnyDecl(cast<ValueDecl>(D), /*addPrefix*/ true);
-      Printer.printAttrName("@_silgen_name");
-      Printer << "(";
-      Printer.printEscapedStringLiteral(mangledName);
-      Printer << ")\n";
-    }
-    else {
-      Printer.printAttrName("@available");
-      Printer << "(*, unavailable, message: ";
-      Printer.printEscapedStringLiteral(
-          "this compiler cannot match the ABI specified by the @abi attribute");
-      Printer << ")\n";
-      scope.Options.ExcludeAttrList.push_back(DeclAttrKind::Available);
     }
   }
 
@@ -2598,6 +2565,16 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
 
   if (Options.SkipImports && isa<ImportDecl>(D)) {
     return false;
+  }
+
+  // Don't print a synthesized, back-deployed member at all. They will be
+  // synthesized by the client.
+  if (Options.IsForSwiftInterface && D->isImplicit() &&
+      !Options.excludeAttrKind(DeclAttrKind::BackDeployed)) {
+    if (auto *VD = dyn_cast<ValueDecl>(D))
+      if (VD->isSynthesized() && VD->getDeclContext()->isTypeContext() &&
+          VD->isBackDeployed())
+        return false;
   }
 
   // Optionally skip these checks for extensions synthesized for '@_nonSendable'
@@ -3720,14 +3697,6 @@ suppressingFeatureCoroutineAccessors(PrintOptions &options,
 }
 
 static void
-suppressingFeatureABIAttributeSE0479(PrintOptions &options,
-                                     llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope1(options.PrintSyntheticSILGenName, true);
-  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::ABI);
-  action();
-}
-
-static void
 suppressingFeaturePreInverseGenericsExcept(PrintOptions &options,
                                            llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList,
@@ -3740,6 +3709,13 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList,
                         DeclAttrKind::AddressableForDependencies);
+  action();
+}
+
+static void
+suppressingFeatureBackDeployFrozenValueTypes(
+    PrintOptions &options, llvm::function_ref<void()> action) {
+  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::BackDeployed);
   action();
 }
 
@@ -4052,8 +4028,11 @@ void PrintAST::visitPatternBindingDecl(PatternBindingDecl *decl) {
 
   bool printAsVar = false;
   if (anyVar) {
-    printAsVar = (anyVar->isSettable(anyVar->getDeclContext()) ||
-                  isInObjCImpl(anyVar));
+    if (Options.PrintPatternBindingIntroducerAsWritten)
+      printAsVar = anyVar->getIntroducer() != VarDecl::Introducer::Let;
+    else
+      printAsVar = (anyVar->isSettable(anyVar->getDeclContext()) ||
+                    isInObjCImpl(anyVar));
   }
 
   Printer << (printAsVar ? "var " : "let ");
@@ -4656,9 +4635,6 @@ void PrintAST::printParameterList(ParameterList *PL,
                                   ArrayRef<AnyFunctionType::Param> params,
                                   bool isAPINameByDefault,
                                   bool isEnumElement) {
-  PrintOptions::OverrideScope scope(Options);
-  OVERRIDE_PRINT_OPTION(scope, PrintSyntheticSILGenName, false);
-
   Printer.printStructurePre(PrintStructureKind::FunctionParameterList);
   SWIFT_DEFER {
     Printer.printStructurePost(PrintStructureKind::FunctionParameterList);

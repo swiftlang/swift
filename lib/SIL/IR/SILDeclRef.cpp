@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AnyFunctionRef.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/Basic/Assertions.h"
@@ -581,6 +582,19 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       auto *storage = accessor->getStorage();
       if (storage->isAlwaysEmittedIntoClient())
         return Limit::AlwaysEmitIntoClient;
+    }
+
+    // A transparent member of a type that is back-deployed into the client
+    // doesn't inherit back deployment.
+    if (auto *nominal = d->getDeclContext()->getSelfNominalTypeDecl()) {
+      if (nominal->isBackDeployedIntoClient()) {
+        const Decl *owner = d;
+        if (auto accessor = dyn_cast<AccessorDecl>(d))
+          owner = accessor->getStorage();
+        if (d->getAttrs().hasAttribute<TransparentAttr>() ||
+            owner->getAttrs().hasAttribute<TransparentAttr>())
+          return Limit::AlwaysEmitIntoClient;
+      }
     }
     break;
   }
@@ -1310,6 +1324,22 @@ bool SILDeclRef::isForeignToNativeThunk() const {
   return false;
 }
 
+bool SILDeclRef::isForeignReferenceInitializer() const {
+  if (!isForeign || kind != Kind::Initializer || !hasDecl())
+    return false;
+  auto ctor = dyn_cast<ConstructorDecl>(getDecl());
+  if (!ctor || !ctor->hasClangNode())
+    return false;
+  auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
+  if (!classDecl || !classDecl->isForeignReferenceType())
+    return false;
+  // Only an initializer imported from a C++ constructor has an initializing
+  // entry point.
+  return ctor->getASTContext()
+             .getClangModuleLoader()
+             ->getOriginalForeignReferenceConstructor(ctor) != nullptr;
+}
+
 bool SILDeclRef::isNativeToForeignThunk() const {
   // If this isn't a foreign entry-point, it's not a native-to-foreign thunk.
   if (!isForeign)
@@ -1362,8 +1392,10 @@ bool SILDeclRef::isDistributed() const {
 bool SILDeclRef::isBackDeploymentFallback() const {
   if (backDeploymentKind != BackDeploymentKind::Fallback)
     return false;
+  // The deinit of a back-deployed noncopyable type has a fallback so that
+  // clients can emit it, but no thunk: nothing calls it by name.
   return kind == Kind::Func || kind == Kind::Initializer ||
-         kind == Kind::Allocator;
+         kind == Kind::Allocator || kind == Kind::Deallocator;
 }
 
 bool SILDeclRef::isBackDeploymentThunk() const {
@@ -1571,6 +1603,11 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
 
 std::optional<std::string> SILDeclRef::getAsmName() const {
   if (isAutoDiffDerivativeFunction())
+    return std::nullopt;
+
+  // The Clang decl of a C++ foreign reference type's initializer is the static
+  // factory it was imported from, which is not the initializing entry point.
+  if (isForeignReferenceInitializer())
     return std::nullopt;
 
   if (hasDecl() && !isDefaultArgGenerator() &&

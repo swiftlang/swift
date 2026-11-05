@@ -22,6 +22,7 @@
 #include "swift/SIL/SILConstants.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
@@ -29,6 +30,7 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/LoopUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
@@ -143,6 +145,10 @@ OptionalBridgedValue BridgedPassContext::constantFoldBuiltin(BridgedInstruction 
   auto bi = builtin.getAs<BuiltinInst>();
   std::optional<bool> resultsInError;
   return {::constantFoldBuiltin(bi, resultsInError)};
+}
+
+OptionalBridgedValue BridgedPassContext::simplifyInstruction(BridgedInstruction inst) const {
+  return {::simplifyInstruction(inst.unbridged())};
 }
 
 void BridgedPassContext::inlineFunction(BridgedInstruction apply, bool mandatoryInline) const {
@@ -351,6 +357,12 @@ bool BridgedPassContext::specializeKeyPathInst(BridgedInstruction kpi) const {
 
 bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, bool isMandatory) const {
   return ::specializeAppliesInFunction(*function.getFunction(), invocation->getTransform(), isMandatory);
+}
+
+bool BridgedPassContext::unrollPackLoopsInFunction(
+    BridgedFunction function) const {
+  return swift::unrollPackLoopsInFunction(function.getFunction(),
+                                          invocation->getPassManager());
 }
 
 namespace  {

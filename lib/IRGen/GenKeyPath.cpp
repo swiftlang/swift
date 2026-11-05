@@ -1761,8 +1761,12 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
 
   // Multiple `keypath_inst`s referring to the same pattern share one global.
   auto cached = StaticKeyPathInstances.find(pattern);
-  if (cached != StaticKeyPathInstances.end())
-    return cached->second;
+  if (cached != StaticKeyPathInstances.end()) {
+    if (argDataOffsets)
+      argDataOffsets->append(cached->second.ArgDataOffsets.begin(),
+                             cached->second.ArgDataOffsets.end());
+    return cached->second.Instance;
+  }
 
   auto components = pattern->getComponents();
   auto numComponents = components.size();
@@ -2176,11 +2180,13 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   }
   (void)bytesInData; // used for arithmetic above only
 
-  if (argDataOffsets) {
-    for (auto &step : steps)
-      if (step.argWitnesses)
-        argDataOffsets->push_back(step.argDataOffset);
-  }
+  SmallVector<uint32_t, 2> capturedArgDataOffsets;
+  for (auto &step : steps)
+    if (step.argWitnesses)
+      capturedArgDataOffsets.push_back(step.argDataOffset);
+  if (argDataOffsets)
+    argDataOffsets->append(capturedArgDataOffsets.begin(),
+                           capturedArgDataOffsets.end());
 
   auto *global = fields.finishAndCreateGlobal(
       "keypath", Alignment(16), /*constant*/ true,
@@ -2192,7 +2198,7 @@ llvm::Constant *IRGenModule::emitStaticKeyPathInstance(
   auto *keyPathPtrTy = keyPathTI.getStorageType();
   auto *result = llvm::ConstantExpr::getBitCast(global, keyPathPtrTy);
 
-  StaticKeyPathInstances[pattern] = result;
+  StaticKeyPathInstances[pattern] = {result, std::move(capturedArgDataOffsets)};
   return result;
 }
 

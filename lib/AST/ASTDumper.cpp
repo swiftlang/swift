@@ -2964,10 +2964,13 @@ namespace {
         }, Label::optional("foreign_error_convention"));
       }
 
-      auto canParse =
-          (MemberLoading != ASTDumpMemberLoading::None) && !D->isBodySkipped();
-      if (auto Body = D->getBody(canParse)) {
-        printRec(Body, &D->getASTContext(), Label::optional("body"));
+      if (!D->isBodySkipped()) {
+        auto Body = isTypeChecked()
+                        ? D->getTypecheckedBody()
+                        : D->getBody(MemberLoading != ASTDumpMemberLoading::None);
+        if (Body) {
+          printRec(Body, &D->getASTContext(), Label::optional("body"));
+        }
       }
     }
 

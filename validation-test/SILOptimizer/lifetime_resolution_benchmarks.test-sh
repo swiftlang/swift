@@ -14,6 +14,10 @@
 # The benchmarks are run by a minimal driver rather than DriverUtils, which
 # refuses to run against a stdlib with assertions enabled.
 #
+# The benchmarks run with Inputs/scribble_malloc.c interposed, which fills new
+# heap allocations with garbage, so that reads of uninitialized memory are not
+# hidden by the zero-filled memory the system allocator usually returns.
+#
 # To run a subset by hand, append benchmark names to the arguments above.
 
 import concurrent.futures
@@ -31,8 +35,6 @@ EXCEPTIONAL_FILES = [
     # Compiler crash in LifetimeResolution
     pathlib.Path("benchmark/single-source/ToddCoxeter.swift"),
     pathlib.Path("benchmark/utils/DriverUtils.swift"),
-    # Compiler crash in DiagnoseInvalidEscapingCaptures
-    pathlib.Path("benchmark/single-source/Exclusivity.swift"),
     # SIL memory lifetime verification failure
     pathlib.Path("benchmark/single-source/Hash.swift"),
     # Spurious use-before-init / use-after-consume errors
@@ -43,6 +45,22 @@ EXCEPTIONAL_FILES = [
     # Crashes at runtime
     pathlib.Path("benchmark/single-source/NIOChannelPipeline.swift"),
     pathlib.Path("benchmark/single-source/ObjectAllocation.swift"),
+    # Class initializers release uninitialized stored properties at runtime
+    pathlib.Path("benchmark/single-source/ArrayInClass.swift"),
+    pathlib.Path("benchmark/single-source/ArrayOfGenericPOD.swift"),
+    pathlib.Path("benchmark/single-source/ArrayOfGenericRef.swift"),
+    pathlib.Path("benchmark/single-source/ArrayOfPOD.swift"),
+    pathlib.Path("benchmark/single-source/ArrayOfRef.swift"),
+    pathlib.Path("benchmark/single-source/COWTree.swift"),
+    pathlib.Path("benchmark/single-source/DictTest.swift"),
+    pathlib.Path("benchmark/single-source/DictTest2.swift"),
+    pathlib.Path("benchmark/single-source/DictTest3.swift"),
+    pathlib.Path("benchmark/single-source/KeyPathPerformanceTests.swift"),
+    pathlib.Path("benchmark/single-source/MirrorTest.swift"),
+    pathlib.Path("benchmark/single-source/Prims.swift"),
+    pathlib.Path("benchmark/single-source/PrimsNonStrongRef.swift"),
+    pathlib.Path("benchmark/single-source/RecursiveOwnedParameter.swift"),
+    pathlib.Path("benchmark/single-source/SortArrayInClass.swift"),
     # async let support
     pathlib.Path("benchmark/single-source/Concurrency/ChildTaskCreation.swift"),
     # Uncategorized
@@ -72,6 +90,9 @@ BENCHMARK_DIRS = [
 EXTRA_FLAGS = {
     "ObjectiveCNoBridgingStubs": ["-Xfrontend", "-disable-swift-bridge-attr"],
 }
+
+SCRIBBLE_MALLOC_SOURCE = pathlib.Path(
+    "validation-test/SILOptimizer/Inputs/scribble_malloc.c")
 
 BASE_FLAGS = ["-Onone", "-DDEBUG"]
 LR_FLAGS = BASE_FLAGS + ["-Xfrontend", "-enable-lifetime-resolution"]
@@ -136,6 +157,7 @@ class Tools:
             str(tmp / "ObjectiveCTests.o"),
             "-framework", "Foundation",
         ]
+        self.scribble_malloc = tmp / "scribble_malloc.dylib"
 
     def build_module(self, stage, module_name, sources, out_dir, extra=(),
                      flags=LR_FLAGS):
@@ -184,6 +206,7 @@ class Tools:
                 "-o", str(self.tmp / "ObjectiveCTests.o"),
             ],
         )
+        self.build_scribble_malloc()
         return True
 
     def build_driver_utils(self):
@@ -231,12 +254,50 @@ class Tools:
         )
         run_stage("codesign", self.codesign + [str(exe)])
 
-        env = dict(os.environ, SWIFT_DETERMINISTIC_HASHING="1")
+        run_stage("run", self.run_cmd(exe), env=self.run_env())
+
+    def run_cmd(self, exe):
+        return self.run + [f"DYLD_INSERT_LIBRARIES={self.scribble_malloc}",
+                           str(exe)]
+
+    def run_env(self):
+        return dict(os.environ, SWIFT_DETERMINISTIC_HASHING="1")
+
+    def build_scribble_malloc(self):
         run_stage(
-            "run",
-            self.run + [str(exe)],
-            env=env,
+            "compile scribble_malloc",
+            self.clang
+            + [
+                "-x", "c",
+                "-dynamiclib",
+                str(self.src_root / SCRIBBLE_MALLOC_SOURCE),
+                "-o", str(self.scribble_malloc),
+            ],
         )
+
+        # Interposition fails silently, so check that it takes effect on the
+        # allocations made by the Swift runtime.
+        probe = self.tmp / "scribble_probe.swift"
+        probe.write_text(
+            "import Darwin\n"
+            "guard getenv(\"DYLD_INSERT_LIBRARIES\") != nil else {\n"
+            "  print(\"DYLD_INSERT_LIBRARIES is not set\")\n"
+            "  exit(1)\n"
+            "}\n"
+            "for alignment in [8, 64] {\n"
+            "  let p = UnsafeMutableRawPointer.allocate(byteCount: 64, alignment: alignment)\n"
+            "  for i in 0..<64 where p.load(fromByteOffset: i, as: UInt8.self) != 0x5A {\n"
+            "    print(\"allocation with alignment \\(alignment) is not scribbled\")\n"
+            "    exit(1)\n"
+            "  }\n"
+            "  p.deallocate()\n"
+            "}\n"
+        )
+        exe = self.tmp / "scribble_probe"
+        run_stage("link scribble probe",
+                  self.build_swift + BASE_FLAGS + [str(probe), "-o", str(exe)])
+        run_stage("codesign scribble probe", self.codesign + [str(exe)])
+        run_stage("run scribble probe", self.run_cmd(exe), env=self.run_env())
 
 
 def find_benchmarks(src_root, only):

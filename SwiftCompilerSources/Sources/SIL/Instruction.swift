@@ -367,6 +367,11 @@ public class SingleValueInstruction : Instruction, Value {
     uses.replaceAll(with: replacement, context)
     context.erase(instruction: self)
   }
+  
+  /// Replaces this instruction with an undef and erases the instruction.
+  public final func replaceWithUndef(_ context: some MutatingContext) {
+    replace(with: Undef.get(type: type, context), context)
+  }
 }
 
 public final class MultipleValueInstructionResult : Value, Hashable {
@@ -762,10 +767,34 @@ final public class DebugValueInst : Instruction, DebugVariableInstruction, MetaI
     bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
   }
 
+  /// Destroys the debug reconstruction block, leaving the operand to describe the
+  /// variable directly. Only valid when the block does nothing but return its only
+  /// argument, as the block's return type is what carries the variable type.
+  public func clearDebugReconstructionBlock(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.DebugValue_clearDebugReconstructionBlock()
+    context.notifyInstructionChanged(self)
+  }
+
   public func stripDeref(index: Int) { bridged.DebugValue_stripDeref(index) }
   public func prependDeref(index: Int) { bridged.DebugValue_prependDeref(index) }
-  public func killOperand(index: Int, withType type: Type? = nil) {
+  public func killOperand(index: Int, withType type: Type? = nil,
+                          _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
     bridged.DebugValue_killOperand(index, type?.bridged ?? BridgedType())
+    context.notifyInstructionChanged(self)
+  }
+
+  /// Replaces this instruction with an equivalent one whose operand list is `values`,
+  /// and returns it. The reconstruction block must already match `values`.
+  /// This instruction is erased if the change can't be done in place.
+  public func replaceOperands(with values: [Value], _ context: some MutatingContext) -> DebugValueInst {
+    context.notifyInstructionsChanged()
+    let newInst = values.withBridgedValues {
+      bridged.DebugValue_replaceOperands($0)
+    }.getAs(DebugValueInst.self)
+    context.notifyInstructionChanged(newInst)
+    return newInst
   }
 }
 
@@ -2065,6 +2094,12 @@ final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, Beg
   // code using noncopyable types that consumes or mutates a memory location while that location is borrowed,
   // but the move-only checker must diagnose those problems before canonical SIL is formed.
   public var isUnchecked: Bool { bridged.LoadBorrowInst_isUnchecked() }
+
+  public func set(isUnchecked: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadBorrowInst_setUnchecked(isUnchecked)
+    context.notifyInstructionChanged(self)
+  }
 
   public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }

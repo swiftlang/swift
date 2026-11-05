@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify %s
 
 // Use-before-init diagnostics from LifetimeResolution, which match what
 // DefiniteInitialization emits for the same code.

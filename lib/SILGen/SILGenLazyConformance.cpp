@@ -95,9 +95,10 @@ void SILGenModule::useConformance(SILInstruction *inst,
   // If this is a normal conformance that needs to be synthesized, we'll want
   // to emit it.
   if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
-    // If this conformance was not synthesized, we're not going to be emitting
-    // it lazily either, so we can avoid doing anything below.
-    if (!normal->isSynthesized())
+    // If this conformance was not synthesized, or declared alongside a
+    // back-deployed type that we emit into this module, we're not going to be
+    // emitting it lazily either, so we can avoid doing anything below.
+    if (!normal->isSynthesized() && !isBackDeployedIntoClient(normal))
       return;
   } else if (auto self = dyn_cast<SelfProtocolConformance>(conformance)) {
     // Marker protocols don't need anything synthesized.
@@ -124,6 +125,13 @@ void SILGenModule::useConformance(SILInstruction *inst,
   pendingConformances.push_back(rootConformance);
 }
 
+bool SILGenModule::isBackDeployedIntoClient(
+    const NormalProtocolConformance *conformance) {
+  auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
+  return nominal &&
+         nominal->emitsConformanceIntoClient(conformance->getDeclContext());
+}
+
 void SILGenModule::useConformancesFromSubstitutions(
                                                 SILInstruction *inst,
                                                 const SubstitutionMap subs) {
@@ -142,6 +150,30 @@ void SILGenModule::useConformancesFromType(SILInstruction *inst, CanType type) {
 
     if (isa<ProtocolDecl>(decl))
       return;
+
+    // A back-deployed type emitted into this module brings all of the
+    // conformances declared alongside it, so that its conformance records
+    // are available to dynamic casts.
+    if (decl->isBackDeployedIntoClient()) {
+      for (auto *conformance : decl->getAllConformances()) {
+        auto *normal = dyn_cast<NormalProtocolConformance>(conformance);
+        if (normal && isBackDeployedIntoClient(normal))
+          useConformance(inst, ProtocolConformanceRef(normal));
+      }
+    }
+
+    // The value witnesses that this module emits for a back-deployed
+    // noncopyable type call its deinit, so load the type's deinit table and
+    // the body of the deinit that it refers to.
+    if (decl->isBackDeployedIntoClient() && !decl->canBeCopyable() &&
+        decl->hasValueTypeDestructor()) {
+      if (auto *deinit = M.lookUpMoveOnlyDeinit(
+              decl, /*deserializeLazily=*/true)) {
+        auto *impl = deinit->getImplementation();
+        if (impl->isExternalDeclaration())
+          M.loadFunction(impl, SILModule::LinkingMode::LinkNormal);
+      }
+    }
 
     // If this is an imported noncopyable type with a deinitializer, record it.
     if (decl->hasClangNode() && !decl->canBeCopyable() &&

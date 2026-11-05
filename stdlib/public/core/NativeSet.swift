@@ -848,4 +848,25 @@ extension _NativeSet {
       return unsafe extractSubset(using: bitset, count: count)
     }
   }
+
+  @export(implementation)
+  @unsafe
+  internal mutating func formUnion(
+    _ buffer: UnsafeBufferPointer<Element>,
+    isUnique: Bool
+  ) {
+    // If empty and too small, this is equivalent to `Set(buffer)`.
+    if count == 0 && capacity < buffer.count {
+      self = unsafe _NativeSet(buffer)
+      return
+    }
+    var isUnique = isUnique
+    for index in 0..<buffer.count {
+      let element = unsafe buffer[index]
+      let (bucket, found) = find(element)
+      guard !found else { continue }
+      insertNew(element, at: bucket, isUnique: isUnique)
+      isUnique = true
+    }
+  }
 }

@@ -1421,6 +1421,15 @@ performModuleScanImpl(
 
   const ASTContext &ctx = instance->getASTContext();
   const FrontendOptions &opts = instance->getInvocation().getFrontendOptions();
+
+  auto expectedScannerPtr =
+      ModuleDependencyScanner::create(service, instance, cache);
+
+  if (!expectedScannerPtr)
+    return expectedScannerPtr.getError();
+
+  auto &scanner = **expectedScannerPtr;
+
   // Load the dependency cache if -reuse-dependency-scan-cache
   // is specified
   if (opts.ReuseDependencyScannerCache) {
@@ -1440,22 +1449,21 @@ performModuleScanImpl(
       auto mainModuleID =
           ModuleDependencyID{instance->getMainModule()->getNameStr().str(),
                              ModuleDependencyKind::SwiftSource};
+      // Load clang module names to capture their defined module map.
+      std::vector<StringRef> clangModuleNames;
+      for (const auto &entry :
+           cache.getDependenciesMap(ModuleDependencyKind::Clang))
+        clangModuleNames.push_back(entry.getKey());
+      const llvm::StringMap<std::string> clangModuleMapFiles =
+          scanner.findClangModuleMapFiles(clangModuleNames);
       incremental::validateInterModuleDependenciesCache(
           mainModuleID, cache, instance->getSharedCASInstance(),
           instance->getSharedCacheInstance(), serializedCacheTimeStamp,
           *instance->getSourceMgr().getFileSystem(), ctx.Diags,
           [&](StringRef dir) { return service.isDirectoryInvalidated(dir); },
-          opts.EmitDependencyScannerCacheRemarks);
+          clangModuleMapFiles, opts.EmitDependencyScannerCacheRemarks);
     }
   }
-
-  auto expectedScannerPtr =
-      ModuleDependencyScanner::create(service, instance, cache);
-
-  if (!expectedScannerPtr)
-    return expectedScannerPtr.getError();
-
-  auto &scanner = **expectedScannerPtr;
 
   // Identify imports of the main module and add an entry for it
   // to the dependency graph.
@@ -1662,12 +1670,12 @@ void swift::dependencies::incremental::validateInterModuleDependenciesCache(
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
-    bool emitRemarks) {
+    const llvm::StringMap<std::string> &clangModuleMapFiles, bool emitRemarks) {
   ModuleDependencyIDSet visited;
   ModuleDependencyIDSet modulesRequiringRescan;
   outOfDateModuleScan(rootModuleID, cache, cas, actionCache, cacheTimeStamp, fs,
-                      diags, isDirectoryInvalidated, emitRemarks, visited,
-                      modulesRequiringRescan);
+                      diags, isDirectoryInvalidated, clangModuleMapFiles,
+                      emitRemarks, visited, modulesRequiringRescan);
   for (const auto &outOfDateModID : modulesRequiringRescan)
     cache.removeDependency(outOfDateModID);
   // Regardless of invalidation, always re-scan main module.
@@ -1681,7 +1689,8 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
-    bool emitRemarks, ModuleDependencyIDSet &visited,
+    const llvm::StringMap<std::string> &clangModuleMapFiles, bool emitRemarks,
+    ModuleDependencyIDSet &visited,
     ModuleDependencyIDSet &modulesRequiringRescan) {
   // Visit the module's dependencies
   bool hasOutOfDateModuleDependency = false;
@@ -1689,8 +1698,8 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     // If we have not already visited this module, recurse.
     if (visited.find(depID) == visited.end())
       outOfDateModuleScan(depID, cache, cas, actionCache, cacheTimeStamp, fs,
-                          diags, isDirectoryInvalidated, emitRemarks, visited,
-                          modulesRequiringRescan);
+                          diags, isDirectoryInvalidated, clangModuleMapFiles,
+                          emitRemarks, visited, modulesRequiringRescan);
 
     // Even if we're not revisiting a dependency, we must check if it's
     // already known to be out of date.
@@ -1705,7 +1714,7 @@ void swift::dependencies::incremental::outOfDateModuleScan(
     modulesRequiringRescan.insert(moduleID);
   } else if (!verifyModuleDependencyUpToDate(
                  moduleID, cache, cas, actionCache, cacheTimeStamp, fs, diags,
-                 isDirectoryInvalidated, emitRemarks))
+                 isDirectoryInvalidated, clangModuleMapFiles, emitRemarks))
     modulesRequiringRescan.insert(moduleID);
 
   visited.insert(moduleID);
@@ -1718,7 +1727,7 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
-    bool emitRemarks) {
+    const llvm::StringMap<std::string> &clangModuleMapFiles, bool emitRemarks) {
   const auto &moduleInfo = cache.findKnownDependency(moduleID);
   auto verifyInputOlderThanCacheTimeStamp = [&cacheTimeStamp, &fs, &diags,
                                              emitRemarks](StringRef moduleName,
@@ -1829,6 +1838,21 @@ bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
 
   // Check header/modulemap source files for a Clang dependency
   if (const auto &clangModuleDetails = moduleInfo.getAsClangModule()) {
+    // Check if a different module map now defines this module.
+    if (auto it = clangModuleMapFiles.find(moduleID.ModuleName);
+        it == clangModuleMapFiles.end()) {
+      // Skip over the module if is not in the map.
+      if (emitRemarks)
+        diags.diagnose(SourceLoc(), diag::remark_scanner_module_map_not_found,
+                       moduleID.ModuleName);
+    } else if (it->getValue() != clangModuleDetails->moduleMapFile) {
+      if (emitRemarks)
+        diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_module_map,
+                       moduleID.ModuleName, clangModuleDetails->moduleMapFile,
+                       it->getValue());
+      return false;
+    }
+
     for (const auto &fileInput : clangModuleDetails->fileDependencies)
       if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, fileInput))
         return false;

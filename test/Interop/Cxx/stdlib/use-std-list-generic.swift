@@ -2,7 +2,6 @@
 // Test iterating through a list using the borrowing iterators (currently behind a feature flag).
 
 // REQUIRES: executable_test
-// XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 import StdlibUnittest
 import StdList
