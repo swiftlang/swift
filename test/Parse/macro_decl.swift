@@ -24,11 +24,11 @@ extension String {
   struct Foo {
     #memberwiseInit
 
-    // expected-error @+1 {{expected a macro identifier for a pound literal declaration}}
-    #-
+    // expected-cparser-error @+1 {{expected a macro identifier for a pound literal declaration}} expected-astgen-error@+1 {{expected identifier in macro expansion}}
+    #- // expected-astgen-error {{unexpected code '-' in struct}}
   }
 
-  // expected-error @+1 {{expected a macro identifier for a pound literal declaration}}
+  // expected-cparser-error @+1 {{expected a macro identifier for a pound literal declaration}} expected-astgen-error@+1 {{expected identifier in macro expansion}}
   #()
 }
 
@@ -47,10 +47,10 @@ func test() {
   #someFunc
 }
 
-public # someFunc // expected-error {{extraneous whitespace between '#' and macro name is not permitted}} {{9-10=}}
+public # someFunc // expected-cparser-error {{extraneous whitespace between '#' and macro name is not permitted}} {{9-10=}} expected-astgen-error {{extraneous whitespace after '#' is not permitted}}
 
 struct S {
-  # someFunc // expected-error {{extraneous whitespace between '#' and macro name is not permitted}} {{4-5=}}
+  # someFunc // expected-cparser-error {{extraneous whitespace between '#' and macro name is not permitted}} {{4-5=}} expected-astgen-error {{extraneous whitespace after '#' is not permitted}}
   #class
-  # struct Inner {} // expected-error {{expected a macro identifier for a pound literal declaration}} expected-error {{consecutive declarations on a line}}
+  # struct Inner {} // expected-cparser-error {{expected a macro identifier for a pound literal declaration}} expected-astgen-error {{found an unexpected second identifier in macro expansion; is there an accidental break?}} expected-cparser-error {{consecutive declarations on a line}} expected-astgen-error {{extraneous whitespace after '#' is not permitted}}
 }

@@ -75,7 +75,7 @@ FILE_MODE = dict(encoding="utf-8", errors="surrogateescape", newline="")
 DIRECTIVE_RE = re.compile(
     r"expected-(?:(?P<prefix>[A-Za-z0-9_]+)-)?(?P<kind>error|warning|note|remark)"
     r"(?P<re>-re)?"
-    r"(?:@(?P<offset>[+-]?\d+|:\d+))?"
+    r"(?:\s*@(?P<offset>[+-]?\d+|:\d+))?"
     r"(?:\s+(?P<count>\d+|\*))?"
     r"\s*\{\{")
 
@@ -333,7 +333,7 @@ def rewrite(path, lines, failures, report):
 
     def directive_for_fixit(f):
         for d in directives:
-            if d.line == f.line and any(c == f.col for c, _ in d.fixits):
+            if d.line == f.line and any(abs(f.col - c) <= 1 for c, _ in d.fixits):
                 return d
         return None
 

@@ -123,7 +123,13 @@ extension ASTGenVisitor {
     let introducer: BridgedVarDeclIntroducer
     switch node.bindingSpecifier.text {
     case "let": introducer = .let
-    case "inout": introducer = .inOut
+    case "inout":
+      introducer = .inOut
+      // Without the feature, the C++ parser does not take 'inout' as a binding
+      // specifier in a pattern; it fails parsing the rest as a type.
+      if !self.ctx.langOpts.hasFeature(.ReferenceBindings) {
+        self.diagnose(.attr_only_on_parameters("inout"), at: node.bindingSpecifier)
+      }
     case "borrowing", "_borrowing":
       // `borrowing` in a pattern is deprecated spelling for `let`, but it still
       // gives the bindings the borrowing introducer. It applies only directly to
