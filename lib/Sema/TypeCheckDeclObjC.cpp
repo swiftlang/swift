@@ -4291,17 +4291,15 @@ private:
       if (reqCtor->isRequired() != cast<ConstructorDecl>(cand)->isRequired())
         return MatchOutcome::WrongRequiredAttr;
 
-    // Directness has to agree, or the two sides disagree about the symbol: the
-    // header's callers would reference a direct symbol the implementation does
-    // not define, or vice versa.
-    //
-    // The requirement is imported Clang, so ask isObjCDirectDispatched(); the
-    // candidate is Swift, so ask for the attribute specifically.
-    if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req)) {
-      auto candAFD = cast<AbstractFunctionDecl>(cand);
-      if (reqAFD->isObjCDirectDispatched() != candAFD->isObjCDirect())
-        return MatchOutcome::WrongDirectness;
-    }
+    // Swift and ObjC has to agree on directness.
+    if (req->isObjCDirectDispatched() != cand->isObjCDirect())
+      return MatchOutcome::WrongDirectness;
+
+    // TODO: Diagnose that the accessors match.
+    // If ObjC declares 'getter=isDirty' while Swift implements it as
+    // '@objc(dirty) @objcDirect var isDirty', the accessors mismatch and it's a
+    // link time error. Without @objcDirect that's a runtime error anyway, so
+    // it's reasonable to trust developers not to shoot themselves in the foot.
 
     if (auto reqAFD = dyn_cast<AbstractFunctionDecl>(req)) {
       auto candAFD = cast<AbstractFunctionDecl>(cand);
@@ -4718,8 +4716,16 @@ private:
     }
 
     case MatchOutcome::WrongDirectness: {
-      bool shouldBeDirect =
-          cast<AbstractFunctionDecl>(req)->isObjCDirectDispatched();
+      bool shouldBeDirect = req->isObjCDirectDispatched();
+
+      // Without the feature, '@objcDirect' can't be written, so say how to
+      // enable it instead of offering a fix-it.
+      if (shouldBeDirect && !cand->isObjCDirectFeatureEnabled()) {
+        diagnose(cand, diag::objc_implementation_directness_mismatch, cand, req,
+                 shouldBeDirect);
+        diagnose(cand, diag::objc_implementation_directness_needs_feature);
+        return;
+      }
 
       auto diag = diagnose(cand, diag::objc_implementation_directness_mismatch,
                            cand, req, shouldBeDirect);
