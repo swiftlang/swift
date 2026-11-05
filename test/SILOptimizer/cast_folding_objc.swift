@@ -365,3 +365,25 @@ public func testForcedBridgedCastFromSwiftToNSObjectDerivedClass(_ s: String) ->
 func foo(x: CFMutableDictionary) -> [AnyHashable:AnyObject]? {
   return x as? [AnyHashable:AnyObject]
 }
+
+// rdar://186519050
+// A Swift class conforming to Error bridges to NSError at runtime, so casts
+// to NSError must not be folded to failure.
+public class SwiftErrorClass: Error {}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testSwiftErrorClassToNSError{{.*}}
+// CHECK:         checked_cast_addr_br take_always SwiftErrorClass in {{%.*}} : $*SwiftErrorClass to NSError in
+// CHECK:       } // end sil function '{{.*}}testSwiftErrorClassToNSError{{.*}}'
+@inline(never)
+public func testSwiftErrorClassToNSError(_ e: SwiftErrorClass) -> NSError? {
+  return e as? NSError
+}
+
+// CHECK-LABEL: sil [noinline] @{{.*}}testForcedSwiftErrorClassToNSError{{.*}}
+// CHECK-NOT:     cond_fail
+// CHECK:         unconditional_checked_cast_addr SwiftErrorClass in {{%.*}} : $*SwiftErrorClass to NSError in
+// CHECK:       } // end sil function '{{.*}}testForcedSwiftErrorClassToNSError{{.*}}'
+@inline(never)
+public func testForcedSwiftErrorClassToNSError(_ e: SwiftErrorClass) -> NSError {
+  return e as! NSError
+}

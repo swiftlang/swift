@@ -633,6 +633,29 @@ CastsTests.test("Casting NSError <-> Error") {
 }
 #endif
 
+#if _runtime(_ObjC)
+// rdar://186519050
+CastsTests.test("Swift Error class -> NSError") {
+  class SwiftErrorClass: Error {}
+  class NonErrorBase {}
+  class ErrorSubclass: NonErrorBase, Error {}
+
+  let e = SwiftErrorClass()
+  expectNotNil(e as? NSError)
+  expectTrue(e is NSError)
+  let forced = e as! NSError
+  expectEqual(forced.domain, (e as Error)._domain)
+
+  let sub: NonErrorBase = ErrorSubclass()
+  expectNotNil(sub as? NSError)
+  expectTrue(sub is NSError)
+
+  let base = NonErrorBase()
+  expectNil(base as? NSError)
+  expectFalse(base is NSError)
+}
+#endif
+
 // Foundation's JSON handling makes heavy use of passing Any? inside of Any
 // existentials.  That inspired the following three checks:
 CastsTests.test("[Any(Any?)] -> [Any?] should prefer unwrapping source") {
