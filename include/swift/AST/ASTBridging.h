@@ -380,6 +380,7 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj Class_getSuperclassDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Accessor_getStorage() const;
   BRIDGED_INLINE bool Class_isForeign() const;
   BRIDGED_INLINE bool ProtocolDecl_requiresClass() const;
   BRIDGED_INLINE bool ProtocolDecl_isMarkerProtocol() const;
@@ -545,6 +546,7 @@ public:
 
   BridgedDiagnosticArgument(SwiftInt i);
   BridgedDiagnosticArgument(BridgedStringRef s);
+  BridgedDiagnosticArgument(swift::Identifier identifier);
 };
 
 class BridgedFixIt {

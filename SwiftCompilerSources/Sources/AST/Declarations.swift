@@ -307,7 +307,9 @@ final public class DestructorDecl: AbstractFunctionDecl {
 
 public class FuncDecl: AbstractFunctionDecl {}
 
-final public class AccessorDecl: FuncDecl {}
+final public class AccessorDecl: FuncDecl {
+  public var storage: AbstractStorageDecl { bridged.Accessor_getStorage().getAs(AbstractStorageDecl.self) }
+}
 
 final public class MacroDecl: ValueDecl {}
 
