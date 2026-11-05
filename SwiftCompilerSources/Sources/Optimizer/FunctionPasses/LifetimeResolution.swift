@@ -580,6 +580,11 @@ private struct Resolver {
       if becomesCopy && isUnpermittedCopy(of: copyAddr.type) {
         Builder(after: copyAddr, context).createDiagnose(operand: op.value, kind: .unpermittedCopy)
       }
+
+      if !becomesCopy {
+        adjustAccessForTake(copyAddr.source)
+      }
+
       return op
 
     case let load as LoadInst:
@@ -591,6 +596,11 @@ private struct Resolver {
         if newOwnership == .copy && isUnpermittedCopy(of: load.type) {
           Builder(after: load, context).createDiagnose(operand: load, kind: .unpermittedCopy)
         }
+
+        if newOwnership == .take {
+          adjustAccessForTake(load.address)
+        }
+
         return load.operand
 
       // load [old] --> load_borrow
@@ -635,6 +645,20 @@ private struct Resolver {
     default:
       fatalError("unexpected inst to transform: \(op.instruction)")
     }
+  }
+
+  func adjustAccessForTake(_ addr: Value) {
+    assert(addr.type.isAddress)
+
+    // If there's no begin_acess [read], there's no adjustment needed.
+    guard case let .access(beginAccess) = addr.enclosingAccessScope,
+          beginAccess.accessKind == .read else {
+      return
+    }
+
+    // If it's static read, we turn it into a deinit.
+    // For a dynamic read, it needs to be reinitialized at end-of-access, so make it a modify.
+    beginAccess.set(accessKind: beginAccess.isStatic ? .deinit : .modify, context: context)
   }
 
   // Emit an `assign undef to [init]` of each given leaf of the root, right after the root's definition.

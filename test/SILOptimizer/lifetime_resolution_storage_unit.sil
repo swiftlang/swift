@@ -121,10 +121,9 @@ bb0:
 }
 
 
-// FIXME: the `begin_access [read]` should be corrected by LifetimeResolution into a `[deinit]` or `[modify]`
 // CHECK-LABEL: sil [ossa] @basic_last_use_is_copy :
 // CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
-// CHECK:          [[BA:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*K
+// CHECK:          [[BA:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*K
 // CHECK-NEXT:     [[LD:%.*]] = load [take] [[BA]] : $*K
 // CHECK-NEXT:     end_access [[BA]] : $*K
 // CHECK-NEXT:     ignored_use [[LD]]
@@ -141,6 +140,37 @@ bb0:
   assign %val to %root
 
   %d1 = begin_access [read] [unknown] %root : $*K
+  %l1 = load [copy] %d1 : $*K
+  end_access %d1 : $*K
+  ignored_use %l1
+  destroy_value %l1
+
+  destroy_addr %root : $*K
+  dealloc_stack %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+// A static read access that ends up containing a take becomes a `[deinit]`.
+// CHECK-LABEL: sil [ossa] @basic_last_use_is_copy_static :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[BA:%.*]] = begin_access [deinit] [static] [[ROOT]] : $*K
+// CHECK-NEXT:     [[LD:%.*]] = load [take] [[BA]] : $*K
+// CHECK-NEXT:     end_access [[BA]] : $*K
+// CHECK-NEXT:     ignored_use [[LD]]
+// CHECK-NOT:      destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @basic_last_use_is_copy_static : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_stack [lexical] [var_decl] $K, var, name "a", type $K
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %val = apply %getFn() : $@convention(thin) () -> @owned K
+  assign %val to %root
+
+  %d1 = begin_access [read] [static] %root : $*K
   %l1 = load [copy] %d1 : $*K
   end_access %d1 : $*K
   ignored_use %l1
@@ -893,11 +923,11 @@ bb0:
 // CHECK:       bb0([[OUT:%.*]] : $*C, [[ARG:%.*]] : $*C):
 // CHECK:         [[ROOT:%.*]] = mark_uninitialized [var]
 // CHECK-NEXT:    copy_addr [[ARG]] to [init] [[ROOT]] : $*C
-// CHECK:         [[R1:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*C
+// CHECK:         [[R1:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*C
 // CHECK-NEXT:    copy_addr [take] [[R1]] to [init] {{%.*}} : $*C
 // CHECK:         [[M:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*C
 // CHECK-NEXT:    copy_addr [take] {{%.*}} to [init] [[M]] : $*C
-// CHECK:         [[R2:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*C
+// CHECK:         [[R2:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*C
 // CHECK-NEXT:    copy_addr [take] [[R2]] to [init] [[OUT]] : $*C
 // CHECK-NOT:     destroy_addr
 // CHECK:       } // end sil function
@@ -1202,9 +1232,9 @@ bb0(%out : $*C, %arg : $*C):
 // CHECK-LABEL: sil [ossa] @cpa_chain_two_roots :
 // CHECK:         [[A:%.*]] = alloc_stack [lexical] [var_decl] $C, var, name "a"
 // CHECK-NEXT:    [[B:%.*]] = alloc_stack [lexical] [var_decl] $C, var, name "b"
-// CHECK:         [[RA:%.*]] = begin_access [read] [unknown] [[A]] : $*C
+// CHECK:         [[RA:%.*]] = begin_access [modify] [unknown] [[A]] : $*C
 // CHECK-NEXT:    copy_addr [take] [[RA]] to [init] [[B]] : $*C
-// CHECK:         [[RB:%.*]] = begin_access [read] [unknown] [[B]] : $*C
+// CHECK:         [[RB:%.*]] = begin_access [modify] [unknown] [[B]] : $*C
 // CHECK-NEXT:    [[L:%.*]] = load [take] [[RB]] : $*C
 // CHECK-NOT:     destroy_addr
 // CHECK:         return [[L]]
