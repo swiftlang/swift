@@ -74,30 +74,32 @@ import SIL
 let packTypeElimination = FunctionPass(name: "pack-type-elimination") {
   (function: Function, context: FunctionPassContext) in
 
-  tryEliminateOpenedPackElementTypes(in: function, context)
+  _ = tryEliminateOpenedPackElementTypes(in: function, context)
 }
 
 /// If an equivalent structural pack index can be determined for the provided
 /// dynamic pack indexing instruction, replace it with an equivalent
-/// scalar_pack_index.
+/// scalar_pack_index. Returns true if the instruction was replaced.
 private func tryRewriteToScalar(
   dynamicPackIndex inst: AnyPackIndexInst, in function: Function, _ context: FunctionPassContext
-) {
+) -> Bool {
   guard let index = inst.structuralIndex
   else {
-    return
+    return false
   }
 
   let builder = Builder(before: inst, context)
   let scalarPackIndex = builder.createScalarPackIndex(
     componentIndex: index, indexedPackType: inst.indexedPackType)
   inst.replace(with: scalarPackIndex, context)
-  return
+  return true
 }
 
-private func tryEliminateOpenedPackElementTypes(
+/// Returns true if the function was changed.
+func tryEliminateOpenedPackElementTypes(
   in function: Function, _ context: FunctionPassContext
-) {
+) -> Bool {
+  var changed = false
   var cloner = Cloner(in: function, context)
   defer { cloner.deinitialize() }
 
@@ -118,10 +120,10 @@ private func tryEliminateOpenedPackElementTypes(
       }
       break
     case let dpi as DynamicPackIndexInst:
-      tryRewriteToScalar(dynamicPackIndex: dpi, in: function, context)
+      changed = tryRewriteToScalar(dynamicPackIndex: dpi, in: function, context) || changed
       break
     case let ppi as PackPackIndexInst:
-      tryRewriteToScalar(dynamicPackIndex: ppi, in: function, context)
+      changed = tryRewriteToScalar(dynamicPackIndex: ppi, in: function, context) || changed
       break
     default:
       break
@@ -129,7 +131,7 @@ private func tryEliminateOpenedPackElementTypes(
   }
 
   if mappedOpenInsts.isEmpty {
-    return
+    return changed
   }
 
   for inst in function.instructions {
@@ -148,6 +150,7 @@ private func tryEliminateOpenedPackElementTypes(
   for opei in mappedOpenInsts {
     context.erase(instruction: opei)
   }
+  return true
 }
 
 private func instUsesMappedArchetype(inst: Instruction, from mappedOpenInsts: [OpenPackElementInst])

@@ -18,6 +18,11 @@ struct S6: ~Copyable {
 
 class C {}
 
+struct A {}
+struct B {}
+struct D {}
+struct E {}
+
 sil_global [let] @g1 : $Int32
 sil_global [let] @g2 : $Int32
 sil_global [let] @g3 : $Int32
@@ -291,6 +296,438 @@ bb0(%0 : @owned $S6):
   end_lifetime %0
   %r = tuple ()
   return %r
+}
+
+// MARK: Dynamic Pack Loop Unrolling and Optimization
+
+sil [ossa] @foo : $@convention(thin) <T> () -> ()
+
+// Only unroll a loop if it contains a dynamic_pack_index instruction that uses
+// the loop counter.
+//
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @dont_unroll_non_pack_loop :
+// CHECK:       bb0
+// CHECK:         br bb1
+// CHECK:       bb1
+// CHECK:         cond_br {{.*}}, bb3, bb2
+// CHECK:       bb2
+// CHECK:         br bb1
+// CHECK:       bb3
+// CHECK-NOT:     {{^bb}}
+// CHECK-LABEL: } // end sil function 'dont_unroll_non_pack_loop'
+sil [no_locks] [ossa] @dont_unroll_non_pack_loop : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_pack_loop :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:         apply {{%[0-9]+}}<A>()
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop'
+sil [no_locks] [ossa] @unroll_pack_loop : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %dpi = dynamic_pack_index %4 of $Pack{B, A, C}
+  %ope = open_pack_element %dpi of <each U> at <Pack{B, A, C}>, shape $each U, id 1
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(1) each U>() : $@convention(thin) <T> () -> ()
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_pack_loop_with_pack_pack_index :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:         apply {{%[0-9]+}}<A>()
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop_with_pack_pack_index'
+sil [no_locks] [ossa] @unroll_pack_loop_with_pack_pack_index : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %dpi = dynamic_pack_index %4 of $Pack{B, A, C}
+  %ppi = pack_pack_index 1, %dpi of $Pack{B, B, A, C}
+  %ope = open_pack_element %dpi of <each U> at <Pack{B, A, C}>, shape $each U, id 2
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(2) each U>() : $@convention(thin) <T> () -> ()
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+// When a pack is homogeneous, we can specialize uses of the opened
+// @pack_element type without unrolling the loop, since every element is the
+// same type.
+//
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @dont_unroll_homogeneous_pack_loop :
+// CHECK:       bb0
+// CHECK:         br bb1
+// CHECK:       bb1
+// CHECK:         cond_br {{.*}}, bb3, bb2
+// CHECK:       bb2
+// CHECK:         br bb1
+// CHECK:       bb3
+// CHECK-NOT:     {{^bb}}
+// CHECK-LABEL: } // end sil function 'dont_unroll_homogeneous_pack_loop'
+sil [no_locks] [ossa] @dont_unroll_homogeneous_pack_loop : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %dpi = dynamic_pack_index %4 of $Pack{B, B}
+  %ope = open_pack_element %dpi of <each U> at <Pack{B, B}>, shape $each U, id 3
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(3) each U>() : $@convention(thin) <T> () -> ()
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_homogeneous_and_heterogeneous_pack_loop :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:         apply {{%[0-9]+}}<A>()
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_homogeneous_and_heterogeneous_pack_loop'
+sil [no_locks] [ossa] @unroll_homogeneous_and_heterogeneous_pack_loop : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %dpi = dynamic_pack_index %4 of $Pack{B, B, B}
+  %ope1 = open_pack_element %dpi of <each U> at <Pack{B, B, B}>, shape $each U, id 4
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(4) each U>() : $@convention(thin) <T> () -> ()
+  %ope2 = open_pack_element %dpi of <each U> at <Pack{A, B, C}>, shape $each U, id 5
+  apply %foo<@pack_element(5) each U>() : $@convention(thin) <T> () -> ()
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+// While single-element packs are technically homogeneous, PackTypeElimination
+// currently bails out when it encounters one (rdar://190731025), so we must
+// unroll loops over them.
+//
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_single_element_pack_loop :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_single_element_pack_loop'
+sil [no_locks] [ossa] @unroll_single_element_pack_loop : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %dpi = dynamic_pack_index %4 of $Pack{B}
+  %ope = open_pack_element %dpi of <each U> at <Pack{B}>, shape $each U, id 6
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(6) each U>() : $@convention(thin) <T> () -> ()
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %1 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+
+// CHECK-LABEL:    sil [no_locks] [perf_constraint] [ossa] @unroll_many_iteration_pack_loop :
+// CHECK:            apply {{%[0-9]+}}<A>()
+// CHECK-COUNT-49:   apply {{%[0-9]+}}<B>()
+// CHECK-NOT:        apply
+// CHECK-LABEL:    } // end sil function 'unroll_many_iteration_pack_loop'
+sil [no_locks] [ossa] @unroll_many_iteration_pack_loop : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 50
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %dpi = dynamic_pack_index %4 of $Pack{A, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B}
+  %ope = open_pack_element %dpi of <each U> at <Pack{A, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B, B}>, shape $each U, id 7
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(7) each U>() : $@convention(thin) <T> () -> ()
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
+}
+
+// Normal LoopUnroll only attempts to unroll the innermost loops in a nest, but
+// PackLoopUnroll must unroll pack loops, even if they contain sub-loops. In
+// this case, it also must not unroll the inner loop, which is not a pack loop.
+//
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_outer_pack_loop :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:       [[INNER1:bb[0-9]+]](
+// CHECK:         cond_br
+// CHECK:         br [[INNER1]](
+// CHECK:         apply {{%[0-9]+}}<A>()
+// CHECK:       [[INNER2:bb[0-9]+]](
+// CHECK:         cond_br
+// CHECK:         br [[INNER2]](
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_outer_pack_loop'
+sil [no_locks] [ossa] @unroll_outer_pack_loop : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = integer_literal $Builtin.Int1, -1
+  br bb1(%0)
+
+bb1(%5 : $Builtin.Word):
+  %6 = dynamic_pack_index %5 of $Pack{B, A, C}
+  %ope = open_pack_element %6 of <each U> at <Pack{B, A, C}>, shape $each U, id 8
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(8) each U>() : $@convention(thin) <T> () -> ()
+  %7 = builtin "sadd_with_overflow_Word"(%5, %1, %3) : $(Builtin.Word, Builtin.Int1)
+  %8 = tuple_extract %7, 0
+  %9 = builtin "cmp_eq_Word"(%8, %2) : $Builtin.Int1
+  br bb2(%0)
+
+bb2(%11 : $Builtin.Word):
+  %12 = builtin "sadd_with_overflow_Word"(%11, %1, %3) : $(Builtin.Word, Builtin.Int1)
+  %13 = tuple_extract %12, 0
+  %14 = builtin "cmp_eq_Word"(%13, %2) : $Builtin.Int1
+  cond_br %14, bb4, bb3
+
+bb3:
+  br bb2(%13)
+
+bb4:
+  cond_br %9, bb6, bb5
+
+bb5:
+  br bb1(%8)
+
+bb6:
+  %19 = tuple ()
+  return %19
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_nested_pack_loops :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:         apply {{%[0-9]+}}<C>()
+// CHECK:         apply {{%[0-9]+}}<D>()
+// CHECK:         apply {{%[0-9]+}}<A>()
+// CHECK:         apply {{%[0-9]+}}<C>()
+// CHECK:         apply {{%[0-9]+}}<D>()
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_nested_pack_loops'
+sil [no_locks] [ossa] @unroll_nested_pack_loops : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = integer_literal $Builtin.Int1, -1
+  br bb1(%0)
+
+bb1(%5 : $Builtin.Word):
+  %6 = dynamic_pack_index %5 of $Pack{B, A, C}
+  %ope = open_pack_element %6 of <each U> at <Pack{B, A, C}>, shape $each U, id 9
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(9) each U>() : $@convention(thin) <T> () -> ()
+  %7 = builtin "sadd_with_overflow_Word"(%5, %1, %3) : $(Builtin.Word, Builtin.Int1)
+  %8 = tuple_extract %7, 0
+  %9 = builtin "cmp_eq_Word"(%8, %2) : $Builtin.Int1
+  br bb2(%0)
+
+bb2(%11 : $Builtin.Word):
+  %dpi2 = dynamic_pack_index %11 of $Pack{B, A, C}
+  %ope2 = open_pack_element %dpi2 of <each U> at <Pack{C, D, E}>, shape $each U, id 10
+  apply %foo<@pack_element(10) each U>() : $@convention(thin) <T> () -> ()
+  %12 = builtin "sadd_with_overflow_Word"(%11, %1, %3) : $(Builtin.Word, Builtin.Int1)
+  %13 = tuple_extract %12, 0
+  %14 = builtin "cmp_eq_Word"(%13, %2) : $Builtin.Int1
+  cond_br %14, bb4, bb3
+
+bb3:
+  br bb2(%13)
+
+bb4:
+  cond_br %9, bb6, bb5
+
+bb5:
+  br bb1(%8)
+
+bb6:
+  %19 = tuple ()
+  return %19
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_outer_pack_loop_with_unbounded_inner_pack_loop :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:       [[INNER1:bb[0-9]+]](
+// CHECK:         dynamic_pack_index
+// CHECK:         br [[INNER1]](
+// CHECK:         apply {{%[0-9]+}}<A>()
+// CHECK:       [[INNER2:bb[0-9]+]](
+// CHECK:         dynamic_pack_index
+// CHECK:         br [[INNER2]](
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_outer_pack_loop_with_unbounded_inner_pack_loop'
+sil [no_locks] [ossa] @unroll_outer_pack_loop_with_unbounded_inner_pack_loop : $@convention(thin) (Builtin.Word) -> () {
+bb0(%n : $Builtin.Word):
+  %0 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
+  %2 = integer_literal $Builtin.Word, 2
+  %3 = integer_literal $Builtin.Int1, -1
+  br bb1(%0)
+
+bb1(%5 : $Builtin.Word):
+  %6 = dynamic_pack_index %5 of $Pack{B, A, C}
+  %ope = open_pack_element %6 of <each U> at <Pack{B, A, C}>, shape $each U, id 11
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(11) each U>() : $@convention(thin) <T> () -> ()
+  %7 = builtin "sadd_with_overflow_Word"(%5, %1, %3) : $(Builtin.Word, Builtin.Int1)
+  %8 = tuple_extract %7, 0
+  %9 = builtin "cmp_eq_Word"(%8, %2) : $Builtin.Int1
+  br bb2(%0)
+
+bb2(%11 : $Builtin.Word):
+  %dpi2 = dynamic_pack_index %11 of $Pack{B, A, C}
+  %ope2 = open_pack_element %dpi2 of <each U> at <Pack{B, A, C}>, shape $each U, id 12
+  apply %foo<@pack_element(12) each U>() : $@convention(thin) <T> () -> ()
+  %12 = builtin "sadd_with_overflow_Word"(%11, %1, %3) : $(Builtin.Word, Builtin.Int1)
+  %13 = tuple_extract %12, 0
+  %14 = builtin "cmp_eq_Word"(%13, %n) : $Builtin.Int1
+  cond_br %14, bb4, bb3
+
+bb3:
+  br bb2(%13)
+
+bb4:
+  cond_br %9, bb6, bb5
+
+bb5:
+  br bb1(%8)
+
+bb6:
+  %19 = tuple ()
+  return %19
+}
+
+// CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @unroll_pack_loop_multi_open :
+// CHECK:         apply {{%[0-9]+}}<B>()
+// CHECK:         apply {{%[0-9]+}}<C>()
+// CHECK:         apply {{%[0-9]+}}<A>()
+// CHECK:         apply {{%[0-9]+}}<D>()
+// CHECK-NOT:     apply
+// CHECK-LABEL: } // end sil function 'unroll_pack_loop_multi_open'
+sil [no_locks] [ossa] @unroll_pack_loop_multi_open : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %dpi = dynamic_pack_index %4 of $Pack{B, A, C}
+  %ope = open_pack_element %dpi of <each U> at <Pack{B, A, C}>, shape $each U, id 13
+  %foo = function_ref @foo : $@convention(thin) <T> () -> ()
+  apply %foo<@pack_element(13) each U>() : $@convention(thin) <T> () -> ()
+  %ope2 = open_pack_element %dpi of <each U> at <Pack{C, D, E}>, shape $each U, id 14
+  apply %foo<@pack_element(14) each U>() : $@convention(thin) <T> () -> ()
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_eq_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb3, bb2
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ %9 = tuple()
+ return %9 : $()
 }
 
 // CHECK-LABEL: sil [no_locks] [perf_constraint] [ossa] @remove_metatype_arg :
