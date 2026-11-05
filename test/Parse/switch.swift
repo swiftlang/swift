@@ -103,11 +103,11 @@ case 1:
 
 
 
-switch x { // expected-astgen-error {{switch must be exhaustive}}
-  x = 1 // expected-cparser-error{{all statements inside a switch must be covered by a 'case' or 'default'}} expected-astgen-error {{unexpected code before conditional compilation clause}}
+switch x {
+  x = 1 // expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
 default:
   x = 0
-case 0: // expected-cparser-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+case 0: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 case 1:
   x = 0
@@ -116,59 +116,56 @@ case 1:
 switch x {
 default:
   x = 0
-default: // expected-cparser-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 }
 
-switch x { // expected-cparser-error{{'switch' statement body must have at least one 'case' or 'default' block}}
-  x = 1 // expected-cparser-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
+switch x { // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
+  x = 1 // expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
 }
 
-switch x { // expected-cparser-error{{'switch' statement body must have at least one 'case' or 'default' block}}
-  x = 1 // expected-cparser-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
+switch x { // expected-error{{'switch' statement body must have at least one 'case' or 'default' block}}
+  x = 1 // expected-error{{all statements inside a switch must be covered by a 'case' or 'default'}}
   x = 2
 }
 
 switch x {
-default: // expected-cparser-error{{'default' label in a 'switch' must have at least one executable statement}} {{9-9= break}}
-case 0: // expected-cparser-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+default: // expected-error{{'default' label in a 'switch' must have at least one executable statement}} {{9-9= break}}
+case 0: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 }
 
 switch x {
-default: // expected-cparser-error{{'default' label in a 'switch' must have at least one executable statement}} {{9-9= break}}
-default: // expected-cparser-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+default: // expected-error{{'default' label in a 'switch' must have at least one executable statement}} {{9-9= break}}
+default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 }
 
 switch x { // expected-cparser-error {{switch must be exhaustive}} expected-cparser-note{{add a default clause}}
-default where x == 0: // expected-cparser-error{{'default' cannot be used with a 'where' guard expression}}
+default where x == 0: // expected-error{{'default' cannot be used with a 'where' guard expression}}
   x = 0
 }
 
-switch x { // expected-cparser-error {{switch must be exhaustive}} expected-cparser-note{{add a default clause}}
-case 0: // expected-cparser-error {{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
+case 0: // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
 }
 
-switch x { // expected-cparser-error {{switch must be exhaustive}} expected-cparser-note{{add a default clause}}
-case 0: // expected-cparser-error{{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
+case 0: // expected-error{{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
 case 1:
   x = 0
 }
 
-switch x { // expected-cparser-error {{switch must be exhaustive}} expected-cparser-note{{add a default clause}}
+switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0:
   x = 0
-case 1: // expected-cparser-error{{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
+case 1: // expected-error{{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
 }
 
 
-case 0: // expected-cparser-error{{'case' label can only appear inside a 'switch' statement}}
-var y = 0
-default: // expected-cparser-error{{'default' label can only appear inside a 'switch' statement}}
-var z = 1
-
-fallthrough // expected-cparser-error{{'fallthrough' is only allowed inside a switch}}
+// The 'case', 'default' and 'fallthrough' outside of a 'switch' are in
+// switch_case_outside_switch.swift: SwiftParser takes the rest of the file as the
+// body of the first, which hides the diagnostics of what follows.
 
 switch x {
 case 0:
@@ -176,7 +173,7 @@ case 0:
 case 1:
   fallthrough
 default:
-  fallthrough // expected-cparser-error{{'fallthrough' without a following 'case' or 'default' block}}
+  fallthrough // expected-error{{'fallthrough' without a following 'case' or 'default' block}}
 }
 
 // Fallthrough can transfer control anywhere within a case and can appear
@@ -196,56 +193,56 @@ default:
 var t = (1, 2)
 
 switch t {
-case (var a, 2), (1, _): // expected-cparser-error {{'a' must be bound in every pattern}} expected-cparser-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, 2), (1, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (_, 2), (var a, _): // expected-cparser-error {{'a' must be bound in every pattern}} expected-cparser-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (_, 2), (var a, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (var a, 2), (1, var b): // expected-cparser-error {{'a' must be bound in every pattern}} expected-cparser-error {{'b' must be bound in every pattern}} expected-cparser-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-cparser-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+case (var a, 2), (1, var b): // expected-error {{'a' must be bound in every pattern}} expected-error {{'b' must be bound in every pattern}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (var a, 2): // expected-cparser-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}} expected-cparser-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
 case (1, _):
   ()
 
-case (_, 2): // expected-cparser-error {{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
-case (1, var a): // expected-cparser-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (_, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
+case (1, var a): // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (var a, 2): // expected-cparser-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}} expected-cparser-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
-case (1, var b): // expected-cparser-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+case (var a, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}} expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+case (1, var b): // expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (1, let b): // let bindings expected-cparser-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}}
+case (1, let b): // let bindings expected-warning {{immutable value 'b' was never used; consider replacing with '_' or removing it}}
   ()
 
-case (_, 2), (let a, _): // expected-cparser-error {{'a' must be bound in every pattern}} expected-cparser-warning {{case is already handled by previous patterns; consider removing it}} expected-cparser-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}}
+case (_, 2), (let a, _): // expected-error {{'a' must be bound in every pattern}} expected-warning {{case is already handled by previous patterns; consider removing it}} expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}}
   ()
 
 // OK
 case (_, 2), (1, _):
   ()
   
-case (_, var a), (_, var a): // expected-cparser-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
-  // expected-cparser-warning@-1 {{case is already handled by previous patterns; consider removing it}}
-  // expected-cparser-warning@-2 {{case is already handled by previous patterns; consider removing it}}
+case (_, var a), (_, var a): // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}}
+  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
+  // expected-warning@-2 {{case is already handled by previous patterns; consider removing it}}
   ()
   
-case (var a, var b), (var b, var a): // expected-cparser-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-cparser-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
-  // expected-cparser-warning@-1 {{case is already handled by previous patterns; consider removing it}}
-  // expected-cparser-warning@-2 {{case is already handled by previous patterns; consider removing it}}
+case (var a, var b), (var b, var a): // expected-warning {{variable 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+  // expected-warning@-1 {{case is already handled by previous patterns; consider removing it}}
+  // expected-warning@-2 {{case is already handled by previous patterns; consider removing it}}
   ()
 
-case (_, 2): // expected-cparser-error {{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
+case (_, 2): // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
 case (1, _):
   ()
 }
 
 func patternVarUsedInAnotherPattern(x: Int) {
   switch x {
-  case let a, // expected-cparser-error {{'a' must be bound in every pattern}}
-       value: // expected-cparser-error {{cannot find 'value' in scope}}
+  case let a, // expected-error {{'a' must be bound in every pattern}}
+       value: // expected-error {{cannot find 'value' in scope}}
     break
   }
 }
@@ -253,13 +250,13 @@ func patternVarUsedInAnotherPattern(x: Int) {
 // Fallthroughs can only transfer control into a case label with bindings if the previous case binds a superset of those vars.
 switch t {
 case (1, 2):
-  fallthrough // expected-cparser-error {{'fallthrough' from a case which doesn't bind variable 'a'}} expected-cparser-error {{'fallthrough' from a case which doesn't bind variable 'b'}}
-case (var a, var b): // expected-cparser-warning {{variable 'a' was never mutated; consider changing to 'let' constant}} expected-cparser-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
+  fallthrough // expected-error {{'fallthrough' from a case which doesn't bind variable 'a'}} expected-error {{'fallthrough' from a case which doesn't bind variable 'b'}}
+case (var a, var b): // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}} expected-warning {{variable 'b' was never mutated; consider changing to 'let' constant}}
   t = (b, a)
 }
 
 switch t { // specifically notice on next line that we shouldn't complain that a is unused - just never mutated
-case (var a, let b): // expected-cparser-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
+case (var a, let b): // expected-warning {{variable 'a' was never mutated; consider changing to 'let' constant}}
   t = (b, b)
   fallthrough // ok - notice that subset of bound variables falling through is fine
 case (2, let a):
@@ -268,7 +265,7 @@ case (2, let a):
 
 func patternVarDiffType(x: Int, y: Double) {
   switch (x, y) {
-  case (1, let a): // expected-cparser-error {{pattern variable bound to type 'Double', fallthrough case bound to type 'Int'}}
+  case (1, let a): // expected-error {{pattern variable bound to type 'Double', fallthrough case bound to type 'Int'}}
     fallthrough
   case (let a, _):
     break
@@ -277,20 +274,20 @@ func patternVarDiffType(x: Int, y: Double) {
 
 func patternVarDiffMutability(x: Int, y: Double) {
   switch x {
-  case let a where a < 5, var a where a > 10: // expected-cparser-error {{'var' pattern binding must match previous 'let' pattern binding}}{{27-30=let}}
+  case let a where a < 5, var a where a > 10: // expected-error {{'var' pattern binding must match previous 'let' pattern binding}}{{27-30=let}}
     break
   default:
     break
   }
   switch (x, y) {
   // Would be nice to have a fixit in the following line if we detect that all bindings in the same pattern have the same problem.
-  case let (a, b) where a < 5, var (a, b) where a > 10: // expected-cparser-error 2{{'var' pattern binding must match previous 'let' pattern binding}}{{none}}
+  case let (a, b) where a < 5, var (a, b) where a > 10: // expected-error 2{{'var' pattern binding must match previous 'let' pattern binding}}{{none}}
     break
-  case (let a, var b) where a < 5, (let a, let b) where a > 10: // expected-cparser-error {{'let' pattern binding must match previous 'var' pattern binding}}{{44-47=var}}
+  case (let a, var b) where a < 5, (let a, let b) where a > 10: // expected-error {{'let' pattern binding must match previous 'var' pattern binding}}{{44-47=var}}
     break
   case (let a, let b) where a < 5, (var a, let b) where a > 10, (let a, var b) where a == 8:
-    // expected-cparser-error@-1 {{'var' pattern binding must match previous 'let' pattern binding}}{{37-40=let}}
-    // expected-cparser-error@-2 {{'var' pattern binding must match previous 'let' pattern binding}}{{73-76=let}}
+    // expected-error@-1 {{'var' pattern binding must match previous 'let' pattern binding}}{{37-40=let}}
+    // expected-error@-2 {{'var' pattern binding must match previous 'let' pattern binding}}{{73-76=let}}
     break
   default:
     break
@@ -298,7 +295,7 @@ func patternVarDiffMutability(x: Int, y: Double) {
 }
 
 func test_label(x : Int) {
-Gronk: // expected-cparser-error {{switch must be exhaustive}} expected-cparser-note{{add a default clause}}
+Gronk: // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
   switch x {
   case 42: return
   }
@@ -306,7 +303,7 @@ Gronk: // expected-cparser-error {{switch must be exhaustive}} expected-cparser-
 
 func enumElementSyntaxOnTuple() {
   switch (1, 1) {
-  case .Bar: // expected-cparser-error {{value of tuple type '(Int, Int)' has no member 'Bar'}}
+  case .Bar: // expected-error {{value of tuple type '(Int, Int)' has no member 'Bar'}}
     break
   default:
     break
@@ -315,8 +312,8 @@ func enumElementSyntaxOnTuple() {
 
 // https://github.com/apple/swift/issues/42798
 enum Whatever { case Thing }
-func f0(values: [Whatever]) { // expected-cparser-note {{'values' declared here}}
-    switch value { // expected-cparser-error {{cannot find 'value' in scope; did you mean 'values'?}}
+func f0(values: [Whatever]) { // expected-note {{'values' declared here}}
+    switch value { // expected-error {{cannot find 'value' in scope; did you mean 'values'?}}
     case .Thing: // Ok. Don't emit diagnostics about enum case not found in type <<error type>>.
         break
     }
@@ -333,11 +330,11 @@ func f1(x: String, y: Whichever) {
   switch x {
     case Whichever.title: // Ok. Don't emit diagnostics for static member of enum.
         break
-    case Whichever.buzz: // expected-cparser-error {{type 'Whichever' has no member 'buzz'}}
+    case Whichever.buzz: // expected-error {{type 'Whichever' has no member 'buzz'}}
         break
-    // expected-cparser-note @+1 {{overloads for '~=' exist with these partially matching parameter lists: (Substring, String)}}
-    case Whichever.alias: // expected-cparser-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
-    // expected-cparser-error@-1 {{'case' label in a 'switch' must have at least one executable statement}}
+    // expected-note @+1 {{overloads for '~=' exist with these partially matching parameter lists: (Substring, String)}}
+    case Whichever.alias: // expected-error {{expression pattern of type 'Whichever' cannot match values of type 'String'}}
+    // expected-error@-1 {{'case' label in a 'switch' must have at least one executable statement}}
     default:
       break
   }
@@ -346,7 +343,7 @@ func f1(x: String, y: Whichever) {
         break
     case Whichever.alias: // Ok. Don't emit diagnostics for static member of enum.
         break
-    case Whichever.title: // expected-cparser-error {{expression pattern of type 'String' cannot match values of type 'Whichever'}}
+    case Whichever.title: // expected-error {{expression pattern of type 'String' cannot match values of type 'Whichever'}}
         break
   }
   switch y {
@@ -359,13 +356,13 @@ func f1(x: String, y: Whichever) {
 
 
 switch Whatever.Thing {
-case .Thing: // expected-cparser-error{{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
+case .Thing: // expected-error{{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
 @unknown case _:
   x = 0
 }
 
 switch Whatever.Thing {
-case .Thing: // expected-cparser-error{{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
+case .Thing: // expected-error{{'case' label in a 'switch' must have at least one executable statement}} {{13-13= break}}
 @unknown default:
   x = 0
 }
@@ -373,20 +370,20 @@ case .Thing: // expected-cparser-error{{'case' label in a 'switch' must have at 
 switch Whatever.Thing {
 case .Thing:
   x = 0
-@unknown case _: // expected-cparser-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}}
+@unknown case _: // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{17-17= break}}
 }
 
 switch Whatever.Thing {
 case .Thing:
   x = 0
-@unknown default: // expected-cparser-error {{'default' label in a 'switch' must have at least one executable statement}} {{18-18= break}}
+@unknown default: // expected-error {{'default' label in a 'switch' must have at least one executable statement}} {{18-18= break}}
 }
 
 
 switch Whatever.Thing {
 @unknown default:
   x = 0
-default: // expected-cparser-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 case .Thing:
   x = 0
@@ -395,7 +392,7 @@ case .Thing:
 switch Whatever.Thing {
 default:
   x = 0
-@unknown case _: // expected-cparser-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}} expected-cparser-error {{'@unknown' can only be applied to the last case in a switch}}
+@unknown case _: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}} expected-error {{'@unknown' can only be applied to the last case in a switch}}
   x = 0
 case .Thing:
   x = 0
@@ -404,24 +401,24 @@ case .Thing:
 switch Whatever.Thing {
 default:
   x = 0
-@unknown default: // expected-cparser-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+@unknown default: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   x = 0
 case .Thing:
   x = 0
 }
 
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '.Thing'}}
-@unknown default where x == 0: // expected-cparser-error{{'default' cannot be used with a 'where' guard expression}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown default where x == 0: // expected-error{{'default' cannot be used with a 'where' guard expression}}
   x = 0
 }
 
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '.Thing'}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
 @unknown case _:
-  fallthrough // expected-cparser-error{{'fallthrough' without a following 'case' or 'default' block}}
+  fallthrough // expected-error{{'fallthrough' without a following 'case' or 'default' block}}
 }
 
 switch Whatever.Thing {
-@unknown case _: // expected-cparser-error {{'@unknown' can only be applied to the last case in a switch}}
+@unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
   fallthrough
 case .Thing:
   break
@@ -430,53 +427,53 @@ case .Thing:
 switch Whatever.Thing {
 @unknown default:
   fallthrough
-case .Thing: // expected-cparser-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+case .Thing: // expected-error{{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
   break
 }
 
 switch Whatever.Thing {
-@unknown case _, _: // expected-cparser-error {{'@unknown' cannot be applied to multiple patterns}}
+@unknown case _, _: // expected-error {{'@unknown' cannot be applied to multiple patterns}}
   break
 }
 
 switch Whatever.Thing {
-@unknown case _, _, _: // expected-cparser-error {{'@unknown' cannot be applied to multiple patterns}}
+@unknown case _, _, _: // expected-error {{'@unknown' cannot be applied to multiple patterns}}
   break
 }
 
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '.Thing'}}
-@unknown case let value: // expected-cparser-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case let value: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
   _ = value
 }
 
-switch (Whatever.Thing, Whatever.Thing) { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '(_, _)'}}
-@unknown case (_, _): // expected-cparser-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+switch (Whatever.Thing, Whatever.Thing) { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '(_, _)'}}
+@unknown case (_, _): // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
   break
 }
 
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '.Thing'}}
-@unknown case is Whatever: // expected-cparser-error {{'@unknown' is only supported for catch-all cases ("case _")}}
-  // expected-cparser-warning@-1 {{'is' test is always true}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case is Whatever: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+  // expected-warning@-1 {{'is' test is always true}}
   break
 }
 
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '.Thing'}}
-@unknown case .Thing: // expected-cparser-error {{'@unknown' is only supported for catch-all cases ("case _")}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case .Thing: // expected-error {{'@unknown' is only supported for catch-all cases ("case _")}}
   break
 }
 
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '.Thing'}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
 @unknown case (_): // okay
   break
 }
 
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '.Thing'}}
-@unknown case _ where x == 0: // expected-cparser-error {{'where' cannot be used with '@unknown'}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown case _ where x == 0: // expected-error {{'where' cannot be used with '@unknown'}}
   break
 }
 
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note{{add missing case: '.Thing'}}
-@unknown default where x == 0: // expected-cparser-error {{'default' cannot be used with a 'where' guard expression}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note{{add missing case: '.Thing'}}
+@unknown default where x == 0: // expected-error {{'default' cannot be used with a 'where' guard expression}}
   break
 }
 
@@ -484,7 +481,7 @@ switch Whatever.Thing {
 case .Thing:
   x = 0
 #if true
-@unknown case _: // expected-astgen-note {{remove '@unknown' to handle remaining values}}
+@unknown case _:
   x = 0
 #endif
 }
@@ -510,13 +507,13 @@ case _:
   @unknown let _ = 1 // expected-cparser-error {{unknown attribute 'unknown'}}
 }
 
-switch Whatever.Thing { // expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing {
 case .Thing:
   break
 @unknown(garbage) case _: // expected-cparser-error {{unexpected '(' in attribute 'unknown'}} expected-astgen-error {{unexpected code '(garbage)' in switch case}}
   break
 }
-switch Whatever.Thing { // expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing {
 case .Thing:
   break
 @unknown // expected-cparser-note {{attribute already specified here}}
@@ -524,7 +521,7 @@ case .Thing:
 case _:
   break
 }
-switch Whatever.Thing { // expected-cparser-warning {{switch must be exhaustive}} expected-cparser-note {{add missing case: '.Thing'}} expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note {{add missing case: '.Thing'}}
 @unknown @garbage(foobar) // expected-cparser-error {{unknown attribute 'garbage'}} expected-astgen-error {{unexpected code '@garbage(foobar)' in switch case}}
 case _:
   break
@@ -547,7 +544,7 @@ switch x { // expected-error {{switch must be exhaustive}}
   break
 }
 
-switch Whatever.Thing { // expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing {
 case .Thing:
   break
 @unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
@@ -556,7 +553,7 @@ case .Thing:
   break
 }
 
-switch Whatever.Thing { // expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing {
 case .Thing:
   break
 @unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
@@ -565,7 +562,7 @@ case .Thing:
   break
 }
 
-switch Whatever.Thing { // expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing {
 case .Thing:
   break
 @unknown default:
@@ -574,21 +571,21 @@ case .Thing:
   break
 }
 
-switch Whatever.Thing { // expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing {
 @unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
   break
 @unknown case _:
   break
 }
 
-switch Whatever.Thing { // expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing {
 @unknown case _: // expected-error {{'@unknown' can only be applied to the last case in a switch}}
   break
 @unknown default:
   break
 }
 
-switch Whatever.Thing { // expected-astgen-error {{cannot find 'Whatever' in scope}}
+switch Whatever.Thing {
 @unknown default:
   break
 @unknown default: // expected-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
