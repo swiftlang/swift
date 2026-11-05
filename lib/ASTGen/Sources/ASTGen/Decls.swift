@@ -1625,6 +1625,10 @@ extension BridgedOperatorFixity {
 
 extension ASTGenVisitor {
   func generate(operatorDecl node: OperatorDeclSyntax) -> BridgedOperatorDecl? {
+    guard self.declContext.isModuleScopeContext else {
+      self.diagnose(.operator_decl_inner_scope, at: node.operatorKeyword)
+      return nil
+    }
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
@@ -1698,6 +1702,10 @@ extension swift.Associativity {
 
 extension ASTGenVisitor {
   func generate(precedenceGroupDecl node: PrecedenceGroupDeclSyntax) -> BridgedPrecedenceGroupDecl? {
+    guard self.declContext.isModuleScopeContext else {
+      self.diagnose(.decl_inner_scope, at: node.precedencegroupKeyword)
+      return nil
+    }
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
