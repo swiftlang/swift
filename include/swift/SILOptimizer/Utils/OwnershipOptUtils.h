@@ -358,6 +358,11 @@ bool extendStoreBorrow(StoreBorrowInst *sbi,
                        SmallVectorImpl<Operand *> &newUses,
                        InstModCallbacks callbacks = InstModCallbacks());
 
+/// Return \p result from a thunk. The result of a borrow accessor call is
+/// returned from within its borrow scope by a return_borrow.
+TermInst *createThunkReturn(SILBuilder &builder, SILLocation loc,
+                            SILValue result);
+
 /// Updates the reborrow flags and the borrowed-from instructions for all
 /// guaranteed phis in function `f`.
 void updateAllGuaranteedPhis(SILPassManager *pm, SILFunction *f);

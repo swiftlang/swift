@@ -1969,6 +1969,16 @@ bool swift::createBorrowScopeForPhiOperands(SILPhiArgument *newPhi) {
   return GuaranteedPhiBorrowFixup().createExtendedNestedBorrowScope(newPhi);
 }
 
+TermInst *swift::createThunkReturn(SILBuilder &builder, SILLocation loc,
+                                  SILValue result) {
+  if (auto *apply = dyn_cast<ApplyInst>(result)) {
+    if (BorrowedValue(apply)) {
+      return builder.createReturnBorrow(loc, result, {result});
+    }
+  }
+  return builder.createReturn(loc, result);
+}
+
 bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
                               SmallVectorImpl<Operand *> &newUses,
                               InstModCallbacks callbacks) {

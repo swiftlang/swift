@@ -147,7 +147,7 @@ class ClassC : ClassP {}
 // CHECK:         [[O:%.*]] = open_existential_ref %0
 // CHECK:         [[R:%.*]] = apply {{%.*}}<@opened{{.*}}>([[O]])
 // CHECK-NOT:     destroy_value
-// CHECK:         return [[R]]
+// CHECK:         return_borrow [[R]] : $any ClassP from_scopes ([[R]] : $any ClassP)
 // CHECK-LABEL: } // end sil function 'borrow_existential'
 sil [ossa] [noinline] @borrow_existential : $@convention(thin) (@guaranteed any ClassP) -> @guaranteed any ClassP {
 bb0(%0 : @guaranteed $any ClassP):
@@ -160,6 +160,7 @@ bb0(%0 : @guaranteed $ClassC):
   %f = function_ref @borrow_existential : $@convention(thin) (@guaranteed any ClassP) -> @guaranteed any ClassP
   %r = apply %f(%1) : $@convention(thin) (@guaranteed any ClassP) -> @guaranteed any ClassP
   %c = copy_value %r : $any ClassP
+  end_borrow %r : $any ClassP
   destroy_value %c : $any ClassP
   %t = tuple ()
   return %t : $()
