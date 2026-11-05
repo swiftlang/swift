@@ -20,11 +20,16 @@ struct NE : ~Escapable {
   init()
 }
 
+struct NC : ~Copyable { var k: Kl }
+
 sil @getK : $@convention(thin) () -> @owned Kl
 sil @consumeK : $@convention(thin) (@owned Kl) -> ()
 sil @useRawPtr : $@convention(thin) (Builtin.RawPointer) -> ()
 sil @makeNE : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
 sil @useNE : $@convention(thin) (@guaranteed NE) -> ()
+sil @getNE : $@convention(thin) () -> @owned NE
+sil @getNC : $@convention(thin) () -> @owned NC
+sil @consumeNC : $@convention(thin) (@owned NC) -> ()
 
 
 // A bare `mark_dependence` is [escaping]: the dependent value's uses cannot be enumerated, so
@@ -255,6 +260,196 @@ bb0:
   destroy_addr %stk
   dealloc_stack %stk
   destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// Storage roots: the memory stays initialized wherever a value depending on it is still used.
+
+// CHECK-LABEL: sil [ossa] @test_storage_markdep_on_address :
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] $Kl
+// CHECK:      mark_dependence [unresolved] {{%.*}} on [[A]]
+// CHECK-NEXT: load [copy] [[A]]
+// CHECK-NOT:  diagnose
+// CHECK:      destroy_addr [[A]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_storage_markdep_on_address : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $Kl
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %v = apply %getK() : $@convention(thin) () -> @owned Kl
+  store %v to [init] %a
+  %getNE = function_ref @getNE : $@convention(thin) () -> @owned NE
+  %ne = apply %getNE() : $@convention(thin) () -> @owned NE
+  %dep = mark_dependence [unresolved] %ne on %a
+  %l = load [copy] %a
+  %c = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  apply %c(%l) : $@convention(thin) (@owned Kl) -> ()
+  %u = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  apply %u(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
+
+// The access was extended over the dependent's uses, so the load feeding the dependence
+// can't take the memory.
+
+// CHECK-LABEL: sil [ossa] @test_storage_markdep_on_access :
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] $Kl
+// CHECK:      [[ACC:%.*]] = begin_access [read] [unknown] [[A]]
+// CHECK-NEXT: load [copy] [[ACC]]
+// CHECK-NOT:  diagnose
+// CHECK:      mark_dependence [unresolved] {{%.*}} on [[ACC]]
+// CHECK:      end_access [[ACC]]
+// CHECK-NEXT: destroy_addr [[A]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_storage_markdep_on_access : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $Kl
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %v = apply %getK() : $@convention(thin) () -> @owned Kl
+  store %v to [init] %a
+  %acc = begin_access [read] [unknown] %a
+  %l = load [copy] %acc
+  %mk = function_ref @makeNE : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %ne = apply %mk(%l) : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  destroy_value %l
+  %dep = mark_dependence [unresolved] %ne on %acc
+  %u = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  apply %u(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  end_access %acc
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @test_storage_markdep_on_load_borrow :
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] $Kl
+// CHECK:      [[LB:%.*]] = load_borrow [[A]]
+// CHECK:      mark_dependence [unresolved] {{%.*}} on [[LB]]
+// CHECK:      end_borrow [[LB]]
+// CHECK-NEXT: load [copy] [[A]]
+// CHECK-NOT:  diagnose
+// CHECK:      destroy_addr [[A]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_storage_markdep_on_load_borrow : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $Kl
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %v = apply %getK() : $@convention(thin) () -> @owned Kl
+  store %v to [init] %a
+  %lb = load_borrow %a
+  %mk = function_ref @makeNE : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %ne = apply %mk(%lb) : $@convention(thin) (@guaranteed Kl) -> @lifetime(borrow 0) @owned NE
+  %dep = mark_dependence [unresolved] %ne on %lb
+  end_borrow %lb
+  %l = load [copy] %a
+  %c = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  apply %c(%l) : $@convention(thin) (@owned Kl) -> ()
+  %u = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  apply %u(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
+
+// An [escaping] dependent's uses can't be enumerated, so the memory stays initialized until
+// the function exits.
+
+// CHECK-LABEL: sil [ossa] @test_storage_markdep_escaping :
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] $Kl
+// CHECK:      mark_dependence {{%.*}} on [[A]]
+// CHECK:      load [copy] [[A]]
+// CHECK-NOT:  diagnose
+// CHECK:      destroy_addr [[A]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_storage_markdep_escaping : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $Kl
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %v = apply %getK() : $@convention(thin) () -> @owned Kl
+  store %v to [init] %a
+  %getNE = function_ref @getNE : $@convention(thin) () -> @owned NE
+  %ne = apply %getNE() : $@convention(thin) () -> @owned NE
+  %dep = mark_dependence %ne on %a
+  %u = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  apply %u(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  %l = load [copy] %a
+  %c = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  apply %c(%l) : $@convention(thin) (@owned Kl) -> ()
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @test_storage_markdep_noncopyable :
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] $NC
+// CHECK:      mark_dependence [unresolved] {{%.*}} on [[A]]
+// CHECK-NEXT: [[L:%.*]] = load [copy] [[A]]
+// CHECK-NEXT: diagnose [unpermitted_copy] [[L]]
+// CHECK:      destroy_addr [[A]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_storage_markdep_noncopyable : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $NC
+  specify_test "lifetime_resolution_resolve %a"
+  %getNC = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %v = apply %getNC() : $@convention(thin) () -> @owned NC
+  store %v to [init] %a
+  %getNE = function_ref @getNE : $@convention(thin) () -> @owned NE
+  %ne = apply %getNE() : $@convention(thin) () -> @owned NE
+  %dep = mark_dependence [unresolved] %ne on %a
+  %l = load [take] %a
+  %c = function_ref @consumeNC : $@convention(thin) (@owned NC) -> ()
+  apply %c(%l) : $@convention(thin) (@owned NC) -> ()
+  %u = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  apply %u(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
+
+// The dependent is no longer used, so the last use takes the memory.
+
+// CHECK-LABEL: sil [ossa] @test_storage_markdep_uses_before_take :
+// CHECK:      [[A:%.*]] = alloc_stack [lexical] $Kl
+// CHECK:      mark_dependence [unresolved] {{%.*}} on [[A]]
+// CHECK:      load [take] [[A]]
+// CHECK-NOT:  destroy_addr [[A]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_storage_markdep_uses_before_take : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $Kl
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %v = apply %getK() : $@convention(thin) () -> @owned Kl
+  store %v to [init] %a
+  %getNE = function_ref @getNE : $@convention(thin) () -> @owned NE
+  %ne = apply %getNE() : $@convention(thin) () -> @owned NE
+  %dep = mark_dependence [unresolved] %ne on %a
+  %u = function_ref @useNE : $@convention(thin) (@guaranteed NE) -> ()
+  apply %u(%dep) : $@convention(thin) (@guaranteed NE) -> ()
+  destroy_value %dep
+  %l = load [copy] %a
+  %c = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  apply %c(%l) : $@convention(thin) (@owned Kl) -> ()
+  destroy_addr %a
+  dealloc_stack %a
   %t = tuple ()
   return %t
 }
