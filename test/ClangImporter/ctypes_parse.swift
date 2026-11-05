@@ -593,3 +593,29 @@ func testFunctionPointerWithHugeArrayParam() {
   // expected-modern-c-array-error@-1 {{cannot assign value of type '(@convention(c) (UnsafeMutablePointer<[5000 of CInt]>?) -> Void)?' (aka 'Optional<@convention(c) (Optional<UnsafeMutablePointer<InlineArray<5000, Int32>>>) -> ()>') to type '((OpaquePointer?) -> Void)?'}}
   // expected-modern-c-array-note@-2 {{arguments to generic parameter 'Wrapped' ('@convention(c) (UnsafeMutablePointer<[5000 of CInt]>?) -> Void' (aka '@convention(c) (Optional<UnsafeMutablePointer<InlineArray<5000, Int32>>>) -> ()') and '(OpaquePointer?) -> Void') are expected to be equal}}
 }
+
+// Indirect fields don't get memberwise init params, so they shouldn't force a
+// legacy projection.
+func testAnonymousMemberArrays() {
+  var s = AnonStruct()
+  var p = PackedFloat3()
+  var n = NamedMember()
+  p.x = 1
+
+  s.b[1] = 2
+  // expected-legacy-c-array-error@-1 {{cannot access element using subscript for tuple type}}
+  s.b.1 = 2
+  // expected-modern-c-array-error@-1 {{cannot access element using tuple member for non-tuple type}}
+
+  p.elements[2] = 3
+  // expected-legacy-c-array-error@-1 {{cannot access element using subscript for tuple type}}
+  p.elements.2 = 3
+  // expected-modern-c-array-error@-1 {{cannot access element using tuple member for non-tuple type}}
+
+  n.inner.a[0] = 4
+  // expected-legacy-c-array-error@-1 {{cannot access element using subscript for tuple type}}
+  n.inner.a.0 = 4
+  // expected-modern-c-array-error@-1 {{cannot access element using tuple member for non-tuple type}}
+
+  _ = (s, p, n)
+}

@@ -3250,13 +3250,19 @@ namespace {
       for (auto member : members) {
         auto cArrayAttr = member->getAttrs()
                               .getAttribute<CArrayProjectionAttr>();
+
+        // Indirect fields don't affect the signature of a memberwise init.
+        bool isIndirectField =
+            isa<clang::IndirectFieldDecl>(member->getClangDecl());
+
         if (!cArrayAttr) {
           legacyMembers.push_back(member);
         } else if (auto *legacyMember = importer::getDeclForCArrayProjection(
                        member, CArrayProjection::Legacy)) {
           legacyMembers.push_back(legacyMember);
-          needsLegacyMemberwiseCtor = true;
-        } else {
+          if (!isIndirectField)
+            needsLegacyMemberwiseCtor = true;
+        } else if (!isIndirectField) {
           // No legacy projection, so we can't make a parameter for this member.
           // We'll have to zero-initialize it instead.
           hasModernOnlyMember = true;
