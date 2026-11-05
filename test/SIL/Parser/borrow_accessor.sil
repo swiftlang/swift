@@ -71,3 +71,77 @@ bb0(%0 : $*GenWrapper<T>):
   return %6
 }
 
+
+class C {
+  @_hasStorage final let _k: Klass { get }
+  init(_ k: Klass)
+  var k: Klass { borrow }
+  var m: Klass { borrow mutate }
+}
+
+protocol P {
+  var k: Klass { borrow mutate }
+}
+
+struct S : P {
+  @_hasStorage var _k: Klass { get set }
+  var k: Klass { borrow mutate }
+}
+
+sil @C_k_borrow : $@convention(method) (@guaranteed C) -> @guaranteed Klass
+sil @C_m_borrow : $@convention(method) (@guaranteed C) -> @guaranteed Klass
+sil @C_m_mutate : $@convention(method) (@guaranteed C) -> @inout Klass
+sil @S_k_borrow : $@convention(witness_method: P) (@in_guaranteed S) -> @guaranteed Klass
+sil @S_k_mutate : $@convention(witness_method: P) (@inout S) -> @inout Klass
+
+// CHECK-LABEL: sil [ossa] @class_method_borrow : $@convention(thin) (@guaranteed C) -> () {
+// CHECK:         class_method %0, #C.k!borrow : (C) -> () -> Klass, $@convention(method) (@guaranteed C) -> @guaranteed Klass
+// CHECK-LABEL: } // end sil function 'class_method_borrow'
+sil [ossa] @class_method_borrow : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = class_method %0, #C.k!borrow : (C) -> () -> Klass, $@convention(method) (@guaranteed C) -> @guaranteed Klass
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @class_method_mutate : $@convention(thin) (@guaranteed C) -> () {
+// CHECK:         class_method %0, #C.m!mutate : (C) -> () -> Klass, $@convention(method) (@guaranteed C) -> @inout Klass
+// CHECK-LABEL: } // end sil function 'class_method_mutate'
+sil [ossa] @class_method_mutate : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  %1 = class_method %0, #C.m!mutate : (C) -> () -> Klass, $@convention(method) (@guaranteed C) -> @inout Klass
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @witness_method_borrow_mutate : $@convention(thin) <T where T : P> () -> () {
+// CHECK:         witness_method $T, #P.k!borrow : <Self where Self : P> (Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @guaranteed Klass
+// CHECK:         witness_method $T, #P.k!mutate : <Self where Self : P> (inout Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout Klass
+// CHECK-LABEL: } // end sil function 'witness_method_borrow_mutate'
+sil [ossa] @witness_method_borrow_mutate : $@convention(thin) <T where T : P> () -> () {
+bb0:
+  %0 = witness_method $T, #P.k!borrow : <Self where Self : P> (Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @guaranteed Klass
+  %1 = witness_method $T, #P.k!mutate : <Self where Self : P> (inout Self) -> () -> Klass : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@inout τ_0_0) -> @inout Klass
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil_vtable C {
+// CHECK-NEXT:    #C.k!borrow: (C) -> () -> Klass : @C_k_borrow
+// CHECK-NEXT:    #C.m!borrow: (C) -> () -> Klass : @C_m_borrow
+// CHECK-NEXT:    #C.m!mutate: (C) -> () -> Klass : @C_m_mutate
+// CHECK-NEXT:  }
+sil_vtable C {
+  #C.k!borrow: (C) -> () -> Klass : @C_k_borrow
+  #C.m!borrow: (C) -> () -> Klass : @C_m_borrow
+  #C.m!mutate: (C) -> () -> Klass : @C_m_mutate
+}
+
+// CHECK-LABEL: sil_witness_table S: P module main {
+// CHECK-NEXT:    method #P.k!borrow: <Self where Self : P> (Self) -> () -> Klass : @S_k_borrow
+// CHECK-NEXT:    method #P.k!mutate: <Self where Self : P> (inout Self) -> () -> Klass : @S_k_mutate
+// CHECK-NEXT:  }
+sil_witness_table S: P module main {
+  method #P.k!borrow: <Self where Self : P> (Self) -> () -> Klass : @S_k_borrow
+  method #P.k!mutate: <Self where Self : P> (inout Self) -> () -> Klass : @S_k_mutate
+}
