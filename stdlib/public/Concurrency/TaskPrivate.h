@@ -171,7 +171,9 @@ swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task, JobPriority
 /// If the client of withStatusRecordLock has already loaded the status of the
 /// task, they may pass it into this function to avoid a double-load.
 ///
-/// The input `fn` is invoked once while holding the status record lock.
+/// The input `fn` is invoked once while holding the status record lock. It may
+/// change the status with its own compare and swap, and releasing the lock
+/// preserves that change.
 ///
 /// The optional `statusUpdate` is invoked while releasing the StatusRecordLock
 /// from the ActiveTaskStatus so that callers may make additional modifications
