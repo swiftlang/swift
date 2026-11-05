@@ -2843,9 +2843,7 @@ static CanSILFunctionType getSILFunctionType(
               ? SILCoroutineKind::YieldOnce2
               : SILCoroutineKind::YieldOnce;
     } else {
-      // FIXME: Decide we'd directly go to YieldOnce2 for non-accessor
-      // coroutines
-      coroutineKind = SILCoroutineKind::YieldOnce;
+      coroutineKind = SILCoroutineKind::YieldOnce2;
     }
 
     // Coroutines are always native, so fetch the native abstraction pattern.
@@ -2875,7 +2873,7 @@ static CanSILFunctionType getSILFunctionType(
     }
   } else if (substFnInterfaceType
                  ->isCoroutine()) { // Derive yield type for function type
-    coroutineKind = SILCoroutineKind::YieldOnce;
+    coroutineKind = SILCoroutineKind::YieldOnce2;
     assert(substFnInterfaceType->getYields().size() == 1 &&
            "only support a single yield type");
 
