@@ -12,6 +12,10 @@
 // RUN: %target-run %t/opt.out call | %FileCheck %s --check-prefix=CALL-call
 // RUN: %target-run %t/onone.out callWithResource | %FileCheck %s --check-prefix=CALL-callWithResource
 // RUN: %target-run %t/opt.out callWithResource | %FileCheck %s --check-prefix=CALL-callWithResource
+// RUN: %target-run %t/onone.out callOrForwardDirect | %FileCheck %s --check-prefix=CALL-callOrForward
+// RUN: %target-run %t/opt.out callOrForwardDirect | %FileCheck %s --check-prefix=CALL-callOrForward
+// RUN: %target-run %t/onone.out callOrForwardForwarded | %FileCheck %s --check-prefix=CALL-callOrForward
+// RUN: %target-run %t/opt.out callOrForwardForwarded | %FileCheck %s --check-prefix=CALL-callOrForward
 // RUN: %target-run %t/onone.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/opt.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/onone.out callGlobal | %FileCheck %s --check-prefix=CALL-callGlobal
@@ -95,6 +99,23 @@ struct Resource: ~Copyable {
 @inline(never)
 func call(_ f: @once () -> Void) {
   f()
+  print("called")
+}
+
+@_optimize(none)
+func forward(_ f: @once () -> Void) {
+  f()
+}
+
+// One path calls the closure and the other forwards it, so the closure can't
+// be deleted after the call is optimized into a direct call.
+@inline(__always)
+func callOrForward(_ direct: Bool, _ f: @once () -> Void) {
+  if direct {
+    f()
+  } else {
+    forward(f)
+  }
   print("called")
 }
 
@@ -280,6 +301,8 @@ func run(_ which: String, _ box: Box, _ resource: consuming Resource) {
     call { box.count += 1 }
   case "callWithResource":
     call { _ = consume resource }
+  case "callOrForwardDirect", "callOrForwardForwarded":
+    callOrForward(which == "callOrForwardDirect") { _ = consume resource }
   case "callEscaping":
     callEscaping { box.count += 1 }
   case "callGlobal":
@@ -356,6 +379,9 @@ default:
 
 // CALL-callWithResource: Resource r deinit
 // CALL-callWithResource-NEXT: called
+
+// CALL-callOrForward: Resource r deinit
+// CALL-callOrForward-NEXT: called
 
 // CALL-callEscaping: called
 // CALL-callEscaping-NEXT: Resource r deinit
