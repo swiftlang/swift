@@ -641,6 +641,7 @@ struct BridgedFunction {
   BRIDGED_INLINE bool wasDeserializedCanonical() const;
   BRIDGED_INLINE void setNeedStackProtection(bool needSP) const;
   BRIDGED_INLINE void setIsPerformanceConstraint(bool isPerfConstraint) const;
+  BRIDGED_INLINE void addSemanticsAttr(BridgedStringRef attrName) const;
   BRIDGED_INLINE bool isResilientNominalDecl(BridgedDeclObj decl) const;
   BRIDGED_INLINE bool isEffectivelyExhaustiveEnumDecl(BridgedDeclObj decl) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getLoweredType(BridgedASTType type, bool maximallyAbstracted) const;
@@ -871,6 +872,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef CondFailInst_getMessage() const;
   BRIDGED_INLINE SwiftInt LoadInst_getLoadOwnership() const ;
   BRIDGED_INLINE bool LoadBorrowInst_isUnchecked() const ;
+  BRIDGED_INLINE void LoadBorrowInst_setUnchecked(bool unchecked) const;
   BRIDGED_INLINE BuiltinValueKind BuiltinInst_getID() const;
   BRIDGED_INLINE IntrinsicID BuiltinInst_getIntrinsicID() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef BuiltinInst_getName() const;
