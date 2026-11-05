@@ -454,6 +454,7 @@ extension ASTGenVisitor {
   }
 
   func generate(catchItemList node: CatchItemListSyntax) -> BridgedArrayRef {
+    self.diagnoseUnboundPatternVariables(in: node.compactMap { $0.pattern })
     if node.isEmpty {
       let item = BridgedCaseLabelItemInfo(
         isDefault: false,
@@ -726,6 +727,7 @@ extension ASTGenVisitor {
       introducerLoc = self.generateSourceLoc(node.caseKeyword)
       terminatorLoc = self.generateSourceLoc(node.colon)
       items = self.generate(switchCaseItemList: node.caseItems)
+      self.diagnoseUnboundPatternVariables(in: node.caseItems.map { $0.pattern })
     case .default(let node):
       introducerLoc = self.generateSourceLoc(node.defaultKeyword)
       let item = BridgedCaseLabelItemInfo(
@@ -907,9 +909,96 @@ extension CodeBlockItemSyntax {
   /// syntax before an empty item. The C++ parser recovers by skipping the label
   /// only, so the statements are still code that needs to be checked.
   var strayCaseBody: CodeBlockItemListSyntax? {
+    // Within an '#if' clause the statements' enclosing construct is not the
+    // block they are generated into (in a switch, for one), so leave them.
+    guard self.parent?.parent?.is(IfConfigClauseSyntax.self) != true else {
+      return nil
+    }
     guard let unexpected = self.unexpectedBeforeItem, unexpected.count == 1 else {
       return nil
     }
-    return unexpected.first?.as(SwitchCaseSyntax.self)?.statements
+    guard let statements = unexpected.first?.as(SwitchCaseSyntax.self)?.statements else {
+      return nil
+    }
+    // Recovery inside the statements themselves can leave them with synthesized
+    // tokens and locations that are not inside their parent's; leave them out.
+    guard !statements.hasError else {
+      return nil
+    }
+    // After the label, the C++ parser skips to the start of the next statement
+    // or declaration, so leading expressions are dropped.
+    let skipped = statements.prefix { element in
+      if case .expr = element.item {
+        return true
+      }
+      return false
+    }
+    return CodeBlockItemListSyntax(statements.dropFirst(skipped.count))
+  }
+}
+
+extension ASTGenVisitor {
+  /// Every pattern of a `case` label or `catch` clause must bind the same
+  /// variables as the first one; diagnose each variable that does not appear
+  /// in all of them, as `parseGuardedPattern` does.
+  func diagnoseUnboundPatternVariables(in patterns: [PatternSyntax]) {
+    guard patterns.count > 1 else {
+      return
+    }
+    let first = patterns[0].boundVariables
+    for pattern in patterns.dropFirst() {
+      let repeated = pattern.boundVariables
+      for variable in repeated where !first.contains(where: { $0.text == variable.text }) {
+        self.diagnose(.extra_var_in_multiple_pattern_list(self.generateIdentifier(variable)), at: variable)
+      }
+      for variable in first where !repeated.contains(where: { $0.text == variable.text }) {
+        self.diagnose(.extra_var_in_multiple_pattern_list(self.generateIdentifier(variable)), at: variable)
+      }
+    }
+  }
+}
+
+private final class BoundVariableCollector: SyntaxVisitor {
+  var variables: [TokenSyntax] = []
+  var bindingDepth = 0
+
+  init() {
+    super.init(viewMode: .sourceAccurate)
+  }
+
+  override func visit(_ node: ValueBindingPatternSyntax) -> SyntaxVisitorContinueKind {
+    bindingDepth += 1
+    return .visitChildren
+  }
+
+  override func visitPost(_ node: ValueBindingPatternSyntax) {
+    bindingDepth -= 1
+  }
+
+  override func visit(_ node: IdentifierPatternSyntax) -> SyntaxVisitorContinueKind {
+    if bindingDepth > 0 {
+      variables.append(node.identifier)
+    }
+    return .skipChildren
+  }
+
+  override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+    // In `case let .foo(x)`, the `x` is an expression that binds a name.
+    if bindingDepth > 0, node.argumentNames == nil, node.baseName.rawTokenKind == .identifier,
+      let parent = node.parent, parent.is(ExpressionPatternSyntax.self) || parent.is(LabeledExprSyntax.self)
+    {
+      variables.append(node.baseName)
+    }
+    return .skipChildren
+  }
+}
+
+extension SyntaxProtocol {
+  /// The names this pattern binds, as written: identifiers inside a `let`,
+  /// `var` or `inout` pattern, other than `_`.
+  var boundVariables: [TokenSyntax] {
+    let collector = BoundVariableCollector()
+    collector.walk(self)
+    return collector.variables
   }
 }
