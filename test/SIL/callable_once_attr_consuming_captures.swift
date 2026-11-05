@@ -534,6 +534,60 @@ func testCallingLetCapturedByLocalFunction() {
   local()
 }
 
+// A binding of a borrowing `switch` is borrowed. Sema can't tell whether a
+// `switch` borrows its subject, so the closure still consumes the capture in the
+// AST, and SILGen captures a copy instead.
+// SILGEN-LABEL: sil private [ossa] @$s4test0A30ConsumingBorrowedSwitchBindingyyAA8ResourceVSgFyyXEfU_ : $@convention(thin) (@owned Resource) -> ()
+func testConsumingBorrowedSwitchBinding(_ e: borrowing Resource?) {
+  switch e {
+  case .some(let r): // expected-error {{'r' is borrowed and cannot be consumed}}
+    calledAtMostOnce { r.use() } // expected-note {{consumed here}}
+  case .none:
+    break
+  }
+}
+
+// An enclosing at-most-once closure consumes the binding too.
+// SILGEN-LABEL: sil private [ossa] @$s4test0A45ConsumingBorrowedSwitchBindingInNestedClosureyyAA8ResourceVSgFyyXEfU_ : $@convention(thin) (@owned Resource) -> ()
+// SILGEN-LABEL: sil private [ossa] @$s4test0A45ConsumingBorrowedSwitchBindingInNestedClosureyyAA8ResourceVSgFyyXEfU_yyXEfU_ : $@convention(thin) (@owned Resource) -> ()
+func testConsumingBorrowedSwitchBindingInNestedClosure(
+  _ e: borrowing Resource?
+) {
+  switch e {
+  case .some(let r): // expected-error {{'r' is borrowed and cannot be consumed}}
+    calledAtMostOnce { // expected-note {{consumed here}}
+      calledAtMostOnce { r.use() }
+    }
+  case .none:
+    break
+  }
+}
+
+// A binding of a borrowing `switch` with an address-only payload is borrowed
+// too.
+// SILGEN-LABEL: sil private [ossa] @$s4test0A41ConsumingBorrowedAddressOnlySwitchBindingyyxSgRi_zlFyyXEfU_ : $@convention(thin) <T where T : ~Copyable> (@in T) -> ()
+func testConsumingBorrowedAddressOnlySwitchBinding<T: ~Copyable>(
+  _ e: borrowing T?
+) {
+  switch e {
+  case .some(let t): // expected-error {{'t' is borrowed and cannot be consumed}}
+    calledAtMostOnce { consumeValue(t) } // expected-note {{consumed here}}
+  case .none:
+    break
+  }
+}
+
+func escapingAtMostOnce(_ fn: @escaping @callable(once) () -> Void) { fn() }
+
+// An escaping at-most-once closure can't capture a borrowed parameter any more
+// than another escaping closure can.
+// SILGEN-LABEL: sil private [ossa] @$s4test0A52BorrowedParameterCapturedByEscapingAtMostOnceClosureyyAA8ResourceVFyyXOofU_ : $@convention(thin) (@guaranteed Resource) -> ()
+func testBorrowedParameterCapturedByEscapingAtMostOnceClosure(
+  _ r: borrowing Resource // expected-error {{'r' cannot be captured by an escaping closure since it is a borrowed parameter}}
+) {
+  escapingAtMostOnce { r.peek() } // expected-note {{closure capturing 'r' here}}
+}
+
 #if NONCOPYABLE_CASTING
 protocol Shape: ~Copyable {}
 struct Circle: Shape, ~Copyable {}
