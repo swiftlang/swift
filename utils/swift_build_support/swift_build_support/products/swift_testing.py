@@ -120,9 +120,9 @@ class SwiftTesting(product.Product):
             shell.call(
                 [
                     os.path.join(self.source_dir, "../swift", "utils/recursive-lipo"),
-                    "-v" if self.args.verbose_build else "",
-                    "--destination", os.path.join(final_install_destdir)
-                ] + intermediate_destdirs)
+                    "--destination", final_install_destdir
+                ] + (["-v"] if self.args.verbose_build else [])
+                + intermediate_destdirs)
         else:
             self._cmake_product(host_target).install(host_target)
 
