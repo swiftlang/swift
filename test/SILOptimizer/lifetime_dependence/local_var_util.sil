@@ -1,8 +1,10 @@
 // RUN: %target-sil-opt -test-runner %s \
 // RUN:     -enable-experimental-feature LifetimeDependence \
+// RUN:     -enable-experimental-feature Lifetimes \
 // RUN:     -o /dev/null 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Lifetimes
 
 sil_stage raw
 
@@ -130,4 +132,43 @@ bb3:
   end_borrow %3
   destroy_value %2
   return %19
+}
+
+// rdar://190361126: inject_enum_addr on an address-only enum whose payload was initialized via init_enum_data_addr is
+// not a full assignment. The payload store's dependent uses must continue past it.
+
+struct AONE : ~Escapable {
+  var tag: Any
+
+  @_lifetime(immortal)
+  init()
+}
+
+sil @useOptionalAONE : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+
+// CHECK-LABEL: testInjectEnumAddrNotAssign: local_variable_reachable_uses with: %1, @instruction
+// CHECK: ### Access map:
+// CHECK-NEXT: Access map for:   %{{.*}} = alloc_stack $Optional<AONE>
+// CHECK-NEXT: assign: value, hasEscaped: false, store,   destroy_addr %{{.*}} : $*Optional<AONE>
+// CHECK-NEXT: assign: no, hasEscaped: false, apply,   %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+// CHECK-NEXT: assign: no, hasEscaped: false, store,   inject_enum_addr %{{.*}} : $*Optional<AONE>, #Optional.some!enumelt
+// CHECK-NEXT: assign: value, hasEscaped: false, store,   copy_addr %0 to [init] %{{.*}} : $*AONE
+// CHECK-NEXT: ### Modify:   copy_addr %0 to [init] %{{.*}} : $*AONE
+// CHECK-NEXT: ### Reachable access:
+// CHECK-NEXT: store,   inject_enum_addr %{{.*}} : $*Optional<AONE>, #Optional.some!enumelt
+// CHECK-NEXT: apply,   %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+// CHECK-NEXT: testInjectEnumAddrNotAssign: local_variable_reachable_uses with: %1, @instruction
+sil [ossa] @testInjectEnumAddrNotAssign : $@convention(thin) (@in_guaranteed AONE) -> () {
+bb0(%0 : $*AONE):
+  %1 = alloc_stack $Optional<AONE>
+  %2 = init_enum_data_addr %1, #Optional.some!enumelt
+  specify_test "local_variable_reachable_uses %1 @instruction"
+  copy_addr %0 to [init] %2
+  inject_enum_addr %1, #Optional.some!enumelt
+  %5 = function_ref @useOptionalAONE : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  %6 = apply %5(%1) : $@convention(thin) (@in_guaranteed Optional<AONE>) -> ()
+  destroy_addr %1
+  dealloc_stack %1
+  %9 = tuple ()
+  return %9
 }
