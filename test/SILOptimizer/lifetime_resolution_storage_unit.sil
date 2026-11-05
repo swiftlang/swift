@@ -1915,3 +1915,132 @@ bb0:
   %t = tuple ()
   return %t
 }
+
+// `self` in a root class initializer: the stored properties of the instance are resolved separately.
+
+class RC {
+  var k: K
+  let n: Builtin.Int64
+  var two: Two
+  init()
+}
+
+sil @consumeRC : $@convention(thin) (@owned RC) -> ()
+
+// Each stored property is initialized by its first def, including the trivial `let`, and each
+// field of a struct-typed property separately.
+// CHECK-LABEL: sil [ossa] @rootself_field_defs :
+// CHECK:          [[K1:%.*]] = ref_element_addr {{.*}} #RC.k
+// CHECK:          assign {{.*}} to [init] [[K1]]
+// CHECK:          [[K2:%.*]] = ref_element_addr {{.*}} #RC.k
+// CHECK-NEXT:     [[A2:%.*]] = begin_access [modify] [dynamic] [[K2]]
+// CHECK:          assign {{.*}} to [reassign] [[A2]]
+// CHECK:          [[N:%.*]] = ref_element_addr {{.*}} #RC.n
+// CHECK:          assign {{.*}} to [init] [[N]]
+// CHECK:          [[TA:%.*]] = struct_element_addr {{.*}} #Two.a
+// CHECK:          store {{.*}} to [init] [[TA]]
+// CHECK:          [[TB:%.*]] = struct_element_addr {{.*}} #Two.b
+// CHECK:          store {{.*}} to [init] [[TB]]
+// CHECK:       } // end sil function
+sil [ossa] @rootself_field_defs : $@convention(method) (@owned RC) -> @owned RC {
+bb0(%0 : @owned $RC):
+  %self = mark_uninitialized [rootself] %0
+  specify_test "lifetime_resolution_resolve %0"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+
+  %b1 = begin_borrow %self
+  %k1 = ref_element_addr %b1, #RC.k
+  %v1 = apply %getK() : $@convention(thin) () -> @owned K
+  assign %v1 to %k1
+  end_borrow %b1
+
+  %b2 = begin_borrow %self
+  %k2 = ref_element_addr %b2, #RC.k
+  %a2 = begin_access [modify] [dynamic] %k2
+  %v2 = apply %getK() : $@convention(thin) () -> @owned K
+  assign %v2 to %a2
+  end_access %a2
+  end_borrow %b2
+
+  %b3 = begin_borrow %self
+  %n3 = ref_element_addr %b3, #RC.n
+  %i3 = integer_literal $Builtin.Int64, 1
+  assign %i3 to %n3
+  end_borrow %b3
+
+  %b4 = begin_borrow %self
+  %t4 = ref_element_addr %b4, #RC.two
+  %ta4 = struct_element_addr %t4, #Two.a
+  %v4 = apply %getK() : $@convention(thin) () -> @owned K
+  store %v4 to [assign] %ta4
+  %tb4 = struct_element_addr %t4, #Two.b
+  %v5 = apply %getK() : $@convention(thin) () -> @owned K
+  store %v5 to [assign] %tb4
+  end_borrow %b4
+
+  return %self
+}
+
+// CHECK-LABEL: sil [ossa] @rootself_uninit_field :
+// CHECK:          [[SELF:%.*]] = mark_uninitialized [rootself] %0
+// CHECK-NEXT:     [[B:%.*]] = begin_borrow [[SELF]]
+// CHECK-NEXT:     [[K:%.*]] = ref_element_addr [[B]] : $RC, #RC.k
+// CHECK-NEXT:     assign undef to [init] [[K]] : $*K
+// CHECK-NEXT:     end_borrow [[B]]
+// CHECK-NOT:      assign undef
+// CHECK:       } // end sil function
+sil [ossa] @rootself_uninit_field : $@convention(method) (@owned RC) -> @owned RC {
+bb0(%0 : @owned $RC):
+  %self = mark_uninitialized [rootself] %0
+  specify_test "lifetime_resolution_resolve %0"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+
+  %b1 = begin_borrow %self
+  %n1 = ref_element_addr %b1, #RC.n
+  %i1 = integer_literal $Builtin.Int64, 1
+  assign %i1 to %n1
+  %t1 = ref_element_addr %b1, #RC.two
+  %ta1 = struct_element_addr %t1, #Two.a
+  %v1 = apply %getK() : $@convention(thin) () -> @owned K
+  store %v1 to [init] %ta1
+  %tb1 = struct_element_addr %t1, #Two.b
+  %v2 = apply %getK() : $@convention(thin) () -> @owned K
+  store %v2 to [init] %tb1
+  end_borrow %b1
+
+  return %self
+}
+
+// The reference to `self` is copied for a consume before its last use.
+// CHECK-LABEL: sil [ossa] @rootself_consumed_before_return :
+// CHECK:          [[SELF:%.*]] = mark_uninitialized [rootself] %0
+// CHECK:          [[COPY:%.*]] = copy_value [[SELF]]
+// CHECK-NEXT:     apply {{.*}}([[COPY]])
+// CHECK-NEXT:     return [[SELF]]
+// CHECK:       } // end sil function
+sil [ossa] @rootself_consumed_before_return : $@convention(method) (@owned RC) -> @owned RC {
+bb0(%0 : @owned $RC):
+  %self = mark_uninitialized [rootself] %0
+  specify_test "lifetime_resolution_resolve %0"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+
+  %b1 = begin_borrow %self
+  %k1 = ref_element_addr %b1, #RC.k
+  %v1 = apply %getK() : $@convention(thin) () -> @owned K
+  store %v1 to [init] %k1
+  %n1 = ref_element_addr %b1, #RC.n
+  %i1 = integer_literal $Builtin.Int64, 1
+  store %i1 to [trivial] %n1
+  %t1 = ref_element_addr %b1, #RC.two
+  %ta1 = struct_element_addr %t1, #Two.a
+  %v2 = apply %getK() : $@convention(thin) () -> @owned K
+  store %v2 to [init] %ta1
+  %tb1 = struct_element_addr %t1, #Two.b
+  %v3 = apply %getK() : $@convention(thin) () -> @owned K
+  store %v3 to [init] %tb1
+  end_borrow %b1
+
+  %consumeRC = function_ref @consumeRC : $@convention(thin) (@owned RC) -> ()
+  apply %consumeRC(%self) : $@convention(thin) (@owned RC) -> ()
+  return %self
+}

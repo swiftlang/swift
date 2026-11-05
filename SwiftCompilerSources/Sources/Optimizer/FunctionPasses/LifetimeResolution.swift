@@ -71,7 +71,8 @@ struct ResolvableRoot {
   let storage: Value
 
   /// The address that all accesses project from: the `mark_uninitialized` itself for
-  /// an `alloc_stack`, or the `project_box` for an `alloc_box`.
+  /// an `alloc_stack`, or the `project_box` for an `alloc_box`. For a class instance, it is
+  /// instead the `mark_uninitialized` reference whose stored properties are projected.
   let address: Value
 
   /// The source variable, for diagnostics.
@@ -116,6 +117,9 @@ struct ResolvableRoot {
       return address.nextInstruction
   }
 
+  /// Whether the storage is the instance referenced by `address`, i.e., `self` in a root class initializer.
+  var isClassInstance: Bool { !address.type.isAddress }
+
   /// Whether the binding is a `let` (vs a `var`), which may only be initialized once.
   var isLet: Bool { !(storage is FunctionArgument) && (varDecl?.isLet ?? false) }
 
@@ -137,9 +141,10 @@ struct ResolvableRoot {
       guard let fields = address.type.getNominalFields(in: address.parentFunction) else {
         return []
       }
+      let kind: SmallProjectionPath.FieldKind = isClassInstance ? .classField : .structField
       var leaves = Set<Int>()
       for field in fields.indices where fields.getUserFacingFieldDecl(withIndex: field)?.isLet ?? false {
-        leaves.formUnion(indices.range(of: SmallProjectionPath(.structField, index: field)))
+        leaves.formUnion(indices.range(of: SmallProjectionPath(kind, index: field)))
       }
       return leaves
     default:
@@ -216,6 +221,19 @@ struct ResolvableRoot {
       }
 
       break
+
+    case _ where val.type.isClass && val.ownership == .owned:
+      // `self` in a root class initializer, whose instance's stored properties start uninitialized.
+      guard let mu = Self.findMarkUninitialized(val), mu.kind == .rootSelf else {
+        return nil
+      }
+      storage = val
+      address = mu
+      markUninitialized = mu
+      varDecl = (val as? FunctionArgument)?.findVarDecl()
+      isLexical = (val as? Argument)?.isLexical ?? false
+      startsInitialized = !indexCache.fieldIndices(forClassInstance: val.type).hasFields
+
     default:
       return nil
     }
@@ -233,6 +251,14 @@ struct ResolvableRoot {
           && arg.uses.users(ofType: StoreInst.self).contains { $0.source == arg && $0.destination == address }
       }
     }
+  }
+
+  /// The trie numbering the leaves of this storage.
+  func fieldIndices(_ indexCache: inout FieldIndexTrieCache) -> FieldIndexTrie {
+    if isClassInstance {
+      return indexCache.fieldIndices(forClassInstance: address.type)
+    }
+    return indexCache.fieldIndices(for: address.type)
   }
 
   // Change the storage such that it indicates a dynamic lifetime.
@@ -310,9 +336,13 @@ private struct Resolver {
 
     log("\n** Demand Analysis start **")
 
-    let type = root.address.type
-    let indices = indexCache.fieldIndices(for: type)
-    log("FieldIndexTrie of \(type): \n\(indices)")
+    let indices = root.fieldIndices(&indexCache)
+    log("FieldIndexTrie of \(root.address.type): \n\(indices)")
+
+    // The reference to a class instance is itself an SSA value, whose copies and destroys are resolved first.
+    if root.isClassInstance {
+      resolveSingleDef(root.address, context)
+    }
 
     self.state = Self.createBlockState(root, indices, context)
 
@@ -539,7 +569,7 @@ private struct Resolver {
 
       // If we aren't converting from a take, then we still need to diagnose implicit copies
       // if it was a no-implicit-copy binding.
-      return root.isNoImplicitCopy && op.value.accessPath.projectionPath.isEmpty
+      return root.isNoImplicitCopy && op.value.projectionPathFromRoot.isEmpty
     }
 
     switch op.instruction {
@@ -749,7 +779,7 @@ private struct Resolver {
         switch kind {
         case let .def(op):
           // All of `self` may be reassigned, even after initializing its `let` properties.
-          let assignsWholeSelf = root.isRootSelf && op.value.accessPath.projectionPath.isEmpty
+          let assignsWholeSelf = root.isRootSelf && op.value.projectionPathFromRoot.isEmpty
           if !assignsWholeSelf,
              range.contains(where: { immutableLeaves.contains($0) && current[$0].contains(.yes) }) {
             Builder(before: op.instruction, context).createDiagnose(operand: op.value, kind: .letReinit)
@@ -757,6 +787,8 @@ private struct Resolver {
 
           let nontrivial = range.filter { !indices.leafType($0).isTrivial(in: function) }
           if nontrivial.isEmpty {
+            // Nothing needs to be destroyed, but LetPropertyLowering relies on knowing the initializations.
+            makeDef(op.instruction, initialization: summary == .no)
             break
           }
           let defSummary = nontrivial.reduce(Availability.unknown, { $0.union(current[$1]) })
@@ -939,7 +971,7 @@ private struct Resolver {
   }
 
   // Classifies every use of the root's address, following projections and access scopes, into the events of each block.
-  private struct UseCollector : AddressDefUseWalker, AddressUseVisitor {
+  private struct UseCollector : AddressDefUseWalker, AddressUseVisitor, ClassInstanceUseWalker {
     private(set) var uses: Dictionary<BasicBlock, EventList> = [:]
     private let indices: FieldIndexTrie
     private let function: Function
@@ -964,7 +996,7 @@ private struct Resolver {
 
     // The leaves of the root accessed by an operand.
     func range(of operand: Operand) -> EventList.IndexRange {
-      indices.range(of: operand.value.accessPath.projectionPath)
+      indices.range(of: operand.value.projectionPathFromRoot)
     }
 
     mutating func collectUses(of root: ResolvableRoot) -> Bool {
@@ -974,7 +1006,9 @@ private struct Resolver {
       // Add the root use to do detect uninitialized paths.
       addUse(.root(root), indices.wholeRange)
 
-      if walkDownUses(ofAddress: address, path: Path()) == .abortWalk {
+      let result = root.isClassInstance ? walkDownUses(ofClassInstance: address)
+                                        : walkDownUses(ofAddress: address, path: Path())
+      if result == .abortWalk {
         return false
       }
 
@@ -1005,6 +1039,21 @@ private struct Resolver {
       for block in function.exitingBlocks {
         addUse(.liveness(block.terminator), range)
       }
+    }
+
+    // Implement ClassInstanceUseWalker
+
+    mutating func storedPropertyUse(_ projection: RefElementAddrInst) -> WalkResult {
+      return walkDownUses(ofAddress: projection, path: Path())
+    }
+
+    mutating func instanceUse(_ use: Operand) -> WalkResult {
+      // TODO: end the lifetime of a partially initialized instance.
+      if use.instruction is DestroyValueInst {
+        return .continueWalk
+      }
+      addUse(.liveness(use.instruction), indices.wholeRange)
+      return .continueWalk
     }
 
     // Implement AddressDefUseWalker
@@ -1423,6 +1472,53 @@ private struct Resolver {
              }
              """
     }
+  }
+}
+
+/// Walks the uses of a class instance, looking through borrows and copies of its reference.
+protocol ClassInstanceUseWalker {
+  /// The address of one of the instance's stored properties.
+  mutating func storedPropertyUse(_ projection: RefElementAddrInst) -> WalkResult
+
+  /// Any other use, which needs the whole instance.
+  mutating func instanceUse(_ use: Operand) -> WalkResult
+}
+
+extension ClassInstanceUseWalker {
+  mutating func walkDownUses(ofClassInstance instance: Value) -> WalkResult {
+    for use in instance.uses {
+      let result: WalkResult
+      switch use.instruction {
+      case let projection as RefElementAddrInst:
+        result = storedPropertyUse(projection)
+      case let borrow as BeginBorrowInst:
+        result = walkDownUses(ofClassInstance: borrow)
+      case let copy as CopyValueInst:
+        result = walkDownUses(ofClassInstance: copy)
+      case is EndBorrowInst, is DebugValueInst, is ClassMethodInst:
+        result = .continueWalk
+      case is DestroyValueInst where instance is CopyValueInst:
+        result = .continueWalk
+      default:
+        result = instanceUse(use)
+      }
+      if result == .abortWalk {
+        return .abortWalk
+      }
+    }
+    return .continueWalk
+  }
+}
+
+extension Value {
+  /// The projection path of this address from its storage root, which for a stored property of
+  /// a class instance starts at the instance.
+  var projectionPathFromRoot: SmallProjectionPath {
+    let accessPath = self.accessPath
+    if case .class(let projection) = accessPath.base {
+      return accessPath.projectionPath.push(.classField, index: projection.fieldIndex)
+    }
+    return accessPath.projectionPath
   }
 }
 

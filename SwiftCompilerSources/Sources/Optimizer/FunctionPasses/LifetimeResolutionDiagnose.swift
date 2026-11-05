@@ -568,7 +568,7 @@ private struct Diagnoser {
     guard let root = ResolvableRoot(allocation, &indexCache, context) else {
       return nil
     }
-    let storage = Storage(root: root, indices: indexCache.fieldIndices(for: root.address.type))
+    let storage = Storage(root: root, indices: root.fieldIndices(&indexCache))
     storages[allocation.hashable] = storage
     return storage
   }
