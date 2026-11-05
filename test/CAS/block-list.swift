@@ -17,7 +17,7 @@
 // CMD-NEXT: /^tmp{{/|\\}}empty.yml
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Test casFSRootID > %t/fs.casid
-// DISABLE: llvm-cas --cas %t/cas --ls-tree-recursive @%t/fs.casid | %FileCheck %s -check-prefix FS
+// DISABLE: llvm-cas ls-tree-recursive --cas %t/cas @%t/fs.casid | %FileCheck %s -check-prefix FS
 
 // FS-DAG: blocklist.yml
 // FS-DAG: empty.yml

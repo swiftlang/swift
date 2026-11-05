@@ -6,7 +6,7 @@
 // RUN:   %t/a.swift %t/b.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
@@ -62,7 +62,7 @@
 // RUN:   -cas-plugin-option first-prefix=myfirst-
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/plugin_deps.json > %t/plugin_map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/plugin_map.json > %t/map.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/plugin_map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/plugin_deps.json Test > %t/plugin_MyApp.cmd
 // RUN: %cache-tool print-output-keys -cas-path %t/cas-plugin -cas-plugin-path %plugin(CASPluginTest) \

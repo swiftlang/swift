@@ -38,7 +38,7 @@
 // RUN: %swift_frontend_plain @%t/A.cmd
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
 // RUN: %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
@@ -86,7 +86,7 @@
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys1.json > %t/key1
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps2.json > %t/map2.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map2.json > %t/map2.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map2.json > %t/map2.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps2.json User > %t/User.cmd
 // RUN: %target-swift-frontend  -cache-compile-job -module-name User -O -cas-path %t/cas \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -disable-implicit-swift-modules \
@@ -117,7 +117,7 @@
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys2.json > %t/key2
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps3.json > %t/map3.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map3.json > %t/map3.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map3.json > %t/map3.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps3.json User > %t/User2.cmd
 // RUN: echo "\"-import-objc-header\"" >> %t/User2.cmd
 // RUN: echo "\"%t/Bridging2.h\"" >> %t/User2.cmd
@@ -144,7 +144,7 @@
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys3.json > %t/key3
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps4.json > %t/map4.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map4.json > %t/map4.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map4.json > %t/map4.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps4.json User > %t/User3.cmd
 // RUN: echo "\"-import-pch\"" >> %t/User3.cmd
 // RUN: echo "\"%t/bridging3.pch\"" >> %t/User3.cmd
@@ -178,7 +178,7 @@
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys4.json > %t/key4
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps5.json > %t/map5.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map5.json > %t/map5.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map5.json > %t/map5.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps5.json User > %t/User4.cmd
 // RUN: echo "\"-import-pch\"" >> %t/User4.cmd
 // RUN: echo "\"%t/bridging4.pch\"" >> %t/User4.cmd

@@ -6,11 +6,11 @@
 // RUN:   %t/a.swift %t/b.swift %t/c.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map.json > %t/map.casid
 // RUN: echo "" >> %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map2.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map.json > %t/map2.casid
 // RUN: echo "missing" > %t/missing.json
-// RUN: llvm-cas --cas %t/other-cas --make-blob --data %t/missing.json > %t/missing.casid
+// RUN: llvm-cas make-blob --cas %t/other-cas --data %t/missing.json > %t/missing.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
@@ -27,8 +27,8 @@
 // RUN:   %target-swift-frontend-plain -cache-compile-job -c @%t/MyApp.cmd @%t/map.casid \
 // RUN:   %t/a.swift -primary-file %t/b.swift -primary-file %t/c.swift -o %t/b.o -o %t/c.o > %t/job2.casid
 // RUN: not diff %t/job1.casid %t/job2.casid
-// RUN: llvm-cas --cas %t/cas --ls-node-refs @%t/job1.casid > %t/job1.refs
-// RUN: llvm-cas --cas %t/cas --ls-node-refs @%t/job2.casid > %t/job2.refs
+// RUN: llvm-cas ls-node-refs --cas %t/cas @%t/job1.casid > %t/job1.refs
+// RUN: llvm-cas ls-node-refs --cas %t/cas @%t/job2.casid > %t/job2.refs
 // RUN: diff %t/job1.refs %t/job2.refs
 
 /// Same for the jobs using file lists.
@@ -44,8 +44,8 @@
 // RUN:   %target-swift-frontend-plain -cache-compile-job -c @%t/MyApp.cmd @%t/map.casid \
 // RUN:   -filelist %t/filelist -primary-filelist %t/primary-filelist-2 > %t/filelist2.casid
 // RUN: not diff %t/filelist1.casid %t/filelist2.casid
-// RUN: llvm-cas --cas %t/cas --ls-node-refs @%t/filelist1.casid > %t/filelist1.refs
-// RUN: llvm-cas --cas %t/cas --ls-node-refs @%t/filelist2.casid > %t/filelist2.refs
+// RUN: llvm-cas ls-node-refs --cas %t/cas @%t/filelist1.casid > %t/filelist1.refs
+// RUN: llvm-cas ls-node-refs --cas %t/cas @%t/filelist2.casid > %t/filelist2.refs
 // RUN: sed '$d' %t/filelist1.refs > %t/filelist1.shared.refs
 // RUN: sed '$d' %t/filelist2.refs > %t/filelist2.shared.refs
 // RUN: diff %t/filelist1.shared.refs %t/filelist2.shared.refs
@@ -64,7 +64,7 @@
 // RUN:   %target-swift-frontend-plain -cache-compile-job -c @%t/MyApp.cmd @%t/map2.casid \
 // RUN:   -primary-file %t/a.swift %t/b.swift %t/c.swift -o %t/a.o > %t/casid.casid
 // RUN: not diff %t/job1.casid %t/casid.casid
-// RUN: llvm-cas --cas %t/cas --ls-node-refs @%t/casid.casid > %t/casid.refs
+// RUN: llvm-cas ls-node-refs --cas %t/cas @%t/casid.casid > %t/casid.refs
 // RUN: not diff %t/job1.refs %t/casid.refs
 // RUN: head -n 3 %t/job1.refs > %t/job1.shared.refs
 // RUN: head -n 3 %t/casid.refs > %t/casid.shared.refs
@@ -74,7 +74,7 @@
 // RUN: %cache-tool print-base-key -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain -cache-compile-job -c @%t/MyApp.cmd @%t/map.casid \
 // RUN:   -primary-file %t/a.swift %t/b.swift %t/c.swift -o %t/a.o -Xcc -DFOO > %t/xcc.casid
-// RUN: llvm-cas --cas %t/cas --ls-node-refs @%t/xcc.casid > %t/xcc.refs
+// RUN: llvm-cas ls-node-refs --cas %t/cas @%t/xcc.casid > %t/xcc.refs
 // RUN: sed -n 2p %t/job1.refs > %t/job1.cmd.ref
 // RUN: sed -n 2p %t/xcc.refs > %t/xcc.cmd.ref
 // RUN: diff %t/job1.cmd.ref %t/xcc.cmd.ref

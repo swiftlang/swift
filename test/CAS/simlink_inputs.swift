@@ -14,7 +14,7 @@
 // RUN: %swift_frontend_plain @%t/B.cmd
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map.json > %t/map.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: %target-swift-frontend \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
@@ -35,7 +35,7 @@
 // RUN: %swift_frontend_plain @%t/B-1.cmd
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps-1.json > %t/map-1.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map-1.json > %t/map-1.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map-1.json > %t/map-1.casid
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps-1.json Test > %t/MyApp-1.cmd
 // RUN: %target-swift-frontend \
 // RUN:   -typecheck -cache-compile-job -cas-path %t/cas \
