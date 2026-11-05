@@ -44,10 +44,13 @@ func for_each(r: AsyncRange<Int>, iir: AsyncIntRange<Int>) async { // expected-n
 
   // Parse errors
   // FIXME: Bad diagnostics; should be just 'expected 'in' after for-each patter'.
-  for await i r { // expected-error {{found an unexpected second identifier in constant declaration}}
-  }         // expected-note @-1 {{join the identifiers together}}
-            // expected-note @-2 {{join the identifiers together with camel-case}}
-            // expected-error @-3 {{expected 'in' after for-each pattern}}
-            // expected-error @-4 {{expected Sequence expression for for-each loop}}
-  for await i in r sum = sum + i; // expected-error{{expected '{' to start the body of for-each loop}}
+  for await i r { // expected-cparser-error {{found an unexpected second identifier in constant declaration}}
+  }         // expected-cparser-note @-1 {{join the identifiers together}}
+            // expected-cparser-note @-2 {{join the identifiers together with camel-case}}
+            // expected-cparser-error @-3 {{expected 'in' after for-each pattern}}
+            // expected-cparser-error @-4 {{expected Sequence expression for for-each loop}}
+            // expected-astgen-error @-5 {{expected 'in' in 'for' statement}}
+  for await i in r sum = sum + i; // expected-cparser-error{{expected '{' to start the body of for-each loop}}
+  // expected-astgen-error @-1 {{expected '{' in 'for' statement}}
+  // expected-astgen-error @-2 {{expected '}' to end 'for' statement}}
 }

@@ -1199,8 +1199,9 @@ void ForEachStmtScope::expandAScopeThatDoesNotCreateANewInsertionPoint(
   // In error cases such as:
   //    let v: C { for b : Int -> S((array: P { }
   // the body is implicit and it would overlap the source range of the expr
-  // above.
-  if (!stmt->getBody()->isImplicit()) {
+  // above. An implicit body that has contents (as when ASTGen recovers from
+  // missing braces) covers only those contents, so it is fine.
+  if (!stmt->getBody()->isImplicit() || !stmt->getBody()->empty()) {
     ASTScopeAssert(
         stmt->getBody()->getSourceRange().isValid(),
         "pattern initializer has invalid source range");
