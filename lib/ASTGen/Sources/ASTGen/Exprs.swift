@@ -58,6 +58,11 @@ extension ASTGenVisitor {
     case .functionCallExpr(let node):
       return self.generate(functionCallExpr: node).asExpr
     case .genericSpecializationExpr(let node):
+      // The C++ parser takes an editor placeholder as a complete expression and
+      // does not look for generic arguments after it.
+      if let placeholder = node.expression.as(DeclReferenceExprSyntax.self), placeholder.baseName.isEditorPlaceholder {
+        return self.generate(declReferenceExpr: placeholder)
+      }
       return self.generate(genericSpecializationExpr: node).asExpr
     case .ifExpr(let node):
       return self.generate(ifExpr: node).asExpr
@@ -589,9 +594,25 @@ extension ASTGenVisitor {
     let placeholderTyR: BridgedTypeRepr?
     let expansionTyR: BridgedTypeRepr?
     func parseType(text: SyntaxText) -> BridgedTypeRepr {
-      var parser = Parser(UnsafeBufferPointer(start: text.baseAddress, count: text.count))
+      let buffer = UnsafeBufferPointer(start: text.baseAddress, count: text.count)
+      var parser = Parser(buffer)
       let syntax = TypeSyntax.parse(from: &parser)
-      return self.generate(type: syntax)
+      // `text` points into the token's raw text, not into the source buffer.
+      // Parse it on its own, but generate with a visitor whose buffer is the
+      // corresponding part of the source buffer so that locations are real.
+      let offsetInToken = text.baseAddress! - token.rawText.baseAddress!
+      let sourceText = UnsafeBufferPointer(
+        start: self.base.baseAddress! + token.positionAfterSkippingLeadingTrivia.utf8Offset + offsetInToken,
+        count: text.count
+      )
+      let typeVisitor = ASTGenVisitor(
+        diagnosticEngine: self.diagnosticEngine,
+        sourceBuffer: sourceText,
+        declContext: self.declContext,
+        astContext: self.ctx,
+        configuredRegions: self.configuredRegions
+      )
+      return typeVisitor.generate(type: syntax)
     }
     if let typeText = data.typeText {
       placeholderTyR = parseType(text: typeText)
