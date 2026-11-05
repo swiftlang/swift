@@ -1216,3 +1216,130 @@ bb0:
   %12 = tuple ()
   return %12
 }
+
+// rdar://191117232: a dependent value stored into an inout argument is live-out on every function exit, not only on
+// return. The access scope must be extended up to the throw, throw_addr, or unwind, and must end before it.
+
+sil @makeError : $@convention(thin) () -> @owned any Error
+
+struct ThrowStop: Error {}
+
+// CHECK-LABEL: sil hidden [ossa] @testInoutThrow : $@convention(thin) (@lifetime(borrow 1) @inout NE, @inout Holder) -> @error any Error {
+// CHECK: bb0(%0 : $*NE, %1 : $*Holder):
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] %1
+// CHECK:   [[NE:%[0-9]+]] = apply %{{.*}}([[ACCESS]])
+// CHECK:   [[MD:%[0-9]+]] = mark_dependence [unresolved] [[NE]] on %1
+// CHECK:   store [[MD]] to [assign] %0
+// CHECK:   [[ERROR:%[0-9]+]] = apply
+// CHECK-NEXT: end_access [[ACCESS]]
+// CHECK-NEXT: throw [[ERROR]]
+// CHECK-LABEL: } // end sil function 'testInoutThrow'
+sil hidden [ossa] @testInoutThrow : $@convention(thin) (@lifetime(borrow 1) @inout NE, @inout Holder) -> @error any Error {
+bb0(%0 : $*NE, %1 : $*Holder):
+  %2 = begin_access [modify] [unknown] %1
+  %3 = function_ref @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %4 = apply %3(%2) : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %2
+  end_access %2
+  store %5 to [assign] %0
+  %8 = function_ref @makeError : $@convention(thin) () -> @owned any Error
+  %9 = apply %8() : $@convention(thin) () -> @owned any Error
+  throw %9
+}
+
+// Multiple throw sites merge into a single throw block. The access ends in the throw block, not at the branches.
+//
+// CHECK-LABEL: sil hidden [ossa] @testInoutThrowMerge : $@convention(thin) (@lifetime(borrow 1) @inout NE, @inout Holder) -> @error any Error {
+// CHECK: bb0(%0 : $*NE, %1 : $*Holder):
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] %1
+// CHECK:   mark_dependence [unresolved] %{{.*}} on %1
+// CHECK-NOT: end_access
+// CHECK: bb3([[ERROR:%[0-9]+]] : @owned $any Error):
+// CHECK-NEXT: end_access [[ACCESS]]
+// CHECK-NEXT: throw [[ERROR]]
+// CHECK-LABEL: } // end sil function 'testInoutThrowMerge'
+sil hidden [ossa] @testInoutThrowMerge : $@convention(thin) (@lifetime(borrow 1) @inout NE, @inout Holder) -> @error any Error {
+bb0(%0 : $*NE, %1 : $*Holder):
+  %2 = begin_access [modify] [unknown] %1
+  %3 = function_ref @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %4 = apply %3(%2) : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %2
+  end_access %2
+  store %5 to [assign] %0
+  %8 = function_ref @makeError : $@convention(thin) () -> @owned any Error
+  cond_br undef, bb1, bb2
+
+bb1:
+  %10 = apply %8() : $@convention(thin) () -> @owned any Error
+  br bb3(%10)
+
+bb2:
+  %12 = apply %8() : $@convention(thin) () -> @owned any Error
+  br bb3(%12)
+
+bb3(%14 : @owned $any Error):
+  throw %14
+}
+
+// CHECK-LABEL: sil hidden [ossa] @testInoutThrowAddr : $@convention(thin) (@lifetime(borrow 1) @inout NE, @inout Holder) -> @error_indirect ThrowStop {
+// CHECK: bb0(%0 : $*ThrowStop, %1 : $*NE, %2 : $*Holder):
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] %2
+// CHECK:   [[MD:%[0-9]+]] = mark_dependence [unresolved] %{{.*}} on %2
+// CHECK:   store [[MD]] to [assign] %1
+// CHECK:   store %{{.*}} to [trivial] %0
+// CHECK-NEXT: end_access [[ACCESS]]
+// CHECK-NEXT: throw_addr
+// CHECK-LABEL: } // end sil function 'testInoutThrowAddr'
+sil hidden [ossa] @testInoutThrowAddr : $@convention(thin) (@lifetime(borrow 1) @inout NE, @inout Holder) -> @error_indirect ThrowStop {
+bb0(%0 : $*ThrowStop, %1 : $*NE, %2 : $*Holder):
+  %3 = begin_access [modify] [unknown] %2
+  %4 = function_ref @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %5 = apply %4(%3) : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %6 = mark_dependence [unresolved] %5 on %3
+  end_access %3
+  store %6 to [assign] %1
+  %9 = struct $ThrowStop ()
+  store %9 to [trivial] %0
+  throw_addr
+}
+
+// The dependent value is stored to the inout argument only on the unwind path, so the unwind is the only function
+// exit that the stored value reaches.
+//
+// CHECK-LABEL: sil hidden [ossa] @testInoutUnwind : $@yield_once @convention(thin) (@lifetime(borrow 1) @inout NE, @inout Holder) -> @yields () {
+// CHECK: bb0(%0 : $*NE, %1 : $*Holder):
+// CHECK:   [[ACCESS:%[0-9]+]] = begin_access [modify] [unknown] %1
+// CHECK:   [[MD:%[0-9]+]] = mark_dependence [unresolved] %{{.*}} on %1
+// CHECK:   yield
+// CHECK: bb1:
+// CHECK-NEXT: destroy_value [[MD]]
+// CHECK-NEXT: end_access [[ACCESS]]
+// CHECK: return
+// CHECK: bb2:
+// CHECK-NEXT: store [[MD]] to [assign] %0
+// CHECK:      apply %{{.*}}(%{{.*}}) : $@convention(thin) (A) -> ()
+// CHECK-NEXT: end_access [[ACCESS]]
+// CHECK-NEXT: unwind
+// CHECK-LABEL: } // end sil function 'testInoutUnwind'
+sil hidden [ossa] @testInoutUnwind : $@yield_once @convention(thin) (@lifetime(borrow 1) @inout NE, @inout Holder) -> @yields () {
+bb0(%0 : $*NE, %1 : $*Holder):
+  %2 = begin_access [modify] [unknown] %1
+  %3 = function_ref @getOwnedNEFromInout : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %4 = apply %3(%2) : $@convention(thin) (@inout Holder) -> @lifetime(borrow 0) @owned NE
+  %5 = mark_dependence [unresolved] %4 on %2
+  end_access %2
+  %7 = tuple ()
+  yield %7, resume bb1, unwind bb2
+
+bb1:
+  destroy_value %5
+  %10 = tuple ()
+  return %10
+
+bb2:
+  store %5 to [assign] %0
+  %13 = struct $A ()
+  %14 = function_ref @useA : $@convention(thin) (A) -> ()
+  %15 = apply %14(%13) : $@convention(thin) (A) -> ()
+  unwind
+}
