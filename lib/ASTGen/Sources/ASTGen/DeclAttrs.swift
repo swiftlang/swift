@@ -674,11 +674,18 @@ extension ASTGenVisitor {
   ///
   /// Matches the C++ parser, which points at the attribute name rather than at
   /// the `@`.
-  func diagnoseExpectedAttributeArguments(_ node: AttributeSyntax) {
-    self.diagnose(
-      .attr_expected_lparen(node.attributeName.trimmedDescription, /*isModifier=*/false),
-      at: node.attributeName
-    )
+  func diagnoseExpectedAttributeArguments(_ node: AttributeSyntax, atNextToken: Bool = false) {
+    let diagnostic = CompilerDiagnostic.attr_expected_lparen(
+      node.attributeName.trimmedDescription, /*isModifier=*/false)
+    // Some attributes are parsed by code that has consumed the name and points at
+    // whatever comes next.
+    if atNextToken,
+      let next = node.attributeName.lastToken(viewMode: .sourceAccurate)?.nextToken(viewMode: .sourceAccurate)
+    {
+      self.diagnose(diagnostic, at: next)
+    } else {
+      self.diagnose(diagnostic, at: node.attributeName)
+    }
   }
 
   /// E.g.:

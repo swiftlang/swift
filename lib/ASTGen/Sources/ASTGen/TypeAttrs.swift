@@ -378,7 +378,7 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
-      self.diagnoseExpectedAttributeArguments(node)
+      self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
       return nil
     }
     if let trailingComma = args.last?.trailingComma {
@@ -470,7 +470,7 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, let arg = args.first else {
-      self.diagnoseExpectedAttributeArguments(node)
+      self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
       return nil
     }
     guard args.count == 1, arg.label == nil, arg.trailingComma == nil,
@@ -512,7 +512,7 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
-      self.diagnoseExpectedAttributeArguments(node)
+      self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
       return nil
     }
     if let trailingComma = args.last?.trailingComma {
