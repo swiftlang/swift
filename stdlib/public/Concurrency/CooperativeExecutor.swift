@@ -177,9 +177,7 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
     }
 
     init(from duration: Swift.Duration) {
-      let (seconds, attoseconds) = duration.components
-      self.seconds = seconds
-      self.nanoseconds = attoseconds / 1_000_000_000
+      (self.seconds, self.nanoseconds) = duration._saturatedSecondsAndNanoseconds
     }
 
     static func == (lhs: Duration, rhs: Duration) -> Bool {

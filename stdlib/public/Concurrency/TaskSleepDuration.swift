@@ -18,16 +18,8 @@ extension ContinuousClock {
   func timestamp(for instant: Instant)
     -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
   {
-    let (seconds, nanoseconds) = durationComponents(for: instant._value)
+    let (seconds, nanoseconds) = instant._value._saturatedSecondsAndNanoseconds
     return (clockID: .continuous, seconds: seconds, nanoseconds: nanoseconds)
-  }
-
-  func durationComponents(for duration: Duration)
-    -> (seconds: Int64, nanoseconds: Int64)
-  {
-    let (seconds, attoseconds) = duration.components
-    let nanoseconds = attoseconds / 1_000_000_000
-    return (seconds: seconds, nanoseconds: nanoseconds)
   }
 }
 
@@ -36,16 +28,8 @@ extension SuspendingClock {
   func timestamp(for instant: Instant)
     -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
   {
-    let (seconds, nanoseconds) = durationComponents(for: instant._value)
+    let (seconds, nanoseconds) = instant._value._saturatedSecondsAndNanoseconds
     return (clockID: .suspending, seconds: seconds, nanoseconds: nanoseconds)
-  }
-
-  func durationComponents(for duration: Duration)
-    -> (seconds: Int64, nanoseconds: Int64)
-  {
-    let (seconds, attoseconds) = duration.components
-    let nanoseconds = attoseconds / 1_000_000_000
-    return (seconds: seconds, nanoseconds: nanoseconds)
   }
 }
 
@@ -64,10 +48,8 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
 fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C)
   -> (seconds: Int64, nanoseconds: Int64) {
   #if !$Embedded
-  if let continuousClock = clock as? ContinuousClock {
-    return continuousClock.durationComponents(for: duration as! ContinuousClock.Duration)
-  } else if let suspendingClock = clock as? SuspendingClock {
-    return suspendingClock.durationComponents(for: duration as! SuspendingClock.Duration)
+  if clock is ContinuousClock || clock is SuspendingClock {
+    return (duration as! Swift.Duration)._saturatedSecondsAndNanoseconds
   }
   #endif
   fatalError("unknown clock in fallback path")
