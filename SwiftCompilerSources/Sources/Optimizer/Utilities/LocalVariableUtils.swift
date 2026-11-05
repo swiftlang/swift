@@ -196,6 +196,10 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       if let store = localAccess.instruction as? StoringInstruction {
         self._isFullyAssigned = LocalVariableAccessInfo.isBase(address: store.destination) ? .value : .no
 
+      } else if localAccess.instruction is InjectEnumAddrInst {
+        // inject_enum_addr only sets the tag of a payload that was already initialized via init_enum_data_addr (or
+        // has no payload). It does not kill the dependence of the stored payload.
+        self._isFullyAssigned = .no
       } else {
         self._isFullyAssigned = .value
       }
