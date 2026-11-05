@@ -254,11 +254,14 @@ class Tools:
         )
         run_stage("codesign", self.codesign + [str(exe)])
 
-        run_stage("run", self.run + [str(exe)], env=self.run_env())
+        run_stage("run", self.run_cmd(exe), env=self.run_env())
+
+    def run_cmd(self, exe):
+        return self.run + [f"DYLD_INSERT_LIBRARIES={self.scribble_malloc}",
+                           str(exe)]
 
     def run_env(self):
-        return dict(os.environ, SWIFT_DETERMINISTIC_HASHING="1",
-                    DYLD_INSERT_LIBRARIES=str(self.scribble_malloc))
+        return dict(os.environ, SWIFT_DETERMINISTIC_HASHING="1")
 
     def build_scribble_malloc(self):
         run_stage(
@@ -277,6 +280,10 @@ class Tools:
         probe = self.tmp / "scribble_probe.swift"
         probe.write_text(
             "import Darwin\n"
+            "guard getenv(\"DYLD_INSERT_LIBRARIES\") != nil else {\n"
+            "  print(\"DYLD_INSERT_LIBRARIES is not set\")\n"
+            "  exit(1)\n"
+            "}\n"
             "for alignment in [8, 64] {\n"
             "  let p = UnsafeMutableRawPointer.allocate(byteCount: 64, alignment: alignment)\n"
             "  for i in 0..<64 where p.load(fromByteOffset: i, as: UInt8.self) != 0x5A {\n"
@@ -290,7 +297,7 @@ class Tools:
         run_stage("link scribble probe",
                   self.build_swift + BASE_FLAGS + [str(probe), "-o", str(exe)])
         run_stage("codesign scribble probe", self.codesign + [str(exe)])
-        run_stage("run scribble probe", self.run + [str(exe)], env=self.run_env())
+        run_stage("run scribble probe", self.run_cmd(exe), env=self.run_env())
 
 
 def find_benchmarks(src_root, only):

@@ -4124,6 +4124,7 @@ static OpaqueBuiltinKind classifyOpaqueBuiltin(BuiltinInst *bi) {
   case BuiltinValueKind::InsertElement:
   case BuiltinValueKind::PrepareInitialization:
   case BuiltinValueKind::Select:
+  case BuiltinValueKind::InitializeForeignReferenceSubclassVTables:
     return OpaqueBuiltinKind::Unimplemented;
 
   case BuiltinValueKind::None:
