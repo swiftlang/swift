@@ -37,6 +37,7 @@ using namespace swift;
 /// same instruction (in parallel).
 bool isParallelOperand(Operand *operand) {
   return isa<MarkDependenceInst>(operand->getUser()) //!!! why???
+    || isa<ReturnBorrowInst>(operand->getUser())
     || operand->getOperandOwnership() == OperandOwnership::Reborrow
     || operand->getOperandOwnership() == OperandOwnership::GuaranteedForwarding;
 }

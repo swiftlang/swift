@@ -1530,9 +1530,13 @@ bb0(%0 : $*S):
   return_borrow %3 from_scopes (%3)
 }
 
+// The destroy of the @in_guaranteed self cannot be hoisted above the end of the
+// result's borrow scope.
+//
 // CHECK-LABEL: sil shared [noinline] [ossa] @test_borrow1 :
 // CHECK:         [[BORROW:%[0-9]+]] = apply {{%[0-9]+}}(%0)
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = copy_value [[BORROW]]
+// CHECK-NEXT:    end_borrow [[BORROW]]
 // CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    store [[COPY]] to [init] [[TMP:%[0-9]+]]
 // CHECK:         store {{%[0-9]+}} to [init] %0
@@ -1543,6 +1547,7 @@ bb0(%0 : $*S, %1 : $Int):
   %3 = function_ref @borrow_data1 : $@convention(method) (@in_guaranteed S) -> @guaranteed X
   %4 = apply %3(%0) : $@convention(method) (@in_guaranteed S) -> @guaranteed X
   %5 = copy_value %4
+  end_borrow %4
   store %5 to [init] %2
   %7 = load [take] %2
   %8 = struct $S (%7)

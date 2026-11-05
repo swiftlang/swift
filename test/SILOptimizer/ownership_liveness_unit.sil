@@ -2023,14 +2023,15 @@ bb0(%0 : @guaranteed $Wrapper):
 // CHECK:   %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK:   %5 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK:   %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   end_borrow %4 : $Klass
 // CHECK:   unreachable
 // CHECK: }
 // CHECK: Interior liveness:   %2 = begin_borrow %1 : $Wrapper
+// CHECK: Inner scope:   %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK: bb0: LiveWithin
-// CHECK: regular user:   %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
-// CHECK: regular user:   %6 = apply %5(%4) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: regular user:   end_borrow %4 : $Klass
 // CHECK: Complete liveness
-// CHECK: last user:   end_borrow
+// CHECK: last user:   end_borrow %2
 // CHECK: end running test 1 of 2 on test_borrow_accessor1: interior_liveness with: %1
 sil [ossa] @test_borrow_accessor1 : $@convention(thin) (@owned Wrapper) -> () {
 bb0(%0 : @owned $Wrapper):
@@ -2042,6 +2043,7 @@ bb0(%0 : @owned $Wrapper):
   %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3
   end_borrow %1
   destroy_value [dead_end] %copy
   destroy_value [dead_end] %0
@@ -2057,23 +2059,25 @@ bb0(%0 : @owned $Wrapper):
 // CHECK:   %3 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK:   %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK:   %5 = copy_value %4 : $Klass
-// CHECK:   %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-// CHECK:   %7 = apply %6(%5) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   end_borrow %4 : $Klass
+// CHECK:   %7 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK:   %8 = apply %7(%5) : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK:   unreachable
 // CHECK: }
 // CHECK: Interior liveness:   %2 = begin_borrow %1 : $Wrapper
+// CHECK: Inner scope:   %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK: bb0: LiveWithin
-// CHECK: regular user:   %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
-// CHECK: regular user:   %5 = copy_value %4 : $Klass
+// CHECK: regular user:   end_borrow %4 : $Klass
 // CHECK: Complete liveness
-// CHECK: last user:   end_borrow
+// CHECK: last user:   end_borrow %2
 // CHECK: end running test 1 of 2 on test_borrow_accessor2: interior_liveness with: %3
 // CHECK: begin running test 2 of 2 on test_borrow_accessor2: interior_liveness_swift with: %3
 // CHECK: Interior liveness:   %2 = begin_borrow %1 : $Wrapper
+// CHECK: Inner scope:   %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK: begin:      %2 = begin_borrow %1 : $Wrapper
-// CHECK: ends:       end_borrow
+// CHECK: ends:       end_borrow %2
 // CHECK: exits:
-// CHECK: interiors:  %5 = copy_value %4
+// CHECK: interiors:  end_borrow %4 : $Klass
 // CHECK:             %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK: last user:   end_borrow %2
 // CHECK: end running test 2 of 2 on test_borrow_accessor2: interior_liveness_swift with: %3
@@ -2088,12 +2092,75 @@ bb0:
   %4 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   %5 = apply %4(%3) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
   %copy = copy_value %5
+  end_borrow %5
   %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
   %7 = apply %6(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value [dead_end] %copy
   end_borrow %3
   destroy_value [dead_end] %2
   unreachable
+}
+
+class WrapperBox {
+  @_hasStorage var w: Wrapper
+}
+
+sil @borrow_klass_from_address : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+sil @borrow_int_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Int
+
+// The memory location of an @in_guaranteed self of a borrow accessor is used over the scope of
+// the result.
+// CHECK-LABEL: begin running test 1 of 2 on test_borrow_accessor_address_self: interior_liveness with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $WrapperBox
+// CHECK: regular user:   %3 = apply %2(%1) : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+// CHECK: regular user:   end_borrow %3 : $Klass
+// CHECK: Complete liveness
+// CHECK: last user:   end_borrow %3 : $Klass
+// CHECK-LABEL: end running test 1 of 2 on test_borrow_accessor_address_self: interior_liveness with: %0
+// CHECK-LABEL: begin running test 2 of 2 on test_borrow_accessor_address_self: interior_liveness_swift with: %0
+// CHECK: Interior liveness: %0 = argument of bb0 : $WrapperBox
+// CHECK: Inner scope:   %3 = apply %2(%1) : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+// CHECK: ends:       end_borrow %3 : $Klass
+// CHECK: last user:   end_borrow %3 : $Klass
+// CHECK-LABEL: end running test 2 of 2 on test_borrow_accessor_address_self: interior_liveness_swift with: %0
+sil [ossa] @test_borrow_accessor_address_self : $@convention(thin) (@guaranteed WrapperBox) -> () {
+bb0(%0 : @guaranteed $WrapperBox):
+  specify_test "interior_liveness %0"
+  specify_test "interior_liveness_swift %0"
+  %1 = ref_element_addr %0, #WrapperBox.w
+  %2 = function_ref @borrow_klass_from_address : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %3 = apply %2(%1) : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed Klass
+  %4 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %3
+  %7 = tuple ()
+  return %7
+}
+
+// A trivial borrow accessor result has no scope. The apply is a regular use of self.
+// CHECK-LABEL: begin running test 1 of 2 on test_borrow_accessor_trivial_result: interior_liveness with: %1
+// CHECK: Interior liveness:   %1 = begin_borrow %0 : $Wrapper
+// CHECK-NOT: Inner scope
+// CHECK: regular user:   %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Int
+// CHECK: Complete liveness
+// CHECK: last user:   end_borrow %1 : $Wrapper
+// CHECK-LABEL: end running test 1 of 2 on test_borrow_accessor_trivial_result: interior_liveness with: %1
+// CHECK-LABEL: begin running test 2 of 2 on test_borrow_accessor_trivial_result: interior_liveness_swift with: %1
+// CHECK: Interior liveness:   %1 = begin_borrow %0 : $Wrapper
+// CHECK-NOT: Inner scope
+// CHECK: interiors:  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Int
+// CHECK: last user:   end_borrow %1 : $Wrapper
+// CHECK-LABEL: end running test 2 of 2 on test_borrow_accessor_trivial_result: interior_liveness_swift with: %1
+sil [ossa] @test_borrow_accessor_trivial_result : $@convention(thin) (@owned Wrapper) -> Int {
+bb0(%0 : @owned $Wrapper):
+  specify_test "interior_liveness %1"
+  specify_test "interior_liveness_swift %1"
+  %1 = begin_borrow %0
+  %2 = function_ref @borrow_int_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Int
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Int
+  end_borrow %1
+  destroy_value %0
+  return %3
 }
 
 
