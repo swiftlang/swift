@@ -4242,6 +4242,12 @@ void MissingMemberFailure::diagnoseUnsafeCxxMethod(SourceLoc loc,
                                                    DeclName name) const {
   auto &ctx = baseType->getASTContext();
 
+  // None of this applies to a special name like 'init' or 'subscript': there is
+  // no '__<name>Unsafe' spelling of those, and getBaseIdentifier() below would
+  // assert on one.
+  if (name.getBaseName().isSpecial())
+    return;
+
   if (baseType->getAnyNominal() == nullptr ||
       // Don't waist time on non-cxx-methods.
       !isa_and_nonnull<clang::CXXRecordDecl>(
