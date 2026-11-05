@@ -68,8 +68,10 @@ llvm_unreachable_internal(const char *msg = nullptr, const char *file = nullptr,
 #ifndef NDEBUG
 #define llvm_unreachable(msg) \
   __swift::__runtime::llvm::llvm_unreachable_internal(msg, __FILE__, __LINE__)
-#elif defined(LLVM_BUILTIN_UNREACHABLE)
-#define llvm_unreachable(msg) LLVM_BUILTIN_UNREACHABLE
+#elif defined(LLVM_BUILTIN_TRAP)
+// TRAP rather than LLVM_BUILTIN_UNREACHABLE so this produces a reliable crash
+// instead of undefined behavior when it turns out to actually be reachable.
+#define llvm_unreachable(msg) LLVM_BUILTIN_TRAP
 #else
 #define llvm_unreachable(msg) __swift::__runtime::llvm::llvm_unreachable_internal()
 #endif
