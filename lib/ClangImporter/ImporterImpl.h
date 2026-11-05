@@ -2522,6 +2522,12 @@ bool isDirectViewType(const clang::Decl *decl, ASTContext &swiftCtx);
 /// derived from \c swift::RefCountedClass).
 bool isSwiftClassType(const clang::CXXRecordDecl *decl);
 
+/// Whether \p decl is a C++ record that is really a Swift existential type
+/// exposed back to C++ (annotated with a Swift \c external_source_symbol
+/// attribute and derived from \c swift::SwiftExistentialType or \c
+/// swift::SwiftClassExistentialType).
+bool isSwiftExistentialType(const clang::CXXRecordDecl *decl);
+
 /// Why \p recordDecl's escapability is unknown, or nothing when it is known --
 /// or when no reason could be attributed, since a note that cannot be justified
 /// is worse than none.

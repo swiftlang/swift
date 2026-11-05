@@ -21,6 +21,8 @@
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -728,6 +730,8 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       exposedModules.insert(mod.moduleName);
 
     // Include the shim header only in the C++ mode.
+    if (M->getASTContext().LangOpts.hasFeature(Feature::CxxExistentialInterop))
+      os << "#define SWIFT_CXX_EXISTENTIAL_INTEROP 1\n";
     ClangSyntaxPrinter(M->getASTContext(), os).printIncludeForShimHeader(
         "_SwiftCxxInteroperability.h");
 

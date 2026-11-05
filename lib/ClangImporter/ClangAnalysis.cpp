@@ -1187,6 +1187,49 @@ bool importer::isSwiftClassType(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+/// Get the ExternalSourceSymbolAttr from a CXXRecordDecl, looking through
+/// ClassTemplateSpecializationDecl to the primary template if needed.
+static const clang::ExternalSourceSymbolAttr *
+getSwiftSourceSymbolAttr(const clang::CXXRecordDecl *decl) {
+  if (auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>())
+    return essAttr;
+  if (auto specDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
+    auto *templatedDecl = specDecl->getSpecializedTemplate()->getTemplatedDecl();
+    return templatedDecl->getAttr<clang::ExternalSourceSymbolAttr>();
+  }
+  return nullptr;
+}
+
+bool importer::isSwiftExistentialType(const clang::CXXRecordDecl *decl) {
+  auto essAttr = getSwiftSourceSymbolAttr(decl);
+  if (!essAttr || essAttr->getLanguage() != "Swift" ||
+      essAttr->getDefinedIn().empty() || essAttr->getUSR().empty())
+    return false;
+
+  const clang::CXXRecordDecl *baseDecl = decl;
+  if (auto specDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(decl))
+    baseDecl = specDecl->getSpecializedTemplate()->getTemplatedDecl();
+
+  int depth = 0;
+  do {
+    if (baseDecl->getNumBases() != 1)
+      return false;
+    auto baseClassSpecifier = *baseDecl->bases_begin();
+    auto Ty = baseClassSpecifier.getType();
+    auto nextBaseDecl = Ty->getAsCXXRecordDecl();
+    if (!nextBaseDecl)
+      return false;
+    baseDecl = nextBaseDecl;
+    if (++depth > 8)
+      return false;
+  } while (baseDecl->getName() != "SwiftExistentialType" &&
+           baseDecl->getName() != "SwiftClassExistentialType");
+
+  return true;
+}
+
 static bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
   // std::pair and std::tuple might have copy and move constructors, or base
   // classes with copy and move constructors, but they are not self-contained
@@ -1282,6 +1325,10 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   if (auto *cxxRecordReturnType =
           method->getReturnType()->getAsCXXRecordDecl()) {
     if (isSwiftClassType(cxxRecordReturnType))
+      return safe();
+
+    if (isSwiftExistentialType(cxxRecordReturnType) &&
+        ctx.LangOpts.hasFeature(Feature::CxxExistentialInterop))
       return safe();
 
     if (hasIteratorAPIAttr(cxxRecordReturnType) ||

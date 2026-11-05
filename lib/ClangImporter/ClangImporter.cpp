@@ -42,6 +42,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/Feature.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceLoc.h"
@@ -9105,6 +9106,20 @@ hasConstructorWithUnsupportedDefaultArgs(const clang::CXXRecordDecl *decl) {
   });
 }
 
+/// Get the ExternalSourceSymbolAttr from a CXXRecordDecl, looking through
+/// ClassTemplateSpecializationDecl to the primary template if needed.
+static const clang::ExternalSourceSymbolAttr *
+getSwiftSourceSymbolAttr(const clang::CXXRecordDecl *decl) {
+  if (auto essAttr = decl->getAttr<clang::ExternalSourceSymbolAttr>())
+    return essAttr;
+  if (auto specDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
+    auto *templatedDecl = specDecl->getSpecializedTemplate()->getTemplatedDecl();
+    return templatedDecl->getAttr<clang::ExternalSourceSymbolAttr>();
+  }
+  return nullptr;
+}
+
 CxxRecordSemanticsKind
 CxxRecordSemantics::evaluate(Evaluator &evaluator,
                              CxxRecordSemanticsDescriptor desc) const {
@@ -9121,6 +9136,10 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (isSwiftClassType(cxxDecl))
     return CxxRecordSemanticsKind::SwiftClassType;
 
+  if (isSwiftExistentialType(cxxDecl) &&
+      desc.ctx.LangOpts.hasFeature(Feature::CxxExistentialInterop))
+    return CxxRecordSemanticsKind::SwiftExistentialType;
+
   if (hasIteratorAPIAttr(cxxDecl) || hasIteratorCategory(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
@@ -9134,23 +9153,31 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   auto cxxDecl = dyn_cast<clang::CXXRecordDecl>(desc.decl);
   if (!cxxDecl)
     return nullptr;
-  if (!isSwiftClassType(cxxDecl))
+  bool isClass = isSwiftClassType(cxxDecl);
+  bool isExistential = !isClass && isSwiftExistentialType(cxxDecl) &&
+                       desc.ctx.LangOpts.hasFeature(Feature::CxxExistentialInterop);
+  if (!isClass && !isExistential)
     return nullptr;
 
   SmallVector<ValueDecl *, 1> results;
-  auto *essaAttr = cxxDecl->getAttr<clang::ExternalSourceSymbolAttr>();
+  auto *essaAttr = getSwiftSourceSymbolAttr(cxxDecl);
   auto *mod = desc.ctx.getModuleByName(essaAttr->getDefinedIn());
   if (!mod) {
-    // TODO: warn about missing 'import'.
     return nullptr;
   }
   // FIXME: Support renamed declarations.
-  auto swiftName = cxxDecl->getName();
+  // For template specializations, get the name from the primary template.
+  StringRef swiftName = cxxDecl->getName();
+  if (auto specDecl =
+          dyn_cast<clang::ClassTemplateSpecializationDecl>(cxxDecl))
+    swiftName = specDecl->getSpecializedTemplate()->getTemplatedDecl()->getName();
   // FIXME: handle nested Swift types once they're supported.
   mod->lookupValue(desc.ctx.getIdentifier(swiftName), NLKind::UnqualifiedLookup,
                    results);
   if (results.size() == 1) {
-    if (isa<ClassDecl>(results[0]))
+    if (isClass && isa<ClassDecl>(results[0]))
+      return results[0];
+    if (isExistential && isa<ProtocolDecl>(results[0]))
       return results[0];
   }
   return nullptr;

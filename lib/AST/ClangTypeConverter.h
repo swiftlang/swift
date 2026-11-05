@@ -111,9 +111,11 @@ private:
 
   std::optional<unsigned> classifySIMD(Type type);
 
-  friend ASTContext; // HACK: expose `convert` method to ASTContext
+  friend ASTContext; // HACK: expose `convert` and `registerMapping` to ASTContext
 
   clang::QualType convert(Type type);
+
+  void registerMapping(Type swiftType, clang::QualType clangType);
 
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);

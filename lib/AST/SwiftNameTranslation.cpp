@@ -359,6 +359,11 @@ swift::cxx_translation::getDeclRepresentation(
     if (isa<ProtocolDecl>(typeDecl)) {
       if (typeDecl->hasClangNode())
         return {ObjCxxOnly, std::nullopt};
+      if (typeDecl->isObjC())
+        return {ObjCxxOnly, std::nullopt};
+      if (typeDecl->getASTContext().LangOpts.hasFeature(
+              Feature::CxxExistentialInterop))
+        return {Representable, std::nullopt};
       return {Unsupported, UnrepresentableProtocol};
     }
     // A noncopyable type is exposed as a move-only C++ class. One imported from
