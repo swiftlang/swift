@@ -317,3 +317,50 @@ struct AnyOwnerClient {
     runClosure { _ = d.value }
   }
 }
+
+// rdar://191117232 (https://github.com/swiftlang/swift/issues/93665): storing a dependent value into a captured
+// variable is an escape even if the closure only exits by throwing, because the caller may read the variable after
+// catching the error.
+struct ThrowStop: Error {}
+
+func lendSpan<E: Error>(_ array: [Int], _ body: (Span<Int>) throws(E) -> Void) throws(E) {
+  try body(array.span)
+}
+
+func lendSpanUntyped(_ array: [Int], _ body: (Span<Int>) throws -> Void) rethrows {
+  try body(array.span)
+}
+
+func storeThenThrowTyped(array: [Int]) -> Int {
+  var kept: Span<Int>? = nil // expected-error{{lifetime-dependent variable 'kept' escapes its scope}}
+  do {
+    try lendSpan(array) { (span) throws(ThrowStop) in // expected-note{{it depends on the lifetime of argument 'span'}}
+      kept = span
+      throw ThrowStop() // expected-note{{this use causes the lifetime-dependent value to escape}}
+    }
+  } catch {}
+  return kept![0]
+}
+
+func storeThenThrowUntyped(array: [Int]) -> Int {
+  var kept: Span<Int>? = nil // expected-error{{lifetime-dependent variable 'kept' escapes its scope}}
+  do {
+    try lendSpanUntyped(array) { span in // expected-note{{it depends on the lifetime of argument 'span'}}
+      kept = span
+      throw ThrowStop() // expected-note{{this use causes the lifetime-dependent value to escape}}
+    }
+  } catch {}
+  return kept![0]
+}
+
+// A throwing closure that does not store the dependent value is fine.
+func throwWithoutStore(array: [Int]) -> Int {
+  var count = 0
+  do {
+    try lendSpan(array) { (span) throws(ThrowStop) in
+      count = span.count
+      throw ThrowStop()
+    }
+  } catch {}
+  return count
+}
