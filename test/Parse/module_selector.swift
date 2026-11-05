@@ -735,11 +735,11 @@ func fn() {
 }
 
 @attached(extension, names: Swift::deinit) macro m()
-// expected-legacy-error@-1 {{unknown introduced name kind 'Swift'}} FIXME: 'Swift::' should be diagnosed by ASTGen
+// expected-error@-1 {{unknown introduced name kind 'Swift'}}
 // expected-legacy-error@-2 {{expected '{' for deinitializer}}
 
 @attached(extension, names: Swift::subscript) macro m()
-// expected-legacy-error@-1 {{unknown introduced name kind 'Swift'}} FIXME: 'Swift::' should be diagnosed by ASTGen
+// expected-error@-1 {{unknown introduced name kind 'Swift'}}
 // expected-legacy-error@-2 {{expected '(' for subscript parameters}}
 
 _ = Swift::Self

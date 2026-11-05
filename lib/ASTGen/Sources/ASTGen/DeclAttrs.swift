@@ -1986,7 +1986,16 @@ extension ASTGenVisitor {
       return nil
     }
 
-    guard kindExpr.argumentNames == nil, kindExpr.moduleSelector == nil,
+    // The C++ parser reads `Swift::deinit` as a name kind of `Swift`.
+    if let selector = kindExpr.moduleSelector {
+      self.diagnose(
+        .macro_attribute_unknown_name_kind(self.generateIdentifier(selector.moduleName)),
+        at: self.generateSourceLoc(selector.moduleName)
+      )
+      return nil
+    }
+
+    guard kindExpr.argumentNames == nil,
       let kind = self.generateMacroIntroducedDeclNameKind(declReferenceExpr: kindExpr)
     else {
       self.diagnose(
