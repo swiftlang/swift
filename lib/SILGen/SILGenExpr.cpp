@@ -1249,38 +1249,6 @@ manageBufferForExprResult(SILValue buffer, const TypeLowering &bufferTL,
                                              enterDestroyCleanup(buffer));
 }
 
-static ManagedValue emitForcedErrorCast(SILGenFunction &SGF, SILLocation loc,
-                                        ManagedValue erasedError,
-                                        CanType typedErrorType) {
-  auto &typedErrorTL = SGF.getTypeLowering(typedErrorType);
-  auto castOptions = CheckedCastInstOptions();
-  auto erasedErrorType = erasedError.getType().getASTType();
-  bool requiresAddressCast = !canSILUseScalarCheckedCastInstructions(
-      SGF.SGM.M, SGF.F.hasLoweredAddresses(), erasedErrorType, typedErrorType);
-
-  if (requiresAddressCast) {
-    // If an address cast is required, move the erased error into
-    // a temporary buffer and initialize the typed error in a new one.
-    auto erasedErrorAddr = erasedError.materialize(SGF, loc);
-    auto typedErrorAddr =
-        SGF.emitTemporaryAllocation(loc, typedErrorTL.getLoweredType());
-
-    SGF.B.createUnconditionalCheckedCastAddr(
-        loc, castOptions, erasedErrorAddr.forward(SGF), erasedErrorType,
-        typedErrorAddr, typedErrorType);
-
-    ManagedValue typedError =
-        SGF.emitManagedBufferWithCleanup(typedErrorAddr, typedErrorTL);
-    return typedError;
-  }
-
-  // Otherwise, cast the erased error directly to the typed error.
-  ManagedValue typedError = SGF.B.createUnconditionalCheckedCast(
-      loc, castOptions, std::move(erasedError), typedErrorTL.getLoweredType(),
-      typedErrorType);
-  return typedError;
-}
-
 SILGenFunction::AsyncLetTypedErrorEmission::AsyncLetTypedErrorEmission(
     SILGenFunction &SGF, SILLocation loc, CanType errorType)
     : SGF(SGF), Loc(loc), ErrorType(errorType), OldThrowDest(SGF.ThrowDest),
@@ -1316,8 +1284,11 @@ void SILGenFunction::AsyncLetTypedErrorEmission::finish() {
            "typed async-let error block must receive one erased error");
     auto erasedError =
         ManagedValue::forForwardedRValue(SGF, erasedErrorBB->getArgument(0));
-    auto typedError =
-        emitForcedErrorCast(SGF, Loc, std::move(erasedError), ErrorType);
+    auto erasedErrorType = erasedError.getType().getASTType();
+    auto cast = emitUnconditionalCheckedCast(SGF, Loc, std::move(erasedError),
+                                             erasedErrorType, ErrorType,
+                                             SGFContext());
+    auto typedError = std::move(cast).getScalarValue();
 
     // Propagate the typed error to the original throw destination.
     SGF.emitThrow(Loc, std::move(typedError));

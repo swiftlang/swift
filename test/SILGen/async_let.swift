@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values %s
+// RUN: %target-swift-emit-silgen-ossa -Xllvm -sil-print-types -module-name test -enable-sil-opaque-values %s | %FileCheck %s --check-prefix=OPAQUE
 // RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple -parse-stdlib -sil-verify-all | %FileCheck %s --dump-input always
 // REQUIRES: concurrency
 
@@ -52,6 +52,7 @@ func testAsyncLetThrows() async throws -> String {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A19AsyncLetTypedThrowsSSyYaAA9SomeErrorOYKF : $@convention(thin) @async () -> (@owned String, @error SomeError) {
+// OPAQUE-LABEL: sil hidden [ossa] [opaque] @$s4test0A19AsyncLetTypedThrowsSSyYaAA9SomeErrorOYKF : $@convention(thin) @async () -> (@owned String, @error SomeError) {
 func testAsyncLetTypedThrows() async throws(SomeError) -> String {
   async let s = try await getStringWithTypedThrows()
 
@@ -64,7 +65,52 @@ func testAsyncLetTypedThrows() async throws(SomeError) -> String {
   // CHECK: unconditional_checked_cast_addr any Error in [[ERASED_ERROR_BUFFER]] : $*any Error to SomeError in [[TYPED_ERROR_BUFFER]] : $*SomeError
   // CHECK: [[TYPED_ERROR:%.*]] = load [trivial] [[TYPED_ERROR_BUFFER]] : $*SomeError
   // CHECK: throw [[TYPED_ERROR]] : $SomeError
+  // OPAQUE: [[ASYNC_LET_GET_THROWING:%.*]] = function_ref @swift_asyncLet_get_throwing
+  // OPAQUE: try_apply [[ASYNC_LET_GET_THROWING]]
+  // OPAQUE: bb{{[0-9]+}}([[ERASED_ERROR:%.*]] : @owned $any Error):
+  // OPAQUE: [[TYPED_ERROR:%.*]] = unconditional_checked_cast [[ERASED_ERROR]] : $any Error to SomeError
+  // OPAQUE: throw [[TYPED_ERROR]] : $SomeError
   return try await s
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A26AsyncLetGenericTypedThrows
+// OPAQUE-LABEL: sil hidden [ossa] [opaque] @$s4test0A26AsyncLetGenericTypedThrows
+func testAsyncLetGenericTypedThrows<E: Error>(_ body: () async throws(E) -> String) async throws(E) -> String {
+  // CHECK: bb0([[ERROR_RESULT:%[0-9]+]] : $*E,
+  async let s = try await body()
+  
+  // CHECK: [[ASYNC_LET_GET_THROWING:%.*]] = function_ref @swift_asyncLet_get_throwing
+  // CHECK: try_apply [[ASYNC_LET_GET_THROWING]]
+  // CHECK: bb{{[0-9]+}}([[ERASED_ERROR:%.*]] : @owned $any Error):
+  // CHECK: [[ERASED_ERROR_BUFFER:%.*]] = alloc_stack $any Error
+  // CHECK: store [[ERASED_ERROR]] to [init] [[ERASED_ERROR_BUFFER]] : $*any Error
+  // CHECK: [[TYPED_ERROR_BUFFER:%.*]] = alloc_stack $E
+  // CHECK: unconditional_checked_cast_addr any Error in [[ERASED_ERROR_BUFFER]] : $*any Error to E in [[TYPED_ERROR_BUFFER]] : $*E
+  // CHECK: copy_addr [take] [[TYPED_ERROR_BUFFER]] to [init] [[ERROR_RESULT]] : $*E
+  // CHECK: throw_addr
+  // OPAQUE: [[ASYNC_LET_GET_THROWING:%.*]] = function_ref @swift_asyncLet_get_throwing
+  // OPAQUE: try_apply [[ASYNC_LET_GET_THROWING]]
+  // OPAQUE: bb{{[0-9]+}}([[ERASED_ERROR:%.*]] : @owned $any Error):
+  // OPAQUE: [[TYPED_ERROR:%.*]] = unconditional_checked_cast [[ERASED_ERROR]] : $any Error to E
+  // OPAQUE: throw [[TYPED_ERROR]] : $E
+  return try await s
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A25AsyncLetWithImplicitAwaityyYaF : $@convention(thin) @async () -> () {
+// OPAQUE-LABEL: sil hidden [ossa] [opaque] @$s4test0A25AsyncLetWithImplicitAwaityyYaF : $@convention(thin) @async () -> () {
+func testAsyncLetWithImplicitAwait() async {
+  // CHECK: [[UNUSED_START:%.*]] = builtin "startAsyncLetWithLocalBuffer"<String>({{.*}}, [[UNUSED_BUFFER:%[0-9]+]] : $Builtin.RawPointer)
+  // OPAQUE: [[UNUSED_START:%.*]] = builtin "startAsyncLetWithLocalBuffer"<String>({{.*}}, [[UNUSED_BUFFER:%[0-9]+]] : $Builtin.RawPointer)
+  async let _ = try await getStringWithTypedThrows()
+  
+  // CHECK-NOT: function_ref @swift_asyncLet_get
+  // OPAQUE-NOT: function_ref @swift_asyncLet_get
+  // CHECK: builtin "finishAsyncLet"([[UNUSED_START]] : $Builtin.RawPointer, [[UNUSED_BUFFER]] : $Builtin.RawPointer)
+  // OPAQUE: builtin "finishAsyncLet"([[UNUSED_START]] : $Builtin.RawPointer, [[UNUSED_BUFFER]] : $Builtin.RawPointer)
+  // CHECK: builtin "endAsyncLetLifetime"([[UNUSED_START]] : $Builtin.RawPointer)
+  // OPAQUE: builtin "endAsyncLetLifetime"([[UNUSED_START]] : $Builtin.RawPointer)
+  // CHECK: return
+  // OPAQUE: return
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A14DecomposeAwait4condSiSb_tYaF : $@convention(thin) @async (Bool) -> Int {

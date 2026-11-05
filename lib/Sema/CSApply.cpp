@@ -9324,7 +9324,7 @@ static Expr *wrapAsyncLetInitializer(
          "Region Isolation should imply SendingArgsAndResults");
   auto extInfo = ASTExtInfoBuilder()
                      .withAsync()
-                     .withThrows(throws, thrownError)
+                     .withThrows(throws, /*FIXME:*/ Type())
                      .withSendable(isSendable)
                      .withSendingResult(hasSendingeResult)
                      .build();

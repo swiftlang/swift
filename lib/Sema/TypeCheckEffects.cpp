@@ -1279,18 +1279,13 @@ public:
       if (var->isAsyncLet()) {
         // If the initializer could throw, we will have a 'try' in the
         // application of its autoclosure.
-        CallExpr *callExpr;
+        CallExpr *callExpr = nullptr;
         if (auto init = var->getParentInitializer()) {
           if (auto await = dyn_cast<AwaitExpr>(init))
             init = await->getSubExpr();
           if (auto tryExpr = dyn_cast<TryExpr>(init))
             init = tryExpr->getSubExpr();
-          if (auto autoclosure = dyn_cast<CallExpr>(init))
-            callExpr = autoclosure;
-          else
-            callExpr = nullptr;
-        } else {
-          callExpr = nullptr;
+          callExpr = dyn_cast<CallExpr>(init);
         }
 
         result.merge(Classification::forAsync(
@@ -1970,7 +1965,6 @@ public:
       //
       // An autoclosure callee here only appears in a narrow case where
       // we're in the initializer of an 'async let'.
-      // FIXME: handle typed async let
       if (fnRef.isAutoClosure()) {
         switch (kind) {
         case EffectKind::Async:
@@ -1978,11 +1972,21 @@ public:
                           ConditionalEffectKind::Always,
                           PotentialEffectReason::forApply()));
           break;
-        case EffectKind::Throws:
+        case EffectKind::Throws: {
+          auto *autoclosure = cast<AutoClosureExpr>(fnRef.getClosure());
+          Type thrownError;
+          // Async-let closures erase their errors, but the synthetic call
+          // already records the inferred error type.
+          if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet) {
+            thrownError = call->throws().getThrownErrorType();
+          } else {
+            thrownError = /*FIXME:*/ctx.getErrorExistentialType();
+          }
           result.merge(Classification::forThrows(
-              fnType->getThrownError(), ConditionalEffectKind::Always,
+              thrownError, ConditionalEffectKind::Always,
               PotentialEffectReason::forApply()));
           break;
+        }
         case EffectKind::Unsafe:
           llvm_unreachable("@unsafe isn't handled in applies");
         }
