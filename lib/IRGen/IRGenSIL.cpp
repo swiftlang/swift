@@ -7922,6 +7922,14 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
     return;
   }
 
+  // A zero-sized result has no bits to reload. Some such types (e.g. enums
+  // with no or one case) have an unsized storage type, which can't be
+  // allocated.
+  if (outTI.getFixedSize().isZero()) {
+    (void)in.claimAll();
+    return;
+  }
+
   // TODO: We could do bitcasts entirely in the value domain in some cases, but
   // for simplicity, let's just always go through the stack for now.
 
