@@ -40,7 +40,7 @@ extension ASTGenVisitor {
         self.diagnose(.disallowed_enum_element, at: node.caseKeyword)
         return nil
       }
-      return decl.asDecl
+      return decl?.asDecl
     case .enumDecl(let node):
       return self.generate(enumDecl: node)?.asDecl
     case .extensionDecl(let node):
@@ -400,7 +400,7 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(enumCaseDecl node: EnumCaseDeclSyntax) -> BridgedEnumCaseDecl {
+  func generate(enumCaseDecl node: EnumCaseDeclSyntax) -> BridgedEnumCaseDecl? {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
 
     // All attributes goes to each element.
@@ -415,6 +415,12 @@ extension ASTGenVisitor {
       }
       elemDecl.asDecl.attachParsedAttrs(attrs.attributes)
       return elemDecl
+    }
+    // A case with no usable element, e.g. `case 0:`, has been diagnosed; the C++
+    // parser builds no declaration for it, and one with no elements has no source
+    // range.
+    guard !elements.isEmpty else {
+      return nil
     }
     return .createParsed(
       declContext: self.declContext,

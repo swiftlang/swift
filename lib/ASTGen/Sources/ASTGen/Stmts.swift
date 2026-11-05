@@ -149,6 +149,12 @@ extension ASTGenVisitor {
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { codeBlockItem in
+      // The statements of a 'case' outside of a 'switch' belong after it.
+      defer {
+        if let body = codeBlockItem.strayCaseBody {
+          allItems.append(contentsOf: self.generate(codeBlockItemList: body))
+        }
+      }
       guard let item = self.generate(codeBlockItem: codeBlockItem) else {
         return
       }
@@ -889,5 +895,21 @@ extension ASTGenVisitor {
       yields: yields,
       rParenLoc: rParenLoc
     )
+  }
+}
+
+extension CodeBlockItemSyntax {
+  /// The statements following a `case` or `default` label that is not inside a
+  /// `switch`.
+  ///
+  /// SwiftParser diagnoses the label and wraps the whole `case`, including the
+  /// statements up to the next label or the end of the block, as unexpected
+  /// syntax before an empty item. The C++ parser recovers by skipping the label
+  /// only, so the statements are still code that needs to be checked.
+  var strayCaseBody: CodeBlockItemListSyntax? {
+    guard let unexpected = self.unexpectedBeforeItem, unexpected.count == 1 else {
+      return nil
+    }
+    return unexpected.first?.as(SwitchCaseSyntax.self)?.statements
   }
 }

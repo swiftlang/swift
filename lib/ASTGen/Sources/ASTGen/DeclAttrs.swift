@@ -700,7 +700,7 @@ extension ASTGenVisitor {
     case .deinitializer(let deinitDecl):
       abiDecl = self.generate(deinitializerDecl: deinitDecl).asDecl
     case .enumCase(let caseDecl):
-      abiDecl = self.generate(enumCaseDecl: caseDecl).asDecl
+      abiDecl = self.generate(enumCaseDecl: caseDecl)?.asDecl
     case .function(let funcDecl):
       abiDecl = self.generate(functionDecl: funcDecl)?.asDecl
     case .initializer(let initDecl):

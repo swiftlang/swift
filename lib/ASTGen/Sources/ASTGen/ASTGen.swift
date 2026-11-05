@@ -210,6 +210,12 @@ struct ASTGenVisitor {
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
+      // The statements of a 'case' outside of a 'switch' belong after it.
+      defer {
+        if let body = element.strayCaseBody {
+          out.append(contentsOf: self.generateTopLevel(codeBlockItemList: body))
+        }
+      }
       guard let item = self.generateTopLevel(codeBlockItem: element) else {
         return
       }
