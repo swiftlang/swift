@@ -1440,14 +1440,41 @@ bool swift::canOptimizeToScalarCheckedCastInstructions(
 
 /// Can the given cast be performed by the scalar checked-cast
 /// instructions?
+/// Returns true if \p type is a parameterized existential or a (possibly
+/// nested) metatype or optional of a parameterized existential.
+///
+/// Parameterized existentials which only appear in generic arguments of the
+/// type, e.g. `C<any P<Int>>` or `any C<any P<Int>> & Q`, are not relevant for
+/// the cast and are ignored.
+static bool isParameterizedExistentialOrMetatype(CanType type) {
+  for (;;) {
+    if (auto objectType = type.getOptionalObjectType()) {
+      type = objectType;
+    } else if (auto metatype = dyn_cast<AnyMetatypeType>(type)) {
+      type = metatype.getInstanceType();
+    } else {
+      break;
+    }
+  }
+  if (!type->isExistentialType())
+    return false;
+  auto layout = type->getExistentialLayout();
+  return !layout.getParameterizedProtocols().empty();
+}
+
 bool swift::canIRGenUseScalarCheckedCastInstructions(SILModule &M,
                                                      CanType sourceFormalType,
                                                      CanType targetFormalType) {
   // If the cast involves any kind of generalized existential we
   // need to use the indirect-cast path to handle checking the extra
   // constraints there as the scalar path does not (yet) know how to do it.
-  if (sourceFormalType->hasParameterizedExistential() ||
-      targetFormalType->hasParameterizedExistential()) {
+  //
+  // Note that it's important to not look into generic arguments of the source
+  // or target type. Otherwise the result could change when specializing a
+  // generic cast, e.g. a class-to-class cast which forwards guaranteed
+  // ownership would become non-ownership-preserving.
+  if (isParameterizedExistentialOrMetatype(sourceFormalType) ||
+      isParameterizedExistentialOrMetatype(targetFormalType)) {
     return false;
   }
 
