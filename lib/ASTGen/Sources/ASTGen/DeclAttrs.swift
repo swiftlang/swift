@@ -1793,7 +1793,9 @@ extension ASTGenVisitor {
   func generateLifetimeDescriptor(nameToken node: TokenSyntax, lifetimeDependenceKind: BridgedParsedLifetimeDependenceKind = .default) -> BridgedLifetimeDescriptor {
     let ident = self.generateIdentifier(node)
     let loc = self.generateSourceLoc(node)
-    if ident == ctx.id_self {
+    // Only the keyword is 'self'; a backticked `self` names a parameter. (A
+    // label like the one in `self: copy self` is lexed as an identifier.)
+    if ident == ctx.id_self, !node.rawText.hasPrefix("`") {
       return .forSelf(
         dependenceKind: lifetimeDependenceKind,
         loc: loc
