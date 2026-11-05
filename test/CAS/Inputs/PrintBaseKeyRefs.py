@@ -44,7 +44,7 @@ with open(jobs_file, 'r') as file:
             [cache_tool, 'print-base-key', '-cas-path', cas_path, '--'] + args,
             text=True).strip()
         refs = subprocess.check_output(
-            [llvm_cas, '--cas', cas_path, '--ls-node-refs', base_key],
+            [llvm_cas, 'ls-node-refs', '--cas', cas_path, base_key],
             text=True).split()
         refs_per_job.append(tuple(refs))
 
