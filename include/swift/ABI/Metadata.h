@@ -2393,17 +2393,25 @@ public:
     return getGenSigHeader()->getArgumentLayoutSizeInWords();
   }
   
-  bool isCopyable() const {
+  /// The invertible protocols that the existential's `Self` is not required
+  /// to conform to.
+  InvertibleProtocolSet getSelfInvertedProtocols() const {
+    // `Self` is the requirement signature's last parameter. Older compilers
+    // also emit inverse requirements on the generalization parameters, which
+    // don't apply to the existential.
+    unsigned selfIndex = getNumReqSigParams() - 1;
+    InvertibleProtocolSet result;
     for (auto &reqt : getRequirementSignature().getRequirements()) {
-      if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
-        continue;
-      }
-      if (reqt.getInvertedProtocols()
-              .contains(InvertibleProtocolKind::Copyable)) {
-        return false;
-      }
+      if (reqt.getKind() == GenericRequirementKind::InvertedProtocols &&
+          reqt.getInvertedProtocolsGenericParamIndex() == selfIndex)
+        result.insertAll(reqt.getInvertedProtocols());
     }
-    return true;
+    return result;
+  }
+
+  bool isCopyable() const {
+    return !getSelfInvertedProtocols().contains(
+        InvertibleProtocolKind::Copyable);
   }
 };
 using ExtendedExistentialTypeShape

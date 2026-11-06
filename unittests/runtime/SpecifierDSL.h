@@ -287,8 +287,14 @@ struct ConformanceReqtSpecifier {
   ProtocolSpecifier protocol;
   bool isKeyArgument;
 };
+struct InvertedProtocolsReqtSpecifier {
+  TypeSpecifier type;
+  uint16_t paramIndex;
+  InvertibleProtocolSet protocols;
+};
 struct ReqtSpecifier : TaggedUnion<SameTypeReqtSpecifier,
-                                   ConformanceReqtSpecifier> {
+                                   ConformanceReqtSpecifier,
+                                   InvertedProtocolsReqtSpecifier> {
   using TaggedUnion::TaggedUnion;
 };
 
@@ -301,6 +307,14 @@ inline ReqtSpecifier conforms(TypeSpecifier &&type,
                               bool isKeyArgument = true) {
   return ConformanceReqtSpecifier{std::move(type), std::move(protocol),
                                   isKeyArgument};
+}
+
+/// A requirement that the generic parameter `type`, at flat index
+/// `paramIndex`, need not conform to `protocols`.
+inline ReqtSpecifier inverted(TypeSpecifier &&type, uint16_t paramIndex,
+                              InvertibleProtocolSet protocols) {
+  return InvertedProtocolsReqtSpecifier{std::move(type), paramIndex,
+                                        protocols};
 }
 
 /// Add a GenericRequirementDescriptor that makes the given two
@@ -346,6 +360,23 @@ inline void addConformanceRequirement(AnyObjectBuilder &builder,
   addConformanceRequirement(builder, typeObject, protocol, isKeyArgument);
 }
 
+/// Add a GenericRequirementDescriptor that suppresses the given invertible
+/// protocols on a generic parameter.
+inline void addInvertedProtocolsRequirement(AnyObjectBuilder &builder,
+                                            const TypeSpecifier &type,
+                                            uint16_t paramIndex,
+                                            InvertibleProtocolSet protocols) {
+  auto flags = GenericRequirementFlags(GenericRequirementKind::InvertedProtocols,
+                                       /*key argument*/ false,
+                                       /*is pack requirement*/ false,
+                                       /*is value requirement*/ false);
+  auto typeObject = createMangledTypeString(builder, type);
+  builder.add32(flags.getIntValue());
+  builder.addRelativeReference(typeObject);
+  builder.add16(paramIndex);
+  builder.add16(protocols.rawBits());
+}
+
 static void addGenericRequirements(AnyObjectBuilder &builder,
                                    llvm::ArrayRef<ReqtSpecifier> reqts) {
   for (auto &reqt : reqts) {
@@ -354,6 +385,11 @@ static void addGenericRequirements(AnyObjectBuilder &builder,
     } else if (auto conforms = reqt.dyn_cast<ConformanceReqtSpecifier>()) {
       addConformanceRequirement(builder, conforms->type, conforms->protocol,
                                 conforms->isKeyArgument);
+    } else if (auto inverted =
+                   reqt.dyn_cast<InvertedProtocolsReqtSpecifier>()) {
+      addInvertedProtocolsRequirement(builder, inverted->type,
+                                      inverted->paramIndex,
+                                      inverted->protocols);
     } else {
       swift_unreachable("unknown requirement specifier");
     }
