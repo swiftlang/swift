@@ -25,6 +25,8 @@ internal import WinSDK
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 @_implementationOnly import BacktracingImpl.OS.Libc
@@ -640,7 +642,7 @@ fileprivate func safe_read(
 #else
 fileprivate func safe_read(
   _ handle: MultiStreamFile.FileHandle,
-  _ offset: Int, _ buffer: UnsafeMutableRawPointer?, _ count: Int
+  _ offset: Int, _ buffer: UnsafeMutableRawPointer, _ count: Int
 ) -> Int {
   while true {
     let ret = pread(handle, buffer, count, off_t(offset))

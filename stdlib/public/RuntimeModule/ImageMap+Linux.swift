@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 
 import Swift
 
@@ -22,6 +22,8 @@ import Swift
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 @_implementationOnly import BacktracingImpl.ImageFormats.Elf
@@ -31,7 +33,7 @@ fileprivate func readOSRelease(fd: CInt) -> [String:String]? {
   guard len >= 0 else {
     return nil
   }
-  return withUnsafeTemporaryAllocation(byteCount: len, alignment: 16) {
+  return withUnsafeTemporaryAllocation(byteCount: Int(len), alignment: 16) {
     (buffer: UnsafeMutableRawBufferPointer) -> [String:String]? in
 
     _ = lseek(fd, 0, SEEK_SET)
@@ -166,4 +168,4 @@ extension ImageMap {
 
 }
 
-#endif // os(Linux)
+#endif // os(Linux) || os(Android)

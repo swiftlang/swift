@@ -301,7 +301,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                              offset: Int = 0,
                              top: Int = 16,
                              images: ImageMap? = nil) throws -> Backtrace {
-    #if os(Linux) || os(Windows)
+    #if os(Linux) || os(Android) || os(Windows)
     // On Linux, we need the captured images to resolve async functions;
     // on Windows, we need them because they contain unwind information.
     let theImages = images ?? ImageMap.capture()
@@ -374,7 +374,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
     #if os(anyAppleOS)
     static public let `default` = SymbolicationPlatform.Darwin
-    #elseif os(Linux)
+    #elseif os(Linux) || os(Android)
     static public let `default` = SymbolicationPlatform.Linux
     #elseif os(Windows)
     static public let `default` = SymbolicationPlatform.Windows

@@ -36,6 +36,8 @@ internal import WinSDK
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 @_implementationOnly import BacktracingImpl.CompressionLibs
 @_implementationOnly import BacktracingImpl.ImageFormats.Elf
@@ -71,7 +73,7 @@ protocol CompressedStream {
 private var lzmaHandle = dlopen("liblzma.dylib", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.dylib", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.dylib", RTLD_LAZY)
-#elseif os(Linux)
+#elseif os(Linux) || os(Android)
 private var lzmaHandle = dlopen("liblzma.so.5", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.so.1", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.so.1", RTLD_LAZY)
