@@ -866,6 +866,19 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
     return .continueWalk
   }
 
+  mutating func visitBorrowedAddressableCapture(operand: Operand, path: EscapePath) -> UseResult {
+    if !isAddress {
+      return .continueWalk
+    }
+    // Instead of following the result, assume that `apply` reads the address through it, e.g.
+    //   %span = apply %utf8Span(%s)
+    //   apply %sumSpanBytes(%span)  // reads %s
+    if calleeAnalysis.getSideEffects(ofApply: apply).memory.read {
+      result.memory.read = true
+    }
+    return .ignore
+  }
+
   var followTrivialTypes: Bool { isAddress }
   var followLoads: Bool { !isAddress }
 }
