@@ -5,14 +5,15 @@
 // REQUIRES: swift_feature_SendCalls
 
 // Which of two overloads of an actor method, one of which is '@oneway', a call
-// picks: the operand of a 'send' picks the '@oneway' overload, any other call
-// picks the one which is not '@oneway'. This holds over the preference for an
-// 'async' overload in an async context, since the operand of a 'send' is
-// type-checked in an async closure and an awaited or plain call may be in an
-// async function, and over the preference for an overload which needs no
-// default arguments. Two functions which differ only in '@oneway' are
-// redeclarations (see test/attr/attr_oneway.swift), so the overloads here
-// differ in 'async' or in their parameters too.
+// picks: the operand of a 'send' picks the '@oneway' overload, the operand of
+// an 'await' picks the one which is not '@oneway', and any other call follows
+// the usual rules. This holds over the preference for an 'async' overload in
+// an async context, since the operand of a 'send' is type-checked in an async
+// closure and an awaited call may be in an async function, and over the
+// preference for an overload which needs no default arguments. Two functions
+// which differ only in '@oneway' are redeclarations (see
+// test/attr/attr_oneway.swift), so the overloads here differ in 'async' or in
+// their parameters too. See also oneway_send_overload_filter.swift.
 //
 // Each call is checked with an argument as well as without one: with a single
 // unlabeled argument the constraint solver favors the overloads which match
@@ -56,11 +57,9 @@ actor A2 {
 
   func insideSendArg() async { send self.tell(1) }
   func insideAwaitArg() async { await self.tell(1) } // expected-warning{{no 'async' operations occur within 'await' expression}}
-  func insidePlainArg() async { self.tell(1) }
   func insidePlainSyncArg() { self.tell(1) }
   func insideSendZero() async { send self.zero() }
   func insideAwaitZero() async { await self.zero() } // expected-warning{{no 'async' operations occur within 'await' expression}}
-  func insidePlainZero() async { self.zero() }
   func insidePlainSyncZero() { self.zero() }
 }
 
@@ -123,15 +122,11 @@ func nonisolatedSend() { send example() }
 // CHECK: #A2.tell : (isolated A2) -> (Int) async -> ()
 // CHECK-LABEL: sil hidden [ossa] @$s4main2A2C14insideAwaitArgyyYaF :
 // CHECK: #A2.tell : (isolated A2) -> (Int) -> ()
-// CHECK-LABEL: sil hidden [ossa] @$s4main2A2C14insidePlainArgyyYaF :
-// CHECK: #A2.tell : (isolated A2) -> (Int) -> ()
 // CHECK-LABEL: sil hidden [ossa] @$s4main2A2C18insidePlainSyncArgyyF :
 // CHECK: #A2.tell : (isolated A2) -> (Int) -> ()
 // CHECK-LABEL: sil private [ossa] @$s4main2A2C14insideSendZeroyyYaF{{.*}}fU_ :
 // CHECK: #A2.zero : (isolated A2) -> () async -> ()
 // CHECK-LABEL: sil hidden [ossa] @$s4main2A2C15insideAwaitZeroyyYaF :
-// CHECK: #A2.zero : (isolated A2) -> () -> ()
-// CHECK-LABEL: sil hidden [ossa] @$s4main2A2C15insidePlainZeroyyYaF :
 // CHECK: #A2.zero : (isolated A2) -> () -> ()
 // CHECK-LABEL: sil hidden [ossa] @$s4main2A2C19insidePlainSyncZeroyyF :
 // CHECK: #A2.zero : (isolated A2) -> () -> ()

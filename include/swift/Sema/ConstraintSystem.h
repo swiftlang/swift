@@ -2118,10 +2118,6 @@ public:
   /// function or closure.
   bool isAsynchronousContext(DeclContext *dc);
 
-  /// Determine whether the given locator refers to the callee of a call
-  /// which is the operand of a 'send', e.g. the 'x.f' in 'send x.f()'
-  bool isSendCallee(ConstraintLocator *locator);
-
   /// Determine whether constraint system already has a fix recorded
   /// for a particular location.
   bool hasFixFor(ConstraintLocator *locator,
@@ -2168,7 +2164,8 @@ public:
   void addApplicationConstraint(
       FunctionType *appliedFn, Type calleeType,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
-      DeclContext *useDC, ConstraintLocatorBuilder locator);
+      DeclContext *useDC, ConstraintLocatorBuilder locator,
+      ApplicationKind applicationKind = ApplicationKind::Ordinary);
 
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(Expr *expr, Type conversionType,
@@ -3541,7 +3538,7 @@ private:
   SolutionKind simplifyApplicableFnConstraint(
       FunctionType *appliedFn, Type calleeTy,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
-      DeclContext *useDC,
+      ApplicationKind applicationKind, DeclContext *useDC,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the DynamicCallableApplicableFunction constraint.

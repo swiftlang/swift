@@ -331,6 +331,20 @@ enum RememberChoice_t : bool {
   RememberChoice = true
 };
 
+/// How the call described by an applicable function constraint is made.
+///
+/// Overload resolution prefers a '@oneway' callee for the operand of a
+/// 'send', and a callee which is not '@oneway' for the operand of an 'await',
+/// see \c computeDisjunctionInfo.
+enum class ApplicationKind : uint8_t {
+  /// Any other call.
+  Ordinary,
+  /// The operand of a 'send', e.g. the 'x.f()' in 'send x.f()'.
+  Send,
+  /// The operand of an explicit 'await', e.g. the 'x.f()' in 'await x.f()'.
+  Await,
+};
+
 /// A constraint between two type variables.
 class Constraint final : public llvm::ilist_node<Constraint>,
     private llvm::TrailingObjects<Constraint,
@@ -396,7 +410,10 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// node is unused.
   unsigned isDiscarded : 1;
 
-  // 22 bits remaining
+  /// The \c ApplicationKind of an applicable function constraint.
+  unsigned TheApplicationKind : 2;
+
+  // 20 bits remaining
 
   union {
     struct {
@@ -505,7 +522,8 @@ class Constraint final : public llvm::ilist_node<Constraint>,
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   Constraint(FunctionType *appliedFn, Type calleeType,
-             unsigned trailingClosureMatching, DeclContext *useDC,
+             unsigned trailingClosureMatching,
+             ApplicationKind applicationKind, DeclContext *useDC,
              ConstraintLocator *locator, ArrayRef<TypeVariableType *> typeVars);
 
   /// Retrieve the type variables buffer, for internal mutation.
@@ -597,7 +615,8 @@ public:
   static Constraint *createApplicableFunction(
       ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
-      DeclContext *useDC, ConstraintLocator *locator);
+      ApplicationKind applicationKind, DeclContext *useDC,
+      ConstraintLocator *locator);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
                                             ASTNode node,
@@ -892,6 +911,12 @@ public:
   /// For an applicable function constraint, retrieve the trailing closure
   /// matching rule.
   std::optional<TrailingClosureMatching> getTrailingClosureMatching() const;
+
+  /// For an applicable function constraint, retrieve how the call is made.
+  ApplicationKind getApplicationKind() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return static_cast<ApplicationKind>(TheApplicationKind);
+  }
 
   /// Retrieve the locator for this constraint.
   ConstraintLocator *getLocator() const { return Locator; }

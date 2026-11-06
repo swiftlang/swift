@@ -705,37 +705,10 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   if (argumentType->hasTypeVariable())
     return DisjunctionInfo::none();
 
-  // Whether the overload choices differ in being '@oneway', i.e. some of
-  // them are '@oneway' and some are not. Computed lazily, only when an
-  // async/sync mismatch would otherwise drop a choice
-  std::optional<bool> hasMixedOneway;
-  auto choicesMixOneway = [&]() -> bool {
-    if (!hasMixedOneway) {
-      bool anyOneway = false, anyNotOneway = false;
-      if (cs.getASTContext().LangOpts.hasFeature(Feature::SendCalls)) {
-        for (auto *choice : disjunction->getNestedConstraints()) {
-          if (choice->isDisabled())
-            continue;
-          auto *func =
-              dyn_cast_or_null<FuncDecl>(getOverloadChoiceDecl(choice));
-          if (!func)
-            continue;
-          if (func->isOneway())
-            anyOneway = true;
-          else
-            anyNotOneway = true;
-        }
-      }
-      hasMixedOneway = anyOneway && anyNotOneway;
-    }
-    return *hasMixedOneway;
-  };
-
   SmallVector<Constraint *, 2> favoredChoices;
   forEachDisjunctionChoice(
       cs, disjunction,
-      [&cs, &argumentType, &favoredChoices, &argument,
-       &choicesMixOneway](
+      [&cs, &argumentType, &favoredChoices, &argument](
           Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
           return;
@@ -752,19 +725,9 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
           return;
 
         if (argumentType->isEqual(param.getPlainType())) {
-          // Don't favor an overload whose async-ness doesn't match the
-          // context, unless the overloads differ in being '@oneway'. Then
-          // whether the call is the operand of a 'send' decides between
-          // e.g. '@oneway func f(_: T)' and 'func f(_: T) async' (see
-          // SK_OnewayMismatch, which ranks above SK_SyncInAsync), so
-          // both have to be attempted. The operand of a 'send' is
-          // type-checked in an async closure, so this filter would
-          // otherwise always drop a synchronous '@oneway' overload, and
-          // drop a synchronous non-'@oneway' overload of an awaited call
           if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
             if (func->isAsyncContext() !=
-                    cs.isAsynchronousContext(choice->getDeclContext()) &&
-                !choicesMixOneway())
+                cs.isAsynchronousContext(choice->getDeclContext()))
               return;
           }
 
@@ -1189,6 +1152,41 @@ scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
   return 0;
 }
 
+/// Favor the '@oneway' overloads of the callee of a 'send', or the overloads
+/// which are not '@oneway' of the callee of an 'await', if the overloads mix
+/// both. Favored choices form the first partition of the disjunction, so if
+/// any of them leads to a solution the others are never attempted.
+static std::optional<DisjunctionInfo>
+favorChoicesForApplicationKind(Constraint *disjunction,
+                               Constraint *applicableFn) {
+  auto applicationKind = applicableFn->getApplicationKind();
+  if (applicationKind == ApplicationKind::Ordinary)
+    return std::nullopt;
+
+  bool preferOneway = applicationKind == ApplicationKind::Send;
+  SmallVector<Constraint *, 2> favoredChoices;
+  bool hasOtherChoices = false;
+  for (auto *choice : disjunction->getNestedConstraints()) {
+    if (choice->isDisabled())
+      continue;
+
+    auto *decl = getOverloadChoiceDecl(choice);
+    if (!decl)
+      continue;
+
+    auto *func = dyn_cast<FuncDecl>(decl);
+    if ((func && func->isOneway()) == preferOneway)
+      favoredChoices.push_back(choice);
+    else
+      hasOtherChoices = true;
+  }
+
+  if (favoredChoices.empty() || !hasOtherChoices)
+    return std::nullopt;
+
+  return DisjunctionInfoBuilder(/*score=*/100, favoredChoices).build();
+}
+
 static DisjunctionInfo computeDisjunctionInfo(
     ConstraintSystem &cs,
     SmallVectorImpl<Constraint *> &disjunctions, unsigned index,
@@ -1265,6 +1263,12 @@ static DisjunctionInfo computeDisjunctionInfo(
         return DisjunctionInfo();
     }
   }
+
+  // 'send actor.hello()' prefers an '@oneway func hello()', and
+  // 'await actor.hello()' prefers a 'hello()' which is not '@oneway'. This
+  // takes precedence over the favoring below.
+  if (auto info = favorChoicesForApplicationKind(disjunction, applicableFn))
+    return info.value();
 
   // This maintains an "old hack" behavior where overloads
   // of `OverloadedDeclRef` calls were favored purely

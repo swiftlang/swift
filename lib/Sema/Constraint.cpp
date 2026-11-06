@@ -282,7 +282,8 @@ Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
 }
 
 Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
-                       unsigned trailingClosureMatching, DeclContext *useDC,
+                       unsigned trailingClosureMatching,
+                       ApplicationKind applicationKind, DeclContext *useDC,
                        ConstraintLocator *locator,
                        ArrayRef<TypeVariableType *> typeVars)
     : Kind(ConstraintKind::ApplicableFunction),
@@ -290,6 +291,7 @@ Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
       HasRestriction(false), IsActive(false), IsDisabled(false),
       IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       IsIsolated(false), trailingClosureMatching(trailingClosureMatching),
+      TheApplicationKind(static_cast<unsigned>(applicationKind)),
       Locator(locator) {
   ASSERT(isAdmissibleType(appliedFn));
   ASSERT(isAdmissibleType(calleeType));
@@ -521,6 +523,17 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
         Out << " [backward scan]";
         break;
       }
+    }
+
+    switch (getApplicationKind()) {
+    case ApplicationKind::Ordinary:
+      break;
+    case ApplicationKind::Send:
+      Out << " [send]";
+      break;
+    case ApplicationKind::Await:
+      Out << " [await]";
+      break;
     }
   }
 
@@ -959,7 +972,8 @@ Constraint *Constraint::createConjunction(
 Constraint *Constraint::createApplicableFunction(
     ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    DeclContext *useDC, ConstraintLocator *locator) {
+    ApplicationKind applicationKind, DeclContext *useDC,
+    ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSetVector<TypeVariableType *, 4> typeVars;
   if (argumentFnType->hasTypeVariable())
@@ -989,8 +1003,8 @@ Constraint *Constraint::createApplicableFunction(
       /*hasContextualTypeInfo=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   auto constraint = new (mem)
-      Constraint(argumentFnType, calleeType, rawTrailingClosureMatching, useDC,
-                 locator, typeVars.getArrayRef());
+      Constraint(argumentFnType, calleeType, rawTrailingClosureMatching,
+                 applicationKind, useDC, locator, typeVars.getArrayRef());
 
   return constraint;
 }

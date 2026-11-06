@@ -5184,7 +5184,7 @@ public:
 
   /// Whether this call is the operand of a 'send', e.g. the 'x.f()' in
   /// 'send x.f()'. Overload resolution prefers a '@oneway' callee for such a
-  /// call, and a non-'@oneway' callee for any other call
+  /// call, see \c constraints::ApplicationKind
   bool isOnewaySendOperand() const { return Bits.ApplyExpr.IsOnewaySendOperand; }
   void setIsOnewaySendOperand(bool flag = true) {
     Bits.ApplyExpr.IsOnewaySendOperand = flag;

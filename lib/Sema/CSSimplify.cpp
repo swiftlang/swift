@@ -13657,7 +13657,7 @@ static UnresolvedDotExpr *createImplicitRootForCallAsFunction(
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     FunctionType *func1, Type type2,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    DeclContext *useDC,
+    ApplicationKind applicationKind, DeclContext *useDC,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto &ctx = getASTContext();
 
@@ -13758,7 +13758,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   auto formUnsolved = [&](bool activate = false) {
     if (flags.contains(TMF_GenerateConstraints)) {
       auto *application = Constraint::createApplicableFunction(
-          *this, func1, type2, trailingClosureMatching, useDC,
+          *this, func1, type2, trailingClosureMatching, applicationKind, useDC,
           getConstraintLocator(locator));
 
       addUnsolvedConstraint(application);
@@ -13820,7 +13820,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // Add new applicable function constraint based on the member type
     // variable.
     addApplicationConstraint(func1, memberTy, trailingClosureMatching, useDC,
-                             locator);
+                             locator, applicationKind);
     return SolutionKind::Solved;
   }
 
@@ -13939,7 +13939,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
         // active when `callableType` is bound.
         addUnsolvedConstraint(Constraint::createApplicableFunction(
             *this, callAsFunctionArguments, callableType,
-            trailingClosureMatching, useDC,
+            trailingClosureMatching, ApplicationKind::Ordinary, useDC,
             getConstraintLocator(implicitRef,
                                  ConstraintLocator::ApplyFunction)));
         break;
@@ -13957,11 +13957,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
       auto applyLocator = getConstraintLocator(locator);
       auto forwardConstraint = Constraint::createApplicableFunction(
-          *this, func1, type2, TrailingClosureMatching::Forward, useDC,
-          applyLocator);
+          *this, func1, type2, TrailingClosureMatching::Forward,
+          applicationKind, useDC, applyLocator);
       auto backwardConstraint = Constraint::createApplicableFunction(
-          *this, func1, type2, TrailingClosureMatching::Backward, useDC,
-          applyLocator);
+          *this, func1, type2, TrailingClosureMatching::Backward,
+          applicationKind, useDC, applyLocator);
       addDisjunctionConstraint({forwardConstraint, backwardConstraint},
                                applyLocator);
       break;
@@ -16828,13 +16828,13 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
 void ConstraintSystem::addApplicationConstraint(
     FunctionType *appliedFn, Type calleeType,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    DeclContext *useDC,
-    ConstraintLocatorBuilder locator) {
+    DeclContext *useDC, ConstraintLocatorBuilder locator,
+    ApplicationKind applicationKind) {
   auto recordFailure = [&]() {
     if (shouldRecordFailedConstraint()) {
       auto *c = Constraint::createApplicableFunction(
-          *this, appliedFn, calleeType, trailingClosureMatching, useDC,
-          getConstraintLocator(locator));
+          *this, appliedFn, calleeType, trailingClosureMatching,
+          applicationKind, useDC, getConstraintLocator(locator));
       recordFailedConstraint(c);
     }
   };
@@ -16846,7 +16846,8 @@ void ConstraintSystem::addApplicationConstraint(
   }
 
   switch (simplifyApplicableFnConstraint(appliedFn, calleeType,
-                                         trailingClosureMatching, useDC,
+                                         trailingClosureMatching,
+                                         applicationKind, useDC,
                                          TMF_GenerateConstraints, locator)) {
   case SolutionKind::Error:
     recordFailure();
@@ -17045,8 +17046,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
     return simplifyApplicableFnConstraint(
         constraint.getAppliedFunctionType(), constraint.getCalleeType(),
         constraint.getTrailingClosureMatching(),
-        constraint.getDeclContext(), /*flags=*/std::nullopt,
-        constraint.getLocator());
+        constraint.getApplicationKind(), constraint.getDeclContext(),
+        /*flags=*/std::nullopt, constraint.getLocator());
 
   case ConstraintKind::DynamicCallableApplicableFunction:
     return simplifyDynamicCallableApplicableFnConstraint(

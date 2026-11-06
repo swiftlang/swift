@@ -31,8 +31,8 @@ actor Worker {
   @discardableResult func confirmAsync() async -> Bool { true }
   @discardableResult func confirmNeverThrows() throws(Never) -> Int { 0 }
   @discardableResult func confirmThrows() throws -> Bool { true }
-  func pick() {}
-  @discardableResult func pick() -> Int { 0 }
+  func pick() {} // expected-note@:8{{found this candidate}}
+  @discardableResult func pick() -> Int { 0 } // expected-note@:27{{found this candidate}}
   func add(_ values: Span<Int>) {}
   func addAsync(_ values: Span<Int>) async {}
   func addRaw(_ item: Int, _ bytes: RawSpan) {}
@@ -116,8 +116,10 @@ func test(_ worker: Worker, _ box: Box, _ item: Int, _ maybe: Worker?) async {
   // expected-error@+1{{'send' cannot discard the result of a call to 'confirmThrows()'}}{{3-7=await}}
   send worker.confirmThrows()
 
-  // A 'send' call picks the overload which returns 'Void': the one which
-  // returns a value cannot be sent, even though it is '@discardableResult'
+  // Neither overload is '@oneway', so the usual rules pick between them, and
+  // like 'await worker.pick()' this is ambiguous: the call's result is
+  // discarded, so nothing prefers the overload which returns 'Void'
+  // expected-error@+1:15{{ambiguous use of 'pick()'}}
   send worker.pick()
 
   // A single-expression closure can consist of a 'send' call

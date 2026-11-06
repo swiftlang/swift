@@ -2859,9 +2859,42 @@ namespace {
           FunctionType::get(params, /* yields */ {}, resultType, extInfo),
           CS.getType(fnExpr),
           /*trailingClosureMatching=*/std::nullopt, CurDC,
-          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction),
+          getApplicationKind(expr));
 
       return resultType;
+    }
+
+    /// Determine whether the given call is the operand of a 'send' or of an
+    /// explicit 'await', which lets overload resolution prefer a '@oneway'
+    /// callee or one which is not '@oneway' respectively.
+    ApplicationKind getApplicationKind(ApplyExpr *expr) {
+      if (!CS.getASTContext().LangOpts.hasFeature(Feature::SendCalls))
+        return ApplicationKind::Ordinary;
+
+      if (expr->isOnewaySendOperand())
+        return ApplicationKind::Send;
+
+      // Look for an 'await' around the call, e.g. 'await x.f()',
+      // 'try await x.f()', 'await (x.f())' or 'await x?.f()'. The implicit
+      // 'await' around the operand of a 'send' doesn't count, and neither does
+      // an 'await' which covers more than the call, e.g. 'await x.f() + 1'
+      Expr *current = expr;
+      while (auto *parent = CS.getParentExpr(current)) {
+        if (isa<ParenExpr>(parent) || isa<AnyTryExpr>(parent) ||
+            isa<OptionalEvaluationExpr>(parent)) {
+          current = parent;
+          continue;
+        }
+
+        if (auto *await = dyn_cast<AwaitExpr>(parent)) {
+          if (!await->isImplicit())
+            return ApplicationKind::Await;
+        }
+        break;
+      }
+
+      return ApplicationKind::Ordinary;
     }
 
     Type visitRebindSelfInConstructorExpr(RebindSelfInConstructorExpr *expr) {
