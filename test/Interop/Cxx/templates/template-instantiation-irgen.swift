@@ -59,10 +59,13 @@ func takesMutPtrToFRT(x: UnsafeMutablePointer<FRT>) { takesValue(x) }
 // CHECK: define {{.*}} void @{{.*}}takesMutPtrToFRT{{.*}}
 
 func takesCPtr() {
+  // Previously, instantiating these function templates with optional and
+  // non-optional pointers would crash the Swift compiler. Make sure that
+  // doesn't happen anymore.
   takesValue(intPtr)
-
-  // It's fine if we dereference it, though
   takesValue(intPtr!)
+  constLvalueReference(intPtr)
+  constLvalueReference(intPtr!)
 }
 
 func takesCFnPtr() {
