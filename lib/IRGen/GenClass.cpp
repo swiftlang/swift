@@ -3131,7 +3131,10 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
 }
 
 llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
-  assert(!method.getOverridden() && "must always be base method");
+  // It must be a method that doesn't override anything or an override that
+  // requires a new vtable entry slot.
+  assert((!method.getOverridden() || method.requiresNewVTableEntry()) &&
+         "must always be base method");
 
   auto entity = LinkEntity::forMethodDescriptor(method);
   auto mangled = entity.mangleAsString(IGM.Context);
