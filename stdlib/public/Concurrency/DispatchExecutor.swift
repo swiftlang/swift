@@ -98,20 +98,13 @@ enum DispatchClockID: CInt {
   case walltime = 3
 }
 
-fileprivate func clamp(_ components: (seconds: Int64, attoseconds: Int64))
-  -> (seconds: Int64, attoseconds: Int64) {
-  if components.seconds < 0
-       || components.seconds == 0 && components.attoseconds < 0 {
-    return (seconds: 0, attoseconds: 0)
-  }
-  return (seconds: components.seconds, attoseconds: components.attoseconds)
-}
-
 fileprivate func delay(from duration: Swift.Duration) -> (
   seconds: Int64, nanoseconds: Int64
 ) {
-  let (seconds, attoseconds) = clamp(duration.components)
-  let nanoseconds = attoseconds / 1_000_000_000
+  let (seconds, nanoseconds) = duration._saturatedSecondsAndNanoseconds
+  if seconds < 0 || seconds == 0 && nanoseconds < 0 {
+    return (seconds: 0, nanoseconds: 0)
+  }
   return (seconds: seconds, nanoseconds: nanoseconds)
 }
 
@@ -127,10 +120,8 @@ fileprivate func timestamp<C: Clock>(for instant: C.Instant, clock: C)
 
 fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C)
   -> (seconds: Int64, nanoseconds: Int64) {
-  if let continuousClock = clock as? ContinuousClock {
-    return continuousClock.durationComponents(for: duration as! ContinuousClock.Duration)
-  } else if let suspendingClock = clock as? SuspendingClock {
-    return suspendingClock.durationComponents(for: duration as! SuspendingClock.Duration)
+  if clock is ContinuousClock || clock is SuspendingClock {
+    return (duration as! Swift.Duration)._saturatedSecondsAndNanoseconds
   }
   // This shouldn't be reachable
   fatalError("unknown clock in Dispatch Executor")
