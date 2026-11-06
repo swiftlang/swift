@@ -154,11 +154,11 @@ func blarp0a() {}
 func blarp1() {}
 
 // expected-cparser-error@+2 {{expected declaration}}
-// expected-error@+1 {{expected ':' after label 'message'}} {{none}}
-@_unavailableFromAsync(message; "almost right, but not quite")
+// expected-cparser-error@+1 {{expected ':' after label 'message'}} {{none}} expected-astgen-error@+1 {{expected ')' to end attribute}}
+@_unavailableFromAsync(message; "almost right, but not quite") // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{unexpected code '; "almost right, but not quite")' in function}}
 func blarp2() {}
 
-// expected-error@+1 {{expected ':' after label 'message'}} {{31-31=:}}
+// expected-cparser-error@+1 {{expected ':' after label 'message'}} {{31-31=:}} expected-astgen-error@+1 {{unexpected code '"almost right, but not quite"' in attribute}}
 @_unavailableFromAsync(message "almost right, but not quite")
 func blarp2a() {}
 
@@ -189,10 +189,10 @@ func blarp4b() {}
 func blarp4c() {}
 
 // expected-cparser-error@+2 {{expected declaration}}
-// expected-error@+1 {{message cannot be an interpolated string}}
+// expected-cparser-error@+1 {{message cannot be an interpolated string}} expected-astgen-error@+1 {{argument cannot be an interpolated string literal}}
 @_unavailableFromAsync(message: "blarppy blarp \(31 + 10)")
 func blarp5() {}
 
-// expected-error@+1:48 {{expected ')' in '_unavailableFromAsync' attribute}}{{48-48=)}}
-@_unavailableFromAsync(message: "blarppy blarp"
+// expected-cparser-error@+1:48 {{expected ')' in '_unavailableFromAsync' attribute}}{{48-48=)}} expected-astgen-error@+1 {{expected ')' to end attribute}}
+@_unavailableFromAsync(message: "blarppy blarp" // expected-astgen-note {{to match this opening '('}}
 func blarp6() {}
