@@ -289,7 +289,7 @@ extension AsyncThrowingStream {
     }
 
     @unsafe struct State {
-      var continuation: UnsafeContinuation<Element?, Error>?
+      var continuation: UnsafeContinuation<Result<Element?, Failure>, Never>?
       var pending = _Deque<Element>()
       let limit: Continuation.BufferingPolicy
       var onTermination: TerminationHandler?
@@ -386,7 +386,7 @@ extension AsyncThrowingStream {
           unsafe state.continuation = nil
           let toSend = unsafe state.pending.removeFirst()
           unlock()
-          unsafe continuation.resume(returning: toSend)
+          unsafe continuation.resume(returning: .success(toSend))
         } else if let terminal = unsafe state.terminal {
           result = .terminated
           unsafe state.continuation = nil
@@ -394,9 +394,9 @@ extension AsyncThrowingStream {
           unlock()
           switch terminal {
           case .finished:
-            unsafe continuation.resume(returning: nil)
+            unsafe continuation.resume(returning: .success(nil))
           case .failed(let error):
-            unsafe continuation.resume(throwing: error)
+            unsafe continuation.resume(returning: .failure(error))
           }
         } else {
           switch limit {
@@ -410,7 +410,7 @@ extension AsyncThrowingStream {
 
           unsafe state.continuation = nil
           unlock()
-          unsafe continuation.resume(returning: value)
+          unsafe continuation.resume(returning: .success(value))
         }
       } else {
         if unsafe state.terminal == nil {
@@ -462,16 +462,16 @@ extension AsyncThrowingStream {
           let toSend = unsafe state.pending.removeFirst()
           unlock()
           handler?(.finished(error))
-          unsafe continuation.resume(returning: toSend)
+          unsafe continuation.resume(returning: .success(toSend))
         } else if let terminal = unsafe state.terminal {
           unsafe state.continuation = nil
           unlock()
           handler?(.finished(error))
           switch terminal {
           case .finished:
-            unsafe continuation.resume(returning: nil)
+            unsafe continuation.resume(returning: .success(nil))
           case .failed(let error):
-            unsafe continuation.resume(throwing: error)
+            unsafe continuation.resume(returning: .failure(error))
           }
         } else {
           unlock()
@@ -483,21 +483,21 @@ extension AsyncThrowingStream {
       }
     }
 
-    func next(_ continuation: UnsafeContinuation<Element?, Error>) {
+    func next(_ continuation: UnsafeContinuation<Result<Element?, Failure>, Never>) {
       lock()
       if unsafe state.continuation == nil {
         if unsafe state.pending.count > 0 {
           let toSend = unsafe state.pending.removeFirst()
           unlock()
-          unsafe continuation.resume(returning: toSend)
+          unsafe continuation.resume(returning: .success(toSend))
         } else if let terminal = unsafe state.terminal {
           unsafe state.terminal = .finished
           unlock()
           switch terminal {
           case .finished:
-            unsafe continuation.resume(returning: nil)
+            unsafe continuation.resume(returning: .success(nil))
           case .failed(let error):
-            unsafe continuation.resume(throwing: error)
+            unsafe continuation.resume(returning: .failure(error))
           }
         } else {
           unsafe state.continuation = unsafe continuation
@@ -509,14 +509,14 @@ extension AsyncThrowingStream {
       }
     }
 
-    func next() async throws -> Element? {
-      try await withTaskCancellationHandler {
-        try unsafe await withUnsafeThrowingContinuation {
+    nonisolated(nonsending) func next() async throws(Failure) -> Element? {
+      try await withTaskCancellationHandler { () throws(Failure) in
+        unsafe await withUnsafeContinuation {
           unsafe next($0)
         }
       } onCancel: { [cancel] in
         cancel()
-      }
+      }.get()
     }
 
     static func create(limit: Continuation.BufferingPolicy) -> _Storage {
