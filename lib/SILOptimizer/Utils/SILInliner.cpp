@@ -926,6 +926,16 @@ void SILInlineCloner::fixupReturnBorrow() {
         }
       });
     }
+
+    // End the borrow on edges the lifetime doesn't extend into, e.g. the
+    // payload-less case of a switch_enum on the result.
+    for (auto *edgeBlock : phiBoundary.boundaryEdges) {
+      SILBuilderWithScope builder(edgeBlock->begin());
+      for (auto &updater : updaters) {
+        SILValue val = updater->getValueInMiddleOfBlock(edgeBlock);
+        builder.createEndBorrow(Loc, val);
+      }
+    }
   }
 }
 
