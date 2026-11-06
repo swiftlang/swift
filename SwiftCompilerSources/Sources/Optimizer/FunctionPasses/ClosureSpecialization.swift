@@ -691,12 +691,12 @@ private struct SpecializationInfo {
       let clonedRootClosure = cloner.getClonedValue(of: rootClosure) as! PartialApplyInst
       let argsAreKeptAlive = cloner.context.tryOptimizeApplyOfPartialApply(closure: clonedRootClosure)
       // Unlike a regular closure (which only ever borrows, or independently copies, its captures),
-      // an at-most-once closure can have consuming captures. When the fold above transfers a
+      // a noncopyable closure can have consuming captures. When the fold above transfers a
       // non-Copyable capture to the new direct call, it can't copy it, so it leaves `Undef` in
       // `clonedRootClosure`'s own operand instead. Leaving such a closure's `partial_apply` behind
       // would still run its destructor at runtime, which would release whatever garbage is left
       // in that now-`Undef`'d capture slot.
-      if clonedRootClosure.hasCalledAtMostOnceSemantics {
+      if clonedRootClosure.isNoncopyable {
         _ = cloner.context.tryDeleteDeadClosure(closure: clonedRootClosure, needKeepArgsAlive: !argsAreKeptAlive)
       }
     }
@@ -763,8 +763,8 @@ private struct SpecializationInfo {
     let newCapturedArguments = rootClosures.flatMap { partialApply in
       partialApply.argumentOperands.map { argOp -> Value in
         let capturedArg = argOp.value
-        if partialApply.hasCalledAtMostOnceSemantics {
-          // An at-most-once closure can consume its captures and always gets a destructor even
+        if partialApply.isNoncopyable {
+          // A noncopyable closure can consume its captures and always gets a destructor even
           // if it's stack-promoted. So all of the arguments that are consumed have to be passed
           // the same way to the specialized version.
           if capturedArg.ownership != .none &&
@@ -984,7 +984,7 @@ private extension ParameterInfo {
     let argType = type.loweredType(in: partialApply.parentFunction)
     let specializedParamConvention = if self.convention.isIndirect {
       self.convention
-    } else if partialApply.hasCalledAtMostOnceSemantics {
+    } else if partialApply.isNoncopyable {
       if argType.isTrivial(in: callee) {
         ArgumentConvention.directUnowned
       } else if argOp.ownership == .destroyingConsume || argOp.ownership == .forwardingConsume {

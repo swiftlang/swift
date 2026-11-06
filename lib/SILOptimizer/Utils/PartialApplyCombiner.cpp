@@ -69,8 +69,8 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
   if (!pai->isOnStack()) {
     getConsumedPartialApplyArgs(pai, argsToHandle,
                                 /*includeTrivialAddrArgs*/ true);
-  } else if (pai->hasCalledAtMostOnceSemantics()) {
-    // An at-most-once on-stack closure can own (consume)
+  } else if (pai->isNoncopyable()) {
+    // A noncopyable on-stack closure can own (consume)
     // captures, so they have to be copied when possible.
     for (Operand &argOp : pai->getArgumentOperands()) {
       if (argOp.isConsuming())

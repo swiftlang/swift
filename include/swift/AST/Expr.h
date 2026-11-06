@@ -4188,6 +4188,9 @@ public:
   /// at-most-once and exactly-once closures.
   bool hasCalledAtMostOnceSemantics() const;
 
+  /// Whether calling this closure consumes it.
+  bool isCallConsuming() const;
+
   /// Whether this closure consists of a single expression.
   bool hasSingleExpressionBody() const;
 

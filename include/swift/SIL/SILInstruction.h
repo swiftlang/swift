@@ -3460,6 +3460,14 @@ public:
     return getFunctionType()->hasCalledAtMostOnceSemantics();
   }
 
+  /// Returns true if the resulting closure can't be copied. See
+  /// `SILFunctionType::isNoncopyable()`.
+  bool isNoncopyable() const { return getFunctionType()->isNoncopyable(); }
+
+  /// Returns true if calling the resulting closure consumes it. See
+  /// `SILFunctionType::isCallConsuming()`.
+  bool isCallConsuming() const { return getFunctionType()->isCallConsuming(); }
+
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }

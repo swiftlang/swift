@@ -1246,16 +1246,16 @@ namespace {
           // handle delayed initialization of the boxes and convert those to
           // initable_but_not_consumable.
           //
-          // at-most-once values are always consumed by whatever uses
-          // them, so a non-read access to one must permit consuming it,
-          // unlike an ordinary noncopyable var/let box, which only permits
-          // being fully reassigned.
+          // Function values whose call consumes them are always consumed by
+          // whatever uses them, so a non-read access to one must permit
+          // consuming it, unlike an ordinary noncopyable var/let box, which
+          // only permits being fully reassigned.
           addr = SGF.B.createMarkUnresolvedNonCopyableValueInst(
               loc, addr,
               isReadAccess(getAccessKind())
                   ? MarkUnresolvedNonCopyableValueInst::CheckKind::
                         NoConsumeOrAssign
-              : Value.getType().hasCalledAtMostOnceSemantics()
+              : Value.getType().isCallConsuming()
                   ? MarkUnresolvedNonCopyableValueInst::CheckKind::
                         ConsumableAndAssignable
                   : MarkUnresolvedNonCopyableValueInst::CheckKind::

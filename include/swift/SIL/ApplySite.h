@@ -565,7 +565,7 @@ public:
   /// `partial_apply` that the closure's context owns.
   bool hasContextOwnedAddressArgument(const Operand &oper) const {
     auto *pai = dyn_cast<PartialApplyInst>(Inst);
-    if (!pai || !pai->isOnStack() || !pai->hasCalledAtMostOnceSemantics())
+    if (!pai || !pai->isOnStack() || !pai->isNoncopyable())
       return false;
     SILType type = oper.get()->getType();
     return type.isAddress() && type.isMoveOnly() &&
