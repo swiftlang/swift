@@ -3767,8 +3767,11 @@ namespace {
       // Application of a DynamicMemberLookup result turns
       // a member access of `x.foo` into `x[dynamicMember: "foo", ...]`, or
       // `x[dynamicMember: KeyPath<T, U>, ...]`
+      // An implicit 'self.foo' for an unqualified 'foo' has no dot, so use
+      // the name's location instead.
       auto componentLoc =
-          overload.choice.getKind() == OverloadChoiceKind::DynamicMemberLookup
+          overload.choice.getKind() == OverloadChoiceKind::DynamicMemberLookup ||
+                  dotLoc.isInvalid()
               ? nameLoc
               : dotLoc;
       auto *argList = buildArgumentListForDynamicMemberLookupSubscript(
