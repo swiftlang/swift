@@ -465,8 +465,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK-NEXT: [[METH:%.*]] = class_method [[CAST_ARG2_LOADED]] : $PropertyRequirementBase, #PropertyRequirementBase.width!modify
   // CHECK-NEXT: ([[RES:%.*]], [[TOKEN:%.*]]) = begin_apply [[METH]]([[CAST_ARG2_LOADED]]) : $@yield_once @convention(method) (@guaranteed PropertyRequirementBase) -> @yields @inout Int
   // CHECK-NEXT: yield [[RES]]
-  // CHECK:      end_apply [[TOKEN]]
-  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ()
+  // CHECK:      [[TUPLE:%.*]] = end_apply [[TOKEN]] as $()
   // CHECK-NEXT: end_borrow [[ARG2_LOADED]]
   // CHECK-NEXT: return [[TUPLE]]
 
@@ -475,8 +474,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK: [[METH:%.*]] = function_ref @$s9witnesses23PropertyRequirementBaseC6heightSivMZ
   // CHECK-NEXT: ([[RES:%.*]], [[TOKEN:%.*]]) = begin_apply [[METH]]
   // CHECK-NEXT: yield [[RES]]
-  // CHECK:      end_apply [[TOKEN]]
-  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ()
+  // CHECK:      [[TUPLE:%.*]] = end_apply [[TOKEN]] as $()
   // CHECK-NEXT: return [[TUPLE]]
 
  // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses34PropertyRequirementWitnessFromBaseCAA0bC0A2aDP5depthSivMTW
@@ -485,8 +483,7 @@ class PropertyRequirementWitnessFromBase : PropertyRequirementBase, PropertyRequ
   // CHECK: [[METH:%.*]] = class_method [[ARG2_LOADED]] : $PropertyRequirementWitnessFromBase, #PropertyRequirementWitnessFromBase.depth!modify
   // CHECK-NEXT: ([[RES:%.*]], [[TOKEN:%.*]]) = begin_apply [[METH]]([[ARG2_LOADED]]) : $@yield_once @convention(method) (@guaranteed PropertyRequirementWitnessFromBase) -> @yields @inout Int
   // CHECK-NEXT: yield [[RES]]
-  // CHECK:      end_apply [[TOKEN]]
-  // CHECK-NEXT: [[TUPLE:%.*]] = tuple ()
+  // CHECK:      [[TUPLE:%.*]] = end_apply [[TOKEN]] as $()
   // CHECK-NEXT: end_borrow [[ARG2_LOADED]]
   // CHECK-NEXT: return [[TUPLE]]
 }
