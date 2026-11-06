@@ -62,6 +62,8 @@ extension ASTGenVisitor {
       return self.generate(suppressedType: node).asTypeRepr
     case .tupleType(let node):
       return self.generate(tupleType: node).asTypeRepr
+    case .yieldType(let node):
+      return self.generate(yieldType: node).asTypeRepr
     }
   }
 
@@ -236,6 +238,24 @@ extension ASTGenVisitor {
       self.ctx,
       base: base,
       repeatKeywordLoc: repeatLoc
+    )
+  }
+
+  func generate(yieldType node: YieldTypeSyntax) -> BridgedYieldTypeRepr {
+    let specifier: BridgedParamSpecifier
+    switch node.specifier?.keywordKind {
+    case .borrow:
+      specifier = .borrowing
+    case .inout:
+      specifier = .inOut
+    default:
+      specifier = .consuming
+    }
+    return .createParsed(
+      self.ctx,
+      base: self.generate(type: node.type),
+      yieldLoc: self.generateSourceLoc(node.yieldKeyword),
+      specifier: specifier
     )
   }
 

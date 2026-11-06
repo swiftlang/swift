@@ -703,6 +703,8 @@ private:
   NeverNullType
   resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
                                    TypeResolutionOptions options);
+  NeverNullType resolveYieldTypeRepr(YieldTypeRepr *repr,
+                                     TypeResolutionOptions options);
   NeverNullType
   resolveGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *repr,
                                      DeclContext *dc,
@@ -3244,6 +3246,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveLifetimeDependentTypeRepr(
         cast<LifetimeDependentTypeRepr>(repr), options);
 
+  case TypeReprKind::Yield:
+    return resolveYieldTypeRepr(cast<YieldTypeRepr>(repr), options);
+
   case TypeReprKind::GenericArgumentExpr:
     return resolveGenericArgumentExprTypeRepr(
         cast<GenericArgumentExprTypeRepr>(repr), getDeclContext(), options);
@@ -5294,6 +5299,14 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                     diag::lifetime_dependence_function_type);
   }
 
+  if (auto *yieldRepr = dyn_cast<YieldTypeRepr>(repr->getResultTypeRepr())) {
+    diagnoseInvalid(yieldRepr, yieldRepr->getYieldLoc(),
+                    ctx.LangOpts.hasFeature(Feature::SingleYieldFunctions)
+                        ? diag::single_yield_function_type_unsupported
+                        : diag::single_yield_requires_feature);
+    return ErrorType::get(ctx);
+  }
+
   SmallVector<AnyFunctionType::Yield, 1> yields;
   if (coroutine) {
     auto yieldsOptions = options.withoutContext();
@@ -6670,6 +6683,12 @@ TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
   return resolveType(repr->getBase(), options);
 }
 
+NeverNullType TypeResolver::resolveYieldTypeRepr(YieldTypeRepr *repr,
+                                                 TypeResolutionOptions options) {
+  diagnoseInvalid(repr, repr->getYieldLoc(), diag::yield_type_invalid_position);
+  return ErrorType::get(getASTContext());
+}
+
 static SourceLoc findClosureExpr(Expr *expr) {
   class ClosureFinder : public ASTWalker {
   public:
@@ -7841,6 +7860,7 @@ private:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::LifetimeDependent:
+    case TypeReprKind::Yield:
     case TypeReprKind::GenericArgumentExpr:
     case TypeReprKind::NonisolatedNonsending:
       return false;

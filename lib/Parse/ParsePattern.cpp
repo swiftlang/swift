@@ -847,8 +847,11 @@ ParserStatus Parser::parseFunctionSignature(
     parseEffectsSpecifiers(arrowLoc, asyncLoc, &reasync, throwsLoc, &rethrows,
                            thrownType);
 
+    // A single-yield function: `-> yield [borrow|inout] T`.
     ParserResult<TypeRepr> ResultType =
-        parseDeclResultType(diag::expected_type_function_result);
+        isStartOfSingleYieldResult()
+            ? parseSingleYieldResult()
+            : parseDeclResultType(diag::expected_type_function_result);
     retType = ResultType.getPtrOrNull();
     Status |= ResultType;
     if (Status.isErrorOrHasCompletion())

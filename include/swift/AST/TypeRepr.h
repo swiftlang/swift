@@ -1154,7 +1154,8 @@ public:
            T->getKind() == TypeReprKind::CompileTimeLiteral ||
            T->getKind() == TypeReprKind::ConstValue ||
            T->getKind() == TypeReprKind::LifetimeDependent ||
-           T->getKind() == TypeReprKind::Sending;
+           T->getKind() == TypeReprKind::Sending ||
+           T->getKind() == TypeReprKind::Yield;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1648,6 +1649,38 @@ private:
   friend class TypeRepr;
 };
 
+/// The yielded type of a single-yield function, written in the result
+/// position.
+/// \code
+///   func f() -> yield T
+///   func f() -> yield borrow T
+///   func f() -> yield inout T
+/// \endcode
+class YieldTypeRepr final : public SpecifierTypeRepr {
+  ParamSpecifier Specifier;
+
+public:
+  YieldTypeRepr(TypeRepr *base, SourceLoc yieldLoc, ParamSpecifier specifier)
+      : SpecifierTypeRepr(TypeReprKind::Yield, base, yieldLoc),
+        Specifier(specifier) {}
+
+  SourceLoc getYieldLoc() const { return getSpecifierLoc(); }
+
+  /// `Consuming` for `yield T`, `Borrowing` for `yield borrow T` and `InOut`
+  /// for `yield inout T`.
+  ParamSpecifier getSpecifier() const { return Specifier; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Yield;
+  }
+  static bool classof(const YieldTypeRepr *T) { return true; }
+
+private:
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
+  friend class TypeRepr;
+};
+
 class GenericArgumentExprTypeRepr final : public TypeRepr {
   /// Exactly the expr the programmer wrote
   Expr *originalArgExpr;
@@ -1726,6 +1759,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::CompileTimeLiteral:
   case TypeReprKind::ConstValue:
   case TypeReprKind::LifetimeDependent:
+  case TypeReprKind::Yield:
   case TypeReprKind::GenericArgumentExpr:
   case TypeReprKind::NonisolatedNonsending:
     return true;
