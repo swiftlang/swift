@@ -1,0 +1,122 @@
+// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify -o /dev/null 2>&1 | %FileCheck %s
+
+// How LifetimeResolution classifies the uses of the memory holding `self` in a derived class initializer.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class K {}
+
+class B {
+  init()
+}
+
+class D : B {
+  var k: K
+  override init()
+}
+
+// As in DefiniteInitialization, a function named `superinit` stands in for `super.init` in SIL tests.
+sil @superinit : $@convention(method) (@owned B) -> @owned B
+sil @takesB : $@convention(thin) (@owned B) -> ()
+sil @makeK : $@convention(thin) () -> @owned K
+
+// CHECK-LABEL: begin running test {{.*}} on super_init: lifetime_resolution_derived_self_uses
+// CHECK-NEXT:  initialStore: store %0 to [init] [[SLOT:%.*]] :
+// CHECK-NEXT:  ignored: debug_value [[SLOT]]
+// CHECK-NEXT:  borrow: {{%.*}} = load_borrow [[SLOT]]
+// CHECK-NEXT:  superInit: {{%.*}} = load [take] [[SLOT]]
+// CHECK-NEXT:    call: {{%.*}} = apply {{%.*}}({{%.*}})
+// CHECK-NEXT:  storeBack: store {{%.*}} to [init] [[SLOT]]
+// CHECK-NEXT:  copy: {{%.*}} = load [copy] [[SLOT]]
+// CHECK-NEXT:  destroy: destroy_addr [[SLOT]]
+// CHECK-NEXT:  end running test {{.*}} on super_init: lifetime_resolution_derived_self_uses
+sil [ossa] @super_init : $@convention(method) (@owned D) -> @owned D {
+bb0(%0 : @owned $D):
+  %1 = alloc_stack [lexical] [var_decl] $D, let, name "self"
+  %2 = mark_uninitialized [derivedself] %1
+  specify_test "lifetime_resolution_derived_self_uses %2"
+  store %0 to [init] %2
+  debug_value %2, let, name "self", expr op_deref
+  %5 = function_ref @makeK : $@convention(thin) () -> @owned K
+  %6 = apply %5() : $@convention(thin) () -> @owned K
+  %7 = load_borrow %2
+  %8 = ref_element_addr %7, #D.k
+  %9 = begin_access [modify] [dynamic] %8
+  assign %6 to %9
+  end_access %9
+  end_borrow %7
+  %13 = load [take] %2
+  %14 = upcast %13 to $B
+  %15 = function_ref @superinit : $@convention(method) (@owned B) -> @owned B
+  %16 = apply %15(%14) : $@convention(method) (@owned B) -> @owned B
+  %17 = unchecked_ref_cast %16 to $D
+  store %17 to [init] %2
+  %19 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %1
+  return %19
+}
+
+// A `super.init` take that LifetimeResolution demoted to a copy is still a `super.init`.
+// CHECK-LABEL: begin running test {{.*}} on demoted_super_init: lifetime_resolution_derived_self_uses
+// CHECK-NEXT:  initialStore: store %0 to [init] [[SLOT:%.*]] :
+// CHECK-NEXT:  superInit: {{%.*}} = load [copy] [[SLOT]]
+// CHECK-NEXT:    call: {{%.*}} = apply {{%.*}}({{%.*}})
+// CHECK-NEXT:  ignored: diagnose [missing_super_init] [[SLOT]]
+// CHECK-NEXT:  copy: {{%.*}} = load [copy] [[SLOT]]
+// CHECK-NEXT:  destroy: destroy_addr [[SLOT]]
+// CHECK-NEXT:  end running test {{.*}} on demoted_super_init: lifetime_resolution_derived_self_uses
+sil [ossa] @demoted_super_init : $@convention(method) (@owned D) -> @owned D {
+bb0(%0 : @owned $D):
+  %1 = alloc_stack [lexical] [var_decl] $D, let, name "self"
+  %2 = mark_uninitialized [derivedself] %1
+  specify_test "lifetime_resolution_derived_self_uses %2"
+  store %0 to [init] %2
+  %5 = load [copy] %2
+  diagnose [unpermitted_copy] %5 : $D
+  %7 = upcast %5 to $B
+  %8 = function_ref @superinit : $@convention(method) (@owned B) -> @owned B
+  %9 = apply %8(%7) : $@convention(method) (@owned B) -> @owned B
+  destroy_value %9
+  diagnose [missing_super_init] %2 : $*D
+  %12 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %1
+  return %12
+}
+
+// A take of `self` that isn't passed as the `self` of `super.init` isn't recognized.
+// CHECK-LABEL: begin running test {{.*}} on unrecognized_take: lifetime_resolution_derived_self_uses
+// CHECK-NEXT:  initialStore: store %0 to [init] [[SLOT:%.*]] :
+// CHECK-NEXT:  unknown: {{%.*}} = load [take] [[SLOT]]
+// CHECK-NEXT:  superInit: {{%.*}} = load [take] [[SLOT]]
+// CHECK-NEXT:    call: {{%.*}} = apply {{%.*}}({{%.*}})
+// CHECK-NEXT:  storeBack: store {{%.*}} to [init] [[SLOT]]
+// CHECK-NEXT:  copy: {{%.*}} = load [copy] [[SLOT]]
+// CHECK-NEXT:  destroy: destroy_addr [[SLOT]]
+// CHECK-NEXT:  end running test {{.*}} on unrecognized_take: lifetime_resolution_derived_self_uses
+sil [ossa] @unrecognized_take : $@convention(method) (@owned D) -> @owned D {
+bb0(%0 : @owned $D):
+  %1 = alloc_stack [lexical] [var_decl] $D, let, name "self"
+  %2 = mark_uninitialized [derivedself] %1
+  specify_test "lifetime_resolution_derived_self_uses %2"
+  store %0 to [init] %2
+  %5 = load [take] %2
+  %6 = upcast %5 to $B
+  %7 = function_ref @takesB : $@convention(thin) (@owned B) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (@owned B) -> ()
+  %9 = function_ref @superinit : $@convention(method) (@owned B) -> @owned B
+  %10 = load [take] %2
+  %11 = upcast %10 to $B
+  %12 = apply %9(%11) : $@convention(method) (@owned B) -> @owned B
+  %13 = apply %9(%12) : $@convention(method) (@owned B) -> @owned B
+  %14 = unchecked_ref_cast %13 to $D
+  store %14 to [init] %2
+  %16 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %1
+  return %16
+}

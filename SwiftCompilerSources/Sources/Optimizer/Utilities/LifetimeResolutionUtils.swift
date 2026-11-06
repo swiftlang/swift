@@ -137,6 +137,85 @@ struct StateIndexSpace: CustomStringConvertible {
 }
 
 //===----------------------------------------------------------------------===//
+//                            Derived Class Self
+//===----------------------------------------------------------------------===//
+
+/// A use of the memory holding `self` in a derived class initializer.
+enum DerivedSelfUse {
+  /// Stores the initializer's `self` argument.
+  case initialStore(StoreInst)
+
+  /// Borrows `self`, e.g. to access one of its stored properties.
+  case borrow(LoadBorrowInst)
+
+  /// Copies `self`, for a use of all of it.
+  case copy(LoadInst)
+
+  /// Loads `self` to pass it to `super.init`: a take, or a copy if LifetimeResolution demoted the take.
+  case superInit(LoadInst, FullApplySite)
+
+  /// Stores the result of `super.init`.
+  case storeBack(StoreInst)
+
+  case destroy(DestroyAddrInst)
+
+  /// Has no effect on `self`, like a `dealloc_stack`, `debug_value` or `diagnose`.
+  case ignored
+
+  case unknown
+
+  init(_ use: Operand) {
+    switch use.instruction {
+    case let store as StoreInst where use == store.destinationOperand:
+      if let argument = store.source as? FunctionArgument, argument.isSelf {
+        self = .initialStore(store)
+      } else {
+        self = .storeBack(store)
+      }
+    case let loadBorrow as LoadBorrowInst:
+      self = .borrow(loadBorrow)
+    case let load as LoadInst:
+      if let apply = superInitCall(passingSelfLoadedBy: load) {
+        self = .superInit(load, apply)
+      } else if load.loadOwnership == .copy {
+        self = .copy(load)
+      } else {
+        self = .unknown
+      }
+    case let destroy as DestroyAddrInst:
+      self = .destroy(destroy)
+    case is DeallocStackInst, is DebugValueInst, is DiagnoseInst:
+      self = .ignored
+    default:
+      self = .unknown
+    }
+  }
+}
+
+/// The call to `super.init` that takes `self` as loaded by `load`, if any.
+func superInitCall(passingSelfLoadedBy load: LoadInst) -> FullApplySite? {
+  guard let upcast = load.uses.ignoreDebugUses.ignore(usersOfType: DiagnoseInst.self).singleUse?.instruction
+                       as? UpcastInst else {
+    return nil
+  }
+  for use in upcast.uses {
+    guard let apply = use.instruction as? FullApplySite,
+          let argIndex = apply.calleeArgumentIndex(of: use),
+          argIndex == apply.calleeArgumentConventions.selfIndex else {
+      continue
+    }
+    if apply.callee is ObjCSuperMethodInst {
+      return apply
+    }
+    if let callee = (apply.callee as? FunctionRefBaseInst)?.referencedFunction,
+       callee.isInitializer || callee.name == "superinit" {
+      return apply
+    }
+  }
+  return nil
+}
+
+//===----------------------------------------------------------------------===//
 //                               Unit Tests
 //===----------------------------------------------------------------------===//
 
@@ -158,4 +237,21 @@ let lifetimeResolutionStateSpaceTest = FunctionTest("lifetime_resolution_state_s
     assert(space.range(of: space.element(at: index)) == index..<(index + 1))
   }
   assert(space.initialRanges.map { $0.range.count }.reduce(0, +) == space.count)
+}
+
+let lifetimeResolutionDerivedSelfUsesTest = FunctionTest("lifetime_resolution_derived_self_uses") {
+  function, arguments, context in
+  let value = arguments.takeValue()
+  for use in function.instructions.flatMap({ $0.operands }) where use.value == value {
+    switch DerivedSelfUse(use) {
+    case .initialStore(let store): print("initialStore: \(store)")
+    case .borrow(let loadBorrow): print("borrow: \(loadBorrow)")
+    case .copy(let load): print("copy: \(load)")
+    case .superInit(let load, let apply): print("superInit: \(load)\n  call: \(apply)")
+    case .storeBack(let store): print("storeBack: \(store)")
+    case .destroy(let destroy): print("destroy: \(destroy)")
+    case .ignored: print("ignored: \(use.instruction)")
+    case .unknown: print("unknown: \(use.instruction)")
+    }
+  }
 }

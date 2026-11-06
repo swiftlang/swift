@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: objc_interop
+
+// How LifetimeResolution classifies a call to an Objective-C `super.init` in a derived class initializer.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+@objc class Base {
+  init()
+}
+
+class D : Base {
+  override init()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on objc_super_init: lifetime_resolution_derived_self_uses
+// CHECK-NEXT:  initialStore: store %0 to [init] [[SLOT:%.*]] :
+// CHECK-NEXT:  superInit: {{%.*}} = load [take] [[SLOT]]
+// CHECK-NEXT:    call: {{%.*}} = apply {{%.*}}({{%.*}}) : $@convention(objc_method) (@owned Base) -> @owned Base
+// CHECK-NEXT:  storeBack: store {{%.*}} to [init] [[SLOT]]
+// CHECK-NEXT:  copy: {{%.*}} = load [copy] [[SLOT]]
+// CHECK-NEXT:  destroy: destroy_addr [[SLOT]]
+// CHECK-NEXT:  end running test {{.*}} on objc_super_init: lifetime_resolution_derived_self_uses
+sil [ossa] @objc_super_init : $@convention(method) (@owned D) -> @owned D {
+bb0(%0 : @owned $D):
+  %1 = alloc_stack [lexical] [var_decl] $D, let, name "self"
+  %2 = mark_uninitialized [derivedself] %1
+  specify_test "lifetime_resolution_derived_self_uses %2"
+  store %0 to [init] %2
+  %5 = load [take] %2
+  %6 = upcast %5 to $Base
+  %7 = begin_borrow %6
+  %8 = unchecked_ref_cast %7 to $D
+  %9 = objc_super_method %8, #Base.init!initializer.foreign : (Base.Type) -> () -> Base, $@convention(objc_method) (@owned Base) -> @owned Base
+  end_borrow %7
+  %11 = apply %9(%6) : $@convention(objc_method) (@owned Base) -> @owned Base
+  %12 = unchecked_ref_cast %11 to $D
+  store %12 to [init] %2
+  %14 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %1
+  return %14
+}

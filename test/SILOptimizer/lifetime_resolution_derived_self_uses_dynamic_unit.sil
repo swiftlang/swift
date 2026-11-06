@@ -1,0 +1,45 @@
+// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify -o /dev/null 2>&1 | %FileCheck %s
+
+// How LifetimeResolution classifies a call to a dynamically replaceable `super.init` in a derived class initializer.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class B {
+  init()
+}
+
+class D : B {
+  override init()
+}
+
+// As in DefiniteInitialization, a function named `superinit` stands in for `super.init` in SIL tests.
+sil [dynamically_replacable] @superinit : $@convention(method) (@owned B) -> @owned B
+
+// CHECK-LABEL: begin running test {{.*}} on dynamic_super_init: lifetime_resolution_derived_self_uses
+// CHECK-NEXT:  initialStore: store %0 to [init] [[SLOT:%.*]] :
+// CHECK-NEXT:  superInit: {{%.*}} = load [take] [[SLOT]]
+// CHECK-NEXT:    call: {{%.*}} = apply {{%.*}}({{%.*}}) : $@convention(method) (@owned B) -> @owned B
+// CHECK-NEXT:  storeBack: store {{%.*}} to [init] [[SLOT]]
+// CHECK-NEXT:  copy: {{%.*}} = load [copy] [[SLOT]]
+// CHECK-NEXT:  destroy: destroy_addr [[SLOT]]
+// CHECK-NEXT:  end running test {{.*}} on dynamic_super_init: lifetime_resolution_derived_self_uses
+sil [ossa] @dynamic_super_init : $@convention(method) (@owned D) -> @owned D {
+bb0(%0 : @owned $D):
+  %1 = alloc_stack [lexical] [var_decl] $D, let, name "self"
+  %2 = mark_uninitialized [derivedself] %1
+  specify_test "lifetime_resolution_derived_self_uses %2"
+  store %0 to [init] %2
+  %5 = load [take] %2
+  %6 = upcast %5 to $B
+  %7 = dynamic_function_ref @superinit : $@convention(method) (@owned B) -> @owned B
+  %8 = apply %7(%6) : $@convention(method) (@owned B) -> @owned B
+  %9 = unchecked_ref_cast %8 to $D
+  store %9 to [init] %2
+  %11 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %1
+  return %11
+}
