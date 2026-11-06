@@ -14,8 +14,6 @@ let i: Int = "Hello"
 
 #if arch(arm) && os(none) && _pointerBitWidth(_32)
 #if _hasAtomicBitWidth(_8) && _hasAtomicBitWidth(_16) && _hasAtomicBitWidth(_32)
-class C {}
-var x = C()
+#warning("word-sized atomics are available") // expected-warning {{word-sized atomics are available}}
 #endif
 #endif
-var y = x
