@@ -534,6 +534,14 @@ There are two main ways to run tests:
    The `-s` and `-vv` flags print a progress bar and the executed commands
    respectively.
 
+The paths above assume the `Ninja-RelWithDebInfoAssert` build directory created
+by `build-script --release-debuginfo`. The directory name depends on the build
+options, so adjust the paths to match the one in your `build` directory. For
+example, adding `--debug-swift` creates
+`Ninja-RelWithDebInfoAssert+swift-DebugAssert`. If `run-test` reports
+"Can't infer swift build directory", the test path usually doesn't match an
+existing build directory.
+
 If you are making small changes to the compiler or some other component, you'll
 likely want to [incrementally rebuild](#editing-code) only the relevant
 target and use `lit.py` with `--filter`. One potential failure mode with this
