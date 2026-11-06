@@ -2133,7 +2133,9 @@ namespace {
       std::string typeEnc;
       if (field.getKind() == Field::Var) {
         auto *varDecl = field.getVarDecl();
-        if (varDecl->isObjC() && varDecl->hasStorage()) {
+        // A direct property's ivar gets no type encoding.
+        if (varDecl->isObjC() && !varDecl->isObjCDirect() &&
+            varDecl->hasStorage()) {
           auto varTy = varDecl->getInterfaceType();
           auto varDC = varDecl->getDeclContext();
           bool isTriviallyRepresentable = varTy->isTriviallyRepresentableIn(

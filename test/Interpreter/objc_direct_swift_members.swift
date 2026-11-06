@@ -85,3 +85,22 @@ print(s.responds(to: NSSelectorFromString("count")),
       s.responds(to: NSSelectorFromString("total")),
       c.responds(to: NSSelectorFromString("initWithValue:")),
       t.responds(to: NSSelectorFromString("initWithTwice:")))
+
+// A direct property's ivar has no type encoding, so KVC cannot write it behind
+// the property's back; it raises instead.
+class Ivars: NSObject {
+  @objcDirect var direct: Int = 1
+  @objcDirect var directObject: NSObject = NSObject()
+  @objc var plain: Int = 2
+}
+
+func encoding(_ name: String) -> String {
+  guard let ivar = class_getInstanceVariable(Ivars.self, name) else {
+    return "<no ivar>"
+  }
+  guard let enc = ivar_getTypeEncoding(ivar) else { return "<null>" }
+  return String(cString: enc)
+}
+
+// CHECK-NEXT: direct='' directObject='' plain='q'
+print("direct='\(encoding("direct"))' directObject='\(encoding("directObject"))' plain='\(encoding("plain"))'")
