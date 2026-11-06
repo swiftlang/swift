@@ -50,22 +50,10 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   Diags.addConsumer(DiagPrinter);
 
   std::unique_ptr<llvm::opt::OptTable> Table = createSwiftOptTable();
-  unsigned MissingIndex;
-  unsigned MissingCount;
-  llvm::opt::InputArgList ParsedArgs = Table->ParseArgs(
-      Args, MissingIndex, MissingCount,
-      SwiftSynthesizeInterfaceOption | ModuleLoadingOption);
-  if (MissingCount) {
-    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
-                   ParsedArgs.getArgString(MissingIndex), MissingCount);
-    return EXIT_FAILURE;
-  }
-
-  if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
-    for (const auto *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
-      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
-                     A->getAsString(ParsedArgs));
-    }
+  llvm::opt::InputArgList ParsedArgs(nullptr, nullptr);
+  if (CompilerInvocation::parseDriverToolArgs(
+          *Table, Args, ParsedArgs,
+          SwiftSynthesizeInterfaceOption | ModuleLoadingOption, Diags)) {
     return EXIT_FAILURE;
   }
 

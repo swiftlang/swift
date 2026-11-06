@@ -4759,6 +4759,84 @@ bool CompilerInvocation::parseModuleLoadingArgs(
   return false;
 }
 
+bool CompilerInvocation::parseDriverToolArgs(
+    llvm::opt::OptTable &Table, ArrayRef<const char *> Args,
+    llvm::opt::InputArgList &ParsedArgs, unsigned FlagsToInclude,
+    DiagnosticEngine &Diags) {
+  using namespace options;
+
+  unsigned MissingIndex;
+  unsigned MissingCount;
+  ParsedArgs =
+      Table.ParseArgs(Args, MissingIndex, MissingCount, FlagsToInclude);
+  if (MissingCount) {
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   ParsedArgs.getArgString(MissingIndex), MissingCount);
+    return true;
+  }
+
+  if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(ParsedArgs));
+    }
+    return true;
+  }
+
+  if (!ParsedArgs.hasArg(OPT_Xfrontend))
+    return false;
+
+  // Validate that the arguments passed via -Xfrontend are valid FrontendOptions.
+  SmallVector<const char *, 16> XFrontendArgs;
+  llvm::SmallDenseSet<unsigned, 16> XFrontendTokenIndices;
+  for (const Arg *A : ParsedArgs.filtered(OPT_Xfrontend)) {
+    XFrontendArgs.push_back(A->getValue());
+    XFrontendTokenIndices.insert(A->getIndex());
+  }
+
+  llvm::opt::InputArgList ValidatedXFrontendArgs = Table.ParseArgs(
+      XFrontendArgs, MissingIndex, MissingCount, FrontendOption);
+  if (MissingCount) {
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   ValidatedXFrontendArgs.getArgString(MissingIndex),
+                   MissingCount);
+    return true;
+  }
+  if (ValidatedXFrontendArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : ValidatedXFrontendArgs.filtered(OPT_UNKNOWN)) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(ValidatedXFrontendArgs));
+    }
+    return true;
+  }
+
+  // Re-parse the full argument list with -Xfrontend tokens stripped so relative
+  // argument ordering is preserved.
+  SmallVector<const char *, 64> ExpandedArgs;
+  ExpandedArgs.reserve(Args.size());
+  for (unsigned i = 0, n = Args.size(); i != n; ++i) {
+    if (!XFrontendTokenIndices.contains(i))
+      ExpandedArgs.push_back(Args[i]);
+  }
+
+  ParsedArgs = Table.ParseArgs(ExpandedArgs, MissingIndex, MissingCount,
+                               FlagsToInclude | FrontendOption);
+  if (MissingCount) {
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   ParsedArgs.getArgString(MissingIndex), MissingCount);
+    return true;
+  }
+  if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(ParsedArgs));
+    }
+    return true;
+  }
+
+  return false;
+}
+
 serialization::Status
 CompilerInvocation::loadFromSerializedAST(StringRef data) {
   serialization::ExtendedValidationInfo extendedInfo;

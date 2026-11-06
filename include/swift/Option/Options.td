@@ -1612,7 +1612,8 @@ def num_threads : Separate<["-"], "num-threads">,
   HelpText<"Enable multi-threading and specify number of threads">,
   MetaVarName<"<n>">;
 
-def Xfrontend : Separate<["-"], "Xfrontend">, Flags<[HelpHidden]>,
+def Xfrontend : Separate<["-"], "Xfrontend">,
+  Flags<[HelpHidden, ModuleLoadingOption]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to the Swift frontend">;
 
 def Xcc : Separate<["-"], "Xcc">,
