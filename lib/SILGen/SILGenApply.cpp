@@ -317,6 +317,68 @@ static void convertOwnershipConventionsGivenParamInfos(
                   });
 }
 
+/// Returns the member of an '@objc @implementation' extension in this module
+/// that implements \p imported, a direct method or accessor declared by a
+/// header, otherwise null.
+/// E.g. 'triple()' in '@objc @implementation extension Calc' for
+/// '- (Triple)triple __attribute__((objc_direct));'.
+static AbstractFunctionDecl *
+getObjCDirectImplementation(SILGenModule &SGM, AbstractFunctionDecl *imported) {
+  // An accessor is matched through its storage, so one without a selector,
+  // e.g. 'modify', still finds its implementation.
+  auto *accessor = dyn_cast<AccessorDecl>(imported);
+  ValueDecl *decl = imported;
+  if (accessor)
+    decl = accessor->getStorage();
+  if (!decl->hasClangNode() || !imported->isObjCDirectDispatched())
+    return nullptr;
+
+  auto *interface = decl->getDeclContext()->getAsDecl();
+  auto *impl = dyn_cast_or_null<ExtensionDecl>(
+      interface ? interface->getObjCImplementationDecl() : nullptr);
+  if (!impl || impl->getModuleContext() != SGM.SwiftModule)
+    return nullptr;
+
+  // TODO: We could modify ObjCInterfaceAndImplementationRequest to pair
+  // members, but its callers assume a paired function is a C or C++
+  // '@implementation', so that could be a rather large change to fit into
+  // this PR.
+  for (auto *member : impl->getMembers()) {
+    auto *candidate = dyn_cast<ValueDecl>(member);
+    if (!candidate || !candidate->isObjCDirect() ||
+        candidate->isStatic() != decl->isStatic())
+      continue;
+    if (auto *storage = dyn_cast<AbstractStorageDecl>(candidate)) {
+      if (accessor && storage->getObjCGetterSelector() ==
+                          accessor->getStorage()->getObjCGetterSelector())
+        return storage->getOpaqueAccessor(accessor->getAccessorKind());
+    } else if (auto *func = dyn_cast<AbstractFunctionDecl>(candidate)) {
+      if (!accessor && func->getObjCSelector() == imported->getObjCSelector())
+        return func;
+    }
+  }
+  return nullptr;
+}
+
+std::optional<SILDeclRef>
+SILGenFunction::getObjCDirectImplementationRef(SILDeclRef constant) {
+  if (F.isAnySerialized() || !constant.hasDecl())
+    return std::nullopt;
+  auto *imported = dyn_cast<AbstractFunctionDecl>(constant.getDecl());
+  auto *impl = imported ? getObjCDirectImplementation(SGM, imported) : nullptr;
+  if (!impl)
+    return std::nullopt;
+  // If the signature is not aligned, e.g. header expects 'String' while the
+  // implementation returns 'String!', then we should still call through the
+  // thunk.
+  auto unlabeled = [](AbstractFunctionDecl *fn) {
+    return fn->getInterfaceType()->removeArgumentLabels(2);
+  };
+  if (!unlabeled(impl)->isEqual(unlabeled(imported)))
+    return std::nullopt;
+  return SILDeclRef(impl, constant.kind);
+}
+
 //===----------------------------------------------------------------------===//
 //                                   Callee
 //===----------------------------------------------------------------------===//
@@ -478,6 +540,10 @@ public:
                           SubstitutionMap subs,
                           SILLocation l,
                           bool callPreviousDynamicReplaceableImpl = false) {
+    // If the callee is a direct '@objc @implementation' method in the same
+    // module, we can just call the native entry point instead of the thunks.
+    if (auto native = SGF.getObjCDirectImplementationRef(c))
+      c = *native;
     auto &ci = SGF.getConstantInfo(SGF.getTypeExpansionContext(), c);
     return Callee(
         SGF, c, ci.FormalPattern, ci.FormalType,

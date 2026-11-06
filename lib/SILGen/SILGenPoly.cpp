@@ -7577,6 +7577,11 @@ void SILGenFunction::emitProtocolWitness(
     witnessSubs = SubstitutionMap::get(derivativeId->getDerivativeGenericSignature(),
                                        witnessSubs);
   
+  // A direct method this module implements is witnessed by its native entry
+  // point, just as it's called.
+  if (auto native = getObjCDirectImplementationRef(witness))
+    witness = *native;
+
   // Then get the type of the witness.
   auto witnessKind = getWitnessDispatchKind(witness, isSelfConformance);
   auto witnessInfo = getConstantInfo(getTypeExpansionContext(), witness);

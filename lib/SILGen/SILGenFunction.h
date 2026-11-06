@@ -2001,6 +2001,11 @@ public:
                         SILConstantInfo constantInfo,
                         bool callPreviousDynamicReplaceableImpl = false);
 
+  /// Returns the implementation's native entry point if \p constant is a
+  /// direct method that a header declares and this module implements with
+  /// '@objc @implementation', otherwise std::nullopt.
+  std::optional<SILDeclRef> getObjCDirectImplementationRef(SILDeclRef constant);
+
   /// Returns a reference to a function value that dynamically dispatches
   /// the function in a runtime-modifiable way.
   ManagedValue emitDynamicMethodRef(SILLocation loc, SILDeclRef constant,
