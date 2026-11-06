@@ -191,7 +191,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     # check-incremental determinism check. -pch-output-dir gives the PCH a
     # content-hashed name in this directory, so the recorded path is stable.
     -pch-output-dir ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedSynchronizationPCH
-    -enable-experimental-feature LiteralExpressions)
+    -enable-experimental-feature LiteralExpressions
+    -Xfrontend -enable-sil-opaque-values)
 
   # wasm32 builds the full Synchronization library plus its wasm-specific
   # mutex implementation.

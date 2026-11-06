@@ -80,7 +80,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
     "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
     -internal-import-bridging-header
       ${CMAKE_CURRENT_SOURCE_DIR}/../../../EmbeddedPlatform/swift/EmbeddedPlatform.h
-    -pch-output-dir ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedObservationPCH)
+    -pch-output-dir ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedObservationPCH
+    -Xfrontend -enable-sil-opaque-values)
 
   set(_embedded_observation_all_triples "${EMBEDDED_STDLIB_TARGET_TRIPLES}")
 
