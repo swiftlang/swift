@@ -108,6 +108,13 @@ where SubSequence: MutableCollection
   ///     print(streets[index!])
   ///     // Prints "Eustace"
   ///
+  /// When you assign a new slice through this subscript, the new slice must
+  /// have the same number of elements as the range it replaces, because a
+  /// mutable collection can't change its length. The default implementation
+  /// of this subscript traps at runtime if the counts don't match. To insert or
+  /// remove elements, use a collection that conforms to
+  /// `RangeReplaceableCollection` and call `replaceSubrange(_:with:)` instead.
+  ///
   /// - Parameter bounds: A range of the collection's indices. The bounds of
   ///   the range must be valid indices of the collection.
   ///
