@@ -22,7 +22,7 @@ from .. import shell
 class EmscriptenHostLLVM(product.Product):
     @classmethod
     def product_source_name(cls):
-        return os.path.join("llvm-project", "llvm")
+        return os.path.join(cls.llvm_source_dirname, "llvm")
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -121,7 +121,7 @@ class EmscriptenHostLLVM(product.Product):
         sys.exit(1)
 
     def _cache_file_path(self):
-        # source_dir is <root>/llvm-project/llvm; the cache lives in the
+        # source_dir is <root>/<llvm-project>/llvm; the cache lives in the
         # sibling swift repo.
         source_root = os.path.dirname(os.path.dirname(self.source_dir))
         return os.path.join(source_root, 'swift', 'cmake', 'caches',

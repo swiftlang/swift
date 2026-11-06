@@ -1531,6 +1531,11 @@ def create_argument_parser():
     # -------------------------------------------------------------------------
     in_group('Build settings specific for LLVM')
 
+    option('--llvm-source-dirname', store,
+           default='llvm-project',
+           help='name of the llvm-project source directory under '
+                '$SWIFT_SOURCE_ROOT')
+
     option('--llvm-enable-modules', toggle_true('llvm_enable_modules'),
            help='enable building llvm using modules')
 

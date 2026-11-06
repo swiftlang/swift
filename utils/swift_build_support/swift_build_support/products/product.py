@@ -29,6 +29,11 @@ def is_debug_info_variant(build_variant):
 
 
 class Product(object):
+    # The name of the llvm-project source directory under the source root. This
+    # is set from --llvm-source-dirname, e.g. to build from an llvm-project
+    # worktree.
+    llvm_source_dirname = 'llvm-project'
+
     @classmethod
     def product_name(cls):
         """product_name() -> str
@@ -54,7 +59,7 @@ class Product(object):
                          'llvm']
 
         if cls.product_name() in llvm_projects:
-            return "llvm-project/{}".format(cls.product_name())
+            return "{}/{}".format(cls.llvm_source_dirname, cls.product_name())
         return cls.product_name()
 
     @classmethod
