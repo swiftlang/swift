@@ -128,3 +128,30 @@ public func testBlockConstRefTrivial() {
 public func testBlockConstRefStrong() {
   blockConstRefStrong({S in });
 }
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s4main34testConstRefNonTrivialStructAssign
+// CHECK-SAME: $@convention(c) (@in_guaranteed NonTrivial) -> () {
+// CHECK: bb0(%[[V0:.*]] : $*NonTrivial):
+
+public func testConstRefNonTrivialStructAssign() {
+  var s = ConstRefNonTrivialFPStruct()
+  s.fp = { S in }
+}
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s4main31testConstRefTrivialStructAssign
+// CHECK-SAME: $@convention(c) (@in_guaranteed Trivial) -> () {
+// CHECK: bb0(%[[V0:.*]] : $*Trivial):
+
+public func testConstRefTrivialStructAssign() {
+  var s = ConstRefTrivialFPStruct()
+  s.fp = { S in }
+}
+
+// CHECK-LABEL: sil private [thunk] [ossa] @$s4main42testNullableConstRefNonTrivialStructAssign
+// CHECK-SAME: $@convention(c) (@in_guaranteed NonTrivial) -> () {
+// CHECK: bb0(%[[V0:.*]] : $*NonTrivial):
+
+public func testNullableConstRefNonTrivialStructAssign() {
+  var s = NullableConstRefNonTrivialFPStruct()
+  s.fp = { S in }
+}
