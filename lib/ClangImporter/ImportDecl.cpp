@@ -3790,7 +3790,17 @@ namespace {
         if (hasUnsafeAPIAttr(decl))
           Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_unsafe",
                         decl->getNameAsString());
-        if (hasOwnedValueAttr(decl))
+        // SWIFT_SELF_CONTAINED(_IF) pairs import_owned with an escapability
+        // annotation, which still applies to a type that is only used
+        // indirectly (e.g. through std::shared_ptr), so do not warn then.
+        bool hasEscapabilityAnnotation =
+            hasEscapableAttr(decl) ||
+            llvm::any_of(decl->specific_attrs<clang::SwiftAttrAttr>(),
+                         [](const clang::SwiftAttrAttr *attr) {
+                           return attr->getAttribute().starts_with(
+                               "escapable_if:");
+                         });
+        if (hasOwnedValueAttr(decl) && !hasEscapabilityAnnotation)
           Impl.diagnose(loc, diag::api_pattern_attr_ignored, "import_owned",
                         decl->getNameAsString());
         if (hasIteratorAPIAttr(decl))

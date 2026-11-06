@@ -6263,7 +6263,7 @@ getSTLConditionalEscapabilityParams(StringRef name) {
 }
 
 /// The template parameter names listed by a conditional annotation such as
-/// `SWIFT_ESCAPABLE_IF(T, U)`. These are always few enough to stay inline.
+/// `SWIFT_SELF_CONTAINED_IF(T, U)`. These are always few enough to stay inline.
 using ConditionalAttrParams = llvm::SmallSet<StringRef, 4>;
 
 template <typename Kind>
@@ -6434,7 +6434,7 @@ computeClangTypeEscapability(Evaluator &evaluator,
   // (importing them as non-escapable broke backward compatibility)
   // - a record type is escapable or non-escapable if it is explicitly annotated
   // as such
-  // - a record type is escapable if it is annotated with SWIFT_ESCAPABLE_IF()
+  // - a record type is escapable if it is annotated with SWIFT_SELF_CONTAINED_IF()
   // and none of the annotation arguments are non-escapable
   // - a non-cxx record, or a non-polymorphic CxxRecordDecl, is escapable if
   // none of their fields or bases are non-escapable (as long as they have a
@@ -6485,7 +6485,7 @@ computeClangTypeEscapability(Evaluator &evaluator,
       pushedBy.try_emplace(desugared, *provenance);
   };
   // Pushes along the current path. The conditional-parameter path uses this:
-  // SWIFT_ESCAPABLE_IF is a promise about the arguments, so the annotated
+  // SWIFT_SELF_CONTAINED_IF is a promise about the arguments, so the annotated
   // record's own copy, move or destruction must not demote them.
   auto maybePushToStack = [&](const clang::Type *type, bool isBase=false) {
     push(type, demotedBy, std::nullopt);
@@ -10376,9 +10376,9 @@ bool importer::isSymbolicCircularBase(const clang::CXXRecordDecl *symbolicClass,
 
 static const std::vector<std::vector<std::pair<StringRef, StringRef>>>
     ConflictingSwiftAttrs = {
-        {{"Escapable", "SWIFT_ESCAPABLE"},
-         {"~Escapable", "SWIFT_NONESCAPABLE"},
-         {"escapable_if:", "SWIFT_ESCAPABLE_IF"}},
+        {{"Escapable", "SWIFT_SELF_CONTAINED"},
+         {"~Escapable", "SWIFT_VIEW"},
+         {"escapable_if:", "SWIFT_SELF_CONTAINED_IF"}},
         {{"~Copyable", "SWIFT_NONCOPYABLE"},
          {"copyable_if:", "SWIFT_COPYABLE_IF"}},
         {{"mutating", "SWIFT_MUTATING"}, {"nonmutating", "'nonmutating'"}}};
