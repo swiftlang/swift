@@ -1,6 +1,7 @@
 include_guard(GLOBAL)
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../../cmake/modules/SwiftUtils.cmake)
+include(${CMAKE_CURRENT_LIST_DIR}/../../../Runtimes/cmake/modules/SwiftRuntimePageSize.cmake)
 
 precondition(SWIFT_HOST_VARIANT_SDK)
 precondition(SWIFT_DARWIN_PLATFORMS)
@@ -289,3 +290,9 @@ set(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH "" CACHE STRING
   "If set, provides a fixed path to the swift-backtrace binary.  This
    will disable dynamic determination of the path and will also disable
    the setting in SWIFT_BACKTRACE.")
+
+set(SWIFT_RUNTIME_PAGE_SIZE "" CACHE STRING
+  "Maximum supported runtime page size in bytes, used for buffer alignment and ELF linking. Leave empty to use the target platform default.")
+if(NOT "${SWIFT_RUNTIME_PAGE_SIZE}" STREQUAL "")
+  swift_runtime_validate_page_size("${SWIFT_RUNTIME_PAGE_SIZE}")
+endif()

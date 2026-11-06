@@ -2,6 +2,7 @@
 include(AddSwift)
 include(SwiftSource)
 include(CompatibilityLibs)
+include(${CMAKE_CURRENT_LIST_DIR}/../../../Runtimes/cmake/modules/SwiftRuntimePageSize.cmake)
 
 function(add_dependencies_multiple_targets)
   cmake_parse_arguments(
@@ -1761,6 +1762,27 @@ function(add_swift_target_library_single target name)
     set(PLIST_INFO_BUILD_VERSION)
   endif()
 
+  # Keep runtime buffer alignment and linking in agreement for each target.
+  if(name STREQUAL "swiftRuntimeCore" OR name STREQUAL "swiftCore")
+    swift_runtime_get_page_size(runtime_page_size
+      "${SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}"
+      "${SWIFT_RUNTIME_PAGE_SIZE}")
+    if(name STREQUAL "swiftRuntimeCore")
+      list(APPEND c_compile_flags "-DSWIFT_PAGE_SIZE=${runtime_page_size}")
+    elseif(SWIFT_SDK_${SWIFTLIB_SINGLE_SDK}_OBJECT_FORMAT STREQUAL "ELF")
+      if(libkind STREQUAL "SHARED")
+        list(APPEND link_flags "LINKER:-z,max-page-size=${runtime_page_size}")
+      else()
+        target_link_options(${target} INTERFACE
+          "LINKER:-z,max-page-size=${runtime_page_size}")
+      endif()
+      if(target_static)
+        target_link_options(${target_static} INTERFACE
+          "LINKER:-z,max-page-size=${runtime_page_size}")
+      endif()
+    endif()
+  endif()
+
   # Set compilation and link flags.
   if(SWIFTLIB_SINGLE_SDK STREQUAL "WINDOWS")
     if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
@@ -2741,8 +2763,11 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_link_flags_all "-shared")
         # TODO: Instead of `lib${name}.so` find variable or target property which already have this value.
         list(APPEND swiftlib_link_flags_all "-Wl,-soname,lib${name}.so")
-        # Ensure compatibility with Android 15+ devices using 16KB memory pages.
-        list(APPEND swiftlib_link_flags_all "-Wl,-z,max-page-size=16384")
+        # swiftCore uses the configured runtime page size.
+        if(NOT name STREQUAL "swiftCore")
+          # Ensure compatibility with Android 15+ devices using 16KB memory pages.
+          list(APPEND swiftlib_link_flags_all "-Wl,-z,max-page-size=16384")
+        endif()
       endif()
 
       if (SWIFTLIB_BACK_DEPLOYMENT_LIBRARY)

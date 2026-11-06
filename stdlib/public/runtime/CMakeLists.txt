@@ -116,7 +116,18 @@ set(swift_runtime_library_compile_flags ${swift_runtime_compile_flags})
 list(APPEND swift_runtime_library_compile_flags -DswiftCore_EXPORTS)
 list(APPEND swift_runtime_library_compile_flags -I${SWIFT_SOURCE_DIR}/stdlib/include/llvm/Support -I${SWIFT_SOURCE_DIR}/include)
 
-set(static_binary_lnk_file_list)
+# Driver response files are shared by all architectures in an SDK. Use the
+# largest required alignment so they are safe for every runtime in that SDK.
+foreach(sdk ${SWIFT_SDKS})
+  set(swift_runtime_link_page_size_${sdk} 0)
+  foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
+    swift_runtime_get_page_size(page_size
+      "${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE}" "${SWIFT_RUNTIME_PAGE_SIZE}")
+    if(page_size GREATER swift_runtime_link_page_size_${sdk})
+      set(swift_runtime_link_page_size_${sdk} ${page_size})
+    endif()
+  endforeach()
+endforeach()
 
 foreach(sdk ${SWIFT_SDKS})
   if(NOT SWIFT_SDK_${sdk}_STATIC_LINKING_SUPPORTED)
@@ -129,17 +140,16 @@ foreach(sdk ${SWIFT_SDKS})
 
     # Generate the static-executable-args.lnk file used for ELF systems (eg linux)
     set(linkfile "${lib_dir}/static-executable-args.lnk")
-    add_custom_command_target(swift_static_binary_${sdk}_args
-      COMMAND
-      "${CMAKE_COMMAND}" -E copy
-      "${static_binary_lnk_src}"
-      "${SWIFTSTATICLIB_DIR}/${linkfile}"
-      OUTPUT
-      "${SWIFTSTATICLIB_DIR}/${linkfile}"
-      DEPENDS
-      "${static_binary_lnk_src}")
+    if(SWIFT_SDK_${sdk}_OBJECT_FORMAT STREQUAL "ELF")
+      swift_runtime_configure_link_file(
+        "${static_binary_lnk_src}"
+        "${SWIFTSTATICLIB_DIR}/${linkfile}"
+        "${swift_runtime_link_page_size_${sdk}}")
+    else()
+      configure_file("${static_binary_lnk_src}"
+        "${SWIFTSTATICLIB_DIR}/${linkfile}" COPYONLY)
+    endif()
 
-    list(APPEND static_binary_lnk_file_list ${swift_static_binary_${sdk}_args})
     swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
       DESTINATION "lib/swift_static/${lib_dir}"
       COMPONENT stdlib)
@@ -280,16 +290,10 @@ foreach(sdk ${SWIFT_SDKS})
     set(static_stdlib_lnk_src "${SWIFT_SOURCE_DIR}/stdlib/public/Resources/${lib_dir}/static-stdlib-args.lnk")
     set(linkfile ${lib_dir}/static-stdlib-args.lnk)
     if(EXISTS "${static_stdlib_lnk_src}")
-      add_custom_command_target(swift_static_stdlib_${sdk}_args
-        COMMAND
-        "${CMAKE_COMMAND}" -E copy
+      swift_runtime_configure_link_file(
         "${static_stdlib_lnk_src}"
         "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        OUTPUT
-        "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        DEPENDS
-        "${static_stdlib_lnk_src}")
-      list(APPEND static_binary_lnk_file_list ${swift_static_stdlib_${sdk}_args})
+        "${swift_runtime_link_page_size_${sdk}}")
     else()
       set(libpthread -lpthread)
       set(concurrency_libs)
@@ -301,11 +305,10 @@ foreach(sdk ${SWIFT_SDKS})
         set(concurrency_libs "-ldispatch -lBlocksRuntime")
       endif()
 
-      configure_file(
+      swift_runtime_configure_link_file(
         "${SWIFT_SOURCE_DIR}/stdlib/public/Resources/static-stdlib-args.lnk.in"
         "${SWIFTSTATICLIB_DIR}/${linkfile}"
-        @ONLY
-        NEWLINE_STYLE LF)
+        "${swift_runtime_link_page_size_${sdk}}")
     endif()
 
     swift_install_in_component(FILES "${SWIFTSTATICLIB_DIR}/${linkfile}"
@@ -314,8 +317,3 @@ foreach(sdk ${SWIFT_SDKS})
   endif()
 
 endforeach()
-
-if(static_binary_lnk_file_list)
-  add_dependencies(stdlib ${static_binary_lnk_file_list})
-  add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
-endif()
