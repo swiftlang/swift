@@ -133,6 +133,8 @@ private:
   template <bool templateArgument>
   clang::QualType convertPointerType(CanType pointeeType, PointerKind kind);
 
+  clang::QualType convertCArrayType(Type eltTy, const APInt &size);
+
   void registerExportedClangDecl(Decl *swiftDecl,
                                  const clang::Decl *clangDecl);
 

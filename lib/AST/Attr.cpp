@@ -2255,6 +2255,14 @@ StringRef DeclAttribute::getAttrName() const {
     return "<<ObjC bridged>>";
   case DeclAttrKind::SynthesizedProtocol:
     return "<<synthesized protocol>>";
+  case DeclAttrKind::CArrayProjection:
+    switch (cast<CArrayProjectionAttr>(this)->getProjection()) {
+    case CArrayProjection::Modern: return "_cArrayProjection(modern)";
+    case CArrayProjection::Legacy: return "_cArrayProjection(legacy)";
+    case CArrayProjection::HiddenStorage:
+      return "_cArrayProjection(hiddenStorage)";
+    }
+    llvm_unreachable("unknown CArrayProjection");
   case DeclAttrKind::Specialized:
     return "specialized";
   case DeclAttrKind::Specialize:

@@ -1,7 +1,95 @@
-// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/array_typedef.h %s
-// RUN: %target-swift-emit-silgen -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/array_typedef.h %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -enable-objc-interop -disable-objc-attr-requires-foundation-module %clang-importer-sdk %s
+// RUN: %target-swift-emit-silgen -enable-objc-interop -disable-objc-attr-requires-foundation-module %clang-importer-sdk %s | %FileCheck %s --check-prefix=LEGACY
 
-// CHECK-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo4NameV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (UInt8, UInt8, UInt8, UInt8, @thin Name.Type) -> Name
-func useImportedArrayTypedefInit() -> Name {
-  return Name(name: (0, 0, 0, 0))
+// RUN: %target-swift-emit-silgen -enable-objc-interop -disable-objc-attr-requires-foundation-module %clang-importer-sdk %s -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple | %FileCheck %s --check-prefix=MODERN
+// REQUIRES: swift_feature_ModernImportedCArrays
+
+import ctypes
+
+// LEGACY-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo27StructWithArrayTypedefFieldV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Int32, Int32, Int32, Int32, @thin StructWithArrayTypedefField.Type) -> StructWithArrayTypedefField
+// MODERN-LABEL: sil shared [transparent] [serialized]{{ \[available 26.0.0\] | }}[ossa] @$sSo27StructWithArrayTypedefFieldV{{[_0-9a-zA-Z$]*}}fC : $@convention(method) (InlineArray<4, Int32>, @thin StructWithArrayTypedefField.Type) -> StructWithArrayTypedefField
+#if hasFeature(ModernImportedCArrays)
+func useImportedArrayTypedefInit() -> StructWithArrayTypedefField {
+  return StructWithArrayTypedefField(small: [0, 0, 0, 0])
 }
+#else
+func useImportedArrayTypedefInit() -> StructWithArrayTypedefField {
+  return StructWithArrayTypedefField(small: (0, 0, 0, 0))
+}
+#endif
+
+// Test compatibility with anonymous unions (and indirect fields into them).
+
+// LEGACY-LABEL: sil hidden [ossa] @$s{{.*}}readAnonymousUnionElement
+// MODERN-LABEL: sil hidden [ossa] @$s{{.*}}readAnonymousUnionElement
+// LEGACY-LABEL: sil hidden [ossa] @$s{{.*}}writeAnonymousUnionElement
+// MODERN-LABEL: sil hidden [ossa] @$s{{.*}}writeAnonymousUnionElement
+#if hasFeature(ModernImportedCArrays)
+func readAnonymousUnionElement(_ s: StructWithAnonymousUnionArray) -> CChar {
+  s.name[0]
+}
+
+func writeAnonymousUnionElement(_ s: inout StructWithAnonymousUnionArray) {
+  s.name[1] = 3
+}
+#else
+func readAnonymousUnionElement(_ s: StructWithAnonymousUnionArray) -> CChar {
+  s.name.0
+}
+
+func writeAnonymousUnionElement(_ s: inout StructWithAnonymousUnionArray) {
+  s.name.1 = 3
+}
+#endif
+
+// A modern projection of a stored legacy field is accessed in place, by
+// casting the address of the stored field.
+
+// LEGACY-LABEL: sil hidden [ossa] @$s{{.*}}writeArrayField
+// LEGACY-NOT: unchecked_addr_cast
+// LEGACY: struct_element_addr {{%.*}}, #StructWithPlainAndArrayFields.small
+// LEGACY: tuple_addr_constructor [assign]
+// MODERN-LABEL: sil hidden [ossa] @$s{{.*}}writeArrayField
+// MODERN: [[ACCESS:%.*]] = begin_access [modify] [unknown] %0
+// MODERN: [[FIELD:%.*]] = struct_element_addr [[ACCESS]], #StructWithPlainAndArrayFields.small
+// MODERN: [[CAST:%.*]] = unchecked_addr_cast [[FIELD]] to $*InlineArray<4, Int32>
+// MODERN: assign {{%.*}} to [[CAST]]
+// MODERN: end_access [[ACCESS]]
+#if hasFeature(ModernImportedCArrays)
+func writeArrayField(_ s: inout StructWithPlainAndArrayFields,
+                     _ a: InlineArray<4, CInt>) {
+  s.small = a
+}
+#else
+func writeArrayField(_ s: inout StructWithPlainAndArrayFields,
+                     _ a: (CInt, CInt, CInt, CInt)) {
+  s.small = a
+}
+#endif
+
+// Test that we handle memberwise inits with pointers to C arrays.
+
+// LEGACY-LABEL: sil shared [transparent] [serialized] [ossa] @$sSo24StructWithPointerToArrayV{{[_0-9a-zA-Z]*}}fC : $@convention(method) (Optional<UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>>, Int32, @thin StructWithPointerToArray.Type) -> StructWithPointerToArray
+// MODERN-LABEL: sil shared [transparent] [serialized]{{ \[available 26.0.0\] | }}[ossa] @$sSo24StructWithPointerToArrayV{{[_0-9a-zA-Z$]*}}fC : $@convention(method) (Optional<UnsafeMutablePointer<InlineArray<4, Int32>>>, Int32, @thin StructWithPointerToArray.Type) -> StructWithPointerToArray
+#if hasFeature(ModernImportedCArrays)
+func usePointerToArrayInit(
+    _ p: UnsafeMutablePointer<InlineArray<4, CInt>>?
+) -> StructWithPointerToArray {
+  return StructWithPointerToArray(small: p, plain: 1)
+}
+#else
+func usePointerToArrayInit(
+    _ p: UnsafeMutablePointer<(CInt, CInt, CInt, CInt)>?
+) -> StructWithPointerToArray {
+  return StructWithPointerToArray(small: p, plain: 1)
+}
+#endif
+
+// MODERN-LABEL: sil shared [transparent] [serialized]{{ \[available 26.0.0\] | }}[ossa] @$sSo28StructWithPointerToHugeArrayV{{[_0-9a-zA-Z$]*}}fC : $@convention(method) (Optional<UnsafeMutablePointer<InlineArray<5000, Int32>>>, Int32, @thin StructWithPointerToHugeArray.Type) -> StructWithPointerToHugeArray
+#if hasFeature(ModernImportedCArrays)
+func usePointerToHugeArrayInit(
+    _ p: UnsafeMutablePointer<InlineArray<5000, CInt>>?
+) -> StructWithPointerToHugeArray {
+  return StructWithPointerToHugeArray(huge: p, plain: 1)
+}
+#endif

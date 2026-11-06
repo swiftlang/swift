@@ -58,6 +58,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <functional>
+#include <type_traits>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -508,6 +509,8 @@ public:
   const bool DisableOverlayModules;
   const bool EnableClangSPI;
 
+  const CArrayProjection VisibleCArrayProjection;
+
   bool IsReadingBridgingPCH;
   llvm::SmallVector<clang::serialization::SubmoduleID, 2> PCHImportedSubmodules;
 
@@ -749,6 +752,15 @@ public:
   /// mapped back to it.
   llvm::DenseMap<const ValueDecl *, ValueDecl *> forwardingSources;
 
+  /// The C++ methods built by
+  /// \c SwiftDeclSynthesizer::synthesizeCXXForwardingMethod() , keyed by its
+  /// arguments (with flags packed into one integer).
+  llvm::DenseMap<
+      std::tuple<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *,
+                 const clang::CXXMethodDecl *, uint8_t>,
+      clang::CXXMethodDecl *>
+      synthesizedForwardingMethods;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -929,6 +941,17 @@ public:
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inherit);
 
+  /// Like three-arg \c importBaseMemberDecl() , but clones only the indicated
+  /// \p projection .
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                                  ClangInheritanceInfo inherit,
+                                  CArrayProjection projection);
+
+  /// Returns the operator that was synthesized from \p decl , a function
+  /// imported from a C++ operator (so its name starts with `__operator`), or
+  /// \c nullptr if there is none.
+  FuncDecl *getCXXSynthesizedOperatorFunc(const ValueDecl *decl);
+
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
 
@@ -957,7 +980,9 @@ public:
 
   /// Keeps track of the Clang functions that have been turned into
   /// properties.
-  llvm::DenseMap<const clang::FunctionDecl *, VarDecl *> FunctionsAsProperties;
+  llvm::DenseMap<std::pair<const clang::FunctionDecl *, CArrayProjection>,
+                 VarDecl *>
+      FunctionsAsProperties;
 
   /// Maps a foreign reference type's Clang record to the (retain, release)
   /// Clang functions that implement its custom reference counting.
@@ -1067,6 +1092,15 @@ public:
       if (alt == altDecl)
         return;
     vec.push_back(altDecl);
+  }
+
+  /// The maximum access level a declaration can have while still being
+  /// usable from the given C array projection, given whether it needs a
+  /// counterpart in the other projection to be fully available.
+  AccessLevel getMaxAccessLevel(CArrayProjection projection, bool needsBoth) {
+    if (needsBoth && VisibleCArrayProjection != projection)
+      return AccessLevel::Internal;
+    return AccessLevel::Open;
   }
 
 private:
@@ -1380,6 +1414,16 @@ public:
   void importAttributes(const clang::NamedDecl *ClangDecl, Decl *MappedDecl,
                         const clang::ObjCContainerDecl *NewContext = nullptr);
 
+  /// The availability that \p decl needs at a minimum, without considering any
+  /// availability attributes on its clang node. In many cases it returns
+  ///  \c isAlwaysAvailable() .
+  AvailabilityRange getAvailabilityFloor(Decl *decl);
+
+  /// Add an \c @available attribute with the version returned by
+  /// \c getAvailabilityFloor(). Use this only for declarations that \em don't
+  /// pass through \c importAttributes() .
+  void applyAvailabilityFloor(Decl *decl);
+
   Type applyImportTypeAttrs(ImportTypeAttrs attrs, Type type,
                  llvm::function_ref<void(Diagnostic &&)> addImportDiagnosticFn);
 
@@ -1402,6 +1446,94 @@ public:
                                          Version version,
                                          bool UseCanonicalDecl = true);
 
+  /// If \p decl needs multiple C array projections, imports it for all of them,
+  /// registers them as counterparts, and returns the projection indicated by
+  /// \p version . Otherwise, imports \p decl only for the modern projection and
+  /// doesn't register it.
+  ///
+  /// \param importVersion Imports \p decl for the version it's given. It's
+  ///        passed a variant of \p version for each projection that should
+  ///        be imported, and should return \c nullptr if the requested
+  ///        projection of \p decl is unimportable, or if a \c HiddenStorage
+  ///        projection was requested for a declaration that doesn't have
+  ///        storage.
+  ///
+  /// \param addAlternate Whether to record the legacy projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \p version, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(const clang::NamedDecl *decl, Version version,
+                               BodyFn &&importVersion,
+                               bool addAlternate = true) {
+    using DeclTy =
+        std::remove_pointer_t<std::invoke_result_t<BodyFn &, Version>>;
+    return cast_or_null<DeclTy>(forEachCArrayProjectionImpl(
+        decl, version, [&](Version v) -> Decl * { return importVersion(v); },
+        addAlternate));
+  }
+
+  /// If \p needsBoth is true, imports a declaration for both the modern and
+  /// legacy C array projections, registering them as counterparts of one
+  /// another. Otherwise, imports only a modern projection and does not
+  /// register it as a C array projection.
+  ///
+  /// \param importProjection Imports the declaration for the projection it's
+  ///        given. It's passed each projection that should be imported, and
+  ///        should return \c nullptr if the requested projection is
+  ///        unimportable, or if a \c HiddenStorage projection was requested for
+  ///        a declaration that doesn't have storage.
+  ///
+  /// \param addAlternate Whether to record the legacy projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \c Modern, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(bool needsBoth, BodyFn &&importProjection,
+                               bool addAlternate = true) {
+    return forEachCArrayProjection(
+        needsBoth ? CArrayProjection::Legacy : CArrayProjection::Modern,
+        std::move(importProjection), addAlternate);
+  }
+
+  /// Imports a declaration for both the modern C array projection and
+  /// \p neededCounterpartProjection , registering them as counterparts of one
+  /// another. (If \p neededCounterpartProjection is \c Modern, only one
+  /// projection is imported and it is not registered.)
+  ///
+  /// \param importProjection Imports the declaration for the projection it's
+  ///        given. It's passed each projection that should be imported, and
+  ///        should return \c nullptr if the requested projection is
+  ///        unimportable, or if a \c HiddenStorage projection was requested for
+  ///        a declaration that doesn't have storage.
+  ///
+  /// \param addAlternate Whether to record the counterpart projection as an
+  ///        alternate of the modern one.
+  ///
+  /// \returns The result of importing \c Modern, or null if that failed.
+  template <typename BodyFn>
+  auto forEachCArrayProjection(CArrayProjection neededCounterpartProjection,
+                               BodyFn &&importProjection,
+                               bool addAlternate = true) {
+    using DeclTy =
+        std::remove_pointer_t<std::invoke_result_t<BodyFn &, CArrayProjection>>;
+    return cast_or_null<DeclTy>(forEachCArrayProjectionImpl(
+        neededCounterpartProjection,
+        [&](CArrayProjection p) -> Decl * { return importProjection(p); },
+        addAlternate));
+  }
+
+private:
+  Decl *forEachCArrayProjectionImpl(
+    const clang::NamedDecl *decl, Version version,
+    llvm::function_ref<Decl *(Version)> importVersion, bool addAlternate);
+
+  Decl *forEachCArrayProjectionImpl(
+      CArrayProjection neededProjection,
+      llvm::function_ref<Decl *(CArrayProjection)> importProjection,
+      bool addAlternate);
+
+public:
   Decl *importDeclImpl(const clang::NamedDecl *ClangDecl, Version version,
                        bool &TypedefIsSuperfluous, bool &HadForwardDeclaration);
 
@@ -2287,6 +2419,74 @@ bool isForwardDeclOfType(const clang::Decl *decl);
 /// Checks whether this type is bool or is a C++ enum with a bool underlying
 /// type.
 bool isBoolOrBoolEnumType(Type ty);
+
+/// Determines which C array projection, besides the modern one, a declaration
+/// involving \p type needs. \c Modern indicates that no C arrays are involved.
+CArrayProjection getNeededCArrayCounterpartForType(clang::QualType type);
+
+/// If \p modernType is the modern type of an imported fixed-size C array
+/// ( \c InlineArray ), compute the legacy tuple type that would be used
+/// for \p projection.
+///
+/// \param projection The projection to compute the type for. Legacy by default.
+ImportedType
+computeLegacyCArrayType(ImportedType modernType,
+                        CArrayProjection projection = CArrayProjection::Legacy);
+
+/// Determines which C array projection, besides the modern one, \p decl needs.
+/// \c Modern indicates that no C array projections are involved.
+CArrayProjection getNeededCArrayCounterpart(const clang::NamedDecl *decl);
+
+/// The other C array projection of \p decl, or null if \p decl has none (or
+/// has no projections at all). To tell a declaration with no projections apart
+/// from one with a modern projection only, check for a
+/// \c CArrayProjectionAttr ; to get only a legacy or only a hidden storage
+/// projection, use \c getDeclForCArrayProjection() .
+template <typename DeclTy>
+DeclTy *getDeclForCounterpartCArrayProjection(const DeclTy *decl) {
+  if (!decl)
+    return nullptr;
+  auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  if (!attr || !attr->getCounterpart())
+    return nullptr;
+
+  return dyn_cast_or_null<DeclTy>(attr->getCounterpart());
+}
+
+/// Switch to the C array projection of \p decl that is \p projection.
+///
+/// \returns \p decl if it has no C array projections or is already the
+///          requested one; otherwise its counterpart if that is the requested
+///          projection, or null if the requested projection doesn't exist.
+template <typename DeclTy>
+DeclTy *getDeclForCArrayProjection(DeclTy *decl, CArrayProjection projection) {
+  if (!decl)
+    return nullptr;
+  auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  if (!attr || attr->getProjection() == projection)
+    return decl;
+
+  auto *counterpart = getDeclForCounterpartCArrayProjection(decl);
+  if (!counterpart)
+    return nullptr;
+  auto *counterpartAttr =
+      counterpart->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  return counterpartAttr && counterpartAttr->getProjection() == projection
+             ? counterpart : nullptr;
+}
+
+/// Switch to the C array projection of \p decl that is the same as the
+/// projection of \p reference.
+///
+/// \returns \p decl if \p reference has no C array projections; otherwise the
+///          same thing as \c getDeclForCArrayProjection() .
+template <typename DeclTy>
+DeclTy *getDeclForCArrayProjectionMatching(DeclTy *decl,
+                                           const ValueDecl *reference) {
+  auto *attr = reference->getAttrs().getAttribute<CArrayProjectionAttr>();
+  return attr ? getDeclForCArrayProjection(decl, attr->getProjection())
+              : decl;
+}
 
 /// Whether we should suppress the import of the given Clang declaration.
 bool shouldSuppressDeclImport(const clang::Decl *decl);

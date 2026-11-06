@@ -53,6 +53,10 @@ typedef struct {
   unsigned b[];
 } StructWithFlexibleArray;
 
+typedef struct {
+  unsigned elems[2][2];
+} Unsigned2x2;
+
 #include <stdarg.h>
 extern void hasVaList(va_list args);
 
@@ -259,6 +263,16 @@ union _GLKVector4 {
 } __attribute__((aligned(16)));
 typedef union _GLKVector4 GLKVector4;
 
+struct StructWithAnonymousArrays {
+  union {
+    // We don't care whether these fields are the same size, only that they're
+    // `clang::IndirectFieldDecl`s.
+    char bytes[8];
+    int words[2];
+  };
+  int tag;
+};
+
 typedef union IntOrFloat {
   int i;
   float f;
@@ -287,6 +301,18 @@ struct UnnamedUnion {
   } u;
 };
 
+// The types of these fields are unnamed records, so their members aren't
+// reachable by name lookup in the clang module.
+struct StructWithUnnamedRecordArrays {
+  union {
+    char bytes[8];
+    int words[2];
+  } u;
+  struct {
+    int pair[2];
+  } s;
+};
+
 //===---
 // Bitfields
 //===---
@@ -296,6 +322,11 @@ struct StructWithBitfields {
   unsigned Second : 17;
   unsigned Third : 5;
   unsigned : 11;
+};
+
+struct StructWithBitfieldAndArray {
+  unsigned flags : 4;
+  int values[4];
 };
 
 union EmptyCUnion {};
@@ -319,10 +350,141 @@ void staticBoundsArray(const char x[static 4]);
 void useBigArray(char max_size[4096], char max_size_plus_one[4097]);
 void useBigArray2d(char max_size[][4096], char max_size_plus_one[][4097]);
 
+typedef int SmallArrayTypedef[4];
+typedef int HugeArrayTypedef[5000];
+typedef int SmallArrayNewtype[4] __attribute__((swift_newtype(struct)));
+typedef int HugeArrayNewtype[9000] __attribute__((swift_newtype(struct)));
+
 struct StructWithBigArray {
   char max_size[4096];
   char max_size_plus_one[4097];
 };
+
+struct StructWithPlainAndArrayFields {
+  int plain;
+  int small[4];
+};
+
+struct StructWithAnonymousUnionArray {
+  int plain;
+  union {
+    char name[8];
+    struct {
+      int zeroes;
+      int offset;
+    } longName;
+  };
+};
+
+struct StructWithNestedPlainAndArrayFields {
+  struct StructWithPlainAndArrayFields inner;
+};
+
+struct ArrayElement {
+  int first;
+  int second;
+};
+
+struct StructWithArrayOfStructs {
+  struct ArrayElement elems[2];
+};
+
+struct StructWithHugeArrayOfHugeArrayPointers {
+  int (*pointers[5000])[5000];
+};
+
+struct StructWithAnonymousStructArray {
+  int plain;
+  struct {
+    int first;
+    int elems[4];
+  };
+};
+
+struct StructWithSmallAndHugeArrayFields {
+  int small[4];
+  int huge[5000];
+};
+
+struct StructWithAllHugeArrayFields {
+  int huge1[5000];
+  int huge2[6000];
+};
+
+union UnionWithSmallAndHugeArrayFields {
+  int small[4];
+  int huge[5000];
+};
+
+struct StructWithNestedArrayField {
+  int elems[2][2];
+};
+
+struct StructWithNestedHugeArrayField {
+  int elems[2][5000];
+};
+
+typedef float __attribute__((ext_vector_type(3))) VectorFloat3;
+
+struct StructWithArrayOfVectors {
+  VectorFloat3 tangents[2];
+  float scalars[2];
+};
+
+struct StructWithHugeArrayOfSmallArrays {
+  int grid[5000][2];
+};
+
+struct StructWithArrayTypedefField {
+  SmallArrayTypedef small;
+};
+
+struct StructWithPointerToArray {
+  int (*small)[4];
+  int plain;
+};
+
+struct StructWithPointerToHugeArray {
+  int (*huge)[5000];
+  int plain;
+};
+
+struct StructWithHugeArrayTypedefField {
+  HugeArrayTypedef huge;
+};
+
+struct StructWithSmallArrayNewtypeField {
+  SmallArrayNewtype small;
+};
+
+struct StructWithHugeArrayNewtypeField {
+  HugeArrayNewtype huge;
+};
+
+struct StructWithStructArrayFields {
+  struct FooStruct1 small[4];
+  struct FooStruct1 huge[5000];
+};
+
+struct StructWithStaticArrays {
+  int plain;
+};
+extern int smallStaticArray[4]
+    __attribute__((swift_name("StructWithStaticArrays.small")));
+extern int hugeStaticArray[5000]
+    __attribute__((swift_name("StructWithStaticArrays.huge")));
+
+extern int hugeGlobalArray[5000];
+extern int smallGlobalArray[4];
+extern int smallNestedGlobalArray[2][2];
+extern int hugeNestedGlobalArray[2][5000];
+extern int hugeOuterNestedGlobalArray[5000][2];
+extern int (*globalPointerToHugeArray)[5000];
+extern void (*globalFunctionPointerWithHugeArrayParam)(int x[][5000]);
+extern HugeArrayTypedef hugeTypedefGlobalArray;
+extern SmallArrayTypedef smallTypedefGlobalArray;
+extern SmallArrayNewtype smallNewtypeGlobalArray;
+extern HugeArrayNewtype hugeNewtypeGlobalArray;
 
 typedef const int FourConstInts[4];
 void nonnullArrayParameters(const char x[_Nonnull], void * const _Nullable y[_Nonnull], _Nonnull FourConstInts z);

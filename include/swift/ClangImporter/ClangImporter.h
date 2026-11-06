@@ -434,6 +434,10 @@ public:
   ConcreteDeclRef getCXXFunctionTemplateSpecialization(
           SubstitutionMap subst, ValueDecl *decl) override;
 
+  /// Returns the operator that was synthesized from \p decl , or \c nullptr if
+  /// there is none. \p decl is not an operator itself; it is the regular
+  /// function that a C++ operator was imported as, whose name starts with
+  /// `__operator`.
   FuncDecl *getCXXSynthesizedOperatorFunc(FuncDecl *decl);
 
   /// Just like Decl::getClangNode() except we look through to the 'Code'
@@ -614,6 +618,7 @@ public:
       std::vector<std::string> &swiftArgs);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
+  CArrayProjection getVisibleCArrayProjection() const override;
   clang::ASTContext &getClangASTContext() const override;
   clang::Preprocessor &getClangPreprocessor() const override;
   clang::Sema &getClangSema() const override;

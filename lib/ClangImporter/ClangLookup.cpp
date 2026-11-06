@@ -553,8 +553,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   if (result.empty() && !inheritance) {
     if (name.isSimpleName("pointee")) {
-      if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl))
+      if (auto *pointee = Importer.Impl.lookupAndImportPointee(inheritingDecl)){
         result.push_back(pointee);
+        if (auto *legacyPointee =
+                importer::getDeclForCounterpartCArrayProjection(pointee))
+          result.push_back(legacyPointee);
+      }
     } else if (name.getBaseName() == "successor" &&
                name.getArgumentNames().empty()) {
       if (auto *succ = Importer.Impl.lookupAndImportSuccessor(inheritingDecl))
@@ -793,7 +797,6 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
     setter = importUnderlyingFunction(*this, CXXSetter, Struct);
     if (!setter)
       return {};
-    markUnavailable(setter, "use .pointee property");
   }
 
   if (CXXGetter == CXXSetter) {
@@ -802,17 +805,41 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
     getter = importUnderlyingFunction(*this, CXXGetter, Struct);
     if (!getter)
       return {};
-    markUnavailable(getter, "use .pointee property");
   }
 
   SwiftDeclSynthesizer synth{*this};
-  auto *pointee = synth.makeDereferencedPointeeProperty(getter, setter);
+  auto *pointee = forEachCArrayProjection(
+      (getter ? getter : setter)->getAttrs()
+                                    .hasAttribute<CArrayProjectionAttr>(),
+      [&](CArrayProjection projection) -> VarDecl * {
+        FuncDecl *projectedGetter = importer::getDeclForCArrayProjection(
+                     getter, projection),
+                 *projectedSetter = importer::getDeclForCArrayProjection(
+                     setter, projection);
+        if ((getter && !projectedGetter) || (setter && !projectedSetter))
+          return nullptr;
+
+        if (projectedSetter)
+          markUnavailable(projectedSetter, "use .pointee property");
+        if (projectedGetter && projectedGetter != projectedSetter)
+          markUnavailable(projectedGetter, "use .pointee property");
+
+        auto *projectedPointee = synth.makeDereferencedPointeeProperty(
+            projectedGetter, projectedSetter);
+        if (projectedPointee)
+          Struct->addMember(projectedPointee);
+        return projectedPointee;
+      },
+      /*addAlternate=*/false);
   if (!pointee)
     return {};
 
-  importAttributes(CXXGetter ? CXXGetter.method : CXXSetter.method, pointee);
+  auto *clangOperator = CXXGetter ? CXXGetter.method : CXXSetter.method;
+  importAttributes(clangOperator, pointee);
+  if (auto *legacyPointee =
+          importer::getDeclForCounterpartCArrayProjection(pointee))
+    importAttributes(clangOperator, legacyPointee);
 
-  Struct->addMember(pointee);
   auto pointeeAndOpStar =
       std::make_tuple(pointee, getter ? getter : setter, setter);
   importedPointeeCache[Struct] = pointeeAndOpStar;
@@ -1026,31 +1053,73 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
     FuncDecl *getter = importSubscriptOverload(CXXGetter),
              *setter = importSubscriptOverload(CXXSetter);
 
-    // Mark subscript setter as mutating in Swift even if C++ operator is const.
-    if (setter && !setter->getDeclContext()->isModuleScopeContext() &&
-        !Struct->getDeclaredType()->isForeignReferenceType())
-      setter->setSelfAccessKind(SelfAccessKind::Mutating);
-
     if (!getter && !setter)
       // Didn't end up with a usable getter or setter, so nothing to synthesize
       continue;
 
     SwiftDeclSynthesizer synth{*this};
-    auto *subscript = synth.makeSubscript(getter, setter);
+
+    // Builds a subscript from the given accessors and adds it to the type.
+    auto addSubscript = [&](FuncDecl *getter,
+                            FuncDecl *setter) -> SubscriptDecl * {
+      // Mark subscript setter as mutating in Swift even if C++ operator is
+      // const.
+      if (setter && !setter->getDeclContext()->isModuleScopeContext() &&
+          !Struct->getDeclaredType()->isForeignReferenceType())
+        setter->setSelfAccessKind(SelfAccessKind::Mutating);
+
+      auto *subscript = synth.makeSubscript(getter, setter);
+      if (!subscript)
+        return nullptr;
+
+      Struct->addMember(subscript);
+      result.push_back(subscript);
+      return subscript;
+    };
+
+    /// Import attributes from the Clang operator[] decl(s) onto the
+    /// synthesized accessor thunks (importAttributes is a no-op on
+    /// SubscriptDecl itself).
+    auto importSubscriptAttributes = [&](SubscriptDecl *subscript) {
+      if (auto *getterAccessor = subscript->getAccessor(AccessorKind::Get);
+          getterAccessor && CXXGetter)
+        importAttributes(CXXGetter.method, getterAccessor);
+      if (auto *setterAccessor = subscript->getAccessor(AccessorKind::Set);
+          setterAccessor && CXXSetter)
+        importAttributes(CXXSetter.method, setterAccessor);
+    };
+
+    auto *subscript = addSubscript(getter, setter);
     if (!subscript)
       continue;
 
-    // Import attributes from the Clang operator[] decl(s) onto the synthesized
-    // accessor thunks (importAttributes is a no-op on SubscriptDecl itself).
-    if (auto *getterAccessor = subscript->getAccessor(AccessorKind::Get);
-        getterAccessor && CXXGetter)
-      importAttributes(CXXGetter.method, getterAccessor);
-    if (auto *setterAccessor = subscript->getAccessor(AccessorKind::Set);
-        setterAccessor && CXXSetter)
-      importAttributes(CXXSetter.method, setterAccessor);
+    // If the underlying functions use C arrays, they have a legacy projection
+    // as well, and so does a subscript built from them.
+    SubscriptDecl *legacySubscript = nullptr;
+    if ((getter && getter->getAttrs().hasAttribute<CArrayProjectionAttr>()) ||
+        (setter && setter->getAttrs().hasAttribute<CArrayProjectionAttr>())) {
+      FuncDecl *legacyGetter =
+                   importer::getDeclForCounterpartCArrayProjection(getter),
+               *legacySetter =
+                   importer::getDeclForCounterpartCArrayProjection(setter);
+      bool hasLegacy = (!getter || legacyGetter) && (!setter || legacySetter);
 
-    Struct->addMember(subscript);
-    result.push_back(subscript);
+      if (hasLegacy) {
+        for (auto *fn : {legacyGetter, legacySetter}) {
+          if (fn)
+            markUnavailable(fn, "use subscript");
+        }
+        legacySubscript = addSubscript(legacyGetter, legacySetter);
+      }
+      synth.registerCArrayProjections(subscript, legacySubscript,
+                                      /*addAlternate=*/false);
+
+      applyAvailabilityFloor(subscript);
+    }
+
+    importSubscriptAttributes(subscript);
+    if (legacySubscript)
+      importSubscriptAttributes(legacySubscript);
   }
 
   return result;

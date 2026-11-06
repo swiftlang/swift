@@ -47,18 +47,24 @@ enum { NumImportedAccessorKindBits = 3 };
 
 /// The name version
 class ImportNameVersion : public RelationalOperationsBase<ImportNameVersion> {
-  unsigned rawValue : 31;
+  unsigned rawValue : 29;
   unsigned concurrency : 1;
+  unsigned cArrayProjection : 2;
 
   friend llvm::DenseMapInfo<ImportNameVersion>;
 
   enum AsConstExpr_t { AsConstExpr };
 
-  constexpr ImportNameVersion() : rawValue(0), concurrency(false) {}
+  static constexpr unsigned ModernBits =
+      static_cast<unsigned>(CArrayProjection::Modern);
+
+  constexpr ImportNameVersion()
+      : rawValue(0), concurrency(false), cArrayProjection(ModernBits) {}
   constexpr ImportNameVersion(unsigned version, AsConstExpr_t)
-      : rawValue(version), concurrency(false) {}
+      : rawValue(version), concurrency(false), cArrayProjection(ModernBits) {}
   explicit ImportNameVersion(unsigned version, bool concurrency = false)
-      : rawValue(version), concurrency(concurrency) {
+      : rawValue(version), concurrency(concurrency),
+        cArrayProjection(ModernBits) {
     assert(version >= 2 && "only Swift 2 and later are supported");
   }
 public:
@@ -79,21 +85,21 @@ public:
   }
 
   unsigned majorVersionNumber() const {
-    assert(*this != ImportNameVersion::raw());
-    if (*this == ImportNameVersion::swift4_2())
+    assert(withoutCArrayProjection() != ImportNameVersion::raw());
+    if (withoutCArrayProjection() == ImportNameVersion::swift4_2())
       return 4;
     return rawValue < 5 ? rawValue : rawValue - 1;
   }
 
   unsigned minorVersionNumber() const {
-    assert(*this != ImportNameVersion::raw());
-    if (*this == ImportNameVersion::swift4_2())
+    assert(withoutCArrayProjection() != ImportNameVersion::raw());
+    if (withoutCArrayProjection() == ImportNameVersion::swift4_2())
       return 2;
     return 0;
   }
 
   llvm::VersionTuple asClangVersionTuple() const {
-    assert(*this != ImportNameVersion::raw());
+    assert(withoutCArrayProjection() != ImportNameVersion::raw());
     return llvm::VersionTuple(majorVersionNumber(), minorVersionNumber());
   }
 
@@ -106,12 +112,32 @@ public:
     return result;
   }
 
+  /// Which projection of C arrays this version imports.
+  CArrayProjection getCArrayProjection() const {
+    return static_cast<CArrayProjection>(cArrayProjection);
+  }
+
+  /// Returns a version that imports C arrays with \p projection.
+  ImportNameVersion withCArrayProjection(CArrayProjection projection) const {
+    ImportNameVersion result = *this;
+    result.cArrayProjection = static_cast<unsigned>(projection);
+    return result;
+  }
+
+  ImportNameVersion withoutCArrayProjection() const {
+    return withCArrayProjection(CArrayProjection::Modern);
+  }
+
   bool operator==(ImportNameVersion other) const {
-    return rawValue == other.rawValue && concurrency == other.concurrency;
+    return rawValue == other.rawValue && concurrency == other.concurrency &&
+           cArrayProjection == other.cArrayProjection;
   }
   bool operator<(ImportNameVersion other) const {
-    return rawValue < other.rawValue ||
-        (rawValue == other.rawValue && concurrency < other.concurrency);
+    if (rawValue != other.rawValue)
+      return rawValue < other.rawValue;
+    if (concurrency != other.concurrency)
+      return concurrency < other.concurrency;
+    return cArrayProjection < other.cArrayProjection;
   }
 
   /// Calls \p action for each name version other than this one, first going
@@ -119,6 +145,8 @@ public:
   /// ImportNameVersion::maxVersion().
   ///
   /// This is the most useful order for importing compatibility stubs.
+  ///
+  /// \note This does not handle C array projections, which are driven by type.
   void forEachOtherImportNameVersion(
       llvm::function_ref<void(ImportNameVersion)> action) const {
     assert(*this >= ImportNameVersion::swift2());
@@ -540,7 +568,7 @@ template <> struct DenseMapInfo<swift::importer::ImportNameVersion> {
   using ImportNameVersion = swift::importer::ImportNameVersion;
   using DMIU = DenseMapInfo<unsigned>;
   static unsigned getHashValue(const ImportNameVersion &Val) {
-    return DMIU::getHashValue(Val.rawValue);
+    return DMIU::getHashValue(Val.rawValue) ^ Val.cArrayProjection;
   }
   static bool isEqual(const ImportNameVersion &LHS,
                       const ImportNameVersion &RHS) {
