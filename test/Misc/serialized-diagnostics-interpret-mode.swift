@@ -4,8 +4,8 @@
 
 // RUN: %target-swift-frontend -typecheck -serialize-diagnostics-path %t.dia %s -verify
 // RUN: %target-swift-frontend -typecheck -serialize-diagnostics-path=%t_EQ.dia %s -verify
-// RUN: not %swift_driver -serialize-diagnostics-path %t_interpret_mode.dia %s
-// RUN: not %swift_driver -serialize-diagnostics-path=%t_EQ_interpret_mode.dia %s
+// RUN: not %swift_driver %if parser_astgen %{-enable-experimental-feature ParserASTGen%} -serialize-diagnostics-path %t_interpret_mode.dia %s
+// RUN: not %swift_driver %if parser_astgen %{-enable-experimental-feature ParserASTGen%} -serialize-diagnostics-path=%t_EQ_interpret_mode.dia %s
 
 // RUN: diff %t.dia %t_EQ.dia
 // RUN: diff %t.dia %t_interpret_mode.dia

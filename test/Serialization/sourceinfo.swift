@@ -3,7 +3,7 @@ import MyModule
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/Modules)
 
-// RUN: %target-swiftc_driver -emit-module -module-name MyModule -o %t/Modules/MyModule.swiftmodule %S/Inputs/SourceInfo/File1.swift %S/Inputs/SourceInfo/File2.swift
+// RUN: %target-swiftc_driver %if parser_astgen %{-enable-experimental-feature ParserASTGen%} -emit-module -module-name MyModule -o %t/Modules/MyModule.swiftmodule %S/Inputs/SourceInfo/File1.swift %S/Inputs/SourceInfo/File2.swift
 // RUN: %target-swift-ide-test -print-module-metadata -module-to-print MyModule -enable-swiftsourceinfo -I %t/Modules -source-filename %s | %FileCheck %s --check-prefixes=CHECK,%if parser_astgen %{ASTGEN%} %else %{CPARSER%}
 
 // The C++ parser hashes some tokens twice (e.g. those it skips while looking
