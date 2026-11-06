@@ -2145,12 +2145,13 @@ visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
     return false;
 
   // Like a load_borrow, a borrow accessor borrows the memory location of an
-  // @in_guaranteed self over the scope of its result.
+  // @in_guaranteed self over the scope of its result, including the scopes of
+  // its reborrows.
   if (auto *applyInst = dyn_cast<ApplyInst>(user)) {
     if (applyInst->hasSelfArgument() &&
         use == &applyInst->getSelfArgumentOperand()) {
       if (auto borrow = BorrowedValue(applyInst)) {
-        return borrow.visitLocalScopeEndingUses(
+        return borrow.visitTransitiveLifetimeEndingUses(
             [&](Operand *endUse) { return (visitor.*visit)(endUse); });
       }
     }
