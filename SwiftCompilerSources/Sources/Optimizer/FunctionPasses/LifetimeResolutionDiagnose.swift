@@ -29,6 +29,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
   // The `diagnose` markers are erased last, as they identify which copies were demoted consumes.
   var unpermittedCopies: [DiagnoseInst] = []
   var letReinits: [DiagnoseInst] = []
+  var missingSuperInits: [DiagnoseInst] = []
   var undefInits: [AssignInst] = []
   for inst in function.instructions {
     switch inst {
@@ -36,6 +37,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
       switch diagnose.kind {
       case .unpermittedCopy: unpermittedCopies.append(diagnose)
       case .letReinit: letReinits.append(diagnose)
+      case .missingSuperInit: missingSuperInits.append(diagnose)
       case .invalid: break
       }
     case let assign as AssignInst where assign.assignOwnership == .initialize && assign.source is Undef:
@@ -57,7 +59,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
   diagnoser.diagnoseLetReinits(letReinits)
   diagnoser.diagnoseUsesAfterConsume()
 
-  for marker in unpermittedCopies + letReinits {
+  for marker in unpermittedCopies + letReinits + missingSuperInits {
     context.erase(instruction: marker)
   }
 

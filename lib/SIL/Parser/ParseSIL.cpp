@@ -4043,6 +4043,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                             .Case("unpermitted_copy",
                                   DiagnoseKind::UnpermittedCopy)
                             .Case("let_reinit", DiagnoseKind::LetReinit)
+                            .Case("missing_super_init",
+                                  DiagnoseKind::MissingSuperInit)
                             .Default(DiagnoseKind::Invalid);
 
     if (Kind == DiagnoseKind::Invalid) {
