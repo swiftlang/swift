@@ -129,15 +129,10 @@ struct StateIndexSpace: CustomStringConvertible {
   }
 
   var description: String {
-    let elements = wholeRange.map { "  \($0): \(description(of: element(at: $0)))" }
-    return """
-           {
-           mode: \(mode)
-           count: \(count)
-           elements: \n\(elements.joined(separator: "\n"))
-           initiallyInitialized: \(initiallyInitialized)
-           }
-           """
+    let lines = ["{", "mode: \(mode)", "count: \(count)", "elements:"]
+              + wholeRange.map { "  \($0): \(description(of: element(at: $0)))" }
+              + ["initiallyInitialized: \(initiallyInitialized)", "}"]
+    return lines.joined(separator: "\n")
   }
 }
 

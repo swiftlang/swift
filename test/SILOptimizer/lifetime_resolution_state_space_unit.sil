@@ -132,12 +132,12 @@ bb0(%0 : @owned $Root):
   return %1
 }
 
+// A class instance without stored properties has nothing to track.
 // CHECK-LABEL: begin running test {{.*}} on empty_root_class_self: lifetime_resolution_state_space
 // CHECK:      mode: rootClassSelf
-// CHECK-NEXT: count: 1
+// CHECK-NEXT: count: 0
 // CHECK-NEXT: elements:
-// CHECK-NEXT:   0: field <root>
-// CHECK-NEXT: initiallyInitialized: 0..<1
+// CHECK-NEXT: initiallyInitialized: 0..<0
 // CHECK-LABEL: end running test {{.*}} on empty_root_class_self: lifetime_resolution_state_space
 sil [ossa] @empty_root_class_self : $@convention(method) (@owned EmptyRoot) -> @owned EmptyRoot {
 bb0(%0 : @owned $EmptyRoot):

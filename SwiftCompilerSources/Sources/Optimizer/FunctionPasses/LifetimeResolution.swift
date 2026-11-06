@@ -350,6 +350,11 @@ private struct Resolver {
       resolveSingleDef(root.address, context)
     }
 
+    // Nothing else about the root needs to be tracked, e.g., a class instance without stored properties.
+    if space.isEmpty {
+      return true
+    }
+
     self.state = Self.createBlockState(root, space, context)
 
     // Initialize the demand per block

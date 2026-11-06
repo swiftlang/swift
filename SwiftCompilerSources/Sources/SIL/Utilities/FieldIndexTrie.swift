@@ -73,7 +73,8 @@ public struct FieldIndexTrieCache {
 /// A class type is normally a single opaque leaf, since a value of that type is just a reference.
 /// A trie built for a class *instance* instead has a leaf for each of the class's own stored
 /// properties, reached through `.classField` projections. Inherited stored properties have no
-/// leaves. Only the root is expanded this way; class-typed fields within it are still opaque leaves.
+/// leaves, so an instance without stored properties of its own has no leaves at all. Only the root is
+/// expanded this way; class-typed fields within it are still opaque leaves.
 public struct FieldIndexTrie: CustomStringConvertible {
   public typealias Path = SmallProjectionPath
   public typealias FieldKind = SmallProjectionPath.FieldKind
@@ -120,7 +121,8 @@ public struct FieldIndexTrie: CustomStringConvertible {
 
   private let root: Node
 
-  /// The total number of leaf subelements. This is always at least 1, even for types with no fields.
+  /// The total number of leaf subelements. This is always at least 1, even for types with no fields,
+  /// except for a class instance without stored properties.
   public var leafCount: Int { wholeRange.upperBound }
 
   /// The range covering every leaf: `0..<leafCount`.
@@ -139,7 +141,7 @@ public struct FieldIndexTrie: CustomStringConvertible {
     assert(type.isClass, "expected a class type: \(type)")
     var cursor = 0
     guard let fields = type.getNominalFields(in: function) else {
-      self.root = Self.build(type, in: function, cursor: &cursor)
+      self.root = Node(type: type, range: 0..<0, childKind: nil, children: [])
       return
     }
 
@@ -150,7 +152,7 @@ public struct FieldIndexTrie: CustomStringConvertible {
     }
 
     if children.isEmpty {
-      self.root = Node(type: type, range: 0..<1, childKind: nil, children: [])
+      self.root = Node(type: type, range: 0..<0, childKind: nil, children: [])
     } else {
       self.root = Node(type: type, range: 0..<cursor, childKind: .classField, children: children,
                        firstFieldIndex: firstOwnField)
@@ -262,7 +264,7 @@ public struct FieldIndexTrie: CustomStringConvertible {
     // Paths are built leaf-to-root, so record each step and assemble the path once a subtree is found.
     var steps: [(kind: FieldKind, index: Int)] = []
     func visit(_ node: Node) {
-      if node.range.allSatisfy(leaves.contains) && !(excludingRoot && node === root && node.childKind != nil) {
+      if !node.range.isEmpty && node.range.allSatisfy(leaves.contains) && !(excludingRoot && node === root && node.childKind != nil) {
         body(steps.reversed().reduce(Path()) { $0.push($1.kind, index: $1.index) })
         return
       }

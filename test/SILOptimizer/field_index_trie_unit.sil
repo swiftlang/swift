@@ -203,11 +203,11 @@ bb0(%0 : $Derived):
   return %r : $()
 }
 
-// A derived class without stored properties of its own is a single leaf.
+// A class instance without stored properties of its own has no leaves.
 // CHECK-LABEL: begin running test {{.*}} on test_class_empty_derived: field_index_trie
-// CHECK: leafCount: 1
+// CHECK: leafCount: 0
 // CHECK-NEXT: nodes:
-// CHECK-NEXT: <root> -> 0..<1
+// CHECK-NEXT: <root> -> 0..<0
 // CHECK-NEXT: }
 // CHECK-LABEL: end running test {{.*}} on test_class_empty_derived: field_index_trie
 sil @test_class_empty_derived : $@convention(thin) (@guaranteed EmptyDerived) -> () {
@@ -217,11 +217,10 @@ bb0(%0 : $EmptyDerived):
   return %r : $()
 }
 
-// A root class without stored properties is a single leaf.
 // CHECK-LABEL: begin running test {{.*}} on test_class_empty_root: field_index_trie
-// CHECK: leafCount: 1
+// CHECK: leafCount: 0
 // CHECK-NEXT: nodes:
-// CHECK-NEXT: <root> -> 0..<1
+// CHECK-NEXT: <root> -> 0..<0
 // CHECK-NEXT: }
 // CHECK-LABEL: end running test {{.*}} on test_class_empty_root: field_index_trie
 sil @test_class_empty_root : $@convention(thin) (@guaranteed Klass) -> () {
