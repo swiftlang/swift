@@ -3456,6 +3456,70 @@ static ValueOwnership mapAddressableValueOwnership(SGFAccessKind accessKind) {
 
 }
 
+/// Is \p e borrowable local storage?
+static bool isValueTypeRootedLocalStorage(Expr *e) {
+  e = e->getSemanticsProvidingExpr();
+
+  // An earlier binding in the same chain.
+  if (auto *bind = dyn_cast<BindOptionalExpr>(e))
+    return isValueTypeRootedLocalStorage(bind->getSubExpr());
+
+  if (auto *dre = dyn_cast<DeclRefExpr>(e)) {
+    auto *var = dyn_cast<VarDecl>(dre->getDecl());
+    return var && var->getDeclContext()->isLocalContext();
+  }
+
+  if (auto *mre = dyn_cast<MemberRefExpr>(e)) {
+    auto *var = dyn_cast<VarDecl>(mre->getMember().getDecl());
+    if (!var || !var->hasStorage())
+      return false;
+    // Class storage isn't handled.
+    if (mre->getBase()->getType()->getRValueType()->mayHaveSuperclass())
+      return false;
+    return isValueTypeRootedLocalStorage(mre->getBase());
+  }
+
+  return false;
+}
+
+/// Return \p e if it is a binding borrowed in place for the chain's result.
+///
+/// The result is used after the chain's branches join, so the optional must be
+/// borrowed before they split.
+static BindOptionalExpr *getBindOfAddressableOptional(SILGenFunction &SGF,
+                                                      Expr *e) {
+  auto *bind = dyn_cast<BindOptionalExpr>(e);
+  if (!bind || !SGF.isInNonEscapableOptionalChain(bind->getDepth()))
+    return nullptr;
+
+  auto optType = bind->getSubExpr()->getType()->getRValueType()
+                     ->getCanonicalType();
+  if (!SGF.getTypeProperties(optType).isAddressableForDependencies())
+    return nullptr;
+
+  if (!isValueTypeRootedLocalStorage(bind->getSubExpr()))
+    return nullptr;
+
+  return bind;
+}
+
+/// Return \p e if it is a binding borrowed in place, or a chain of stored
+/// properties starting with a binding borrowed in place.
+static Expr *getAddressablePath(SILGenFunction &SGF, Expr *e) {
+  if (auto *load = dyn_cast<LoadExpr>(e))
+    e = load->getSubExpr()->getSemanticsProvidingExpr();
+
+  auto *mre = dyn_cast<MemberRefExpr>(e);
+  if (!mre)
+    return getBindOfAddressableOptional(SGF, e) ? e : nullptr;
+
+  auto *var = dyn_cast<VarDecl>(mre->getMember().getDecl());
+  if (!var || !var->hasStorage())
+    return nullptr;
+
+  return getAddressablePath(SGF, mre->getBase()) ? e : nullptr;
+}
+
 LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
                               LValueOptions options, AbstractionPattern orig) {
   // First see if we have an lvalue type. If we do, then quickly handle that and
@@ -3467,6 +3531,9 @@ LValue SILGenLValue::visitRec(Expr *e, SGFAccessKind accessKind,
   // If the component wants an addressable base, see whether we can provide
   // one.
   if (options.TryAddressable) {
+    if (auto *path = getAddressablePath(SGF, e))
+      return visit(path, SGFAccessKind::BorrowedAddressRead, options);
+
     auto ownership = mapAddressableValueOwnership(accessKind);
     if (auto addressable
           = SGF.tryEmitAddressableParameterAsAddress(e, ownership)) {
@@ -4495,6 +4562,12 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
       orig = AbstractionPattern::getOpaque();
     }
   }
+
+  // Keep the base addressable to project the property from the base's address.
+  if (options.TryAddressable && getAddressablePath(SGF, e->getBase())) {
+    addressable = true;
+    orig = AbstractionPattern::getOpaque();
+  }
   
   LValue lv = visitRec(e->getBase(),
                        getBaseAccessKind(SGF.SGM, var, accessKind, strategy,
@@ -4990,6 +5063,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
   // The chaining operator immediately evaluates the base.
   
   ManagedValue optBase;
+  bool borrowInPlace = getBindOfAddressableOptional(SGF, e) == e;
   if (isBorrowAccess(baseAccessKind)) {
     optBase = SGF.emitBorrowedLValue(e, std::move(optLV));
     
@@ -5002,14 +5076,16 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
                                                       optBase.getValue()));
         }
       
-        optBase = enterAccessScope(SGF, e, ManagedValue(),
-                                   optBase, optTypeData,
-                                   baseAccessKind,
-                                   SILAccessEnforcement::Static,
-                                   std::nullopt,
-                                   /*no nested conflict*/ true);
-        if (optBase.getType().isLoadable(SGF.F)) {
-          optBase = SGF.B.createFormalAccessLoadBorrow(e, optBase);
+        if (!borrowInPlace) {
+          optBase = enterAccessScope(SGF, e, ManagedValue(),
+                                     optBase, optTypeData,
+                                     baseAccessKind,
+                                     SILAccessEnforcement::Static,
+                                     std::nullopt,
+                                     /*no nested conflict*/ true);
+          if (optBase.getType().isLoadable(SGF.F)) {
+            optBase = SGF.B.createFormalAccessLoadBorrow(e, optBase);
+          }
         }
       } else {
         optBase = SGF.B.createFormalAccessBeginBorrow(e, optBase, IsNotLexical,
@@ -5074,6 +5150,14 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
     optPayload = ManagedValue::forLValue(optPayload.forward(SGF));
   }
   LValue valueLV;
+  // Present the payload as an addressable base.
+  if (optBase.getType().isAddress()
+      && getBindOfAddressableOptional(SGF, e) == e) {
+    valueLV.add<ValueComponent>(
+        ManagedValue::forBorrowedAddressRValue(optPayload.getValue()),
+        std::nullopt, valueTypeData, /*is rvalue*/ true);
+    return valueLV;
+  }
   valueLV.add<ValueComponent>(optPayload, std::nullopt, valueTypeData,
                               /*is rvalue*/optBase.getType().isObject());
   return valueLV;

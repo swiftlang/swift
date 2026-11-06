@@ -6481,17 +6481,20 @@ namespace {
     unsigned Depth;
 #endif
   public:
-    RestoreOptionalFailureDest(SILGenFunction &SGF, JumpDest &&dest)
+    RestoreOptionalFailureDest(SILGenFunction &SGF, JumpDest &&dest,
+                               bool nonEscapableChain = false)
       : SGF(SGF)
 #ifndef NDEBUG
       , Depth(SGF.BindOptionalFailureDests.size())
 #endif
     {
       SGF.BindOptionalFailureDests.push_back(std::move(dest));
+      SGF.BindOptionalNonEscapableChains.push_back(nonEscapableChain);
     }
     ~RestoreOptionalFailureDest() {
       assert(SGF.BindOptionalFailureDests.size() == Depth + 1);
       SGF.BindOptionalFailureDests.pop_back();
+      SGF.BindOptionalNonEscapableChains.pop_back();
     }
   };
 } // end anonymous namespace
@@ -6608,8 +6611,10 @@ void SILGenFunction::emitOptionalEvaluation(SILLocation loc, Type optType,
   // cleanups scope.
   SILBasicBlock *failureBB = createBasicBlock();
   RestoreOptionalFailureDest
-    restoreFailureDest(*this, JumpDest(failureBB, Cleanups.getCleanupsDepth(),
-                                       CleanupLocation(loc)));
+    restoreFailureDest(*this,
+                       JumpDest(failureBB, Cleanups.getCleanupsDepth(),
+                                CleanupLocation(loc)),
+                       !optType->isEscapable());
 
   generateNormalResults(results, SGFContext(normalInit.get()));
   assert(results.size() >= 1 && "didn't include a normal result");
