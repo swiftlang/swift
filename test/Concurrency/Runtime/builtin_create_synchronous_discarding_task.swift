@@ -74,12 +74,9 @@ func launch(on actor: Counter, _ operation: sending @escaping () -> Void) {
     operation: operation)
 }
 
+@available(SwiftStdlib 6.5, *)
 @main struct Main {
   static func main() async {
-    guard #available(SwiftStdlib 6.5, *) else {
-      fatalError("This test shouldn't be running against old stdlibs.")
-    }
-
     let done = DispatchSemaphore(value: 0)
 
     // No task locals at all
