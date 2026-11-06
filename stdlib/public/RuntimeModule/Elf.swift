@@ -724,6 +724,15 @@ protocol Elf_Phdr : ByteSwappable {
   var p_align: Size { get set }
 }
 
+extension Array where Element: Elf_Phdr {
+  /// The lowest virtual address of the loadable segments.  An image is
+  /// mapped so that its first byte is at this address.
+  var lowestLoadAddress: ImageSource.Address {
+    return lazy.filter { $0.p_type == .PT_LOAD }
+      .map { ImageSource.Address($0.p_vaddr) }.min() ?? 0
+  }
+}
+
 extension Elf32_Phdr : Elf_Phdr {
 }
 
@@ -1197,21 +1206,12 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
 
     var phdrs: [Traits.Phdr] = []
     var phAddr = ImageSource.Address(header.e_phoff)
-    var minAddr: Traits.Address? = nil
     for _ in 0..<header.e_phnum {
       let phdr = maybeSwap(try source.fetch(from: phAddr, as: Traits.Phdr.self))
       phdrs.append(phdr)
       phAddr += ImageSource.Address(header.e_phentsize)
-
-      if phdr.p_type == .PT_LOAD {
-        if let oldMinAddr = minAddr {
-          minAddr = min(oldMinAddr, phdr.p_vaddr)
-        } else {
-          minAddr = phdr.p_vaddr
-        }
-      }
     }
-    imageBase = ImageSource.Address(exactly: minAddr ?? 0)!
+    imageBase = phdrs.lowestLoadAddress
     programHeaders = phdrs
 
     if source.isMappedImage {
@@ -1805,10 +1805,8 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
   }
 
   // The image is mapped at `address`, which corresponds to the lowest
-  // virtual address of its loadable segments (as in `ElfImage.imageBase`);
-  // that isn't always zero.
-  let imageBase = phdrs.lazy.filter { $0.p_type == .PT_LOAD }
-    .map { ImageSource.Address($0.p_vaddr) }.min() ?? 0
+  // virtual address of its loadable segments; that isn't always zero.
+  let imageBase = phdrs.lowestLoadAddress
   func mappedAddress(_ vaddr: Traits.Address) -> R.Address {
     return address + ImageSource.Address(vaddr) - imageBase
   }
