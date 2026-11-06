@@ -1073,6 +1073,34 @@ bb1(%8 : @reborrow $DoubleWrapper, %9 : @reborrow $Klass):
   return %15
 }
 
+sil @borrow_val_from_address : $@convention(method) (@in_guaranteed StructWrapper) -> @guaranteed Klass
+
+// Like a load_borrow of a class field, a borrow accessor result with an
+// @in_guaranteed self in a class field is nested in the borrow scope of the
+// class reference, so the reborrow of the class reference is kept.
+// CHECK-LABEL: sil [ossa] @reborrow_address_self_borrow_accessor_result : $@convention(method) (@owned DoubleWrapper) -> () {
+// CHECK:         [[R:%.*]] = apply
+// CHECK-NEXT:    end_borrow [[R]]
+// CHECK-NEXT:    br bb1({{%.*}} : $DoubleWrapper)
+// CHECK-LABEL: } // end sil function 'reborrow_address_self_borrow_accessor_result'
+sil [ossa] @reborrow_address_self_borrow_accessor_result : $@convention(method) (@owned DoubleWrapper) -> () {
+bb0(%0 : @owned $DoubleWrapper):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #DoubleWrapper.s
+  %3 = function_ref @borrow_val_from_address : $@convention(method) (@in_guaranteed StructWrapper) -> @guaranteed Klass
+  %4 = apply %3(%2) : $@convention(method) (@in_guaranteed StructWrapper) -> @guaranteed Klass
+  br bb1(%1, %4)
+
+bb1(%6 : @reborrow $DoubleWrapper, %7 : @reborrow $Klass):
+  %8 = borrowed %7 from ()
+  %9 = borrowed %6 from (%0)
+  end_borrow %8
+  end_borrow %9
+  destroy_value %0
+  %13 = tuple ()
+  return %13
+}
+
 // CHECK-LABEL: sil [ossa] @borrow_guaranteed_tuple : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE_1:%[^,]+]] : @owned $Klass, [[INSTANCE_2:%[^,]+]] : @owned $Klass):
 // CHECK:         destroy_value [[INSTANCE_2]]
