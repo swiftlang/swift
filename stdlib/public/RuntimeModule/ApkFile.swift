@@ -26,56 +26,33 @@ import Swift
 struct ApkFile {
   struct Entry {
     var name: String
-    var offset: Int
-    var size: Int
+    var range: Range<Int>
   }
 
-  private(set) var entries: [Entry] = []
+  /// The APK's contents, or `nil` if it couldn't be opened.
+  let source: ImageSource?
+
+  /// The uncompressed entries; empty if the APK couldn't be read.
+  let entries: [Entry]
 
   /// Split an `<apk>!/<entry>` path into the APK path and the entry name.
   static func split(path: String) -> (apk: String, entry: String)? {
     let utf8 = path.utf8
-    var index = utf8.startIndex
-    while index != utf8.endIndex {
-      let next = utf8.index(after: index)
-      if utf8[index] == UInt8(ascii: "!") && next != utf8.endIndex
-           && utf8[next] == UInt8(ascii: "/") {
-        return (String(path[..<index]),
-                String(path[utf8.index(after: next)...]))
-      }
-      index = next
-    }
-    return nil
-  }
-
-  init?(path: String) {
-    guard let source = try? ImageSource(path: path) else {
+    guard let bang = utf8.indices.first(where: {
+      utf8[$0...].starts(with: "!/".utf8)
+    }) else {
       return nil
     }
-    self.init(source: source)
+    return (String(path[..<bang]),
+            String(path[utf8.index(bang, offsetBy: 2)...]))
   }
 
-  init?(source: ImageSource) {
-    let endOfCentralDirectorySize = 22
-    guard source.count >= endOfCentralDirectorySize else {
-      return nil
-    }
+  init(path: String) {
+    source = try? ImageSource(path: path)
+    entries = source.flatMap(Self.readEntries) ?? []
+  }
 
-    // The end of central directory record is followed by a comment of up
-    // to 64KiB, so search backwards for its signature.
-    var eocd = source.count - endOfCentralDirectorySize
-    let lowest = Swift.max(0, eocd - 0xffff)
-    while true {
-      if let signature = try? source.fetch(from: UInt64(eocd), as: UInt32.self),
-         UInt32(littleEndian: signature) == 0x06054b50 {
-        break
-      }
-      if eocd == lowest {
-        return nil
-      }
-      eocd -= 1
-    }
-
+  private static func readEntries(_ source: ImageSource) -> [Entry]? {
     func u16(_ at: Int) throws -> Int {
       return Int(UInt16(littleEndian: try source.fetch(from: UInt64(at),
                                                        as: UInt16.self)))
@@ -85,6 +62,18 @@ struct ApkFile {
                                                        as: UInt32.self)))
     }
 
+    // The end of central directory record is followed by a comment of up
+    // to 64KiB, so search backwards for its signature.
+    let last = source.count - 22
+    guard last >= 0, let eocd = stride(from: last,
+                                       through: Swift.max(0, last - 0xffff),
+                                       by: -1).first(where: {
+      (try? u32($0)) == 0x06054b50
+    }) else {
+      return nil
+    }
+
+    var entries: [Entry] = []
     do {
       let count = try u16(eocd + 10)
       var header = try u32(eocd + 16)
@@ -109,7 +98,7 @@ struct ApkFile {
           }
           let offset = localHeader + 30
             + (try u16(localHeader + 26)) + (try u16(localHeader + 28))
-          entries.append(Entry(name: name, offset: offset, size: size))
+          entries.append(Entry(name: name, range: offset..<offset + size))
         }
 
         header += 46 + nameLength + extraLength + commentLength
@@ -117,13 +106,12 @@ struct ApkFile {
     } catch {
       return nil
     }
+    return entries
   }
 
   /// Find the entry whose data contains the given offset in the APK.
   func entry(containing offset: Int) -> Entry? {
-    return entries.first {
-      offset >= $0.offset && offset < $0.offset + $0.size
-    }
+    return entries.first { $0.range.contains(offset) }
   }
 
   /// Find the entry with the given name.

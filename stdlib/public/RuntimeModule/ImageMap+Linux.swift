@@ -28,6 +28,7 @@ internal import Android
 
 @_implementationOnly import BacktracingImpl.ImageFormats.Elf
 
+#if !os(Android)
 fileprivate func readOSRelease(fd: CInt) -> [String:String]? {
   let len = lseek(fd, 0, SEEK_END)
   guard len >= 0 else {
@@ -62,6 +63,7 @@ fileprivate func readOSRelease() -> [String:String]? {
 
   return readOSRelease(fd: fd)
 }
+#endif
 
 extension ImageMap {
 
@@ -114,9 +116,6 @@ extension ImageMap {
 
     // Find all the mapped files and get high/low ranges
     var mappedFiles: [Substring:AddressRange] = [:]
-    #if os(Android)
-    var apks: [Substring:ApkFile?] = [:]
-    #endif
     for match in ProcMapsScanner(procMaps) {
       var path = stripWhitespace(match.pathname)
       if match.inode == "0" || path == "" {
@@ -131,10 +130,8 @@ extension ImageMap {
       // A library loaded from an APK is mapped from the APK itself, so tell
       // the libraries apart by the APK entry that holds the mapped offset.
       if path.hasSuffix(".apk"), let offset = Int(match.offset, radix: 16) {
-        if apks[path] == nil {
-          apks[path] = .some(ApkFile(path: String(path)))
-        }
-        if let apk = apks[path]!, let entry = apk.entry(containing: offset) {
+        let apk = ElfImageCache.threadLocal.apk(path: String(path))
+        if let entry = apk.entry(containing: offset) {
           path = Substring("\(path)!/\(entry.name)")
         }
       }
