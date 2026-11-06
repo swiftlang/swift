@@ -2914,6 +2914,25 @@ RValue RValueEmitter::visitMemberRefExpr(MemberRefExpr *e,
   // Any writebacks for this access are tightly scoped.
   FormalEvaluationScope scope(SGF);
 
+  // A noncopyable member read whose base is an opened existential must
+  // be borrowed so the access stays open across the uses.  Concrete and
+  // generic bases already emit the whole member chain as a single l-value, so
+  // they don't need this (and taking this path for them regresses the
+  // address-only move-checker's diagnostics).
+  if (e->getType()->isNoncopyable() &&
+      e->getBase()->getType()->getRValueType()->is<ExistentialArchetypeType>()) {
+    LValue lv = SGF.emitLValue(e, SGFAccessKind::BorrowedObjectRead);
+    ManagedValue mv = SGF.emitRawProjectedLValue(e, std::move(lv));
+
+    // If we got back a borrow (aka +0) because of a coroutine read
+    // accessor, defer the end_apply to the outer evaluation scope.
+    // Otherwise, we can end any other formal accesses now.
+    if (mv.isPlusZero())
+      std::move(scope).deferPop();
+
+    return RValue(SGF, e, mv);
+  }
+
   LValue lv = SGF.emitLValue(e, SGFAccessKind::OwnedObjectRead);
 
   // Otherwise, we can't load at +0 without further analysis, since the formal
