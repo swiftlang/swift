@@ -929,6 +929,9 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   };
 
   // Print any modifiers before the signature.
+  if (kind == FunctionSignatureKind::CxxInlineThunk &&
+      cxx_translation::isMainActorIsolated(FD))
+    functionSignatureOS << "SWIFT_MAIN_ACTOR ";
   if (modifiers.isStatic) {
     assert(!modifiers.isConst);
     functionSignatureOS << "static ";
@@ -1382,6 +1385,8 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
     ClangSyntaxPrinter(FD->getASTContext(), os).printGenericSignatureInnerStaticAsserts(Signature);
   }
+  if (cxx_translation::isMainActorIsolated(FD))
+    os << "  swift::_impl::checkMainActorIsolation();\n";
   if (hasThrows) {
     os << "  void* opaqueError = nullptr;\n";
     // The lowered signature only has a synthesized context parameter when

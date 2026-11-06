@@ -240,6 +240,16 @@ void ClangSyntaxPrinter::printObjCBlock(
   os << "\n#endif // defined(__OBJC__)\n";
 }
 
+void ClangSyntaxPrinter::printMainActorBlock(
+    bool isMainActorIsolated,
+    llvm::function_ref<void(raw_ostream &OS)> bodyPrinter) const {
+  if (isMainActorIsolated)
+    os << "#ifdef SWIFT_CXX_INTEROP_ENABLE_MAIN_ACTOR\n";
+  bodyPrinter(os);
+  if (isMainActorIsolated)
+    os << "#endif // SWIFT_CXX_INTEROP_ENABLE_MAIN_ACTOR\n";
+}
+
 void ClangSyntaxPrinter::printSwiftImplQualifier() const {
   os << "swift::" << cxx_synthesis::getCxxImplNamespaceName() << "::";
 }

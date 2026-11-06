@@ -10,6 +10,7 @@
 // RUN: cat %t/useclass.h     >> %t/fixed-useclass.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %check-interop-cxx-header-in-clang(%t/fixed-useclass.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_ENABLE_MAIN_ACTOR)
 // RUN: %target-interop-build-clangxx -fsyntax-only %S/Inputs/swift-subclass-generic-members.cpp -I %t -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY
 
 // RUN: %target-swift-frontend %s -I %t -module-name UseClass -clang-header-expose-decls=has-expose-attr -typecheck -verify -emit-clang-header-path %t/useclass-exposed.h
@@ -87,6 +88,15 @@ public struct ZGeneric<T> {
   public init(_ value: T) { self.value = value }
 }
 
+// The class metadata base offset is shared by all methods of the class, so it
+// must not be hidden behind the main actor macro with an isolated method.
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+public class MainActorDerivedClass: BaseClass {
+  override public init() {}
+  @MainActor public func aMainActorMethod() {}
+  public func bNonisolatedMethod() {}
+}
+
 public func createCrossModuleDerivedClass() -> CrossModuleDerivedClass {
     return CrossModuleDerivedClass()
 }
@@ -101,6 +111,12 @@ public func createCrossModuleDerivedDerivedClass() -> CrossModuleDerivedDerivedC
 // CHECK-NEXT: SWIFT_EXTERN uint[[#NUM:]]_t $s8UseClass018CrossModuleDerivedB0CMo; // class metadata base offset
 // CHECK-NEXT: SWIFT_EXTERN ptrdiff_t $s8UseClass018CrossModuleDerivedB0C19derivedComputedPropSivg(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN void $s8UseClass018CrossModuleDerivedB0C016virtualMethod2InE0yyF(SWIFT_CONTEXT void * _Nonnull _self) SWIFT_NOEXCEPT SWIFT_CALL; // virtualMethod2InDerived()
+
+// CHECK:      #ifdef SWIFT_CXX_INTEROP_ENABLE_MAIN_ACTOR
+// CHECK-NEXT: SWIFT_EXTERN void $s8UseClass016MainActorDerivedB0C01acD6MethodyyF(
+// CHECK-NEXT: #endif // SWIFT_CXX_INTEROP_ENABLE_MAIN_ACTOR
+// CHECK-NEXT: SWIFT_EXTERN uint[[#NUM]]_t $s8UseClass016MainActorDerivedB0CMo; // class metadata base offset
+// CHECK-NEXT: SWIFT_EXTERN void $s8UseClass016MainActorDerivedB0C18bNonisolatedMethodyyF(
 
 
 // CHECK:      void CrossModuleDerivedClass::virtualMethod() noexcept {
