@@ -16,14 +16,14 @@ protocol P2: Q, R {}
 extension P2 : @reparented Q, @reparented R {}
 
 protocol DirectlyOnProto: @reparented R {}
-// expected-error@-1 {{'@reparented' only applies in inheritance clause of a protocol extension}}
+// expected-error@-1 {{'@reparented' can only be used as a type attribute in inheritance clause of a protocol extension}}
 
 class Whatever: @reparented AnyObject {}
-// expected-error @-1 {{'@reparented' only applies in inheritance clause of a protocol extension}}
+// expected-error @-1 {{'@reparented' can only be used as a type attribute in inheritance clause of a protocol extension}}
 
 protocol Invalid {
   associatedtype A: @reparented Q
-  // expected-error @-1 {{'@reparented' only applies in inheritance clause of a protocol extension}}
+  // expected-error @-1 {{'@reparented' can only be used as a type attribute in inheritance clause of a protocol extension}}
 }
 
 extension Invalid: @reparented AnyObject {}

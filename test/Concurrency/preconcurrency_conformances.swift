@@ -15,18 +15,18 @@ do {
   struct B : @preconcurrency K {
     // expected-error@-1 {{'@preconcurrency' cannot apply to non-protocol type 'K'}}
     var x: @preconcurrency Int
-    // expected-error@-1 {{'@preconcurrency' only applies in inheritance clauses}}
+    // expected-error@-1 {{'@preconcurrency' can only be used as a type attribute in inheritance clauses}}
   }
 
   typealias T = @preconcurrency Q
-  // expected-error@-1 {{'@preconcurrency' only applies in inheritance clauses}}
+  // expected-error@-1 {{'@preconcurrency' can only be used as a type attribute in inheritance clauses}}
 
   func test(_: @preconcurrency K) {}
-  // expected-error@-1 {{'@preconcurrency' only applies in inheritance clauses}}
+  // expected-error@-1 {{'@preconcurrency' can only be used as a type attribute in inheritance clauses}}
 }
 
 protocol InvalidUseOfPreconcurrencyAttr : @preconcurrency Q {
-  // expected-error@-1 {{'@preconcurrency' only applies in inheritance clauses}}
+  // expected-error@-1 {{'@preconcurrency' can only be used as a type attribute in inheritance clauses}}
 }
 
 struct TestPreconcurrencyAttr {}
