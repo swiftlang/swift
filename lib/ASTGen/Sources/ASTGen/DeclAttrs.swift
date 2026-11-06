@@ -1062,16 +1062,42 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(differentiabilityWithRespectToArgument node: DifferentiabilityWithRespectToArgumentSyntax?) -> BridgedArrayRef {
+  func generate(
+    differentiabilityWithRespectToArgument node: DifferentiabilityWithRespectToArgumentSyntax?,
+    attrName: String,
+    allowNamedParameters: Bool = true
+  ) -> BridgedArrayRef {
     guard let node else {
       return BridgedArrayRef()
     }
+    let arguments: [DifferentiabilityArgumentSyntax]
     switch node.arguments {
-    case .argument(let node): // Single argument e.g. 'wrt: foo'
-      return CollectionOfOne(self.generate(differentiabilityArgument: node)).bridgedArray(in: self)
-    case .argumentList(let node): // Multiple arguments e.g. 'wrt: (self, 2)'
-      return  node.arguments.lazy.map(self.generate(differentiabilityArgument:)).bridgedArray(in: self)
+    case .argument(let single): // Single argument e.g. 'wrt: foo'
+      arguments = [single]
+    case .argumentList(let list): // Multiple arguments e.g. 'wrt: (self, 2)'
+      arguments = Array(list.arguments)
     }
+
+    // Diagnose what the C++ parser does in the parameter clause.
+    for argument in arguments where argument.argument.rawTokenKind == .identifier && !allowNamedParameters {
+      self.diagnose(.diff_params_clause_expected_parameter_unnamed, at: argument.argument)
+      break
+    }
+    if let last = arguments.last, let comma = last.trailingComma {
+      let next = comma.nextToken(viewMode: .sourceAccurate) ?? comma
+      if attrName == "differentiable" {
+        self.diagnose(
+          .unexpected_separator(","),
+          at: next,
+          fixIts: [.init(remove: self.generateCharSourceRange(comma))]
+        )
+      } else {
+        self.diagnose(.attr_expected_rparen(attrName, false), at: next)
+        self.diagnose(.expected_decl, at: next)
+      }
+    }
+
+    return arguments.lazy.map(self.generate(differentiabilityArgument:)).bridgedArray(in: self)
   }
 
   /// E.g.:
@@ -1217,7 +1243,7 @@ extension ASTGenVisitor {
       )
     }
 
-    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)
+    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments, attrName: "derivative")
 
     if let accessorKind {
       return .createParsed(
@@ -1276,7 +1302,7 @@ extension ASTGenVisitor {
       return nil
     }
 
-    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)
+    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments, attrName: "differentiable")
 
     let whereClause: BridgedTrailingWhereClause?
     if let node = args.genericWhereClause {
@@ -3197,7 +3223,7 @@ extension ASTGenVisitor {
       return nil
     }
 
-    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments)
+    let parameters = self.generate(differentiabilityWithRespectToArgument: args.arguments, attrName: "transpose", allowNamedParameters: false)
 
     return .createParsed(
       self.ctx,
