@@ -174,3 +174,40 @@ class ThrowsPartially {
     y = Link()
   }
 }
+
+// A consumed stored property is reinitialized by its next assignment, and is not destroyed again if the
+// initializer fails before then.
+// CHECK-LABEL: sil hidden [ossa] [opaque] @$s4test18ConsumedThenThrowsCACyKcfc :
+// CHECK:         [[SELF:%.*]] = end_init_let_ref %0
+// CHECK:         [[X0:%.*]] = ref_element_addr {{.*}} #ConsumedThenThrows.x
+// CHECK-NEXT:    [[X0_ACCESS:%.*]] = begin_access [modify] [dynamic] [[X0]]
+// CHECK-NEXT:    store {{.*}} to [init] [[X0_ACCESS]]
+// CHECK:         [[X1:%.*]] = ref_element_addr {{.*}} #ConsumedThenThrows.x
+// CHECK-NEXT:    [[X1_ACCESS:%.*]] = begin_access [modify] [dynamic] [[X1]]
+// CHECK-NEXT:    load [take] [[X1_ACCESS]]
+// CHECK:         try_apply {{%.*}}() : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
+// CHECK:       [[NORMAL]]({{%.*}} : $()):
+// CHECK:         [[X2:%.*]] = ref_element_addr {{.*}} #ConsumedThenThrows.x
+// CHECK-NEXT:    [[X2_ACCESS:%.*]] = begin_access [modify] [dynamic] [[X2]]
+// CHECK-NEXT:    store {{.*}} to [init] [[X2_ACCESS]]
+// CHECK:       [[ERROR_BB]]([[ERROR:%.*]] : @owned $any Error):
+// CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[SELF]]
+// CHECK-NEXT:    [[Y:%.*]] = ref_element_addr [[BORROW]], #ConsumedThenThrows.y
+// CHECK-NEXT:    destroy_addr [[Y]]
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    [[METATYPE:%.*]] = metatype $@thick ConsumedThenThrows.Type
+// CHECK-NEXT:    dealloc_partial_ref [[SELF]], [[METATYPE]]
+// CHECK-NEXT:    throw [[ERROR]]
+// CHECK:       } // end sil function '$s4test18ConsumedThenThrowsCACyKcfc'
+class ConsumedThenThrows {
+  var x: Link
+  var y: Link
+
+  init() throws {
+    x = Link()
+    y = Link()
+    _ = consume x
+    try mayThrow()
+    x = Link()
+  }
+}

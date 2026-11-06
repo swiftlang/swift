@@ -502,6 +502,15 @@ private struct ConsumeSite {
     }
   }
 
+  /// The consumed storage, unless a value was consumed.
+  var address: Value? {
+    switch instruction {
+    case let load as LoadInst: load.address
+    case let copyAddr as CopyAddrInst: copyAddr.source
+    default: nil
+    }
+  }
+
   var isCopyable: Bool { return !marker.operand.value.type.isMoveOnly }
 
   /// The instruction that takes ownership of the copy, or the copy itself if unknown.
@@ -862,7 +871,7 @@ private struct Diagnoser {
       consumedType = copy.fromValue.type
       uses = self.uses(of: copy.fromValue)
     } else {
-      let address = (consume.instruction as? LoadInst)?.address ?? (consume.instruction as! CopyAddrInst).source
+      let address = consume.address!
       guard let s = self.storage(backing: address) else { return nil }
       storage = s
       storageValue = s.allocation
@@ -884,6 +893,9 @@ private struct Diagnoser {
         violation = .consumedTwice
       } else if let consumedPath, let usePath = use.accessPath, usePath.contains(consumedPath) {
         violation = .usedAfterPartialConsume
+      } else if use.accessPath == nil, storage?.root.isClassInstance ?? false {
+        // A use of the whole instance after consuming one of its stored properties.
+        violation = .usedAfterPartialConsume
       } else {
         violation = .usedAfterConsume
       }
@@ -895,8 +907,11 @@ private struct Diagnoser {
     let name: String
     let declaration: (name: String, type: Type, location: SourceLoc?)?
     if let storage {
-      let path = violation == .usedAfterPartialConsume ? use!.accessPath! : consumedPath!
-      name = storage.name(of: path.projectionPath)
+      if violation == .usedAfterPartialConsume {
+        name = use!.accessPath.map { storage.name(of: $0.projectionPathFromRoot) } ?? storage.rootName
+      } else {
+        name = storage.name(of: consumedPath!.projectionPathFromRoot)
+      }
       declaration = storage.isSelf ? nil : storage.root.varDecl.map { (storage.rootName, storage.type, $0.nameLoc) }
     } else {
       let varDecl = storageValue.findVarDecl()
@@ -943,7 +958,8 @@ private struct Diagnoser {
 
     // If the type is copyable, then suggest using `copy` to fix the use-after-consume.
     for consume in report.consumes where consume.isCopyable {
-      diagnostics.diagnose(.sil_movechecking_add_explicit_copy, report.name, at: consume.location)
+      diagnostics.diagnose(.sil_movechecking_add_explicit_copy, copySuggestion(for: consume, in: report),
+                           at: consume.location)
     }
 
     // Explain that the value cannot be implicitly copied, and suggest borrowing instead.
@@ -956,6 +972,16 @@ private struct Diagnoser {
     for consume in report.consumes {
       if suggestBorrowingParameter(for: consume) { break }
     }
+  }
+
+  /// What to `copy` at `consume` to keep the use in `report` valid.
+  private mutating func copySuggestion(for consume: ConsumeSite, in report: UseAfterConsume) -> String {
+    // Copying the reference to a class instance doesn't keep its stored properties valid.
+    guard report.violation == .usedAfterPartialConsume, let address = consume.address,
+          let storage = storage(backing: address), storage.root.isClassInstance else {
+      return report.name
+    }
+    return storage.name(of: address.projectionPathFromRoot)
   }
 
   /// Points out where the function exits before `name` is reinitialized: by throwing an error, or by an

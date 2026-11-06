@@ -473,6 +473,9 @@ private struct Resolver {
       // A consume with demand still below it (use-after-consume): legalize with a copy.
       newKind = transform(kind, to: .load(.copy), root)
 
+    case let .take(op, _):
+      adjustAccessForTake(op.value)
+
     case .use(_, .own) where someDemand:
       // A use demanding ownership, where there is some demand following it, can only be satisfied with a copy.
       newKind = transform(kind, to: .load(.copy), root)
@@ -680,15 +683,21 @@ private struct Resolver {
   func adjustAccessForTake(_ addr: Value) {
     assert(addr.type.isAddress)
 
-    // If there's no begin_acess [read], there's no adjustment needed.
-    guard case let .access(beginAccess) = addr.enclosingAccessScope,
-          beginAccess.accessKind == .read else {
+    guard case let .access(beginAccess) = addr.enclosingAccessScope else {
       return
     }
 
-    // If it's static read, we turn it into a deinit.
-    // For a dynamic read, it needs to be reinitialized at end-of-access, so make it a modify.
-    beginAccess.set(accessKind: beginAccess.isStatic ? .deinit : .modify, context: context)
+    switch beginAccess.accessKind {
+    case .read:
+      // If it's static read, we turn it into a deinit.
+      // For a dynamic read, it needs to be reinitialized at end-of-access, so make it a modify.
+      beginAccess.set(accessKind: beginAccess.isStatic ? .deinit : .modify, context: context)
+    case .deinit where beginAccess.enforcement == .dynamic:
+      // Only a read or modify can be dynamically enforced.
+      beginAccess.set(accessKind: .modify, context: context)
+    default:
+      break
+    }
   }
 
   // Emit an `assign undef to [init]` of each given leaf of the root, right after the root's definition.
@@ -1559,16 +1568,20 @@ extension ClassInstanceUseWalker {
   }
 }
 
-extension Value {
-  /// The projection path of this address from its storage root, which for a stored property of
-  /// a class instance starts at the instance.
+extension AccessPath {
+  /// The projection path from the storage root, which for a stored property of a class instance
+  /// starts at the instance.
   var projectionPathFromRoot: SmallProjectionPath {
-    let accessPath = self.accessPath
-    if case .class(let projection) = accessPath.base {
-      return accessPath.projectionPath.push(.classField, index: projection.fieldIndex)
+    if case .class(let projection) = base {
+      return projectionPath.push(.classField, index: projection.fieldIndex)
     }
-    return accessPath.projectionPath
+    return projectionPath
   }
+}
+
+extension Value {
+  /// The projection path of this address from its storage root.
+  var projectionPathFromRoot: SmallProjectionPath { accessPath.projectionPathFromRoot }
 }
 
 // Gathers the uses of values depending on `markDep`. Returns false if they can't all be found.
