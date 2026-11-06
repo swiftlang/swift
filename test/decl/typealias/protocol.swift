@@ -160,7 +160,12 @@ protocol P5 {
   typealias X = Self
   typealias T1 = Int
   typealias T2 = A
+  typealias T3 = T1
+  typealias T4<U> = T3
+  typealias T5 = T4<A>
   var a: T2 { get }
+  var b: T2 { get }
+  var c: T2 { get }
 }
 
 protocol P6 {
@@ -168,9 +173,11 @@ protocol P6 {
   typealias B = Self
 }
 
-struct T5 : P5 {
+struct S5 : P5 {
   // This is OK -- the typealias is fully concrete
-  var a: P5.T1 // OK
+  var a: P5.T1
+  var b: P5.T3
+  var c: P5.T5
 
   // Invalid -- cannot represent associated type of existential
   var v2: P5.T2 // expected-error {{cannot access type alias 'T2' from 'P5'; use a concrete type or generic parameter base instead}}
@@ -179,16 +186,20 @@ struct T5 : P5 {
   // Unqualified reference to typealias from a protocol conformance
   var v4: T1 // OK
   var v5: T2 // OK
+  var v6: T3 // OK
+  var v7: T5 // OK
 
   // Qualified reference
-  var v6: T5.T1 // OK
-  var v7: T5.T2 // OK
+  var v8: S5.T1 // OK
+  var v9: S5.T2 // OK
+  var v10: S5.T3 // OK
+  var v11: S5.T5 // OK
 
-  var v8 = P6.A.self
-  var v9 = P6.B.self // expected-error {{cannot access type alias 'B' from 'P6'; use a concrete type or generic parameter base instead}}
+  var v12 = P6.A.self
+  var v13 = P6.B.self // expected-error {{cannot access type alias 'B' from 'P6'; use a concrete type or generic parameter base instead}}
 
-  var v10 = (any P6).A.self
-  var v11 = (any P6).B.self // expected-error {{cannot access type alias 'B' from 'any P6'; use a concrete type or generic parameter base instead}}
+  var v14 = (any P6).A.self
+  var v15 = (any P6).B.self // expected-error {{cannot access type alias 'B' from 'any P6'; use a concrete type or generic parameter base instead}}
 
   struct Generic<T> {
     func okay(value: T.A) where T == any P6 {}
@@ -219,8 +230,10 @@ struct S7 : P7 {
   func inExpressionContext() {
     _ = Y.self
     _ = Z.self
-    _ = T5.T1.self
-    _ = T5.T2.self
+    _ = S5.T1.self
+    _ = S5.T2.self
+    _ = S5.T3.self
+    _ = S5.T5.self
   }
 }
 
