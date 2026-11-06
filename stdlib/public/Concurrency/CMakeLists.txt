@@ -10,7 +10,9 @@
 #
 #===----------------------------------------------------------------------===#
 
-set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS)
+# ExecutorImpl.h includes ExecutorTypes.h from the EmbeddedPlatform headers.
+set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
+  -I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift)
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/InternalShims)
 
 set(swift_concurrency_private_link_libraries)
@@ -227,6 +229,7 @@ set(LLVM_OPTIONAL_SOURCES
   CooperativeGlobalExecutor.cpp
   DispatchGlobalExecutor.cpp
   CFExecutor.cpp
+  ThreadPoolGlobalExecutor.cpp
 )
 
 set(SWIFT_CONCURRENCY_DEPENDENCIES)
@@ -304,8 +307,10 @@ endif()
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENCY)
   add_custom_target(embedded-concurrency)
   add_custom_target(embedded-concurrency-default-executor)
+  add_custom_target(embedded-concurrency-thread-pool-executor)
   add_dependencies(embedded-libraries embedded-concurrency)
   add_dependencies(embedded-concurrency embedded-concurrency-default-executor)
+  add_dependencies(embedded-concurrency embedded-concurrency-thread-pool-executor)
 
   set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
   set(SWIFT_STDLIB_TRACING FALSE)
@@ -363,6 +368,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
            AND "${triple}" MATCHES
                "${SWIFT_EMBEDDED_PLATFORM_ABSTRACTION_LAYER_TRIPLE_REGEX}"))
       list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
+    endif()
+
+    # Bare-metal triples have no executable test of custom serial executors.
+    if(NOT "${triple}" MATCHES "-none-")
+      list(APPEND extra_c_compile_flags
+        "-DSWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS=1")
     endif()
 
     if("${arch}" MATCHES "wasm32")
@@ -425,10 +436,32 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       CooperativeGlobalExecutor.cpp
 
       C_COMPILE_FLAGS
-        ${extra_c_compile_flags}
+        ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
         -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
       INSTALL_IN_COMPONENT stdlib
       )
+
+    if("${triple}" MATCHES "-wasip1-threads$|-linux-gnu$" OR
+       ("${triple}" MATCHES "-apple-" AND NOT "${triple}" MATCHES "-none-"))
+      # lib/swift/embedded/<triple>/libswift_ConcurrencyThreadPoolExecutor.a
+      add_embedded_swift_target_library(
+        embedded-concurrency-thread-pool-executor
+        swift_ConcurrencyThreadPoolExecutor
+        IS_STDLIB
+        NON_EMPTY_OBJECT_FILE
+
+        ThreadPoolMainExecutor.swift
+        ThreadPoolGlobalExecutor.cpp
+
+        SWIFT_COMPILE_FLAGS
+          ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+        C_COMPILE_FLAGS
+          ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS}
+          -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
+        DEPENDS embedded-concurrency-${mod}
+        INSTALL_IN_COMPONENT stdlib
+        )
+    endif()
   endforeach()
 
   # Restore the full triple list for any later consumers.
@@ -449,6 +482,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
 
   swift_install_in_component(FILES
     "${CMAKE_CURRENT_SOURCE_DIR}/ExecutorImpl.h"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift/ExecutorTypes.h"
     DESTINATION "include/swift"
     COMPONENT compiler)
 
