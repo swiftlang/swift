@@ -84,6 +84,53 @@ class ExponentialRetryTestCase(unittest.TestCase):
         fn.assert_called_once_with()
         mock_time.sleep.assert_not_called()
 
+    @patch("update_checkout.retry.time")
+    def test_non_retryable_exception_is_reraised_immediately(self, mock_time):
+        error = GitException(
+            128,
+            ["status"],
+            "repo1",
+            "fatal: not a git repository (or any of the parent directories): .git",
+        )
+        fn = MagicMock(side_effect=error)
+
+        with self.assertRaises(GitException):
+            _quietly(exponential_retry(max_retries=3)(fn))
+
+        fn.assert_called_once_with()
+        mock_time.sleep.assert_not_called()
+
+
+class GitExceptionRetryableTestCase(unittest.TestCase):
+    """GitException.is_retryable must separate permanent errors from ones
+    that might go away on a second attempt."""
+
+    def _error(self, output):
+        return GitException(128, ["clone", "origin"], "repo1", output)
+
+    def test_permanent_errors_are_not_retryable(self):
+        for output in [
+            "fatal: not a git repository (or any of the parent directories): .git",
+            "fatal: 'origin' does not appear to be a git repository",
+            "remote: Repository not found.\nfatal: repository 'x' not found",
+            "fatal: could not read Username for 'https://github.com': "
+            "terminal prompts disabled",
+            "fatal: Authentication failed for 'https://github.com/x.git/'",
+            "git@github.com: Permission denied (publickey).",
+        ]:
+            with self.subTest(output=output):
+                self.assertFalse(self._error(output).is_retryable)
+
+    def test_network_errors_are_retryable(self):
+        for output in [
+            "fatal: unable to access 'https://github.com/x.git/': "
+            "Could not resolve host: github.com",
+            "error: RPC failed; curl 56 GnuTLS recv error (-9)",
+            "fatal: early EOF",
+        ]:
+            with self.subTest(output=output):
+                self.assertTrue(self._error(output).is_retryable)
+
 
 class PerRepoRetryTestCase(scheme_mock.SchemeMockTestCase):
     """A transient failure of one repository's clone/update operation must be
@@ -137,6 +184,45 @@ class PerRepoRetryTestCase(scheme_mock.SchemeMockTestCase):
         self.assertEqual(calls, {"repo1": 2, "repo2": 1})
         mock_time.sleep.assert_called_once_with(10.0)
         mock_exit.assert_called_once_with(0)
+
+    @patch("update_checkout.retry.time")
+    @patch("sys.exit", return_value=None)
+    def test_non_retryable_clone_failure_is_not_retried(self, mock_exit, mock_time):
+        calls = {"repo1": 0, "repo2": 0}
+
+        def missing_repo_clone(pool_args):
+            calls[pool_args.repo_name] += 1
+            if pool_args.repo_name == "repo1":
+                raise GitException(
+                    128,
+                    ["clone", "origin"],
+                    "repo1",
+                    "remote: Repository not found.\n"
+                    "fatal: repository 'https://example.com/repo1.git/' not found",
+                )
+            return None
+
+        with patch(
+            "update_checkout.update_checkout.obtain_additional_swift_sources",
+            new=missing_repo_clone,
+        ):
+            self._run_main(
+                [
+                    "--config",
+                    self.config_path,
+                    "--source-root",
+                    self.source_root,
+                    "--clone",
+                    "--max-retries",
+                    "3",
+                ]
+            )
+
+        # Neither the per-repository retry nor the whole-checkout retry may
+        # run again, or wait, for an error that retrying can't fix.
+        self.assertEqual(calls, {"repo1": 1, "repo2": 1})
+        mock_time.sleep.assert_not_called()
+        mock_exit.assert_called_once_with(1)
 
     @patch("update_checkout.retry.time")
     @patch("sys.exit", return_value=None)
