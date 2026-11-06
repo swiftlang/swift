@@ -303,7 +303,7 @@ macro(swift_common_cxx_warnings)
       $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=c++98-compat-extra-semi>
       $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=gnu>
 
-      $<$<COMPILE_LANGUAGE:С,CXX>:-Wimplicit-fallthrough>
+      $<$<COMPILE_LANGUAGE:C,CXX>:-Wimplicit-fallthrough>
       $<$<COMPILE_LANGUAGE:C,CXX>:-Wunreachable-code>
       $<$<COMPILE_LANGUAGE:C,CXX>:-Woverloaded-virtual>
       $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-nested-anon-types>)
