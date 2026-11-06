@@ -23,6 +23,7 @@
 #include "swift/Remote/MetadataReader.h"
 #include "swift/RemoteInspection/DescriptorFinder.h"
 #include "swift/RemoteInspection/MetadataSourceBuilder.h"
+#include "swift/RemoteInspection/ReflectionDiag.h"
 #include "swift/RemoteInspection/Records.h"
 #include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/RemoteInspection/TypeRef.h"
@@ -535,6 +536,14 @@ public:
     /// We return a uint32_t since it's extremely unlikely we'll run out of
     /// indexes.
     uint32_t addReflectionInfo(ReflectionInfo I) {
+      REFLECTION_DIAG("addReflectionInfo #%zu: field=%zu assocty=%zu "
+                      "builtin=%zu capture=%zu typeref=%zu reflstr=%zu "
+                      "conformances=%zu (bytes)",
+                      ReflectionInfos.size(), (size_t)I.Field.size(),
+                      (size_t)I.AssociatedType.size(), (size_t)I.Builtin.size(),
+                      (size_t)I.Capture.size(), (size_t)I.TypeReference.size(),
+                      (size_t)I.ReflectionString.size(),
+                      (size_t)I.Conformance.size());
       ReflectionInfos.push_back(I);
       auto InfoID = ReflectionInfos.size() - 1;
       assert(InfoID <= UINT32_MAX && "ReflectionInfo ID overflow");

@@ -12,6 +12,7 @@
 
 #include "swift/StaticMirror/ObjectFileContext.h"
 #include "swift/RemoteInspection/ReflectionContext.h"
+#include "swift/RemoteInspection/ReflectionDiag.h"
 #include "swift/RemoteInspection/TypeRefBuilder.h"
 
 #include "llvm/Object/MachOUniversal.h"
@@ -23,6 +24,9 @@
 #include "llvm/Object/RelocationResolver.h"
 #include "llvm/Object/Wasm.h"
 #include "llvm/Support/Error.h"
+
+#include <map>
+#include <string>
 
 
 using namespace llvm::object;
@@ -147,19 +151,45 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
   auto resolverSupports = resolver.first;
   auto resolve = resolver.second;
 
-  if (!resolverSupports || !resolve)
+  if (!resolverSupports || !resolve) {
+    REFLECTION_DIAG("scanELF %s: NO relocation resolver for this file; "
+                    "dynamic relocations will NOT be collected",
+                    O->getFileName().str().c_str());
     return;
+  }
 
   auto machine = O->getELFFile().getHeader().e_machine;
   auto relativeRelocType = llvm::object::getELFRelativeRelocationType(machine);
   auto globDatRelocType = getELFGlobDatRelocationType(machine);
 
+  unsigned diagRelocSections = 0;
+  std::map<uint32_t, uint64_t> diagRelocTypeCounts;
+  uint64_t diagRelocsSkipped = 0;
   for (auto &S : static_cast<const llvm::object::ELFObjectFileBase *>(O)
                      ->dynamic_relocation_sections()) {
     bool isRela =
         O->getSection(S.getRawDataRefImpl())->sh_type == llvm::ELF::SHT_RELA;
+    ++diagRelocSections;
+    {
+      auto diagName = S.getName();
+      uint64_t diagCount = 0;
+      for (const llvm::object::RelocationRef &R : S.relocations()) {
+        (void)R;
+        ++diagCount;
+      }
+      REFLECTION_DIAG(
+          "scanELF %s: dynamic relocation section '%s' sh_type=0x%x "
+          "relocations=%llu",
+          O->getFileName().str().c_str(),
+          diagName ? diagName->str().c_str() : "<error>",
+          (unsigned)O->getSection(S.getRawDataRefImpl())->sh_type,
+          (unsigned long long)diagCount);
+      if (!diagName)
+        llvm::consumeError(diagName.takeError());
+    }
 
     for (const llvm::object::RelocationRef &R : S.relocations()) {
+      ++diagRelocTypeCounts[(uint32_t)R.getType()];
       // `getRelocationResolver` doesn't handle RELATIVE relocations, so we
       // have to do that ourselves.
       if (isRela && R.getType() == relativeRelocType) {
@@ -191,8 +221,10 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
         continue;
       }
 
-      if (!resolverSupports(R.getType()))
+      if (!resolverSupports(R.getType())) {
+        ++diagRelocsSkipped;
         continue;
+      }
       auto symbol = R.getSymbol();
       auto name = symbol->getName();
       if (!name) {
@@ -203,6 +235,18 @@ void Image::scanELFType(const llvm::object::ELFObjectFile<ELFT> *O) {
       DynamicRelocations.insert({R.getOffset(), {*name, offset}});
     }
   }
+
+  REFLECTION_DIAG("scanELF %s: machine=%u relativeRelocType=%u "
+                  "globDatRelocType=%u dynamicRelocSections=%u "
+                  "collectedDynamicRelocations=%zu unsupportedRelocations=%llu",
+                  O->getFileName().str().c_str(), (unsigned)machine,
+                  (unsigned)relativeRelocType, (unsigned)globDatRelocType,
+                  diagRelocSections, (size_t)DynamicRelocations.size(),
+                  (unsigned long long)diagRelocsSkipped);
+  for (auto &KV : diagRelocTypeCounts)
+    REFLECTION_DIAG("scanELF %s:   relocation type %u: %llu",
+                    O->getFileName().str().c_str(), (unsigned)KV.first,
+                    (unsigned long long)KV.second);
 }
 
 void Image::scanELF(const llvm::object::ELFObjectFileBase *O) {
@@ -309,6 +353,95 @@ Image::Image(const llvm::object::ObjectFile *O) : O(O) {
     fputs("unsupported image format\n", stderr);
     abort();
   }
+
+  if (reflection::diagEnabled())
+    diagDescribe();
+}
+
+void Image::diagDescribe() const {
+  std::string fileStr = O->getFileName().str();
+  const char *file = fileStr.c_str();
+  REFLECTION_DIAG("image %s: format='%s' arch=%s bytesInAddress=%u "
+                  "headerAddress=0x%llx endAddress=0x%llx segments=%zu "
+                  "dynamicRelocations=%zu",
+                  file, O->getFileFormatName().str().c_str(),
+                  llvm::Triple::getArchTypeName(O->getArch()).str().c_str(),
+                  O->getBytesInAddress(), (unsigned long long)HeaderAddress,
+                  (unsigned long long)getEndAddress(), Segments.size(),
+                  (size_t)DynamicRelocations.size());
+  for (auto &Seg : Segments)
+    REFLECTION_DIAG("image %s:   segment addr=0x%llx size=0x%llx", file,
+                    (unsigned long long)Seg.Addr,
+                    (unsigned long long)Seg.Contents.size());
+
+  // All sections, with their ELF type, so that we can see things like
+  // .symtab, packed relocation sections, and the swift5_* sections.
+  unsigned idx = 0;
+  for (const SectionRef &S : O->sections()) {
+    auto name = S.getName();
+    std::string nameStr = name ? name->str() : std::string("<error>");
+    if (!name)
+      llvm::consumeError(name.takeError());
+    if (auto *ELFObj = dyn_cast<ELFObjectFileBase>(O)) {
+      (void)ELFObj;
+      ELFSectionRef ES(S);
+      REFLECTION_DIAG("image %s:   section[%u] name='%s' type=0x%x "
+                      "flags=0x%llx addr=0x%llx size=0x%llx",
+                      file, idx, nameStr.c_str(), (unsigned)ES.getType(),
+                      (unsigned long long)ES.getFlags(),
+                      (unsigned long long)S.getAddress(),
+                      (unsigned long long)S.getSize());
+      // SHT_ANDROID_REL, SHT_ANDROID_RELA, SHT_RELR and SHT_ANDROID_RELR are
+      // not recognized as dynamic relocation sections, so none of the
+      // relocations in them are applied when reading pointers out of this
+      // image.
+      uint32_t ty = ES.getType();
+      if (ty == 0x60000001 || ty == 0x60000002 || ty == 19 ||
+          ty == 0x6fffff00)
+        REFLECTION_DIAG("image %s:   WARNING: section '%s' has packed "
+                        "relocation type 0x%x; its relocations are NOT "
+                        "collected by scanELF",
+                        file, nameStr.c_str(), (unsigned)ty);
+    } else {
+      REFLECTION_DIAG("image %s:   section[%u] name='%s' addr=0x%llx "
+                      "size=0x%llx",
+                      file, idx, nameStr.c_str(),
+                      (unsigned long long)S.getAddress(),
+                      (unsigned long long)S.getSize());
+    }
+    ++idx;
+  }
+
+  // Symbol tables: how many symbols are visible, and can we find the symbol
+  // that the ELF reflection table lookup needs?
+  auto countAndFind = [&](auto &&Symbols, const char *which) {
+    unsigned count = 0;
+    bool found = false;
+    uint64_t value = 0;
+    for (const auto &Symb : Symbols) {
+      ++count;
+      auto SymbName = Symb.getName();
+      if (!SymbName) {
+        llvm::consumeError(SymbName.takeError());
+        continue;
+      }
+      if (*SymbName == "__swift5_reflection_sections") {
+        found = true;
+        auto V = Symb.getValue();
+        if (V)
+          value = *V;
+        else
+          llvm::consumeError(V.takeError());
+      }
+    }
+    REFLECTION_DIAG("image %s:   %s: %u symbols; __swift5_reflection_sections "
+                    "%s (value=0x%llx)",
+                    file, which, count, found ? "FOUND" : "NOT FOUND",
+                    (unsigned long long)value);
+  };
+  countAndFind(O->symbols(), "symbol table (.symtab)");
+  if (const auto *ELF = dyn_cast<llvm::object::ELFObjectFileBase>(O))
+    countAndFind(ELF->getDynamicSymbolIterators(), "dynamic symbols (.dynsym)");
 }
 
 uint64_t Image::getEndAddress() const {
@@ -382,11 +515,22 @@ std::optional<uint64_t> Image::getSymbolAddress(StringRef Name) const {
   };
   // Prefer the regular symbol table and then fall back to the dynamic symbol
   // table.
-  if (auto Addr = findIn(O->symbols()))
+  if (auto Addr = findIn(O->symbols())) {
+    REFLECTION_DIAG("getSymbolAddress(%s) in %s: found in .symtab at 0x%llx",
+                    Name.str().c_str(), O->getFileName().str().c_str(),
+                    (unsigned long long)*Addr);
     return Addr;
+  }
   if (const auto *ELF = dyn_cast<llvm::object::ELFObjectFileBase>(O))
-    if (auto Addr = findIn(ELF->getDynamicSymbolIterators()))
+    if (auto Addr = findIn(ELF->getDynamicSymbolIterators())) {
+      REFLECTION_DIAG("getSymbolAddress(%s) in %s: found in .dynsym at 0x%llx",
+                      Name.str().c_str(), O->getFileName().str().c_str(),
+                      (unsigned long long)*Addr);
       return Addr;
+    }
+  REFLECTION_DIAG("getSymbolAddress(%s) in %s: NOT FOUND in .symtab or "
+                  ".dynsym",
+                  Name.str().c_str(), O->getFileName().str().c_str());
   return std::nullopt;
 }
 
@@ -453,6 +597,14 @@ ObjectMemoryReader::ObjectMemoryReader(
       abort();
     }
   }
+
+  for (unsigned i = 0; i < Images.size(); ++i)
+    REFLECTION_DIAG("image #%u %s: start=0x%llx end=0x%llx slide=0x%llx", i,
+                    Images[i].TheImage.getObjectFile()->getFileName().str()
+                        .c_str(),
+                    (unsigned long long)Images[i].TheImage.getStartAddress(),
+                    (unsigned long long)Images[i].TheImage.getEndAddress(),
+                    (unsigned long long)Images[i].Slide);
 }
 
 bool ObjectMemoryReader::queryDataLayout(DataLayoutQueryType type,
@@ -657,7 +809,15 @@ std::unique_ptr<ReflectionContextHolder> makeReflectionContextForMetadataReader(
   auto context = new ReflectionContext(reader);
   auto &builder = context->getBuilder();
   for (unsigned i = 0, e = reader->getImages().size(); i < e; ++i) {
-    context->addImage(reader->getImageStartAddress(i));
+    auto diagID = context->addImage(reader->getImageStartAddress(i));
+    REFLECTION_DIAG("addImage(#%u %s) -> %s (reflection info id %d)", i,
+                    reader->getImages()[i]
+                        .TheImage.getObjectFile()
+                        ->getFileName()
+                        .str()
+                        .c_str(),
+                    diagID ? "SUCCESS" : "FAILED: no reflection info registered",
+                    diagID ? (int)*diagID : -1);
   }
 
   ReflectionContextHolder *holder = new ReflectionContextHolder{
