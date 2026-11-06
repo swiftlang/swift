@@ -102,7 +102,7 @@ struct Foo {
 
 }
 
-func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-cparser-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-cparser-error {{expected ',' separator}} expected-cparser-error {{unnamed parameters must be written with the empty name '_'}} expected-astgen-error {{expected ')' in 'differentiable' attribute}}
+func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-cparser-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-cparser-error {{expected ',' separator}} expected-cparser-error {{unnamed parameters must be written with the empty name '_'}} expected-astgen-error {{expected ')' to end parameter clause}} expected-astgen-note {{to match this opening '('}} expected-astgen-error {{unexpected code '(Int) -> Int)' in function}} expected-astgen-warning {{'@differentiable' has been renamed to '@differentiable(reverse)'}}
 
 @derivative(of: Self.other,) // expected-cparser-error {{unexpected ',' separator}} {{27-28=}} expected-astgen-error {{expected 'wrt:' and arguments in '@differentiable' argument}}
 func foo() {}
