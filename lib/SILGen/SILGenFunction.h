@@ -1903,6 +1903,16 @@ public:
                                             StorageReferenceOperationKind kind);
   Expr *findStorageReferenceExprForBorrowExpr(Expr *argExpr);
 
+  /// Whether \p e reads storage through a `borrow` accessor whose base is a
+  /// copyable parameter that the function borrows (such as `self`), or is
+  /// reached from one only through stored properties and other `borrow`
+  /// accessors.
+  ///
+  /// Nothing can consume or reassign that parameter while the expression is
+  /// evaluated, so a borrowing use can take the accessor's result in place
+  /// rather than a copy, unless reaching it needed a formal access of its own.
+  bool isBorrowAccessorReadOfBorrowedParameter(Expr *e);
+
   /// Emit the given expression as a +1 r-value.
   ///
   /// *NOTE* This creates the +1 r-value and then pushes that +1 r-value through
