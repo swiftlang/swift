@@ -15,6 +15,7 @@ swift_compiler_sources(Optimizer
   GenericSpecialization.swift
   LifetimeCompletion.swift
   LifetimeDependenceUtils.swift
+  LifetimeResolutionUtils.swift
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift

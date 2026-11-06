@@ -79,7 +79,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
 /// A storage location that LifetimeResolution resolved, with helpers to describe it to the user.
 private struct Storage {
   let root: ResolvableRoot
-  let indices: FieldIndexTrie
+  let space: StateIndexSpace
 
   var allocation: Value { root.storage }
   var function: Function { root.address.parentFunction }
@@ -148,10 +148,15 @@ private struct Storage {
   /// over all of `self`.
   func firstPath(of leaves: Set<Int>) -> SmallProjectionPath {
     var firstPath: SmallProjectionPath? = nil
-    indices.forEachCoveringSubtree(of: leaves, excludingRoot: root.isRootSelf) { path in
+    space.fields.forEachCoveringSubtree(of: fieldLeaves(leaves), excludingRoot: root.isRootSelf) { path in
       if firstPath == nil { firstPath = path }
     }
     return firstPath ?? SmallProjectionPath()
+  }
+
+  /// The elements among `leaves` that are fields, which have a path.
+  func fieldLeaves(_ leaves: Set<Int>) -> Set<Int> {
+    leaves.filter { space.fieldRange.contains($0) }
   }
 }
 
@@ -624,7 +629,7 @@ private struct Diagnoser {
     guard let root = ResolvableRoot(allocation, &indexCache, context) else {
       return nil
     }
-    let storage = Storage(root: root, indices: root.fieldIndices(&indexCache))
+    let storage = Storage(root: root, space: root.stateIndexSpace(&indexCache))
     storages[allocation.hashable] = storage
     return storage
   }
@@ -697,7 +702,7 @@ private struct Diagnoser {
         continue
       }
       let accessPath = marker.destination.accessPath
-      let leaves = storage.indices.range(of: marker.destination.projectionPathFromRoot)
+      let leaves = storage.space.range(ofFieldPath: marker.destination.projectionPathFromRoot)
       let use = findOffendingUse(of: accessPath, in: uses(of: storage), after: marker, context)
 
       if let i = reports.firstIndex(where: { $0.storage.allocation == storage.allocation &&
@@ -785,7 +790,7 @@ private struct Diagnoser {
 
   /// One "'self.x' not initialized" note per uninitialized stored property, or part of one.
   private func noteUninitializedStoredProperties(of storage: Storage, _ leaves: Set<Int>, fallback: Location) {
-    storage.indices.forEachCoveringSubtree(of: leaves, excludingRoot: true) { path in
+    storage.space.fields.forEachCoveringSubtree(of: storage.fieldLeaves(leaves), excludingRoot: true) { path in
       let loc = storage.storedProperty(at: path)?.nameLoc ?? sourceLoc(fallback)
       diagnostics.diagnose(.stored_property_not_initialized, storage.name(of: path), at: loc)
     }

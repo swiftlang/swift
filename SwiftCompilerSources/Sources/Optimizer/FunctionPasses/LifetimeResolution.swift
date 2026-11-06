@@ -87,7 +87,7 @@ struct ResolvableRoot {
   let isNoImplicitCopy: Bool
 
   // Does this address start fully initialized?
-  let startsInitialized: Bool
+  private let startsInitialized: Bool
 
   /// An instruction requiring the whole root to be initialized, which is not found by walking uses of the address.
   enum ExtraLivenessUse {
@@ -131,20 +131,24 @@ struct ResolvableRoot {
     }
   }
 
-  /// The leaves of the storage that may only be initialized once: all of a `let` binding,
-  /// or the `let` stored properties of `self` in a struct initializer.
-  func immutableLeaves(_ indices: FieldIndexTrie) -> Set<Int> {
+  /// The elements of the storage that may only be initialized once: all of a `let` binding,
+  /// or the `let` stored properties of `self` in a struct or class initializer.
+  func immutableLeaves(_ space: StateIndexSpace) -> Set<Int> {
     switch markUninitialized?.kind {
     case .variable?, nil:
-      return isLet ? Set(indices.wholeRange) : []
+      return isLet ? Set(space.wholeRange) : []
     case .rootSelf?, .crossModuleRootSelf?:
-      guard let fields = address.type.getNominalFields(in: address.parentFunction) else {
+      let function = address.parentFunction
+      let type = address.type.objectType
+      guard let fields = type.getNominalFields(in: function) else {
         return []
       }
       let kind: SmallProjectionPath.FieldKind = isClassInstance ? .classField : .structField
+      // An inherited stored property has no element of its own.
+      let firstOwnField = isClassInstance ? (type.superClassType?.bridged.getNumNominalFields() ?? 0) : 0
       var leaves = Set<Int>()
-      for field in fields.indices where fields.getUserFacingFieldDecl(withIndex: field)?.isLet ?? false {
-        leaves.formUnion(indices.range(of: SmallProjectionPath(kind, index: field)))
+      for field in firstOwnField..<fields.count where fields.getUserFacingFieldDecl(withIndex: field)?.isLet ?? false {
+        leaves.formUnion(space.range(ofFieldPath: SmallProjectionPath(kind, index: field)))
       }
       return leaves
     default:
@@ -253,12 +257,14 @@ struct ResolvableRoot {
     }
   }
 
-  /// The trie numbering the leaves of this storage.
-  func fieldIndices(_ indexCache: inout FieldIndexTrieCache) -> FieldIndexTrie {
+  /// The elements of the dataflow state tracked for this storage.
+  func stateIndexSpace(_ indexCache: inout FieldIndexTrieCache) -> StateIndexSpace {
     if isClassInstance {
-      return indexCache.fieldIndices(forClassInstance: address.type)
+      return StateIndexSpace(.rootClassSelf, fields: indexCache.fieldIndices(forClassInstance: address.type),
+                             initiallyInitialized: startsInitialized)
     }
-    return indexCache.fieldIndices(for: address.type)
+    return StateIndexSpace(.storage, fields: indexCache.fieldIndices(for: address.type),
+                           initiallyInitialized: startsInitialized)
   }
 
   // Change the storage such that it indicates a dynamic lifetime.
@@ -336,15 +342,15 @@ private struct Resolver {
 
     log("\n** Demand Analysis start **")
 
-    let indices = root.fieldIndices(&indexCache)
-    log("FieldIndexTrie of \(root.address.type): \n\(indices)")
+    let space = root.stateIndexSpace(&indexCache)
+    log("StateIndexSpace of \(root.address.type): \n\(space)")
 
     // The reference to a class instance is itself an SSA value, whose copies and destroys are resolved first.
     if root.isClassInstance {
       resolveSingleDef(root.address, context)
     }
 
-    self.state = Self.createBlockState(root, indices, context)
+    self.state = Self.createBlockState(root, space, context)
 
     // Initialize the demand per block
     for blk in function.blocks {
@@ -352,10 +358,10 @@ private struct Resolver {
     }
 
     logState("\n** state before solveDemand **")
-    solveDemand(indices)
+    solveDemand(space)
 
     logState("\n** state before legalizeDemand **")
-    legalizeDemand(for: root, indices)
+    legalizeDemand(for: root, space)
 
     ////////////////
     // Step 2: Determine availability at lifetime ends, handling partially initialized destroys.
@@ -366,10 +372,10 @@ private struct Resolver {
     }
 
     logState("\n** state before solveAvailability **")
-    solveAvailability(indices)
+    solveAvailability(space)
 
     logState("\n** state before legalizeAvailability **")
-    legalizeAvailability(root, indices)
+    legalizeAvailability(root, space)
 
     logState("\n** final state **")
 
@@ -391,7 +397,7 @@ private struct Resolver {
   }
 
   // Solve the backward demand-flow to a fixpoint.
-  mutating func solveDemand(_ indices: FieldIndexTrie) {
+  mutating func solveDemand(_ space: StateIndexSpace) {
     var worklist = BasicBlockWorklist(context)
     defer { worklist.deinitialize() }
 
@@ -403,7 +409,7 @@ private struct Resolver {
     while let block = worklist.popAndForget() {
       guard let info = state[block] else { fatalError("no block state?") }
 
-      var exits = Array.init(repeating: Demand.nothing, count: indices.leafCount)
+      var exits = space.makeStates(repeating: Demand.nothing)
       let range = info.demand.indices
       assert(exits.count == range.upperBound)
 
@@ -444,7 +450,7 @@ private struct Resolver {
 
   // Legalize the SIL from the solved demand, leaving markers behind for LifetimeResolutionDiagnose
   // to turn into user-facing diagnostics for any misuses that were corrected by this phase.
-  mutating func legalizeDemand(for root: ResolvableRoot, _ indices: FieldIndexTrie) {
+  mutating func legalizeDemand(for root: ResolvableRoot, _ space: StateIndexSpace) {
     for block in function.blocks {
       guard var events = state[block]?.events else { continue }
       defer { state[block]!.events = events }
@@ -454,14 +460,14 @@ private struct Resolver {
       var current = state[block]!.demand.map { $0.exit }
 
       for i in events.list.indices.reversed() {
-        legalize(event: &events.list[i], successorDemand: &current, root, indices)
+        legalize(event: &events.list[i], successorDemand: &current, root, space)
       }
     }
   }
 
   // Legalize a single event with respect to the demand reaching it from its successor instruction.
   func legalize(event: inout EventList.Event, successorDemand current: inout [Demand], _ root: ResolvableRoot,
-                _ indices: FieldIndexTrie) {
+                _ space: StateIndexSpace) {
     let noDemand = current[event.range].allSatisfy { $0 == .nothing }
     let someDemand = !noDemand
 
@@ -504,10 +510,10 @@ private struct Resolver {
       //          emit a load_borrow for a copyable type, given access scopes may end.
       newKind = transform(kind, to: .load(.take), root)
 
-    case let .root(r) where someDemand && !r.startsInitialized:
+    case .root(_, initialized: false) where someDemand:
       // Unsatisfied demand reaching the root means there exists a use-before-init of those leaves.
       let demanded = event.range.filter { current[$0] != .nothing }
-      initializeWithUndef(leaves: demanded, of: root, indices)
+      initializeWithUndef(leaves: demanded, of: root, space)
 
     default:
       break
@@ -701,10 +707,10 @@ private struct Resolver {
   }
 
   // Emit an `assign undef to [init]` of each given leaf of the root, right after the root's definition.
-  func initializeWithUndef(leaves: [Int], of root: ResolvableRoot, _ indices: FieldIndexTrie) {
+  func initializeWithUndef(leaves: [Int], of root: ResolvableRoot, _ space: StateIndexSpace) {
     let builder = Builder(after: root.startInstruction, context)
     for leaf in leaves {
-      indices.withElementAddress(forLeaf: leaf, from: root.address, builder) { address in
+      space.withElementAddress(forIndex: leaf, from: root.address, builder) { address in
         let undef = Undef.get(type: address.type.objectType, context)
         builder.createAssign(source: undef, destination: address, ownership: .initialize)
       }
@@ -712,7 +718,7 @@ private struct Resolver {
   }
 
   // Forward dataflow solving for the availability of fields, to a fixed-point.
-  mutating func solveAvailability(_ indices: FieldIndexTrie) {
+  mutating func solveAvailability(_ space: StateIndexSpace) {
     var worklist = BasicBlockWorklist(context)
     defer { worklist.deinitialize() }
 
@@ -724,7 +730,7 @@ private struct Resolver {
     while let block = worklist.popAndForget() {
       guard let info = state[block] else { fatalError("no block state?") }
 
-      var entries = Array.init(repeating: Availability.unknown, count: indices.leafCount)
+      var entries = space.makeStates(repeating: Availability.unknown)
       let range = info.availability.indices
       assert(entries.count == range.upperBound)
 
@@ -759,11 +765,11 @@ private struct Resolver {
     }
   }
 
-  mutating func legalizeAvailability(_ root: ResolvableRoot, _ indices: FieldIndexTrie) {
-    typealias PartialAvailability = (inst: Instruction, avail: [Availability], range: FieldIndexTrie.IndexRange)
+  mutating func legalizeAvailability(_ root: ResolvableRoot, _ space: StateIndexSpace) {
+    typealias PartialAvailability = (inst: Instruction, avail: [Availability], range: StateIndexSpace.IndexRange)
     var partialDestroys: [PartialAvailability] = []
     var destroysBeforeInit: [PartialAvailability] = []
-    let immutableLeaves = root.immutableLeaves(indices)
+    let immutableLeaves = root.immutableLeaves(space)
 
     // Do a first pass over blocks, collecting any needed partial destroys for a second step.
     for block in function.blocks {
@@ -794,7 +800,7 @@ private struct Resolver {
             Builder(before: op.instruction, context).createDiagnose(operand: op.value, kind: .letReinit)
           }
 
-          let nontrivial = range.filter { !indices.leafType($0).isTrivial(in: function) }
+          let nontrivial = space.fieldLeaves(in: range).filter { !space.leafType($0).isTrivial(in: function) }
           if nontrivial.isEmpty {
             // Nothing needs to be destroyed, but LetPropertyLowering relies on knowing the initializations.
             makeDef(op.instruction, initialization: summary == .no)
@@ -866,15 +872,15 @@ private struct Resolver {
 
     var controlVar: ControlVariable? = nil
     if !conditionalLeaves.isEmpty {
-      controlVar = ControlVariable(for: root, numBits: indices.leafCount, context)
+      controlVar = ControlVariable(for: root, space, context)
     }
 
     for (destroy, avail, range) in partialDestroys {
       if root.isClassInstance {
-        endInstanceLifetime(at: destroy, avail, root, indices, controlVar)
+        endInstanceLifetime(at: destroy, avail, root, space, controlVar)
         continue
       }
-      destroyAvailableFields(avail, range, before: destroy, root, indices, controlVar)
+      destroyAvailableFields(avail, range, before: destroy, root, space, controlVar)
 
       // Everything in range is now uninitialized.
       controlVar?.update(range, initialized: false, before: destroy)
@@ -882,7 +888,7 @@ private struct Resolver {
     }
 
     for (def, avail, range) in destroysBeforeInit {
-      destroyAvailableFields(avail, range, before: def, root, indices, controlVar)
+      destroyAvailableFields(avail, range, before: def, root, space, controlVar)
     }
 
     if let controlVar {
@@ -944,13 +950,13 @@ private struct Resolver {
   // stored properties turn out to be initialized, in which case the destroy runs its deinit, the initialized
   // ones are destroyed and the instance is deallocated without running its deinit.
   func endInstanceLifetime(at destroy: Instruction, _ avail: [Availability], _ root: ResolvableRoot,
-                           _ indices: FieldIndexTrie, _ controlVar: ControlVariable?) {
+                           _ space: StateIndexSpace, _ controlVar: ControlVariable?) {
     let instance = destroy.operands[0].value
-    let partialLeaves = indices.wholeRange.filter { avail[$0] == .partial }
+    let partialLeaves = space.fieldRange.filter { avail[$0] == .partial }
     var deallocPoint = destroy
     var deallocAvail = avail
 
-    if !partialLeaves.isEmpty && indices.wholeRange.allSatisfy({ avail[$0] != .no }) {
+    if !partialLeaves.isEmpty && space.fieldRange.allSatisfy({ avail[$0] != .no }) {
       guard let controlVar else { fatalError("missing control variable for conditional destroy") }
 
       //   start:        cond_br (test bits), keepBlock, deallocBlock
@@ -977,7 +983,7 @@ private struct Resolver {
       }
     }
 
-    destroyAvailableFields(deallocAvail, indices.wholeRange, before: deallocPoint, root, indices, controlVar)
+    destroyAvailableFields(deallocAvail, space.fieldRange, before: deallocPoint, root, space, controlVar)
     let builder = Builder(before: deallocPoint, location: destroy.location, context)
     let metatype = builder.createMetatype(ofInstanceType: instance.type.canonicalType, representation: .thick)
     builder.createDeallocPartialRef(instance, metatype: metatype)
@@ -987,17 +993,17 @@ private struct Resolver {
   // Destroys only the available fields of partially available memory, testing the control variable
   // for fields that are only conditionally available.
   func destroyAvailableFields(_ current: [Availability], _ range: EventList.IndexRange, before inst: Instruction,
-                              _ root: ResolvableRoot, _ indices: FieldIndexTrie, _ controlVar: ControlVariable?) {
+                              _ root: ResolvableRoot, _ space: StateIndexSpace, _ controlVar: ControlVariable?) {
     log("destroying available fields before \(inst)")
 
-    for leaf in range {
-      if current[leaf] == .no || indices.leafType(leaf).isTrivial(in: function) {
+    for leaf in space.fieldLeaves(in: range) {
+      if current[leaf] == .no || space.leafType(leaf).isTrivial(in: function) {
         continue
       }
 
       if current[leaf] == .yes {
         let builder = Builder(before: inst, context)
-        indices.withElementAddress(forLeaf: leaf, from: root.address, builder) { builder.createDestroyAddr(address: $0) }
+        space.withElementAddress(forIndex: leaf, from: root.address, builder) { builder.createDestroyAddr(address: $0) }
         continue
       }
 
@@ -1017,7 +1023,7 @@ private struct Resolver {
       let falseBlock = context.createBlock(after: trueBlock)
 
       let trueBuilder = Builder(atEndOf: trueBlock, location: inst.location, context)
-      indices.withElementAddress(forLeaf: leaf, from: root.address, trueBuilder) {
+      space.withElementAddress(forIndex: leaf, from: root.address, trueBuilder) {
         trueBuilder.createDestroyAddr(address: $0)
       }
       trueBuilder.createBranch(to: cont)
@@ -1031,13 +1037,13 @@ private struct Resolver {
   // Classifies every use of the root's address, following projections and access scopes, into the events of each block.
   private struct UseCollector : AddressDefUseWalker, AddressUseVisitor, ClassInstanceUseWalker {
     private(set) var uses: Dictionary<BasicBlock, EventList> = [:]
-    private let indices: FieldIndexTrie
+    private let space: StateIndexSpace
     private let function: Function
     let context: Context
     private let localReachabilityCache = LocalVariableReachabilityCache()
 
-    init(_ indices: FieldIndexTrie, _ function: Function, _ context: Context) {
-      self.indices = indices
+    init(_ space: StateIndexSpace, _ function: Function, _ context: Context) {
+      self.space = space
       self.function = function
       self.context = context
     }
@@ -1052,9 +1058,9 @@ private struct Resolver {
       addUse(.liveness(operand.instruction), range(of: operand))
     }
 
-    // The leaves of the root accessed by an operand.
+    // The elements of the root accessed by an operand.
     func range(of operand: Operand) -> EventList.IndexRange {
-      indices.range(of: operand.value.projectionPathFromRoot)
+      space.range(ofFieldPath: operand.value.projectionPathFromRoot)
     }
 
     mutating func collectUses(of root: ResolvableRoot) -> Bool {
@@ -1062,7 +1068,9 @@ private struct Resolver {
       log("** starting collectUses on \(address) **")
 
       // Add the root use to do detect uninitialized paths.
-      addUse(.root(root), indices.wholeRange)
+      for (range, initialized) in space.initialRanges {
+        addUse(.root(root, initialized: initialized), range)
+      }
 
       let result = root.isClassInstance ? walkDownUses(ofClassInstance: address)
                                         : walkDownUses(ofAddress: address, path: Path())
@@ -1071,7 +1079,7 @@ private struct Resolver {
       }
 
       // Add any extra uses specific to this root.
-      root.extraLivenessUses.forEach { addUse(.liveness($0.instruction), indices.wholeRange) }
+      root.extraLivenessUses.forEach { addUse(.liveness($0.instruction), space.wholeRange) }
 
       // Ensure correct order within each block
       for blk in uses.keys {
@@ -1107,9 +1115,9 @@ private struct Resolver {
 
     mutating func instanceUse(_ use: Operand) -> WalkResult {
       if use.instruction is DestroyValueInst {
-        addUse(.end(use), indices.wholeRange)
+        addUse(.end(use), space.instanceRange)
       } else {
-        addUse(.liveness(use.instruction), indices.wholeRange)
+        addUse(.liveness(use.instruction), space.instanceRange)
       }
       return .continueWalk
     }
@@ -1267,18 +1275,18 @@ private struct Resolver {
     }
   }
 
-  static func createBlockState(_ root: ResolvableRoot, _ indices: FieldIndexTrie,
+  static func createBlockState(_ root: ResolvableRoot, _ space: StateIndexSpace,
                                _ context: FunctionPassContext) -> BlockState {
     let function = root.address.parentFunction
-    var uc = UseCollector(indices, function, context)
+    var uc = UseCollector(space, function, context)
     guard uc.collectUses(of: root) else {
       fatalError("collectUses aborted its walk?")
     }
 
     var state: BlockState = [:]
 
-    let emptyDemand = Array.init(repeating: BlockDemand(), count: indices.leafCount)
-    let emptyAvailability = Array.init(repeating: BlockAvailability(), count: indices.leafCount)
+    let emptyDemand = space.makeStates(repeating: BlockDemand())
+    let emptyAvailability = space.makeStates(repeating: BlockAvailability())
 
     // Initialize an empty block state along with the accesses for that particular block.
     // We need state for all blocks, so information transits across them.
@@ -1369,7 +1377,7 @@ private struct Resolver {
 
   // Classified memory events within a BasicBlock.
   struct EventList: CustomStringConvertible {
-    typealias IndexRange = FieldIndexTrie.IndexRange
+    typealias IndexRange = StateIndexSpace.IndexRange
     typealias Event = (kind: Kind, range: IndexRange)
 
     private let block: BasicBlock
@@ -1388,7 +1396,7 @@ private struct Resolver {
     }
 
     enum Kind: CustomStringConvertible {
-      case root(ResolvableRoot)
+      case root(ResolvableRoot, initialized: Bool)  // Whether the elements in range are initialized at the start.
       case use(Operand, Demand)         // The demand summarizes the kinds of users of this operand's instruction.
       case take(Operand, Demand)        // The demand summarizes the kinds of users of this operand's instruction.
       case def(Operand)
@@ -1397,7 +1405,7 @@ private struct Resolver {
 
       var inst: Instruction {
         switch self {
-        case let .root(r): r.startInstruction
+        case let .root(r, _): r.startInstruction
         case let .use(op, _): op.instruction
         case let .take(op, _): op.instruction
         case let .def(op): op.instruction
@@ -1421,7 +1429,7 @@ private struct Resolver {
       var demandKill: Demand {
         switch self {
         case .def: .all
-        case let .root(r) where r.startsInitialized: .all // A root that starts initialized is a def.
+        case .root(_, initialized: true): .all // A root that starts initialized is a def.
         default: .nothing
         }
       }
@@ -1430,7 +1438,7 @@ private struct Resolver {
       var availGen: Availability {
         switch self {
         case .def: .yes
-        case let .root(r) where r.startsInitialized: .yes  // A root that starts initialized is a def.
+        case .root(_, initialized: true): .yes  // A root that starts initialized is a def.
         case .root, .take, .end: .no    // these leave the operand uninitialized.
         case .use: .unknown       // doesn't change the state
         case .liveness: .unknown
@@ -2057,14 +2065,15 @@ private extension Function {
 }
 
 /// A "control" variable: a bit vector in memory, represented as an integer, tracking whether each field of a
-/// root is dynamically initialized. Bit `i` corresponds to leaf `i` of the root's FieldIndexTrie.
+/// root is dynamically initialized. Bit `i` corresponds to element `i` of the root's StateIndexSpace.
 private struct ControlVariable {
   let address: Value
   let intType: Type
   let numBits: Int
   let context: FunctionPassContext
 
-  init(for root: ResolvableRoot, numBits: Int, _ context: FunctionPassContext) {
+  init(for root: ResolvableRoot, _ space: StateIndexSpace, _ context: FunctionPassContext) {
+    let numBits = space.count
     guard numBits <= UInt.bitWidth else {
       fatalError("TODO: control variable with more than \(UInt.bitWidth) bits")
     }
@@ -2087,8 +2096,7 @@ private struct ControlVariable {
     } else {
       initBuilder = entryBuilder
     }
-    let initial = initBuilder.createIntegerLiteral(root.startsInitialized ? Self.mask(of: 0..<numBits) : 0,
-                                                   type: intType)
+    let initial = initBuilder.createIntegerLiteral(Self.mask(of: space.initiallyInitialized), type: intType)
     initBuilder.createStore(source: initial, destination: address, ownership: .trivial)
 
     // Deallocate before each function exit.

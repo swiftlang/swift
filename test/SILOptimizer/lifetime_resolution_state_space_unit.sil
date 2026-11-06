@@ -1,0 +1,147 @@
+// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify -o /dev/null 2>&1 | %FileCheck %s
+
+// The elements of the dataflow state that LifetimeResolution tracks for each kind of root.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class K {}
+struct Two { var a: K; var b: K }
+struct Nested { var p: Two; var k: K }
+struct Empty {}
+struct Pair {
+  var x: K
+  let y: K
+}
+
+class Root {
+  var a: K
+  let p: Two
+  init()
+}
+
+class EmptyRoot {
+  init()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on local_var: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 3
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field s0.s0
+// CHECK-NEXT:   1: field s0.s1
+// CHECK-NEXT:   2: field s1
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK:      instanceRange: 0..<3
+// CHECK-LABEL: end running test {{.*}} on local_var: lifetime_resolution_state_space
+sil [ossa] @local_var : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Nested, var, name "n"
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [var] %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: begin running test {{.*}} on local_let_tuple: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 2
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field 0
+// CHECK-NEXT:   1: field 1
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK-LABEL: end running test {{.*}} on local_let_tuple: lifetime_resolution_state_space
+sil [ossa] @local_let_tuple : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $(K, K), let, name "t"
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [var] %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: begin running test {{.*}} on inout_argument: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 2
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field s0
+// CHECK-NEXT:   1: field s1
+// CHECK-NEXT: initiallyInitialized: 0..<2
+// CHECK-LABEL: end running test {{.*}} on inout_argument: lifetime_resolution_state_space
+sil [ossa] @inout_argument : $@convention(thin) (@inout Two) -> () {
+bb0(%0 : $*Two):
+  specify_test "lifetime_resolution_state_space %0"
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: begin running test {{.*}} on struct_self: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 2
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field s0
+// CHECK-NEXT:   1: field s1
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK-LABEL: end running test {{.*}} on struct_self: lifetime_resolution_state_space
+sil [ossa] @struct_self : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Pair, var, name "self"
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [rootself] %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// `self` of an empty struct has nothing to initialize, so it starts initialized.
+// CHECK-LABEL: begin running test {{.*}} on empty_struct_self: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 1
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field <root>
+// CHECK-NEXT: initiallyInitialized: 0..<1
+// CHECK-LABEL: end running test {{.*}} on empty_struct_self: lifetime_resolution_state_space
+sil [ossa] @empty_struct_self : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Empty, var, name "self"
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [rootself] %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: begin running test {{.*}} on root_class_self: lifetime_resolution_state_space
+// CHECK:      mode: rootClassSelf
+// CHECK-NEXT: count: 3
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field c0
+// CHECK-NEXT:   1: field c1.s0
+// CHECK-NEXT:   2: field c1.s1
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK:      instanceRange: 0..<3
+// CHECK-LABEL: end running test {{.*}} on root_class_self: lifetime_resolution_state_space
+sil [ossa] @root_class_self : $@convention(method) (@owned Root) -> @owned Root {
+bb0(%0 : @owned $Root):
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [rootself] %0
+  return %1
+}
+
+// CHECK-LABEL: begin running test {{.*}} on empty_root_class_self: lifetime_resolution_state_space
+// CHECK:      mode: rootClassSelf
+// CHECK-NEXT: count: 1
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field <root>
+// CHECK-NEXT: initiallyInitialized: 0..<1
+// CHECK-LABEL: end running test {{.*}} on empty_root_class_self: lifetime_resolution_state_space
+sil [ossa] @empty_root_class_self : $@convention(method) (@owned EmptyRoot) -> @owned EmptyRoot {
+bb0(%0 : @owned $EmptyRoot):
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [rootself] %0
+  return %1
+}
