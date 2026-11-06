@@ -1223,8 +1223,8 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   auto unsafe = [](CxxUnsafetyReason reason)
       -> std::optional<CxxUnsafetyReason> { return reason; };
 
-  // The user explicitly explicitly acknowledged this method's unsafety
-  // and asked us to import it as is anyway. No renaming needed.
+  // The user explicitly acknowledged this method's unsafety and asked us to
+  // import it as is anyway. No renaming needed.
   if (hasUnsafeAPIAttr(method))
     return safe();
 
