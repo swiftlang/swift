@@ -1229,6 +1229,14 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   /// calling `deinitialize(count:)`, the memory is uninitialized, but still
   /// bound to the `Pointee` type.
   ///
+  /// Deinitializing a value has the same effect as the value going out of
+  /// scope. If `Pointee` is a nontrivial type, any strong references the value
+  /// holds are released. For example, if `Pointee` is a class type, each
+  /// deinitialized instance's reference count is decremented, and an instance
+  /// is deallocated if that was its last strong reference. If `Pointee` is a
+  /// trivial type, such as `Int`, deinitializing doesn't perform any work,
+  /// but you must still treat the memory as uninitialized afterward.
+  ///
   /// - Parameter count: The number of instances to deinitialize. `count` must
   ///   not be negative.
   /// - Returns: A raw pointer to the same address as this pointer. The memory
