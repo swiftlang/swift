@@ -11,7 +11,7 @@
  *===----------------------------------------------------------------------===*
  *
  * The C view of the jobs and executor references that the Swift Concurrency
- * runtime passes to a global executor. `EmbeddedPlatform.h` and
+ * runtime passes to a global executor. `EmbeddedPlatform+Concurrency.h` and
  * `ExecutorImpl.h` both include this file, which must compile without C
  * library headers.
  *
@@ -48,6 +48,18 @@
 #define EMBEDDED_SWIFT_NULLABLE
 #endif
 
+#if defined(__has_attribute) && __has_attribute(swift_name)
+#define EMBEDDED_SWIFT_NAME(_name) __attribute__((swift_name(#_name)))
+#else
+#define EMBEDDED_SWIFT_NAME(_name)
+#endif
+
+#if defined(__has_attribute) && __has_attribute(enum_extensibility)
+#define EMBEDDED_SWIFT_ENUM __attribute__((enum_extensibility(open)))
+#else
+#define EMBEDDED_SWIFT_ENUM
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -58,23 +70,21 @@ typedef struct SwiftHeapMetadata SwiftHeapMetadata;
 /// Jobs have flags, which currently encode a kind and a priority
 typedef __UINT32_TYPE__ SwiftJobFlags;
 
-typedef __SIZE_TYPE__ SwiftJobKind;
-enum {
-  SwiftTaskJobKind = 0,
+typedef enum EMBEDDED_SWIFT_ENUM: __SIZE_TYPE__ {
+  SwiftTaskJobKind EMBEDDED_SWIFT_NAME(task) = 0,
 
   // Job kinds >= 192 are private to the implementation
-  SwiftFirstReservedJobKind = 192,
-};
+  SwiftFirstReservedJobKind EMBEDDED_SWIFT_NAME(firstReserved) = 192,
+} SwiftJobKind;
 
-typedef __SIZE_TYPE__ SwiftJobPriority;
-enum {
-  SwiftUserInteractiveJobPriority = 0x21, /* UI */
-  SwiftUserInitiatedJobPriority   = 0x19, /* IN */
-  SwiftDefaultJobPriority         = 0x15, /* DEF */
-  SwiftUtilityJobPriority         = 0x11, /* UT */
-  SwiftBackgroundJobPriority      = 0x09, /* BG */
-  SwiftUnspecifiedJobPriority     = 0x00, /* UN */
-};
+typedef enum EMBEDDED_SWIFT_ENUM: __SIZE_TYPE__ {
+  SwiftUserInteractiveJobPriority EMBEDDED_SWIFT_NAME(userInteractive) = 0x21,
+  SwiftUserInitiatedJobPriority EMBEDDED_SWIFT_NAME(userInitiated) = 0x19,
+  SwiftDefaultJobPriority EMBEDDED_SWIFT_NAME(default) = 0x15,
+  SwiftUtilityJobPriority EMBEDDED_SWIFT_NAME(utility) = 0x11,
+  SwiftBackgroundJobPriority EMBEDDED_SWIFT_NAME(background) = 0x09,
+  SwiftUnspecifiedJobPriority EMBEDDED_SWIFT_NAME(unspecified) = 0x00,
+} SwiftJobPriority;
 
 /// Used by the Concurrency runtime to represent a job.  The `schedulerPrivate`
 /// field may be freely used by the executor implementation.
@@ -119,11 +129,10 @@ typedef struct {
 
 /// Indicates whether or not an executor can be compared by just looking at
 /// the `identity` field.
-typedef unsigned SwiftExecutorKind;
-enum {
-  SwiftExecutorOrdinaryKind = 0,
-  SwiftExecutorComplexEqualityKind = 1
-};
+typedef enum EMBEDDED_SWIFT_ENUM: unsigned {
+  SwiftExecutorOrdinaryKind EMBEDDED_SWIFT_NAME(ordinary) = 0,
+  SwiftExecutorComplexEqualityKind EMBEDDED_SWIFT_NAME(complexEquality) = 1
+} SwiftExecutorKind;
 
 typedef struct SwiftExecutorWitnessTable SwiftExecutorWitnessTable;
 
@@ -189,20 +198,20 @@ swift_executor_getWitnessTable(SwiftExecutorRef executor) {
   return (const SwiftExecutorWitnessTable *)(executor.implementation & mask);
 }
 
-/// Runs the job on the executor. The Swift Concurrency runtime defines this
-/// function, and executors call it through `swift_job_runSynchronously`.
-void _swift_job_run_c(SwiftJob * EMBEDDED_SWIFT_NONNULL job,
-                      SwiftExecutorRef executor);
-
 /// Execute the specified job while running on the specified executor.
 static inline void
 swift_job_runSynchronously(SwiftJob * EMBEDDED_SWIFT_NONNULL job,
                            SwiftExecutorRef executor) {
+  extern void _swift_job_run_c(SwiftJob * EMBEDDED_SWIFT_NONNULL,
+                               SwiftExecutorRef);
+
   _swift_job_run_c(job, executor);
 }
 
 #ifdef __cplusplus
 } // extern "C"
 #endif
+
+#undef EMBEDDED_SWIFT_NAME
 
 #endif // SWIFT_EXECUTOR_TYPES_H

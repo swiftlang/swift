@@ -12,15 +12,15 @@
 ///
 /// The implementation of the cooperative global executor.
 ///
-/// It defines the executor entrypoints declared in EmbeddedPlatform.h and
-/// ExecutorImpl.h.
+/// It defines the executor entrypoints declared in
+/// EmbeddedPlatform+Concurrency.h and ExecutorImpl.h.
 ///
 ///===------------------------------------------------------------------===///
 
 #include "swift/shims/Visibility.h"
 
 #include "swift/Basic/PriorityQueue.h"
-#include "swift/EmbeddedPlatform.h"
+#include "swift/EmbeddedPlatform+Concurrency.h"
 
 #include "ExecutorImpl.h"
 
@@ -72,7 +72,7 @@ void _swift_concurrency_donateThreadToGlobalExecutorUntil(
   }
 }
 
-void _swift_concurrency_asyncMainDrainQueue(void) {
+void _swift_concurrency_asyncMain(void) {
   while (true) {
     auto job = JobQueue.dequeue();
     assert(job && "We should never run out of jobs on the async main queue.");

@@ -20,7 +20,7 @@
 
 #if SWIFT_CONCURRENCY_EMBEDDED
 #include "ExecutorImpl.h"
-#include "swift/EmbeddedPlatform.h"
+#include "swift/EmbeddedPlatform+Concurrency.h"
 #endif
 
 using namespace swift;
@@ -49,10 +49,6 @@ int8_t _swift_task_isIsolatingCurrentContextSwift(
 
 #if SWIFT_CONCURRENCY_EMBEDDED
 
-// The `_swift_concurrency_*` executor entrypoints default to the executor in
-// ExecutorImpl.swift. An executor archive replaces these defaults only when it
-// comes before libswift_Concurrency.a on the link line.
-
 extern "C" __attribute__((weak))
 void _swift_concurrency_enqueueGlobal(SwiftJob *job) {
   swift_task_enqueueGlobalImpl(job);
@@ -78,7 +74,7 @@ bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
 }
 
 extern "C" __attribute__((weak))
-void _swift_concurrency_asyncMainDrainQueue(void) {
+void _swift_concurrency_asyncMain(void) {
   swift_task_asyncMainDrainQueueImpl();
 }
 
