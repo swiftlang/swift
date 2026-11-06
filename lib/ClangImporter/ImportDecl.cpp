@@ -8099,9 +8099,23 @@ void SwiftDeclConverter::recordFuncOverride(AbstractFunctionDecl *decl) const {
     return;
   // Look up the overridden member from the ObjC or C++ superclass
   SmallVector<ValueDecl *, 4> results;
-  superDecl->lookupQualified(
-      superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
-      {NLFlags::QualifiedDefault, NLFlags::IgnoreMissingImports}, results);
+  if (isa_and_nonnull<clang::CXXRecordDecl>(classDecl->getClangDecl())) {
+    for (auto *cls = superDecl; cls; cls = cls->getSuperclassDecl()) {
+      // A C++ member cannot override anything declared in an extension, so no
+      // need to use lookupQualified()
+      for (auto *member :
+           importer::lookupDirectWithoutExtensions(cls, decl->getName()))
+        if (member->isAccessibleFrom(superDecl))
+          results.push_back(member);
+      // C++ classes do not inherit constructors.
+      if (isa<ConstructorDecl>(decl))
+        break;
+    }
+  } else {
+    superDecl->lookupQualified(
+        superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
+        {NLFlags::QualifiedDefault, NLFlags::IgnoreMissingImports}, results);
+  }
   for (auto member : results) {
     if (member->getKind() != decl->getKind() ||
         member->isInstanceMember() != decl->isInstanceMember() ||

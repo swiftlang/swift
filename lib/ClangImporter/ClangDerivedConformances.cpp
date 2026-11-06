@@ -143,17 +143,15 @@ lookupCxxZeroArityMethod(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
   return {constMethod, mutMethod};
 }
 
-/// Alternative to `NominalTypeDecl::lookupDirect`.
-/// This function does not attempt to load extensions of the nominal decl.
-static TinyPtrVector<ValueDecl *>
-lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
+TinyPtrVector<ValueDecl *>
+importer::lookupDirectWithoutExtensions(NominalTypeDecl *decl, DeclName name) {
   ASTContext &ctx = decl->getASTContext();
   auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
 
   TinyPtrVector<ValueDecl *> result;
 
-  if (id.isOperator()) {
-    auto underlyingId = getOperatorName(ctx, id);
+  if (name.getBaseName().isOperator()) {
+    auto underlyingId = getOperatorName(ctx, name.getBaseIdentifier());
     TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
         ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
     for (auto it : underlyingFuncs) {
@@ -164,14 +162,13 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
   } else {
     // See if there is a Clang decl with the given name.
     result = evaluateOrDefault(ctx.evaluator,
-                               ClangRecordMemberLookup({decl, id}), {});
+                               ClangRecordMemberLookup({decl, name}), {});
   }
 
   // Check if there are any synthesized Swift members that match the name.
   for (auto member : decl->getCurrentMembersWithoutLoading()) {
     if (auto namedMember = dyn_cast<ValueDecl>(member)) {
-      if (namedMember->hasName() && !namedMember->getName().isSpecial() &&
-          namedMember->getName().getBaseIdentifier().is(id.str()) &&
+      if (namedMember->hasName() && namedMember->getName().matchesRef(name) &&
           // Make sure we don't add duplicate entries, as that would wrongly
           // imply that lookup is ambiguous.
           !llvm::is_contained(result, namedMember)) {
@@ -179,6 +176,13 @@ lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
       }
     }
   }
+
+  // ClangRecordMemberLookup matches by base name only.
+  if (name.isCompoundName())
+    llvm::erase_if(result, [&](ValueDecl *found) {
+      return !found->getName().matchesRef(name);
+    });
+
   return result;
 }
 
