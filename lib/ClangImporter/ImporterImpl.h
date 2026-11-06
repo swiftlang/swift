@@ -497,7 +497,8 @@ public:
       DiagnosedTemplateDiagnostics;
 
   // Tracks already-emitted diagnostics associated with template arguments
-  // (e.g., from a malformed SWIFT_ESCAPABLE_IF) to avoid duplicate diagnostics.
+  // (e.g., from a malformed SWIFT_SELF_CONTAINED_IF) to avoid duplicate
+  // diagnostics.
   llvm::DenseSet<
       std::pair<const clang::ClassTemplateSpecializationDecl *, unsigned>>
       DiagnosedConditionalAttrParams;
@@ -2684,7 +2685,7 @@ bool hasEscapableAttr(const clang::RecordDecl *decl);
 /// smart pointer, or null if it does not have one.
 CustomAttr *getRefCountedPtrAttr(Decl *decl);
 
-/// The macro that spells \p attr in a header, e.g. \c SWIFT_ESCAPABLE for
+/// The macro that spells \p attr in a header, e.g. \c SWIFT_SELF_CONTAINED for
 /// \c swift_attr("Escapable"), for use in diagnostics. Falls back to the
 /// attribute string itself when it has no documented macro.
 StringRef getPrettySwiftAttributeName(const clang::SwiftAttrAttr *attr);
@@ -2712,8 +2713,8 @@ bool isViewType(const clang::CXXRecordDecl *decl);
 /// self-contained pointee, or a record (including a class template
 /// specialization) in which every field and base is either self-contained or
 /// itself a direct view. Here "self-contained" means escapable
-/// (SWIFT_ESCAPABLE), a foreign reference type, or a type annotated
-/// SWIFT_SELF_CONTAINED (import_owned); a type explicitly marked unsafe is
+/// (SWIFT_SELF_CONTAINED or inferred), a foreign reference type, or a type
+/// with the import_owned attribute; a type explicitly marked unsafe is
 /// never self-contained. Incomplete/forward-declared types, `void` pointees,
 /// and function pointees are never direct views.
 ///

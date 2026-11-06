@@ -361,54 +361,54 @@ ViewThenUnsafe m10();
 UnsafeThenView m11();
 // expected-NO-LIFETIMES-error@-1 {{a function cannot return a non-'Escapable' result}}
 
-// expected-error@+1 {{multiple SWIFT_NONESCAPABLE annotations found on 'DoubleNonEscapableAnnotation'}}
+// expected-error@+1 {{multiple SWIFT_VIEW annotations found on 'DoubleNonEscapableAnnotation'}}
 struct SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE DoubleNonEscapableAnnotation {};
-// expected-note@-1 {{SWIFT_NONESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_NONESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_VIEW annotation found here}}
+// expected-note@-2 {{SWIFT_VIEW annotation found here}}
 
-// expected-error@+1 {{multiple SWIFT_ESCAPABLE annotations found on 'DoubleEscapableAnnotation'}}
+// expected-error@+1 {{multiple SWIFT_SELF_CONTAINED annotations found on 'DoubleEscapableAnnotation'}}
 struct SWIFT_ESCAPABLE SWIFT_ESCAPABLE DoubleEscapableAnnotation {};
-// expected-note@-1 {{SWIFT_ESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_ESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED annotation found here}}
+// expected-note@-2 {{SWIFT_SELF_CONTAINED annotation found here}}
 
-// expected-error@+3 {{multiple SWIFT_ESCAPABLE_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, NonEscapable>'}}
-// expected-error@+2 {{multiple SWIFT_ESCAPABLE_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation>'}}
+// expected-error@+3 {{multiple SWIFT_SELF_CONTAINED_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, NonEscapable>'}}
+// expected-error@+2 {{multiple SWIFT_SELF_CONTAINED_IF annotations found on 'DoubleEscapableIfAnnotation<Owner, DoubleEscapableAnnotation>'}}
 template<typename F, typename S>
 struct SWIFT_ESCAPABLE_IF(F) SWIFT_ESCAPABLE_IF(S) DoubleEscapableIfAnnotation {};
-// expected-note@-1 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-2 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-3 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-4 {{SWIFT_ESCAPABLE_IF annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-2 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-3 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-4 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
 
 // expected-error@+1 {{multiple conflicting annotations found on 'EscapableNonEscapable'}}
 struct SWIFT_ESCAPABLE SWIFT_NONESCAPABLE EscapableNonEscapable {};
-// expected-note@-1 {{SWIFT_ESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_NONESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED annotation found here}}
+// expected-note@-2 {{SWIFT_VIEW annotation found here}}
 
 // expected-error@+1 {{multiple conflicting annotations found on 'DoubleEscapableNonEscapable'}}
 struct SWIFT_ESCAPABLE SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE SWIFT_ESCAPABLE DoubleEscapableNonEscapable {};
-// expected-note@-1 {{SWIFT_ESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_NONESCAPABLE annotation found here}}
-// expected-note@-3 {{SWIFT_NONESCAPABLE annotation found here}}
-// expected-note@-4 {{SWIFT_ESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED annotation found here}}
+// expected-note@-2 {{SWIFT_VIEW annotation found here}}
+// expected-note@-3 {{SWIFT_VIEW annotation found here}}
+// expected-note@-4 {{SWIFT_SELF_CONTAINED annotation found here}}
 
 // expected-error@+2 {{multiple conflicting annotations found on 'EscapableIfEscapable<NonEscapable>'}}
 template<typename T>
 struct SWIFT_ESCAPABLE_IF(T) SWIFT_ESCAPABLE EscapableIfEscapable {};
-// expected-note@-1 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-2 {{SWIFT_ESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-2 {{SWIFT_SELF_CONTAINED annotation found here}}
 
 // expected-error@+2 {{multiple conflicting annotations found on 'NonEscapableIfEscapable<Owner>'}}
 template<typename T>
 struct SWIFT_ESCAPABLE_IF(T) SWIFT_NONESCAPABLE NonEscapableIfEscapable {};
-// expected-note@-1 {{SWIFT_ESCAPABLE_IF annotation found here}}
-// expected-note@-2 {{SWIFT_NONESCAPABLE annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
+// expected-note@-2 {{SWIFT_VIEW annotation found here}}
 
-// expected-error@+2 {{SWIFT_ESCAPABLE_IF is invalid because it is only supported in class templates}}
+// expected-error@+2 {{SWIFT_SELF_CONTAINED_IF is invalid because it is only supported in class templates}}
 // expected-error@+1 {{multiple conflicting annotations found on 'NonTemplateEscapableIf'}}
 struct SWIFT_ESCAPABLE SWIFT_ESCAPABLE_IF(T) NonTemplateEscapableIf {};
-// expected-note@-1 {{SWIFT_ESCAPABLE annotation found here}}
-// expected-note@-2 {{SWIFT_ESCAPABLE_IF annotation found here}}
+// expected-note@-1 {{SWIFT_SELF_CONTAINED annotation found here}}
+// expected-note@-2 {{SWIFT_SELF_CONTAINED_IF annotation found here}}
 
 // expected-warning@+3 {{the returned type 'DoubleNonEscapableAnnotation' is annotated as non-'Escapable'; its lifetime dependencies must be annotated}}
 // expected-LIFETIMES-error@+2 {{a function with a non-'Escapable' result needs a parameter to depend on}}
