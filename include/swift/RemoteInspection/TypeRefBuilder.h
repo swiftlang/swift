@@ -546,10 +546,12 @@ public:
     }
 
     std::unique_ptr<FieldDescriptorBase>
-    getFieldDescriptor(const TypeRef *TR) override;
+    getFieldDescriptor(const TypeRef *TR,
+                       Mangle::ManglingFlavor Flavor) override;
 
     std::unique_ptr<BuiltinTypeDescriptorBase>
-    getBuiltinTypeDescriptor(const TypeRef *TR) override;
+    getBuiltinTypeDescriptor(const TypeRef *TR,
+                             Mangle::ManglingFlavor Flavor) override;
 
     /// Get the raw capture descriptor for a remote capture descriptor
     /// address.
