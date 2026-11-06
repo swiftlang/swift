@@ -143,45 +143,6 @@ lookupCxxZeroArityMethod(clang::Sema &Sema, const clang::CXXRecordDecl *Rec,
   return {constMethod, mutMethod};
 }
 
-/// Alternative to `NominalTypeDecl::lookupDirect`.
-/// This function does not attempt to load extensions of the nominal decl.
-static TinyPtrVector<ValueDecl *>
-lookupDirectWithoutExtensions(NominalTypeDecl *decl, Identifier id) {
-  ASTContext &ctx = decl->getASTContext();
-  auto *importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
-
-  TinyPtrVector<ValueDecl *> result;
-
-  if (id.isOperator()) {
-    auto underlyingId = getOperatorName(ctx, id);
-    TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
-        ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
-    for (auto it : underlyingFuncs) {
-      if (auto synthesizedFunc =
-              importer->getCXXSynthesizedOperatorFunc(cast<FuncDecl>(it)))
-        result.push_back(synthesizedFunc);
-    }
-  } else {
-    // See if there is a Clang decl with the given name.
-    result = evaluateOrDefault(ctx.evaluator,
-                               ClangRecordMemberLookup({decl, id}), {});
-  }
-
-  // Check if there are any synthesized Swift members that match the name.
-  for (auto member : decl->getCurrentMembersWithoutLoading()) {
-    if (auto namedMember = dyn_cast<ValueDecl>(member)) {
-      if (namedMember->hasName() && !namedMember->getName().isSpecial() &&
-          namedMember->getName().getBaseIdentifier().is(id.str()) &&
-          // Make sure we don't add duplicate entries, as that would wrongly
-          // imply that lookup is ambiguous.
-          !llvm::is_contained(result, namedMember)) {
-        result.push_back(namedMember);
-      }
-    }
-  }
-  return result;
-}
-
 template <typename Decl>
 static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
                                                  Identifier id) {

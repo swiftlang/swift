@@ -2466,6 +2466,11 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
+/// Alternative to \c NominalTypeDecl::lookupDirect for an imported C++ record,
+/// which does not load (and hence deserialize) extensions of \p decl.
+TinyPtrVector<ValueDecl *> lookupDirectWithoutExtensions(NominalTypeDecl *decl,
+                                                         DeclName name);
+
 bool hasSwiftAttribute(const clang::Decl *decl, ArrayRef<StringRef> attrs);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
