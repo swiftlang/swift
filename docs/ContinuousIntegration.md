@@ -2,10 +2,12 @@
 
 **Table of Contents**
 
-- [Introduction](#introduction)
-- [Pull Request Testing](#pull-request-testing)
+- [Continuous Integration for Swift](#continuous-integration-for-swift)
+  - [Introduction](#introduction)
+  - [Pull Request Testing](#pull-request-testing)
     - [@swift-ci](#swift-ci)
     - [Validation Testing](#validation-testing)
+    - [Benchmarking](#benchmarking)
     - [Linting](#linting)
     - [Source Compatibility Testing](#source-compatibility-testing)
     - [Sourcekit Stress Testing](#sourcekit-stress-testing)
@@ -15,10 +17,11 @@
     - [Specific Preset Testing against a Snapshot Toolchain](#specific-preset-testing-against-a-snapshot-toolchain)
     - [Running Non-Executable Device Tests using Specific Preset Testing](#running-non-executable-device-tests-using-specific-preset-testing)
     - [Build and Test the Minimal Freestanding Stdlib using Toolchain Specific Preset Testing](#build-and-test-the-minimal-freestanding-stdlib-using-toolchain-specific-preset-testing)
+    - [Useful preset triggers](#useful-preset-triggers)
     - [Testing Compiler Performance](#testing-compiler-performance)
+  - [Cross Repository Testing](#cross-repository-testing)
     - [Swift Community Hosted CI Pull Request Testing](#swift-community-hosted-ci-pull-request-testing)
-- [Cross Repository Testing](#cross-repository-testing)
-- [ci.swift.org bots](#ciswiftorg-bots)
+  - [ci.swift.org bots](#ciswiftorg-bots)
 
 
 ## Introduction
@@ -126,13 +129,14 @@ Linux platform | @swift-ci Please Build Toolchain Linux Platform| Swift Build To
 
 You can also build a toolchain for a specific Linux distribution
 
-Distro         | Comment                                          | Check Status
--------------- | ------------------------------------------------ | ----------------------------------------------
-UBI9           | @swift-ci Please Build Toolchain UBI9            | Swift Build Toolchain UBI9 (x86_64)
-Ubuntu 20.04   | @swift-ci Please Build Toolchain Ubuntu 20.04    | Swift Build Toolchain Ubuntu 20.04 (x86_64)
-Ubuntu 22.04   | @swift-ci Please Build Toolchain Ubuntu 22.04    | Swift Build Toolchain Ubuntu 22.04 (x86_64)
-Ubuntu 24.04   | @swift-ci Please Build Toolchain Ubuntu 24.04    | Swift Build Toolchain Ubuntu 24.04 (x86_64)
-Amazon Linux 2 | @swift-ci Please Build Toolchain Amazon Linux 2  | Swift Build Toolchain Amazon Linux 2 (x86_64)
+Distro            | Comment                                             | Check Status
+----------------- | --------------------------------------------------- | ------------------------------------------------
+UBI9              | @swift-ci Please Build Toolchain UBI9               | Swift Build Toolchain UBI9 (x86_64)
+Ubuntu 20.04      | @swift-ci Please Build Toolchain Ubuntu 20.04       | Swift Build Toolchain Ubuntu 20.04 (x86_64)
+Ubuntu 22.04      | @swift-ci Please Build Toolchain Ubuntu 22.04       | Swift Build Toolchain Ubuntu 22.04 (x86_64)
+Ubuntu 24.04      | @swift-ci Please Build Toolchain Ubuntu 24.04       | Swift Build Toolchain Ubuntu 24.04 (x86_64)
+Amazon Linux 2    | @swift-ci Please Build Toolchain Amazon Linux 2.    | Swift Build Toolchain Amazon Linux 2023 (x86_64)
+Amazon Linux 2023 | @swift-ci Please Build Toolchain Amazon Linux 2023  | Swift Build Toolchain Amazon Linux 2023 (x86_64)
 
 ### Build and Test Stdlib against Snapshot Toolchain
 
