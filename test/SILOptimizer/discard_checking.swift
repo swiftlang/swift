@@ -320,10 +320,10 @@ struct Basics: ~Copyable {
 
   consuming func test12Bang(_ c: Color) throws {
     guard case .red = c else {
-      discard self // expected-note {{discarded self here}}
+      discard self
       return
     }
-    try! thrower() // expected-error {{must consume 'self' before exiting method that discards self}}
+    try! thrower() // okay, try!'s throw case crashes rather than exiting the method
     print("hi")
     _ = consume self
   }
