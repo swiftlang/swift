@@ -1,7 +1,8 @@
 // RUN: %target-swift-frontend -g -emit-sil %s -parse-as-library -module-name a | %FileCheck %s
 
 // Instructions without a usable source location (cleanups, the epilogue) must
-// not inherit the scope of a nested block that has already ended.
+// not inherit the scope of a nested block that has already ended. A block
+// shared by several exits must be in a scope enclosing all of them.
 // rdar://191202669
 
 @inline(never) func use<T>(_ t: T) {}
@@ -32,15 +33,13 @@ public func topLevelLet(_ flag: Bool) {
   }
 }
 
-// A guard binding outlives the guard statement.
-// FIXME: The return is shared with the else branch, where v is not bound.
-// Ideally in this case the return should use the function's scope to avoid
-// showing potentially uninitialized variables.
-
+// The return is shared with the else branch, where v is not bound, so it is in
+// the guard statement's scope, not in v's.
 // CHECK-LABEL: sil @$s1a8guardLetyySiSg_SbtF
+// CHECK: switch_enum {{.*}}, scope [[GL_GUARD:[0-9]+]]
 // CHECK: debug_value {{.*}}, let, name "v", {{.*}}, scope [[GL_V:[0-9]+]]
 // CHECK: debug_value {{.*}}, let, name "inner", {{.*}}, scope [[GL_INNER:[0-9]+]]
-// CHECK: return {{.*}}, scope [[GL_V]]
+// CHECK: return {{.*}}, scope [[GL_GUARD]]
 public func guardLet(_ opt: Int?, _ flag: Bool) {
   guard let v = opt else { return }
   if flag {
@@ -89,5 +88,86 @@ public func initializerThenBlock() {
   do {
     let y = 1
     use(y)
+  }
+}
+
+// The cleanups of the early return run inside the block. The shared return is
+// in outer's scope, which encloses both exits.
+// CHECK-LABEL: sil @$s1a13returnInBlockyySbF
+// CHECK: debug_value [[RIB_OUTER_VAL:%[0-9]+]], let, name "outer", {{.*}}, scope [[RIB_OUTER:[0-9]+]]
+// CHECK: debug_value {{.*}}, let, name "inner", {{.*}}, scope [[RIB_INNER:[0-9]+]]
+// CHECK: strong_release [[RIB_OUTER_VAL]], {{.*}}, scope [[RIB_INNER]]
+// CHECK: strong_release [[RIB_OUTER_VAL]], {{.*}}, scope [[RIB_OUTER]]
+// CHECK: return {{.*}}, scope [[RIB_OUTER]]
+public func returnInBlock(_ flag: Bool) {
+  let outer = C()
+  withExtendedLifetime(outer) {}
+  if flag {
+    let inner = 42
+    use(inner)
+    return
+  }
+  use(flag)
+}
+
+// The return is shared with the early return, where x is not bound.
+// CHECK-LABEL: sil @$s1a18earlyReturnThenLetyySbF
+// CHECK: debug_value {{.*}}, let, name "flag", argno 1, {{.*}}, scope [[ERTL_FN:[0-9]+]]
+// CHECK: debug_value {{.*}}, let, name "x", {{.*}}, scope [[ERTL_X:[0-9]+]]
+// CHECK: return {{.*}}, scope [[ERTL_FN]]
+public func earlyReturnThenLet(_ flag: Bool) {
+  if flag { return }
+  let x = 1
+  use(x)
+}
+
+struct E: Error {}
+@inline(never) func mayThrow() throws {}
+
+// The throw is shared with the throw before x is bound.
+// CHECK-LABEL: sil @$s1a15rethrowAfterLetyySbKF
+// CHECK: debug_value {{.*}}, let, name "flag", argno 1, {{.*}}, scope [[RAL_FN:[0-9]+]]
+// CHECK: debug_value {{.*}}, let, name "x", {{.*}}, scope [[RAL_X:[0-9]+]]
+// CHECK: throw {{.*}}, scope [[RAL_FN]]
+public func rethrowAfterLet(_ flag: Bool) throws {
+  if flag { throw E() }
+  let x = C()
+  try mayThrow()
+  use(x)
+}
+
+// The epilog is emitted into the block of its only return, not in the scope
+// of the final trap.
+// CHECK-LABEL: sil hidden @$s1a21returnInBlockThenTrapySiAA1CCn_SbtF
+// CHECK: [[RIBTT_C:%[0-9]+]] = alloc_stack [var_decl] [moveable_value_debuginfo] $C, var, name "c"
+// CHECK: debug_value {{.*}}, let, name "x", {{.*}}, scope [[RIBTT_X:[0-9]+]]
+// CHECK: debug_value {{.*}}, let, name "y", {{.*}}, scope [[RIBTT_Y:[0-9]+]]
+// CHECK: destroy_addr [[RIBTT_C]], {{.*}}, scope [[RIBTT_Y]]
+// CHECK-NEXT: dealloc_stack [[RIBTT_C]], {{.*}}, scope [[RIBTT_Y]]
+// CHECK-NEXT: return {{.*}}, scope [[RIBTT_Y]]
+func returnInBlockThenTrap(_ c: consuming C, _ flag: Bool) -> Int {
+  let x = 1
+  if flag {
+    let y = 2
+    use(y)
+    return x
+  }
+  fatalError()
+}
+
+// The implicit return is in x's scope, but the throw is shared between two
+// branches, and uses the function's scope.
+// CHECK-LABEL: sil @$s1a9InitScopeVyACSbKcfC
+// CHECK: debug_value {{.*}}, let, name "flag", argno 1, {{.*}}, scope [[IS_FN:[0-9]+]]
+// CHECK: debug_value {{.*}}, let, name "x", {{.*}}, scope [[IS_X:[0-9]+]]
+// CHECK: return {{.*}}, scope [[IS_X]]
+// CHECK: throw {{.*}}, scope [[IS_FN]]
+public struct InitScope {
+  var a: Int
+  public init(_ flag: Bool) throws {
+    if flag { throw E() }
+    let x = 1
+    try mayThrow()
+    a = x
   }
 }

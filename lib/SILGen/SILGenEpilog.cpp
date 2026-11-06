@@ -16,6 +16,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -195,6 +196,49 @@ static SILValue buildReturnValue(SILGenFunction &SGF, SILLocation loc,
   return SGF.B.createTuple(loc, resultType, directResults);
 }
 
+/// Return the scope outside any macro expansion. The returned scope will
+/// be in the same function as the one being built.
+static const SILDebugScope *getScopeOutsideMacros(const SILDebugScope *scope) {
+  while (scope->InlinedCallSite)
+    scope = cast<const SILDebugScope *>(scope->InlinedCallSite->Parent);
+  return scope;
+}
+
+/// Return the innermost common scope of the given scopes. Both scopes must
+/// be in the same function.
+static const SILDebugScope *getCommonScope(const SILDebugScope *lhs,
+                                           const SILDebugScope *rhs) {
+  if (!lhs)
+    return rhs;
+  if (!rhs)
+    return lhs;
+
+  SmallPtrSet<const SILDebugScope *, 8> ancestors;
+  while (lhs) {
+    ancestors.insert(lhs);
+    lhs = lhs->Parent.dyn_cast<const SILDebugScope *>();
+  }
+  while (rhs) {
+    if (ancestors.count(rhs))
+      return rhs;
+    rhs = rhs->Parent.dyn_cast<const SILDebugScope *>();
+  }
+  ABORT("scopes of the same function must have a common ancestor");
+}
+
+/// Set up the builder's scope for building the epilog in \p BB. The scope is
+/// merged from the scopes of the predecessors of the block.
+static void setSharedBlockDebugScope(SILGenFunction &SGF, SILBasicBlock *BB) {
+  const SILDebugScope *sharedScope = nullptr;
+  for (SILBasicBlock *pred : BB->getPredecessorBlocks()) {
+    auto *predScope =
+        getScopeOutsideMacros(pred->getTerminator()->getDebugScope());
+    sharedScope = getCommonScope(sharedScope, predScope);
+  }
+  ASSERT(sharedScope && "epilog block must have predecessors");
+  SGF.B.setCurrentDebugScope(sharedScope);
+}
+
 static std::optional<SILLocation>
 prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
                               SILBasicBlock *epilogBB,
@@ -249,6 +293,9 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
       returnLoc = implicitReturnFromTopLevel;
     }
 
+    // Use the only return's scope for the cleanup.
+    SGF.B.setCurrentDebugScope(predBranch->getDebugScope());
+
     // Kill the branch to the now-dead epilog BB.
     pred->erase(predBranch);
 
@@ -273,6 +320,9 @@ prepareForEpilogBlockEmission(SILGenFunction &SGF, SILLocation topLevel,
 
   // If we are falling through from the current block, the return is implicit.
   SGF.B.emitBlock(epilogBB, implicitReturnFromTopLevel);
+
+  // Set the debug scope for the epilog.
+  setSharedBlockDebugScope(SGF, epilogBB);
 
   // If the return location is known to be that of an already
   // processed return, use it. (This will get triggered when the
@@ -328,13 +378,15 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
   std::tie(maybeReturnValue, returnLoc) = emitEpilogBB(TopLevel);
 
   SILBasicBlock *ResultBB = nullptr;
-  
+  const SILDebugScope *ResultScope = nullptr;
+
   if (!maybeReturnValue) {
     // Nothing to do.
   } else if (UsesCustomEpilog) {
     // If the epilog is reachable, and the caller provided an epilog, just
     // remember the block so the caller can continue it.
     ResultBB = B.getInsertionBB();
+    ResultScope = B.getCurrentDebugScope();
     assert(ResultBB && "Didn't have an epilog block?");
     B.clearInsertionPoint();
   } else {
@@ -370,9 +422,11 @@ emitEpilog(SILLocation TopLevel, bool UsesCustomEpilog) {
   emitRethrowEpilog(TopLevel);
   emitCoroutineUnwindEpilog(TopLevel);
   
-  if (ResultBB)
+  if (ResultBB) {
     B.setInsertionPoint(ResultBB);
-  
+    B.setCurrentDebugScope(ResultScope);
+  }
+
   return returnLoc;
 }
 
@@ -406,9 +460,10 @@ static bool prepareExtraEpilog(SILGenFunction &SGF, JumpDest &dest,
     if (auto branch = dyn_cast<BranchInst>(predBB->getTerminator())) {
       assert(branch->getArgs().size() == epilogBB->getNumArguments());
 
-      // Save the location and operand information from the branch,
+      // Save the location, scope and operand information from the branch,
       // then destroy it.
       loc = branch->getLoc();
+      SGF.B.setCurrentDebugScope(branch->getDebugScope());
       if (arg) *arg = branch->getArgs()[0];
       predBB->erase(branch);
 
@@ -422,6 +477,7 @@ static bool prepareExtraEpilog(SILGenFunction &SGF, JumpDest &dest,
   // Reposition the block to the end of the postmatter section
   // unless we're emitting into a single predecessor.
   if (reposition) {
+    setSharedBlockDebugScope(SGF, epilogBB);
     SGF.F.moveBlockBefore(epilogBB, SGF.F.end());
   }
 
