@@ -3737,6 +3737,14 @@ suppressingFeatureNonexhaustiveAttribute(PrintOptions &options,
 }
 
 static void
+suppressingFeatureRemoteCallIdempotent(PrintOptions &options,
+                                       llvm::function_ref<void()> action) {
+  ExcludeAttrRAII scope(options.ExcludeAttrList,
+                        DeclAttrKind::RemoteCallIdempotent);
+  action();
+}
+
+static void
 suppressingFeatureInlineAlways(PrintOptions &options,
                                llvm::function_ref<void()> action) {
   llvm::SaveAndRestore<bool> scope(options.SuppressInlineAlways, true);
@@ -5571,6 +5579,11 @@ void PrintAST::visitUnsafeExpr(UnsafeExpr *expr) {
 
 void PrintAST::visitConsumeExpr(ConsumeExpr *expr) {
   Printer << "consume ";
+  visit(expr->getSubExpr());
+}
+
+void PrintAST::visitSendExpr(SendExpr *expr) {
+  Printer << "send ";
   visit(expr->getSubExpr());
 }
 

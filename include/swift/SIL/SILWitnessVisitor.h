@@ -207,6 +207,12 @@ private:
       return;
 
     asDerived().addMethod(SILDeclRef(AFD, kind).getDistributedThunkDeclRef());
+
+    // A '@oneway' requirement has a second entry, for its await
+    // thunk, which calls that are not a 'send' call use
+    if (auto *awaitThunk = AFD->getDistributedAwaitThunk())
+      asDerived().addMethod(
+          SILDeclRef(awaitThunk, kind).getDistributedThunkDeclRef());
   }
 };
 

@@ -320,3 +320,25 @@ fileprivate class _Lock {
     return body()
   }
 }
+
+// ==== ----------------------------------------------------------------------------------------------------------------
+// MARK: Oneway
+
+/// A local-only actor system supports `@oneway` distributed functions: all of
+/// its actors are local, so the synthesized distributed thunk never makes a
+/// remote call
+///
+/// SPI, since '_DistributedOnewayActorSystem' is
+@_spi(OnewaySend)
+@available(SwiftStdlib 6.5, *)
+extension LocalTestingDistributedActorSystem: _DistributedOnewayActorSystem {
+  public func remoteCallOneway<Act>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation: inout InvocationEncoder
+  ) throws
+    where Act: DistributedActor,
+          Act.ID == ActorID {
+    fatalError("Attempted to make remote call to \(target) on actor \(actor) using a local-only actor system")
+  }
+}

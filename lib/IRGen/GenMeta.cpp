@@ -1046,7 +1046,9 @@ namespace {
           declRef = declRef.asAutoDiffDerivativeFunction(
               entry.getFunction().getAutoDiffDerivativeFunctionIdentifier());
         if (entry.getFunction().isDistributedThunk()) {
-          flags = flags.withIsAsync(true);
+          // The synchronous thunk of a '@oneway' function is not async
+          if (cast<AbstractFunctionDecl>(func.getDecl())->hasAsync())
+            flags = flags.withIsAsync(true);
           declRef = declRef.getDistributedThunkDeclRef();
         }
         addDiscriminator(flags, schema, declRef);
@@ -7843,6 +7845,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::DistributedActor:
   case KnownProtocolKind::DistributedActorStub:
   case KnownProtocolKind::DistributedActorSystem:
+  case KnownProtocolKind::DistributedOnewayActorSystem:
   case KnownProtocolKind::DistributedTargetInvocationEncoder:
   case KnownProtocolKind::DistributedTargetInvocationDecoder:
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:

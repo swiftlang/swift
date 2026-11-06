@@ -266,6 +266,17 @@ SILDeclRef SILDeclRef::getDistributedThunkDeclRef() const {
                     cast<AutoDiffDerivativeFunctionIdentifier *>(pointer));
 }
 
+SILDeclRef SILDeclRef::getDistributedThunkDeclRefForClient(bool isSend) const {
+  if (auto *func = dyn_cast_or_null<FuncDecl>(loc.dyn_cast<ValueDecl *>())) {
+    // Only a 'send' of a '@oneway' function calls its synchronous
+    // thunk, which does not wait for the call. Any other call waits for it
+    if (!isSend)
+      if (auto *awaitThunk = func->getDistributedAwaitThunk())
+        return SILDeclRef(awaitThunk).getDistributedThunkDeclRef();
+  }
+  return getDistributedThunkDeclRef();
+}
+
 ValueDecl *SILDeclRef::getDecl() const {
   return loc.dyn_cast<ValueDecl *>();
 }
@@ -705,6 +716,14 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
   // Declarations imported from Clang modules have shared linkage.
   if (isClangImported())
     return SILLinkage::Shared;
+
+  // The module of a conformance emits the oneway witness adapter of a function
+  // of any module, including its own, in every file that needs it, so the
+  // adapter of a function can be emitted more than once
+  if (isDistributedThunk())
+    if (auto *thunk = getDistributedThunk())
+      if (thunk->isDistributedOnewayWitnessAdapter())
+        return SILLinkage::Shared;
 
   const auto limit = getLinkageLimit(*this);
   if (limit == Limit::Private)
@@ -2107,8 +2126,12 @@ bool SILDeclRef::isDynamicallyReplaceable() const {
 }
 
 bool SILDeclRef::hasAsync() const {
-  if (isDistributedThunk())
+  if (isDistributedThunk()) {
+    // A '@oneway' function gets a synchronous thunk
+    if (auto *thunk = getDistributedThunk())
+      return thunk->hasAsync();
     return true;
+  }
 
   if (hasDecl()) {
     if (auto afd = dyn_cast<AbstractFunctionDecl>(getDecl())) {

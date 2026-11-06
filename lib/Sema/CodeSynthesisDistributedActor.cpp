@@ -94,6 +94,153 @@ static Expr *createDistributedResolveCall(ASTContext &C,
 }
 
 
+/// Build the implicit member reference `<base>.<func>` to exactly \p func
+///
+/// Synthesized code must not look the function up by name: the function may
+/// have overloads, so a lookup by name could be ambiguous
+static Expr *createExactMemberRef(ASTContext &C, Expr *base,
+                                  AbstractFunctionDecl *func) {
+  // An invalid 'distributed static func' was already diagnosed, keep the
+  // lookup by name so that its thunk fails to type-check gracefully
+  if (func->isStatic())
+    return UnresolvedDotExpr::createImplicit(C, base, func->getBaseName());
+
+  return new (C) MemberRefExpr(base, /*dotLoc=*/SourceLoc(),
+                               ConcreteDeclRef(func), DeclNameLoc(),
+                               /*implicit=*/true);
+}
+
+/// Build a reference to the top-level function \p name of the 'Distributed'
+/// module, found by a direct lookup in that module
+///
+/// The 'oneway' API of the 'Distributed' module is SPI (in the
+/// 'OnewaySend' group), which a lookup by name in the module of
+/// the actor only finds with an '@_spi(OnewaySend)' import, which
+/// a user of '@oneway' and 'send' does not need. The lowering of 'send' finds
+/// the '_enqueueOneway' functions of '_Concurrency' the same way
+static Expr *createDistributedSPIFuncRef(ASTContext &C, Identifier name) {
+  if (auto *distributed = C.getLoadedModule(C.Id_Distributed)) {
+    SmallVector<ValueDecl *, 1> results;
+    distributed->lookupValue(name, NLKind::QualifiedLookup, results);
+    if (results.size() == 1)
+      if (auto *func = dyn_cast<FuncDecl>(results.front()))
+        return new (C) DeclRefExpr(ConcreteDeclRef(func), DeclNameLoc(),
+                                   /*implicit=*/true);
+  }
+  return UnresolvedDeclRefExpr::createImplicit(C, DeclName(name));
+}
+
+/// Build the implicit member reference `<targetRef>.<name>` to the member
+/// \p name of 'RemoteCallTarget', found by a direct lookup in it
+///
+/// The 'oneway' and idempotency members of 'RemoteCallTarget' are SPI, see
+/// 'createDistributedSPIFuncRef'
+static Expr *createRemoteCallTargetSPIMemberRef(ASTContext &C, Expr *targetRef,
+                                                Identifier name) {
+  if (auto *RCT = C.getRemoteCallTargetDecl()) {
+    auto results = RCT->lookupDirect(DeclName(name));
+    if (results.size() == 1)
+      return new (C) MemberRefExpr(targetRef, /*dotLoc=*/SourceLoc(),
+                                   ConcreteDeclRef(results.front()),
+                                   DeclNameLoc(), /*implicit=*/true);
+  }
+  return UnresolvedDotExpr::createImplicit(C, targetRef, DeclName(name));
+}
+
+/// Build `<systemExpr>.remoteCallOneway(on:target:invocation:)` of the actor
+/// system of \p func
+///
+/// '_DistributedOnewayActorSystem' is SPI. A lookup by name finds its
+/// 'remoteCallOneway' requirement, or a witness which is declared in an
+/// '@_spi' conformance (such as the one of
+/// 'LocalTestingDistributedActorSystem'), only with an
+/// '@_spi(OnewaySend)' import, which a user of '@oneway' does not
+/// need. Look the member up by name when that finds a member other than the
+/// requirement, as for any other actor system. Otherwise reference the witness
+/// of a concrete actor system directly, so that it is called the same with
+/// or without the SPI imports, or the requirement for a generic actor system
+static Expr *createRemoteCallOnewayRef(ASTContext &C, DeclContext *thunkDC,
+                                       AbstractFunctionDecl *func,
+                                       Expr *systemExpr, DeclName name) {
+  if (Type systemTy = getDistributedActorSystemTypeOfMember(func)) {
+    auto *onewayProto =
+        C.getProtocol(KnownProtocolKind::DistributedOnewayActorSystem);
+    // Whether the lookup by name finds anything but the requirement
+    auto foundOtherThanRequirement = [&]() {
+      auto lookup =
+          TypeChecker::lookupMember(thunkDC, systemTy, DeclNameRef(name));
+      return llvm::any_of(lookup, [&](const LookupResultEntry &entry) {
+        return entry.getValueDecl()->getDeclContext() != onewayProto;
+      });
+    };
+    if (onewayProto && !foundOtherThanRequirement()) {
+      auto conformance = lookupConformance(systemTy, onewayProto);
+      for (auto *req : onewayProto->lookupDirect(name)) {
+        if (!isa<FuncDecl>(req) || !req->isProtocolRequirement())
+          continue;
+        ValueDecl *callee = req;
+        if (conformance.isConcrete())
+          if (auto *witness = conformance.getConcrete()->getWitnessDecl(req))
+            callee = witness;
+        return new (C) MemberRefExpr(systemExpr, /*dotLoc=*/SourceLoc(),
+                                     ConcreteDeclRef(callee), DeclNameLoc(),
+                                     /*implicit=*/true);
+      }
+    }
+  }
+  return UnresolvedDotExpr::createImplicit(C, systemExpr, name);
+}
+
+/// Build `_enqueueOnewayDistributed(on: <actorExpr>) { __isolatedSelf in
+/// __isolatedSelf.<func>(<args>) }`.
+///
+/// This schedules a call to the synchronous 'oneway' function \p func on the
+/// local actor's executor without awaiting it: a discarding task which copies
+/// the caller's task locals and starts on the actor's executor, so there is
+/// no async code at the call site. Used for 'oneway' functions for which
+/// \c FuncDecl::isSynchronouslyEnqueuedOneway() is true
+static Expr *createEnqueueOnewayCall(ASTContext &C, DeclContext *parentDC,
+                                     Expr *actorExpr, FuncDecl *func,
+                                     ArrayRef<Argument> args) {
+  const SourceLoc sloc = SourceLoc();
+  const DeclNameLoc dloc = DeclNameLoc();
+  const bool implicit = true;
+
+  auto *closure = new (C) ClosureExpr(
+      DeclAttributes(), /*bracketRange=*/SourceRange(),
+      /*capturedSelfDecl=*/nullptr, /*params=*/nullptr,
+      /*asyncLoc=*/sloc, /*throwsLoc=*/sloc, /*thrownType=*/nullptr,
+      /*arrowLoc=*/sloc, /*inLoc=*/sloc, /*explicitResultType=*/nullptr,
+      parentDC);
+  closure->setImplicit();
+
+  // The closure's single parameter is inferred as 'isolated Act' from the
+  // '_enqueueOnewayDistributed' parameter type, so the call in its body is a
+  // plain, synchronous, same-actor call
+  auto *isolatedSelfParam = new (C) ParamDecl(
+      sloc, sloc, Identifier(), sloc, C.getIdentifier("__isolatedSelf"),
+      closure);
+  isolatedSelfParam->setImplicit();
+  isolatedSelfParam->setSpecifier(ParamSpecifier::Default);
+  closure->setParameterList(ParameterList::create(C, {isolatedSelfParam}));
+
+  auto *funcRef = createExactMemberRef(
+      C, new (C) DeclRefExpr(ConcreteDeclRef(isolatedSelfParam), dloc,
+                             implicit),
+      func);
+  auto *call = CallExpr::createImplicit(
+      C, funcRef, ArgumentList::createImplicit(C, args));
+  closure->setBody(BraceStmt::createImplicit(C, {ASTNode(call)}));
+
+  // '_enqueueOnewayDistributed' is SPI, see 'createDistributedSPIFuncRef'
+  Expr *enqueueRef = createDistributedSPIFuncRef(
+      C, C.getIdentifier("_enqueueOnewayDistributed"));
+  auto *enqueueArgs = ArgumentList::createImplicit(
+      C, {Argument(sloc, C.Id_on, actorExpr),
+          Argument::unlabeled(closure)});
+  return CallExpr::createImplicit(C, enqueueRef, enqueueArgs);
+}
+
 /// Mangle the target thunk in a way that we can look up the appropriate record.
 static llvm::StringRef
 mangleDistributedThunkForAccessorRecordName(
@@ -164,6 +311,32 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   Type returnTy = func->getResultInterfaceType();
   auto isVoidReturn = returnTy->isVoid();
 
+  // A 'oneway' function gets a synchronous thunk (see
+  // 'createSameSignatureDistributedThunkDecl'), which runs local calls on the
+  // actor without waiting for them, and hands remote calls to the
+  // synchronous 'remoteCallOneway' of the '_DistributedOnewayActorSystem'
+  const bool isSyncOneway = !thunk->hasAsync();
+
+  // The adapter with which a non-'@oneway' function witnesses a '@oneway'
+  // requirement behaves like the thunk of a '@oneway' function, but calls and
+  // identifies the non-'@oneway' function
+  const bool isOnewayAdapter =
+      cast<FuncDecl>(thunk)->isDistributedOnewayWitnessAdapter();
+
+  // The await thunk of a '@oneway' function is the thunk that any
+  // call which is not a 'send' calls. It is the thunk that the function would
+  // have if it was not '@oneway': it waits for a local call, and makes a
+  // regular request-reply remote call through 'remoteCallVoid', which is not
+  // marked as a 'oneway' remote call
+  const bool isAwaitThunk = cast<FuncDecl>(thunk)->isDistributedAwaitThunk();
+
+  // The '@oneway' attribute of an invalid function, e.g. one that returns a
+  // value, is invalidated after its synchronous thunk was created. That was
+  // diagnosed, so leave the thunk empty
+  if (isSyncOneway && !isOnewayAdapter &&
+      !func->hasSynchronousDistributedThunk())
+    return {BraceStmt::createImplicit(C, {}), /*isTypeChecked=*/true};
+
   // === Type:
   StructDecl *RCT = C.getRemoteCallTargetDecl();
   assert(RCT && "Missing RemoteCalLTarget declaration");
@@ -206,6 +379,48 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         ReturnStmt::createImplicit(C, sloc, localPropertyAccess);
     localBranchStmt =
         BraceStmt::create(C, sloc, {returnLocalPropertyAccess}, sloc, implicit);
+  } else if (isSyncOneway) {
+    // A 'oneway' function: run the call on the local actor without waiting
+    // for it, so the thunk does not need to be 'async'
+    //
+    // TODO: Omit this branch for a '$P' stub, which is remote-only, so its
+    // local branch is unreachable
+    auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
+
+    SmallVector<Expr*, 4> forwardingParams;
+    forwardParameters(thunk, forwardingParams);
+    SmallVector<Argument, 4> forwardingArgs;
+    auto *thunkParams = thunk->getParameters();
+    for (unsigned i : indices(forwardingParams)) {
+      forwardingArgs.push_back(
+          Argument(sloc, thunkParams->get(i)->getArgumentName(),
+                   forwardingParams[i]));
+    }
+
+    Expr *localCall;
+    if (!isOnewayAdapter && func->isSynchronouslyEnqueuedOneway()) {
+      // A synchronous function in Embedded Swift is enqueued on the actor
+      // without any async code
+      //
+      //   _enqueueOnewayDistributed(on: self) { __isolatedSelf in
+      //     __isolatedSelf.<func>(<params>)
+      //   }
+      localCall = createEnqueueOnewayCall(
+          C, thunk, selfRefExpr, func, forwardingArgs);
+    } else {
+      // Otherwise the call is sent like any other 'send' of a 'oneway'
+      // function, which runs it in a new task that starts on the actor. The
+      // call is made on the known-to-be-local 'self', so it calls the
+      // function itself, not this thunk
+      //
+      //   send self.<func>(<params>)
+      auto *call = CallExpr::createImplicit(
+          C, createExactMemberRef(C, selfRefExpr, func),
+          ArgumentList::createImplicit(C, forwardingArgs));
+      localCall = SendExpr::createImplicit(C, sloc, call);
+    }
+    localBranchStmt =
+        BraceStmt::create(C, sloc, {localCall}, sloc, implicit);
   } else {
     // normal function
     auto selfRefExpr = new (C) DeclRefExpr(selfDecl, dloc, implicit);
@@ -514,20 +729,50 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
   }
 
   // === Prepare the 'RemoteCallTarget'
-  VarDecl *targetVar = VarDeclBuilder(thunk, C.Id_target)
-                           .introducer(VarDecl::Introducer::Let)
-                           .type(remoteCallTargetTy);
+  // '@oneway' is an attribute of the function itself (never of an accessor or
+  // computed property), so read it straight off 'func'. When set it flags the
+  // freshly constructed 'RemoteCallTarget', which requires the target to be
+  // introduced as a 'var'
+  bool isOneway = (func->isOneway() && !isAwaitThunk) || isOnewayAdapter;
+  // Both thunks of a '@oneway' function, the synchronous one and the await
+  // thunk, target a '@oneway' function. The oneway witness adapter does not:
+  // it makes a 'oneway' remote call of a function which is not '@oneway'
+  const bool isOnewayTarget = func->isOneway() && !isOnewayAdapter;
+  // Every thunk of an '@_remoteCallIdempotent' function marks the target as
+  // idempotent, however the call is made
+  const bool isIdempotentTarget =
+      func->getAttrs().hasAttribute<RemoteCallIdempotentAttr>();
+  VarDecl *targetVar =
+      VarDeclBuilder(thunk, C.Id_target)
+          .introducer((isOneway || isOnewayTarget || isIdempotentTarget)
+                          ? VarDecl::Introducer::Var
+                          : VarDecl::Introducer::Let)
+          .type(remoteCallTargetTy);
 
   {
     // --- Mangle the thunk name
+    //
+    // Every remote call of a function uses the identifier of its regular
+    // 'async' thunk, the one with an accessible function record, which the
+    // receiving side looks up to run the function. For a '@oneway' function
+    // that is its await thunk, whose name is the one of the thunk of the
+    // function if it was not '@oneway', so sent and awaited calls use the same
+    // identifier, which does not change when '@oneway' is added or removed.
+    // Only 'isOnewayRemoteCall' tells a sent call apart. The adapter uses the
+    // identifier of the thunk of the function it adapts
+    AbstractFunctionDecl *identifierThunk = thunk;
+    if (isOnewayAdapter)
+      identifierThunk = func->getDistributedThunk();
+    else if (isSyncOneway)
+      identifierThunk = func->getDistributedAwaitThunk();
     auto mangledAccessorRecordName =
-        mangleDistributedThunkForAccessorRecordName(C, thunk);
+        mangleDistributedThunkForAccessorRecordName(C, identifierThunk);
 
     StringLiteralExpr *mangledTargetStringLiteral =
         new (C) StringLiteralExpr(mangledAccessorRecordName,
                                   SourceRange(), implicit);
 
-    // --- let target = RemoteCallTarget(<mangled name>)
+    // --- let/var target = RemoteCallTarget(<mangled name>)
     Pattern *targetPattern = NamedPattern::createImplicit(C, targetVar);
 
     auto remoteCallTargetInitDecl =
@@ -549,12 +794,65 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
     remoteBranchStmts.push_back(targetPB);
     remoteBranchStmts.push_back(targetVar);
+
+    // --- Mark the target as a 'oneway' (fire-and-forget) remote call
+    //
+    //   target._markOnewayRemoteCall()
+    //
+    // Synthesized code is not availability checked, so do not set
+    // 'isOnewayRemoteCall' (available since Swift 6.5) directly: the helper is
+    // emitted into the client and only sets the flag when running on a
+    // runtime which has it, which makes it a no-op when back deployed
+    if (isOneway) {
+      auto *targetRef = new (C) DeclRefExpr(
+          ConcreteDeclRef(targetVar), dloc, implicit, AccessSemantics::Ordinary,
+          remoteCallTargetTy);
+      // '_markOnewayRemoteCall()' is SPI
+      auto *markRef = createRemoteCallTargetSPIMemberRef(
+          C, targetRef, C.Id_markOnewayRemoteCall);
+      remoteBranchStmts.push_back(CallExpr::createImplicitEmpty(C, markRef));
+    }
+
+    // --- Mark the target as the target of a '@oneway' function
+    //
+    //   target._markOnewayTarget()
+    //
+    // Synthesized code is not availability checked, and the setter of the SPI
+    // property 'isOnewayTarget' is inaccessible without the SPI import, so
+    // call the helper, which is emitted into the client
+    if (isOnewayTarget) {
+      auto *targetRef = new (C) DeclRefExpr(
+          ConcreteDeclRef(targetVar), dloc, implicit, AccessSemantics::Ordinary,
+          remoteCallTargetTy);
+      // '_markOnewayTarget()' is SPI
+      auto *markRef = createRemoteCallTargetSPIMemberRef(
+          C, targetRef, C.Id_markOnewayTarget);
+      remoteBranchStmts.push_back(CallExpr::createImplicitEmpty(C, markRef));
+    }
+
+    // --- Mark the target as the target of an idempotent function
+    //
+    //   target._markIdempotentTarget()
+    if (isIdempotentTarget) {
+      auto *targetRef = new (C) DeclRefExpr(
+          ConcreteDeclRef(targetVar), dloc, implicit, AccessSemantics::Ordinary,
+          remoteCallTargetTy);
+      // '_markIdempotentTarget()' is SPI
+      auto *markRef = createRemoteCallTargetSPIMemberRef(
+          C, targetRef, C.Id_markIdempotentTarget);
+      remoteBranchStmts.push_back(CallExpr::createImplicitEmpty(C, markRef));
+    }
   }
 
   // === Make the 'remoteCall(Void)(...)'
   {
     DeclName remoteCallName;
-    if (isVoidReturn) {
+    if (isSyncOneway) {
+      // The actor system of a 'oneway' function is known to be an
+      // '_DistributedOnewayActorSystem', which declares 'remoteCallOneway'
+      remoteCallName = DeclName(C, C.Id_remoteCallOneway,
+                                {C.Id_on, C.Id_target, C.Id_invocation});
+    } else if (isVoidReturn) {
       remoteCallName =
           DeclName(C, C.Id_remoteCallVoid,
                    {C.Id_on, C.Id_target, C.Id_invocation, C.Id_throwing});
@@ -564,9 +862,14 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
                                  C.Id_throwing, C.Id_returning});
     }
 
-    auto systemRemoteCallRef = UnresolvedDotExpr::createImplicit(
-        C, new (C) DeclRefExpr(ConcreteDeclRef(systemVar), dloc, implicit),
-        remoteCallName);
+    auto *systemRef =
+        new (C) DeclRefExpr(ConcreteDeclRef(systemVar), dloc, implicit);
+    // 'remoteCallOneway' is SPI, see 'createRemoteCallOnewayRef'
+    Expr *systemRemoteCallRef =
+        isSyncOneway
+            ? createRemoteCallOnewayRef(C, thunk, func, systemRef,
+                                        remoteCallName)
+            : UnresolvedDotExpr::createImplicit(C, systemRef, remoteCallName);
 
     SmallVector<Expr *, 5> args;
     // -- on actor: Act
@@ -585,7 +888,10 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         Type(), implicit));
 
     // -- throwing: Err.Type
-    if (func->hasThrows()) {
+    //
+    // A 'oneway' function cannot throw, so 'remoteCallOneway' has no
+    // 'throwing' parameter
+    if (!isSyncOneway && func->hasThrows()) {
       // Error.self
       auto errorDecl = C.getErrorDecl();
       auto *errorTypeExpr = new (C) DotSelfExpr(
@@ -593,7 +899,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
           sloc, errorDecl->getDeclaredInterfaceType());
 
       args.push_back(errorTypeExpr);
-    } else {
+    } else if (!isSyncOneway) {
       // Never.self
       auto neverDecl = C.getNeverDecl();
       auto *neverTypeExpr = new (C) DotSelfExpr(
@@ -619,13 +925,15 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
       args.push_back(resultTypeExpr);
     }
 
-    assert(args.size() == (isVoidReturn ? 4 : 5));
+    assert(args.size() == (isSyncOneway ? 3 : isVoidReturn ? 4 : 5));
     auto remoteCallArgs = ArgumentList::forImplicitCallTo(
-        systemRemoteCallRef->getName(), args, C);
+        DeclNameRef(remoteCallName), args, C);
 
     Expr *remoteCallExpr =
         CallExpr::createImplicit(C, systemRemoteCallRef, remoteCallArgs);
-    remoteCallExpr = AwaitExpr::createImplicit(C, sloc, remoteCallExpr);
+    // 'remoteCallOneway' is synchronous
+    if (!isSyncOneway)
+      remoteCallExpr = AwaitExpr::createImplicit(C, sloc, remoteCallExpr);
     remoteCallExpr = TryExpr::createImplicit(C, sloc, remoteCallExpr);
 
     auto returnRemoteCall =
@@ -688,6 +996,15 @@ static void addDistributedThunkIsolationAttributes(FuncDecl *thunk,
 
   auto &C = thunk->getASTContext();
 
+  // The synchronous thunk of a 'oneway' function is plain 'nonisolated': it
+  // never hops, it runs on the caller's executor and only hands the call
+  // over to the actor or the actor system. 'nonisolated(nonsending)' and
+  // '@concurrent' only apply to 'async' functions
+  if (!thunk->hasAsync()) {
+    thunk->addAttribute(NonisolatedAttr::createImplicit(C));
+    return;
+  }
+
   if (distributedThunkShouldBeNonisolatedNonsending(originalFunc)) {
     thunk->addAttribute(
         NonisolatedAttr::createImplicit(C, NonIsolatedModifier::NonSending));
@@ -702,8 +1019,9 @@ static void addDistributedThunkIsolationAttributes(FuncDecl *thunk,
 /// This is used both to create stub witnesses as well as distributed thunks.
 ///
 /// \param DC The declaration context of the newly created function
-static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
-                                                         FuncDecl *func) {
+static FuncDecl *createSameSignatureDistributedThunkDecl(
+    DeclContext *DC, FuncDecl *func, bool isOnewayAdapter = false,
+    bool isAwaitThunk = false) {
   auto &C = func->getASTContext();
 
   // --- Prepare generic parameters
@@ -740,6 +1058,7 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
 
     paramDecls.push_back(paramDecl);
   }
+
   ParameterList *params = ParameterList::create(C, paramDecls);
 
   FuncDecl *thunk;
@@ -758,14 +1077,38 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
   } else {
     // Let's use the name of a 'distributed func'
     DeclName thunkName = func->getName();
+    if (isOnewayAdapter) {
+      // A distinct name keeps the symbol of the adapter, which the module of
+      // the conformance emits, apart from the synchronous thunk that the
+      // function would get if it was made '@oneway' later
+      SmallString<32> adapterName("$onewayWitness$");
+      adapterName += thunkName.getBaseIdentifier().str();
+      thunkName = DeclName(C, C.getIdentifier(adapterName),
+                           thunkName.getArgumentNames());
+    }
+
+    // The thunk of a 'oneway' function never awaits: it runs local calls on
+    // the actor without waiting for them and hands remote calls to the
+    // synchronous 'remoteCallOneway', so it is not 'async'. Its await thunk is the
+    // regular 'async' thunk of the function
+    bool isAsync = isAwaitThunk ||
+                   (!func->hasSynchronousDistributedThunk() && !isOnewayAdapter);
 
     thunk = FuncDecl::createImplicit(
         C, swift::StaticSpellingKind::None,
         thunkName, SourceLoc(),
-        /*async=*/true, /*throws=*/true, // since it's a distributed thunk
+        /*async=*/isAsync, /*throws=*/true, // since it's a distributed thunk
         /*thrownType=*/Type(),
         genericParamList,
         params, func->getResultInterfaceType(), DC);
+
+    // The thunks of a '@oneway' function are '@oneway' as well, see
+    // 'FuncDecl::isDistributedAwaitThunk()'. '@oneway' is not part of the
+    // function type: the await thunk differs from the synchronous thunk by
+    // being 'async' (the 'Ya' operator), and has the same mangled name as the
+    // thunk of the function if it was not '@oneway'
+    if (func->isOneway() || isOnewayAdapter)
+      thunk->addAttribute(new (C) OnewayAttr(/*IsImplicit=*/true));
   }
   thunk->setSynthesized(true);
 
@@ -777,6 +1120,21 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
 
   thunk->setSynthesized(true);
   thunk->setDistributedThunk(true);
+
+  // The witness table of a conformance in a module that does not use library
+  // evolution, or of a frozen type, is serialized and so is the witness thunk
+  // that calls the adapter, so the adapter has to be serializable as well,
+  // along with the closure that it contains. That is the case if the function
+  // that it calls is visible to the clients of the module. The witness tables
+  // of a module built with library evolution are not serialized, and neither
+  // is the adapter, which would not be able to call a function of a module
+  // built with library evolution anyway
+  if (isOnewayAdapter &&
+      !C.MainModule->isResilient() && !func->getModuleContext()->isResilient() &&
+      func->getFormalAccessScope(/*useDC=*/nullptr,
+                                 /*treatUsableFromInlineAsPublic=*/true)
+          .isPublic())
+    thunk->addAttribute(new (C) InlinableAttr(/*implicit=*/true));
 
   addDistributedThunkIsolationAttributes(thunk, func);
 
@@ -1006,6 +1364,9 @@ createDistributedResolvableProxyAdapterThunkDecl(DeclContext *DC,
       /*async=*/true, /*throws=*/true,
       /*thrownType=*/Type(), genericParamList, params, resultTy, DC);
   thunk->setSynthesized(true);
+  // The adapter of a '@oneway' function is '@oneway', like its thunks
+  if (func->isOneway())
+    thunk->addAttribute(new (C) OnewayAttr(/*IsImplicit=*/true));
 
   if (isa<ClassDecl>(DC))
     thunk->addAttribute(new (C) FinalAttr(/*isImplicit=*/true));
@@ -1161,6 +1522,25 @@ struct EmbeddedDispatchContext {
 /// The errors of every branch are handled by one shared
 /// `catch { try await resultHandler.onThrow(error: error) }` around the whole
 /// dispatch, see 'buildEmbeddedDispatchOnThrowCatch'
+///
+/// For a synchronous 'oneway' function (see
+/// \c FuncDecl::isSynchronouslyEnqueuedOneway()) a 'oneway' remote call
+/// is enqueued instead, and no result is reported to the result handler. Any
+/// other call of it is made like the call of a regular function:
+///
+///   if target.identifierEquals("$e_..._TE") || ... {
+///     let p1: T1 = try invocationDecoder.decodeNextArgument()
+///     if target.isOnewayRemoteCall {
+///       _enqueueOnewayDistributed(on: self) { __isolatedSelf in
+///         __isolatedSelf.distFunc(p1)
+///       }
+///       return
+///     }
+///     let __localSelf = self // known to be local
+///     await __localSelf.distFunc(p1)
+///     try await resultHandler.onReturnVoid()
+///     return
+///   }
 static IfStmt *buildEmbeddedDispatchBranch(
     ASTContext &C, AbstractFunctionDecl *thunk,
     VarDecl *targetVar, VarDecl *invocationDecoderVar,
@@ -1239,6 +1619,22 @@ static IfStmt *buildEmbeddedDispatchBranch(
                                 implicit, AccessSemantics::Ordinary),
             C.Id_decodeNextArgument),
         decodeArgs);
+
+    // The arguments of a synchronous 'oneway' function are captured by the
+    // closure which is enqueued on the actor, which sends them to the actor.
+    // A decoded argument is a fresh value that nothing else refers to, but
+    // the region checker cannot tell, since it comes out of the caller's
+    // 'inout' decoder, so mark it as disconnected
+    //
+    //   _onewayDecodedArgument(invocationDecoder.decodeNextArgument())
+    if (cast<FuncDecl>(distFunc)->isSynchronouslyEnqueuedOneway()) {
+      decodeCall = CallExpr::createImplicit(
+          C,
+          // '_onewayDecodedArgument' is SPI
+          createDistributedSPIFuncRef(
+              C, C.getIdentifier("_onewayDecodedArgument")),
+          ArgumentList::createImplicit(C, {Argument::unlabeled(decodeCall)}));
+    }
     decodeCall = TryExpr::createImplicit(C, sloc, decodeCall);
 
     auto *paramPB = PatternBindingDecl::createImplicit(
@@ -1267,13 +1663,77 @@ static IfStmt *buildEmbeddedDispatchBranch(
                                      implicit)));
   }
 
-  auto *selfDotFunc = createDistributedTargetRef(
-      C, new (C) DeclRefExpr(selfDecl, dloc, implicit), funcDecl);
+  // --- A synchronous 'oneway' function, called by a 'oneway' remote call:
+  //     enqueue the call without awaiting it and without reporting any
+  //     result, since the caller does not wait for a reply. Errors thrown
+  //     while decoding the arguments above are still reported through the
+  //     shared catch around the dispatch.
+  //
+  //       if target.isOnewayRemoteCall {
+  //         _enqueueOnewayDistributed(on: self) { __isolatedSelf in
+  //           __isolatedSelf.<distFunc>(arg0, arg1, ...)
+  //         }
+  //         return
+  //       }
+  //
+  //     Whether a reply is expected is a property of each call, which the
+  //     actor system carries in its message and passes to the recipient in
+  //     the 'RemoteCallTarget', never of the declaration: any other call, for
+  //     example one of a client compiled against a version of the function
+  //     which was not '@oneway', waits for a reply, so it is made and
+  //     reported to the result handler like the call of any other function
+  if (funcDecl->isSynchronouslyEnqueuedOneway()) {
+    // 'isOnewayRemoteCall' is SPI
+    auto *isOnewayCheck = createRemoteCallTargetSPIMemberRef(
+        C, new (C) DeclRefExpr(ConcreteDeclRef(targetVar), dloc, implicit),
+        C.getIdentifier("isOnewayRemoteCall"));
+    auto *onewayBody = BraceStmt::create(
+        C, sloc,
+        {createEnqueueOnewayCall(
+             C, thunk, new (C) DeclRefExpr(selfDecl, dloc, implicit), funcDecl,
+             callArgs),
+         ReturnStmt::createImplicit(C, sloc, /*Result=*/nullptr)},
+        sloc, implicit);
+    thenStmts.push_back(new (C) IfStmt(sloc, /*Cond=*/isOnewayCheck,
+                                       /*Then=*/onewayBody,
+                                       /*ElseLoc=*/SourceLoc(),
+                                       /*Else=*/nullptr, implicit, C));
+  }
+
+  Expr *callBase = new (C) DeclRefExpr(selfDecl, dloc, implicit);
+  bool callIsThrowing = true;
+  if (funcDecl->isSynchronouslyEnqueuedOneway()) {
+    // The distributed thunk of a '@oneway' function does not wait for
+    // a call on a local actor, so call the function itself, on the actor,
+    // through a copy of 'self' which is known to be local:
+    //
+    //   let __localSelf = self
+    //   await __localSelf.<distFunc>(arg0, arg1, ...)
+    auto *localSelfVar = new (C) VarDecl(
+        /*isStatic=*/false, VarDecl::Introducer::Let, sloc,
+        C.getIdentifier("__localSelf"), thunk);
+    localSelfVar->setImplicit();
+    localSelfVar->setSynthesized();
+    localSelfVar->setInterfaceType(selfDecl->getInterfaceType());
+    localSelfVar->addAttribute(new (C) KnownToBeLocalAttr(implicit));
+    Pattern *localSelfPattern = NamedPattern::createImplicit(C, localSelfVar);
+    thenStmts.push_back(PatternBindingDecl::createImplicit(
+        C, StaticSpellingKind::None, localSelfPattern,
+        new (C) DeclRefExpr(selfDecl, dloc, implicit), thunk));
+    thenStmts.push_back(localSelfVar);
+
+    callBase = new (C) DeclRefExpr(ConcreteDeclRef(localSelfVar), dloc,
+                                   implicit);
+    callIsThrowing = funcDecl->hasThrows();
+  }
+
+  auto *selfDotFunc = createDistributedTargetRef(C, callBase, funcDecl);
   Expr *funcCall = CallExpr::createImplicit(
       C, selfDotFunc,
       ArgumentList::createImplicit(C, callArgs));
   funcCall = AwaitExpr::createImplicit(C, sloc, funcCall);
-  funcCall = TryExpr::createImplicit(C, sloc, funcCall);
+  if (callIsThrowing)
+    funcCall = TryExpr::createImplicit(C, sloc, funcCall);
 
   // The call, with onReturn / onReturnVoid
   SmallVector<ASTNode, 4> callStmts;
@@ -1447,6 +1907,10 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
       auto *thunkFunc = funcDecl->getDistributedThunk();
       if (!thunkFunc)
         continue;
+      // Sent and awaited calls of a '@oneway' function both use the
+      // identifier of its await thunk, the regular 'async' thunk
+      if (auto *awaitThunk = funcDecl->getDistributedAwaitThunk())
+        thunkFunc = awaitThunk;
       auto mangled = mangler.mangleDistributedThunk(thunkFunc);
 
       AbstractFunctionDecl *impl = distFunc;
@@ -1545,8 +2009,11 @@ deriveBodyEmbeddedDistributedReceiveDispatch(AbstractFunctionDecl *thunk,
   }
   dispatchStmts.push_back(switchStmt);
 
-  // A dispatcher without targets has nothing that could throw into the catch
-  if (targets.empty())
+  // A dispatcher has nothing that could throw into the catch without targets.
+  // Every target can: even a synchronous 'oneway' target without parameters
+  // reports the result of a call which is not a 'oneway' remote call
+  bool dispatchCanThrow = !targets.empty();
+  if (!dispatchCanThrow)
     bodyStmts.append(dispatchStmts.begin(), dispatchStmts.end());
   else
     bodyStmts.push_back(buildEmbeddedDispatchOnThrowCatch(
@@ -1800,6 +2267,59 @@ FuncDecl *GetDistributedThunkRequest::evaluate(Evaluator &evaluator,
   }
 
   llvm_unreachable("Unable to synthesize distributed thunk");
+}
+
+FuncDecl *GetDistributedOnewayWitnessAdapterRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *distributedTarget) const {
+  auto func = dyn_cast<FuncDecl>(distributedTarget);
+  if (!func || func->isOneway() || !func->isInstanceMember())
+    return nullptr;
+
+  // A '@oneway' requirement is a function that does not throw and returns
+  // 'Void', and so is what witnesses it
+  if (auto thrownTy = func->getEffectiveThrownErrorType())
+    if (!(*thrownTy)->isNever())
+      return nullptr;
+  auto resultTy = func->getResultInterfaceType();
+  if (!resultTy || resultTy->hasError() || !resultTy->isVoid())
+    return nullptr;
+
+  // The adapter calls the function's own thunk's identifier, so it can only
+  // exist if that thunk does
+  if (!func->getDistributedThunk())
+    return nullptr;
+
+  auto *thunk = createSameSignatureDistributedThunkDecl(
+      func->getDeclContext(), func, /*isOnewayAdapter=*/true);
+  // Unlike the thunk of a function, which its own module emits, the adapter
+  // is emitted by the module of the conformance that needs it, which can be
+  // another module than the one of the function, so it does not need the body
+  // of the function
+  if (!isa<ProtocolDecl>(func->getDeclContext()))
+    thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
+  return thunk;
+}
+
+FuncDecl *GetDistributedAwaitThunkRequest::evaluate(
+    Evaluator &evaluator, AbstractFunctionDecl *distributedTarget) const {
+  auto func = dyn_cast<FuncDecl>(distributedTarget);
+  if (!func || !func->hasSynchronousDistributedThunk())
+    return nullptr;
+
+  // The synchronous thunk is the one that is checked for errors, so the await
+  // thunk only exists if that exists
+  if (!func->getDistributedThunk())
+    return nullptr;
+
+  auto *thunk = createSameSignatureDistributedThunkDecl(
+      func->getDeclContext(), func, /*isOnewayAdapter=*/false,
+      /*isAwaitThunk=*/true);
+  assert(thunk->isDistributedAwaitThunk());
+
+  // Protocol requirements don't have bodies
+  if (func->hasBody())
+    thunk->setBodySynthesizer(deriveBodyDistributed_thunk, func);
+  return thunk;
 }
 
 FuncDecl *

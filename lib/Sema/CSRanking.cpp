@@ -51,7 +51,7 @@ static bool exprHasCodeCompletionAsArgument(Expr *expr, ConstraintSystem &cs) {
 
 static bool shouldIgnoreScoreIncreaseForCodeCompletion(
     ScoreKind kind, ConstraintLocatorBuilder Locator, ConstraintSystem &cs) {
-  if (kind < SK_SyncInAsync) {
+  if (kind <= SK_AsyncInSyncMismatch) {
     // We don't want to ignore score kinds that make the code invalid.
     return false;
   }

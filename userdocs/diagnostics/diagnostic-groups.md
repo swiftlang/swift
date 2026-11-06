@@ -47,6 +47,8 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
+- <doc:awaited-oneway-call>
+- <doc:sent-oneway-never-call>
 - <doc:canimport-missing-module>
 - <doc:module-version-missing>
 - <doc:module-self-import>
@@ -105,6 +107,8 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:isolated-conformances>
 - <doc:error-in-future-swift-version>
 - <doc:old-suppressed-associatedtypes>
+- <doc:awaited-oneway-call>
+- <doc:sent-oneway-never-call>
 - <doc:canimport-missing-module>
 - <doc:missing-module-on-known-paths>
 - <doc:module-version-missing>

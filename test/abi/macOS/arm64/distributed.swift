@@ -133,3 +133,51 @@ Added: _swift_distributed_execute_target_with_isolation
 Added: _$s11Distributed0A11ActorSystemPAAE08_executeA16TargetNonsending2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationJ0Qzz13ResultHandlerQztYaKAA0aB0Rd__lF
 // async function pointer to (extension in Distributed):Distributed.DistributedActorSystem._executeDistributedTargetNonsending<A where A1: Distributed.DistributedActor>(on: A1, target: Distributed.RemoteCallTarget, invocationDecoder: inout A.InvocationDecoder, handler: A.ResultHandler) async throws -> ()
 Added: _$s11Distributed0A11ActorSystemPAAE08_executeA16TargetNonsending2on6target17invocationDecoder7handleryqd___AA010RemoteCallE0V010InvocationJ0Qzz13ResultHandlerQztYaKAA0aB0Rd__lFTu
+
+// New 'isOnewayRemoteCall' hint on RemoteCallTarget, set for a 'send' of a '@oneway' distributed function
+// Distributed.RemoteCallTarget.isOnewayRemoteCall.getter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewaybC0Sbvg
+// Distributed.RemoteCallTarget.isOnewayRemoteCall.setter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewaybC0Sbvs
+// Distributed.RemoteCallTarget.isOnewayRemoteCall.modify : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewaybC0SbvM
+// property descriptor for Distributed.RemoteCallTarget.isOnewayRemoteCall : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewaybC0SbvpMV
+
+// New 'isOnewayTarget' hint on RemoteCallTarget, set by both distributed thunks of a '@oneway' function
+// Distributed.RemoteCallTarget.isOnewayTarget.getter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewayD0Sbvg
+// Distributed.RemoteCallTarget.isOnewayTarget.setter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewayD0Sbvs
+// Distributed.RemoteCallTarget.isOnewayTarget.modify : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewayD0SbvM
+// property descriptor for Distributed.RemoteCallTarget.isOnewayTarget : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV08isOnewayD0SbvpMV
+
+// New 'isIdempotentTarget' hint on RemoteCallTarget, set by the distributed thunks of a '@_remoteCallIdempotent' function
+// Distributed.RemoteCallTarget.isIdempotentTarget.getter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV012isIdempotentD0Sbvg
+// Distributed.RemoteCallTarget.isIdempotentTarget.setter : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV012isIdempotentD0Sbvs
+// Distributed.RemoteCallTarget.isIdempotentTarget.modify : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV012isIdempotentD0SbvM
+// property descriptor for Distributed.RemoteCallTarget.isIdempotentTarget : Swift.Bool
+Added: _$s11Distributed16RemoteCallTargetV012isIdempotentD0SbvpMV
+
+// New '_DistributedOnewayActorSystem' protocol, whose 'remoteCallOneway' the synchronous distributed thunk of a '@oneway' function calls
+// protocol descriptor for Distributed._DistributedOnewayActorSystem
+Added: _$s11Distributed01_A17OnewayActorSystemMp
+// protocol requirements base descriptor for Distributed._DistributedOnewayActorSystem
+Added: _$s11Distributed01_A17OnewayActorSystemTL
+// base conformance descriptor for Distributed._DistributedOnewayActorSystem: Distributed.DistributedActorSystem
+Added: _$s11Distributed01_A17OnewayActorSystemPAA0acD0Tb
+// dispatch thunk of Distributed._DistributedOnewayActorSystem.remoteCallOneway<A where A1: Distributed.DistributedActor, A.ActorID == A1.ID>(on: A1, target: Distributed.RemoteCallTarget, invocation: inout A.InvocationEncoder) throws -> ()
+Added: _$s11Distributed01_A17OnewayActorSystemP010remoteCallB02on6target10invocationyqd___AA06RemoteF6TargetV17InvocationEncoderQzztKAA0aC0Rd__2IDQyd__0cN0RtzlFTj
+// method descriptor for Distributed._DistributedOnewayActorSystem.remoteCallOneway<A where A1: Distributed.DistributedActor, A.ActorID == A1.ID>(on: A1, target: Distributed.RemoteCallTarget, invocation: inout A.InvocationEncoder) throws -> ()
+Added: _$s11Distributed01_A17OnewayActorSystemP010remoteCallB02on6target10invocationyqd___AA06RemoteF6TargetV17InvocationEncoderQzztKAA0aC0Rd__2IDQyd__0cN0RtzlFTq
+// protocol conformance descriptor for Distributed.LocalTestingDistributedActorSystem : Distributed._DistributedOnewayActorSystem in Distributed
+Added: _$s11Distributed012LocalTestingA11ActorSystemCAA01_a6OnewaydE0AAMc
+// protocol witness table for Distributed.LocalTestingDistributedActorSystem : Distributed._DistributedOnewayActorSystem in Distributed
+Added: _$s11Distributed012LocalTestingA11ActorSystemCAA01_a6OnewaydE0AAWP
+// Distributed.LocalTestingDistributedActorSystem.remoteCallOneway<A where A: Distributed.DistributedActor, A.ID == Distributed.LocalTestingActorID>(on: A, target: Distributed.RemoteCallTarget, invocation: inout Distributed.LocalTestingInvocationEncoder) throws -> ()
+Added: _$s11Distributed012LocalTestingA11ActorSystemC16remoteCallOneway2on6target10invocationyx_AA06RemoteG6TargetVAA0bC17InvocationEncoderVztKAA0aD0RzAA0bcD2IDV0P0RtzlF

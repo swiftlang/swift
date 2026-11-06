@@ -726,6 +726,15 @@ EXPERIMENTAL_FEATURE(ModernImportedCArrays, true)
 /// into a future language version.
 EXPERIMENTAL_FEATURE(ModernImportedCArraysOnly, true)
 
+/// The 'send' fire-and-forget call expression, and the '@oneway' and
+/// '@oneway(never)' attributes.
+EXPERIMENTAL_FEATURE(SendCalls, false)
+
+/// The '@_remoteCallIdempotent' attribute on distributed functions. It only
+/// marks the targets of their remote calls, so it can be dropped for older
+/// compilers
+SUPPRESSIBLE_LANGUAGE_FEATURE(RemoteCallIdempotent, 0, "@_remoteCallIdempotent attribute")
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

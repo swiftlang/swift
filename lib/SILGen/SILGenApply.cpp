@@ -395,6 +395,11 @@ private:
   // The pointer back to the AST node that produced the callee.
   SILLocation Loc;
 
+  /// Whether this is the callee of a 'send' call, which calls the synchronous
+  /// distributed thunk of a '@oneway' distributed requirement rather
+  /// than its await thunk
+  bool IsDistributedSendCall = false;
+
   static CanFunctionType
   getSubstFormalInterfaceType(CanAnyFunctionType substFormalType,
                               SubstitutionMap subs) {
@@ -468,6 +473,8 @@ private:
   }
 
 public:
+
+  void setIsDistributedSendCall(bool flag) { IsDistributedSendCall = flag; }
 
   static Callee forIndirect(ManagedValue indirectValue,
                             AbstractionPattern origFormalType,
@@ -749,11 +756,7 @@ public:
       return fn;
     }
     case Kind::WitnessMethod: {
-      if (auto func = constant->getFuncDecl()) {
-        if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
-          constant = constant->getDistributedThunkDeclRef();
-        }
-      }
+      constant = getAppliedWitnessMethodConstant(SGF);
 
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
@@ -841,11 +844,7 @@ public:
       return createCalleeTypeInfo(SGF, constant, constantInfo.getSILType());
     }
     case Kind::WitnessMethod: {
-      if (auto func = constant->getFuncDecl()) {
-        if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func)) {
-          constant = constant->getDistributedThunkDeclRef();
-        }
-      }
+      constant = getAppliedWitnessMethodConstant(SGF);
 
       auto constantInfo =
           SGF.getConstantInfo(SGF.getTypeExpansionContext(), *constant);
@@ -867,6 +866,29 @@ public:
 
   SILDeclRef getMethodName() const {
     return Constant;
+  }
+
+  /// The constant that a witness method callee is applied through. A witness
+  /// method callee names the requirement, but a call to a distributed
+  /// requirement that has to go through a distributed thunk calls the thunk
+  /// that suits the call, see \c SILDeclRef::getDistributedThunkDeclRefForClient.
+  SILDeclRef getAppliedWitnessMethodConstant(SILGenFunction &SGF) const {
+    ASSERT(kind == Kind::WitnessMethod);
+    if (auto func = Constant.getFuncDecl()) {
+      if (SGF.shouldReplaceConstantForApplyWithDistributedThunk(func))
+        return Constant.getDistributedThunkDeclRefForClient(
+            IsDistributedSendCall);
+    }
+    return Constant;
+  }
+
+  /// The distributed thunk that this callee calls, or null if it does not call
+  /// one. It is the thunk that is really called, which can be the await thunk
+  /// of a '@oneway' function.
+  FuncDecl *getCalledDistributedThunk(SILGenFunction &SGF) const {
+    if (kind == Kind::WitnessMethod)
+      return getAppliedWitnessMethodConstant(SGF).getDistributedThunk();
+    return Constant.getDistributedThunk();
   }
 
   /// Return a specialized emission function if this is a function with a known
@@ -1143,6 +1165,7 @@ public:
     Callee theCallee = Callee::forWitnessMethod(
         SGF, selfValue.getSubstRValueType(),
         constant, subs, e);
+    theCallee.setIsDistributedSendCall(callSite && callSite->isOnewaySendOperand());
 
     setSelfParam(std::move(selfValue));
     setCallee(std::move(theCallee));
@@ -1207,7 +1230,8 @@ public:
 
     SILDeclRef constant = SILDeclRef(afd);
     if (afd->getDistributedThunk()) {
-      constant = SILDeclRef(afd).getDistributedThunkDeclRef();
+      constant = SILDeclRef(afd).getDistributedThunkDeclRefForClient(
+          callSite && callSite->isOnewaySendOperand());
     } else {
       constant = constant.asForeign(requiresForeignEntryPoint(afd));
     }
@@ -1236,7 +1260,8 @@ public:
     // A call to a `distributed` function may need to go through a thunk.
     if (callSite && callSite->shouldApplyDistributedThunk()) {
       if (afd->getDistributedThunk())
-        return SILDeclRef(afd).getDistributedThunkDeclRef();
+        return SILDeclRef(afd).getDistributedThunkDeclRefForClient(
+            callSite->isOnewaySendOperand());
     }
 
     // A call to `@backDeployed` function may need to go through a thunk.
@@ -5481,17 +5506,10 @@ public:
     return (callee.kind == Callee::Kind::EnumElement);
   }
 
-  /// Is this call dispatched through a distributed thunk?
-  bool callsDistributedThunk() const {
-    if (callee.getMethodName().isDistributedThunk())
-      return true;
-    // A witness method callee still names the requirement; it is redirected
-    // to the requirement's distributed thunk only when the callee value is
-    // emitted (see Callee::getFnValue).
-    if (callee.kind == Callee::Kind::WitnessMethod)
-      if (auto *func = callee.getMethodName().getFuncDecl())
-        return SGF.shouldReplaceConstantForApplyWithDistributedThunk(func);
-    return false;
+  /// The distributed thunk that this call calls, or null if it does not call
+  /// one, see \c Callee::getCalledDistributedThunk
+  FuncDecl *getCalledDistributedThunk() const {
+    return callee.getCalledDistributedThunk(SGF);
   }
 
   /// Sets a flag that indicates whether this call be treated as being 
@@ -6300,7 +6318,7 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
       //
       // Hopping back to the caller after the call is still handled by the
       // executor breadcrumb emitted for async callees.
-      if (!emission.callsDistributedThunk()) {
+      if (!emission.getCalledDistributedThunk()) {
         emission.setImplicitlyAsync(target);
       }
     } else {

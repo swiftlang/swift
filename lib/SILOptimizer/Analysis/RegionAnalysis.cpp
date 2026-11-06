@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -5014,6 +5015,12 @@ static bool canComputeRegionsForFunction(SILFunction *fn) {
   // We do not check thunks. We only emit diagnostics for user created
   // functions.
   if (fn->isThunk())
+    return false;
+
+  // Nor the receive dispatcher synthesized for distributed actors in Embedded
+  // Swift. It is synthesized code like the distributed thunks, and outside of
+  // Embedded the runtime performs the same dispatch without these checks
+  if (isSynthesizedEmbeddedDistributedDispatcher(fn->getDeclRef().getDecl()))
     return false;
 
   return true;

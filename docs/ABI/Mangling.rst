@@ -249,6 +249,16 @@ types where the metadata itself has unknown layout.)
   global ::= global 'TD'                 // dynamic dispatch thunk
   global ::= global 'Td'                 // direct method reference thunk
   global ::= global 'TE'                 // distributed actor thunk
+  #if SWIFT_RUNTIME_VERSION >= 6.5
+    // A '@oneway distributed' function has a synchronous thunk, which is
+    // not 'async', next to the regular 'async' thunk. The remote calls of both
+    // use the mangled name of the 'async' thunk as remote call target
+    // identifier, which is the one the function has if it is not '@oneway'.
+    // The protocol witness adapter thunk with which a function which is not
+    // '@oneway' witnesses a '@oneway distributed' requirement has a base name
+    // with the prefix '$onewayWitness$', followed by the base name of the
+    // function.
+  #endif
   global ::= global 'TF'                 // distributed method accessor
   global ::= global 'TI'                 // implementation of a dynamic_replaceable function
   global ::= global 'Tu'                 // async function pointer of a function

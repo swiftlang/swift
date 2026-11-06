@@ -300,6 +300,12 @@ BridgedUnsafeExpr BridgedUnsafeExpr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) UnsafeExpr(unsafeLoc, cSubExpr.unbridged());
 }
 
+BridgedSendExpr BridgedSendExpr_createParsed(BridgedASTContext cContext,
+                                             SourceLoc sendLoc,
+                                             BridgedExpr cSubExpr) {
+  return new (cContext.unbridged()) SendExpr(sendLoc, cSubExpr.unbridged());
+}
+
 BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
                                                SourceLoc loc,
                                                BridgedExpr cSubExpr) {
