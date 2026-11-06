@@ -151,9 +151,10 @@ extension ASTGenVisitor {
     _ diagnostic: CompilerDiagnostic,
     at loc: SourceLoc,
     highlight: Syntax? = nil,
+    highlightRange explicitRange: CharSourceRange? = nil,
     fixIts: [CompilerDiagnosticFixIt] = []
   ) {
-    let highlightRange = highlight.map { self.generateCharSourceRange($0) }
+    let highlightRange = explicitRange ?? highlight.map { self.generateCharSourceRange($0) }
 
     let bridgedArguments = diagnostic.arguments.map { $0.bridged(in: self.ctx) }
     let bridgedFixIts = fixIts.map { fixIt in

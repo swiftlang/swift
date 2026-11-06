@@ -57,14 +57,17 @@ extension ASTGenVisitor {
       }
       // Diagnose, and drop, an attribute that may appear only once but
       // already did.
-      let duplicate = attrs.checkDuplicate(attr)
+      let duplicate = attrs.checkDuplicate(self.ctx, attr)
       if duplicate.isDuplicate {
         if duplicate.hasDifferentAccessLevel {
-          self.diagnose(.multiple_access_level_modifiers, at: duplicate.newLoc)
-          self.diagnose(.previous_access_level_modifier, at: duplicate.previousLoc)
+          self.diagnose(.multiple_access_level_modifiers, at: duplicate.newLoc, highlightRange: duplicate.newRange)
+          self.diagnose(
+            .previous_access_level_modifier, at: duplicate.previousLoc, highlightRange: duplicate.previousRange)
         } else {
-          self.diagnose(.duplicate_attribute(duplicate.isModifier), at: duplicate.newLoc)
-          self.diagnose(.previous_attribute(duplicate.isModifier), at: duplicate.previousLoc)
+          self.diagnose(
+            .duplicate_attribute(duplicate.isModifier), at: duplicate.newLoc, highlightRange: duplicate.newRange)
+          self.diagnose(
+            .previous_attribute(duplicate.isModifier), at: duplicate.previousLoc, highlightRange: duplicate.previousRange)
         }
         return
       }

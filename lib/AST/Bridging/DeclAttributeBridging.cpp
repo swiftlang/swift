@@ -17,6 +17,7 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 
@@ -98,9 +99,12 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
 }
 
 BridgedDuplicateAttributeInfo BridgedDeclAttributes_checkDuplicate(
-    const BridgedDeclAttributes *_Nonnull attrs, BridgedDeclAttribute newAttr) {
-  BridgedDuplicateAttributeInfo info{false, false, false, SourceLoc(),
-                                     SourceLoc()};
+    BridgedASTContext cContext, const BridgedDeclAttributes *_Nonnull attrs,
+    BridgedDeclAttribute newAttr) {
+  BridgedDuplicateAttributeInfo info{false,        false,        false,
+                                     SourceLoc(),  SourceLoc(),
+                                     CharSourceRange(), CharSourceRange()};
+  auto &SM = cContext.unbridged().SourceMgr;
   auto *attr = newAttr.unbridged();
   auto kind = attr->getKind();
   // Custom attributes (property wrappers, global actors, macros, ...) are not
@@ -115,7 +119,15 @@ BridgedDuplicateAttributeInfo BridgedDeclAttributes_checkDuplicate(
   info.isDuplicate = true;
   info.isModifier = DeclAttribute::isDeclModifier(kind);
   info.newLoc = attr->getLocation();
+  // For simple attributes, the range starts at the '@' and ends at the name,
+  // and the diagnostic is on the name.
+  if (attr->AtLoc.isValid() && info.newLoc == attr->AtLoc)
+    info.newLoc = attr->getEndLoc();
   info.previousLoc = previous->getLocation();
+  info.newRange =
+      Lexer::getCharSourceRangeFromSourceRange(SM, attr->getRangeWithAt());
+  info.previousRange =
+      Lexer::getCharSourceRangeFromSourceRange(SM, previous->getRangeWithAt());
   if (auto *access = dyn_cast<AccessControlAttr>(attr))
     info.hasDifferentAccessLevel =
         access->getAccess() != cast<AccessControlAttr>(previous)->getAccess();

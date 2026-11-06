@@ -982,13 +982,17 @@ struct BridgedDuplicateAttributeInfo {
   bool hasDifferentAccessLevel;
   swift::SourceLoc newLoc;
   swift::SourceLoc previousLoc;
+  /// The ranges of the attributes, including any '@', for highlighting.
+  swift::CharSourceRange newRange;
+  swift::CharSourceRange previousRange;
 };
 
 /// Check whether \p newAttr duplicates an attribute in \p attrs of a kind that
 /// may appear only once, as `Parser::parseNewDeclAttribute` does.
-SWIFT_NAME("BridgedDeclAttributes.checkDuplicate(self:_:)")
+SWIFT_NAME("BridgedDeclAttributes.checkDuplicate(_:self:_:)")
 BridgedDuplicateAttributeInfo BridgedDeclAttributes_checkDuplicate(
-    const BridgedDeclAttributes *_Nonnull attrs, BridgedDeclAttribute newAttr);
+    BridgedASTContext cContext, const BridgedDeclAttributes *_Nonnull attrs,
+    BridgedDeclAttribute newAttr);
 
 SWIFT_NAME("BridgedDeclAttributes.hasAttribute(self:_:)")
 bool BridgedDeclAttributes_hasAttribute(
