@@ -33,7 +33,9 @@ _ = [(Int) -> async throws Int]()
 // expected-error@-1{{'async throws' must precede '->'}} {{15-21=}} {{21-28=}} {{12-12=async }} {{12-12=throws }}
 //
 
-@freestanding // expected-error {{expected '(' in 'freestanding' attribute}}
+// The diagnostic points at the token after the attribute name.
+// expected-error@+2 {{expected '(' in 'freestanding' attribute}}
+@freestanding
 func dummy() {}
 
 @_silgen_name("whatever", extra)  // expected-error@:27 {{unexpected arguments in '_silgen_name' attribute}}
@@ -88,7 +90,7 @@ default test
 // expected-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
 func scopedMissingLParen(b: @_scoped Int) {}
-// expected-error@-1:30{{expected '(' in '_scoped' attribute}}
+// expected-error@-1:38{{expected '(' in '_scoped' attribute}}
 
 func scopedNotAName(b: @_scoped(0) Int) {}
 // expected-error@-1:33{{invalid argument in '_scoped' attribute}}

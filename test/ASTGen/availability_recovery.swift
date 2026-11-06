@@ -20,6 +20,9 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_CustomAvailability
+// UNSUPPORTED: parser_astgen
+// This test compares ASTGen with the C++ parser, so forcing ASTGen on everywhere
+// (`lit --param swift_parser_astgen`) leaves it with nothing to compare.
 
 // A domain without a version is valid: a custom availability domain has no
 // version. ASTGen used to require one and crash. Whether a version is required

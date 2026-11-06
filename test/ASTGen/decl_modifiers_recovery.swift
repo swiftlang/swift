@@ -8,6 +8,9 @@
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
+// UNSUPPORTED: parser_astgen
+// This test compares ASTGen with the C++ parser, so forcing ASTGen on everywhere
+// (`lit --param swift_parser_astgen`) leaves it with nothing to compare.
 
 // 'yielding' is not a modifier of its own -- it is part of the spelling of the
 // 'yielding borrow' accessor kind. ASTGen used to hand it to the declaration

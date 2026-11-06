@@ -239,7 +239,7 @@ struct ASTGenVisitor {
       guard let item = self.generateTopLevel(codeBlockItem: element) else {
         return
       }
-      if let semicolon = element.semicolon, semicolon.presence == .present {
+      if let semicolon = element.semicolon, semicolon.presence == .present, !element.item.hasError {
         item.setTrailingSemiLoc(self.generateSourceLoc(semicolon))
       }
       if isFollowingGuard, item.kind == .decl {

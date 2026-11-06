@@ -10,6 +10,9 @@
 
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
+// UNSUPPORTED: parser_astgen
+// This test compares ASTGen with the C++ parser, so forcing ASTGen on everywhere
+// (`lit --param swift_parser_astgen`) leaves it with nothing to compare.
 
 // A ternary missing its ':'. With no 'else' expression the TernaryExpr's range
 // degenerates and no longer contains its children's.

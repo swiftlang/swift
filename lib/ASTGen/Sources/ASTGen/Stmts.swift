@@ -70,7 +70,9 @@ extension ASTGenVisitor {
     guard let result = self.generateCodeBlockItemNode(node) else {
       return nil
     }
-    if let semicolon = node.semicolon, semicolon.presence == .present {
+    // Like the C++ parser, don't record the ';' after an item that needed error
+    // recovery.
+    if let semicolon = node.semicolon, semicolon.presence == .present, !node.item.hasError {
       result.setTrailingSemiLoc(self.generateSourceLoc(semicolon))
     }
     return result

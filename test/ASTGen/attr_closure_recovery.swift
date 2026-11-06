@@ -17,6 +17,9 @@
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_RawLayout
 // REQUIRES: swift_feature_Lifetimes
+// UNSUPPORTED: parser_astgen
+// This test compares ASTGen with the C++ parser, so forcing ASTGen on everywhere
+// (`lit --param swift_parser_astgen`) leaves it with nothing to compare.
 
 // MARK: - @_rawLayout
 
