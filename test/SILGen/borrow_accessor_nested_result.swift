@@ -42,6 +42,13 @@ public struct Loadable {
       return inner.i
     }
   }
+
+  public var neverK: Klass {
+    borrow {
+      let i = inner.i
+      fatalError("\(i)")
+    }
+  }
 }
 
 public struct AddressOnly<T> {
@@ -111,6 +118,14 @@ public struct Projecting {
 // CHECK-NEXT: end_borrow [[INNER]]
 // CHECK-NEXT: return [[I]]
 // CHECK: } // end sil function '$s29borrow_accessor_nested_result8LoadableV0C1ISivb'
+
+// A borrow accessor that never returns has no result to enclose, but the
+// unchecked_ownership of a nested result is still removed.
+// CHECK-LABEL: sil [ossa] @$s29borrow_accessor_nested_result8LoadableV6neverKAA5KlassCvb : $@convention(method) (@guaranteed Loadable) -> @guaranteed Klass {
+// CHECK:   [[INNER:%.*]] = apply {{%.*}}(%0) : $@convention(method) (@guaranteed Loadable) -> @guaranteed Inner
+// CHECK-NOT: unchecked_ownership
+// CHECK:   unreachable
+// CHECK: } // end sil function '$s29borrow_accessor_nested_result8LoadableV6neverKAA5KlassCvb'
 
 // CHECK-LABEL: sil [ossa] @$s29borrow_accessor_nested_result11AddressOnlyV0C1KAA5KlassCvb : $@convention(method) <T> (@in_guaranteed AddressOnly<T>) -> @guaranteed Klass {
 // CHECK:   [[INNER:%.*]] = apply {{%.*}}<T>(%0) : $@convention(method) <τ_0_0> (@in_guaranteed AddressOnly<τ_0_0>) -> @guaranteed Inner

@@ -32,9 +32,7 @@ import OptimizerBridging
 ///
 /// Returns true if the function changed.
 func fixupBorrowAccessors(in function: Function, _ context: FunctionPassContext) -> Bool {
-  guard function.convention.hasGuaranteedResult,
-        let returnInst = function.returnInstruction as? ReturnInst
-  else {
+  guard function.convention.hasGuaranteedResult else {
     return false
   }
 
@@ -44,6 +42,11 @@ func fixupBorrowAccessors(in function: Function, _ context: FunctionPassContext)
       uncheckedOwnership.replace(with: uncheckedOwnership.operand.value, context)
       changed = true
     }
+  }
+
+  // A function that never returns has no result to enclose.
+  guard let returnInst = function.returnInstruction as? ReturnInst else {
+    return changed
   }
 
   let enclosingScopes = getEnclosingLocalScopes(of: returnInst.returnedValue, context)
