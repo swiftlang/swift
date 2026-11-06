@@ -52,24 +52,36 @@ public:
     return OwnershipKind::OWNERSHIP;                                           \
   }
 
+// Like CONSTANT_OWNERSHIP_INST, but yields None ownership when the result type
+// is trivial. strong_copy_*_value normally produces an owned value, but its
+// result type is trivial for C++ foreign reference types imported with
+// immortal/unsafe (no-op) retain/release.
+#define CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(OWNERSHIP, INST)                    \
+  ValueOwnershipKind ValueOwnershipKindClassifier::visit##INST##Inst(          \
+      INST##Inst *I) {                                                         \
+    if (I->getType().isTrivial(*I->getFunction()))                            \
+      return OwnershipKind::None;                                              \
+    return OwnershipKind::OWNERSHIP;                                           \
+  }
+
 CONSTANT_OWNERSHIP_INST(Owned, UnownedCopyValue)
 CONSTANT_OWNERSHIP_INST(Owned, WeakCopyValue)
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                          \
-  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)                      \
+  CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)           \
   CONSTANT_OWNERSHIP_INST(Owned, Load##Name)
 #define ALWAYS_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                         \
   CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name)                                \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
-  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
+  CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #define SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)                      \
   CONSTANT_OWNERSHIP_INST(Owned, Load##Name)                                   \
   CONSTANT_OWNERSHIP_INST(Unowned, RefTo##Name)                                \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
-  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
+  CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   CONSTANT_OWNERSHIP_INST(None, RefTo##Name)                                   \
   CONSTANT_OWNERSHIP_INST(Unowned, Name##ToRef)                                \
-  CONSTANT_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
+  CONSTANT_OR_TRIVIAL_OWNERSHIP_INST(Owned, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 
 CONSTANT_OWNERSHIP_INST(Guaranteed, BeginBorrow)
