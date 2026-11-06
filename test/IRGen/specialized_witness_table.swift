@@ -190,3 +190,30 @@ extension Named {
 public func makeFinalBox() -> any Named {
   return FinalBox(t: 1)
 }
+
+// Non-optimized functions don't create specialized witness tables. But if a specialized
+// witness table is created for an existential in an optimized function, it's used for all
+// existentials of the conformance in the module, including the ones in non-optimized functions.
+// CHECK-LABEL: define {{.*}} @"$s4test16makeBoxOptimizedAA1P_pyF"
+// CHECK:         store ptr @"$s4test3BoxVys6UInt16VGAA1PAAWP"
+// CHECK:       }
+public func makeBoxOptimized() -> any P {
+  return Box(t: UInt16(1))
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4test19makeBoxNotOptimizedAA1P_pyF"
+// CHECK:         store ptr @"$s4test3BoxVys6UInt16VGAA1PAAWP"
+// CHECK:       }
+@_optimize(none)
+public func makeBoxNotOptimized() -> any P {
+  return Box(t: UInt16(1))
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4test24makeOtherBoxNotOptimizedAA1P_pyF"
+// CHECK-NOT:     @"$s4test3BoxVys6UInt32VGAA1PAAWP"
+// CHECK:       }
+// NOSTATIC-NOT: @"$s4test3BoxVys6UInt32VGAA1PAAWP" =
+@_optimize(none)
+public func makeOtherBoxNotOptimized() -> any P {
+  return Box(t: UInt32(1))
+}
