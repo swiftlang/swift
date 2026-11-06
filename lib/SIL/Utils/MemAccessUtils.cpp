@@ -786,6 +786,17 @@ protected:
   // Return an invalid value for a phi with no resolved inputs.
   SILValue recursiveFindRoot(SILValue ref) {
     while (auto *svi = dyn_cast<SingleValueInstruction>(ref)) {
+      // A `load_borrow` with a value hint is guaranteed to load the hinted value.
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(svi)) {
+        if (!lbi->hasValueHint())
+          break;
+        ref = lbi->getValueHint();
+        continue;
+      }
+      if (isa<UncheckedOwnershipInst>(svi)) {
+        ref = svi->getOperand(0);
+        continue;
+      }
       // If preserveOwnership is true, stop at the first owned root
       if (!isIdentityPreservingRefCast(svi)) {
         break;
