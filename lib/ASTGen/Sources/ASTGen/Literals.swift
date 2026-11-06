@@ -122,7 +122,7 @@ extension ASTGenVisitor {
         base: interpolationVarRef.asExpr,
         dotLoc: nil,
         name: appendLiteral,
-        nameLoc: BridgedDeclNameLoc()
+        nameLoc: BridgedDeclNameLoc.createParsed(isFirst ? startLoc : literal.loc)
       )
       appendLiteralRef.asExpr.setImplicit()
       let argList = BridgedArgumentList.createImplicitUnlabeled(
