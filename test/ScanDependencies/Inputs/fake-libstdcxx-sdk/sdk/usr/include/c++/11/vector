@@ -1,0 +1,2 @@
+#pragma once
+namespace std { inline int vectorMarker() { return 1; } }

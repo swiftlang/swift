@@ -1,0 +1,9 @@
+module std {
+  header "libstdcxx.h"
+  header "cstdlib"
+  header "string"
+  header "vector"
+  /// additional headers.
+  requires cplusplus
+  export *
+}
