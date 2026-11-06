@@ -229,12 +229,6 @@ extension ASTGenVisitor {
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
-    // SwiftParser parses `protocol P<> {}` as an empty list and leaves it to us.
-    if let clause = node.primaryAssociatedTypeClause, clause.primaryAssociatedTypes.isEmpty,
-      clause.rightAngle.presence == .present
-    {
-      self.diagnose(.expected_primary_associated_type_name, at: clause.rightAngle)
-    }
     let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
       self.generateLocatedIdentifier($0.name)
     }
