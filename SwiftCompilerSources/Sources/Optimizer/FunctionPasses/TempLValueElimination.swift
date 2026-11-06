@@ -63,8 +63,8 @@ private func removeTempLValues(in function: Function, keepDebugInfo: Bool, _ con
       tryEliminate(copy: copy, keepDebugInfo: keepDebugInfo, context)
     case let store as StoreInst:
       // Also handle `load`-`store` pairs which are basically the same thing as a `copy_addr`.
-      if let load = store.source as? LoadInst, load.uses.isSingleUse, load.parentBlock == store.parentBlock {
-        tryEliminate(copy: store, keepDebugInfo: keepDebugInfo, context)
+      if let copy = store.asCopyLikeInstruction {
+        tryEliminate(copy: copy, keepDebugInfo: keepDebugInfo, context)
       }
     default:
       break
