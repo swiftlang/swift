@@ -104,7 +104,7 @@ func testNonObjC(_ c1: C1) {
 }
 
 func testParseErrors1() {
-  _ = #selector foo // expected-cparser-error{{expected '(' following '#selector'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{expected expression naming a method within '#selector(...)'}} expected-astgen-error {{cannot find 'foo' in scope; did you mean 'Bool'?}}
+  _ = #selector zzzzz // expected-cparser-error{{expected '(' following '#selector'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{expected expression naming a method within '#selector(...)'}} expected-astgen-error {{cannot find 'zzzzz' in scope}}
 }
 
 func testParseErrors2() {
