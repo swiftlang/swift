@@ -309,11 +309,20 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     let theImages = images
     #endif
 
+    #if os(Android)
+    // In an Android app, the stack also holds frames from the Android Runtime
+    // that don't keep a frame pointer chain, so the unwinder can follow a bad
+    // pointer there; use a reader that throws instead of crashing.
+    let reader = UncachedLocalMemoryReader()
+    #else
+    let reader = UnsafeLocalMemoryReader()
+    #endif
+
     // N.B. We use offset+1 here to skip this frame, rather than inlining
     //      this code into the client.
     return try HostContext.withCurrentContext { ctx in
       try capture(from: ctx,
-                  using: UnsafeLocalMemoryReader(),
+                  using: reader,
                   images: theImages,
                   algorithm: algorithm,
                   limit: limit,

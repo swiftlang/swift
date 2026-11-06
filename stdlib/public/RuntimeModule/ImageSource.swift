@@ -410,6 +410,16 @@ struct ImageSource: CustomStringConvertible {
     }
   }
 
+  #if os(Android)
+  /// Get a sub-range of this ImageSource with a path of its own, for a
+  /// library stored in an APK.
+  func subrange(_ range: Range<Address>, path: String) throws -> ImageSource {
+    var result = try self[range]
+    result.path = path
+    return result
+  }
+  #endif
+
   /// Mark unused bytes in the storage as used
   func used(bytes: Int) {
     storage.used(bytes: bytes)

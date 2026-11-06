@@ -33,6 +33,7 @@ endif()
 set(backtracing_sources
   Address.swift
   AggregatingSymbolSource.swift
+  ApkFile.swift
   Backtrace.swift
   Backtrace+Codable.swift
   BacktraceFormatter.swift

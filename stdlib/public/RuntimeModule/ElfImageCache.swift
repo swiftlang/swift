@@ -44,7 +44,7 @@ final class ElfImageCache {
     if let image = elf64[path] {
       return .elf64Image(image)
     }
-    if let source = try? ImageSource(path: path) {
+    if let source = try? Self.openSource(path: path) {
       if let elfImage = try? Elf32Image(source: source) {
         elf32[path] = elfImage
         return .elf32Image(elfImage)
@@ -55,6 +55,24 @@ final class ElfImageCache {
       }
     }
     return nil
+  }
+
+  private static func openSource(path: String) throws -> ImageSource {
+    #if os(Android)
+    // A library stored in an APK has a path of the form `<apk>!/<entry>`.
+    if let (apkPath, entryName) = ApkFile.split(path: path) {
+      let apkSource = try ImageSource(path: apkPath)
+      guard let apk = ApkFile(source: apkSource),
+            let entry = apk.entry(named: entryName) else {
+        throw ImageSourceError.outOfBoundsRead
+      }
+      return try apkSource.subrange(
+        UInt64(entry.offset)..<UInt64(entry.offset + entry.size),
+        path: path
+      )
+    }
+    #endif
+    return try ImageSource(path: path)
   }
 
   static var threadLocal: ElfImageCache {

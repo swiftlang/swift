@@ -65,6 +65,9 @@ fileprivate func readOSRelease() -> [String:String]? {
 
 extension ImageMap {
 
+  #if os(Android)
+  private static var platform = "Android (API \(android_get_device_api_level()))"
+  #else
   private static var platform = {
     guard let info = readOSRelease(),
           let pretty = info["PRETTY_NAME"] else {
@@ -73,6 +76,7 @@ extension ImageMap {
 
     return "Linux (\(pretty))"
   }()
+  #endif
 
   private struct AddressRange {
     var low: Address = 0
@@ -110,8 +114,11 @@ extension ImageMap {
 
     // Find all the mapped files and get high/low ranges
     var mappedFiles: [Substring:AddressRange] = [:]
+    #if os(Android)
+    var apks: [Substring:ApkFile?] = [:]
+    #endif
     for match in ProcMapsScanner(procMaps) {
-      let path = stripWhitespace(match.pathname)
+      var path = stripWhitespace(match.pathname)
       if match.inode == "0" || path == "" {
         continue
       }
@@ -119,6 +126,19 @@ extension ImageMap {
             let end = Address(match.end, radix: 16) else {
         continue
       }
+
+      #if os(Android)
+      // A library loaded from an APK is mapped from the APK itself, so tell
+      // the libraries apart by the APK entry that holds the mapped offset.
+      if path.hasSuffix(".apk"), let offset = Int(match.offset, radix: 16) {
+        if apks[path] == nil {
+          apks[path] = .some(ApkFile(path: String(path)))
+        }
+        if let apk = apks[path]!, let entry = apk.entry(containing: offset) {
+          path = Substring("\(path)!/\(entry.name)")
+        }
+      }
+      #endif
 
       if let range = mappedFiles[path] {
         mappedFiles[path] = AddressRange(low: Swift.min(start, range.low),

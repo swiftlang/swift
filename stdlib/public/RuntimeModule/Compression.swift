@@ -73,10 +73,16 @@ protocol CompressedStream {
 private var lzmaHandle = dlopen("liblzma.dylib", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.dylib", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.dylib", RTLD_LAZY)
-#elseif os(Linux) || os(Android)
+#elseif os(Linux)
 private var lzmaHandle = dlopen("liblzma.so.5", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.so.1", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.so.1", RTLD_LAZY)
+#elseif os(Android)
+// Android libraries have no version in their names.  An app can open only
+// libz.so, which is part of the NDK; liblzma.so and libzstd.so may be missing.
+private var lzmaHandle = dlopen("liblzma.so", RTLD_LAZY)
+private var zlibHandle = dlopen("libz.so", RTLD_LAZY)
+private var zstdHandle = dlopen("libzstd.so", RTLD_LAZY)
 #elseif os(Windows)
 private var lzmaHandle = LoadLibraryA("liblzma.dll")
 private var zlibHandle = LoadLibraryA("zlib1.dll")
