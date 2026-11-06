@@ -45,7 +45,8 @@ private func _loadPartialUnalignedUInt64LE(
   }
 }
 
-/// SipHash-1-3 128bit hasher.
+/// SipHash-2-4 128bit hasher, matching `swift::StableHasher` in the C++ compiler
+/// so that interface hashes are identical whichever parser produced them.
 extension StableHasher {
   /// This is a buffer for segmenting arbitrary data into 8-byte chunks.  Buffer
   /// storage is represented by a single 64-bit value in the format used by the
@@ -281,6 +282,7 @@ extension StableHasher._State {
   mutating func compress(_ m: UInt64) {
     v3 ^= m
     _round()
+    _round()
     v0 ^= m
   }
 
@@ -288,13 +290,13 @@ extension StableHasher._State {
   mutating func finalize(tailAndByteCount: UInt64) -> (UInt64, UInt64) {
     compress(tailAndByteCount)
     v2 ^= 0xee
-    for _ in 0..<3 {
+    for _ in 0..<4 {
       _round()
     }
     let h1 = _extract()
 
     v1 ^= 0xdd
-    for _ in 0..<3 {
+    for _ in 0..<4 {
       _round()
     }
     let h2 = _extract()

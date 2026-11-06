@@ -36,6 +36,8 @@ extension StableHasher {
     )
     self.combine(UInt(truncatingIfNeeded: buffer.count))
     self.combine(bytes: buffer)
+    // Separate tokens with a null byte, as `Parser::recordTokenHash` does.
+    self.combine(UInt8(0))
   }
 }
 
@@ -70,8 +72,11 @@ final class FingerprintVisitor: SyntaxVisitor {
   }
 
   override func visit(_ token: TokenSyntax) -> SyntaxVisitorContinueKind {
-    // Collect all token texts.
-    hasher.combine(text: token.rawText)
+    // Collect all token texts, except for the end-of-file token and missing
+    // tokens, which the C++ parser never consumes.
+    if !token.rawText.isEmpty {
+      hasher.combine(text: token.rawText)
+    }
     return .skipChildren
   }
 
@@ -82,8 +87,14 @@ final class FingerprintVisitor: SyntaxVisitor {
 
   override func visit(_ node: MemberBlockSyntax) -> SyntaxVisitorContinueKind {
     // Skip nested nominal decl / extension member blocks, unless hashing a
-    // body, which covers the local types declared inside it.
-    return includesBodies || node == root ? .visitChildren : .skipChildren
+    // body, which covers the local types declared inside it. Like the C++
+    // parser, only record the braces of a skipped block.
+    if includesBodies || node == root {
+      return .visitChildren
+    }
+    hasher.combine(text: node.leftBrace.rawText)
+    hasher.combine(text: node.rightBrace.rawText)
+    return .skipChildren
   }
 
   override func visit(_ node: AccessorBlockSyntax) -> SyntaxVisitorContinueKind {
@@ -101,7 +112,12 @@ final class FingerprintVisitor: SyntaxVisitor {
     // Skip function bodies.
     // FIXME: Don't skip closure bodies or other control flow statement blocks.
     //        E.g. 'var val = { if condition { "foo" } else { "bar" } }()'
-    return includesBodies ? .visitChildren : .skipChildren
+    if includesBodies {
+      return .visitChildren
+    }
+    hasher.combine(text: node.leftBrace.rawText)
+    hasher.combine(text: node.rightBrace.rawText)
+    return .skipChildren
   }
 
   override func visit(_ node: IfConfigDeclSyntax) -> SyntaxVisitorContinueKind {
