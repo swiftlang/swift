@@ -6,6 +6,12 @@ cmake_minimum_required(VERSION 3.26...3.29)
 # in `EmitSwiftInterface.cmake`
 # to ensure it keeps laying down nested swiftmodule folders
 
+# `emit_swift_interface` emits nested swiftmodule directories, which CMake 4.1+
+# only does itself when CMP0195 is NEW. This must precede `project()`.
+if(POLICY CMP0195)
+  cmake_policy(SET CMP0195 NEW)
+endif()
+
 set(CMAKE_C_VISIBILITY_PRESET "hidden")
 set(CMAKE_CXX_VISIBILITY_PRESET "hidden")
 set(CMAKE_VISIBILITY_INLINES_HIDDEN YES)
@@ -46,6 +52,7 @@ include(gyb)
 include(AvailabilityMacros)
 include(DefaultSettings)
 include(EmitSwiftInterface)
+include(EmitSymbolGraph)
 include(InstallSwiftInterface)
 include(PlatformInfo)
 include(ResourceEmbedding)
@@ -61,6 +68,8 @@ set(SwiftOverlay_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<
 
 option(SwiftOverlay_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime libraries"
   ${SwiftCore_ENABLE_LIBRARY_EVOLUTION})
+option(SwiftOverlay_ENABLE_SYMBOL_GRAPHS "Emit symbol graphs while building"
+  ${SwiftCore_ENABLE_SYMBOL_GRAPHS})
 option(SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment"
   ${SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT})
 
