@@ -160,7 +160,6 @@ bb0(%0 : $*HoldsBase):
 // CHECK: <root> -> 0..<2
 // CHECK: c0 -> 0..<1
 // CHECK: c1 -> 1..<2
-// CHECK: superclassLeaf: none
 // CHECK: field 0 -> 0..<1
 // CHECK: field 1 -> 1..<2
 // CHECK-LABEL: end running test {{.*}} on test_class_root: field_index_trie
@@ -184,18 +183,16 @@ bb0(%0 : $Base):
 }
 
 // The inherited fields x and y have no leaves: their indices conservatively select the whole
-// instance. The struct-typed field s is expanded, and the superclass leaf comes last.
+// instance. The struct-typed field s is expanded.
 // CHECK-LABEL: begin running test {{.*}} on test_class_derived: field_index_trie
-// CHECK: leafCount: 4
-// CHECK: <root> -> 0..<4
+// CHECK: leafCount: 3
+// CHECK: <root> -> 0..<3
 // CHECK: c2 -> 0..<1
 // CHECK: c3 -> 1..<3
 // CHECK: c3.s0 -> 1..<2
 // CHECK: c3.s1 -> 2..<3
-// CHECK: super -> 3..<4
-// CHECK: superclassLeaf: 3
-// CHECK: field 0 -> 0..<4
-// CHECK: field 1 -> 0..<4
+// CHECK: field 0 -> 0..<3
+// CHECK: field 1 -> 0..<3
 // CHECK: field 2 -> 0..<1
 // CHECK: field 3 -> 1..<3
 // CHECK-LABEL: end running test {{.*}} on test_class_derived: field_index_trie
@@ -206,12 +203,12 @@ bb0(%0 : $Derived):
   return %r : $()
 }
 
-// A superclass without stored properties still gets a leaf.
+// A derived class without stored properties of its own is a single leaf.
 // CHECK-LABEL: begin running test {{.*}} on test_class_empty_derived: field_index_trie
 // CHECK: leafCount: 1
-// CHECK: <root> -> 0..<1
-// CHECK: super -> 0..<1
-// CHECK: superclassLeaf: 0
+// CHECK-NEXT: nodes:
+// CHECK-NEXT: <root> -> 0..<1
+// CHECK-NEXT: }
 // CHECK-LABEL: end running test {{.*}} on test_class_empty_derived: field_index_trie
 sil @test_class_empty_derived : $@convention(thin) (@guaranteed EmptyDerived) -> () {
 bb0(%0 : $EmptyDerived):
@@ -226,7 +223,6 @@ bb0(%0 : $EmptyDerived):
 // CHECK-NEXT: nodes:
 // CHECK-NEXT: <root> -> 0..<1
 // CHECK-NEXT: }
-// CHECK: superclassLeaf: none
 // CHECK-LABEL: end running test {{.*}} on test_class_empty_root: field_index_trie
 sil @test_class_empty_root : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : $Klass):
