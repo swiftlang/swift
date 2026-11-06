@@ -409,7 +409,8 @@ private struct LifetimeVariable {
 
   private func getFirstVariableIntroducer(of value: Value, _ context: some Context) -> Value? {
     var introducer: Value?
-    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value, ignoreTrivialCopies: false) {
+    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value, needsAccessScope: false,
+                                                       isInoutAccess: false) {
       introducer = $0
       return .abortWalk
     }
