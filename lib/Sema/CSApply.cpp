@@ -8546,7 +8546,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         return replacement;
       }
 
-      case DeclTypeCheckingSemantics::WithoutActuallyDiscarding: {
+      case DeclTypeCheckingSemantics::WithoutActuallyDeiniting: {
         // Resolve into body(convert(closure)), where the conversion is marked
         // as a deliberate drop of the exactly-once guarantee.
         auto *args = apply->getArgs();
@@ -8565,7 +8565,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
         auto *conversion =
             new (ctx) FunctionConversionExpr(exactlyOnce, atMostOnceTy);
-        conversion->setWithoutActuallyDiscarding();
+        conversion->setWithoutActuallyDeiniting();
         cs.setType(conversion, atMostOnceTy);
 
         auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {conversion});

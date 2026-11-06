@@ -75,9 +75,9 @@ enum class DeclTypeCheckingSemantics {
   /// closure temporarily escapable.
   WithoutActuallyEscaping,
 
-  /// The withoutActuallyDiscarding(_:do:) declaration, which temporarily
+  /// The withoutActuallyDeiniting(_:do:) declaration, which temporarily
   /// converts an exactly-once function to an at-most-once function.
-  WithoutActuallyDiscarding,
+  WithoutActuallyDeiniting,
 
   /// The _openExistential(_:do:) declaration, which extracts the value inside
   /// an existential and passes it as a value of its own dynamic type.

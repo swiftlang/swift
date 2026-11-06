@@ -1145,7 +1145,7 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
 ///     }
 ///
 ///     func perform(_ f: consuming @escaping @once () -> Void) {
-///         let callback = withoutActuallyDiscarding(f) { action in
+///         let callback = withoutActuallyDeiniting(f) { action in
 ///             Callback(Deferred(action: action))
 ///         }
 ///         register { callback.run() }
@@ -1162,18 +1162,18 @@ func __abi_withoutActuallyEscaping<ClosureType, ResultType>(
 /// - Returns: The return value, if any, of the `body` closure.
 @export(implementation)
 @_transparent
-@_semantics("typechecker.withoutActuallyDiscarding(_:do:)")
-public func withoutActuallyDiscarding<
+@_semantics("typechecker.withoutActuallyDeiniting(_:do:)")
+public func withoutActuallyDeiniting<
   ClosureType: ~Copyable & ~Deinitable, ResultType, Failure
 >(
   _ closure: consuming ClosureType,
-  do body: (_ discardableClosure: consuming ClosureType) throws(Failure) -> ResultType
+  do body: (_ deinitableClosure: consuming ClosureType) throws(Failure) -> ResultType
 ) throws(Failure) -> ResultType {
   // This implementation is never used, since calls to
-  // `Swift.withoutActuallyDiscarding(_:do:)` are resolved as a special case by
+  // `Swift.withoutActuallyDeiniting(_:do:)` are resolved as a special case by
   // the type checker.
   unsafe Builtin.staticReport(_trueAfterDiagnostics(), true._value,
-    ("internal consistency error: 'withoutActuallyDiscarding(_:do:)' operation failed to resolve"
+    ("internal consistency error: 'withoutActuallyDeiniting(_:do:)' operation failed to resolve"
      as StaticString).utf8Start._rawValue)
   Builtin.unreachable()
 }

@@ -476,9 +476,9 @@ enum class FixKind : uint8_t {
   /// Ignore an out-of-place \c then statement.
   IgnoreOutOfPlaceThenStmt,
 
-  /// Ignore an argument to \c withoutActuallyDiscarding that isn't an
+  /// Ignore an argument to \c withoutActuallyDeiniting that isn't an
   /// exactly-once function.
-  AllowNonExactlyOnceDiscardArgument,
+  AllowNonExactlyOnceDeinitArgument,
 
   /// Ignore situations when provided number of generic arguments didn't match
   /// expected number of parameters.
@@ -3930,19 +3930,19 @@ public:
   }
 };
 
-/// Diagnose an argument to \c withoutActuallyDiscarding(_:do:) that isn't an
+/// Diagnose an argument to \c withoutActuallyDeiniting(_:do:) that isn't an
 /// exactly-once function.
-class AllowNonExactlyOnceDiscardArgument final : public ConstraintFix {
+class AllowNonExactlyOnceDeinitArgument final : public ConstraintFix {
   Type ArgType;
 
-  AllowNonExactlyOnceDiscardArgument(ConstraintSystem &cs, Type argType,
-                                     ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowNonExactlyOnceDiscardArgument, locator),
+  AllowNonExactlyOnceDeinitArgument(ConstraintSystem &cs, Type argType,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowNonExactlyOnceDeinitArgument, locator),
         ArgType(argType) {}
 
 public:
   std::string getName() const override {
-    return "allow non-exactly-once argument to 'withoutActuallyDiscarding'";
+    return "allow non-exactly-once argument to 'withoutActuallyDeiniting'";
   }
 
   Type getArgType() const { return ArgType; }
@@ -3953,11 +3953,11 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
-  static AllowNonExactlyOnceDiscardArgument *
+  static AllowNonExactlyOnceDeinitArgument *
   create(ConstraintSystem &cs, Type argType, ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::AllowNonExactlyOnceDiscardArgument;
+    return fix->getKind() == FixKind::AllowNonExactlyOnceDeinitArgument;
   }
 };
 

@@ -5,7 +5,7 @@
 
 // Each case that calls a closure runs to completion, and each case that drops
 // one terminates the program. Dropping goes through
-// withoutActuallyDiscarding, which is the only way to drop an exactly-once
+// withoutActuallyDeiniting, which is the only way to drop an exactly-once
 // closure.
 //
 // RUN: %target-run %t/onone.out call | %FileCheck %s --check-prefix=CALL-call
@@ -127,12 +127,12 @@ func callEscaping(_ f: @escaping @once () -> Void) {
 
 @inline(never)
 func drop(_ f: consuming @once () -> Void) {
-  withoutActuallyDiscarding(f) { _ in }
+  withoutActuallyDeiniting(f) { _ in }
 }
 
 @inline(never)
 func dropEscaping(_ f: consuming @escaping @once () -> Void) {
-  withoutActuallyDiscarding(f) { _ in }
+  withoutActuallyDeiniting(f) { _ in }
 }
 
 @inline(never)

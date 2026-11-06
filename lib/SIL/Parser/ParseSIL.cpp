@@ -4622,8 +4622,8 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       if (parseSILOptional(attrName, *this)) {
         if (attrName == "without_actually_escaping")
           convertKind = ConvertFunctionInst::Kind::WithoutActuallyEscaping;
-        else if (attrName == "without_actually_discarding")
-          convertKind = ConvertFunctionInst::Kind::WithoutActuallyDiscarding;
+        else if (attrName == "without_actually_deiniting")
+          convertKind = ConvertFunctionInst::Kind::WithoutActuallyDeiniting;
         else
           return true;
       }
