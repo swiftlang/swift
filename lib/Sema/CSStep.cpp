@@ -48,6 +48,8 @@ ComponentStep::Scope::Scope(ComponentStep &component)
   SolverScope.emplace(CS);
   prevPartialSolutionFixes = CS.solverState->numPartialSolutionFixes;
   CS.solverState->numPartialSolutionFixes = CS.Fixes.size();
+  prevPartialSolutionTrailStart = CS.solverState->partialSolutionTrailStart;
+  CS.solverState->partialSolutionTrailStart = CS.solverState->Trail.size();
 }
 
 StepResult SplitterStep::take(bool prevFailed) {
