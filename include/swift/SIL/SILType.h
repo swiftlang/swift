@@ -909,6 +909,10 @@ public:
   /// See `SILFunctionType::hasCalledAtMostOnceSemantics()`.
   bool hasCalledAtMostOnceSemantics() const;
 
+  /// Returns true if this SILType is a function type whose values are consumed
+  /// by a call. See `SILFunctionType::isCallConsuming()`.
+  bool isCallConsuming() const;
+
   /// Returns true if the type conforms to Deinitable, which means its values
   /// may be destroyed implicitly. Otherwise, its values must instead be
   /// consumed on every path that doesn't end in `unreachable`. A box is

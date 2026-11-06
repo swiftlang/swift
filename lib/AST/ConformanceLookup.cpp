@@ -317,30 +317,20 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
   }
 }
 
-static bool hasCalledAtMostOnceSemantics(EitherFunctionType eitherFnTy) {
-  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>()) {
-    return fnTy->hasCalledAtMostOnceSemantics();
-  }
-
-  auto silFnTy = cast<const SILFunctionType *>(eitherFnTy);
-  return silFnTy->hasCalledAtMostOnceSemantics();
-}
-
 /// Whether the given function type conforms to Copyable.
 static bool isCopyableFunctionType(EitherFunctionType eitherFnTy) {
-  if (hasCalledAtMostOnceSemantics(eitherFnTy))
-    return false;
+  if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>())
+    return !fnTy->isNoncopyable();
 
-  return true;
+  return !cast<const SILFunctionType *>(eitherFnTy)->isNoncopyable();
 }
 
 /// Whether the given function type conforms to Deinitable.
 static bool isDeinitableFunctionType(EitherFunctionType eitherFnTy) {
-  // An exactly-once value must be called, so it can't be destroyed implicitly.
   if (auto fnTy = eitherFnTy.dyn_cast<const AnyFunctionType *>())
-    return !fnTy->isCalledOnce();
+    return !fnTy->isNondeinitable();
 
-  return !cast<const SILFunctionType *>(eitherFnTy)->isCalledOnce();
+  return !cast<const SILFunctionType *>(eitherFnTy)->isNondeinitable();
 }
 
 /// Whether the given function type conforms to Escapable.
@@ -359,7 +349,7 @@ static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
 }
 
 static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
-  if (hasCalledAtMostOnceSemantics(eitherFnTy))
+  if (!isCopyableFunctionType(eitherFnTy))
     return false;
 
   SILFunctionTypeRepresentation representation;

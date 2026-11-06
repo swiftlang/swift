@@ -2795,8 +2795,8 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                  .withThrows(true, thrownError)
                                  .build());
   }
-  case DeclTypeCheckingSemantics::WithoutActuallyDiscarding: {
-    // Proceed with a "WithoutActuallyDiscarding" operation. The body closure
+  case DeclTypeCheckingSemantics::WithoutActuallyDeiniting: {
+    // Proceed with a "WithoutActuallyDeiniting" operation. The body closure
     // receives the exactly-once argument converted to an at-most-once
     // function. The body parameter is escaping if the argument is.
     auto exactlyOnceClosure = CS.createTypeVariable(
@@ -2805,7 +2805,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto atMostOnceClosure = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionArgument),
         TVO_CanBindToNoEscape, preparedOverload);
-    CS.addConstraint(ConstraintKind::DiscardableFunctionOf, atMostOnceClosure,
+    CS.addConstraint(ConstraintKind::DeinitableFunctionOf, atMostOnceClosure,
                      exactlyOnceClosure, CS.getConstraintLocator(locator),
                      /*isFavored=*/false, preparedOverload);
     auto result = CS.createTypeVariable(
@@ -2833,12 +2833,12 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                             CS.getASTContext().getIdentifier("do")),
     };
 
-    auto withoutDiscardingIsolation = getDefaultFunctionTypeIsolation(CS);
+    auto withoutDeinitingIsolation = getDefaultFunctionTypeIsolation(CS);
 
     return FunctionType::get(args, /* yields */ {}, result,
                              FunctionType::ExtInfoBuilder()
                                  .withNoEscape(false)
-                                 .withIsolation(withoutDiscardingIsolation)
+                                 .withIsolation(withoutDeinitingIsolation)
                                  .withAsync(true)
                                  .withThrows(true, thrownError)
                                  .build());

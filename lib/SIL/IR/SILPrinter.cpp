@@ -2385,8 +2385,8 @@ public:
     *this << getIDAndType(CI->getOperand()) << " to ";
     if (CI->withoutActuallyEscaping())
       *this << "[without_actually_escaping] ";
-    if (CI->withoutActuallyDiscarding())
-      *this << "[without_actually_discarding] ";
+    if (CI->withoutActuallyDeiniting())
+      *this << "[without_actually_deiniting] ";
     *this << CI->getType();
     printForwardingOwnershipKind(CI, CI->getOperand());
   }

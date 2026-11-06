@@ -10047,8 +10047,8 @@ bool OutOfPlaceThenStmtFailure::diagnoseAsError() {
   return true;
 }
 
-bool NonExactlyOnceDiscardArgumentFailure::diagnoseAsError() {
-  emitDiagnostic(diag::without_actually_discarding_requires_exactly_once,
+bool NonExactlyOnceDeinitArgumentFailure::diagnoseAsError() {
+  emitDiagnostic(diag::without_actually_deiniting_requires_exactly_once,
                  ArgType);
   return true;
 }

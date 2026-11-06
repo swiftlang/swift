@@ -3986,8 +3986,8 @@ public:
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *E, Label label) {
     printCommon(E, "function_conversion_expr", label);
-    if (E->isWithoutActuallyDiscarding())
-      printFlag(true, "without_actually_discarding", ExprModifierColor);
+    if (E->isWithoutActuallyDeiniting())
+      printFlag(true, "without_actually_deiniting", ExprModifierColor);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }

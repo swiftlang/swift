@@ -3460,6 +3460,14 @@ public:
     return getFunctionType()->hasCalledAtMostOnceSemantics();
   }
 
+  /// Returns true if the resulting closure can't be copied. See
+  /// `SILFunctionType::isNoncopyable()`.
+  bool isNoncopyable() const { return getFunctionType()->isNoncopyable(); }
+
+  /// Returns true if calling the resulting closure consumes it. See
+  /// `SILFunctionType::isCallConsuming()`.
+  bool isCallConsuming() const { return getFunctionType()->isCallConsuming(); }
+
   OnStackKind isOnStack() const {
     return getFunctionType()->isNoEscape() ? OnStack : NotOnStack;
   }
@@ -6312,8 +6320,8 @@ public:
     WithoutActuallyEscaping = 1,
 
     /// The conversion turns an exactly-once function into an at-most-once
-    /// function. See withoutActuallyDiscarding().
-    WithoutActuallyDiscarding = 2,
+    /// function. See withoutActuallyDeiniting().
+    WithoutActuallyDeiniting = 2,
   };
 
 private:
@@ -6357,8 +6365,8 @@ public:
 
   /// Returns `true` if this converts an exactly-once function into an
   /// at-most-once function.
-  bool withoutActuallyDiscarding() const {
-    return getConversionKind() == Kind::WithoutActuallyDiscarding;
+  bool withoutActuallyDeiniting() const {
+    return getConversionKind() == Kind::WithoutActuallyDeiniting;
   }
 
   /// Returns `true` if the function conversion is between types with the same

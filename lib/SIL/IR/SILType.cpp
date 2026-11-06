@@ -1076,6 +1076,12 @@ bool SILType::hasCalledAtMostOnceSemantics() const {
   return false;
 }
 
+bool SILType::isCallConsuming() const {
+  if (auto F = dyn_cast<SILFunctionType>(getASTType()))
+    return F->isCallConsuming();
+  return false;
+}
+
 bool SILType::isImplicitlyDestroyable(const SILFunction &fn) const {
   auto type = removingMoveOnlyWrapper();
 
@@ -1314,7 +1320,7 @@ bool SILType::isMoveOnly(bool orWrapped) const {
   }
    */
   if (auto F = dyn_cast<SILFunctionType>(ty))
-    return F->hasCalledAtMostOnceSemantics();
+    return F->isNoncopyable();
 
   // Treat all other SIL-specific types as Copyable.
   if (isa<SILBlockStorageType>(ty) || isa<SILBoxType>(ty) ||

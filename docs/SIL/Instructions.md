@@ -4752,7 +4752,7 @@ TODO
 ```
 sil-instruction ::= 'convert_function' sil-operand 'to'
                     ('[' 'without_actually_escaping' ']' |
-                     '[' 'without_actually_discarding' ']')?
+                     '[' 'without_actually_deiniting' ']')?
                     sil-type
 
 %1 = convert_function %0 : $T -> U to $T' -> U'
@@ -4793,11 +4793,11 @@ resulting function type must be escaping, but the operand's function
 type may or may not be @noescape. Note that a non-escaping closure may
 have unboxed captured even though its SIL function type is "escaping".
 
-With the `without_actually_discarding` attribute, the `convert_function`
+With the `without_actually_deiniting` attribute, the `convert_function`
 converts an exactly-once function into an at-most-once function. Without
 the attribute, a conversion cannot drop the guarantee that a function is
 called. This kind of conversion can only happen as a result of
-`withoutActuallyDiscarding()`.  The conversion is memory safe, because
+`withoutActuallyDeiniting()`.  The conversion is memory safe, because
 destroying the context of an exactly-once function terminates the program. The
 operand must be an exactly-once function, and the result must be an
 at-most-once function.

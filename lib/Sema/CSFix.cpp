@@ -2868,17 +2868,17 @@ IgnoreOutOfPlaceThenStmt::create(ConstraintSystem &cs,
   return new (cs.getAllocator()) IgnoreOutOfPlaceThenStmt(cs, locator);
 }
 
-bool AllowNonExactlyOnceDiscardArgument::diagnose(const Solution &solution,
-                                                  bool asNote) const {
-  NonExactlyOnceDiscardArgumentFailure failure(solution, ArgType, getLocator());
+bool AllowNonExactlyOnceDeinitArgument::diagnose(const Solution &solution,
+                                                 bool asNote) const {
+  NonExactlyOnceDeinitArgumentFailure failure(solution, ArgType, getLocator());
   return failure.diagnose(asNote);
 }
 
-AllowNonExactlyOnceDiscardArgument *
-AllowNonExactlyOnceDiscardArgument::create(ConstraintSystem &cs, Type argType,
-                                           ConstraintLocator *locator) {
+AllowNonExactlyOnceDeinitArgument *
+AllowNonExactlyOnceDeinitArgument::create(ConstraintSystem &cs, Type argType,
+                                          ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowNonExactlyOnceDiscardArgument(cs, argType, locator);
+      AllowNonExactlyOnceDeinitArgument(cs, argType, locator);
 }
 
 bool IgnoreGenericSpecializationArityMismatch::diagnose(

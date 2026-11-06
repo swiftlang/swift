@@ -2353,7 +2353,7 @@ llvm::Error SILDeserializer::readSILInstruction(
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND
            && "Layout should be OneTypeOneOperand.");
     assert((Attr & 0x03) <=
-               unsigned(ConvertFunctionInst::Kind::WithoutActuallyDiscarding) &&
+               unsigned(ConvertFunctionInst::Kind::WithoutActuallyDeiniting) &&
            "Unknown convert_function kind");
     auto conversionKind = ConvertFunctionInst::Kind(Attr & 0x03);
     ResultInst = Builder.createConvertFunction(

@@ -3618,7 +3618,7 @@ static CanSILFunctionType getNativeSILFunctionType(
         return getSILFunctionTypeForConventions(DefaultSetterConventions());
       }
 
-      if (substInterfaceType->hasCalledAtMostOnceSemantics())
+      if (substInterfaceType->isCallConsuming())
         return getSILFunctionTypeForConventions(
             DefaultCalledAtMostOnceSemanticsConventions());
 
@@ -3829,12 +3829,12 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
   // Add the formal parameters of the expected type to the thunk.
   //
-  // An at-most-once source function is applied inside the thunk body,
-  // which is itself the consuming use that enforces call-at-most-once, so
-  // it must be captured as `Direct_Owned`.
+  // A source function whose call consumes it is applied inside the thunk
+  // body, which is itself the consuming use, so it must be captured as
+  // `Direct_Owned`.
   auto contextConvention = fn->getTypeProperties(sourceType).isTrivial()
                                ? ParameterConvention::Direct_Unowned
-                           : sourceType->hasCalledAtMostOnceSemantics()
+                           : sourceType->isCallConsuming()
                                ? ParameterConvention::Direct_Owned
                                : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;

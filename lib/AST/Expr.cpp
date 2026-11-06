@@ -2126,6 +2126,10 @@ bool AbstractClosureExpr::hasCalledAtMostOnceSemantics() const {
   return getOrComputeExtInfo(this).hasCalledAtMostOnceSemantics();
 }
 
+bool AbstractClosureExpr::isCallConsuming() const {
+  return getOrComputeExtInfo(this).isCallConsuming();
+}
+
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
   if (auto closure = dyn_cast<ClosureExpr>(this))
     return closure->hasSingleExpressionBody();

@@ -783,6 +783,24 @@ public:
     return getExecutionSemantics() == ExecutionSemantics::Once;
   }
 
+  /// Returns true if values of this function type can't be copied.
+  constexpr bool isNoncopyable() const {
+    return getSuppressedInvertibleProtocols(getExecutionSemantics())
+        .contains(InvertibleProtocolKind::Copyable);
+  }
+
+  /// Returns true if values of this function type can't be destroyed
+  /// implicitly.
+  constexpr bool isNondeinitable() const {
+    return getSuppressedInvertibleProtocols(getExecutionSemantics())
+        .contains(InvertibleProtocolKind::Deinitable);
+  }
+
+  /// Returns true if calling a value of this function type consumes the value.
+  constexpr bool isCallConsuming() const {
+    return hasCalledAtMostOnceSemantics();
+  }
+
   constexpr bool isCoroutine() const { return bits & CoroutineMask; }
 
   constexpr DifferentiabilityKind getDifferentiabilityKind() const {
@@ -1141,6 +1159,16 @@ public:
   /// once, which is true only for exactly-once function types.
   constexpr bool isCalledOnce() const { return builder.isCalledOnce(); }
 
+  /// Returns true if values of this function type can't be copied.
+  constexpr bool isNoncopyable() const { return builder.isNoncopyable(); }
+
+  /// Returns true if values of this function type can't be destroyed
+  /// implicitly.
+  constexpr bool isNondeinitable() const { return builder.isNondeinitable(); }
+
+  /// Returns true if calling a value of this function type consumes the value.
+  constexpr bool isCallConsuming() const { return builder.isCallConsuming(); }
+
   /// Helper method for changing the representation.
   ///
   /// Prefer using \c ASTExtInfoBuilder::withRepresentation for chaining.
@@ -1441,6 +1469,24 @@ public:
     return getExecutionSemantics() == ExecutionSemantics::Once;
   }
 
+  /// Returns true if values of this function type can't be copied.
+  constexpr bool isNoncopyable() const {
+    return getSuppressedInvertibleProtocols(getExecutionSemantics())
+        .contains(InvertibleProtocolKind::Copyable);
+  }
+
+  /// Returns true if values of this function type can't be destroyed
+  /// implicitly.
+  constexpr bool isNondeinitable() const {
+    return getSuppressedInvertibleProtocols(getExecutionSemantics())
+        .contains(InvertibleProtocolKind::Deinitable);
+  }
+
+  /// Returns true if calling a value of this function type consumes the value.
+  constexpr bool isCallConsuming() const {
+    return hasCalledAtMostOnceSemantics();
+  }
+
   /// Does this function type have nonisolated(nonsending) isolation
   /// (i.e. is it the lowering of an nonisolated(nonsending) function type)?
   constexpr bool hasNonisolatedNonsendingIsolation() const {
@@ -1712,6 +1758,16 @@ public:
   /// Returns true if values of this function type must be called exactly
   /// once, which is true only for exactly-once function types.
   constexpr bool isCalledOnce() const { return builder.isCalledOnce(); }
+
+  /// Returns true if values of this function type can't be copied.
+  constexpr bool isNoncopyable() const { return builder.isNoncopyable(); }
+
+  /// Returns true if values of this function type can't be destroyed
+  /// implicitly.
+  constexpr bool isNondeinitable() const { return builder.isNondeinitable(); }
+
+  /// Returns true if calling a value of this function type consumes the value.
+  constexpr bool isCallConsuming() const { return builder.isCallConsuming(); }
 
   constexpr bool hasNonisolatedNonsendingIsolation() const {
     return builder.hasNonisolatedNonsendingIsolation();
