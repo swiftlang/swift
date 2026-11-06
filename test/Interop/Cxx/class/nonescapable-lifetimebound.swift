@@ -3,6 +3,7 @@
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend  -I %t%{fs-sep}Inputs -emit-sil -verify %t%{fs-sep}escaping_scopes.swift -enable-experimental-feature Lifetimes -cxx-interoperability-mode=default -diagnostic-style llvm -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h
+// RUN: %target-swift-frontend  -I %t%{fs-sep}Inputs -typecheck -verify -verify-ignore-unrelated %t%{fs-sep}variadic.swift -cxx-interoperability-mode=default
 
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_Lifetimes
@@ -138,6 +139,30 @@ struct SWIFT_NONESCAPABLE CaptureView {
 void captureGlobalAndOut(View v [[clang::lifetime_capture_by_global]] [[clang::lifetime_capture_by(out)]], View &out) {
     out = v;
 }
+
+// Every 'inout' non-Escapable parameter and mutating 'self' keeps its prior
+// dependencies, not just the capture targets.
+void captureIntoFirst(View &a, View &b, View v [[clang::lifetime_capture_by(a)]]) {
+    a = v;
+}
+
+View viewAndInout(View &io, const Owner &o [[clang::lifetimebound]]) {
+    return View(&o.data);
+}
+
+struct SWIFT_NONESCAPABLE MoreCaptures {
+    MoreCaptures(View v [[clang::lifetime_capture_by_this]]) : view(v) {}
+
+    static void staticCapture(View &out, View v [[clang::lifetime_capture_by(out)]]) {
+        out = v;
+    }
+
+    View mutatingView(const Owner &o [[clang::lifetimebound]]) {
+        return View(&o.data);
+    }
+
+    View view;
+};
 
 CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
     return CaptureView(View{&owner.data});
@@ -279,6 +304,24 @@ struct NonTrivialOwner {
     }
 };
 
+// Capturing appends to what the target already refers to.
+struct SWIFT_NONESCAPABLE OwnerRefs {
+    OwnerRefs() : first(nullptr), second(nullptr) {}
+    void append(const NonTrivialOwner &o [[clang::lifetime_capture_by_this]]) {
+        (first ? second : first) = &o;
+    }
+    int sum() const {
+        return (first ? first->data : 0) + (second ? second->data : 0);
+    }
+private:
+    const NonTrivialOwner *first;
+    const NonTrivialOwner *second;
+};
+
+void append(OwnerRefs &refs, const NonTrivialOwner &o [[clang::lifetime_capture_by(refs)]]) {
+    refs.append(o);
+}
+
 // Transitive: a value type whose field is itself an owner.
 struct OwnerBox {
     NonTrivialOwner field;
@@ -324,6 +367,36 @@ struct SWIFT_NONESCAPABLE IndependentCtor {
     const int *member;
 };
 
+// An independent result does not drop the captures into other targets.
+View captureIndependent(View &out, View v [[clang::lifetime_capture_by(out)]]) SWIFT_RETURNS_INDEPENDENT_VALUE;
+View captureOwnerIndependent(View &out, const Owner &o [[clang::lifetime_capture_by(out)]]) SWIFT_RETURNS_INDEPENDENT_VALUE;
+
+struct SWIFT_NONESCAPABLE IndependentCaptures {
+    IndependentCaptures(View v [[clang::lifetimebound]]) : view(v) {}
+    View capture(View v [[clang::lifetime_capture_by_this]]) SWIFT_RETURNS_INDEPENDENT_VALUE;
+    View view;
+};
+
+// A constructor that captures into the object it produces is not independent
+// of what it captures.
+struct SWIFT_NONESCAPABLE IndependentCapturingCtor {
+    IndependentCapturingCtor(View v [[clang::lifetime_capture_by_this]]) SWIFT_RETURNS_INDEPENDENT_VALUE;
+    View view;
+};
+
+struct SWIFT_NONESCAPABLE RefCapturingCtor {
+    RefCapturingCtor(const Owner &o [[clang::lifetime_capture_by_this]]) : p(&o.data) {}
+    const int *p;
+};
+
+// Variadic functions get a trailing 'CVarArg...' parameter with no Clang
+// counterpart.
+int openLike(const char *path, int flags, ...);
+View viewOfVariadic(const int *p [[clang::lifetimebound]], ...);
+struct VariadicOwner {
+    View view(int n, ...) const [[clang::lifetimebound]];
+};
+
 // CHECK: sil {{.*}}[clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
@@ -334,15 +407,15 @@ struct SWIFT_NONESCAPABLE IndependentCtor {
 // CHECK: sil {{.*}}[clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
 // CHECK: sil {{.*}}[clang OtherView.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out OtherView
 // CHECK: sil {{.*}}[clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @owned View
-// CHECK: sil {{.*}}[clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
-// CHECK: sil {{.*}}[clang captureOwnerRef] {{.*}} : $@convention(c) (@lifetime(borrow {{.*}}1) @inout View, @in_guaranteed Owner) -> ()
-// CHECK: sil {{.*}}[clang captureViewRef] {{.*}} : $@convention(c) (@lifetime(borrow {{.*}}1) @inout ViewRef, {{.*}}View) -> ()
+// CHECK: sil {{.*}}[clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0, copy 1) @inout View) -> ()
+// CHECK: sil {{.*}}[clang captureOwnerRef] {{.*}} : $@convention(c) (@lifetime(copy 0, borrow {{.*}}1) @inout View, @in_guaranteed Owner) -> ()
+// CHECK: sil {{.*}}[clang captureViewRef] {{.*}} : $@convention(c) (@lifetime(copy 0, borrow {{.*}}1) @inout ViewRef, {{.*}}View) -> ()
 // CHECK: sil {{.*}}[clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned CaptureView
-// CHECK: sil {{.*}}[clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
-// CHECK: sil {{.*}}[clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
-// CHECK: sil {{.*}}[clang CaptureView.captureIntoBoth] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, View, @lifetime(copy 1) @inout CaptureView) -> ()
-// CHECK: sil {{.*}}[clang CaptureView.handOutBoth] {{.*}} : $@convention(cxx_method) (@lifetime(copy 2) @inout View, @lifetime(copy 2) @inout View, @in_guaranteed CaptureView) -> ()
-// CHECK: sil {{.*}}[clang captureGlobalAndOut] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0, copy 1) @inout CaptureView) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 0, copy 1) @inout View, @in_guaranteed CaptureView) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.captureIntoBoth] {{.*}} : $@convention(cxx_method) (@lifetime(copy 0, copy 1) @inout View, View, @lifetime(copy 1, copy 2) @inout CaptureView) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.handOutBoth] {{.*}} : $@convention(cxx_method) (@lifetime(copy 0, copy 2) @inout View, @lifetime(copy 1, copy 2) @inout View, @in_guaranteed CaptureView) -> ()
+// CHECK: sil {{.*}}[clang captureGlobalAndOut] {{.*}} : $@convention(c) (View, @lifetime(copy 0, copy 1) @inout View) -> ()
 // CHECK: sil {{.*}}[clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
 // CHECK: sil {{.*}}[clang ViewFromValue.init] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @out ViewFromValue
 // CHECK: sil {{.*}}[clang ViewFromFactory.init] {{.*}} : $@convention(c) (Owner) -> @lifetime(immortal) @owned ViewFromFactory
@@ -358,6 +431,16 @@ struct SWIFT_NONESCAPABLE IndependentCtor {
 // CHECK: sil {{.*}}[clang fromRvalueRefTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} Owner) -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang fromRvalueRefNonTrivialValue] {{.*}} : $@convention(c) (@in{{(_cxx)?}} NonTrivialByValue) -> @lifetime(immortal) @owned View
 // CHECK: sil {{.*}}[clang IndependentCtor.init] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(immortal) @out IndependentCtor
+// CHECK: sil {{.*}}[clang captureIntoFirst] {{.*}} : $@convention(c) (@lifetime(copy 0, copy 2) @inout View, @lifetime(copy 1) @inout View, View) -> ()
+// CHECK: sil {{.*}}[clang viewAndInout] {{.*}} : $@convention(c) (@lifetime(copy 0) @inout View, @in_guaranteed Owner) -> @lifetime(borrow address 1) @owned View
+// CHECK: sil {{.*}}[clang MoreCaptures.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out MoreCaptures
+// CHECK: sil {{.*}}[clang MoreCaptures.staticCapture] {{.*}} : $@convention(c) (@lifetime(copy 0, copy 1) @inout View, View) -> ()
+// CHECK: sil {{.*}}[clang MoreCaptures.mutatingView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner, @lifetime(copy 1) @inout MoreCaptures) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil {{.*}}[clang captureIndependent] {{.*}} : $@convention(c) (@lifetime(copy 0, copy 1) @inout View, View) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang captureOwnerIndependent] {{.*}} : $@convention(c) (@lifetime(copy 0, borrow {{.*}}1) @inout View, @in_guaranteed Owner) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang IndependentCaptures.capture] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0, copy 1) @inout IndependentCaptures) -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang IndependentCapturingCtor.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out IndependentCapturingCtor
+// CHECK: sil {{.*}}[clang RefCapturingCtor.init] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow {{.*}}0) @out RefCapturingCtor
 
 //--- test.swift
 
@@ -432,6 +515,26 @@ func independentCtor(_ o: Owner) {
     let _ = IndependentCtor(o)
 }
 
+func moreCaptures(_ o: Owner, _ v: View) {
+    var a = View()
+    var b = View()
+    captureIntoFirst(&a, &b, v)
+    let _ = viewAndInout(&a, o)
+    var mc = MoreCaptures(v)
+    MoreCaptures.staticCapture(&a, v)
+    let _ = mc.mutatingView(o)
+}
+
+func independentCaptures(_ o: Owner, _ v: View) {
+    var out = View()
+    let _ = captureIndependent(&out, v)
+    let _ = captureOwnerIndependent(&out, o)
+    var ic = IndependentCaptures(v)
+    let _ = ic.capture(v)
+    let _ = IndependentCapturingCtor(v)
+    let _ = RefCapturingCtor(o)
+}
+
 //--- escaping_scopes.swift
 
 import Test
@@ -496,6 +599,86 @@ func captureEscapesLocal() -> View {
   }
   return out
   // expected-note @-1 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// A later capture must not erase the dependence on an earlier one.
+func captureByAppendsFree() -> CInt {
+  let long = NonTrivialOwner()
+  var refs = OwnerRefs()
+  // expected-error @-1 {{lifetime-dependent variable 'refs' escapes its scope}}
+  do {
+    let short = NonTrivialOwner()
+    // expected-note @-1 {{it depends on the lifetime of variable 'short'}}
+    append(&refs, short)
+    append(&refs, long)
+  }
+  return refs.sum()
+  // expected-note @-1 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+func captureByThisAppends() -> CInt {
+  let long = NonTrivialOwner()
+  var refs = OwnerRefs()
+  // expected-error @-1 {{lifetime-dependent variable 'refs' escapes its scope}}
+  do {
+    let short = NonTrivialOwner()
+    // expected-note @-1 {{it depends on the lifetime of variable 'short'}}
+    refs.append(short)
+    refs.append(long)
+  }
+  return refs.sum()
+  // expected-note @-1 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+func captureByValueAppends(_ v: View) {
+  var cv = CaptureView()
+  // expected-error @-1 {{lifetime-dependent variable 'cv' escapes its scope}}
+  do {
+    let short = NonTrivialOwner()
+    // expected-note @-1 {{it depends on the lifetime of variable 'short'}}
+    cv.captureView(short.handOutView())
+    cv.captureView(v)
+  }
+  var out = View()
+  cv.handOut(&out)
+  // expected-note @-1 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+func inoutNonTargetKeepsDependence(_ v: View) {
+  var a = View()
+  var b = View()
+  // expected-error @-1 {{lifetime-dependent variable 'b' escapes its scope}}
+  do {
+    let short = NonTrivialOwner()
+    // expected-note @-1 {{it depends on the lifetime of variable 'short'}}
+    b = short.handOutView()
+    captureIntoFirst(&a, &b, v)
+  }
+  captureIntoFirst(&a, &b, v)
+  // expected-note @-1 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+func staticCaptureAppends(_ v: View) {
+  var out = View()
+  // expected-error @-1 {{lifetime-dependent variable 'out' escapes its scope}}
+  do {
+    let short = NonTrivialOwner()
+    // expected-note @-1 {{it depends on the lifetime of variable 'short'}}
+    MoreCaptures.staticCapture(&out, short.handOutView())
+    MoreCaptures.staticCapture(&out, v)
+  }
+  MoreCaptures.staticCapture(&out, v)
+  // expected-note @-1 {{this use of the lifetime-dependent value is out of scope}}
+}
+
+// Capturing values that are all still alive is fine.
+func captureLongLived() -> CInt {
+  let first = NonTrivialOwner()
+  let second = NonTrivialOwner()
+  var refs = OwnerRefs()
+  append(&refs, first)
+  refs.append(second)
+  return refs.sum()
 }
 
 final class SwiftBoxTrivial { var field = Owner(data: 0) }
@@ -574,4 +757,43 @@ func inferredCtorEscapes() -> ViewNoAnnotation {
   // expected-error @-1 {{lifetime-dependent value escapes its scope}}
   // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
   // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+// The independent result may escape, but what was captured alongside it still
+// may not.
+@_lifetime(immortal)
+func independentResultEscapes() -> View {
+  var out = View()
+  return captureOwnerIndependent(&out, globalOwner)
+}
+
+@_lifetime(immortal)
+func independentCaptureEscapesLocal() -> View {
+  var out = View()
+  // expected-error @-1 {{lifetime-dependent variable 'out' escapes its scope}}
+  do {
+    let o = makeOwner()
+    // expected-note @-1 {{it depends on the lifetime of variable 'o'}}
+    let _ = captureOwnerIndependent(&out, o)
+  }
+  return out
+  // expected-note @-1 {{this use causes the lifetime-dependent value to escape}}
+}
+
+@_lifetime(immortal)
+func independentCtorCaptureEscapes() -> IndependentCapturingCtor {
+  return IndependentCapturingCtor(globalOwner.handOutView())
+  // expected-error @-1 {{lifetime-dependent value escapes its scope}}
+  // expected-note @-2 {{it depends on this scoped access to variable 'globalOwner'}}
+  // expected-note @-3 {{this use causes the lifetime-dependent value to escape}}
+}
+
+//--- variadic.swift
+
+import Test
+
+func variadics(_ o: VariadicOwner) {
+  _ = openLike // expected-error {{'openLike' is unavailable: Variadic function is unavailable}}
+  _ = viewOfVariadic // expected-error {{'viewOfVariadic' is unavailable: Variadic function is unavailable}}
+  _ = o.view // expected-error {{'view' is unavailable: Variadic function is unavailable}}
 }

@@ -49,6 +49,9 @@ func mutableSpanOfLocalArray() {
   _ = s.count
 }
 
+// UTF8View.span is unavailable on watchOS.
+@available(watchOS, unavailable)
+@available(SwiftStdlib 6.2, *)
 func spanOfBorrowedByAddress(_ i: Int) -> Int {
   let span = String(i).utf8.span
   return span.count
