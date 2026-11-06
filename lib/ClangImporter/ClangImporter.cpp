@@ -9013,7 +9013,8 @@ importer::getCxxValueSemanticsKind(const clang::Type *type,
 
 /// Recursively checks that there are no pointers in any fields or base classes.
 /// Does not check C++ records with specific API annotations.
-static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
+static bool hasPointerInSubobjects(clang::Sema &sema,
+                                   const clang::CXXRecordDecl *decl) {
   clang::PrettyStackTraceDecl trace(decl, clang::SourceLocation(),
                                     decl->getASTContext().getSourceManager(),
                                     "looking for pointers in subobjects of");
@@ -9022,7 +9023,7 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
   if (!decl->getDefinition())
     return false;
 
-  auto checkType = [](clang::QualType t) {
+  auto checkType = [&sema](clang::QualType t) {
     if (t->isPointerType())
       return true;
 
@@ -9035,10 +9036,10 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
         return false;
 
       if (hasIteratorAPIAttr(cxxRecord) ||
-          hasIteratorCategoryOrIteratorConcept(cxxRecord))
+          hasIteratorCategoryOrIteratorConcept(sema, cxxRecord))
         return true;
 
-      if (hasPointerInSubobjects(cxxRecord))
+      if (hasPointerInSubobjects(sema, cxxRecord))
         return true;
     }
 
@@ -9048,8 +9049,9 @@ static bool hasPointerInSubobjects(const clang::CXXRecordDecl *decl) {
   return anySubobjectTypeSatisfies(decl, checkType);
 }
 
-bool importer::isViewType(const clang::CXXRecordDecl *decl) {
-  return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
+bool importer::isViewType(clang::Sema &sema,
+                          const clang::CXXRecordDecl *decl) {
+  return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(sema, decl);
 }
 
 const clang::CXXConstructorDecl *
@@ -9130,8 +9132,9 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (isSwiftClassType(cxxDecl))
     return CxxRecordSemanticsKind::SwiftClassType;
 
+  clang::Sema &sema = desc.ctx.getClangModuleLoader()->getClangSema();
   if (hasIteratorAPIAttr(cxxDecl) ||
-      hasIteratorCategoryOrIteratorConcept(cxxDecl)) {
+      hasIteratorCategoryOrIteratorConcept(sema, cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
 

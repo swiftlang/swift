@@ -370,6 +370,16 @@ func check(it: InheritedConstIterator) {
   checkBorrowingIterator(it)    // expected-error {{requires}}
 }
 
+func check(it: InheritedFromBaseWithIteratorCategory) {
+  checkInput(it)
+  checkRandomAccess(it)         // expected-error {{requires}}
+  checkContiguous(it)           // expected-error {{requires}}
+  checkMutableInput(it)         // expected-error {{requires}}
+  checkMutableRandomAccess(it)  // expected-error {{requires}}
+  checkMutableContiguous(it)    // expected-error {{requires}}
+  checkBorrowingIterator(it)    // expected-error {{requires}}
+}
+
 func check(it: InheritedTemplatedConstIteratorInt) {
   checkInput(it)
   checkRandomAccess(it)         // expected-error {{requires}}
@@ -622,6 +632,16 @@ func check(it: InputCategoryContiguousConceptLegacyPtr) {
   checkMutableInput(it)
   checkMutableRandomAccess(it)
   checkMutableContiguous(it)
+  checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
+}
+
+func check(it: InheritedFromBaseWithIteratorConcept) {
+  checkInput(it)
+  checkRandomAccess(it)         // expected-cpp20-error {{requires}}
+  checkContiguous(it)           // expected-cpp20-error {{requires}}
+  checkMutableInput(it)         // expected-cpp20-error {{requires}}
+  checkMutableRandomAccess(it)  // expected-cpp20-error {{requires}}
+  checkMutableContiguous(it)    // expected-cpp20-error {{requires}}
   checkBorrowingIterator(it)    // expected-cpp20-error {{requires}}
 }
 
