@@ -468,6 +468,10 @@ public:
   bool canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
                                            ResilienceExpansion expansion);
 
+  /// If \p storage is a computed C array property that forwards to a stored
+  /// property holding its other representation, find that stored property.
+  static VarDecl *findStoredCArrayCounterpart(AbstractStorageDecl *storage);
+
   KeyPathPatternComponent emitKeyPathComponentForDecl(
       SILLocation loc, GenericEnvironment *genericEnv,
       ResilienceExpansion expansion, unsigned &baseOperand,

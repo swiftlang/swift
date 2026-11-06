@@ -965,7 +965,12 @@ DECL_ATTR(_scopeParams, ScopeParams,
   182)
 DECL_ATTR_FEATURE_REQUIREMENT(ScopeParams, ScopeRestrictions)
 
-LAST_DECL_ATTR(ScopeParams)
+DECL_ATTR(_cArrayProjection, CArrayProjection,
+  OnAnyClangDecl,
+  UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  183)
+
+LAST_DECL_ATTR(CArrayProjection)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

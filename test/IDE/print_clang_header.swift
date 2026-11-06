@@ -20,3 +20,11 @@
 // Test header interface printing from a clang module.
 // RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -source-filename %s -print-header -header-to-print %S/Inputs/print_clang_header/header-to-print.h -enable-objc-interop -disable-objc-attr-requires-foundation-module --cc-args %target-cc-options -isysroot %clang-importer-sdk-path -fsyntax-only %t.framework.m -F %t -ivfsoverlay %t.yaml > %t.module.txt
 // RUN: diff -u %S/Inputs/print_clang_header/header-to-print.h.module.printed.txt %t.module.txt
+
+// Test header interface printing with ModernImportedCArrays enabled.
+// RUN: echo '#include "header-to-print.h"' > %t.m
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -source-filename %s -print-header -header-to-print %S/Inputs/print_clang_header/header-to-print.h -enable-objc-interop -disable-objc-attr-requires-foundation-module -enable-experimental-feature ModernImportedCArraysOnly --cc-args %target-cc-options -isysroot %clang-importer-sdk-path -fsyntax-only %t.m -I %S/Inputs/print_clang_header > %t.modern-c-array.raw.txt
+// RUN: sed -E -e "s:macOS|iOS|tvOS|watchOS|visionOS:PLATFORM:g" %t.modern-c-array.raw.txt > %t.modern-c-array.txt
+// RUN: diff -u %S/Inputs/print_clang_header/header-to-print.h.modern-c-array.printed.txt %t.modern-c-array.txt
+
+// REQUIRES: swift_feature_ModernImportedCArraysOnly

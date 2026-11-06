@@ -936,6 +936,10 @@ static bool usesFeatureNondeinitableTypes(Decl *decl) {
   return suppressesDeinitable(decl);
 }
 
+UNINTERESTING_FEATURE(ModernImportedCArrays)
+UNINTERESTING_FEATURE(ModernImportedCArraysOnly)
+
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

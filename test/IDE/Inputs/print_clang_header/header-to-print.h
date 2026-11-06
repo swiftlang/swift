@@ -35,3 +35,7 @@ struct Arkham;
 @protocol Soul;
 
 typedef struct __attribute__((objc_bridge(id))) __MyLittleCFType *MyLittleCFType;
+
+struct Matrix {
+  int elems[4][4];
+};

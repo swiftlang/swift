@@ -969,6 +969,43 @@ namespace {
     }
   };
 
+  /// A physical path component which reinterprets the address (or value) of the
+  /// previous physical component as a layout-compatible type with an
+  /// \c unchecked_addr_cast (or \c unchecked_bitcast ).
+  ///
+  /// Unlike UncheckedConversionComponent, this cannot follow a logical
+  /// component, since it must be projected even when assigning.
+  class UncheckedAddressCastComponent : public PhysicalPathComponent {
+  public:
+    UncheckedAddressCastComponent(LValueTypeData typeData)
+        : PhysicalPathComponent(typeData, UncheckedAddressCastKind,
+                                /*actorIsolation=*/std::nullopt) {}
+
+    virtual bool isLoadingPure() const override { return true; }
+
+    ManagedValue project(SILGenFunction &SGF, SILLocation loc,
+                         ManagedValue base) && override {
+      assert(base && "invalid value for cast base");
+      auto toType = getTypeOfRValue();
+      if (base.getType().isObject()) {
+        if (base.getType() == toType)
+          return base;
+        return SGF.B.createUncheckedBitCast(loc, base, toType);
+      }
+
+      auto toAddrType = toType.getAddressType();
+      if (base.getType() == toAddrType)
+        return base;
+      auto Res = SGF.B.createUncheckedAddrCast(loc, base.getValue(),
+                                               toAddrType);
+      return ManagedValue::forFormalAccessedAddress(Res, getAccessKind());
+    }
+
+    void dump(raw_ostream &OS, unsigned indent) const override {
+      OS.indent(indent) << "UncheckedAddressCastComponent\n";
+    }
+  };
+
   /// A physical path component which force-projects the address of
   /// the value of an optional l-value.
   class ForceOptionalObjectComponent : public PhysicalPathComponent {
@@ -1334,6 +1371,12 @@ namespace {
     }
   };
 } // end anonymous namespace
+
+void LValue::addUncheckedAddressCast(LValueTypeData typeData) {
+  assert(isLastComponentPhysical() &&
+         "address cast must follow a physical component");
+  add<UncheckedAddressCastComponent>(typeData);
+}
 
 void LValue::addForceValueComponent(bool isObject, bool isImplicitOptional) {
   auto substFormalType = getSubstFormalType();
@@ -3611,6 +3654,11 @@ namespace {
         }
       }
 
+      // Peephole the (technically computed) modern projection of a stored C
+      // array property so that it behaves like a stored property.
+      if (auto *stored = SILGenModule::findStoredCArrayCounterpart(Storage))
+        return asImpl().emitUsingUncheckedAddressCastOfStorage(stored);
+
       switch (strategy.getKind()) {
       case AccessStrategy::Storage: {
         auto typeData =
@@ -3641,6 +3689,28 @@ namespace {
         return asImpl().emitUsingDistributedThunk();
       }
       llvm_unreachable("unknown kind");
+    }
+
+    /// Project \p stored, the stored property that holds the same value as
+    /// `Storage`, and reinterpret its address as `Storage`'s type.
+    void emitUsingUncheckedAddressCastOfStorage(VarDecl *stored) {
+      if constexpr (std::is_same_v<StorageType, VarDecl>) {
+        // Access the stored property.
+        {
+          llvm::SaveAndRestore<StorageType *> tempStorage(Storage, stored);
+          llvm::SaveAndRestore<CanType> tempFormalRValueType(
+              FormalRValueType, stored->getInterfaceType()->getCanonicalType());
+
+          emitUsingStrategy(AccessStrategy::getStorage());
+        }
+
+        // Bitcast it to the type of the computed property.
+        asImpl().LV.addUncheckedAddressCast(getLogicalStorageTypeData(
+            SGF.getTypeExpansionContext(), SGF.SGM, AccessKind,
+            FormalRValueType));
+      } else {
+        llvm_unreachable("only variables have C array projections");
+      }
     }
 
     void emitUsingAccessor(AccessorKind accessorKind,
