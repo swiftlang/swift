@@ -5,8 +5,8 @@
 
 /// Test some invalid syntax first
 
-protocol Invalid1<> {}
-// expected-error@-1 {{expected an identifier to name primary associated type}}
+protocol Invalid1<> {} // expected-astgen-error {{an associated type named '' must be declared in the protocol 'Invalid1' or a protocol it inherits}}
+// expected-cparser-error@-1 {{expected an identifier to name primary associated type}} expected-astgen-error@-1 {{expected name in primary associated type clause}}
 
 protocol Invalid2<A B> {} // expected-astgen-error {{unexpected code 'B>' in protocol}}
 // expected-cparser-error@-1 {{expected '>' to complete primary associated type list}} expected-astgen-error@-1 {{expected '>' to end primary associated type clause}}
