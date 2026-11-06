@@ -300,6 +300,7 @@ extension ASTGenVisitor {
     // The type checker needs to know whether the body declares types even when
     // it is not delayed.
     decl.setHasNestedTypeDeclarations(hasNestedTypeDeclarations(body))
+    self.ctx.recordFunctionBodyParsed()
     self.withDeclContext(declContext) {
       setParsed(self.generate(codeBlock: body))
     }
@@ -328,6 +329,7 @@ extension ASTGenVisitor {
       return
     }
     accessor.asDecl.setHasNestedTypeDeclarations(hasNestedTypeDeclarations(block))
+    self.ctx.recordFunctionBodyParsed()
     self.withDeclContext(accessor.asDeclContext) {
       accessor.setParsedBody(
         self.generateImplicitGetterBody(items, leftBrace: leftBrace, rightBrace: rightBrace))
@@ -387,6 +389,7 @@ public func buildFunctionBody(
     configuredRegions: visitor.configuredRegions
   ).bridged
 
+  ctx.recordFunctionBodyParsed()
   if let body = bodyNode.as(CodeBlockSyntax.self) {
     decl.setDelayedBodyParsed(visitor.generate(codeBlock: body), fingerprint: fingerprint)
   } else if let block = bodyNode.as(AccessorBlockSyntax.self),
@@ -509,6 +512,7 @@ extension ASTGenVisitor {
     let members = self.withDeclContext(declContext) {
       self.generate(memberBlockItemList: block.members)
     }
+    self.ctx.recordIterableDeclContextParsed()
     let fp = self.generateFingerprint(declGroup: node)
     setParsed(members.lazy.bridgedArray(in: self), fp.bridged)
   }
@@ -551,6 +555,7 @@ public func buildMembers(
   for member in visitor.generate(memberBlockItemList: block.members) {
     callback(member, outputContext)
   }
+  ctx.recordIterableDeclContextParsed()
 
   if let configDiagnostics = held.ifConfig[offset] {
     visitor.diagnoseAll(configDiagnostics)

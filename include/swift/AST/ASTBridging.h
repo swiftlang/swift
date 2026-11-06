@@ -1590,6 +1590,16 @@ void BridgedDecl_setBodyDelayed(BridgedDecl decl, swift::SourceRange range,
 
 /// Record that the members of the nominal type or extension \p decl will be
 /// built on demand, and what its body is known to contain.
+/// Count the parse of a function body, as `Parser::parseAbstractFunctionBodyImpl`
+/// does.
+SWIFT_NAME("BridgedASTContext.recordFunctionBodyParsed(self:)")
+void BridgedASTContext_recordFunctionBodyParsed(BridgedASTContext cContext);
+
+/// Count the parse of the members of a nominal type or extension, as the C++
+/// parser does in `Parser::parseDeclList`.
+SWIFT_NAME("BridgedASTContext.recordIterableDeclContextParsed(self:)")
+void BridgedASTContext_recordIterableDeclContextParsed(BridgedASTContext cContext);
+
 SWIFT_NAME("BridgedDecl.setMembersDelayed(self:hasOperatorDeclarations:hasNestedClassDeclarations:hasDerivativeDeclarations:)")
 void BridgedDecl_setMembersDelayed(BridgedDecl decl,
                                    bool hasOperatorDeclarations,

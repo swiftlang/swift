@@ -24,6 +24,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Statistic.h"
 
 using namespace swift;
 
@@ -121,6 +122,17 @@ static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
                                    BridgedDeclAttributes attrs) {
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());
+}
+
+void BridgedASTContext_recordFunctionBodyParsed(BridgedASTContext cContext) {
+  if (auto *stats = cContext.unbridged().Stats)
+    ++stats->getFrontendCounters().NumFunctionsParsed;
+}
+
+void BridgedASTContext_recordIterableDeclContextParsed(
+    BridgedASTContext cContext) {
+  if (auto *stats = cContext.unbridged().Stats)
+    ++stats->getFrontendCounters().NumIterableDeclContextParsed;
 }
 
 void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
