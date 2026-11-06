@@ -2750,7 +2750,7 @@ static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
           return;
         if (!IRGen.hasLazyMetadata(type) || !type->hasClangNode())
           return;
-        IRGen.noteUseOfTypeMetadata(type);
+        IRGen.noteUseOfForeignTypeMetadataByCxx(type);
       }
       IRGenerator &IRGen;
       int genericDepth = 0;
