@@ -41,6 +41,7 @@ namespace options {
     CacheInvariant = (1 << 20),
     ArgumentIsCASID = (1 << 21),
     ArgumentIsEqualKeyedPath = (1 << 22),
+    ModuleLoadingOption = (1 << 23),
   };
 
   enum ID {

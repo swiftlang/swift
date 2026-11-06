@@ -53,7 +53,8 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   unsigned MissingIndex;
   unsigned MissingCount;
   llvm::opt::InputArgList ParsedArgs = Table->ParseArgs(
-      Args, MissingIndex, MissingCount, SwiftSynthesizeInterfaceOption);
+      Args, MissingIndex, MissingCount,
+      SwiftSynthesizeInterfaceOption | ModuleLoadingOption);
   if (MissingCount) {
     Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
                    ParsedArgs.getArgString(MissingIndex), MissingCount);

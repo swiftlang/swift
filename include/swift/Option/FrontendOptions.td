@@ -85,16 +85,20 @@ def dump_api_path : Separate<["-"], "dump-api-path">,
 def group_info_path : Separate<["-"], "group-info-path">,
   HelpText<"The path to collect the group information of the compiled module">;
 
+let Flags = [FrontendOption, NoDriverOption, CacheInvariant, ModuleLoadingOption] in
 def prebuilt_module_cache_path :
   Separate<["-"], "prebuilt-module-cache-path">,
   HelpText<"Directory of prebuilt modules for loading module interfaces">;
+let Flags = [FrontendOption, NoDriverOption, CacheInvariant, ModuleLoadingOption] in
 def prebuilt_module_cache_path_EQ :
   Joined<["-"], "prebuilt-module-cache-path=">,
   Alias<prebuilt_module_cache_path>;
 
+let Flags = [FrontendOption, NoDriverOption, CacheInvariant, ModuleLoadingOption] in
 def backup_module_interface_path :
   Separate<["-"], "backup-module-interface-path">,
   HelpText<"Directory of module interfaces as backups to those from SDKs">;
+let Flags = [FrontendOption, NoDriverOption, CacheInvariant, ModuleLoadingOption] in
 def backup_module_interface_path_EQ :
   Joined<["-"], "backup-module-interface-path=">,
   Alias<backup_module_interface_path>;
@@ -121,6 +125,7 @@ def const_gather_protocols_file
 
 let Flags = [FrontendOption, NoDriverOption] in {
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def triple : Separate<["-"], "triple">, Alias<target>;
 
 def emit_module_doc : Flag<["-"], "emit-module-doc">,
@@ -129,6 +134,7 @@ def emit_module_doc : Flag<["-"], "emit-module-doc">,
 
 def emit_module_source_info : Flag<["-"], "emit-module-source-info">,
   HelpText<"Output module source info file">;
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def ignore_module_source_info : Flag<["-"], "ignore-module-source-info">,
   HelpText<"Avoid getting source location from .swiftsourceinfo files">;
 
@@ -214,8 +220,10 @@ def swift_diagnostics_assert_on_group : Separate<["-"], "diagnostics-assert-on-g
   HelpText<"Trap when any diagnostic in the given group is emitted. "
            "For compiler developers only.">;
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
 
@@ -267,6 +275,7 @@ def print_clang_stats : Flag<["-"], "print-clang-stats">,
 def serialize_debugging_options : Flag<["-"], "serialize-debugging-options">,
   HelpText<"Always serialize options for debugging (default: only for apps)">;
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def serialized_path_obfuscate : Separate<["-"], "serialized-path-obfuscate">,
     HelpText<"Remap source paths in debug info">, MetaVarName<"<prefix=replacement>">;
 
@@ -283,28 +292,34 @@ def autolink_library : Separate<["-"], "autolink-library">,
 def disable_typo_correction : Flag<["-"], "disable-typo-correction">,
   HelpText<"Disable typo correction">;
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def disable_implicit_swift_modules: Flag<["-"], "disable-implicit-swift-modules">,
   HelpText<"Disable building Swift modules implicitly by the compiler">;
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def swift_module_cross_import: MultiArg<["-"], "swift-module-cross-import", 2>,
   MetaVarName<"<moduleName> <crossImport.swiftoverlay>">,
   HelpText<"Specify the cross import module">;
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def module_can_import: Separate<["-"], "module-can-import">,
   MetaVarName<"<moduleName>">,
   HelpText<"Specify canImport module name">;
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def module_can_import_version: MultiArg<["-"], "module-can-import-version", 3>,
   MetaVarName<"<moduleName> <version> <underlyingVersion>">,
   HelpText<"Specify canImport module and versions">;
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def module_import_from_cas: Flag<["-"], "module-import-from-cas">,
   HelpText<"Import modules from CAS instead of file system">;
 
+let Flags = [FrontendOption, NoDriverOption, ModuleLoadingOption] in
 def disable_cross_import_overlay_search: Flag<["-"], "disable-cross-import-overlay-search">,
   HelpText<"Disable searching for cross import overlay file">;
 
-let Flags = [FrontendOption, NoDriverOption, ArgumentIsCASID] in
+let Flags = [FrontendOption, NoDriverOption, ArgumentIsCASID, ModuleLoadingOption] in
 def explicit_swift_module_map
   : Separate<["-"], "explicit-swift-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of explicit Swift modules">;
@@ -373,6 +388,7 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
     Joined<["-"], "enable-destroy-hoisting=">,
     HelpText<"Whether to enable destroy hoisting">,
     MetaVarName<"true|false">;
+  let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable, ModuleLoadingOption] in
   def formal_cxx_interoperability_mode :
     Joined<["-"], "formal-cxx-interoperability-mode=">,
     HelpText<"What version of C++ interoperability a textual interface was originally generated with">,
@@ -387,10 +403,12 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
 
 // Flags that are saved into module interfaces
 let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] in {
+  let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption, ModuleLoadingOption] in
   def enable_objc_interop :
     Flag<["-"], "enable-objc-interop">,
     HelpText<"Enable Objective-C interop code generation and config directives">;
 
+  let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption, ModuleLoadingOption] in
   def disable_objc_interop :
     Flag<["-"], "disable-objc-interop">,
     HelpText<"Disable Objective-C interop code generation and config directives">;
@@ -437,6 +455,7 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Flag<["-"], "enable-experimental-pairwise-build-block">,
     HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
 
+  let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption, ModuleLoadingOption] in
   def enable_resilience : Flag<["-"], "enable-resilience">,
        HelpText<"Deprecated, use -enable-library-evolution instead">;
 
@@ -451,10 +470,12 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     Separate<["-"], "public-autolink-library">,
     HelpText<"Add public dependent library">;
 
+  let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption, ModuleLoadingOption] in
   def enable_com_interop
     : Flag<["-"], "enable-experimental-com-interop">,
       HelpText<"Enable COM interop code generation and configuration directives">;
 
+  let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption, ModuleLoadingOption] in
   def com_interop_model
     : Joined<["-"], "com-interop-model=">,
       HelpText<"Select the COM interop model: 'microsoft' or 'corefoundation'">;
@@ -636,6 +657,7 @@ def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
 def debug_test_dependency_scan_cache_serialization: Flag<["-"], "test-dependency-scan-cache-serialization">,
    HelpText<"After performing a dependency scan, serialize and then deserialize the scanner's internal state.">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def debugger_support : Flag<["-"], "debugger-support">,
   HelpText<"Process swift code as if running in the debugger">;
 
@@ -785,6 +807,7 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def disable_modules_validate_system_headers : Flag<["-"], "disable-modules-validate-system-headers">,
   HelpText<"Disable validating system headers in the Clang importer">;
 
@@ -800,9 +823,11 @@ def no_verbose_asm : Flag<["-"], "no-verbose-asm">,
 def emit_pch : Flag<["-"], "emit-pch">,
   HelpText<"Emit PCH for imported Objective-C header file">, ModeOpt;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def pch_disable_validation : Flag<["-"], "pch-disable-validation">,
   HelpText<"Disable validating the persistent PCH">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def version_independent_apinotes : Flag<["-"], "version-independent-apinotes">,
   HelpText<"Input clang modules carry all versioned APINotes">;
 
@@ -897,6 +922,7 @@ def enable_implicit_dynamic : Flag<["-"], "enable-implicit-dynamic">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Add 'dynamic' to all declarations">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, NoInteractiveOption, ModuleLoadingOption] in
 def bypass_resilience : Flag<["-"], "bypass-resilience-checks">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Ignore all checks for module resilience.">;
@@ -1102,6 +1128,7 @@ def import_module : Separate<["-"], "import-module">,
 def testable_import_module : Separate<["-"], "testable-import-module">,
   HelpText<"Implicitly import the specified module with @testable">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def dependency_only_import : Separate<["-"], "dependency-only-import">,
                              HelpText<"Import the module as a dependency only">;
 
@@ -1286,24 +1313,29 @@ def typecheck_module_from_interface :
   HelpText<"Treat the (single) input as a swiftinterface and typecheck it">,
   ModeOpt;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def module_interface_preserve_types_as_written :
   Flag<["-"], "module-interface-preserve-types-as-written">,
   HelpText<"When emitting a module interface, preserve types as they were "
            "written in the source">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def alias_module_names_in_module_interface :
   Flag<["-"], "alias-module-names-in-module-interface">,
   HelpText<"When emitting a module interface, disambiguate modules using "
            "distinct alias names">;
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def disable_alias_module_names_in_module_interface :
   Flag<["-"], "disable-alias-module-names-in-module-interface">,
   HelpText<"When emitting a module interface, disable disambiguating modules "
            "using distinct alias names">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def experimental_spi_imports :
   Flag<["-"], "experimental-spi-imports">,
   HelpText<"Enable experimental support for SPI imports">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def disable_print_missing_imports_in_module_interface :
   Flag<["-"], "disable-print-missing-imports-in-module-interface">,
   HelpText<"Disable adding to the module interface imports used from API and "
@@ -1440,6 +1472,7 @@ def enable_layout_string_value_witnesses_instantiation : Flag<["-"], "enable-lay
 def disable_layout_string_value_witnesses_instantiation : Flag<["-"], "disable-layout-string-value-witnesses-instantiation">,
   HelpText<"Disable runtime instantiation of layout string value witnesses for generic types">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
   HelpText<"Don't lock interface file when building module">;
 
@@ -1449,23 +1482,29 @@ def bridging_header_directory_for_print: Separate<["-"], "bridging-header-direct
 def entry_point_function_name: Separate<["-"], "entry-point-function-name">, MetaVarName<"<string>">,
     HelpText<"Name of the entry point function">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def target_sdk_version : Separate<["-"], "target-sdk-version">,
   HelpText<"The version of target SDK used for compilation">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def target_variant_sdk_version : Separate<["-"], "target-variant-sdk-version">,
   HelpText<"The version of target variant SDK used for compilation">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def target_sdk_name : Separate<["-"], "target-sdk-name">,
   HelpText<"Canonical name of the target SDK used for compilation">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def candidate_module_file
   : Separate<["-"], "candidate-module-file">, MetaVarName<"<path>">,
     HelpText<"Specify Swift module may be ready to use for an interface">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def use_static_resource_dir
   : Flag<["-"], "use-static-resource-dir">,
     HelpText<"Use resources in the static resource directory">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def disable_building_interface
   : Flag<["-"], "disable-building-interface">,
     HelpText<"Disallow building binary module from textual interface">;
@@ -1693,7 +1732,7 @@ def always_compile_output_files :
   HelpText<"Always compile output files even it might not change the results">;
 
 // CAS/Caching related options.
-let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID, ModuleLoadingOption] in {
 def input_file_key : Separate<["-"], "input-file-key">,
   HelpText<"Cache Key for input file">;
 def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
@@ -1703,18 +1742,20 @@ def bridging_header_pch_key : Separate<["-"], "bridging-header-pch-key">,
 def no_clang_include_tree: Flag<["-"], "no-clang-include-tree">,
   HelpText<"Do not use clang include tree, fallback to use CAS filesystem to build clang modules">;
 
-let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID] in {
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID, ModuleLoadingOption] in {
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
 def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
   HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden, ArgumentIsCASID]
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def cas_fs_input_overlay: Flag<["-"], "cas-fs-input-overlay">,
   HelpText<"Read the input files from disk and overlay them on the CAS file "
            "system. This disables caching, since the content of the input "
            "files no longer contributes to the cache key">;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
   HelpText<"Enable use of @_spiOnly imports">;
@@ -1733,10 +1774,13 @@ def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   HelpText<"Disable sending args and results when region-based isolation is enabled. Only enabled with asserts">,
   Flags<[HelpHidden]>;
 
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def scanner_module_validation: Flag<["-"], "scanner-module-validation">,
     HelpText<"Validate binary modules in the dependency scanner">;
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def no_scanner_module_validation: Flag<["-"], "no-scanner-module-validation">,
     HelpText<"Do not validate binary modules in scanner and delegate the validation to swift-frontend">;
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleLoadingOption] in
 def module_load_mode: Separate<["-"], "module-load-mode">,
     MetaVarName<"only-interface|prefer-interface|prefer-serialized|only-serialized">,
     HelpText<"Module loading mode">;
