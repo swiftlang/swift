@@ -5,6 +5,8 @@
 // See https://swift.org/LICENSE.txt for license information
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend %s -emit-ir
 protocol A:a{typealias a}protocol a:A{typealias a
 class a

@@ -1,4 +1,6 @@
 // {"kind":"typecheck","signature":"createPropertyStoreOrCallSuperclassSetter(swift::AccessorDecl*, swift::Expr*, swift::AbstractStorageDecl*, (anonymous namespace)::TargetImpl, llvm::SmallVectorImpl<swift::ASTNode>&, swift::ASTContext&)","signatureAssert":"Assertion failed: (destType->getOptionalObjectType()), function createPropertyStoreOrCallSuperclassSetter","signatureNext":"synthesizeTrivialSetterBodyWithStorage"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 @propertyWrapper struct a < b {
   wrappedValue : b static subscript<c>(_enclosingInstance d

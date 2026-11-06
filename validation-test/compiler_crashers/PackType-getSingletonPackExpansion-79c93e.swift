@@ -1,4 +1,6 @@
 // {"kind":"typecheck","original":"a6956489","signature":"swift::PackType::getSingletonPackExpansion(swift::Type)","signatureAssert":"Assertion failed: (rootParameterPacks.size() >= 1), function getSingletonPackExpansion","signatureNext":"ConstraintSystem::openGenericParameters"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b

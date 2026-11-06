@@ -1,4 +1,6 @@
 // {"frontendArgs":["-typecheck","-enable-experimental-feature","KeyPathWithMethodMembers"],"kind":"custom","signature":"swift::Expr::setType(swift::Type)","signatureAssert":"Assertion failed: (isa<TypeJoinExpr>(this) || !T->hasTypeVariableOrHole()), function setType","signatureNext":"ExprRewriter::visitKeyPathExpr"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck -enable-experimental-feature KeyPathWithMethodMembers %s
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 struct a < b {

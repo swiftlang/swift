@@ -1,4 +1,6 @@
 // {"kind":"typecheck","original":"b10f3bb6","signature":"swift::Mangle::ASTMangler::appendAnyGenericType(swift::GenericTypeDecl const*, swift::Mangle::ASTMangler::BaseEntitySignature&)","stackOverflow":true}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a
   extension a where Self == b? {

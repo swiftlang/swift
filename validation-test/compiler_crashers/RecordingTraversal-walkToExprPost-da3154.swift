@@ -1,4 +1,6 @@
 // {"kind":"typecheck","signature":"extendDepthMap(swift::Expr*, llvm::DenseMap<swift::Expr*, std::__1::pair<unsigned int, swift::Expr*>, llvm::DenseMapInfo<swift::Expr*, void>, llvm::detail::DenseMapPair<swift::Expr*, std::__1::pair<unsigned int, swift::Expr*>>>&)::RecordingTraversal::walkToExprPost(swift::Expr*)","signatureAssert":"Assertion failed: (Closures.back() == CE), function walkToExprPost","signatureNext":"Traversal::doIt"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 {
   {

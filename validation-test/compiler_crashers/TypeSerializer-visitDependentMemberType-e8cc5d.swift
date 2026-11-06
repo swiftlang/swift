@@ -1,4 +1,6 @@
 // {"extraArgs":["-experimental-allow-module-with-compiler-errors","-emit-module-path","/dev/null"],"kind":"emit-sil","original":"dcff4c5c","signature":"swift::serialization::Serializer::TypeSerializer::visitDependentMemberType(swift::DependentMemberType const*)","signatureAssert":"Assertion failed: (dependent->getAssocType() && \"Unchecked dependent member type\"), function visitDependentMemberType","signatureNext":"Serializer::writeASTBlockEntity"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -emit-sil -experimental-allow-module-with-compiler-errors -emit-module-path /dev/null %s
 protocol a {
   associatedtype b

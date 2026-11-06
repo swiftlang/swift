@@ -1,4 +1,6 @@
 // {"kind":"typecheck","original":"1b6ba0fe","signature":"swift::GenericSignature::verify(llvm::ArrayRef<swift::Requirement>) const","signatureNext":"AbstractGenericSignatureRequest::evaluate"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a where b.c == Self
   protocol d: a

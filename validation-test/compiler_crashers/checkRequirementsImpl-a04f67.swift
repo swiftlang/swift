@@ -1,4 +1,6 @@
 // {"kind":"typecheck","signature":"checkRequirementsImpl(llvm::ArrayRef<swift::Requirement>, bool)","signatureAssert":"Assertion failed: ((allowTypeParameters || !firstType->hasTypeParameter()) && \"must take a contextual type. if you really are ok with an \" \"indefinite answer (and usually YOU ARE NOT), then consider whether \" \"you really, definitely are ok with an indefinite answer, and \" \"use `checkRequirementsWithoutContext` instead\"), function checkRequirementsImpl","signatureNext":"checkRequirements"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 struct a < Element {
   b {

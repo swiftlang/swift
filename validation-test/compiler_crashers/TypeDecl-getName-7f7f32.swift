@@ -1,4 +1,6 @@
 // {"kind":"typecheck","original":"b96aeed6","signature":"swift::TypeDecl::getName() const","signatureAssert":"Assertion failed: (Result->isCanonical()), function computeCanonicalType"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a where b == Self
   extension {

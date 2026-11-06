@@ -1,4 +1,6 @@
 // {"kind":"typecheck","original":"53b0fce0","signature":"swift::rewriting::RequirementMachine::verify(swift::rewriting::MutableTerm const&) const","signatureNext":"RequirementMachine::areReducedTypeParametersEqual"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a: Collection
   protocol b {

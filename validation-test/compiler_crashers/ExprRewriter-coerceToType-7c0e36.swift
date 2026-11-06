@@ -1,4 +1,6 @@
 // {"kind":"typecheck","original":"62bca45e","signature":"(anonymous namespace)::ExprRewriter::coerceToType(swift::Expr*, swift::Type, swift::constraints::ConstraintLocatorBuilder)","signatureNext":"ExprRewriter::coerceCallArguments"}
+// The crash depends on the C++ parser's handling of this input.
+// UNSUPPORTED: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck -solver-disable-diagnose-valid-salvage %s
 protocol a {
   associatedtype b
