@@ -158,8 +158,8 @@ bool ExistentialSpecializer::canSpecializeExistentialArgsInFunction(
 
     /// Find the concrete type.
     Operand &ArgOper = Apply.getArgumentRef(Idx);
-    CanType ConcreteType =
-        ConcreteExistentialInfo(ArgOper.get(), ArgOper.getUser()).ConcreteType;
+    ConcreteExistentialInfo CEI(ArgOper.get(), ArgOper.getUser());
+    CanType ConcreteType = CEI.isValid() ? CEI.ConcreteType : CanType();
     auto ArgConvention = F->getConventions().getSILArgumentConvention(Idx);
     /// Find the concrete type, either via sole type or via
     /// findInitExistential..
