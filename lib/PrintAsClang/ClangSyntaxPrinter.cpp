@@ -26,6 +26,7 @@
 #include "clang/AST/NestedNameSpecifier.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
 
 using namespace swift;
 using namespace cxx_synthesis;
@@ -65,12 +66,77 @@ void ClangSyntaxPrinter::printIdentifier(StringRef name) const {
 }
 
 void ClangSyntaxPrinter::printBaseName(const ValueDecl *decl) const {
-  assert(decl->getName().isSimpleName());
+  // An enum element can have a compound name when it has a payload, but it is
+  // still exposed to C++ under its base name.
+  assert(decl->getName().isSimpleName() || isa<EnumElementDecl>(decl));
   printIdentifier(cxx_translation::getNameForCxx(decl));
 }
 
+std::string
+ClangSyntaxPrinter::getParameterName(const AbstractFunctionDecl *function,
+                                     const ParamDecl *parameter) {
+  if (parameter->getName().empty())
+    return "";
+
+  const auto *enumDecl = function->getDeclContext()->getSelfEnumDecl();
+  llvm::StringSet<> usedNames;
+  if (enumDecl) {
+    // Avoid -Wshadow warnings for parameters of enum methods.
+    for (const auto *element : enumDecl->getAllElements()) {
+      std::string name = cxx_translation::getNameForCxx(element).str();
+      if (isClangKeyword(name))
+        name += '_';
+      usedNames.insert(name);
+    }
+  }
+  for (const auto *current : *function->getParameters()) {
+    if (current->getName().empty())
+      continue;
+    std::string name =
+        cxx_translation::sanitizeNameForCxx(current->getName().str());
+    std::string printedName = name;
+    if (isClangKeyword(printedName))
+      printedName += '_';
+    // Preserve the existing enum-shadow suffix, but do not create a reserved
+    // identifier containing two adjacent underscores when retrying.
+    std::string collisionPrefix = name;
+    unsigned collisionIndex = 0;
+    if (collisionPrefix.back() != '_')
+      collisionPrefix += '_';
+    else
+      collisionIndex = 1;
+    while (!usedNames.insert(printedName).second) {
+      name = collisionPrefix;
+      if (collisionIndex)
+        name += std::to_string(collisionIndex);
+      ++collisionIndex;
+      printedName = name;
+    }
+    if (current == parameter)
+      return name;
+  }
+  // The lowered ABI can also carry 'self', outside the source parameter list.
+  return cxx_translation::sanitizeNameForCxx(parameter->getName().str());
+}
+
+void ClangSyntaxPrinter::printSwiftNameCommentIfNeeded(const ValueDecl *decl,
+                                                       StringRef indent) const {
+  // An operator either keeps its Swift spelling, when that is also a valid
+  // C++ operator, or is not exposed at all.
+  if (decl->isOperator())
+    return;
+  auto baseName = decl->getName().getBaseName();
+  if (baseName.isSpecial() || baseName.getIdentifier().empty() ||
+      cxx_translation::isValidCxxIdentifier(baseName.getIdentifier().str()))
+    return;
+  os << indent << "/// Swift name: '";
+  decl->getName().print(os, /*skipEmptyArgumentNames=*/false,
+                        /*escapeIfNeeded=*/true);
+  os << "'\n";
+}
+
 void ClangSyntaxPrinter::printModuleNameCPrefix(const ModuleDecl &mod) {
-  os << mod.getName().str() << '_';
+  os << cxx_translation::sanitizeNameForCxx(mod.getName().str()) << '_';
 }
 
 void ClangSyntaxPrinter::printModuleNamespaceQualifiersIfNeeded(
