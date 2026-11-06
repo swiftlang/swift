@@ -414,7 +414,6 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// - SeeAlso: `isCancelled()`
   /// - SeeAlso: ``CancellationError/Reason``
-  @_unavailableInEmbedded
   public static func checkCancellation() throws {
     if Task<Never, Never>.isCancelled {
       if #available(StdlibDeploymentTarget 6.5, *) {
