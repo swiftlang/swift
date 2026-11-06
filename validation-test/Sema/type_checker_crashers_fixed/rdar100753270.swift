@@ -34,4 +34,4 @@ struct Test { // expected-note {{to match this opening '{'}}
       }
     }
   }
-} // expected-error@+1 {{expected '}' in struct}}
+} // expected-cparser-error@+1 {{expected '}' in struct}} expected-astgen-error {{expected '}' to end struct}}

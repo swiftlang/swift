@@ -5,7 +5,7 @@ protocol AnyValue {
 
 struct Value<T> {}
 
-extension Value: AnyValue where T = { // expected-error {{use '==' for same-type requirements rather than '='}} expected-error {{expected type}}
+extension Value: AnyValue where T = { // expected-cparser-error {{use '==' for same-type requirements rather than '='}} expected-cparser-error {{expected type}} expected-astgen-error {{unexpected code '=' in extension}} expected-astgen-error {{expected ':' or '==' to indicate a conformance or same-type requirement}}
 }
 
 struct Test {
