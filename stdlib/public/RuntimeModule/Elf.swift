@@ -1797,17 +1797,31 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
   var endOfText = address
   var uuid: [UInt8]? = nil
 
-  // Find the last loadable executable segment, and scan for PT_NOTE
-  // segments that contain the UUID
+  var phdrs: [Traits.Phdr] = []
   var phAddr = ImageSource.Address(address) + ImageSource.Size(header.e_phoff)
   for _ in 0..<header.e_phnum {
-    let phdr = maybeSwap(try reader.fetch(from: phAddr, as: Traits.Phdr.self))
+    phdrs.append(maybeSwap(try reader.fetch(from: phAddr, as: Traits.Phdr.self)))
+    phAddr += ImageSource.Address(header.e_phentsize)
+  }
+
+  // The image is mapped at `address`, which corresponds to the lowest
+  // virtual address of its loadable segments (as in `ElfImage.imageBase`);
+  // that isn't always zero.
+  let imageBase = phdrs.lazy.filter { $0.p_type == .PT_LOAD }
+    .map { ImageSource.Address($0.p_vaddr) }.min() ?? 0
+  func mappedAddress(_ vaddr: Traits.Address) -> R.Address {
+    return address + ImageSource.Address(vaddr) - imageBase
+  }
+
+  // Find the last loadable executable segment, and scan for PT_NOTE
+  // segments that contain the UUID
+  for phdr in phdrs {
     if phdr.p_type == .PT_LOAD && (phdr.p_flags & PF_X) != 0 {
-      endOfText = max(endOfText, address + ImageSource.Address(phdr.p_vaddr)
+      endOfText = max(endOfText, mappedAddress(phdr.p_vaddr)
                                    + ImageSource.Size(phdr.p_memsz))
     }
     if phdr.p_type == .PT_NOTE {
-      var noteAddr = address + ImageSource.Address(phdr.p_vaddr)
+      var noteAddr = mappedAddress(phdr.p_vaddr)
       let noteEnd = noteAddr + ImageSource.Size(phdr.p_memsz)
 
       while noteAddr < noteEnd {
@@ -1860,8 +1874,6 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
         }
       }
     }
-
-    phAddr += ImageSource.Address(header.e_phentsize)
   }
 
   return (endOfText: endOfText, uuid: uuid)
