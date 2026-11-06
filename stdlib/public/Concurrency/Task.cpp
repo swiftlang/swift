@@ -521,9 +521,9 @@ void AsyncTask::flagAsAndEnqueueOnExecutor(SerialExecutorRef newExecutor) {
 #if SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL
   assert(false && "Should not enqueue any tasks to execute in task-to-thread model");
 #else /* SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL */
-  // swift_task_escalate will first increase the priority in the
-  // ActiveTaskStatus without taking the Task Status Lock, then early out
-  // if there is no dependency record, then take the lock to iterate the
+  // swift_task_escalate increases the priority in the ActiveTaskStatus
+  // without taking the Task Status Lock only while the task has no records.
+  // Otherwise it takes the lock, then increases the priority and iterates the
   // dependency records. So we need to take the lock, add or modify the
   // dependency record, and decide (under the lock) which Job to enqueue
   // and at what priority. The actual swift_task_enqueue is then done AFTER
