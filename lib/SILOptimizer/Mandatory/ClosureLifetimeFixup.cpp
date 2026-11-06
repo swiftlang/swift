@@ -17,6 +17,7 @@
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/OwnershipLiveness.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -683,6 +684,33 @@ static bool mayModifyAddress(Operand *use) {
   return user->mayWriteToMemory();
 }
 
+/// Move \p destroy, a destroy_value [dead_end], up to just after the last
+/// instruction in its block that defines or uses its operand, including
+/// interior uses such as the ends of inner borrow scopes. Does nothing if the
+/// operand has dependent uses whose liveness is not computed (for example, a
+/// partial_apply [on_stack] that captures the closure).
+static void hoistDeadEndDestroy(DestroyValueInst *destroy) {
+  SILValue value = destroy->getOperand();
+  InteriorLiveness liveness(value);
+  liveness.compute();
+  if (liveness.getAddressUseKind() != AddressUseKind::NonEscaping)
+    return;
+
+  auto *block = destroy->getParent();
+  auto insertPt = destroy->getIterator();
+  while (insertPt != block->begin()) {
+    auto &prev = *std::prev(insertPt);
+    if (llvm::is_contained(prev.getResults(), value) ||
+        liveness.getLiveness().isInterestingUser(&prev) !=
+            PrunedLiveness::NonUser) {
+      break;
+    }
+    --insertPt;
+  }
+  if (insertPt != destroy->getIterator())
+    destroy->moveBefore(&*insertPt);
+}
+
 /// Rewrite a partial_apply convert_escape_to_noescape sequence with a single
 /// apply/try_apply user to a partial_apply [stack] terminated with a
 /// dealloc_stack placed after the apply.
@@ -1101,7 +1129,8 @@ static SILValue tryRewriteToPartialApplyStack(
     // This getCapturedArg hack attempts to perfectly compensate for all the
     // other hacks involved in gathering new arguments above.
     // argValue may be 'undef'
-    auto insertCleanup = [&](SILBuilder &builder) {
+    auto insertCleanup = [&](SILBuilder &builder,
+                             IsDeadEnd_t isDeadEnd = IsntDeadEnd) {
       auto getArgToDestroy = [&](SILValue argValue) -> SILValue {
         // A MoveOnlyWrapperToCopyableValueInst may produce a trivial value. Be
         // careful not to emit an extra destroy of the original.
@@ -1135,7 +1164,7 @@ static SILValue tryRewriteToPartialApplyStack(
         return borrowedOriginals.count(argValue) ? SILValue() : argValue;
       };
       insertDestroyOfCapturedArguments(newPA, builder, getArgToDestroy,
-                                       newPA->getLoc());
+                                       newPA->getLoc(), isDeadEnd);
     };
 
     // `try_apply` is a terminator: a closure whose call consumes it, used as
@@ -1152,8 +1181,20 @@ static SILValue tryRewriteToPartialApplyStack(
       continue;
     }
 
+    // A closure destroyed on a dead-end path may outlive the scopes its
+    // captures depend on: a destroy_value [dead_end] is not a use, so
+    // LifetimeDependenceScopeFixup may end a lifetime-dependent capture's
+    // borrow scope before it. Hoist the destroy to just after the closure's
+    // last use in the block so that the captures' cleanups below stay within
+    // those scopes (rdar://190239363).
+    auto isDeadEnd = IsntDeadEnd;
+    if (auto *dvi = dyn_cast<DestroyValueInst>(destroy)) {
+      isDeadEnd = dvi->isDeadEnd();
+      if (isDeadEnd)
+        hoistDeadEndDestroy(dvi);
+    }
     SILBuilderWithScope builder(std::next(destroy->getIterator()));
-    insertCleanup(builder);
+    insertCleanup(builder, isDeadEnd);
   }
   /* DEBUG
   llvm::errs() << "=== function after conversion to stack partial_apply of\n";

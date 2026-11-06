@@ -921,7 +921,8 @@ static bool shouldDestroyPartialApplyCapturedArg(SILValue arg,
 }
 
 void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
-                                 SILValue operand, InstModCallbacks callbacks) {
+                                 SILValue operand, InstModCallbacks callbacks,
+                                 IsDeadEnd_t isDeadEnd) {
   // If we have an address, we insert a destroy_addr and return. Any live range
   // issues must have been dealt with by our caller.
   if (operand->getType().isAddress()) {
@@ -938,7 +939,8 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 
   // If we have qualified ownership, we should just emit a destroy value.
   if (builder.getFunction().hasOwnership()) {
-    callbacks.createdNewInst(builder.createDestroyValue(loc, operand));
+    callbacks.createdNewInst(
+        builder.createDestroyValue(loc, operand, isDeadEnd));
     return;
   }
 
@@ -986,12 +988,13 @@ void swift::emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 void swift::releasePartialApplyCapturedArg(SILBuilder &builder, SILLocation loc,
                                            SILValue arg,
                                            SILParameterInfo paramInfo,
-                                           InstModCallbacks callbacks) {
+                                           InstModCallbacks callbacks,
+                                           IsDeadEnd_t isDeadEnd) {
   if (!shouldDestroyPartialApplyCapturedArg(arg, paramInfo,
                                             builder.getFunction()))
     return;
 
-  emitDestroyOperation(builder, loc, arg, callbacks);
+  emitDestroyOperation(builder, loc, arg, callbacks, isDeadEnd);
 }
 
 /// Returns true if \p user is a user of an on-stack closure which can be
@@ -1582,7 +1585,7 @@ swift::findLocalApplySites(FunctionRefBaseInst *fri) {
 void swift::insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
     llvm::function_ref<SILValue(SILValue)> getValueToDestroy,
-    SILLocation origLoc) {
+    SILLocation origLoc, IsDeadEnd_t isDeadEnd) {
   assert(pai->isOnStack());
 
   ApplySite site(pai);
@@ -1597,7 +1600,8 @@ void swift::insertDestroyOfCapturedArguments(
                  OwnershipKind::Owned)));
 
     auto paramInfo = site.getParamInfoForOperand(arg);
-    releasePartialApplyCapturedArg(builder, loc, argValue, paramInfo);
+    releasePartialApplyCapturedArg(builder, loc, argValue, paramInfo,
+                                   InstModCallbacks(), isDeadEnd);
   }
 }
 
