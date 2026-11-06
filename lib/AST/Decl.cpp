@@ -14098,7 +14098,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
       {
         llvm::raw_string_ostream out(prefixedName);
         out << expandedName.getName();
-        out << baseName.getIdentifier();
+        out << baseName.userFacingName();
       }
 
       Identifier nameId = ctx.getIdentifier(prefixedName);
@@ -14118,7 +14118,7 @@ void MacroDecl::getIntroducedNames(MacroRole role, ValueDecl *attachedTo,
       std::string suffixedName;
       {
         llvm::raw_string_ostream out(suffixedName);
-        out << baseName.getIdentifier();
+        out << baseName.userFacingName();
         out << expandedName.getName();
       }
 
