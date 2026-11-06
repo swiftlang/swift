@@ -610,6 +610,25 @@ std::string ASTMangler::mangleReabstractionThunkHelper(
   return finalize();
 }
 
+std::string ASTMangler::mangleConversionThunk(CanSILFunctionType ThunkType,
+                                  Type FromType, Type ToType,
+                                  ModuleDecl *Module) {
+  Mod = Module;
+  assert(ThunkType->getPatternSubstitutions().empty() && "not implemented");
+  GenericSignature GenSig = ThunkType->getInvocationGenericSignature();
+
+  beginMangling();
+  appendType(FromType, GenSig);
+  appendType(ToType, GenSig);
+  
+  if (GenSig)
+    appendGenericSignature(GenSig);
+
+  appendOperator("TTv");
+
+  return finalize();
+}
+
 std::string ASTMangler::mangleObjCAsyncCompletionHandlerImpl(
     CanSILFunctionType BlockType, CanType ResultType, CanGenericSignature Sig,
     std::optional<bool> ErrorOnZero, bool checked) {

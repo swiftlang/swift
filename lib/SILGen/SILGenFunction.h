@@ -1830,11 +1830,15 @@ public:
                             CanType existentialType,
                             SGFContext C = SGFContext());
 
+  enum class CollectionCastKind {
+    Upcast,
+    ForceDowncast,
+    ConditionalDowncast,
+  };
+
   RValue emitCollectionConversion(SILLocation loc,
-                                  FuncDecl *fn,
-                                  CanType fromCollection,
-                                  CanType toCollection,
-                                  ManagedValue mv,
+                                  CanType fromCollection, CanType toCollection,
+                                  ManagedValue mv, CollectionCastKind castKind,
                                   SGFContext C);
 
   //===--------------------------------------------------------------------===//

@@ -169,6 +169,13 @@ public:
                                            CanType dynamicSelfType,
                                            CanType fromGlobalActor);
   
+  /// Get or create the declaration of a conversion thunk with the given
+  /// signature. fromInterfaceType and toInterfaceType must be interface types
+  /// (no archetypes) suitable for mangling.
+  SILFunction *getOrCreateConversionThunk(CanSILFunctionType thunkType,
+                                          CanType fromInterfaceType,
+                                          CanType toInterfaceType);
+  
   /// Get or create the declaration of a completion handler block
   /// implementation function for an ObjC API that was imported
   /// as `async` in Swift.
