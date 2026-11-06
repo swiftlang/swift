@@ -46,5 +46,26 @@ int main() {
 // CHECK: '''Hello world!test'''
 // CHECK: '''hello world!test'''
 // CHECK: '''HELLO WORLD!TEST'''
+
+  {
+    auto small = String("small");
+    auto large = String("a string that is too long to be stored inline");
+    large.append(String("!"));
+    auto copy = large;
+    auto assigned = small;
+    assigned = large;
+    auto &alias = assigned;
+    assigned = alias;
+    small = copy;
+    large = String("replaced");
+    printString(copy);
+    printString(assigned);
+    printString(small);
+    printString(large);
+  }
+// CHECK-NEXT: '''a string that is too long to be stored inline!'''
+// CHECK-NEXT: '''a string that is too long to be stored inline!'''
+// CHECK-NEXT: '''a string that is too long to be stored inline!'''
+// CHECK-NEXT: '''replaced'''
   return 0;
 }
