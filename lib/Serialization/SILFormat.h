@@ -420,6 +420,7 @@ namespace sil_block {
                      BCFixed<2>,  // serializedKind
                      BCFixed<3>,  // thunk kind
                      BCFixed<1>,  // without_actually_escaping
+                     BCFixed<1>,  // closure
                      BCFixed<3>,  // specialPurpose
                      BCFixed<2>,  // inlineStrategy
                      BCFixed<2>,  // optimizationMode

@@ -140,7 +140,7 @@ func testClosure() throws -> Int {
   return try fn()
 }
 
-// CHECK-LABEL: sil private [ossa] @$s7if_expr11testClosureSiyKFSiyKcfU_ : $@convention(thin) () -> (Int, @error any Error)
+// CHECK-LABEL: sil private [closure] [ossa] @$s7if_expr11testClosureSiyKFSiyKcfU_ : $@convention(thin) () -> (Int, @error any Error)
 // CHECK:       [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK:       cond_br {{%[0-9]+}}, [[TRUEBB:bb[0-9]+]], [[FALSEBB:bb[0-9]+]]
 //
@@ -593,11 +593,11 @@ struct Wrapper<T> {
 
 // rdar://119158202 - Make sure we correctly contextualize local bindings.
 func testLazyLocal(_ x: Int?) {
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1aL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1aL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
   lazy var a = if let x { x } else { 0 }
   _ = a
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1bL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1bL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
   lazy var b = if .random() {
     let x = ""
     then x
@@ -606,9 +606,9 @@ func testLazyLocal(_ x: Int?) {
   }
   _ = b
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1cL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1cL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
   lazy var c = if .random() {
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1cL_SSvg1xL2_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1cL_SSvg1xL2_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
     lazy var x = ""
     then x
   } else {
@@ -616,9 +616,9 @@ func testLazyLocal(_ x: Int?) {
   }
   _ = c
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1dL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1dL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
   lazy var d = if .random() {
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1dL_Sivg1yL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1dL_Sivg1yL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
     lazy var y = if let x { x } else { 0 }
     then y
   } else {
@@ -626,7 +626,7 @@ func testLazyLocal(_ x: Int?) {
   }
   _ = d
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1eL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1eL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
   lazy var e = if .random() {
     @Wrapper
     var x = 0
@@ -645,7 +645,7 @@ struct LazyProp {
 
   // CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s7if_expr8LazyPropV1cSivg : $@convention(method) (@inout LazyProp) -> Int
   lazy var c = if .random() {
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr8LazyPropV1cSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr8LazyPropV1cSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
     lazy var x = 0
     then x
   } else {
@@ -654,7 +654,7 @@ struct LazyProp {
 
   // CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s7if_expr8LazyPropV1dSivg : $@convention(method) (@inout LazyProp) -> Int
   lazy var d = if .random() {
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr8LazyPropV1dSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, @inout_aliasable LazyProp) -> Int
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr8LazyPropV1dSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, @inout_aliasable LazyProp) -> Int
     lazy var x = if case let a? = a { a } else { 0 }
     then x
   } else {
@@ -665,12 +665,12 @@ struct LazyProp {
 // https://github.com/swiftlang/swift/issues/75294
 func testAsyncLet(_ x: Int?) async {
   async let _ = if let i = x { i } else { 0 }
-  // CHECK-LABEL: sil private [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
+  // CHECK-LABEL: sil private [closure] [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
 
   async let _ = if let i = x {
-    // CHECK-LABEL: sil private [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu0_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
+    // CHECK-LABEL: sil private [closure] [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu0_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
     lazy var y = i
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu0_1yL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Int) -> Int
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s7if_expr12testAsyncLetyySiSgYaFSiyYaYbcfu0_1yL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Int) -> Int
     then y
   } else {
     0

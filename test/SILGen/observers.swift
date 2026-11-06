@@ -32,7 +32,7 @@ public struct DidSetWillSetTests {
     // appears in an init/deinit for non-actor types.
     defer { a = x }
 
-    // CHECK-LABEL: sil private [ossa] @$s9observers010DidSetWillC5TestsV1xACSi_tcfc6$deferL_yyF
+    // CHECK-LABEL: sil private [closure] [ossa] @$s9observers010DidSetWillC5TestsV1xACSi_tcfc6$deferL_yyF
     // CHECK-NOT:   assign
     // CHECK:       [[SETTER:%.*]] = function_ref @$s9observers010DidSetWillC5TestsV1aSivs
     // CHECK-NEXT:  apply [[SETTER]]
@@ -199,7 +199,7 @@ actor Pop {
   }
   // In Swift 5, a defer in an actor init or deinit matches its enclosing context,
   // which is direct-to-storage.
-  // CHECK-LABEL: sil private [ossa] @$s9observers3PopC5inputACSi_tcfc6$deferL_yyF
+  // CHECK-LABEL: sil private [closure] [ossa] @$s9observers3PopC5inputACSi_tcfc6$deferL_yyF
   // CHECK-NOT:     apply
   // CHECK:         assign {{%.*}} to {{%.*}} : $*Int
   // CHECK-NOT:     apply
@@ -209,7 +209,7 @@ actor Pop {
     defer { a = 0 }
   }
 
-  // CHECK-LABEL: sil private [ossa] @$s9observers3PopCfd6$deferL_yyF
+  // CHECK-LABEL: sil private [closure] [ossa] @$s9observers3PopCfd6$deferL_yyF
   // CHECK:         [[INT:%.*]] = apply {{.*}} : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
   // CHECK-NOT:     apply
   // CHECK:         assign [[INT]] to {{.*}} : $*Int
@@ -228,7 +228,7 @@ class SaltNVinegar {
 
     // In Swift 5, an actor-isolated type has its defers match-up. So, we're
     // direct-to-storage here...
-    // CHECK-LABEL: sil private [ossa] @$s9observers12SaltNVinegarC7regularACSi_tcfc6$deferL_yyF
+    // CHECK-LABEL: sil private [closure] [ossa] @$s9observers12SaltNVinegarC7regularACSi_tcfc6$deferL_yyF
     // CHECK-NOT:     apply
     // CHECK:         assign {{%.*}} to {{%.*}} : $*Int
     // CHECK-NOT:     apply
@@ -247,7 +247,7 @@ class BBQ {
 
     // ... but if the type is using unsafe global-actor isolation, then we preserve
     // the non-direct access in the defer.
-    // CHECK-LABEL: sil private [ossa] @$s9observers3BBQC7regularACSi_tcfc6$deferL_yyF
+    // CHECK-LABEL: sil private [closure] [ossa] @$s9observers3BBQC7regularACSi_tcfc6$deferL_yyF
     // CHECK-NOT:     assign
     // CHECK:         [[SETTER:%.*]] = class_method {{%.*}} : $BBQ, #BBQ.a!setter
     // CHECK-NEXT:    apply [[SETTER]]
@@ -335,7 +335,7 @@ func local_observing_property(_ arg: Int) {
 // didSet of localproperty (above)
 // Ensure that setting the variable from within its own didSet doesn't recursively call didSet.
 
-// CHECK-LABEL: sil private [ossa] @$s9observers24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
+// CHECK-LABEL: sil private [closure] [ossa] @$s9observers24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
 // CHECK: bb0(%0 : @closureCapture @guaranteed ${ var Int })
 // CHECK: [[POINTER:%.*]] = project_box %0 : ${ var Int }, 0
 // CHECK: // function_ref observers.zero.unsafeMutableAddressor : Swift.Int
@@ -399,7 +399,7 @@ func propertyWithDidSetTakingOldValue() {
   p = zero
 }
 
-// CHECK-LABEL: sil private [ossa] @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_Sivs
+// CHECK-LABEL: sil private [closure] [ossa] @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_Sivs
 // CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @closureCapture @guaranteed ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "value", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]

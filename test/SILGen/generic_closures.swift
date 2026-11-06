@@ -144,9 +144,9 @@ class NestedGeneric<U> {
 
 // CHECK: sil hidden [ossa] @$s16generic_closures018nested_closure_in_A0yxxlF : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 // CHECK:   function_ref [[OUTER_CLOSURE:@\$s16generic_closures018nested_closure_in_A0yxxlFxyXEfU_]]
-// CHECK: sil private [ossa] [[OUTER_CLOSURE]] : $@convention(thin) <T> (@in_guaranteed T) -> @out T
+// CHECK: sil private [closure] [ossa] [[OUTER_CLOSURE]] : $@convention(thin) <T> (@in_guaranteed T) -> @out T
 // CHECK:   function_ref [[INNER_CLOSURE:@\$s16generic_closures018nested_closure_in_A0yxxlFxyXEfU_xyXEfU_]]
-// CHECK: sil private [ossa] [[INNER_CLOSURE]] : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
+// CHECK: sil private [closure] [ossa] [[INNER_CLOSURE]] : $@convention(thin) <T> (@in_guaranteed T) -> @out T {
 func nested_closure_in_generic<T>(_ x:T) -> T {
   return { { x }() }()
 }
@@ -314,9 +314,9 @@ func mixed_generic_nongeneric_nesting<T>(t: T) {
   outer()
 }
 
-// CHECK-LABEL: sil private [ossa] @$s16generic_closures06mixed_A19_nongeneric_nesting1tyx_tlF5outerL_yylF : $@convention(thin) <T> () -> ()
-// CHECK-LABEL: sil private [ossa] @$s16generic_closures06mixed_A19_nongeneric_nesting1tyx_tlF5outerL_yylF6middleL_1uyqd___tr__lF : $@convention(thin) <T><U> (@in_guaranteed U) -> ()
-// CHECK-LABEL: sil private [ossa] @$s16generic_closures06mixed_A19_nongeneric_nesting1tyx_tlF5outerL_yylF6middleL_1uyqd___tr__lF5innerL_qd__yr__lF : $@convention(thin) <T><U> (@in_guaranteed U) -> @out U
+// CHECK-LABEL: sil private [closure] [ossa] @$s16generic_closures06mixed_A19_nongeneric_nesting1tyx_tlF5outerL_yylF : $@convention(thin) <T> () -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s16generic_closures06mixed_A19_nongeneric_nesting1tyx_tlF5outerL_yylF6middleL_1uyqd___tr__lF : $@convention(thin) <T><U> (@in_guaranteed U) -> ()
+// CHECK-LABEL: sil private [closure] [ossa] @$s16generic_closures06mixed_A19_nongeneric_nesting1tyx_tlF5outerL_yylF6middleL_1uyqd___tr__lF5innerL_qd__yr__lF : $@convention(thin) <T><U> (@in_guaranteed U) -> @out U
 
 protocol Doge {
   associatedtype Nose : NoseProtocol

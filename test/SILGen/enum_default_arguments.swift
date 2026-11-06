@@ -46,11 +46,11 @@ enum NonTrivialDefaults<T: DefaultInitializable> {
 
   indirect case indirect_defarg1(f: (NonTrivialDefaults, NonTrivialDefaults) = (.empty, .empty))
 
-  // CHECK-LABEL: sil private [transparent] [ossa] @$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSSycfu_{{.*}}
+  // CHECK-LABEL: sil private [transparent] [closure] [ossa] @$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSSycfu_{{.*}}
   // CHECK:   string_literal utf8 {{.*}}enum_default_arguments.swift
   // CHECK: } // end sil function '$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSSycfu_'
 
-  // CHECK-LABEL: sil private [transparent] [ossa] @$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSiycfu0_{{.*}}
+  // CHECK-LABEL: sil private [transparent] [closure] [ossa] @$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSiycfu0_{{.*}}
   // CHECK:   %0 = integer_literal $Builtin.IntLiteral, [[@LINE+12]]
   // CHECK: } // end sil function '$s17default_arguments15testDefaultArg2AA18NonTrivialDefaultsOyxGyAA0D13InitializableRzlFSiycfu0_'
 

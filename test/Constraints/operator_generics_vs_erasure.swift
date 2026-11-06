@@ -11,14 +11,14 @@ extension Error where Self: Equatable {
     other == self
   }
 
-  // CHECK-LABEL: sil private [ossa] @$ss5ErrorP28operator_generics_vs_erasureSQRzrlE14equalsWithCastySbsAA_pFSbxXEfU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$ss5ErrorP28operator_generics_vs_erasureSQRzrlE14equalsWithCastySbsAA_pFSbxXEfU_
   // CHECK: {{.*}} = witness_method $Self, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
   // CHECK: } // end sil function '$ss5ErrorP28operator_generics_vs_erasureSQRzrlE14equalsWithCastySbsAA_pFSbxXEfU_'
   func equalsWithCast(_ other: any Error) -> Bool {
     (other as? Self).map { $0 == self } ?? false
   }
 
-  // CHECK-LABEL: sil private [ossa] @$ss5ErrorP28operator_generics_vs_erasureSQRzrlE18equalsWithIdentityySbsAA_pFSbxXEfU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$ss5ErrorP28operator_generics_vs_erasureSQRzrlE18equalsWithIdentityySbsAA_pFSbxXEfU_
   // CHECK: {{.*}} = witness_method $Self, #Equatable."==" : <Self where Self : Equatable, Self : ~Copyable, Self : ~Escapable> (Self.Type) -> (borrowing Self, borrowing Self) -> Bool
   // CHECK: } // end sil function '$ss5ErrorP28operator_generics_vs_erasureSQRzrlE18equalsWithIdentityySbsAA_pFSbxXEfU_'
   func equalsWithIdentity(_ other: any Error) -> Bool {

@@ -332,13 +332,13 @@ public func bound(_ interface: any IBase) -> (CInt) -> CInt {
   interface.method
 }
 
-// CHECK-LABEL: sil private [ossa] @$s{{.*}}5bound{{.*}}cfu_ :
+// CHECK-LABEL: sil private [closure] [ossa] @$s{{.*}}5bound{{.*}}cfu_ :
 // CHECK:         [[BODY:%.*]] = function_ref @$s{{.*}}5bound{{.*}}cfu0_
 // CHECK:         [[CAPTURE:%.*]] = copy_value
 // CHECK:         partial_apply [callee_guaranteed] [[BODY]]([[CAPTURE]])
 // CHECK:         return
 
-// CHECK-LABEL: sil private [ossa] @$s{{.*}}5bound{{.*}}cfu0_ :
+// CHECK-LABEL: sil private [closure] [ossa] @$s{{.*}}5bound{{.*}}cfu0_ :
 // CHECK:         [[OPEN:%.*]] = open_com_existential {{%.*}} to $@opened{{.*}}IBase
 // CHECK:         [[STORAGE:%.*]] = alloc_stack $@opened
 // CHECK:         [[BORROW:%.*]] = store_borrow [[OPEN]] to [[STORAGE]]

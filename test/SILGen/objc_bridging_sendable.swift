@@ -18,7 +18,7 @@ public func useSendableProperty(_ ns: NSBlah) {
   let _: (Int, Any, String, [Any]) = (42, ns.x, "", [1, 2, 3])
 }
 
-// CHECK-LABEL: sil private [ossa] @$s22objc_bridging_sendable23test_use_of_buffer_inityyKFypSo6NSBlahCKXEfU_ : $@convention(thin) @substituted <τ_0_0> (@guaranteed NSBlah) -> (@out τ_0_0, @error any Error) for <Any>
+// CHECK-LABEL: sil private [closure] [ossa] @$s22objc_bridging_sendable23test_use_of_buffer_inityyKFypSo6NSBlahCKXEfU_ : $@convention(thin) @substituted <τ_0_0> (@guaranteed NSBlah) -> (@out τ_0_0, @error any Error) for <Any>
 // CHECK: bb0(%0 : $*Any, %1 : @guaranteed $NSBlah):
 // CHECK: [[TEST_REF:%.*]] = objc_method %1 : $NSBlah, #NSBlah.test!foreign : (NSBlah) -> () throws -> any Sendable, $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, NSBlah) -> @autoreleased Optional<AnyObject>
 // CHECK: [[RESULT:%.*]] = apply [[TEST_REF]]({{.*}}, %1) : $@convention(objc_method) (Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, NSBlah) -> @autoreleased Optional<AnyObject>

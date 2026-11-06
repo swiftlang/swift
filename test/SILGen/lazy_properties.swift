@@ -26,7 +26,7 @@ func test21057425() {
 
 // CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s15lazy_properties22HasAnonymousParametersV1xSivg : $@convention(method) (@inout HasAnonymousParameters) -> Int
 
-// CHECK-LABEL: sil private [ossa] @$s15lazy_properties22HasAnonymousParametersV1xSivgS2iXEfU_ : $@convention(thin) (Int) -> Int
+// CHECK-LABEL: sil private [closure] [ossa] @$s15lazy_properties22HasAnonymousParametersV1xSivgS2iXEfU_ : $@convention(thin) (Int) -> Int
 
 // CHECK-LABEL: sil hidden [ossa] @$s15lazy_properties22HasAnonymousParametersV1xSivs : $@convention(method) (Int, @inout HasAnonymousParameters) -> ()
 
@@ -62,5 +62,5 @@ class Butt {
 
 // Both the closure and the local function inside of it should capture 'self':
 
-// CHECK-LABEL: sil private [ossa] @$s15lazy_properties4ButtC4buttSivgSiyXEfU_ : $@convention(thin) (@guaranteed Butt) -> Int
-// CHECK-LABEL: sil private [ossa] @$s15lazy_properties4ButtC4buttSivgSiyXEfU_3barL_SiyF : $@convention(thin) (@guaranteed Butt) -> Int
+// CHECK-LABEL: sil private [closure] [ossa] @$s15lazy_properties4ButtC4buttSivgSiyXEfU_ : $@convention(thin) (@guaranteed Butt) -> Int
+// CHECK-LABEL: sil private [closure] [ossa] @$s15lazy_properties4ButtC4buttSivgSiyXEfU_3barL_SiyF : $@convention(thin) (@guaranteed Butt) -> Int

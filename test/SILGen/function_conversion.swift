@@ -678,7 +678,7 @@ struct FunctionConversionParameterSubstToOrigReabstractionTest {
 // CHECK: function_ref @$s19function_conversion9dontCrashyyFs11AnyHashableV_yptSS3key_SS5valuet_tXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <(key: String, value: String), Never, (AnyHashable, Any)>
 // CHECK: return
 
-// CHECK-LABEL: sil private [ossa] @$s19function_conversion9dontCrashyyFs11AnyHashableV_yptSS3key_SS5valuet_tXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <(key: String, value: String), Never, (AnyHashable, Any)> {
+// CHECK-LABEL: sil private [closure] [ossa] @$s19function_conversion9dontCrashyyFs11AnyHashableV_yptSS3key_SS5valuet_tXEfU_ : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <(key: String, value: String), Never, (AnyHashable, Any)> {
 // CHECK: function_ref @$ss21_convertToAnyHashableys0cD0VxSHRzlF : $@convention(thin) <τ_0_0 where τ_0_0 : Hashable> (@in_guaranteed τ_0_0) -> @out AnyHashable
 // CHECK: return
 func dontCrash() {

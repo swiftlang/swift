@@ -62,7 +62,7 @@ actor MyActor {
   // CHECK: } // end sil function '$s4test7MyActorC0A7ClosureSiyYaF'
 
   ///// closure #1 in MyActor.testClosure()
-  // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A7ClosureSiyYaFSiyYaXEfU_ : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> Int {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s4test7MyActorC0A7ClosureSiyYaFSiyYaXEfU_ : $@convention(thin) @async (@sil_isolated @guaranteed MyActor) -> Int {
   // CHECK:        [[COPIED_SELF:%[0-9]+]] = copy_value %0 : $MyActor
   // CHECK:        [[BORROWED_SELF:%[0-9]+]] = begin_borrow [[COPIED_SELF]] : $MyActor
   // CHECK:        hop_to_executor [[BORROWED_SELF]] : $MyActor 
@@ -163,7 +163,7 @@ func testGlobalActorUnsafe() async {
 // CHECK: // end sil function '$s4test0A22GlobalActorWithClosureyyYaF'
 
 ///// closure #1 in testGlobalActorWithClosure()
-// CHECK-LABEL: sil private [ossa] @$s4test0A22GlobalActorWithClosureyyYaFyyYaXEfU_ : $@convention(thin) @async () -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s4test0A22GlobalActorWithClosureyyYaFyyYaXEfU_ : $@convention(thin) @async () -> () {
 // CHECK:   [[F:%[0-9]+]] = function_ref @$s4test11GlobalActorV6sharedAA02MyC0Cvau : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   [[P:%[0-9]+]] = apply [[F]]() : $@convention(thin) () -> Builtin.RawPointer
 // CHECK:   [[A:%[0-9]+]] = pointer_to_address %2 : $Builtin.RawPointer to [strict] $*MyActor
@@ -331,7 +331,7 @@ func acceptAsyncSendableClosureAlwaysInheritingErased<T>(@_inheritActorContext(a
 extension MyActor {
   func synchronous() { }
 
-  // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A10InheritingyyFyyYaYbXEfU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s4test7MyActorC0A10InheritingyyFyyYaYbXEfU_
   // CHECK: debug_value [[SELF:%[0-9]+]] : $MyActor
   // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[SELF]] : $MyActor
   // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $MyActor
@@ -342,7 +342,7 @@ extension MyActor {
     }
   }
 
-  // CHECK-LABEL: sil private [ossa] @$s4test7MyActorC0A16AlwaysInheritingyyFyyYaYbXEfU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s4test7MyActorC0A16AlwaysInheritingyyFyyYaYbXEfU_
   // CHECK: debug_value [[SELF:%[0-9]+]] : $MyActor
   // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[SELF]] : $MyActor
   // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $MyActor
@@ -354,7 +354,7 @@ extension MyActor {
 }
 
 func testIsolatedParameterWithInheritActorContext(_ isolation: isolated (any Actor)?) {
-  // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU_
   // CHECK: debug_value [[ISOLATION:%[0-9]+]] : $Optional<any Actor>
   // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[ISOLATION]] : $Optional<any Actor>
   // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $Optional<any Actor>
@@ -362,22 +362,22 @@ func testIsolatedParameterWithInheritActorContext(_ isolation: isolated (any Act
   acceptAsyncSendableClosureAlwaysInheriting {
   }
 
-  // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbScMYcXEfU0_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbScMYcXEfU0_
   // CHECK: hop_to_executor {{.*}} : $MainActor
   acceptAsyncSendableClosureAlwaysInheriting { @MainActor in
-    // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbScMYcXEfU0_yyYaYbXEfU_
+    // CHECK-LABEL: sil private [closure] [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbScMYcXEfU0_yyYaYbXEfU_
     // CHECK: hop_to_executor {{.*}} : $MainActor
     acceptAsyncSendableClosureAlwaysInheriting {
     }
   }
 
-  // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU1_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU1_
   // CHECK: debug_value [[ISOLATION:%[0-9]+]] : $Optional<any Actor>
   // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[ISOLATION]] : $Optional<any Actor>
   // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $Optional<any Actor>
   // CHECK-NEXT: hop_to_executor [[BORROW]] : $Optional<any Actor>
   acceptAsyncSendableClosureAlwaysInheriting {
-    // CHECK-LABEL: sil private [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU1_yyYaYbXEfU_
+    // CHECK-LABEL: sil private [closure] [ossa] @$s4test0A40IsolatedParameterWithInheritActorContextyyScA_pSgYiFyyYaYbXEfU1_yyYaYbXEfU_
     // CHECK: debug_value [[ISOLATION:%[0-9]+]] : $Optional<any Actor>
     // CHECK-NEXT: [[COPY:%[0-9]+]] = copy_value [[ISOLATION]] : $Optional<any Actor>
     // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $Optional<any Actor>
@@ -394,7 +394,7 @@ func testIsolatedParameterWithInheritActorContext(_ isolation: isolated (any Act
 // CHECK-NEXT: [[DYNAMIC_ISOLATION:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[ISOLATION_COPY_2]] : $any Actor
 // CHECK-NEXT: [[CLOSURE_WITH_APPLIED_ISOLATION:%.*]] = partial_apply [callee_guaranteed] [isolated_any] [[CLOSURE_REF]]([[DYNAMIC_ISOLATION]], [[ISOLATION_COPY_1]])
 func testIsolatedParamWithIsolatedAny(_ isolation: isolated any Actor) {
-  // CHECK-LABEL: sil private [ossa] @$s4test0a17IsolatedParamWithB3AnyyyScA_pYiFyyYaXEfU_
+  // CHECK-LABEL: sil private [closure] [ossa] @$s4test0a17IsolatedParamWithB3AnyyyScA_pYiFyyYaXEfU_
   // CHECK: bb0(%0 : $*(), [[DYNAMIC_ISOLATION:%[0-9]+]] : @guaranteed $Optional<any Actor>, [[CAPTURED_ISOLATION:%[0-9]+]] : @closureCapture @guaranteed $any Actor):
   // CHECK: [[COPY:%[0-9]+]] = copy_value [[CAPTURED_ISOLATION]] : $any Actor
   // CHECK-NEXT: [[BORROW:%[0-9]+]] = begin_borrow [[COPY]] : $any Actor

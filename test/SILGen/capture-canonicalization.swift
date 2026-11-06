@@ -6,7 +6,7 @@ struct Bar {}
 
 extension Foo where T == Bar {
   func foo(x: T) -> Bar {
-    // CHECK-LABEL: sil private [ossa] @{{.*}}3foo{{.*}}4foo2{{.*}} : $@convention(thin) (Bar) -> Bar
+    // CHECK-LABEL: sil private [closure] [ossa] @{{.*}}3foo{{.*}}4foo2{{.*}} : $@convention(thin) (Bar) -> Bar
     func foo2() -> Bar {
       return x
     }

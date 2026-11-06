@@ -13,7 +13,7 @@
 // CHECK:   return [[RESULT]] : $Int
 
 // -- The nested function
-// CHECK-LABEL: sil shared [serialized] [ossa] @$s11back_deploy13hasNestedFuncSiyF6nestedL_SiyF : $@convention(thin) () -> Int
+// CHECK-LABEL: sil shared [serialized] [closure] [ossa] @$s11back_deploy13hasNestedFuncSiyF6nestedL_SiyF : $@convention(thin) () -> Int
 
 // -- Back deployment thunk for hasNestedFunc()
 // CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy13hasNestedFuncSiyFTwb : $@convention(thin) () -> Int
@@ -58,7 +58,7 @@ public func hasNestedFunc() -> Int {
 // CHECK:   return {{%.*}} : $Int
 
 // -- The nested closure
-// CHECK-LABEL: sil shared [serialized] [ossa] @$s11back_deploy16hasNestedClosureSiyFSiycfU_ : $@convention(thin) () -> Int
+// CHECK-LABEL: sil shared [serialized] [closure] [ossa] @$s11back_deploy16hasNestedClosureSiyFSiycfU_ : $@convention(thin) () -> Int
 
 // -- Back deployment thunk for hasNestedClosure()
 // CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy16hasNestedClosureSiyFTwb : $@convention(thin) () -> Int

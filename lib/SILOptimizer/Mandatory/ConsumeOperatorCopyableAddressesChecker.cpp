@@ -1165,6 +1165,7 @@ SILFunction *ClosureArgumentInOutToOutCloner::initCloned(
   for (auto &Attr : orig->getSemanticsAttrs()) {
     Fn->addSemanticsAttr(Attr);
   }
+  Fn->setIsClosure(orig->isClosure());
   return Fn;
 }
 

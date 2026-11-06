@@ -12,6 +12,7 @@
 #ifndef SWIFT_SILOPTIMIZER_PASSMANAGER_TRANSFORMS_H
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_TRANSFORMS_H
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Notifications.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 
@@ -29,6 +30,7 @@ namespace swift {
     enum class TransformKind {
       Function,
       Module,
+      ClosureGroup,
     };
 
     /// Stores the kind of derived class.
@@ -177,6 +179,53 @@ namespace swift {
     }
 
     /// Inform the pass manager that we are going to delete a function.
+    void notifyWillDeleteFunction(SILFunction *F) {
+      PM->notifyWillDeleteFunction(F);
+    }
+  };
+
+  /// A transform that runs once per closure group (ClosureGroupSchedule.h): a
+  /// function and the closures it references. Consecutive closure group
+  /// transforms run as a block, one group at a time, callees first. So when a
+  /// transform runs on a group, every member has run the block's earlier
+  /// transforms and none has started a later one, and every callee in another
+  /// group has finished the block, unless it is on a call cycle with the group.
+  ///
+  /// It may only read or modify the bodies of functions in its group.
+  /// Functions it creates through SILOptFunctionBuilder join the group.
+  class SILClosureGroupTransform : public SILTransform {
+  public:
+    SILClosureGroupTransform() : SILTransform(TransformKind::ClosureGroup) {}
+
+    static bool classof(const SILTransform *S) {
+      return S->getKind() == TransformKind::ClosureGroup;
+    }
+
+    /// The entry point to the transformation. Runs once per group.
+    virtual void run() = 0;
+
+    /// The group's definitions when the transform started, in schedule order,
+    /// then functions that joined the group.
+    llvm::ArrayRef<SILFunction *> getGroup() {
+      return PM->getCurrentClosureGroup();
+    }
+
+    /// True if \p F is in the group, including functions created since
+    /// the transform started.
+    bool isInGroup(SILFunction *F) {
+      ASSERT(PM->isRunningClosureGroupTransform() &&
+             "no closure group transform is running");
+      return PM->isInCurrentClosureGroup(F);
+    }
+
+    /// Invalidate only the function \p F, using invalidation information \p K.
+    /// \p F must be in the group.
+    void invalidateAnalysis(SILFunction *F, SILAnalysis::InvalidationKind K) {
+      PM->invalidateAnalysis(F, K);
+    }
+
+    /// Inform the pass manager that we are going to delete \p F, a function in
+    /// the group.
     void notifyWillDeleteFunction(SILFunction *F) {
       PM->notifyWillDeleteFunction(F);
     }

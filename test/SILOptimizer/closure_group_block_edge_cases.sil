@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt -access-enforcement-selection -diagnose-static-exclusivity -sil-print-closure-groups -sil-print-pass-name %s -o /dev/null 2>&1 | %FileCheck %s
+
+// Verifying around both group passes verifies each group's members and the
+// module, and leaves the output unchanged.
+// RUN: %target-sil-opt -access-enforcement-selection -diagnose-static-exclusivity -sil-print-closure-groups -sil-print-pass-name -sil-verify-around-pass=access-enforcement-selection,diagnose-static-exclusivity %s -o /dev/null 2>&1 | %FileCheck %s
+
+// -sil-print-before prints the members of each group the named pass runs on,
+// and nothing for the other pass. Each group here has one member.
+// RUN: %target-sil-opt -access-enforcement-selection -diagnose-static-exclusivity -sil-print-before=access-enforcement-selection %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=PRINT
+
+// Consecutive closure group passes run in one block, group by group, and a
+// dynamic capture into a declaration-only closure does not assert.
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK: Start closure group block at stage: {{.*}} (2 groups)
+// CHECK-NEXT: Run closure group pass {{.*}} (access-enforcement-selection), Function: captureIntoDeclaration
+// CHECK-NEXT: Closure group for access-enforcement-selection: captureIntoDeclaration{{$}}
+// CHECK-NEXT: Run closure group pass {{.*}} (diagnose-static-exclusivity), Function: captureIntoDeclaration
+// CHECK-NEXT: Closure group for diagnose-static-exclusivity: captureIntoDeclaration{{$}}
+// CHECK-NEXT: Run closure group pass {{.*}} (access-enforcement-selection), Function: secondGroup
+// CHECK-NEXT: Closure group for access-enforcement-selection: secondGroup{{$}}
+// CHECK-NEXT: Run closure group pass {{.*}} (diagnose-static-exclusivity), Function: secondGroup
+// CHECK-NEXT: Closure group for diagnose-static-exclusivity: secondGroup{{$}}
+
+// PRINT:      *** SIL function before {{.*}} (access-enforcement-selection)
+// PRINT-NEXT: // captureIntoDeclaration
+// PRINT:      } // end sil function 'captureIntoDeclaration'
+// PRINT-NOT:  *** SIL function
+// PRINT:      *** SIL function before {{.*}} (access-enforcement-selection)
+// PRINT-NEXT: // secondGroup
+// PRINT:      } // end sil function 'secondGroup'
+// PRINT-NOT:  *** SIL function
+
+sil @closureDeclaration : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+
+sil @captureIntoDeclaration : $@convention(thin) (@guaranteed { var Builtin.Int64 }) -> () {
+bb0(%0 : ${ var Builtin.Int64 }):
+  %1 = project_box %0 : ${ var Builtin.Int64 }, 0
+  %2 = function_ref @closureDeclaration : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %3 = apply %2(%1) : $@convention(thin) (@inout_aliasable Builtin.Int64) -> ()
+  %4 = tuple ()
+  return %4 : $()
+}
+
+sil @secondGroup : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0 : $()
+}

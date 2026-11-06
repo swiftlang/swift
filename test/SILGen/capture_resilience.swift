@@ -14,7 +14,7 @@ public struct ResilientStruct {
 public func hasClosureLet() -> () -> ResilientStruct {
   let s = ResilientStruct()
 
-  // CHECK-LABEL: sil private [ossa] @$s18capture_resilience13hasClosureLetAA15ResilientStructVycyFADycfU_ : $@convention(thin) (ResilientStruct) -> @out ResilientStruct
+  // CHECK-LABEL: sil private [closure] [ossa] @$s18capture_resilience13hasClosureLetAA15ResilientStructVycyFADycfU_ : $@convention(thin) (ResilientStruct) -> @out ResilientStruct
   return { s }
 }
 
@@ -22,7 +22,7 @@ public func hasClosureLet() -> () -> ResilientStruct {
 public func hasClosureVar() -> () -> ResilientStruct {
   var s = ResilientStruct()
 
-  // CHECK-LABEL: sil private [ossa] @$s18capture_resilience13hasClosureVarAA15ResilientStructVycyFADycfU_ : $@convention(thin) (@guaranteed { var ResilientStruct }) -> @out ResilientStruct
+  // CHECK-LABEL: sil private [closure] [ossa] @$s18capture_resilience13hasClosureVarAA15ResilientStructVycyFADycfU_ : $@convention(thin) (@guaranteed { var ResilientStruct }) -> @out ResilientStruct
   return { s }
 }
 
@@ -30,7 +30,7 @@ public func hasClosureVar() -> () -> ResilientStruct {
 @inlinable public func hasInlinableClosureLet() -> () -> ResilientStruct {
   let s = ResilientStruct()
 
-  // CHECK-LABEL: sil shared [serialized] [ossa] @$s18capture_resilience22hasInlinableClosureLetAA15ResilientStructVycyFADycfU_ : $@convention(thin) (@in_guaranteed ResilientStruct) -> @out ResilientStruct
+  // CHECK-LABEL: sil shared [serialized] [closure] [ossa] @$s18capture_resilience22hasInlinableClosureLetAA15ResilientStructVycyFADycfU_ : $@convention(thin) (@in_guaranteed ResilientStruct) -> @out ResilientStruct
   return { s }
 }
 
@@ -38,7 +38,7 @@ public func hasClosureVar() -> () -> ResilientStruct {
 @inlinable public func hasInlinableClosureVar() -> () -> ResilientStruct {
   var s = ResilientStruct()
 
-  // CHECK-LABEL: sil shared [serialized] [ossa] @$s18capture_resilience22hasInlinableClosureVarAA15ResilientStructVycyFADycfU_ : $@convention(thin) (@guaranteed { var ResilientStruct }) -> @out ResilientStruct
+  // CHECK-LABEL: sil shared [serialized] [closure] [ossa] @$s18capture_resilience22hasInlinableClosureVarAA15ResilientStructVycyFADycfU_ : $@convention(thin) (@guaranteed { var ResilientStruct }) -> @out ResilientStruct
   return { s }
 }
 
@@ -48,7 +48,7 @@ public func consume(_: () -> ResilientStruct) {}
 public func hasNoEscapeClosureLet() {
   let s = ResilientStruct()
 
-  // CHECK-LABEL: sil private [ossa] @$s18capture_resilience21hasNoEscapeClosureLetyyFAA15ResilientStructVyXEfU_ : $@convention(thin) (ResilientStruct) -> @out ResilientStruct
+  // CHECK-LABEL: sil private [closure] [ossa] @$s18capture_resilience21hasNoEscapeClosureLetyyFAA15ResilientStructVyXEfU_ : $@convention(thin) (ResilientStruct) -> @out ResilientStruct
   consume { s }
 }
 
@@ -56,7 +56,7 @@ public func hasNoEscapeClosureLet() {
 public func hasNoEscapeClosureVar() {
   var s = ResilientStruct()
 
-  // CHECK-LABEL: sil private [ossa] @$s18capture_resilience21hasNoEscapeClosureVaryyFAA15ResilientStructVyXEfU_ : $@convention(thin) (@inout_aliasable ResilientStruct) -> @out ResilientStruct
+  // CHECK-LABEL: sil private [closure] [ossa] @$s18capture_resilience21hasNoEscapeClosureVaryyFAA15ResilientStructVyXEfU_ : $@convention(thin) (@inout_aliasable ResilientStruct) -> @out ResilientStruct
   consume { s }
 }
 
@@ -64,7 +64,7 @@ public func hasNoEscapeClosureVar() {
 @inlinable public func hasInlinableNoEscapeClosureLet() {
   let s = ResilientStruct()
 
-  // CHECK-LABEL: sil shared [serialized] [ossa] @$s18capture_resilience30hasInlinableNoEscapeClosureLetyyFAA15ResilientStructVyXEfU_ : $@convention(thin) (@in_guaranteed ResilientStruct) -> @out ResilientStruct
+  // CHECK-LABEL: sil shared [serialized] [closure] [ossa] @$s18capture_resilience30hasInlinableNoEscapeClosureLetyyFAA15ResilientStructVyXEfU_ : $@convention(thin) (@in_guaranteed ResilientStruct) -> @out ResilientStruct
   consume { s }
 }
 
@@ -72,6 +72,6 @@ public func hasNoEscapeClosureVar() {
 @inlinable public func hasInlinableNoEscapeClosureVar() {
   var s = ResilientStruct()
 
-  // CHECK-LABEL: sil shared [serialized] [ossa] @$s18capture_resilience30hasInlinableNoEscapeClosureVaryyFAA15ResilientStructVyXEfU_ : $@convention(thin) (@inout_aliasable ResilientStruct) -> @out ResilientStruct
+  // CHECK-LABEL: sil shared [serialized] [closure] [ossa] @$s18capture_resilience30hasInlinableNoEscapeClosureVaryyFAA15ResilientStructVyXEfU_ : $@convention(thin) (@inout_aliasable ResilientStruct) -> @out ResilientStruct
   consume { s }
 }

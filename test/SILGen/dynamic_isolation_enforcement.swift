@@ -35,7 +35,7 @@ func forceIsolation(isolation: isolated MyActor?) {}
 // directly to extract_executor, which is incorrect --- we need to skip
 // the check when the reference is nil.
 
-// CHECK-LABEL: sil private [ossa] @$s4test0A25OptionalIsolation_checked9isolationyAA7MyActorCSgYi_tFSiycfU_ :
+// CHECK-LABEL: sil private [closure] [ossa] @$s4test0A25OptionalIsolation_checked9isolationyAA7MyActorCSgYi_tFSiycfU_ :
 // CHECK:         [[T0:%.*]] = copy_value %0 : $Optional<MyActor>
 // CHECK-NEXT:    [[BORROW:%.*]] = begin_borrow [[T0]] :
 // CHECK-NEXT:    switch_enum [[BORROW]] : $Optional<MyActor>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2

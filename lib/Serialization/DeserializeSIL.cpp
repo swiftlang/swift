@@ -854,7 +854,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, serializedKind, isThunk,
-      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
+      isWithoutActuallyEscapingThunk, isClosure, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences,
       markedAsUsed, effect, numAttrs, hasQualifiedOwnership, isWeakImported,
       codeGenerationModel,
@@ -865,7 +865,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
-      isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
+      isWithoutActuallyEscapingThunk, isClosure, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numAttrs, hasQualifiedOwnership, isWeakImported,
       codeGenerationModel,
@@ -989,6 +989,10 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     }
 
     fn->setSerializedKind(SerializedKind_t(serializedKind));
+    // A declaration that wasn't created from its SILDeclRef, such as one a
+    // pass looked up by name, doesn't know it is a closure.
+    if (isClosure)
+      fn->setIsClosure();
 
     // If the serialized function comes from the same module, we're merging
     // modules, and can update the linkage directly. This is needed to
@@ -1052,6 +1056,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     fn->setSerializedKind(SerializedKind_t(serializedKind));
     fn->setThunk(IsThunk_t(isThunk));
     fn->setWithoutActuallyEscapingThunk(bool(isWithoutActuallyEscapingThunk));
+    fn->setIsClosure(bool(isClosure));
     fn->setInlineStrategy(Inline_t(inlineStrategy));
     fn->setSpecialPurpose(SILFunction::Purpose(specialPurpose));
     fn->setEffectsKind(EffectsKind(effect));
@@ -4532,7 +4537,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   IdentifierID usedAdHocWitnessFunctionID;
   GenericSignatureID genericSigID;
   unsigned rawLinkage, isTransparent, serializedKind, isThunk,
-      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutActuallyEscapingThunk, isClosure, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       codeGenerationModel,
@@ -4542,7 +4547,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
-      isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
+      isWithoutActuallyEscapingThunk, isClosure, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numSpecAttrs, hasQualifiedOwnership, isWeakImported,
       codeGenerationModel,

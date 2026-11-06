@@ -497,7 +497,7 @@ extension Collection {
     for _ in self.dropFirst(i) {}
     // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence
 
-    // CHECK-LABEL: sil private [ossa] @$sSl7rankingE13testDropFirstyySiFyycfU_
+    // CHECK-LABEL: sil private [closure] [ossa] @$sSl7rankingE13testDropFirstyySiFyycfU_
     _ = {
       for _ in self.dropFirst(i) {}
       // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence

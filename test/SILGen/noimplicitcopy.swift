@@ -267,7 +267,7 @@ func useClosureInt(_ f: (Int) -> ()) {}
 
 // Make sure that our closure has the proper convention.
 //
-// CHECK-LABEL: sil private [ossa] @$s14noimplicitcopy14callClosureIntyyFySicfU_ : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s14noimplicitcopy14callClosureIntyyFySicfU_ : $@convention(thin) (Int) -> () {
 // CHECK: bb0([[X:%.*]] : @noImplicitCopy $Int):
 // CHECK:   [[WRAPPED_X:%.*]] = copyable_to_moveonlywrapper [owned] [[X]]
 // CHECK:   [[MOVED_X:%.*]] = move_value [lexical] [[WRAPPED_X]]
@@ -283,7 +283,7 @@ func useClosureInt(_ f: (Int) -> ()) {}
 // CHECK:   store [[GUARANTEED_ESCAPED_X]] to [trivial] {{%.*}} : $*Int
 // CHECK: } // end sil function '$s14noimplicitcopy14callClosureIntyyFySicfU_'
 //
-// SIL-LABEL: sil private @$s14noimplicitcopy14callClosureIntyyFySicfU_ : $@convention(thin) (Int) -> () {
+// SIL-LABEL: sil private [closure] @$s14noimplicitcopy14callClosureIntyyFySicfU_ : $@convention(thin) (Int) -> () {
 // SIL-NOT: @moveOnly
 // SIL: } // end sil function '$s14noimplicitcopy14callClosureIntyyFySicfU_'
 func callClosureInt() {
@@ -301,7 +301,7 @@ func callClosureInt() {
     useClosureInt(f)
 }
 
-// CHECK-LABEL: sil private [ossa] @$s14noimplicitcopy19callClosureIntOwnedyyFySincfU_ : $@convention(thin) (Int) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s14noimplicitcopy19callClosureIntOwnedyyFySincfU_ : $@convention(thin) (Int) -> () {
 // CHECK: bb0([[ARG:%.*]] : @noImplicitCopy $Int):
 // CHECK:   [[WRAPPED_ARG:%.*]] = copyable_to_moveonlywrapper [owned] [[ARG]]
 // CHECK:   [[MOVED_ARG:%.*]] = move_value [lexical] [[WRAPPED_ARG]]
@@ -317,7 +317,7 @@ func callClosureInt() {
 // CHECK:   store [[GUARANTEED_ESCAPED_ARG]] to [trivial] {{%.*}} : $*Int
 // CHECK: } // end sil function '$s14noimplicitcopy19callClosureIntOwnedyyFySincfU_'
 //
-// SIL-LABEL: sil private @$s14noimplicitcopy19callClosureIntOwnedyyFySincfU_ : $@convention(thin) (Int) -> () {
+// SIL-LABEL: sil private [closure] @$s14noimplicitcopy19callClosureIntOwnedyyFySincfU_ : $@convention(thin) (Int) -> () {
 // SIL-NOT: @moveOnly
 // SIL: } // end sil function '$s14noimplicitcopy19callClosureIntOwnedyyFySincfU_'
 func callClosureIntOwned() {

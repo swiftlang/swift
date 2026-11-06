@@ -620,6 +620,10 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   // function.
   specializedApplySiteCallee->setSection(original->section());
 
+  // It replaces the original at the references it is specialized for, so a
+  // specialization of a closure is a closure.
+  specializedApplySiteCallee->setIsClosure(original->isClosure());
+
   specializedApplySiteCallee->inheritDerivedFrom(original);
 
   return {specializedApplySiteCallee};

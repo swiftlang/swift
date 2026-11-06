@@ -17,7 +17,7 @@ func caller<each T>(_ t: repeat each T) {
 // CHECK: [[CALLEE:%.*]]  = function_ref @$s26pack_element_expr_captures6calleeyyypyXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @out Any) -> ()
 // CHECK: apply [[CALLEE]]([[CONVERTED]]) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @out Any) -> ()
 
-// CHECK-LABEL: sil private [ossa] @$s26pack_element_expr_captures6calleryyxxQpRvzlFypyXEfU_ : $@convention(thin) <each T><τ_1_0> (@in_guaranteed τ_1_0) -> @out Any {
+// CHECK-LABEL: sil private [closure] [ossa] @$s26pack_element_expr_captures6calleryyxxQpRvzlFypyXEfU_ : $@convention(thin) <each T><τ_1_0> (@in_guaranteed τ_1_0) -> @out Any {
 // CHECK: bb0(%0 : $*Any, %1 : @closureCapture $*τ_1_0):
 // CHECK: [[ADDR:%.*]] = init_existential_addr %0 : $*Any, $τ_1_0
 // CHECK: copy_addr %1 to [init] [[ADDR]] : $*τ_1_0

@@ -31,5 +31,5 @@ public func convert(strings: [String]) -> [Int] {
 // CHECK: // function_ref
 // CHECK-NEXT: [[THUNK:%.*]] = function_ref @$sSSSiIggd_SSSis5NeverOIegnrzr_TR : $@convention(thin) (@in_guaranteed String, @guaranteed @noescape @callee_guaranteed (@guaranteed String) -> Int) -> (@out Int, @error_indirect Never)
 
-// CHECK-LABEL: sil private [ossa] @$s22partial_apply_override7convert7stringsSaySiGSaySSG_tFSiSScAA18StringIntConverterCcfu_SiSScfu0_ : $@convention(thin) (@guaranteed String, @guaranteed StringIntConverter) -> Int
+// CHECK-LABEL: sil private [closure] [ossa] @$s22partial_apply_override7convert7stringsSaySiGSaySSG_tFSiSScAA18StringIntConverterCcfu_SiSScfu0_ : $@convention(thin) (@guaranteed String, @guaranteed StringIntConverter) -> Int
 // CHECK:      [[METHOD:%.*]] = class_method %1 : $StringIntConverter, #StringIntConverter.convert : (StringIntConverter) -> (String) -> Int, $@convention(method) (@in_guaranteed String, @guaranteed StringIntConverter) -> @out Int

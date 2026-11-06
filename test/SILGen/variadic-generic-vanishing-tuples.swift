@@ -112,7 +112,7 @@ public func takeFunctionWithVariadicTupleParam<each Input, Output>(operation: @e
 public func passSingleParamClosure() {
   takeFunctionWithVariadicTupleParam(operation: { (num: Int) in num })
 }
-// CHECK-LABEL: sil private [ossa] @$s4main22passSingleParamClosureyyFS2icfU_ : $@convention(thin) @substituted <each τ_0_0, τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @out τ_0_1 for <Pack{Int}, Int> {
+// CHECK-LABEL: sil private [closure] [ossa] @$s4main22passSingleParamClosureyyFS2icfU_ : $@convention(thin) @substituted <each τ_0_0, τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @out τ_0_1 for <Pack{Int}, Int> {
 // CHECK:       bb0(%0 : $*Int, %1 : $*Pack{Int}):
 // CHECK-NEXT:    [[PI:%.*]] = scalar_pack_index 0 of $Pack{Int}
 // CHECK-NEXT:    [[ARGPTR:%.*]] = pack_element_get [[PI]] of %1
@@ -124,7 +124,7 @@ public func passSingleParamClosure() {
 public func passSingleStringClosure() {
   takeFunctionWithVariadicTupleParam(operation: { (str: String) in str })
 }
-// CHECK-LABEL: sil private [ossa] @$s4main23passSingleStringClosureyyFS2ScfU_ : $@convention(thin) @substituted <each τ_0_0, τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @out τ_0_1 for <Pack{String}, String> {
+// CHECK-LABEL: sil private [closure] [ossa] @$s4main23passSingleStringClosureyyFS2ScfU_ : $@convention(thin) @substituted <each τ_0_0, τ_0_1> (@pack_guaranteed Pack{repeat each τ_0_0}) -> @out τ_0_1 for <Pack{String}, String> {
 // CHECK:       bb0(%0 : $*String, %1 : $*Pack{String}):
 // CHECK-NEXT:    [[PI:%.*]] = scalar_pack_index 0 of $Pack{String}
 // CHECK-NEXT:    [[ARGPTR:%.*]] = pack_element_get [[PI]] of %1

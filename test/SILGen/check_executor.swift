@@ -27,10 +27,10 @@ func takeClosure(_ fn: @escaping () -> Int) { }
 public actor MyActor {
   var counter = 0
 
-  // CHECK-RAW-LABEL: sil private [ossa] @$s4test7MyActorC10getUpdaterSiycyFSiycfU_
+  // CHECK-RAW-LABEL: sil private [closure] [ossa] @$s4test7MyActorC10getUpdaterSiycyFSiycfU_
   // CHECK-RAW: extract_executor [[ACTOR:%.*]] : $MyActor
 
-  // CHECK-CANONICAL-LABEL: sil private [ossa] @$s4test7MyActorC10getUpdaterSiycyFSiycfU_
+  // CHECK-CANONICAL-LABEL: sil private [closure] [ossa] @$s4test7MyActorC10getUpdaterSiycyFSiycfU_
   // CHECK-CANONICAL: function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
   public func getUpdater() -> (() -> Int) {
     return {
@@ -39,7 +39,7 @@ public actor MyActor {
     }
   }
 
-  // CHECK-RAW-LABEL: sil private [ossa] @$s4test7MyActorC0A10UnsafeMainyyFSiyScMYccfU_
+  // CHECK-RAW-LABEL: sil private [closure] [ossa] @$s4test7MyActorC0A10UnsafeMainyyFSiyScMYccfU_
   // CHECK-RAW: _checkExpectedExecutor
   // CHECK-RAW: onMainActor
   // CHECK-RAW: return
@@ -50,7 +50,7 @@ public actor MyActor {
     }
   }
 
-  // CHECK-CANONICAL-LABEL: sil private [ossa] @$s4test7MyActorC0A13LocalFunctionyyF5localL_SiyF : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> Int
+  // CHECK-CANONICAL-LABEL: sil private [closure] [ossa] @$s4test7MyActorC0A13LocalFunctionyyF5localL_SiyF : $@convention(thin) (@sil_isolated @guaranteed MyActor) -> Int
   // CHECK-CANONICAL: [[CAPTURE:%.*]] = copy_value %0 : $MyActor
   // CHECK-CANONICAL-NEXT: [[BORROWED_CAPTURE:%.*]] = begin_borrow [[CAPTURE]] : $MyActor
   // CHECK-CANONICAL-NEXT: [[EXECUTOR:%.*]] = builtin "buildDefaultActorExecutorRef"<MyActor>([[BORROWED_CAPTURE]] : $MyActor) : $Builtin.Executor

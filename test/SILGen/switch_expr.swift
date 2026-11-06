@@ -228,7 +228,7 @@ func testClosure() throws -> Int {
   return try fn()
 }
 
-// CHECK-LABEL: sil private [ossa] @$s11switch_expr11testClosureSiyKFSiyKcfU_ : $@convention(thin) () -> (Int, @error any Error)
+// CHECK-LABEL: sil private [closure] [ossa] @$s11switch_expr11testClosureSiyKFSiyKcfU_ : $@convention(thin) () -> (Int, @error any Error)
 // CHECK:       [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK:       switch_value {{%[0-9]+}} : $Builtin.Int1, case {{%[0-9]+}}: [[TRUEBB:bb[0-9]+]], case {{%[0-9]+}}: [[FALSEBB:bb[0-9]+]]
 //
@@ -308,7 +308,7 @@ struct TestPropertyInit {
 // https://github.com/swiftlang/swift/issues/75294
 func testAsyncLet(_ x: Int?) async {
   async let _ = switch x { case let i?: i default: 0 }
-  // CHECK-LABEL: sil private [ossa] @$s11switch_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
+  // CHECK-LABEL: sil private [closure] [ossa] @$s11switch_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
 }
 
 func testNested(_ e: E) throws -> Int {
@@ -838,11 +838,11 @@ struct Wrapper<T> {
 
 // rdar://119158202 - Make sure we correctly contextualize local bindings.
 func testLazyLocal(_ x: Int?) {
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1aL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1aL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
   lazy var a = switch x { case let x?: x case nil: 0 }
   _ = a
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1bL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1bL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
   lazy var b = switch Bool.random() {
   case true:
     let x = ""
@@ -852,10 +852,10 @@ func testLazyLocal(_ x: Int?) {
   }
   _ = b
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
   lazy var c = switch Bool.random() {
   case true:
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg1xL3_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg1xL3_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
     lazy var x = ""
     then x
   case false:
@@ -863,10 +863,10 @@ func testLazyLocal(_ x: Int?) {
   }
   _ = c
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1dL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1dL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
   lazy var d = switch Bool.random() {
   case true:
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1dL_Sivg1yL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1dL_Sivg1yL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, Optional<Int>) -> Int
     lazy var y = switch x { case let x?: x case nil: 0 }
     then y
   case false:
@@ -874,7 +874,7 @@ func testLazyLocal(_ x: Int?) {
   }
   _ = d
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1eL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1eL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
   lazy var e = switch Bool.random() {
   case true:
     @Wrapper
@@ -885,7 +885,7 @@ func testLazyLocal(_ x: Int?) {
   }
   _ = e
 
-  // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1fL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+  // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1fL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
   lazy var f = switch 0 {
   case 1:
     1
@@ -904,7 +904,7 @@ struct LazyProp {
   // CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1cSivg : $@convention(method) (@inout LazyProp) -> Int
   lazy var c = switch Bool.random() {
   case true:
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1cSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1cSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
     lazy var x = 0
     then x
   case false:
@@ -914,7 +914,7 @@ struct LazyProp {
   // CHECK-LABEL: sil hidden [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1dSivg : $@convention(method) (@inout LazyProp) -> Int
   lazy var d = switch Bool.random() {
   case true:
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1dSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, @inout_aliasable LazyProp) -> Int
+    // CHECK-LABEL: sil private [closure] [lazy_getter] [noinline] [ossa] @$s11switch_expr8LazyPropV1dSivg1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }, @inout_aliasable LazyProp) -> Int
     lazy var x = switch a { case let a?: a case nil: 0 }
     then x
   case false:

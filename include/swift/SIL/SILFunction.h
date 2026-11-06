@@ -492,6 +492,9 @@ private:
   /// that it may have unboxed capture (i.e. @inout_aliasable parameters).
   unsigned IsWithoutActuallyEscapingThunk : 1;
 
+  /// See isClosure().
+  unsigned IsClosure : 1;
+
   /// If != OptimizationMode::NotSet, the optimization mode specified with an
   /// function attribute.
   unsigned OptMode : NumOptimizationModeBits;
@@ -881,6 +884,13 @@ public:
     assert(!val || isThunk() == IsReabstractionThunk);
     IsWithoutActuallyEscapingThunk = val;
   }
+
+  /// True if this is a closure (the [closure] attribute,
+  /// docs/SIL/FunctionAttributes.md): the function of a closure expression or
+  /// of a local declaration, which SILGen marks when it creates it.
+  bool isClosure() const { return IsClosure; }
+
+  void setIsClosure(bool val = true) { IsClosure = val; }
 
   bool isAsync() const { return LoweredType->isAsync(); }
 

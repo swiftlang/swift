@@ -680,7 +680,7 @@ func test_isa_pattern_array_downcast(ps: Array<P>) {
 // CHECK: function_ref @$s6switch39test_isa_pattern_array_downcast_closureyyFySayAA1P_pGcfU_
 // CHECK: } // end sil function '$s6switch39test_isa_pattern_array_downcast_closureyyF'
 func test_isa_pattern_array_downcast_closure() {
-// CHECK-LABEL: sil private [ossa] @$s6switch39test_isa_pattern_array_downcast_closureyyFySayAA1P_pGcfU_ : $@convention(thin) (@guaranteed Array<any P>) -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s6switch39test_isa_pattern_array_downcast_closureyyFySayAA1P_pGcfU_ : $@convention(thin) (@guaranteed Array<any P>) -> () {
   let _ = { (ps: [P]) -> Void in
     // CHECK: bb0(%0 : @guaranteed $Array<any P>):
     switch ps {

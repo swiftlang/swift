@@ -129,7 +129,7 @@ func opt_to_class(_ obj: AnyObject) {
 // CHECK:   function_ref @$[[THUNK_NAME:[_a-zA-Z0-9]+]]
 // CHECK: } // end sil function '$s14dynamic_lookup20opt_to_class_unboundyyF'
 //
-// CHECK: sil private [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed AnyObject) -> @owned Optional<@callee_guaranteed () -> ()> {
+// CHECK: sil private [closure] [ossa] @$[[THUNK_NAME]] : $@convention(thin) (@guaranteed AnyObject) -> @owned Optional<@callee_guaranteed () -> ()> {
 // CHECK: bb0(%0 : @guaranteed $AnyObject):
 // CHECK:   [[OPENED:%[0-9]+]] = open_existential_ref %0 : $AnyObject to $[[OPENED_TY:@opened\([0-9]+, AnyObject\) Self]]
 // CHECK:   [[OPENED_COPY:%[0-9]+]] = copy_value [[OPENED]]

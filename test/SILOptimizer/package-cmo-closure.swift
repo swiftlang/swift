@@ -38,7 +38,7 @@ public func reproduce(_ e: Something) {
 // CHECK:     } // end sil function '$s3Lib3useyySiyXEF'
 
 // closure #1 in reproduce(_:)
-// CHECK: sil shared [serialized] [canonical] [stage=canonical] [ossa] @$s3Lib9reproduceyyAA9SomethingVFSiyXEfU_ : $@convention(thin) (@in_guaranteed Something) -> Int {
+// CHECK: sil shared [serialized] [closure] [canonical] [stage=canonical] [ossa] @$s3Lib9reproduceyyAA9SomethingVFSiyXEfU_ : $@convention(thin) (@in_guaranteed Something) -> Int {
   // function_ref Something.f()
 // CHECK: bb0(%0 : @closureCapture $*Something):
 // CHECK: [[REF:%.*]] = function_ref @$s3Lib9SomethingV1fSiyF : $@convention(method) (@in_guaranteed Something) -> Int

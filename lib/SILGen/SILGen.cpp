@@ -817,6 +817,34 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   return false;
 }
 
+/// Whether SILGen emits \p constant as a closure (SILFunction::isClosure).
+/// Thunks never are.
+static bool isClosure(Lowering::TypeConverter &types, SILDeclRef constant) {
+  if (constant.isThunk())
+    return false;
+  if (constant.getAbstractClosureExpr())
+    return true;
+  if (!constant.hasDecl())
+    return false;
+  auto *decl = constant.getDecl();
+  switch (constant.kind) {
+  case SILDeclRef::Kind::Func:
+    // A local function or accessor, or a script's top-level function that
+    // captures a local of the top-level code, such as a `guard let` binding.
+    // (Script globals aren't lowered captures.)
+    return decl->getDeclContext()->isLocalContext() ||
+           types.hasLoweredLocalCaptures(constant);
+  case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
+  case SILDeclRef::Kind::PropertyWrapperInitFromProjectedValue:
+  case SILDeclRef::Kind::PropertyWrappedFieldInitAccessor:
+    // A local wrapped variable's initializers are closures. A wrapped
+    // parameter's aren't: every caller of the function calls them.
+    return !isa<ParamDecl>(decl) && decl->getDeclContext()->isLocalContext();
+  default:
+    return false;
+  }
+}
+
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   // If we already emitted the function, return it.
@@ -843,6 +871,7 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
       });
 
   F->setDeclRef(constant);
+  F->setIsClosure(isClosure(Types, constant));
 
   assert(F && "SILFunction should have been defined");
 
@@ -1388,6 +1417,7 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
 
   // Initialize F with the constant we created for it.
   F->setDeclRef(constant);
+  F->setIsClosure(isClosure(Types, constant));
 
   // Closures automatically infer [manual_ownership] based on outermost func.
   //

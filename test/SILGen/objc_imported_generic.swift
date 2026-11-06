@@ -98,7 +98,7 @@ public func arraysOfGenericParam<T: AnyObject>(y: Array<T>) {
   x.propertyArrayOfThings = y
 }
 
-// CHECK-LABEL: sil private [ossa] @$s21objc_imported_generic0C4FuncyyxmRlzClFyycfU_ : $@convention(thin) <V where V : AnyObject> () -> () {
+// CHECK-LABEL: sil private [closure] [ossa] @$s21objc_imported_generic0C4FuncyyxmRlzClFyycfU_ : $@convention(thin) <V where V : AnyObject> () -> () {
 // CHECK:  [[META:%.*]] = metatype $@thick GenericClass<V>.Type
 // CHECK:  [[INIT:%.*]] = function_ref @$sSo12GenericClassCAByxGycfC : $@convention(method) <τ_0_0 where τ_0_0 : AnyObject> (@thick GenericClass<τ_0_0>.Type) -> @owned GenericClass<τ_0_0>
 // CHECK:  apply [[INIT]]<V>([[META]])

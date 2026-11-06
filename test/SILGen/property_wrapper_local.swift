@@ -52,16 +52,16 @@ func testLocalWrapper() {
   // Check local property wrapper backing initializer and accessors
 
   // property wrapped field init accessor of value #1 in testLocalWrapper()
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_SivpfF : $@convention(thin) (Int) -> @out Wrapper<Int> {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_SivpfF : $@convention(thin) (Int) -> @out Wrapper<Int> {
 
   // getter of $value #1 in testLocalWrapper()
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testLocalWrapperyyF6$valueL_AA0F0VySiGvg : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Wrapper<Int> {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s22property_wrapper_local16testLocalWrapperyyF6$valueL_AA0F0VySiGvg : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Wrapper<Int> {
 
   // getter of value #1 in testLocalWrapper()
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivg : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Int {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivg : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Int {
 
   // setter of value #1 in testLocalWrapper()
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> () {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s22property_wrapper_local16testLocalWrapperyyF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var Wrapper<Int> }) -> () {
 }
 
 func testInitialValue() {
@@ -121,7 +121,7 @@ func testLocalLazy() {
   // CHECK: function_ref @$s22property_wrapper_local13testLocalLazyyyF5valueL_SSvg : $@convention(thin) (@guaranteed { var Lazy<String> }) -> @owned String
 
   // getter of value #1 in testLocalLazy()
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local13testLocalLazyyyF5valueL_SSvg : $@convention(thin) (@guaranteed { var Lazy<String> }) -> @owned String {
+  // CHECK-LABEL: sil private [closure] [ossa] @$s22property_wrapper_local13testLocalLazyyyF5valueL_SSvg : $@convention(thin) (@guaranteed { var Lazy<String> }) -> @owned String {
   // CHECK: function_ref @$s22property_wrapper_local4LazyO12wrappedValuexvg : $@convention(method) <τ_0_0> (@inout Lazy<τ_0_0>) -> @out τ_0_0
 }
 
@@ -170,10 +170,10 @@ func testLocalReference(count: Int) {
   // CHECK: function_ref @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var BoundedNumber<Int> }) -> ()
 
   // getter of value #1 in testLocalReference(count:)
-  // CHECK: sil private [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivg : $@convention(thin) (@guaranteed { var BoundedNumber<Int> }) -> Int
+  // CHECK: sil private [closure] [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivg : $@convention(thin) (@guaranteed { var BoundedNumber<Int> }) -> Int
 
   // setter of value #1 in testLocalReference(count:)
-  // CHECK: sil private [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var BoundedNumber<Int> }) -> ()
+  // CHECK: sil private [closure] [ossa] @$s22property_wrapper_local18testLocalReference5countySi_tF5valueL_Sivs : $@convention(thin) (Int, @guaranteed { var BoundedNumber<Int> }) -> ()
 }
 
 func takesAutoclosure(_: @autoclosure () -> Int) {}
@@ -183,14 +183,14 @@ func testCaptures() {
   @Wrapper var value = 10
   takesAutoclosure(value)
   // implicit closure #1 in testCaptures()
-  // CHECK-LABEL: sil private [transparent] [ossa] @$s22property_wrapper_local12testCapturesyyFSiyXEfu_ : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Int
+  // CHECK-LABEL: sil private [transparent] [closure] [ossa] @$s22property_wrapper_local12testCapturesyyFSiyXEfu_ : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> Int
 
   let _: () -> Void = {
     _ = value
     value = 100
   }
   // closure #1 in testCaptures()
-  // CHECK-LABEL: sil private [ossa] @$s22property_wrapper_local12testCapturesyyFyycfU_ : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> ()
+  // CHECK-LABEL: sil private [closure] [ossa] @$s22property_wrapper_local12testCapturesyyFyycfU_ : $@convention(thin) (@guaranteed { var Wrapper<Int> }) -> ()
 }
 
 @propertyWrapper

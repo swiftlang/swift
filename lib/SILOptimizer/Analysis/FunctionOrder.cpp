@@ -19,6 +19,33 @@
 
 using namespace swift;
 
+void BottomUpFunctionOrder::visitCallees(
+    SILInstruction &I, BasicCalleeAnalysis *BCA,
+    llvm::function_ref<void(SILFunction *)> fn) {
+  CalleeList callees;
+  if (auto FAS = FullApplySite::isa(&I)) {
+    callees = BCA->getCalleeList(FAS);
+  } else if (isa<StrongReleaseInst>(&I) || isa<ReleaseValueInst>(&I) ||
+             isa<DestroyValueInst>(&I)) {
+    callees =
+        BCA->getDestructors(I.getOperand(0)->getType(), /*isExactType*/ false);
+  } else if (auto *bi = dyn_cast<BuiltinInst>(&I)) {
+    switch (bi->getBuiltinInfo().ID) {
+    case BuiltinValueKind::Once:
+    case BuiltinValueKind::OnceWithContext:
+      callees = BCA->getCalleeListOfValue(bi->getArguments()[1]);
+      break;
+    default:
+      return;
+    }
+  } else {
+    return;
+  }
+
+  for (auto *CalleeFn : callees)
+    fn(CalleeFn);
+}
+
 /// Use Tarjan's strongly connected components (SCC) algorithm to find
 /// the SCCs in the call graph.
 void BottomUpFunctionOrder::DFS(SILFunction *Start) {
@@ -38,26 +65,7 @@ void BottomUpFunctionOrder::DFS(SILFunction *Start) {
   // Visit all the instructions, looking for apply sites.
   for (auto &B : *Start) {
     for (auto &I : B) {
-      CalleeList callees;
-      if (auto FAS = FullApplySite::isa(&I)) {
-        callees = BCA->getCalleeList(FAS);
-      } else if (isa<StrongReleaseInst>(&I) || isa<ReleaseValueInst>(&I) ||
-                 isa<DestroyValueInst>(&I)) {
-        callees = BCA->getDestructors(I.getOperand(0)->getType(), /*isExactType*/ false);
-      } else if (auto *bi = dyn_cast<BuiltinInst>(&I)) {
-        switch (bi->getBuiltinInfo().ID) {
-          case BuiltinValueKind::Once:
-          case BuiltinValueKind::OnceWithContext:
-            callees = BCA->getCalleeListOfValue(bi->getArguments()[1]);
-            break;
-          default:
-            continue;
-        }
-      } else {
-        continue;
-      }
-
-      for (auto *CalleeFn : callees) {
+      visitCallees(I, BCA, [&](SILFunction *CalleeFn) {
         // If not yet visited, visit the callee.
         if (DFSNum.find(CalleeFn) == DFSNum.end()) {
           DFS(CalleeFn);
@@ -67,7 +75,7 @@ void BottomUpFunctionOrder::DFS(SILFunction *Start) {
           // number based on it's DFS number.
           MinDFSNum[Start] = std::min(MinDFSNum[Start], DFSNum[CalleeFn]);
         }
-      }
+      });
     }
   }
 

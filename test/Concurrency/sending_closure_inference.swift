@@ -17,28 +17,28 @@ class NonSendableKlass {}
 // MARK: Tests //
 /////////////////
 
-// CHECK: sil private [ossa] @$s25sending_closure_inference38testAnonymousParameterSendingInferenceyyFySSYucfU_ : $@convention(thin) (@sil_sending @guaranteed String) -> () {
+// CHECK: sil private [closure] [ossa] @$s25sending_closure_inference38testAnonymousParameterSendingInferenceyyFySSYucfU_ : $@convention(thin) (@sil_sending @guaranteed String) -> () {
 func testAnonymousParameterSendingInference() {
   let _: (sending String) -> () = {
     print($0)
   }
 }
 
-// CHECK: sil private [ossa] @$s25sending_closure_inference38testNamedOnlyParameterSendingInferenceyyFySSYucfU_ : $@convention(thin) (@sil_sending @guaranteed String) -> () {
+// CHECK: sil private [closure] [ossa] @$s25sending_closure_inference38testNamedOnlyParameterSendingInferenceyyFySSYucfU_ : $@convention(thin) (@sil_sending @guaranteed String) -> () {
 func testNamedOnlyParameterSendingInference() {
   let _: (sending String) -> () = { x in
     print(x)
   }
 }
 
-// CHECK: sil private [ossa] @$s25sending_closure_inference38testNamedTypeParameterSendingInferenceyyFySSnYucfU_ : $@convention(thin) (@sil_sending @owned String) -> () {
+// CHECK: sil private [closure] [ossa] @$s25sending_closure_inference38testNamedTypeParameterSendingInferenceyyFySSnYucfU_ : $@convention(thin) (@sil_sending @owned String) -> () {
 func testNamedTypeParameterSendingInference() {
   let _: (sending String) -> () = { (x: sending String) in
     print(x)
   }
 }
 
-// CHECK: sil private [ossa] @$s25sending_closure_inference26testSendingResultInferenceyyFSSyYTcfU_ : $@convention(thin) () -> @sil_sending @owned String {
+// CHECK: sil private [closure] [ossa] @$s25sending_closure_inference26testSendingResultInferenceyyFSSyYTcfU_ : $@convention(thin) () -> @sil_sending @owned String {
 func testSendingResultInference() {
   let _: () -> sending String = { "" }
 }
