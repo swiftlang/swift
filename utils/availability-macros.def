@@ -61,8 +61,8 @@ SwiftCompatibilitySpan 5.0:macOS 10.14.4, iOS 12.2, watchOS 5.2, tvOS 12.2, visi
 # Identical to SwiftStdlib 6.2.
 SwiftCompatibilitySpan 6.2:macOS 26.0, iOS 26.0, watchOS 26.0, tvOS 26.0, visionOS 26.0
 
-# Backtracing is only available for macOS in 6.2
-Backtracing 6.2: macOS 26.0
+# Backtracing shipped for macOS in 6.2; other Apple platforms have not shipped yet
+Backtracing 6.2: macOS 26.0, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999
 
 
 # Local Variables:
