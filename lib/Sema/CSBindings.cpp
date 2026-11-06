@@ -3710,7 +3710,7 @@ void PotentialBindings::infer(Constraint *constraint) {
   if (!Constraints.insert(constraint))
     return;
 
-  ++GenerationNumber;
+  GenerationNumber = CS.getNextBindingGenerationNumber();
 
   // Record the change, if there are active scopes.
   if (CS.solverState)
@@ -3909,7 +3909,7 @@ void PotentialBindings::retract(Constraint *constraint) {
   if (!Constraints.remove(constraint))
     return;
 
-  ++GenerationNumber;
+  GenerationNumber = CS.getNextBindingGenerationNumber();
 
   // Record the change, if there are active scopes.
   if (CS.solverState)
