@@ -1,3 +1,8 @@
 module ImplicitComputedProperties {
   header "implicit-computed-properties.h"
 }
+
+module ExplicitComputedPropertiesRuntime {
+  header "explicit-computed-properties-runtime.h"
+  requires cplusplus
+}
