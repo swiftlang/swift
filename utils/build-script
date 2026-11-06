@@ -141,6 +141,24 @@ def print_xcodebuild_versions(file=sys.stdout):
     file.flush()
 
 
+def get_developer_dir():
+    """
+    Return the active Xcode developer directory: $DEVELOPER_DIR if set,
+    otherwise the output of `xcode-select -p`. Returns None on non-Darwin
+    hosts or if it cannot be determined.
+    """
+    if platform.system() != 'Darwin':
+        return None
+    developer_dir = os.environ.get('DEVELOPER_DIR')
+    if developer_dir:
+        return developer_dir
+    try:
+        return shell.capture(['xcode-select', '-p'],
+                             dry_run=False, echo=False).rstrip() or None
+    except Exception:
+        return None
+
+
 def validate_xcode_compatibility():
     if sys.platform != 'darwin':
         return
@@ -883,18 +901,13 @@ def main_normal():
             # Infer plugin path if not explicitly provided.
             if not args.caching_plugin_path:
                 plugin_path = None
-                if platform.system() == 'Darwin':
-                    try:
-                        developer_dir = shell.capture(
-                            ['xcode-select', '-p'],
-                            dry_run=False, echo=False).rstrip()
-                        candidate = os.path.join(
-                            developer_dir, 'usr', 'lib',
-                            'libToolchainCASPlugin.dylib')
-                        if os.path.isfile(candidate):
-                            plugin_path = candidate
-                    except Exception:
-                        pass
+                developer_dir = get_developer_dir()
+                if developer_dir:
+                    candidate = os.path.join(
+                        developer_dir, 'usr', 'lib',
+                        'libToolchainCASPlugin.dylib')
+                    if os.path.isfile(candidate):
+                        plugin_path = candidate
                 if plugin_path is None:
                     fatal_error(
                         "--caching-remote-service-path requires a CAS "
@@ -924,6 +937,10 @@ def main_normal():
         if args.caching_prefix_map:
             os.environ['LLVM_CACHE_PREFIX_MAPS'] = \
                 SWIFT_SOURCE_ROOT + '=/^src'
+            # On macOS, Swift compiles also map the Xcode developer directory
+            # to /^xcode, so that paths into Xcode outside of the SDK and
+            # toolchain (e.g. macro plugin search paths) are canonical.
+            args.caching_developer_dir = get_developer_dir()
 
         # Enable MCCAS backend unless using remote service or explicitly
         # disabled via environment.

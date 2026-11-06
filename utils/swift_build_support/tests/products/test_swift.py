@@ -634,3 +634,32 @@ class SwiftTestCase(unittest.TestCase):
                           swift.cmake_options)
             self.assertIn('-DSWIFT_CACHING_BUILD_CAS_PATH:PATH=/path/to/cas',
                           swift.cmake_options)
+
+    def test_caching_prefix_map_developer_dir(self):
+        self.args.enable_caching = True
+        self.args.caching_cas_path = '/path/to/cas'
+        self.args.caching_plugin_path = None
+        self.args.caching_plugin_option = None
+        self.args.caching_prefix_map = True
+
+        # No developer dir (e.g. non-Darwin hosts): nothing to map.
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn('-DSWIFT_CACHING_BUILD_PREFIX_MAP:BOOL=TRUE',
+                      swift.cmake_options)
+        self.assertEqual(
+            [], [x for x in swift.cmake_options
+                 if 'SWIFT_CACHING_BUILD_DEVELOPER_DIR' in x])
+
+        self.args.caching_developer_dir = '/path/to/developer'
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DSWIFT_CACHING_BUILD_DEVELOPER_DIR:PATH=/path/to/developer',
+            swift.cmake_options)
