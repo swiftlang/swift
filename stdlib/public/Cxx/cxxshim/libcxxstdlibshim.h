@@ -6,6 +6,9 @@
 #include <ptrauth.h>
 #endif
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnullability-extension"
+
 /// Used for std::string conformance to Swift.Hashable
 typedef std::hash<std::string> __swift_interopHashOfString;
 inline std::size_t __swift_interopComputeHashOfString(const std::string &str) {
@@ -70,7 +73,7 @@ struct __SwiftFunctionWrapper {
   __swift_interop_closure closure;
 
   Result operator()(Args... args) const {
-#if __has_include(<ptrauth.h>)
+#if __has_include(<ptrauth.h>) && __has_feature(ptrauth_intrinsics)
     return ((LoweredFunction *)ptrauth_auth_and_resign(
         closure.func, ptrauth_key_asia, PtrAuthTypeDiscriminator,
         ptrauth_key_function_pointer, 0))(std::forward<Args>(args)...,
@@ -105,3 +108,5 @@ struct __SwiftFunctionWrapper {
       __swift_interop::swift_release(closure.context);
   }
 };
+
+#pragma clang diagnostic pop
