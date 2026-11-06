@@ -31,7 +31,8 @@
 /// temporal measurement component; specifically leap seconds should be 
 /// represented as an additional accessor since that is specific only to certain
 /// clock implementations.
-@available(StdlibDeploymentTarget 5.7, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 5.7)
 @frozen
 public struct Duration: Sendable {
   /// The low 64 bits of a 128-bit signed integer value counting attoseconds.
@@ -78,20 +79,18 @@ public struct Duration: Sendable {
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 extension Duration {
   /// The composite components of the `Duration`.
   ///
   /// This is intended for facilitating conversions to existing time types. The
   /// attoseconds value will not exceed 1e18 or be lower than -1e18.
-  @available(StdlibDeploymentTarget 5.7, *)
   public var components: (seconds: Int64, attoseconds: Int64) {
     let (seconds, attoseconds) = attoseconds.dividedBy1e18()
     return (Int64(seconds), Int64(attoseconds))
   }
 }
 
-@available(StdlibDeploymentTarget 6.0, *)
+@available(SwiftStdlib 5.0, *)
 extension Duration {
   /// The number of attoseconds represented by this `Duration`.
   ///
@@ -100,7 +99,7 @@ extension Duration {
   ///
   ///     let d = Duration.seconds(1)
   ///     print(d.attoseconds) // 1_000_000_000_000_000_000
-  @available(StdlibDeploymentTarget 6.0, *)
+  @available(SwiftStdlib 5.0, *)
   @export(implementation)
   public var attoseconds: Int128 {
     Int128(_low: _low, _high: _high)
@@ -114,14 +113,13 @@ extension Duration {
   ///     print(d) // 1.0 seconds
   ///
   /// - Parameter attoseconds: The total duration expressed in attoseconds.
-  @available(StdlibDeploymentTarget 6.0, *)
+  @available(SwiftStdlib 5.0, *)
   @export(implementation)
   public init(attoseconds: Int128) {
     self.init(_high: attoseconds._high, low: attoseconds._low)
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 extension Duration {
   /// Construct a `Duration` given a number of seconds represented as a 
   /// `BinaryInteger`.
@@ -129,7 +127,6 @@ extension Duration {
   ///       let d: Duration = .seconds(77)
   ///
   /// - Returns: A `Duration` representing a given number of seconds.
-  @available(StdlibDeploymentTarget 5.7, *)
   @inlinable
   public static func seconds<T: BinaryInteger>(_ seconds: T) -> Duration {
     guard let high = Int64(exactly: seconds >> 64) else { fatalError() }
@@ -141,6 +138,7 @@ extension Duration {
   
   /// Construct a `Duration` given a duration and scale, taking care so that
   /// exact integer durations are preserved exactly.
+  @_alwaysEmitIntoClient
   internal init(_ duration: Double, scale: UInt64) {
     // Split the duration into integral and fractional parts, as we need to
     // handle them slightly differently to ensure that integer values are
@@ -162,7 +160,6 @@ extension Duration {
   ///       let d: Duration = .seconds(22.93)
   ///
   /// - Returns: A `Duration` representing a given number of seconds.
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func seconds(_ seconds: Double) -> Duration {
     Duration(seconds, scale: 1_000_000_000_000_000_000)
   }
@@ -173,7 +170,6 @@ extension Duration {
   ///       let d: Duration = .milliseconds(645)
   ///
   /// - Returns: A `Duration` representing a given number of milliseconds.
-  @available(StdlibDeploymentTarget 5.7, *)
   @inlinable
   public static func milliseconds<T: BinaryInteger>(
     _ milliseconds: T
@@ -191,7 +187,6 @@ extension Duration {
   ///       let d: Duration = .milliseconds(88.3)
   ///
   /// - Returns: A `Duration` representing a given number of milliseconds.
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func milliseconds(_ milliseconds: Double) -> Duration {
     Duration(milliseconds, scale: 1_000_000_000_000_000)
   }
@@ -202,7 +197,6 @@ extension Duration {
   ///       let d: Duration = .microseconds(12)
   ///
   /// - Returns: A `Duration` representing a given number of microseconds.
-  @available(StdlibDeploymentTarget 5.7, *)
   @inlinable
   public static func microseconds<T: BinaryInteger>(
     _ microseconds: T
@@ -220,7 +214,6 @@ extension Duration {
   ///       let d: Duration = .microseconds(382.9)
   ///
   /// - Returns: A `Duration` representing a given number of microseconds.
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func microseconds(_ microseconds: Double) -> Duration {
     Duration(microseconds, scale: 1_000_000_000_000)
   }
@@ -231,7 +224,6 @@ extension Duration {
   ///       let d: Duration = .nanoseconds(1929)
   ///
   /// - Returns: A `Duration` representing a given number of nanoseconds.
-  @available(StdlibDeploymentTarget 5.7, *)
   @inlinable
   public static func nanoseconds<T: BinaryInteger>(
     _ nanoseconds: T
@@ -255,10 +247,8 @@ extension Duration {
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension Duration: Codable {
-  @available(StdlibDeploymentTarget 5.7, *)
   public init(from decoder: Decoder) throws {
     var container = try decoder.unkeyedContainer()
     let high = try container.decode(Int64.self)
@@ -266,7 +256,6 @@ extension Duration: Codable {
     self.init(_high: high, low: low)
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public func encode(to encoder: Encoder) throws {
     var container = encoder.unkeyedContainer()
     try container.encode(_high)
@@ -274,120 +263,97 @@ extension Duration: Codable {
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: Hashable {
-  @available(StdlibDeploymentTarget 5.7, *)
   public func hash(into hasher: inout Hasher) {
     hasher.combine(attoseconds)
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: Equatable {
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func == (_ lhs: Duration, _ rhs: Duration) -> Bool {
     return lhs.attoseconds == rhs.attoseconds
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: Comparable {
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func < (_ lhs: Duration, _ rhs: Duration) -> Bool {
     return lhs.attoseconds < rhs.attoseconds
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: AdditiveArithmetic {
-  @available(StdlibDeploymentTarget 5.7, *)
   public static var zero: Duration { Duration(attoseconds: 0) }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func + (_ lhs: Duration, _ rhs: Duration) -> Duration {
     return Duration(attoseconds: lhs.attoseconds + rhs.attoseconds)
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func - (_ lhs: Duration, _ rhs: Duration) -> Duration {
     return Duration(attoseconds: lhs.attoseconds - rhs.attoseconds)
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func += (_ lhs: inout Duration, _ rhs: Duration) {
     lhs = lhs + rhs
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func -= (_ lhs: inout Duration, _ rhs: Duration) {
     lhs = lhs - rhs
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 extension Duration {
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func / (_ lhs: Duration, _ rhs: Double) -> Duration {
     Duration(attoseconds: Int128(Double(lhs.attoseconds) / rhs))
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func /= (_ lhs: inout Duration, _ rhs: Double) {
     lhs = lhs / rhs
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func / <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
     Duration(attoseconds: lhs.attoseconds / Int128(rhs))
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func /= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
     lhs = lhs / rhs
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func / (_ lhs: Duration, _ rhs: Duration) -> Double {
     Double(lhs.attoseconds) / Double(rhs.attoseconds)
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func * (_ lhs: Duration, _ rhs: Double) -> Duration {
     Duration(attoseconds: Int128(Double(lhs.attoseconds) * rhs))
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func * <T: BinaryInteger>(
     _ lhs: Duration, _ rhs: T
   ) -> Duration {
     Duration(attoseconds: lhs.attoseconds * Int128(rhs))
   }
 
-  @available(StdlibDeploymentTarget 5.7, *)
   public static func *= <T: BinaryInteger>(_ lhs: inout Duration, _ rhs: T) {
     lhs = lhs * rhs
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
 @_unavailableInEmbedded
 extension Duration: CustomStringConvertible {
-  @available(StdlibDeploymentTarget 5.7, *)
   public var description: String {
     return (Double(attoseconds) / 1e18).description + " seconds"
   }
 }
 
-@available(StdlibDeploymentTarget 5.7, *)
+@available(SwiftStdlib 5.7, *)
 extension Duration: DurationProtocol { }
 
-@available(StdlibDeploymentTarget 5.7, *)
 extension Duration: ConvertibleToBytes, ConvertibleFromBytes {}
 
-@available(StdlibDeploymentTarget 6.0, *)
+@available(SwiftStdlib 5.0, *)
 extension Int128 {
+  @_alwaysEmitIntoClient
   internal func multiplied(by other: UInt64) -> Self {
     // Mathematically this is just self * Int128(other), but the optimizer
     // doesn't quite get all the invariants it needs to optimize that as well
@@ -399,6 +365,7 @@ extension Int128 {
     return Int128(_low: tail.low, _high: head)
   }
   
+  @_alwaysEmitIntoClient
   internal func dividedBy1e18() -> (quotient: Self, remainder: Self) {
     let m = Int128(_low: 8336148766501648893, _high: 664613997892457936)
     var q = self.multipliedFullWidth(by: m).high
