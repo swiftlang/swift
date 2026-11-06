@@ -36,6 +36,8 @@ internal import WinSDK
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 @_implementationOnly import BacktracingImpl.CompressionLibs
 @_implementationOnly import BacktracingImpl.ImageFormats.Elf
@@ -75,6 +77,12 @@ private var zstdHandle = dlopen("libzstd.dylib", RTLD_LAZY)
 private var lzmaHandle = dlopen("liblzma.so.5", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.so.1", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.so.1", RTLD_LAZY)
+#elseif os(Android)
+// Android libraries have no version in their names.  An app can open only
+// libz.so, which is part of the NDK; liblzma.so and libzstd.so may be missing.
+private var lzmaHandle = dlopen("liblzma.so", RTLD_LAZY)
+private var zlibHandle = dlopen("libz.so", RTLD_LAZY)
+private var zstdHandle = dlopen("libzstd.so", RTLD_LAZY)
 #elseif os(Windows)
 private var lzmaHandle = LoadLibraryA("liblzma.dll")
 private var zlibHandle = LoadLibraryA("zlib1.dll")

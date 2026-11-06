@@ -7,7 +7,7 @@
 // UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
-// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc || OS=linux-android || OS=linux-androideabi
 
 import Runtime
 

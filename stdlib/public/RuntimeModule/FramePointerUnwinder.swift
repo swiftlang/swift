@@ -30,17 +30,17 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   var isAsync: Bool
   var done: Bool
 
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   var images: ImageMap?
   #endif
 
   var reader: MemoryReader
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
-  #if os(macOS) || os(Linux)
+  #if os(macOS) || os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
   #endif
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   public init(context: Context,
@@ -56,7 +56,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     reader = memoryReader
 
     // On Linux, the unwinder needs images in order to spot async frames
-    #if os(Linux)
+    #if os(Linux) || os(Android)
     self.images = images
     #endif
   }
@@ -80,15 +80,15 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
-  #if os(macOS) || os(Linux)
+  #if os(macOS) || os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
   #endif
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   private mutating func isAsyncPC(_ pc: Address) -> Bool {
     // On Linux, we need to examine the PC to see if this is an async frame
-    #if os(Linux)
+    #if os(Linux) || os(Android)
     guard let address = Backtrace.Address(pc) else {
       return false
     }
@@ -122,10 +122,10 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
-  #if os(macOS) || os(Linux)
+  #if os(macOS) || os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
   #endif
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   private func isAsyncFrame(_ storedFp: Address) -> Bool {
@@ -139,10 +139,10 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
-  #if os(macOS) || os(Linux)
+  #if os(macOS) || os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
   #endif
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   private func stripPtrAuth(_ address: Address) -> Address {
@@ -150,10 +150,10 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
-  #if os(macOS) || os(Linux)
+  #if os(macOS) || os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
   #endif
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   private mutating func fetchAsyncContext() -> Bool {
@@ -169,10 +169,10 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
-  #if os(macOS) || os(Linux)
+  #if os(macOS) || os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
   #endif
-  #if os(Linux)
+  #if os(Linux) || os(Android)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
   public mutating func next() -> RichFrame<Address>? {

@@ -301,7 +301,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
                              offset: Int = 0,
                              top: Int = 16,
                              images: ImageMap? = nil) throws -> Backtrace {
-    #if os(Linux) || os(Windows)
+    #if os(Linux) || os(Android) || os(Windows)
     // On Linux, we need the captured images to resolve async functions;
     // on Windows, we need them because they contain unwind information.
     let theImages = images ?? ImageMap.capture()
@@ -309,11 +309,20 @@ public struct Backtrace: CustomStringConvertible, Sendable {
     let theImages = images
     #endif
 
+    #if os(Android)
+    // In an Android app, the stack also holds frames from the Android Runtime
+    // that don't keep a frame pointer chain, so the unwinder can follow a bad
+    // pointer there; use a reader that throws instead of crashing.
+    let reader = UncachedLocalMemoryReader()
+    #else
+    let reader = UnsafeLocalMemoryReader()
+    #endif
+
     // N.B. We use offset+1 here to skip this frame, rather than inlining
     //      this code into the client.
     return try HostContext.withCurrentContext { ctx in
       try capture(from: ctx,
-                  using: UnsafeLocalMemoryReader(),
+                  using: reader,
                   images: theImages,
                   algorithm: algorithm,
                   limit: limit,
@@ -374,7 +383,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
     #if os(anyAppleOS)
     static public let `default` = SymbolicationPlatform.Darwin
-    #elseif os(Linux)
+    #elseif os(Linux) || os(Android)
     static public let `default` = SymbolicationPlatform.Linux
     #elseif os(Windows)
     static public let `default` = SymbolicationPlatform.Windows
