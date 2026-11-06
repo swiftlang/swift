@@ -307,6 +307,38 @@ extension ASTGenVisitor {
     SourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
   }
 
+  /// Obtains the C++ start location of `token`.
+  ///
+  /// A closing token the parser synthesized during recovery has a zero-width
+  /// position just past the preceding token *and its trailing trivia*, which can
+  /// lie beyond the construct that contains it. The C++ parser gives a token it
+  /// did not find the start of the previous token it consumed
+  /// (`Parser::getErrorOrMissingLoc`), which lets a construct end where its
+  /// contents end, so do the same.
+  @inline(__always)
+  func generateSourceLoc(_ token: TokenSyntax) -> SourceLoc {
+    // This applies to closing tokens only: a missing token that starts or
+    // continues a construct, such as the `var` of a declaration or the `{` of a
+    // `switch` whose subject is another `switch`, must not move back into what
+    // precedes it.
+    if token.presence == .missing,
+      token.rawTokenKind == .rightParen || token.rawTokenKind == .rightBrace
+        || token.rawTokenKind == .rightSquare || token.rawTokenKind == .rightAngle,
+      let parent = token.parent,
+      let lastInParent = parent.lastToken(viewMode: .sourceAccurate),
+      lastInParent.endPosition <= token.position,
+      let previous = token.previousToken(viewMode: .sourceAccurate)
+    {
+      return SourceLoc(at: previous.positionAfterSkippingLeadingTrivia, in: self.base)
+    }
+    return SourceLoc(at: token.positionAfterSkippingLeadingTrivia, in: self.base)
+  }
+
+  @inline(__always)
+  func generateSourceLoc(_ token: TokenSyntax?) -> SourceLoc {
+    token.map { self.generateSourceLoc($0) } ?? nil
+  }
+
   /// Obtains the C++ start location of the node excluding leading trivia in the
   /// source buffer. If the `node` is nil returns an invalid source location.
   @inline(__always)
