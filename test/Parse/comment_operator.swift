@@ -20,7 +20,7 @@ func test3() { _ = 1/**/+2 }                  // expected-cparser-error {{consec
 func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-warning {{integer literal is unused}}
 
 // Continue to be errors
-func test5() { _ = !/* */foo }                // expected-cparser-error {{unary operator cannot be separated from its operand}} expected-astgen-error {{expected expression in function}} expected-astgen-error {{unexpected code '!/* */foo' in function}}
+func test5() { _ = !/* */foo }                // expected-cparser-error {{unary operator cannot be separated from its operand}} expected-astgen-error {{expected expression in function}}
 func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-warning {{integer literal is unused}}
 
 // Continue to work

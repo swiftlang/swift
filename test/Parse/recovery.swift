@@ -26,7 +26,7 @@ class Container<T> {
 }
 
 func useContainer() -> () {
-  var a : Container<not a type [skip this greater: >] >, b : Int // expected-cparser-error{{expected '>' to complete generic argument list}} expected-astgen-error {{expected '>' to end generic argument clause}} expected-note{{to match this opening '<'}} expected-astgen-note {{'a' declared here}} expected-astgen-note {{'a' declared here}} expected-astgen-error {{cannot find type 'not' in scope}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{use of local variable 'a' before its declaration}} expected-astgen-error {{unexpected code 'this greater: >' in subscript}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{unexpected code ', b : Int' in function}}
+  var a : Container<not a type [skip this greater: >] >, b : Int // expected-cparser-error{{expected '>' to complete generic argument list}} expected-astgen-error {{expected '>' to end generic argument clause}} expected-note{{to match this opening '<'}} expected-astgen-note {{'a' declared here}} expected-astgen-note {{'a' declared here}} expected-astgen-error {{cannot find type 'not' in scope}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{use of local variable 'a' before its declaration}} expected-astgen-error {{unexpected code 'this greater: >' in subscript}} expected-astgen-error {{expected expression after operator}}
   b = 5 // no-warning // expected-astgen-error {{cannot find 'b' in scope; did you mean 'a'?}}
   a.exists()
 }

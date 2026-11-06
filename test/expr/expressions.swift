@@ -232,17 +232,17 @@ func test_unary1() {
   x = *x      // expected-error {{'*' is not a prefix unary operator}}
   x = x*      // expected-error {{'*' is not a postfix unary operator}}
   x = +(-x)
-  x = + -x // expected-cparser-error {{unary operator cannot be separated from its operand}} {{8-9=}} expected-astgen-error {{expected expression in function}} expected-astgen-error {{unexpected code '+ -x' in function}}
+  x = + -x // expected-cparser-error {{unary operator cannot be separated from its operand}} {{8-9=}} expected-astgen-error {{expected expression in function}}
 }
 func test_unary2() {
   var x: Int
   // FIXME: second diagnostic is redundant.
-  x = &; // expected-cparser-error {{expected expression after unary operator}} expected-astgen-error {{unexpected code '&' in function}} expected-cparser-error {{expected expression in assignment}} expected-astgen-error {{expected expression in function}}
+  x = &; // expected-cparser-error {{expected expression after unary operator}} expected-cparser-error {{expected expression in assignment}} expected-astgen-error {{expected expression in function}}
 }
 func test_unary3() {
   var x: Int
   // FIXME: second diagnostic is redundant.
-  x = &, // expected-cparser-error {{expected expression after unary operator}} expected-astgen-error {{unexpected code '&,' in function}} expected-cparser-error {{expected expression in assignment}} expected-astgen-error {{expected expression in function}}
+  x = &, // expected-cparser-error {{expected expression after unary operator}} expected-cparser-error {{expected expression in assignment}} expected-astgen-error {{expected expression in function}}
 }
 
 func test_as_1() {
