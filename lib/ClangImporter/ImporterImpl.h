@@ -2641,6 +2641,11 @@ bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
 void checkRetainReleaseFunctions(ClassDecl *classDecl,
                                  ClangImporter::Implementation &Impl);
 
+/// Returns true if \p method overrides a virtual member retain or release operation.
+bool isOverrideOfRetainReleaseMethod(const clang::CXXMethodDecl *method,
+                                     StringRef swiftBaseName,
+                                     Evaluator &evaluator);
+
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.
 ///

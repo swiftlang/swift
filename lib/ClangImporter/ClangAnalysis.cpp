@@ -895,6 +895,12 @@ resolveRefCountOperation(const ClassDecl *classDecl,
   }
 
   checkRefCountOperation(classDecl, op, isRetain, name, &Impl, loc);
+
+  // The compiler already takes care of reference counting, so explicitly
+  // calling retain/release operations in Swift unbalances the reference count
+  // and is likely a bug. Mark them as @unsafe(always), so that every use must
+  // be acknowledged with 'unsafe'.
+  Impl.markUnsafe(op, /*always=*/true);
   return op;
 }
 
@@ -1138,6 +1144,62 @@ void importer::checkRetainReleaseFunctions(
   Impl.setForeignReferenceTypeOperations(recordDecl, retainFn, releaseFn);
 }
 
+bool importer::isOverrideOfRetainReleaseMethod(
+    const clang::CXXMethodDecl *method, StringRef swiftBaseName,
+    Evaluator &evaluator) {
+  // Member retain/release operations take no arguments.
+  if (method->size_overridden_methods() == 0 || method->getNumParams() != 0)
+    return false;
+
+  const clang::CXXRecordDecl *record = method->getParent();
+  auto recordFRTInfo = evaluateOrDefault(
+      evaluator, ForeignReferenceTypeInfoRequest({record}), {});
+  if (!recordFRTInfo.isReference() || !recordFRTInfo.isValid() ||
+      recordFRTInfo.isImmortal())
+    return false;
+
+  const auto *annotated =
+      dyn_cast_or_null<clang::CXXRecordDecl>(recordFRTInfo.getDecl());
+  if (!annotated || !annotated->getDefinition())
+    return false;
+  annotated = annotated->getDefinition();
+
+  RetainReleaseInfo rrInfo(annotated);
+  if (!rrInfo.isValid())
+    return false;
+
+  auto isRetainOrRelease = [&](StringRef op) {
+    return op.consume_front(".") && op == swiftBaseName;
+  };
+
+  if (!isRetainOrRelease(rrInfo.getRetain()) &&
+      !isRetainOrRelease(rrInfo.getRelease()))
+    return false;
+
+  // 'method' must override a method declared in the annotated record or one of
+  // its bases; otherwise it overrides a method of some other base.
+  llvm::SmallVector<const clang::CXXMethodDecl *, 4> worklist(
+      method->overridden_methods());
+  llvm::SmallPtrSet<const clang::CXXMethodDecl *, 4> visited;
+
+  while (!worklist.empty()) {
+    auto *currentMethod = worklist.pop_back_val();
+    if (!visited.insert(currentMethod).second)
+      continue;
+
+    auto *currentRecord = currentMethod->getParent();
+
+    if (currentRecord->getCanonicalDecl() == annotated->getCanonicalDecl() ||
+        annotated->isDerivedFrom(currentRecord))
+      return true;
+
+    worklist.append(currentMethod->begin_overridden_methods(),
+                    currentMethod->end_overridden_methods());
+  }
+
+  return false;
+}
+
 //===----------------------------------------------------------------------===//
 // Unsafe projection ("__fooUnsafe") analysis
 //===----------------------------------------------------------------------===//
@@ -1223,8 +1285,8 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
   auto unsafe = [](CxxUnsafetyReason reason)
       -> std::optional<CxxUnsafetyReason> { return reason; };
 
-  // The user explicitly acknowledged this method's unsafety and asked us to
-  // import it as is anyway. No renaming needed.
+  // The user explicitly acknowledged this method's unsafety
+  // and asked us to import it as is anyway. No renaming needed.
   if (hasUnsafeAPIAttr(method))
     return safe();
 

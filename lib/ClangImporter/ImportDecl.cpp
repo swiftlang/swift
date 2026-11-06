@@ -4792,6 +4792,12 @@ namespace {
                 result->addAttribute(unavailable->getParsedAttr()->clone(
                     Impl.SwiftContext, /*implicit=*/true));
 
+              if (!result->getBaseName().isSpecial() &&
+                  importer::isOverrideOfRetainReleaseMethod(
+                      decl, result->getBaseName().getIdentifier().str(),
+                      Impl.SwiftContext.evaluator))
+                Impl.markUnsafe(result, /*always=*/true);
+
               // swiftify is called on import, but the virtualThunkToOriginal
               // mapping is not yet ready at that time, so call it again.
               Impl.swiftify(result);
