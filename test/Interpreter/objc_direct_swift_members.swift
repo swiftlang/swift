@@ -80,7 +80,8 @@ let t = Tagged(twice: "x")
 print("\(type(of: t)) tag=\(t.tag) extra=\(t.extra)")
 
 // Direct members are invisible to the Objective-C runtime.
-// CHECK-NEXT: false false false
+// CHECK-NEXT: false false false false
 print(s.responds(to: NSSelectorFromString("count")),
+      s.responds(to: NSSelectorFromString("total")),
       c.responds(to: NSSelectorFromString("initWithValue:")),
       t.responds(to: NSSelectorFromString("initWithTwice:")))

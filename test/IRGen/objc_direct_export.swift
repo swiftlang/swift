@@ -1,16 +1,24 @@
-// REQUIRES: objc_interop
+// REQUIRES: objc_interop, OS=macosx
 // REQUIRES: swift_feature_ObjCDirect
 
+// The checks are written against arm64 IR, where Int is i64.
+// RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-ir -package-name objc_direct_pkg \
-// RUN:   -enable-experimental-feature ObjCDirect %s \
-// RUN:   | %FileCheck %s --implicit-check-not='-[_TtC' \
-// RUN:     --implicit-check-not='L_selector_data(bar)' \
-// RUN:     --implicit-check-not='L_selector_data(initWithValue:)'
+// RUN:   -target arm64-apple-macosx13.0 \
+// RUN:   -enable-experimental-feature ObjCDirect %s -o %t/onone.ll
+// RUN: %FileCheck %s < %t/onone.ll
+// RUN: %FileCheck %s -check-prefix=ABSENT < %t/onone.ll
 //
 // RUN: %target-swift-frontend -O -emit-ir -package-name objc_direct_pkg \
-// RUN:   -enable-experimental-feature ObjCDirect %s | %FileCheck %s -check-prefix=OPT \
-// RUN:     --implicit-check-not='ptr @"-[Visibility internalDirect]D"' \
-// RUN:     --implicit-check-not='ptr @"-[Visibility packageDirect]D"'
+// RUN:   -target arm64-apple-macosx13.0 \
+// RUN:   -enable-experimental-feature ObjCDirect %s -o %t/opt.ll
+// RUN: %FileCheck %s -check-prefix=OPT < %t/opt.ll
+// RUN: %FileCheck %s -check-prefix=OPT-ABSENT < %t/opt.ll
+
+// Absences use prefixes of their own, so each one scans the whole IR.
+// ABSENT-NOT: -[_TtC
+// ABSENT-NOT: L_selector_data(bar)
+// ABSENT-NOT: L_selector_data(initWithValue:)
 
 import Foundation
 
@@ -86,6 +94,8 @@ final class Inits: NSObject {
 }
 
 // At -O, non-public direct symbols stay out of llvm.used so they can be stripped.
+// OPT-ABSENT-NOT: ptr @"-[Visibility internalDirect]D"
+// OPT-ABSENT-NOT: ptr @"-[Visibility packageDirect]D"
 // Not checked at -Onone, where they show up in llvm.used for an unknown reason.
 // They're still emitted, since ObjC callers in the module may use them.
 // OPT: @llvm.used = {{.*}}"-[Visibility publicDirect]D"
@@ -111,4 +121,45 @@ public class Linkage: NSObject, InternalP {
   // The witness thunk for an internal protocol must not be exported.
   // CHECK-DAG: define {{internal|private}} swiftcc {{i32|i64}} @"$s{{.*}}7LinkageC{{.*}}InternalP{{.*}}3fooSiyFTW"(
   @objcDirect public final func foo() -> Int { 1 }
+}
+
+// MARK: Storage
+
+// A direct property leaves both Objective-C metadata lists.
+// ABSENT-NOT: L_selector_data(count)
+// ABSENT-NOT: L_selector_data(setCount:)
+// ABSENT-NOT: L_selector_data(shared)
+// ABSENT-NOT: L_selector_data(objectAtIndexedSubscript:)
+// ABSENT-NOT: L_selector_data(setObject:atIndexedSubscript:)
+// ABSENT-NOT: _PROPERTIES_DirectProps
+
+@objc(DirectProps)
+public class DirectProps: NSObject {
+  // CHECK-DAG: define {{.*}}@"-[DirectProps count]D"(ptr %0)
+  // CHECK-DAG: define {{.*}}@"-[DirectProps setCount:]D"(ptr %0, i64 %1)
+  @objcDirect public var count: Int = 0
+
+  // CHECK-DAG: define {{.*}}@"-[DirectProps readOnly]D"(ptr %0)
+  @objcDirect public var readOnly: Int { 0 }
+
+  // CHECK-DAG: define {{.*}}@"+[DirectProps shared]D"(ptr %0)
+  @objcDirect public static var shared: Int { 0 }
+
+  // CHECK-DAG: define {{.*}}@"-[DirectProps objectAtIndexedSubscript:]D"(ptr %0, i64 %1)
+  // CHECK-DAG: define {{.*}}@"-[DirectProps setObject:atIndexedSubscript:]D"(ptr %0, i64 %1, i64 %2)
+  @objcDirect public subscript(i: Int) -> Int {
+    get { i }
+    set {}
+  }
+}
+
+// MARK: Categories
+
+// An extension whose only @objc members are direct contributes nothing to the
+// Objective-C metadata, so it emits (and registers) no category.
+// ABSENT-NOT: _CATEGORY_{{[^"]*}}10OnlyDirect
+public class OnlyDirect: NSObject {}
+extension OnlyDirect {
+  @objcDirect public final func f() {}
+  @objcDirect public var p: Int { 1 }
 }
