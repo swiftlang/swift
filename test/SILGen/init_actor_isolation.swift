@@ -28,3 +28,26 @@ actor A {
     _ = await f(isolatedTo: #isolation)
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+func g(isolatedTo actor: isolated any Actor = #isolation) {}
+
+// https://github.com/swiftlang/swift/issues/93800
+@available(SwiftStdlib 5.1, *)
+actor B {
+  let number: Int
+
+  // CHECK-LABEL: sil hidden{{.*}}[ossa] @$s4test1BCACyYacfc : $@convention(method) @async (@sil_isolated @owned B) -> @owned B
+  init() async {
+    number = 0
+
+    // CHECK-NOT: builtin "flowSensitiveSelfIsolation"
+    // CHECK: [[SELF_COPY:%.*]] = copy_value {{%.*}} : $B
+    // CHECK-NEXT: [[ISOLATION:%.*]] = init_existential_ref [[SELF_COPY]] : $B : $B, $any Actor
+    // CHECK-NOT: builtin "flowSensitiveSelfIsolation"
+    // CHECK: [[G:%.*]] = function_ref @$s4test1g10isolatedToyScA_pYi_tF
+    // CHECK-NEXT: apply [[G]]([[ISOLATION]])
+    // CHECK: } // end sil function '$s4test1BCACyYacfc'
+    g()
+  }
+}
