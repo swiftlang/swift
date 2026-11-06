@@ -399,6 +399,34 @@ public:
   }
   void checkSILInstruction(SILInstruction *I) {}
 };
+
+/// Information about the computed C array projection, if any, attached to a
+/// given stored property.
+struct CArrayProjectionInfo {
+  VarDecl *computedProperty;
+  CArrayProjection storedProjection;
+  CArrayProjection computedProjection;
+  Decl *computedCounterpart;
+
+  static std::optional<CArrayProjectionInfo>
+  forStoredProperty(VarDecl *property) {
+    auto *attr = property->getAttrs().getAttribute<CArrayProjectionAttr>();
+    if (!attr)
+      return std::nullopt;
+    
+    auto *modern = dyn_cast_or_null<VarDecl>(attr->getCounterpart());
+    if (!modern)
+      return std::nullopt;
+
+    auto *modernAttr = modern->getAttrs().getAttribute<CArrayProjectionAttr>();
+    if (!modernAttr)
+      return std::nullopt;
+
+    return CArrayProjectionInfo{modern, attr->getProjection(),
+                                modernAttr->getProjection(),
+                                modernAttr->getCounterpart()};
+  }
+};
 } // end anonymous namespace
 
 namespace {
@@ -507,23 +535,40 @@ void verifyKeyPathComponent(SILModule &M,
               "property");
     }
 
-    auto fieldTy = baseTy->getTypeOfMember(property)
-                         ->getReferenceStorageReferent()
-                         ->getCanonicalType();
-    require(getTypeInExpansionContext(fieldTy) ==
-                getTypeInExpansionContext(componentTy),
-            "property decl should be a member of the base with the same type "
-            "as the component");
     require(property->hasStorage(), "property must be stored");
     require(!checkResilience(property, M.getSwiftModule(),
                              expansion, serializedKind),
             "cannot access storage of resilient property");
-    auto propertyTy =
-        loweredBaseTy.getFieldType(property, M, typeExpansionContext);
-    require(propertyTy.getObjectType()
-              == loweredComponentTy.getObjectType(),
-            "component type should match the maximal abstraction of the "
-            "formal type");
+
+    // Modern C array projections use a `stored_property` component with
+    // the legacy projection in `getStoredPropertyDecl()`, but the modern
+    // projection's type in `getComponentTy()`.
+    auto cArrayInfo = CArrayProjectionInfo::forStoredProperty(property);
+    if (cArrayInfo && baseTy->getTypeOfMember(cArrayInfo->computedProperty)
+                          ->getCanonicalType() == componentTy) {
+      require(cArrayInfo->storedProjection != CArrayProjection::Modern,
+              "stored property must not be a modern C array projection");
+      require(cArrayInfo->computedProjection == CArrayProjection::Modern,
+              "computed property must be a modern C array projection");
+      require(cArrayInfo->computedCounterpart == property,
+              "C array counterpart relationship must be reciprocal");
+      require(!cArrayInfo->computedProperty->hasStorage(),
+              "modern projection of a C array must not be stored");
+    } else {
+      auto fieldTy = baseTy->getTypeOfMember(property)
+                           ->getReferenceStorageReferent()
+                           ->getCanonicalType();
+      require(getTypeInExpansionContext(fieldTy) ==
+                  getTypeInExpansionContext(componentTy),
+              "property decl should be a member of the base with the same "
+              "type as the component");
+      auto propertyTy =
+          loweredBaseTy.getFieldType(property, M, typeExpansionContext);
+      require(propertyTy.getObjectType()
+                == loweredComponentTy.getObjectType(),
+              "component type should match the maximal abstraction of the "
+              "formal type");
+    }
     break;
   }
     
@@ -2063,22 +2108,22 @@ public:
       return checkLegalSILType(F, objectType, I);
     }
 
-    // Function values with execution semantics have a context. Thin
-    // functions, including closure bodies and thunks, never have execution
-    // semantics themselves; `partial_apply` or `thin_to_thick_function` adds
-    // them to the value. Calling an escaping value with execution semantics
-    // consumes its context; only a non-escaping one, such as a stack-promoted
-    // closure, can be `@callee_guaranteed`.
+    // Noncopyable function values have a context. Thin functions, including
+    // closure bodies and thunks, are never noncopyable themselves;
+    // `partial_apply` or `thin_to_thick_function` makes the value
+    // noncopyable. Calling an escaping value whose call consumes it consumes
+    // its context; only a non-escaping one, such as a stack-promoted closure,
+    // can be `@callee_guaranteed`.
     if (auto fnTy = dyn_cast<SILFunctionType>(rvalueType)) {
-      if (fnTy->hasCalledAtMostOnceSemantics()) {
+      if (fnTy->isNoncopyable())
         require(fnTy->getRepresentation() ==
                     SILFunctionTypeRepresentation::Thick,
-                "function types with execution semantics must be thick");
+                "noncopyable function types must be thick");
+      if (fnTy->isCallConsuming())
         require(fnTy->isNoEscape() || fnTy->getCalleeConvention() ==
                                           ParameterConvention::Direct_Owned,
-                "escaping function types with execution semantics must be "
+                "escaping function types whose call consumes them must be "
                 "@callee_owned");
-      }
     }
 
     // Metatypes should have explicit representations.
@@ -2581,21 +2626,21 @@ public:
           substConv.getSILArgumentType(argIdx, F.getTypeExpansionContext()),
           "applied argument types do not match suffix of function type's "
           "inputs");
-      // Only an exactly-once closure can capture an exactly-once value. The
-      // move checker diagnoses consumption of a value that is captured by
-      // address instead.
+      // Only a nondeinitable closure can capture a nondeinitable function
+      // value. The move checker diagnoses consumption of a value that is
+      // captured by address instead.
       if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
         require(p.value()->getType().isAddress() ||
-                    !argFnTy->isCalledOnce() ||
-                    PAI->getFunctionType()->isCalledOnce(),
-                "only an exactly-once closure can capture an exactly-once "
-                "value");
+                    !argFnTy->isNondeinitable() ||
+                    PAI->getFunctionType()->isNondeinitable(),
+                "only a nondeinitable closure can capture a nondeinitable "
+                "function value");
       }
       if (PAI->isOnStack()) {
-        // An at-most-once closure is allowed to have consuming captures
+        // A noncopyable closure is allowed to have consuming captures
         // and it always has a destructor (even when a closure is
         // non-escaping) which is responsible for destroying them.
-        require(PAI->hasCalledAtMostOnceSemantics() ||
+        require(PAI->isNoncopyable() ||
                     !substConv.getSILArgumentConvention(argIdx)
                          .isOwnedConventionInCaller(),
                 "on-stack closures do not support owned arguments");
@@ -5771,11 +5816,11 @@ public:
         opTI, resTI, "convert_function cannot change function ABI",
         *ICI->getFunction());
 
-    if (ICI->withoutActuallyDiscarding()) {
+    if (ICI->withoutActuallyDeiniting()) {
       require(opTI->isCalledOnce() &&
                   resTI->getExecutionSemantics() ==
                       std::optional(ExecutionSemantics::AtMostOnce),
-              "convert_function [without_actually_discarding] must convert an "
+              "convert_function [without_actually_deiniting] must convert an "
               "exactly-once function to an at-most-once function");
       return;
     }
@@ -5783,8 +5828,8 @@ public:
     require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
                                          resTI->getExecutionSemantics()),
             "convert_function cannot drop execution semantics");
-    require(!resTI->isCalledOnce() || opTI->isCalledOnce(),
-            "convert_function cannot form an exactly-once value; a thunk "
+    require(!resTI->isNondeinitable() || opTI->isNondeinitable(),
+            "convert_function cannot form a nondeinitable value; a thunk "
             "must form it");
   }
 
@@ -8081,7 +8126,9 @@ void SILWitnessTable::verify(const SILModule &mod) const {
                SILFunctionTypeRepresentation::WitnessMethod &&
            "Witnesses must have witness_method representation.");
 
-    if (!mod.haveFunctionTypesBeenRewritten() &&
+    // Witnesses of a specialized witness table have a concrete self type and
+    // are therefore not ABI compatible with the requirement type.
+    if (!mod.haveFunctionTypesBeenRewritten() && !isSpecialized() &&
         !mod.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
       // Note the direction of the compatibility check: the witness
       // function must be compatible with being used as the requirement

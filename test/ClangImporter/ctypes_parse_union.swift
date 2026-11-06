@@ -1,16 +1,27 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %s -enable-experimental-feature ModernImportedCArrays -DMODERN_C_ARRAYS -target %target-has-inline-array-triple
+
+// REQUIRES: swift_feature_ModernImportedCArrays
 
 import ctypes
 
 func useStructWithUnion(_ vec: GLKVector4) {
   var vec = vec
+#if MODERN_C_ARRAYS
+  _ = vec.v[0]
+  _ = vec.v[1]
+  _ = vec.v[2]
+  _ = vec.v[3]
+
+  vec.v = [0, 0, 0, 0]
+#else
   _ = vec.v.0
   _ = vec.v.1
   _ = vec.v.2
   _ = vec.v.3
 
   vec.v = (0, 0, 0, 0)
-  
+#endif
 }
 
 func useUnionIndirectFields(_ vec: GLKVector4) -> GLKVector4 {
@@ -30,10 +41,17 @@ func useUnionIndirectFields(_ vec: GLKVector4) -> GLKVector4 {
   let _: CFloat = vec.q
 
   // Named indirect fields
+#if MODERN_C_ARRAYS
+  let _: CFloat = vec.v[0]
+  let _: CFloat = vec.v[1]
+  let _: CFloat = vec.v[2]
+  let _: CFloat = vec.v[3]
+#else
   let _: CFloat = vec.v.0
   let _: CFloat = vec.v.1
   let _: CFloat = vec.v.2
   let _: CFloat = vec.v.3
+#endif
 
   var vec1 = vec
   vec1.x = vec.y
@@ -62,4 +80,37 @@ func useStructWithUnnamedUnion(_ u: UnnamedUnion) {
   var u = u
   u.u.i = 100
   u.u.f = 1.0
+}
+
+func useAnonymousUnionArrays(_ s: StructWithAnonymousArrays) {
+  var s = s
+  let _: CInt = s.tag
+#if MODERN_C_ARRAYS
+  let _: CChar = s.bytes[0]
+  let _: CInt = s.words[1]
+  s.bytes = [0, 0, 0, 0, 0, 0, 0, 0]
+  s.words = [0, 0]
+#else
+  let _: CChar = s.bytes.0
+  let _: CInt = s.words.1
+  s.bytes = (0, 0, 0, 0, 0, 0, 0, 0)
+  s.words = (0, 0)
+#endif
+}
+
+func useUnnamedRecordArrays(_ s: StructWithUnnamedRecordArrays) {
+  var s = s
+#if MODERN_C_ARRAYS
+  let _: CChar = s.u.bytes[0]
+  let _: CInt = s.u.words[1]
+  let _: CInt = s.s.pair[1]
+  s.u.bytes = [0, 0, 0, 0, 0, 0, 0, 0]
+  s.s.pair = [0, 0]
+#else
+  let _: CChar = s.u.bytes.0
+  let _: CInt = s.u.words.1
+  let _: CInt = s.s.pair.1
+  s.u.bytes = (0, 0, 0, 0, 0, 0, 0, 0)
+  s.s.pair = (0, 0)
+#endif
 }

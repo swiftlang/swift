@@ -13,6 +13,8 @@ struct NC: ~Copyable { var k: Kl }
 sil @getK : $@convention(thin) () -> @owned Kl
 sil @useK : $@convention(thin) (@guaranteed Kl) -> ()
 sil @consumeK : $@convention(thin) (@owned Kl) -> ()
+sil @getClosure : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+sil @useNoEscape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
 
 // CHECK-LABEL: sil [ossa] @test_move_value_load_copy_nonlexical :
 // CHECK:      [[V:%.*]] = load [take] {{%.*}}
@@ -88,4 +90,82 @@ bb0:
   apply %consFn(%c) : $@convention(thin) (@owned Kl) -> ()
   %t = tuple ()
   return %t : $()
+}
+
+// A copy with a pointer escape isn't merged into its original, since LifetimeResolution keeps
+// the destroys of such values.
+
+// CHECK-LABEL: sil [ossa] @test_keep_copy_with_pointer_escape :
+// CHECK:      [[C:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[C]]
+// CHECK-NEXT: [[NE:%.*]] = convert_escape_to_noescape [[COPY]]
+// CHECK-NEXT: apply {{%.*}}([[NE]])
+// CHECK-NEXT: destroy_value [[NE]]
+// CHECK-NEXT: destroy_value [[COPY]]
+// CHECK-NEXT: destroy_value [[C]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_keep_copy_with_pointer_escape : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getClosure : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+  %useFn = function_ref @useNoEscape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+  %c = copy_value %0
+  %1 = convert_escape_to_noescape %c to $@noescape @callee_guaranteed () -> ()
+  apply %useFn(%1) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %1
+  destroy_value %c
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @test_keep_copy_of_pointer_escaping_original :
+// CHECK:      [[C:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+// CHECK-NEXT: [[NE:%.*]] = convert_escape_to_noescape [[C]]
+// CHECK-NEXT: [[COPY:%.*]] = copy_value [[C]]
+// CHECK-NEXT: destroy_value [[COPY]]
+// CHECK-NEXT: apply {{%.*}}([[NE]])
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_keep_copy_of_pointer_escaping_original : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getClosure : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+  %useFn = function_ref @useNoEscape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+  %1 = convert_escape_to_noescape %0 to $@noescape @callee_guaranteed () -> ()
+  %c = copy_value %0
+  destroy_value %c
+  apply %useFn(%1) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %1
+  destroy_value %0
+  %t = tuple ()
+  return %t
+}
+
+// A pointer escape within a borrow scope is bounded by that scope, so the copy is still merged.
+
+// CHECK-LABEL: sil [ossa] @test_forward_copy_with_borrowed_pointer_escape :
+// CHECK:      [[C:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+// CHECK-NEXT: [[B:%.*]] = begin_borrow [[C]]
+// CHECK-NEXT: [[NE:%.*]] = convert_escape_to_noescape [[B]]
+// CHECK-NEXT: apply {{%.*}}([[NE]])
+// CHECK-NEXT: destroy_value [[NE]]
+// CHECK-NEXT: end_borrow [[B]]
+// CHECK-NEXT: destroy_value [[C]]
+// CHECK-NOT:  copy_value
+// CHECK-LABEL: } // end sil function
+sil [ossa] @test_forward_copy_with_borrowed_pointer_escape : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getClosure : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+  %useFn = function_ref @useNoEscape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %0 = apply %getFn() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
+  %c = copy_value %0
+  destroy_value %0
+  %b = begin_borrow %c
+  %1 = convert_escape_to_noescape %b to $@noescape @callee_guaranteed () -> ()
+  apply %useFn(%1) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %1
+  end_borrow %b
+  destroy_value %c
+  %t = tuple ()
+  return %t
 }

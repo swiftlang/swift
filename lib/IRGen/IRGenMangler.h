@@ -143,6 +143,12 @@ public:
     return mangleTypeSymbol(type, "Ma");
   }
 
+  /// A module's copy of the metadata access function for a back-deployed
+  /// type from another module.
+  std::string mangleBackDeploymentCopyTypeMetadataAccessFunction(Type type) {
+    return mangleTypeSymbol(type, "MaTwa");
+  }
+
   std::string
   mangleCanonicalSpecializedGenericTypeMetadataAccessFunction(Type type) {
     return mangleTypeSymbol(type, "Mb");
@@ -735,7 +741,8 @@ protected:
 /// Determines if the minimum deployment target's runtime demangler will not
 /// understand the mangled name for the given type.
 /// \returns true iff the target's runtime does not understand the mangled name.
-bool mangledNameIsUnknownToDeployTarget(IRGenModule &IGM, CanType type);
+bool mangledNameIsUnknownToDeployTarget(IRGenModule &IGM, CanType type,
+                                        CanGenericSignature sig = nullptr);
 
 } // end namespace irgen
 } // end namespace swift

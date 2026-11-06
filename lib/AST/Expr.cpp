@@ -303,7 +303,9 @@ DeclRefExpr *Expr::getMemberOperatorRef() {
   return operatorRef;
 }
 
-ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
+ConcreteDeclRef
+Expr::getReferencedDecl(ReferencedDeclLookThrough lookThrough) const {
+  // clang-format off
   switch (getKind()) {
   // No declaration reference.
   #define NO_REFERENCE(Id) case ExprKind::Id: return ConcreteDeclRef()
@@ -312,8 +314,10 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
       return cast<Id##Expr>(this)->Getter()
   #define PASS_THROUGH_REFERENCE(Id, GetSubExpr)                      \
     case ExprKind::Id:                                                \
+      if (lookThrough == ReferencedDeclLookThrough::None)             \
+        return ConcreteDeclRef();                                     \
       if (auto sub = cast<Id##Expr>(this)->GetSubExpr())              \
-        return sub->getReferencedDecl(stopAtParenExpr);               \
+        return sub->getReferencedDecl(lookThrough);                   \
       return ConcreteDeclRef();
 
   NO_REFERENCE(Error);
@@ -356,9 +360,9 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(Sequence);
 
   case ExprKind::Paren:
-    if (stopAtParenExpr) return ConcreteDeclRef();
-    return cast<ParenExpr>(this)
-               ->getSubExpr()->getReferencedDecl(stopAtParenExpr);
+    if (lookThrough != ReferencedDeclLookThrough::All)
+      return ConcreteDeclRef();
+    return cast<ParenExpr>(this)->getSubExpr()->getReferencedDecl(lookThrough);
 
   PASS_THROUGH_REFERENCE(UnresolvedMemberChainResult, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
@@ -475,6 +479,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
 #undef NO_REFERENCE
 #undef PASS_THROUGH_REFERENCE
   }
+  // clang-format on
 
   return ConcreteDeclRef();
 }
@@ -2121,6 +2126,10 @@ bool AbstractClosureExpr::hasCalledAtMostOnceSemantics() const {
   return getOrComputeExtInfo(this).hasCalledAtMostOnceSemantics();
 }
 
+bool AbstractClosureExpr::isCallConsuming() const {
+  return getOrComputeExtInfo(this).isCallConsuming();
+}
+
 bool AbstractClosureExpr::hasSingleExpressionBody() const {
   if (auto closure = dyn_cast<ClosureExpr>(this))
     return closure->hasSingleExpressionBody();
@@ -2583,9 +2592,10 @@ Type KeyPathExpr::getValueType() const {
 
 KeyPathExpr::Component KeyPathExpr::Component::forSubscript(
     ASTContext &ctx, ConcreteDeclRef subscript, ArgumentList *argList,
-    Type elementType, ArrayRef<ProtocolConformanceRef> indexHashables) {
+    Type elementType, ArrayRef<ProtocolConformanceRef> indexHashables,
+    SourceLoc loc) {
   return Component(subscript, argList, indexHashables, Kind::Subscript,
-                   elementType, argList->getLParenLoc());
+                   elementType, loc);
 }
 
 KeyPathExpr::Component

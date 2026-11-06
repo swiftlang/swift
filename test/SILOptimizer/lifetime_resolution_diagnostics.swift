@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen-ossa -enable-lifetime-resolution -verify %s
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify %s
 
 // Use-after-consume / use-before-init diagnostics emitted by LifetimeResolution
 // and LifetimeResolutionDiagnose.
@@ -84,7 +84,7 @@ func consumeOperatorInLoop(_ b: Bool) {
   let x: C
   x = C()
   while b {
-    _ = consume x  // expected-error {{'x' consumed in a loop}}
+    _ = consume x  // expected-error {{'x' consumed in a loop}} // expected-note {{write 'copy x' to keep 'x' valid after this consume}}
   }
 }
 
@@ -108,7 +108,7 @@ func varUseBeforeInit(_ b: Bool) {
 func consumeOperatorCopyable() {
   let x: C
   x = C()
-  _ = consume x // expected-note {{consumed here}}
+  _ = consume x // expected-note {{consumed here}} // expected-note {{write 'copy x' to keep 'x' valid after this consume}}
   use(x)    // expected-error {{'x' used after consume}}
 }
 
@@ -122,20 +122,20 @@ func copyableConsumingUse() {
 
 func consumeOfCopyableLet() {
   let p = C()
-  _ = consume p  // expected-note {{consumed here}}
+  _ = consume p  // expected-note {{consumed here}} // expected-note {{write 'copy p' to keep 'p' valid after this consume}}
   _ = p          // expected-error {{'p' used after consume}}
 }
 
 func consumeOfCopyableLetIntoBinding() {
   let p = C()
-  let q = consume p  // expected-note {{consumed here}}
+  let q = consume p  // expected-note {{consumed here}} // expected-note {{write 'copy p' to keep 'p' valid after this consume}}
   _ = p              // expected-error {{'p' used after consume}}
   use(q)
 }
 
 func inoutConsume_error(_ s: inout String) {
   if .random() {
-    _ = consume s  // expected-error {{missing reinitialization of inout parameter 's' after consume}}
+    _ = consume s  // expected-error {{missing reinitialization of inout parameter 's' after consume}} // expected-note {{write 'copy s' to keep 's' valid after this consume}}
   }
 }
 func inoutConsume_fixed(_ s: inout String) {
@@ -299,7 +299,7 @@ func tupleElementConsumeThenUseOther() {
 func fieldUseAfterConsume() {
   var p: Pair
   p = Pair(a: C(), b: C())
-  _ = consume p.a   // expected-note {{consumed here}}
+  _ = consume p.a   // expected-note {{consumed here}} // expected-note {{write 'copy p.a' to keep 'p.a' valid after this consume}}
   use(p.a)          // expected-error {{'p.a' used after consume}}
   use(p.b)          // valid: distinct field
 }
@@ -307,7 +307,7 @@ func fieldUseAfterConsume() {
 func tupleElementUseAfterConsume() {
   var t: (C, C)
   t = (C(), C())
-  _ = consume t.0   // expected-note {{consumed here}}
+  _ = consume t.0   // expected-note {{consumed here}} // expected-note {{write 'copy t.0' to keep 't.0' valid after this consume}}
   use(t.0)          // expected-error {{'t.0' used after consume}}
   use(t.1)          // valid: distinct element
 }
@@ -342,6 +342,7 @@ struct EmptyStruct {
 }
 
 enum EmptyEnum {
+  case empty
   init() {}  // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
 }
 
@@ -363,18 +364,30 @@ func testEmpties_ubi() {
 func testEmpties_uac() {
   let s: EmptyStruct
   s = EmptyStruct()
-  _ = consume s  // expected-warning {{has no effect}}
+  _ = consume s  // expected-warning {{'consume' applied to bitwise-copyable type}}
   _ = s
 
   let e: EmptyEnum
   e = EmptyEnum()
-  _ = consume e  // expected-warning {{has no effect}}
+  _ = consume e  // expected-warning {{'consume' applied to bitwise-copyable type}}
   _ = e
 
   let c: EmptyClass
   c = EmptyClass()
-  _ = consume c  // expected-note {{consumed here}}
+  _ = consume c  // expected-note {{consumed here}} // expected-note {{write 'copy c' to keep 'c' valid after this consume}}
   _ = c          // expected-error {{'c' used after consume}}
+}
+
+enum UninhabitedEnum {
+  init() { }  // expected-error {{'self.init' isn't called on all paths before returning from initializer}}
+  init(fixed: Void) { fatalError() }
+}
+
+func testUninhabited() {
+  let e: UninhabitedEnum
+  e = UninhabitedEnum()  // expected-warning {{will never be executed}}  // expected-note {{a call to a never-returning function}}
+  _ = consume e // expected-warning {{'consume' applied to bitwise-copyable type}}
+  _ = e
 }
 
 struct Point {

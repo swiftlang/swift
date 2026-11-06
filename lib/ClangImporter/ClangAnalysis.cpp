@@ -70,11 +70,11 @@ bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
 namespace {
 
 /// Whether \p type is "self-contained" for the purpose of direct-view
-/// inference: it is escapable (SWIFT_ESCAPABLE), a foreign reference type
-/// (SWIFT_SHARED_REFERENCE / SWIFT_IMMORTAL_REFERENCE), or a record explicitly
-/// annotated SWIFT_SELF_CONTAINED (import_owned). A record explicitly marked
-/// unsafe is never self-contained, which also excludes
-/// SWIFT_UNSAFE_REFERENCE.
+/// inference: it is escapable (SWIFT_SELF_CONTAINED or inferred), a foreign
+/// reference type (SWIFT_SHARED_REFERENCE / SWIFT_IMMORTAL_REFERENCE), or a
+/// record with the import_owned attribute (SWIFT_SELF_CONTAINED or API notes).
+/// A record explicitly marked unsafe is never self-contained, which also
+/// excludes SWIFT_UNSAFE_REFERENCE.
 bool isSelfContainedForDirectView(const clang::Type *type, Evaluator &eval) {
   type = type->getUnqualifiedDesugaredType();
 
@@ -128,7 +128,7 @@ bool isDirectViewTypeImpl(const clang::Type *type, Evaluator &eval,
   // (B) A record is a direct view if every field and base is either
   // self-contained or itself a direct view. A record with no indirection at
   // all is treated as having a single level of indirection, so that a
-  // non-escapable marker type (`struct SWIFT_NONESCAPABLE Token { long id; };`)
+  // non-escapable marker type (`struct SWIFT_VIEW Token { long id; };`)
   // stays a direct view: it holds no pointer, so nothing in it can dangle.
   if (const auto *recordType = type->getAs<clang::RecordType>()) {
     auto *recordDecl = recordType->getDecl()->getDefinition();
@@ -1285,7 +1285,7 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
       return safe();
 
     if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-        hasIteratorCategory(cxxRecordReturnType))
+        hasIteratorCategoryOrIteratorConcept(cxxRecordReturnType))
       return unsafe(CxxUnsafetyReason::ReturnsIterator);
 
     // Mark this as safe to help our diganostics down the road.

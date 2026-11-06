@@ -367,6 +367,11 @@ public class SingleValueInstruction : Instruction, Value {
     uses.replaceAll(with: replacement, context)
     context.erase(instruction: self)
   }
+  
+  /// Replaces this instruction with an undef and erases the instruction.
+  public final func replaceWithUndef(_ context: some MutatingContext) {
+    replace(with: Undef.get(type: type, context), context)
+  }
 }
 
 public final class MultipleValueInstructionResult : Value, Hashable {
@@ -762,10 +767,34 @@ final public class DebugValueInst : Instruction, DebugVariableInstruction, MetaI
     bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
   }
 
+  /// Destroys the debug reconstruction block, leaving the operand to describe the
+  /// variable directly. Only valid when the block does nothing but return its only
+  /// argument, as the block's return type is what carries the variable type.
+  public func clearDebugReconstructionBlock(_ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.DebugValue_clearDebugReconstructionBlock()
+    context.notifyInstructionChanged(self)
+  }
+
   public func stripDeref(index: Int) { bridged.DebugValue_stripDeref(index) }
   public func prependDeref(index: Int) { bridged.DebugValue_prependDeref(index) }
-  public func killOperand(index: Int, withType type: Type? = nil) {
+  public func killOperand(index: Int, withType type: Type? = nil,
+                          _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
     bridged.DebugValue_killOperand(index, type?.bridged ?? BridgedType())
+    context.notifyInstructionChanged(self)
+  }
+
+  /// Replaces this instruction with an equivalent one whose operand list is `values`,
+  /// and returns it. The reconstruction block must already match `values`.
+  /// This instruction is erased if the change can't be done in place.
+  public func replaceOperands(with values: [Value], _ context: some MutatingContext) -> DebugValueInst {
+    context.notifyInstructionsChanged()
+    let newInst = values.withBridgedValues {
+      bridged.DebugValue_replaceOperands($0)
+    }.getAs(DebugValueInst.self)
+    context.notifyInstructionChanged(newInst)
+    return newInst
   }
 }
 
@@ -1503,12 +1532,12 @@ class ConvertFunctionInst : SingleValueInstruction, UnaryInstruction {
     case withoutActuallyEscaping = 1
 
     /// The conversion turns an exactly-once function into an at-most-once function.
-    case withoutActuallyDiscarding = 2
+    case withoutActuallyDeiniting = 2
   }
 
   public var conversionKind: Kind { Kind(rawValue: bridged.ConvertFunctionInst_getConversionKind())! }
   public var withoutActuallyEscaping: Bool { conversionKind == .withoutActuallyEscaping }
-  public var withoutActuallyDiscarding: Bool { conversionKind == .withoutActuallyDiscarding }
+  public var withoutActuallyDeiniting: Bool { conversionKind == .withoutActuallyDeiniting }
 }
 
 final public
@@ -1701,9 +1730,8 @@ final public class PartialApplyInst : SingleValueInstruction, ApplySite {
     return semantics.hasValue ? semantics.value : nil
   }
 
-  /// True if the resulting closure can be called at most once, which is the case
-  /// for every kind of execution semantics.
-  public var hasCalledAtMostOnceSemantics: Bool { executionSemantics != nil }
+  /// True if the resulting closure can't be copied.
+  public var isNoncopyable: Bool { type.isMoveOnly }
 
   /// Warning: isOnStack returns false for all closures prior to ClosureLifetimeFixup, even if they capture on-stack
   /// addresses and need to be diagnosed as non-escaping closures. Use mayEscape to determine whether a closure is
@@ -2065,6 +2093,12 @@ final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, Beg
   // code using noncopyable types that consumes or mutates a memory location while that location is borrowed,
   // but the move-only checker must diagnose those problems before canonical SIL is formed.
   public var isUnchecked: Bool { bridged.LoadBorrowInst_isUnchecked() }
+
+  public func set(isUnchecked: Bool, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadBorrowInst_setUnchecked(isUnchecked)
+    context.notifyInstructionChanged(self)
+  }
 
   public var scopeEndingOperands: LazyFilterSequence<UseList> { uses.endingLifetime }
 }

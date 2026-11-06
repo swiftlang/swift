@@ -353,6 +353,14 @@ static SubstitutionMap getSubstitutionsForPropertyInitializer(
   return SubstitutionMap();
 }
 
+/// Returns the C array projection of \p decl, or \c std::nullopt if it doesn't
+/// have any C arrays.
+static std::optional<CArrayProjection> getCArrayProjection(Decl *decl) {
+  if (auto cArrayAttr = decl->getAttrs().getAttribute<CArrayProjectionAttr>())
+    return cArrayAttr->getProjection();
+  return std::nullopt;
+}
+
 static void emitImplicitValueConstructor(SILGenFunction &SGF,
                                          ConstructorDecl *ctor,
                                          MemberwiseInitKind initKind) {
@@ -419,10 +427,12 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   auto subs = getSubstitutionsForPropertyInitializer(decl, decl);
 
-  /// If the stored property has an attached result builder and its
-  /// type is not a function type, the argument is a noescape closure
-  /// that needs to be called.
-  auto emitResultBuilderCallIfNeeded = [&](VarDecl *field, RValue &&arg) -> RValue {
+  auto ctorProjection = getCArrayProjection(ctor);
+  auto convertArgumentForField = [&](VarDecl *field, SILType fieldTy,
+                                     RValue &&arg) -> RValue {
+    // If the stored property has an attached result builder and its
+    // type is not a function type, the argument is a noescape closure
+    // that needs to be called.
     if (field->getResultBuilderType()) {
       if (!field->getValueInterfaceType()
               ->lookThroughAllOptionalTypes()->is<AnyFunctionType>()) {
@@ -432,6 +442,25 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
             resultTy, ApplyOptions(), std::nullopt, std::nullopt);
       }
     }
+
+    // If the C array projection of this field does not match the projection of
+    // the constructor, bitcast away the resulting type mismatch.
+    if (ctorProjection &&
+          getCArrayProjection(field).value_or(*ctorProjection)
+              != ctorProjection) {
+      auto argValue = std::move(arg).getAsSingleValue(SGF, Loc);
+
+      // InlineArrays too large to be loadable are passed by address.
+      ManagedValue castValue;
+      if (argValue.getType().isAddress())
+        castValue = SGF.B.createUncheckedAddrCast(Loc, argValue,
+                                                  fieldTy.getAddressType());
+      else
+        castValue = SGF.B.createUncheckedBitCast(Loc, argValue,
+                                                 fieldTy.getObjectType());
+      arg = RValue(SGF, Loc, fieldTy.getASTType(), castValue);
+    }
+
     return std::move(arg);
   };
 
@@ -505,7 +534,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
 
         RValue arg = std::move(*elti);
-        arg = emitResultBuilderCallIfNeeded(field, std::move(arg));
+        arg = convertArgumentForField(field, fieldTy, std::move(arg));
 
         maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
                                               std::move(arg))
@@ -580,7 +609,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
       value = std::move(*elti);
-      value = emitResultBuilderCallIfNeeded(field, std::move(value));
+      value = convertArgumentForField(field, fieldTy, std::move(value));
       ++elti;
     } else {
       // Otherwise, use its initializer.

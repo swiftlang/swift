@@ -38,6 +38,7 @@
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -3917,7 +3918,6 @@ public:
    void visit(SILArgument *arg);
 
    bool isLargeLoadableType(SILType ty);
-   bool isPotentiallyCArray(SILType ty);
 
    void propagate(PostOrderFunctionInfo &po);
 
@@ -4024,6 +4024,16 @@ void LargeLoadableHeuristic::visit(SILArgument *arg) {
     }
   }
 }
+
+static bool isImportedCUnion(SILType ty) {
+  auto *structDecl = ty.getStructDecl();
+  if (!structDecl)
+    return false;
+  auto *recordDecl =
+      dyn_cast_or_null<clang::RecordDecl>(structDecl->getClangDecl());
+  return recordDecl && recordDecl->isUnion();
+}
+
 void LargeLoadableHeuristic::visit(SILInstruction *i) {
   if (!UseAggressiveHeuristic)
     return;
@@ -4031,7 +4041,8 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
   // Heuristic to make sure that UncheckedBitCast on C unions don't cause
   // trouble (the type of a union has a single llvm register representing the
   // bitwidth).
-  if (auto *bitcast = dyn_cast<UncheckedTrivialBitCastInst>(i)) {
+  if (auto *bitcast = dyn_cast<UncheckedTrivialBitCastInst>(i);
+      bitcast && isImportedCUnion(bitcast->getOperand()->getType())) {
     auto opdTy = bitcast->getOperand()->getType();
     auto numRegs = numRegisters(opdTy);
     if (numRegs < NumRegistersLargeType) {
@@ -4110,29 +4121,6 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
 
     largeTypeProperties[objType] = entry;
   }
-}
-
-bool LargeLoadableHeuristic::isPotentiallyCArray(SILType ty) {
-  if (ty.isAddress() || ty.isClassOrClassMetatype()) {
-    return false;
-  }
-
-  auto canType = ty.getASTType();
-  if (canType->hasTypeParameter()) {
-    assert(genEnv && "Expected a GenericEnv");
-    canType = genEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
-  }
-
-  if (canType.getAnyGeneric() || isa<TupleType>(canType)) {
-    assert(ty.isObject() &&
-           "Expected only two categories: address and object");
-    assert(!canType->hasTypeParameter());
-    const TypeInfo &TI = irgenModule->getTypeInfoForLowered(canType);
-    auto explosionSchema = TI.getSchema();
-    if (explosionSchema.size() > 15)
-      return true;
-  }
-  return false;
 }
 
 // The old heuristic to determine whether we deem a type as large.
@@ -4245,10 +4233,6 @@ public:
 
   void markBlockArgumentForDeletion(SILBasicBlock *b, unsigned argIdx = 0) {
     toDeleteBlockArg.push_back(std::make_pair(b, argIdx));
-  }
-
-  bool isPotentiallyCArray(SILType ty) {
-    return heuristic.isPotentiallyCArray(ty);
   }
 
   bool isLargeLoadableType(SILType ty) {
@@ -4817,6 +4801,59 @@ protected:
     assignment.markForDeletion(e);
   }
 
+  void visitStructInst(StructInst *s) {
+    assert(!assignment.isLargeLoadableType(s->getType()));
+    auto builder = assignment.getBuilder(s->getIterator());
+    auto structAddr = assignment.createAllocStack(s->getType());
+
+    auto fieldIt = s->getStructDecl()->getStoredProperties().begin();
+    for (auto &opd : s->getAllOperands()) {
+      auto projAddr = builder.createStructElementAddr(
+          s->getLoc(), structAddr, *fieldIt,
+          opd.get()->getType().getAddressType());
+      fieldIt++;
+
+      if (assignment.contains(opd.get())) {
+        auto opdAddr = assignment.getAddressForValue(opd.get());
+        builder.createCopyAddr(s->getLoc(), opdAddr, projAddr, IsTake,
+                               IsInitialization);
+      } else {
+        builder.createStore(s->getLoc(), opd.get(), projAddr,
+                            StoreOwnershipQualifier::Unqualified);
+      }
+    }
+
+    auto structVal = builder.createLoad(s->getLoc(), structAddr,
+                                        LoadOwnershipQualifier::Unqualified);
+    s->replaceAllUsesWith(structVal);
+    assignment.markForDeletion(s);
+  }
+
+  void visitTupleInst(TupleInst *t) {
+    assert(!assignment.isLargeLoadableType(t->getType()));
+    auto builder = assignment.getBuilder(t->getIterator());
+    auto tupleAddr = assignment.createAllocStack(t->getType());
+
+    for (auto &opd : t->getAllOperands()) {
+      auto projAddr = builder.createTupleElementAddr(
+          t->getLoc(), tupleAddr, opd.getOperandNumber(),
+          opd.get()->getType().getAddressType());
+      if (assignment.contains(opd.get())) {
+        auto opdAddr = assignment.getAddressForValue(opd.get());
+        builder.createCopyAddr(t->getLoc(), opdAddr, projAddr, IsTake,
+                               IsInitialization);
+      } else {
+        builder.createStore(t->getLoc(), opd.get(), projAddr,
+                            StoreOwnershipQualifier::Unqualified);
+      }
+    }
+
+    auto tupleVal = builder.createLoad(t->getLoc(), tupleAddr,
+                                       LoadOwnershipQualifier::Unqualified);
+    t->replaceAllUsesWith(tupleVal);
+    assignment.markForDeletion(t);
+  }
+
   void visitApplySite(ApplySite apply) {
     for (auto &opd : apply.getArgumentOperands()) {
       if (assignment.contains(opd.get())) {
@@ -4872,21 +4909,6 @@ protected:
     assignment.markForDeletion(store);
   }
 
-  bool overlapsWithOnStackDebugLoc(SILValue v) {
-    for (auto *use : v->getUses()) {
-      auto *store = dyn_cast<StoreInst>(use->getUser());
-      if (!store)
-        continue;
-
-      auto *stackLoc = dyn_cast<AllocStackInst>(store->getDest());
-      if (!stackLoc)
-        continue;
-      if (getAnyDebugUse(stackLoc))
-        return true;
-    }
-    return false;
-  }
-
   void visitDebugValueInst(DebugValueInst *dbg) {
     for (auto &operand : dbg->getAllOperands()) {
       SILValue operandVal = operand.get();
@@ -4901,12 +4923,6 @@ protected:
       // Rewriting them would also break nullary debug reconstruction blocks.
       if (isa<SILUndef>(operandVal))
         continue;
-      if (!operandVal->getType().isAddress() &&
-          (assignment.isPotentiallyCArray(operandVal->getType()) ||
-           overlapsWithOnStackDebugLoc(operandVal))) {
-        assignment.markForDeletion(dbg);
-        return;
-      }
       SILValue addr = assignment.getAddressForValue(operandVal);
       operand.set(addr);
       assignment.tryPrependDerefToDebugValue(dbg, operand.getOperandNumber());

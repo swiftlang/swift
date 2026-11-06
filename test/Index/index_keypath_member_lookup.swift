@@ -140,6 +140,15 @@ func testExplicit(r: Lens<Rectangle>, a: Lens<[Int]>) {
 // CHECK: [[EA_LINE]]:26 | instance-property/subscript/Swift | subscript(_:) | s:SayxSicip | Ref,Read,RelCont | rel: 1
 }
 
+func testKeyPath() {
+  _ = \Lens<Rectangle>.topLeft
+// => implicit dynamicMember subscript (topLeft)
+// CHECK: [[KTL_LINE:[0-9]+]]:24 | instance-property/subscript/Swift | subscript(dynamicMember:) | [[SUB_USR]] | Ref,Read,Impl,RelCont | rel: 1
+
+// => property topLeft
+// CHECK: [[KTL_LINE]]:24 | instance-property/Swift | topLeft | [[TL_USR]] | Ref,Read,RelCont | rel: 1
+}
+
 // Don't crash: rdar63558609
 //
 @dynamicMemberLookup

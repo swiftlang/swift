@@ -1021,6 +1021,12 @@ private:
   /// The constraint graph.
   ConstraintGraph CG;
 
+  /// The current bindings generation number. This is incremented every
+  /// time a binding set changes, so that we take the maximum generation
+  /// number of a collection of binding sets and compare it against a
+  /// saved value to check if any of those binding sets changed.
+  uint64_t BindingGenerationNumber = 0;
+
   /// Information about the remaining disjunctions we have yet to attempt
   /// in this path.
   llvm::DenseMap<Constraint *, SolverDisjunction> RemainingDisjunctions;
@@ -1112,6 +1118,10 @@ public:
   /// This is not trail-protected state; it's just a cache for some
   /// information about Decls.
   ConformanceCache CC;
+
+  uint64_t getNextBindingGenerationNumber() {
+    return ++BindingGenerationNumber;
+  }
 
 private:
   /// Describes the current solver state.
@@ -2134,17 +2144,6 @@ public:
   /// Try to salvage the constraint system by applying (speculative)
   /// fixes.
   SolutionResult salvage();
-  
-  /// Mine the active and inactive constraints in the constraint
-  /// system to generate a plausible diagnosis of why the system could not be
-  /// solved.
-  ///
-  /// \param target The solution target whose constraints we're investigating
-  /// for a better diagnostic.
-  ///
-  /// Assuming that this constraint system is actually erroneous, this *always*
-  /// emits an error message.
-  void diagnoseFailureFor(SyntacticElementTarget target);
 
   bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
@@ -3559,11 +3558,11 @@ private:
                                          TypeMatchOptions flags,
                                          ConstraintLocatorBuilder locator);
 
-  /// Attempt to simplify the given DiscardableFunctionOf constraint.
+  /// Attempt to simplify the given DeinitableFunctionOf constraint.
   SolutionKind
-  simplifyDiscardableFunctionOfConstraint(Type type1, Type type2,
-                                          TypeMatchOptions flags,
-                                          ConstraintLocatorBuilder locator);
+  simplifyDeinitableFunctionOfConstraint(Type type1, Type type2,
+                                         TypeMatchOptions flags,
+                                         ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the given OpenedExistentialOf constraint.
   SolutionKind simplifyOpenedExistentialOfConstraint(

@@ -21,6 +21,7 @@
 namespace clang {
 class ASTContext;
 class CompilerInstance;
+class CXXConstructorDecl;
 class Decl;
 class FunctionDecl;
 class Module;
@@ -34,6 +35,7 @@ class SourceLocation;
 
 namespace swift {
 
+enum class CArrayProjection : uint8_t;
 class ClangInheritanceInfo;
 class ClangNode;
 class ConcreteDeclRef;
@@ -145,6 +147,8 @@ public:
   /// for use by IRGen/CodeGen clients)
   virtual clang::TargetInfo &getModuleAvailabilityTarget() const = 0;
 
+  virtual CArrayProjection getVisibleCArrayProjection() const = 0;
+
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
   virtual clang::Sema &getClangSema() const = 0;
@@ -250,6 +254,12 @@ public:
   /// If \param decl is a synthesized thunk for a virtual method of a foreign
   /// reference type, returns the originally-imported (un-thunked) method.
   virtual FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) = 0;
+
+  /// If \param ctor is an initializer of a C++ foreign reference type that
+  /// was synthesized as a static factory for a C++ constructor, returns that
+  /// constructor.
+  virtual const clang::CXXConstructorDecl *
+  getOriginalForeignReferenceConstructor(const ConstructorDecl *ctor) = 0;
 
   /// If \param decl is an imported C++ method that overrides a method of a C++
   /// class imported as one of its Swift superclasses, returns the imported

@@ -2555,7 +2555,7 @@ static Type validateParameterType(ParamDecl *decl) {
   }
 
   if (auto *F = Ty->getAs<AnyFunctionType>()) {
-    if (F->hasCalledAtMostOnceSemantics()) {
+    if (F->isCallConsuming()) {
       switch (ownership) {
       case ParamSpecifier::Borrowing:
       case ParamSpecifier::LegacyShared:

@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures %s -swift-version 5 -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple %s -swift-version 6 -verify-additional-prefix swift6plus- -verify-additional-prefix swift6-
+// RUN: %if swift_future %{ %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple %s -swift-version future -verify-additional-prefix swift6plus- -verify-additional-prefix future- %}
 
 // REQUIRES: swift_feature_InferSendableFromCaptures
 
@@ -71,14 +73,18 @@ func testConvertIsolatedAnyToNonIsolated(fn: @Sendable @isolated(any) () -> ()) 
 
 func requireSendableNonIsolated_sync(_ fn: @Sendable () -> ()) {}
 func testConvertIsolatedAnyToNonIsolated_sync(fn: @Sendable @isolated(any) () -> ()) {
-  // expected-warning @+1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}{{group-name=ConversionFromIsolatedAnyToSynchronous}}
+  // expected-swift5-warning @+1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}{{group-name=ConversionFromIsolatedAnyToSynchronous}}
   requireSendableNonIsolated_sync(fn)
+  // expected-future-error@-1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed}}
+  // expected-swift6-warning@-2 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}
 }
 
 func requireNonSendableNonIsolated_sync(_ fn: () -> ()) {}
 func testConvertIsolatedAnyToNonSendableNonIsolated_sync(fn: @isolated(any) () -> ()) {
-  // expected-warning @+1 {{converting @isolated(any) function of type '@isolated(any) () -> ()' to synchronous function type '() -> ()' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-swift5-warning @+1 {{converting @isolated(any) function of type '@isolated(any) () -> ()' to synchronous function type '() -> ()' is not allowed; this will be an error in a future Swift language mode}}
   requireNonSendableNonIsolated_sync(fn)
+  // expected-future-error@-1 {{converting @isolated(any) function of type '@isolated(any) () -> ()' to synchronous function type '() -> ()' is not allowed}}
+  // expected-swift6-warning@-2 {{converting @isolated(any) function of type '@isolated(any) () -> ()' to synchronous function type '() -> ()' is not allowed; this will be an error in a future Swift language mode}}
 }
 
 func requireSendableGlobalActor(_ fn: @Sendable @MainActor () -> ()) {}
@@ -106,9 +112,15 @@ func extractFunctionIsolationExpr(
   // Only `@isolated(any)` functions have `.isolation`
   let myActor = A()
   let _: (any Actor)? = myActor.actorFunction.isolation // expected-error {{value of type '() -> ()' has no member 'isolation'}}
-  let _: (any Actor)? = myActor.asyncActorFunction.isolation // expected-error {{value of type '@Sendable () async -> ()' has no member 'isolation'}}
-  let _: (any Actor)? = myActor.asyncThrowsActorFunction.isolation // expected-error {{value of type '@Sendable () async throws -> ()' has no member 'isolation'}}
-  let _: (any Actor)? = myActor.actorFunctionWithArgs.isolation // expected-error {{value of type '@Sendable (Int) async -> String' has no member 'isolation'}}
+  let _: (any Actor)? = myActor.asyncActorFunction.isolation // expected-swift5-error {{value of type '@Sendable () async -> ()' has no member 'isolation'}}
+  // expected-future-error@-1 {{value of type '@concurrent @Sendable () async -> ()' has no member 'isolation'}}
+  // expected-swift6-error@-2 {{value of type '@Sendable () async -> ()' has no member 'isolation'}}
+  let _: (any Actor)? = myActor.asyncThrowsActorFunction.isolation // expected-swift5-error {{value of type '@Sendable () async throws -> ()' has no member 'isolation'}}
+  // expected-future-error@-1 {{value of type '@concurrent @Sendable () async throws -> ()' has no member 'isolation'}}
+  // expected-swift6-error@-2 {{value of type '@Sendable () async throws -> ()' has no member 'isolation'}}
+  let _: (any Actor)? = myActor.actorFunctionWithArgs.isolation // expected-swift5-error {{value of type '@Sendable (Int) async -> String' has no member 'isolation'}}
+  // expected-future-error@-1 {{value of type '@concurrent @Sendable (Int) async -> String' has no member 'isolation'}}
+  // expected-swift6-error@-2 {{value of type '@Sendable (Int) async -> String' has no member 'isolation'}}
 
   let _: (any Actor)? = globalNonisolatedFunction.isolation // expected-error {{value of type '@Sendable () -> ()' has no member 'isolation'}}
   let _: (any Actor)? = globalMainActorFunction.isolation // expected-error {{value of type '@MainActor @Sendable () -> ()' has no member 'isolation'}}
@@ -140,19 +152,22 @@ func testFunctionIsolationExprTuple(
 func nonSendableIsolatedAnySyncToSendableSync(
   _ fn: @escaping @isolated(any) () -> Void // expected-note {{parameter 'fn' is implicitly non-Sendable}}
 ) {
-  let _: @Sendable () -> Void = fn  // expected-warning {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
-  // expected-warning @-1 {{converting @isolated(any) function of type '@isolated(any) () -> Void' to synchronous function type '@Sendable () -> Void' is not allowed; this will be an error in a future Swift language mode}}
+  let _: @Sendable () -> Void = fn  // expected-swift5-warning {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
+  // expected-swift5-warning @-1 {{converting @isolated(any) function of type '@isolated(any) () -> Void' to synchronous function type '@Sendable () -> Void' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-swift6plus-error@-2 {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
 }
 
 func nonSendableIsolatedAnyAsyncToSendableSync(
   _ fn: @escaping @isolated(any) () async -> Void // expected-note {{parameter 'fn' is implicitly non-Sendable}}
 ) {
-  let _: @Sendable () -> Void = fn  // expected-warning {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
+  let _: @Sendable () -> Void = fn  // expected-swift5-warning {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
   // expected-error @-1 {{invalid conversion from 'async' function of type '@isolated(any) () async -> Void' to synchronous function type '@Sendable () -> Void'}}
+  // expected-swift6plus-error@-2 {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
 }
 
 func nonSendableIsolatedAnyAsyncToSendableAsync(
   _ fn: @escaping @isolated(any) () async -> Void // expected-note {{parameter 'fn' is implicitly non-Sendable}}
 ) {
-  let _: @Sendable () async -> Void = fn  // expected-warning {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
+  let _: @Sendable () async -> Void = fn  // expected-swift5-warning {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
+  // expected-swift6plus-error@-1 {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
 }

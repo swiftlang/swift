@@ -48,7 +48,18 @@ public:
     // The embedded layout consists of:
     // +    // -1 : vwt
     // +    //  0 : metadata flags
+    // and, for Optional only:
+    // +    //  1 : payload (Wrapped) metadata
     super::layout();
+
+    // The casting runtime needs the payload type to unwrap an Optional.
+    if (Target->isOptionalDecl())
+      asImpl().addEmbeddedOptionalPayload();
+  }
+
+  /// Only specialized (generic) metadata can be Optional's.
+  void addEmbeddedOptionalPayload() {
+    llvm_unreachable("Optional metadata is always specialized");
   }
 
   void layout() {

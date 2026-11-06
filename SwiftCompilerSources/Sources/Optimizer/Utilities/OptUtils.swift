@@ -1107,8 +1107,19 @@ func canDynamicallyCast(from sourceType: CanonicalType, to destType: CanonicalTy
 
 func isCastSupportedInEmbeddedSwift(from sourceType: Type,
                                     to destType: Type ) -> Bool {
-  if !sourceType.isExistential {
+  // The runtime unwraps an Optional source, so an Optional of an existential
+  // works as well as the existential.
+  var source = sourceType.rawType
+  while source.isOptional {
+    source = source.optionalObjectType
+  }
+  if !source.isExistential {
     return false
+  }
+  // Unwrapping Optionals down to exactly the destination existential only
+  // checks for `nil`; the runtime answers it by matching metadata.
+  if destType.isExistential {
+    return source.canonical == destType.rawType.canonical
   }
   if destType.hasArchetype {
     return false
@@ -1293,12 +1304,19 @@ extension StoreInst: CopyLikeInstruction {
   private var load: LoadInst { source as! LoadInst }
 }
 
-func eraseIfDead(functions: [Function], _ context: ModulePassContext) {
+/// Erase the functions that are not referenced.
+///
+/// If `ignoringDebuggerPreservation` is true, a private function is erased even if it is kept for
+/// the debugger at -Onone: it can't be used externally otherwise.
+func eraseIfDead(functions: [Function], _ context: ModulePassContext,
+                 ignoringDebuggerPreservation: Bool = false) {
   var toDelete = functions
   while true {
     var remaining = [Function]()
     for fn in toDelete {
-      if !fn.isPossiblyUsedExternally && !fn.isReferencedInModule {
+      let isUsedExternally = fn.isPossiblyUsedExternally &&
+        !(ignoringDebuggerPreservation && fn.linkage == .private)
+      if !isUsedExternally && !fn.isReferencedInModule {
         context.erase(function: fn)
       } else {
         remaining.append(fn)

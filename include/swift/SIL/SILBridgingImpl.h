@@ -758,6 +758,11 @@ bool BridgedArgument::FunctionArgument_isClosureCapture() const {
     getArgument())->isClosureCapture();
 }
 
+bool BridgedArgument::FunctionArgument_isNoImplicitCopy() const {
+  return llvm::cast<swift::SILFunctionArgument>(
+    getArgument())->isNoImplicitCopy();
+}
+
 OptionalBridgedDeclObj BridgedArgument::getDecl() const {
   return {getArgument()->getDecl()};
 }
@@ -1148,6 +1153,10 @@ bool BridgedFunction::shouldOptimize() const {
   return getFunction()->shouldOptimize();
 }
 
+bool BridgedFunction::isOptimizedForSize() const {
+  return getFunction()->optimizeForSize();
+}
+
 bool BridgedFunction::isReferencedInModule() const {
   return getFunction()->getRefCount() != 0;
 }
@@ -1162,6 +1171,10 @@ void BridgedFunction::setNeedStackProtection(bool needSP) const {
 
 void BridgedFunction::setIsPerformanceConstraint(bool isPerfConstraint) const {
   getFunction()->setIsPerformanceConstraint(isPerfConstraint);
+}
+
+void BridgedFunction::addSemanticsAttr(BridgedStringRef attrName) const {
+  getFunction()->addSemanticsAttr(attrName.unbridged());
 }
 
 bool BridgedFunction::hasOwnershipForTrivialValues() const {
@@ -1467,6 +1480,10 @@ SwiftInt BridgedInstruction::LoadInst_getLoadOwnership() const {
 
 bool BridgedInstruction::LoadBorrowInst_isUnchecked() const {
   return (SwiftInt)getAs<swift::LoadBorrowInst>()->isUnchecked();
+}
+
+void BridgedInstruction::LoadBorrowInst_setUnchecked(bool unchecked) const {
+  getAs<swift::LoadBorrowInst>()->setUnchecked(unchecked);
 }
 
 BridgedInstruction::BuiltinValueKind BridgedInstruction::BuiltinInst_getID() const {
@@ -2418,6 +2435,9 @@ OptionalBridgedBasicBlock BridgedInstruction::DebugValue_getDebugReconstructionB
 BridgedBasicBlock BridgedInstruction::DebugValue_getOrCreateDebugReconstructionBlock() const {
   return {getAs<swift::DebugValueInst>()->getOrCreateDebugReconstructionBlock()};
 }
+void BridgedInstruction::DebugValue_clearDebugReconstructionBlock() const {
+  getAs<swift::DebugValueInst>()->setDebugReconstructionBlock(nullptr);
+}
 
 void BridgedInstruction::DebugValue_stripDeref(SwiftInt operandIdx) const {
   getAs<swift::DebugValueInst>()->stripDeref(operandIdx);
@@ -2427,6 +2447,12 @@ void BridgedInstruction::DebugValue_prependDeref(SwiftInt operandIdx) const {
 }
 void BridgedInstruction::DebugValue_killOperand(SwiftInt operandIdx, BridgedType operandType) const {
   getAs<swift::DebugValueInst>()->killOperand(operandIdx, operandType.unbridged());
+}
+BridgedInstruction
+BridgedInstruction::DebugValue_replaceOperands(BridgedValueArray operands) const {
+  llvm::SmallVector<swift::SILValue, 16> operandValues;
+  return {getAs<swift::DebugValueInst>()->replaceOperands(
+      operands.getValues(operandValues))};
 }
 
 bool BridgedInstruction::AllocStack_hasVarInfo() const {
@@ -3824,6 +3850,17 @@ OptionalBridgedWitnessTable BridgedContext::lookupWitnessTable(BridgedConformanc
     return {nullptr};
   }
   return {context->getModule()->lookUpWitnessTable(ref.getConcrete())};
+}
+
+OptionalBridgedWitnessTable BridgedContext::loadWitnessTable(BridgedConformance conformance) const {
+  swift::ProtocolConformanceRef ref = conformance.unbridged();
+  if (!ref.isConcrete()) {
+    return {nullptr};
+  }
+  swift::SILModule *mod = context->getModule();
+  // Only `LinkAll` deserializes witness tables which don't need to be deserialized.
+  mod->linkWitnessTable(ref.getConcrete(), swift::SILModule::LinkingMode::LinkAll);
+  return {mod->lookUpWitnessTable(ref.getConcrete())};
 }
 
 BridgedConformance BridgedContext::substOpaqueTypesWithUnderlyingTypes(BridgedConformance conformance) const {

@@ -40,6 +40,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/InlineBitfield.h"
 #include "swift/Basic/SmallPtrSetVector.h"
+#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMapInfo.h"
 #include "llvm/ADT/DenseSet.h"
@@ -1082,6 +1083,10 @@ public:
   /// Determine if this type is an InlineArray<n, T> and, if so, provide the
   /// element type of the array.
   Type getInlineArrayElementType();
+
+  /// Determine if this type is an InlineArray<n, T> and, if so, provide the
+  /// count of the array as an integer.
+  std::optional<APInt> getInlineArrayCount();
 
   /// Determines the element type of a known
   /// [Autoreleasing]Unsafe[Mutable][Raw]Pointer variant, or returns null if the
@@ -2956,6 +2961,9 @@ public:
   /// return the element index, otherwise return -1.
   int getNamedElementId(Identifier I) const;
 
+  /// True if all elements of this tuple have the same type.
+  bool isHomogeneous() const;
+
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::Tuple;
@@ -4117,6 +4125,22 @@ public:
   bool isCalledOnce() const {
     return getExecutionSemantics() == ExecutionSemantics::Once;
   }
+
+  /// Returns true if values of this function type can't be copied.
+  bool isNoncopyable() const {
+    return getSuppressedInvertibleProtocols(getExecutionSemantics())
+        .contains(InvertibleProtocolKind::Copyable);
+  }
+
+  /// Returns true if values of this function type can't be destroyed
+  /// implicitly.
+  bool isNondeinitable() const {
+    return getSuppressedInvertibleProtocols(getExecutionSemantics())
+        .contains(InvertibleProtocolKind::Deinitable);
+  }
+
+  /// Returns true if calling a value of this function type consumes the value.
+  bool isCallConsuming() const { return hasCalledAtMostOnceSemantics(); }
 
   /// Returns a new function type exactly like this one but with the ExtInfo
   /// replaced.
@@ -5657,6 +5681,13 @@ public:
   /// Returns true if values of this function type must be called exactly
   /// once, which is true only for exactly-once function types.
   bool isCalledOnce() const { return getExtInfo().isCalledOnce(); }
+  /// Returns true if values of this function type can't be copied.
+  bool isNoncopyable() const { return getExtInfo().isNoncopyable(); }
+  /// Returns true if values of this function type can't be destroyed
+  /// implicitly.
+  bool isNondeinitable() const { return getExtInfo().isNondeinitable(); }
+  /// Returns true if calling a value of this function type consumes the value.
+  bool isCallConsuming() const { return getExtInfo().isCallConsuming(); }
   bool hasNonisolatedNonsendingIsolation() const {
     return getExtInfo().hasNonisolatedNonsendingIsolation();
   }
@@ -6299,7 +6330,7 @@ public:
   bool isTrivialNoEscape() const {
     return isNoEscape() &&
            getRepresentation() == SILFunctionTypeRepresentation::Thick &&
-           !hasCalledAtMostOnceSemantics();
+           !isNoncopyable();
   }
 
   bool isDifferentiable() const { return getExtInfo().isDifferentiable(); }
@@ -8551,6 +8582,8 @@ class IntegerType final : public TypeBase, public llvm::FoldingSetNode {
 public:
   static IntegerType *get(StringRef value, bool isNegative,
                           const ASTContext &ctx);
+
+  static IntegerType *get(const APSInt &value, const ASTContext &ctx);
 
   APInt getValue() const;
 

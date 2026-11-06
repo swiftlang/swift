@@ -2290,11 +2290,10 @@ PartialApplyInst::visitOnStackLifetimeEnds(
         continue;
       }
 
-      // An at-most-once closure's context is consumed directly by the
-      // `apply`/`try_apply` its passed to. This closure may also be captured
-      // by an at-most-once closure, which then ends its lifetime.
-      if ((hasCalledAtMostOnceSemantics() ||
-           value->getType().hasCalledAtMostOnceSemantics()) &&
+      // The context of a closure whose call consumes it is consumed directly
+      // by the `apply`/`try_apply` its passed to. This closure may also be
+      // captured by such a closure, which then ends its lifetime.
+      if ((isCallConsuming() || value->getType().isCallConsuming()) &&
           isa<ApplyInst, TryApplyInst>(use->getUser())) {
         liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
         continue;
@@ -2329,9 +2328,9 @@ PartialApplyInst::visitOnStackLifetimeEnds(
       if (!forward) {
         // There shouldn't be any other consumptions of a nonescaping
         // partial_apply that don't forward it along, aside from the ones
-        // handled above: destroy_value, an apply of an at-most-once closure,
-        // move_value, and a store into a stack slot that holds nothing but
-        // the closure.
+        // handled above: destroy_value, an apply of a closure whose call
+        // consumes it, move_value, and a store into a stack slot that holds
+        // nothing but the closure.
         //
         // On-stack partial_apply cannot be cloned, so it should never be used
         // by a BranchInst.
@@ -2368,8 +2367,8 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   for (auto *inst : boundary.lastUsers) {
     Operand *consumingOperand = nullptr;
     // A closure ends its lifetime at a `destroy_value`, at a `destroy_addr`
-    // of a stack slot that holds it, or at an apply that consumes an
-    // at-most-once closure.
+    // of a stack slot that holds it, or at an apply of a closure whose call
+    // consumes it.
     if (auto *dvi = dyn_cast<DestroyValueInst>(inst)) {
       consumingOperand = &dvi->getOperandRef();
     } else if (auto *dai = dyn_cast<DestroyAddrInst>(inst)) {

@@ -62,6 +62,30 @@ Diagnostics in the `EmbeddedRestrictions` group describe those language features
       @_dynamicReplacement(for: greet())
       func greetDifferently() { }     // warning: global function 'greetDifferently()' cannot be a dynamic replacement in Embedded Swift; '@_dynamicReplacement' will be ignored
 
+* Variadic generic functions have limited support. Pack expansion expressions and `for-in repeat` loops must be unrolled, so the body can be specialized for each element of the pack individually. If this unrolling fails, the variadic generic cannot be specialized. Currently, this can happen due to an early exit (e.g. `break`, `throw`) or branch (e.g. `if`) inside the loop. For example:
+
+      func mayThrow<T: BinaryInteger>(_ n: T) -> T throws {}
+
+      func testPackExpansion<each T: BinaryInteger>(_ ts: repeat each T) {
+        _ = (repeat 1 + each ts) // okay
+        _ = try (repeat mayThrow(each ts)) // error: cannot specialize pack expression or statement in Embedded Swift.
+      }
+
+      func sink<T: BinaryInteger>(_ n: T) { }
+
+      func testPackLoop<each T: BinaryInteger>(_ ts: repeat each T) {
+        for t in repeat each ts { // okay
+          sink(0)
+        }
+        for t in repeat each ts { // error: cannot specialize pack expression or statement in Embedded Swift.
+          if t.bitWidth == 16 {
+            sink(0)
+          } else {
+            sink(t)
+          }
+        }
+      }
+
 ## See Also
 
 - [A Vision for Embedded Swift](https://github.com/swiftlang/swift-evolution/blob/main/visions/embedded-swift.md)

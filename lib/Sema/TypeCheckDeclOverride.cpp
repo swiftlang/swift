@@ -1711,6 +1711,7 @@ namespace  {
     UNINTERESTING_ATTR(Postfix)
     UNINTERESTING_ATTR(Infix)
     UNINTERESTING_ATTR(ReferenceOwnership)
+    UNINTERESTING_ATTR(CArrayProjection)
 
     UNINTERESTING_ATTR(SynthesizedProtocol)
     UNINTERESTING_ATTR(RequiresStoredPropertyInits)
@@ -1920,8 +1921,12 @@ checkOverrideAvailability(ValueDecl *override, ValueDecl *base) {
   if (baseAccessor && overrideAccessor) {
     // Skip implicit accessors since they're synthesized with availability that
     // matches the accessors that they were derived from and therefore
-    // diagnostics for them will be redundant.
-    if (baseAccessor->isImplicit())
+    // diagnostics for them will be redundant. An explicit unavailable accessor
+    // that overrides an implicit one (e.g. the setter of a stored property) is
+    // still reachable through dynamic dispatch, though.
+    if (baseAccessor->isImplicit() &&
+        (overrideAccessor->isImplicit() ||
+         result.first != OverrideAvailability::OverrideUnavailable))
       return {OverrideAvailability::Ignored, std::nullopt};
 
     // If we're checking an accessor that's overriding another accessor, ignore
@@ -2242,28 +2247,59 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     break;
   }
   case OverrideAvailability::OverrideUnavailable: {
+    // An unavailable override is still reachable through dynamic dispatch, so
+    // it must be rejected.
     auto unavailableAttr = constraint->getAttr();
     auto domain = unavailableAttr.getDomain();
     auto parsedAttr = unavailableAttr.getParsedAttr();
 
+    // Marking a refined protocol requirement unavailable is fine.
+    if (isa<ProtocolDecl>(override->getDeclContext()))
+      break;
+
+    // `@_spi_available` overrides are printed as unavailable in public
+    // interfaces so this diagnostic cannot be enforced in swiftinterfaces.
+    if (override->getDeclContext()->isInSwiftinterface())
+      break;
+
+    // Only unconditional unavailability is banned, since it is meant to
+    // represent unreachability at runtime.
+    if (constraint->getReason() !=
+        AvailabilityRestriction::Reason::UnavailableUnconditionally)
+      break;
+
+    std::optional<LanguageMode> warnUntilLanguageMode;
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Universal:
     case AvailabilityDomain::Kind::SwiftLanguageMode:
     case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
     case AvailabilityDomain::Kind::PackageDescription:
     case AvailabilityDomain::Kind::Platform:
-      // FIXME: [availability] Diagnose as an error in a future Swift version.
+      // Diagnosing overrides that are unavailable in these domains would be
+      // source breaking for Swift 6 and earlier.
+      warnUntilLanguageMode = LanguageMode::future;
       break;
     case AvailabilityDomain::Kind::Embedded:
     case AvailabilityDomain::Kind::Custom:
-      if (parsedAttr->getLocation().isValid())
-        ctx.Diags.diagnose(override, diag::override_unavailable, override)
-            .fixItRemove(parsedAttr->getRangeWithAt());
-      else
-        ctx.Diags.diagnose(override, diag::override_unavailable, override);
-      ctx.Diags.diagnose(base, diag::overridden_here);
       break;
     }
+
+    auto diag =
+        ctx.Diags.diagnose(override, diag::override_unavailable, override);
+    diag.warnUntilLanguageMode(warnUntilLanguageMode);
+
+    // Only suggest removing the attribute if it was written on the override,
+    // rather than inherited from an enclosing extension or added by a macro.
+    auto attrLoc = parsedAttr->getLocation();
+    bool isAttrWrittenOnOverride =
+        attrLoc.isValid() &&
+        llvm::is_contained(override->getAttrs(), parsedAttr) &&
+        ctx.SourceMgr.findBufferContainingLoc(attrLoc) ==
+            ctx.SourceMgr.findBufferContainingLoc(override->getLoc());
+    if (isAttrWrittenOnOverride)
+      diag.fixItRemove(parsedAttr->getRangeWithAt());
+    diag.flush();
+    ctx.Diags.diagnose(base, diag::overridden_here);
     break;
   }
   case OverrideAvailability::OverrideLessAvailable: {

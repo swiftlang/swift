@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   internal func isTriviallyIdentical(to other: borrowing Self) -> Bool {
@@ -19,9 +18,7 @@ extension _RigidArray where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension _RigidArray: Equatable where Element: Equatable & ~Copyable {
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   internal static func ==(
     left: borrowing Self,

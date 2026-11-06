@@ -74,6 +74,33 @@ struct Stash {
   void handOut(View &out) const [[clang::lifetime_capture_by(out)]];
 };
 
+struct Captured {
+  int data;
+  // expected-note@+1 {{Swift cannot represent a parameter capturing 'self' in an initializer}}
+  Captured(View &out) [[clang::lifetime_capture_by(out)]];
+};
+
+// An independent result does not hide a capture Swift cannot represent.
+// expected-note@+1 {{Swift cannot represent the lifetime annotation on parameter 'o', which may be captured by a global or unknown entity}}
+View independentCaptureGlobally(const Owner &o [[clang::lifetime_capture_by_global]]) SWIFT_RETURNS_INDEPENDENT_VALUE;
+
+// An unannotated non-Escapable parameter does not make an API with an
+// independent result unsafe.
+View independentOfView(View v) SWIFT_RETURNS_INDEPENDENT_VALUE;
+
+struct Shared {
+  int data;
+} SWIFT_IMMORTAL_REFERENCE;
+
+// Capturing into the constructed object has the limits of 'lifetimebound'.
+struct SWIFT_NONESCAPABLE CapturingCtor {
+  // expected-note@+1 {{Swift cannot represent the lifetime annotation on parameter 'v', an rvalue reference that is not guaranteed to outlive the call}}
+  CapturingCtor(View &&v [[clang::lifetime_capture_by_this]]);
+  // expected-note@+1 {{Swift cannot represent the lifetime annotation on parameter 's', which is imported as a class}}
+  CapturingCtor(const Shared &s [[clang::lifetime_capture_by_this]]);
+  const int *p;
+};
+
 //--- test.swift
 import Life
 
@@ -114,4 +141,23 @@ func capturedEscapable(_ o: Owner, _ v: View, _ s: Stash) {
   s.handOut(&out) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
   // expected-note@-1 {{reference to unsafe instance method 'handOut'}}
   captureRefInto(o, &out)
+}
+
+func capturedByConstructor(_ v: View) {
+  var out = v
+  _ = Captured(&out) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe initializer 'init(_:)'}}
+}
+
+func independentResults(_ o: Owner, _ v: View) {
+  _ = independentCaptureGlobally(o) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe global function 'independentCaptureGlobally'}}
+  _ = independentOfView(v)
+}
+
+func capturedIntoConstructed(_ v: consuming View, _ s: Shared) {
+  _ = CapturingCtor(consuming: v) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe initializer 'init(consuming:)'}}
+  _ = CapturingCtor(s) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe initializer 'init(_:)'}}
 }

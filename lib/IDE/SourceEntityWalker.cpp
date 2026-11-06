@@ -516,12 +516,14 @@ ASTWalker::PreWalkResult<Expr *> SemaAnnotator::walkToExprPre(Expr *E) {
         auto *decl = component.getDeclRef().getDecl();
         auto loc = component.getLoc();
         SourceRange range(loc, loc);
+        auto *args = component.getArgs();
+        bool isImplicit = args && args->isImplicit();
         auto Continue = passReference(
             decl, component.getComponentType(), loc, range,
             ReferenceMetaData((isa<SubscriptDecl>(decl)
                                    ? SemaReferenceKind::SubscriptRef
                                    : SemaReferenceKind::DeclMemberRef),
-                              OpAccess));
+                              OpAccess, isImplicit));
         if (!Continue)
           return Action::Stop();
         break;

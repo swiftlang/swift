@@ -27,8 +27,8 @@ enum class MakeStructRawValuedFlags {
   /// whether to also create an unlabeled init
   MakeUnlabeledValueInit = 0x01,
 
-  /// whether the raw value should be a let
-  IsLet = 0x02,
+  /// whether the raw value should be read-only (`let` or no/private setter)
+  ReadOnly = 0x02,
 
   /// whether to mark the rawValue as implicit
   IsImplicit = 0x04,
@@ -38,16 +38,25 @@ using MakeStructRawValuedOptions = OptionSet<MakeStructRawValuedFlags>;
 inline MakeStructRawValuedOptions getDefaultMakeStructRawValuedOptions() {
   MakeStructRawValuedOptions opts;
   opts -= MakeStructRawValuedFlags::MakeUnlabeledValueInit; // default off
-  opts |= MakeStructRawValuedFlags::IsLet;                  // default on
+  opts |= MakeStructRawValuedFlags::ReadOnly;               // default on
   opts |= MakeStructRawValuedFlags::IsImplicit;             // default on
   return opts;
 }
 
-inline AccessLevel getOverridableAccessLevel(const DeclContext *dc) {
-  auto *classDecl = dc->getSelfClassDecl();
-  return (classDecl && !classDecl->isFinal()) ? AccessLevel::Open
-                                              : AccessLevel::Public;
-}
+enum class ValueConstructorFlags {
+  /// If present, arguments should be labeled.
+  WantParamNames = 0x01,
+
+  /// If present, a synthesized AST body should be attached (otherwise the
+  /// implementation will be synthesized by SILGen).
+  WantBody = 0x02,
+
+  /// If present, \c self should be zero-initialized before the properties are
+  /// set (used for a legacy init when a property has a hidden storage
+  /// projection). Only meaningful together with \c WantBody.
+  WantZeroInitPrologue = 0x04,
+};
+using ValueConstructorOptions = OptionSet<ValueConstructorFlags>;
 
 enum class ReferenceReturnTypeBehaviorForBaseMethodSynthesis {
   KeepReference,
@@ -96,10 +105,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            const clang::APValue &value,
-                            ConstantConvertKind convertKind, bool isStatic,
-                            ClangNode ClangN, AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          const clang::APValue &value,
+                          ConstantConvertKind convertKind, bool isStatic,
+                          ClangNode ClangN, AccessLevel access);
 
   /// Create a new named constant with the given value.
   ///
@@ -110,10 +119,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            StringRef value, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN,
-                            AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          StringRef value, ConstantConvertKind convertKind,
+                          bool isStatic, ClangNode ClangN,
+                          AccessLevel access);
 
   /// Create a new named constant using the given expression.
   ///
@@ -124,10 +133,10 @@ public:
   /// \param convertKind How to convert the constant to the given type.
   /// \param isStatic Whether the constant should be a static member of \p dc.
   /// \param access What access level should be given to the constant.
-  ValueDecl *createConstant(Identifier name, DeclContext *dc, Type type,
-                            Expr *valueExpr, ConstantConvertKind convertKind,
-                            bool isStatic, ClangNode ClangN,
-                            AccessLevel access);
+  VarDecl *createConstant(Identifier name, DeclContext *dc, Type type,
+                          Expr *valueExpr, ConstantConvertKind convertKind,
+                          bool isStatic, ClangNode ClangN,
+                          AccessLevel access);
 
   /// Create a default constructor that initializes a struct to zero.
   ConstructorDecl *createDefaultConstructor(NominalTypeDecl *structDecl);
@@ -135,15 +144,14 @@ public:
   /// Create a constructor that initializes a struct from its members.
   ConstructorDecl *createValueConstructor(NominalTypeDecl *structDecl,
                                           ArrayRef<VarDecl *> members,
-                                          bool wantCtorParamNames,
-                                          bool wantBody);
+                                          ValueConstructorOptions options,
+                                          AccessLevel maxAccess =
+                                              AccessLevel::Open);
 
   /// Create a rawValue-ed constructor that bridges to its underlying storage.
-  ConstructorDecl *createRawValueBridgingConstructor(StructDecl *structDecl,
-                                                     VarDecl *computedRawValue,
-                                                     VarDecl *storedRawValue,
-                                                     bool wantLabel,
-                                                     bool wantBody);
+  ConstructorDecl *createRawValueBridgingConstructor(
+      StructDecl *structDecl, VarDecl *computedRawValue,
+      VarDecl *storedRawValue, ValueConstructorOptions options);
 
   /// Create a constructor that initializes a class from a smart pointer.
   VarDecl *createSmartPtrBridgingProperty(FuncDecl *bridgingFunction);
@@ -164,25 +172,29 @@ public:
   void makeStructRawValuedWithBridge(
       StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
       ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-      bool makeUnlabeledValueInit = false);
+      MakeStructRawValuedOptions options =
+         getDefaultMakeStructRawValuedOptions());
 
   /// Make a struct declaration into a raw-value-backed struct
   ///
   /// \param structDecl the struct to make a raw value for
   /// \param underlyingType the type of the raw value
   /// \param synthesizedProtocolAttrs synthesized protocol attributes to add
-  /// \param setterAccess the access level of the raw value's setter
+  /// \param neededProjection which counterpart of the modern projection of
+  ///        \p underlyingType is needed (see
+  ///        \c getNeededCArrayCounterpartForType()). \c Modern (the default)
+  ///        means no C arrays are involved.
   ///
   /// This will perform most of the work involved in making a new Swift struct
   /// be backed by a raw value. This will populated derived protocols and
   /// synthesized protocols, add the new variable and pattern bindings, and
   /// create the inits parameterized over a raw value
-  ///
   void makeStructRawValued(StructDecl *structDecl, Type underlyingType,
                            ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
                            MakeStructRawValuedOptions options =
                                getDefaultMakeStructRawValuedOptions(),
-                           AccessLevel setterAccess = AccessLevel::Private);
+                           CArrayProjection neededProjection =
+                               CArrayProjection::Modern);
 
   /// Build the union field getter and setter.
   ///
@@ -223,28 +235,61 @@ public:
   /// Build the indirect field getter and setter.
   ///
   /// \code
-  /// struct SomeImportedIndirectField {
+  /// struct SomeImportedIndirectField {    // passed as `importedStructDecl`
   ///   struct __Unnamed_struct___Anonymous_field_1 {
-  ///     var myField : Int
+  ///     var myField : Int                 // located by name matching
   ///   }
-  ///   var __Anonymous_field_1 : __Unnamed_struct___Anonymous_field_1
-  ///   var myField : Int {
-  ///     get {
+  ///   var __Anonymous_field_1 :           // passed as `anonymousStorageDecl`
+  ///           __Unnamed_struct___Anonymous_field_1
+  ///   var myField : Int {                 // passed as `importedFieldDecl`
+  ///     get {                             // created, added, and returned
   ///       __Anonymous_field_1.myField
   ///     }
-  ///     set(newValue) {
+  ///     set(newValue) {                   // created, added, and returned
   ///       __Anonymous_field_1.myField = newValue
   ///     }
   ///   }
   /// }
   /// \endcode
   ///
+  /// \param importedStructDecl The type that \p importedFieldDecl is a member
+  ///        of.
+  /// \param importedFieldDecl The property created from the
+  ///        \c clang::IndirectFieldDecl ; the one that clients will directly
+  ///        use and that this function will install accessors on.
+  /// \param anonymousStorageDecl The property that contains the anonymous
+  ///        instance that the accessors should forward to.
+  ///
   /// \returns a pair of getter and setter function decls.
   std::pair<AccessorDecl *, AccessorDecl *>
-  makeIndirectFieldAccessors(const clang::IndirectFieldDecl *indirectField,
-                             ArrayRef<VarDecl *> members,
-                             NominalTypeDecl *importedStructDecl,
-                             VarDecl *importedFieldDecl);
+  makeIndirectFieldAccessors(NominalTypeDecl *importedStructDecl,
+                             VarDecl *importedFieldDecl,
+                             VarDecl *anonymousStorageDecl);
+
+  /// Turn \p forwardingDecl , one projection of an imported C array variable,
+  /// into a computed property whose accessors forward to \p storedDecl , the
+  /// other projection.
+  std::pair<AccessorDecl *, AccessorDecl *>
+  makeCArrayProjectionAccessors(DeclContext *dc,
+                                VarDecl *forwardingDecl,
+                                VarDecl *storedDecl);
+
+  /// Mark \p modern and \p counterpart (if non-null) as alternate projections
+  /// of the same declaration for the purposes of
+  /// \c Feature::ModernImportedCArrays , synthesizing forwarding accessors
+  /// between them if needed.
+  ///
+  /// \param addAlternate Whether to also record \p counterpart as an alternate
+  ///        declaration of \p modern . This should be \c false if the caller
+  ///        takes care of adding the counterpart itself.
+  ///
+  /// \param counterpartProjection What \p counterpart is: either the legacy
+  ///        projection, or, for a variable with no legacy projection, the
+  ///        hidden \c Builtin.FixedArray property that stores the array, which
+  ///        \p modern forwards to.
+  void registerCArrayProjections(
+      Decl *modern, Decl *counterpart, bool addAlternate = true,
+      CArrayProjection counterpartProjection = CArrayProjection::Legacy);
 
   /// Build the init(rawValue:) initializer for an imported NS_ENUM.
   ///
@@ -322,9 +367,10 @@ public:
   FuncDecl *makeOperator(FuncDecl *operatorMethod,
                          clang::OverloadedOperatorKind opKind);
   
-  // Synthesize a C++ method that invokes the method from the base
-  // class. This lets Clang take care of the cast from the derived class
-  // to the base class during the invocation of the method.
+  /// Synthesize a C++ method that invokes the method from the base
+  /// class. This lets Clang take care of the cast from the derived class
+  /// to the base class during the invocation of the method. Results are
+  /// memoized.
   clang::CXXMethodDecl *synthesizeCXXForwardingMethod(
       const clang::CXXRecordDecl *derivedClass,
       const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
@@ -340,7 +386,7 @@ public:
                               StringRef swiftName);
 
   FuncDecl *makeInstanceToStaticOperatorCallMethod(
-      const clang::CXXMethodDecl *clangMethodDecl);
+      const clang::CXXMethodDecl *clangMethodDecl, CArrayProjection projection);
 
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);

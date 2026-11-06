@@ -23,6 +23,7 @@ target_compile_options(swiftGlibc PRIVATE
   "SHELL:-Xfrontend -empty-abi-descriptor"
   "SHELL:-Xfrontend -prespecialize-generic-metadata"
   "SHELL:-Xfrontend -require-explicit-availability=ignore"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>"
   "SHELL:-library-level api")
 
 install(TARGETS swiftGlibc

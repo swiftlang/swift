@@ -369,6 +369,13 @@ _swift_embedded_error_store_destroy(void * _Nullable * _Nonnull destroy_location
 #endif
 }
 
+// Frees the box of an opaque existential container -- without destroying the
+// boxed value -- or does nothing if the value is stored inline. Only compiled
+// code knows how the box was allocated (e.g. with TypedAllocation), so this is
+// defined by the compiler in every Embedded module, not by the runtime. (With
+// -no-allocations, where no box can exist, it traps.)
+extern void __swift_deallocate_boxed_opaque_existential_0(void *container);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

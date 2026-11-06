@@ -336,6 +336,11 @@ clang::QualType ClangTypeConverter::visitStructType(StructType *type) {
     return convertSIMDType</*templateArgument=*/false>(argType, width.value());
   }
 
+  if (auto count = type->getInlineArrayCount()) {
+    auto elemType = type->getInlineArrayElementType();
+    return convertCArrayType(elemType, *count);
+  }
+
   // If the struct type isn't canonical (e.g. because of a sugared parent
   // type), try again with the canonical type, just in case it helps.
   if (!type->isCanonical())
@@ -480,11 +485,16 @@ clang::QualType ClangTypeConverter::visitTupleType(TupleType *type) {
       return clang::QualType();
   }
 
+  APInt size(32, tupleNumElements);
+  return convertCArrayType(eltTy, size);
+}
+
+clang::QualType
+ClangTypeConverter::convertCArrayType(Type eltTy, const APInt &size) {
   auto clangEltTy = convert(eltTy);
   if (clangEltTy.isNull())
     return clang::QualType();
 
-  APInt size(32, tupleNumElements);
   return ClangASTContext.getConstantArrayType(
       clangEltTy, size, nullptr, clang::ArraySizeModifier::Normal, 0);
 }

@@ -100,9 +100,6 @@ public:
                         LinearLifetimeChecker::ErrorBuilder errorBuilder)
       : deadEndBlocks(deadEndBlocks), errorBuilder(errorBuilder) {}
 
-  /// Verify whether all reborrows of \p borrow are within the lifetime of the
-  /// borrowed value.
-  void verifyReborrows(BeginBorrowInst *borrow);
   /// Verify whether the GuaranteedForwardingPhi uses of \p borrow are within
   /// its lifetime.
   void verifyGuaranteedForwardingPhis(BorrowedValue borrow);

@@ -495,6 +495,9 @@ static StringRef getDumpString(Associativity value) {
 
   llvm_unreachable("Unhandled Associativity in switch.");
 }
+static StringRef getDumpString(CArrayProjection projection) {
+  return getCArrayProjectionSpelling(projection);
+}
 static StringRef getDumpString(CheckedCastKind kind) {
   return getCheckedCastKindName(kind);
 }
@@ -2964,10 +2967,13 @@ namespace {
         }, Label::optional("foreign_error_convention"));
       }
 
-      auto canParse =
-          (MemberLoading != ASTDumpMemberLoading::None) && !D->isBodySkipped();
-      if (auto Body = D->getBody(canParse)) {
-        printRec(Body, &D->getASTContext(), Label::optional("body"));
+      if (!D->isBodySkipped()) {
+        auto Body = isTypeChecked()
+                        ? D->getTypecheckedBody()
+                        : D->getBody(MemberLoading != ASTDumpMemberLoading::None);
+        if (Body) {
+          printRec(Body, &D->getASTContext(), Label::optional("body"));
+        }
       }
     }
 
@@ -3265,6 +3271,10 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
   } else {
     cast<ModuleDecl>(this)->getReverseFullModuleName().printForward(os);
   }
+
+  if (auto attr = getAttrs().getAttribute<CArrayProjectionAttr>())
+    os << " c-array-projection("
+       << getCArrayProjectionSpelling(attr->getProjection()) << ")";
 
   if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
     os << " known-to-be-local";
@@ -3983,8 +3993,8 @@ public:
   }
   void visitFunctionConversionExpr(FunctionConversionExpr *E, Label label) {
     printCommon(E, "function_conversion_expr", label);
-    if (E->isWithoutActuallyDiscarding())
-      printFlag(true, "without_actually_discarding", ExprModifierColor);
+    if (E->isWithoutActuallyDeiniting())
+      printFlag(true, "without_actually_deiniting", ExprModifierColor);
     printRec(E->getSubExpr(), Label::optional("sub_expr"));
     printFoot();
   }
@@ -5082,6 +5092,15 @@ public:
 // Dumping for DeclAttributes
 //===----------------------------------------------------------------------===//
 
+StringRef swift::getCArrayProjectionSpelling(CArrayProjection value) {
+  switch (value) {
+  case CArrayProjection::Modern: return "modern";
+  case CArrayProjection::Legacy: return "legacy";
+  case CArrayProjection::HiddenStorage: return "hiddenStorage";
+  }
+  llvm_unreachable("unknown CArrayProjection");
+}
+
 namespace {
 class PrintAttribute : public AttributeVisitor<PrintAttribute, void, Label>,
                        public PrintBase {
@@ -5508,6 +5527,11 @@ public:
     printCommon(Attr, "nonisolated_attr", label);
     printFlag(Attr->isUnsafe(), "unsafe");
     printFlag(Attr->isNonSending(), "nonsending");
+    printFoot();
+  }
+  void visitCArrayProjectionAttr(CArrayProjectionAttr *Attr, Label label) {
+    printCommon(Attr, "c_array_projection", label);
+    printField(Attr->getProjection(), Label::optional("projection"));
     printFoot();
   }
   void visitInheritActorContextAttr(InheritActorContextAttr *Attr,

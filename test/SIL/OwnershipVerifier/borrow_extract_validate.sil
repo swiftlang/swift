@@ -102,9 +102,9 @@ bb1(%elem : @guaranteed $Klass, %newborrow : @guaranteed $WrapperStruct):
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_extract_dominate_discrepency_incorrect2'
 // CHECK: Found outside of lifetime use?!
-// CHECK: Value:   %2 = copy_value %0 : $WrapperStruct           
-// CHECK: Consuming User:   destroy_value %2 : $WrapperStruct               
-// CHECK: Non Consuming User:   end_borrow %7 : $WrapperStruct                  
+// CHECK: Value:   %2 = copy_value %0 : $WrapperStruct
+// CHECK: Consuming User:   destroy_value %2 : $WrapperStruct
+// CHECK: Non Consuming User:   end_borrow %8 : $WrapperStruct
 // CHECK: Block: bb1
 // CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_extract_dominate_discrepency_incorrect2'
 // CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'borrowed_extract_dominate_discrepency_incorrect2'
@@ -115,11 +115,13 @@ bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   %elem0 = struct_extract %borrow0 : $WrapperStruct, #WrapperStruct.cls
   br bb1(%elem0 : $Klass, %borrow0 : $WrapperStruct)
 
-bb1(%elem : @guaranteed $Klass, %newborrow : @guaranteed $WrapperStruct):
+bb1(%elem : @guaranteed $Klass, %newborrow : @reborrow $WrapperStruct):
+  %newborrowbf = borrowed %newborrow : $WrapperStruct from (%copy0 : $WrapperStruct)
+  %elembf = borrowed %elem : $Klass from (%newborrow : $WrapperStruct)
   %func = function_ref @blackhole_spl1 : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %copy0 : $WrapperStruct
-  %call1 = apply %func(%elem) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %newborrow : $WrapperStruct
+  %call1 = apply %func(%elembf) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %newborrowbf : $WrapperStruct
   %ret = tuple ()
   return %ret : $()
 }

@@ -1,3 +1,4 @@
+// RUN: %target-swift-frontend -emit-sil -verify -Onone -target %target-swift-6.2-abi-triple %s -o /dev/null
 // RUN: %target-swift-frontend -emit-sil -verify -O -target %target-swift-6.2-abi-triple %s -o /dev/null
 
 // Static diagnostics for variables captured by box: by a closure that may
@@ -5,7 +6,8 @@
 // unless MandatoryAllocBoxToStack promotes the box, which it only does if a
 // conflict either can't happen or happens on every path through the call. So
 // a conflict is only diagnosed statically if dynamic enforcement would fail
-// every time the call executes. rdar://179406916
+// every time the call executes. The diagnostics must be the same at every
+// optimization level. rdar://179406916
 
 func use(_: Span<Int>) {}
 func use(_: Int) {}
@@ -359,6 +361,31 @@ func localFunctionAndClosureCaptureVariable() {
     modifyAndCallClosure(&x) { c() }
   }
   outer { x += 1 }
+}
+
+// The same with a non-escaping closure, which captures the variable by address
+// and is passed to the same call as the local function's box. Both accesses are
+// dynamic, so the conflict is caught at run time.
+
+func localFunctionAndNonEscapingClosureCaptureVariable() {
+  var x = 0
+  func outer(_ c: () -> ()) {
+    modifyAndCallClosure(&x) { c() }
+  }
+  outer { x += 1 }
+}
+
+func bump(_ v: inout Int, _ body: () -> ()) {
+  body()
+  v += 1
+}
+
+func boxPassedWithNonEscapingClosure() {
+  var x = 0
+  func modify(_ body: () -> ()) {
+    bump(&x, body)
+  }
+  modify { x += 1 }
 }
 
 // The variable is captured twice by arguments of the same call, but the

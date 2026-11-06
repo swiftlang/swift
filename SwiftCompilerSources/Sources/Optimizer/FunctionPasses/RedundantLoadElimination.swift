@@ -631,6 +631,12 @@ private struct InstructionScanner {
         // This happens if the load is in a loop.
         return .available
       }
+      if precedingLoad.loadOwnership == .take {
+        // A `load [take]` de-initializes the memory. Therefore it cannot provide an available value.
+        // This can happen in dead code when working with unsafe pointer APIs, e.g. two consecutive
+        // `load [take]` from the same address.
+        break
+      }
       let precedingLoadPath = precedingLoad.address.constantAccessPath
       if precedingLoadPath.getMaterializableProjection(to: accessPath) != nil {
         availableValues.append(.viaLoad(precedingLoad))

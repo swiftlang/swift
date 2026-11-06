@@ -86,3 +86,18 @@ func tryKeypaths() {
     _ = \Door.[0] // expected-error{{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
     _ = \Door.["hello"] // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
 }
+
+@dynamicMemberLookup
+struct MainActorLens<T> {
+  @MainActor subscript<U>(dynamicMember member: KeyPath<T, U> & Sendable) -> U { fatalError() }
+}
+
+@dynamicMemberLookup
+struct ChainedMainActorLens<T> {
+  subscript<U>(dynamicMember member: KeyPath<MainActorLens<T>, U> & Sendable) -> U { fatalError() }
+}
+
+func tryDynamicMemberLookupKeypaths(_ lens: ChainedMainActorLens<Box>) {
+  _ = \MainActorLens<Box>.size // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(dynamicMember:)'; this is an error in the Swift 6 language mode}}
+  _ = lens.size // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(dynamicMember:)'; this is an error in the Swift 6 language mode}}
+}

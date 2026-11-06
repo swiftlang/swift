@@ -242,6 +242,14 @@ REMARK(remark_scanner_invalidate_directory, none,
        "Incremental module scan: Dependency info for module '%0' invalidated due to a"
        " change in directory: '%1'.", (StringRef, StringRef))
 
+REMARK(remark_scanner_invalidate_module_map, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated because the module"
+       " was previously defined in '%1' but is now found in '%2'.",
+       (StringRef, StringRef, StringRef))
+
+REMARK(remark_scanner_module_map_not_found, none,
+       "Incremental module scan: Module map lookup did not find module '%0'.", (StringRef))
+
 REMARK(remark_scanner_invalidate_upstream, none,
        "Incremental module scan: Dependency info for module '%0' invalidated due to an out-of-date"
        " dependency.", (StringRef))

@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1042; // User module sub-build version
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1043; // widen remaining 16-bit hash table dataLengths to uint32
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -2487,6 +2487,8 @@ namespace decls_block {
     = BCRecordLayout<RestatedObjCConformance_DECL_ATTR>;
   using ClangImporterSynthesizedTypeDeclAttrLayout
     = BCRecordLayout<ClangImporterSynthesizedType_DECL_ATTR>;
+  using CArrayProjectionDeclAttrLayout
+    = BCRecordLayout<CArrayProjection_DECL_ATTR>;
   using PrivateImportDeclAttrLayout = BCRecordLayout<PrivateImport_DECL_ATTR>;
   using AllowFeatureSuppressionDeclAttrLayout =
       BCRecordLayout<AllowFeatureSuppression_DECL_ATTR>;

@@ -608,6 +608,14 @@ static bool hasNoArgumentConstructor(ClassDecl *decl) {
     if (!ctor || ctor->isInvalid() || ctor->isUnavailable())
       continue;
 
+    // Only an initializer imported from a C++ constructor can construct the
+    // base subobject of a subclass of a C++ foreign reference type.
+    if (decl->isForeignReferenceType() &&
+        !decl->getASTContext()
+             .getClangModuleLoader()
+             ->getOriginalForeignReferenceConstructor(ctor))
+      continue;
+
     if (ctor->getParameters()->size() == 0)
       return true;
   }

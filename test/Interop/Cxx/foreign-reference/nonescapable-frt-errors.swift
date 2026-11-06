@@ -82,7 +82,7 @@ struct SWIFT_IMMORTAL_REFERENCE ComplexFRTWithNonEscapableField {
 // argument is rejected, whether or not it spells SWIFT_ESCAPABLE_IF. A
 // non-escapable argument that is not stored is fine, since nothing that cannot
 // escape ends up inside the class.
-// expected-warning@+3 2 {{SWIFT_ESCAPABLE_IF has no effect on}}
+// expected-warning@+3 2 {{SWIFT_SELF_CONTAINED_IF has no effect on}}
 // expected-note@+2 {{'Escapable' record 'StoresArgument<View>' cannot have non-'Escapable' field 'value'}}
 template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE_IF(T)
     StoresArgument {
@@ -109,15 +109,15 @@ struct SWIFT_IMMORTAL_REFERENCE Immortal {
 
 // Escapability annotations are redundant on a foreign reference type, whether
 // it is annotated directly or inherits its reference-ness from a base.
-// expected-warning@+1 {{SWIFT_ESCAPABLE has no effect on 'ImmortalEscapable'}}
+// expected-warning@+1 {{SWIFT_SELF_CONTAINED has no effect on 'ImmortalEscapable'}}
 struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE ImmortalEscapable {
   int value;
 };
 
-// expected-warning@+1 {{SWIFT_ESCAPABLE has no effect on 'DerivedEscapable'}}
+// expected-warning@+1 {{SWIFT_SELF_CONTAINED has no effect on 'DerivedEscapable'}}
 struct SWIFT_ESCAPABLE DerivedEscapable : Immortal {};
 
-// expected-warning@+2 {{SWIFT_ESCAPABLE_IF has no effect on 'ConditionallyEscapable<int>'}}
+// expected-warning@+2 {{SWIFT_SELF_CONTAINED_IF has no effect on 'ConditionallyEscapable<int>'}}
 template <class T> struct SWIFT_IMMORTAL_REFERENCE SWIFT_ESCAPABLE_IF(T)
     ConditionallyEscapable {
   T value;
@@ -145,7 +145,7 @@ struct SWIFT_IMMORTAL_REFERENCE AnnotatedViaAPINotes {
 };
 
 // An escapability annotation applied via API notes is redundant too.
-// expected-warning@+1 {{SWIFT_ESCAPABLE has no effect on 'EscapableViaAPINotes'}}
+// expected-warning@+1 {{SWIFT_SELF_CONTAINED has no effect on 'EscapableViaAPINotes'}}
 struct SWIFT_IMMORTAL_REFERENCE EscapableViaAPINotes {
   int value;
 };

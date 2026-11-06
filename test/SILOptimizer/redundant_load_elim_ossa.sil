@@ -1822,3 +1822,22 @@ bb0(%0 : @owned $NC, %1 : $*NC, %2 : @owned $AnyObject):
   return %5
 }
 
+// A `load [take]` de-initializes the memory and cannot provide an available value.
+// CHECK-LABEL: sil [ossa] @dont_forward_from_load_take :
+// CHECK:         [[A:%.*]] = pointer_to_address
+// CHECK:         [[L1:%.*]] = load [take] [[A]]
+// CHECK:         [[L2:%.*]] = load [take] [[A]]
+// CHECK:         store [[L2]] to [init] [[A]]
+// CHECK:         store [[L1]] to [init] [[A]]
+// CHECK-LABEL: } // end sil function 'dont_forward_from_load_take'
+sil [ossa] @dont_forward_from_load_take : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %a = pointer_to_address %0 to [strict] $*B
+  // A double take can only happen in dead code when working with unsafe pointer APIs.
+  %1 = load [take] %a
+  %2 = load [take] %a
+  store %2 to [init] %a
+  store %1 to [init] %a
+  %r = tuple ()
+  return %r
+}

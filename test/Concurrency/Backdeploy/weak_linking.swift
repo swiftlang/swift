@@ -12,6 +12,10 @@
 // RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx10.15 -O -module-name main -emit-ir -o %t/optimized.ir -target %target-swift-5.1-abi-triple
 // RUN: %FileCheck %s --check-prefix=OPTIMIZED < %t/optimized.ir
 
+// RUN: %target-swift-frontend %s -target %target-cpu-apple-macosx13.0 -module-name main -emit-ir -D CANCELLATION_REASON -o %t/cancellation_reason.ir
+// RUN: %FileCheck %s --check-prefix=CANCELLATION_REASON < %t/cancellation_reason.ir
+// RUN: %FileCheck %s --check-prefix=CANCELLATION_REASON_STORAGE < %t/cancellation_reason.ir
+
 
 // REQUIRES: OS=macosx
 
@@ -31,6 +35,13 @@
 // OPTIMIZED: @llvm.used =
 // OPTIMIZED-SAME: ptr @_swift_async_extendedFramePointerFlagsUser
 
+// The accessors of CancellationError's stored reason have the type's 5.1
+// availability, so a client must never reference them: they would be strongly
+// linked and missing from older runtimes, even behind `if #available`.
+// CANCELLATION_REASON_STORAGE-NOT: _reasonRawStorage
+// CANCELLATION_REASON-DAG: declare extern_weak swiftcc {{.*}} @"$sScE6reasonScE6ReasonOvg"
+// CANCELLATION_REASON-DAG: declare extern_weak swiftcc {{.*}} @"$sScE6reasonS2cE6ReasonO_tcfC"
+
 @available(macOS 12.0, *)
 public func g() async -> String { "hello" }
 
@@ -40,3 +51,21 @@ public func f() async {
     print(await g())
   }
 }
+
+#if CANCELLATION_REASON
+@available(macOS 12.0, *)
+public func isDeadlineExpired(_ error: CancellationError) -> Bool {
+  if #available(SwiftStdlib 6.5, *) {
+    return error.reason == .deadlineExpired
+  }
+  return false
+}
+
+@available(macOS 12.0, *)
+public func makeDeadlineExpiredError() -> CancellationError {
+  if #available(SwiftStdlib 6.5, *) {
+    return CancellationError(reason: .deadlineExpired)
+  }
+  return CancellationError()
+}
+#endif

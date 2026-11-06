@@ -7922,6 +7922,14 @@ static void emitUncheckedValueBitCast(IRGenSILFunction &IGF,
     return;
   }
 
+  // A zero-sized result has no bits to reload. Some such types (e.g. enums
+  // with no or one case) have an unsized storage type, which can't be
+  // allocated.
+  if (outTI.getFixedSize().isZero()) {
+    (void)in.claimAll();
+    return;
+  }
+
   // TODO: We could do bitcasts entirely in the value domain in some cases, but
   // for simplicity, let's just always go through the stack for now.
 
@@ -8049,7 +8057,7 @@ void IRGenSILFunction::visitThinToThickFunctionInst(
   Explosion to;
   to.add(Builder.CreateBitCast(from.claimNext(), IGM.FunctionPtrTy));
   auto fnTy = i->getType().castTo<SILFunctionType>();
-  if (fnTy->isCalledOnce())
+  if (fnTy->isNondeinitable())
     to.add(IGM.getAddrOfExactlyOnceSharedContext());
   else if (fnTy->isTrivialNoEscape())
     to.add(llvm::ConstantPointerNull::get(IGM.OpaquePtrTy));
@@ -8819,6 +8827,12 @@ void IRGenSILFunction::visitPackElementSetInst(PackElementSetInst *i) {
 
 void IRGenSILFunction::visitTuplePackElementAddrInst(
                                                   TuplePackElementAddrInst *i) {
+  if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    // This should normally be caught by EmbeddedSwiftDiagnostics.
+    llvm::report_fatal_error(
+        "tuple_pack_element_addr unsupported in embedded Swift: tuple type "
+        "metadata does not contain element offsets");
+  }
   Address tuple = getLoweredAddress(i->getTuple());
   llvm::Value *index = getLoweredSingletonExplosion(i->getIndex());
 

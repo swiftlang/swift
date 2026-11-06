@@ -56,12 +56,16 @@ using namespace swift;
 using namespace importer;
 
 void ImportNameVersion::dump(llvm::raw_ostream &out) const {
-  if (*this == raw())
+  if (withoutCArrayProjection() == raw())
     out << "raw";
   else
     out << asClangVersionTuple().getAsString();
   if (supportsConcurrency())
     out << " (concurrency)";
+  if (getCArrayProjection() == CArrayProjection::Legacy)
+    out << " (legacy C arrays)";
+  else if (getCArrayProjection() == CArrayProjection::HiddenStorage)
+    out << " (hidden C array storage)";
 }
 
 void ImportNameVersion::dump() const {
@@ -1602,7 +1606,8 @@ addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
 std::optional<StringRef>
 NameImporter::findCustomName(const clang::Decl *decl,
                              ImportNameVersion version) {
-  if (auto nameAttr = findSwiftNameAttr(decl, version)) {
+  if (auto nameAttr = findSwiftNameAttr(decl,
+                                        version.withoutCArrayProjection())) {
     return nameAttr->name;
   }
   return std::nullopt;
@@ -2660,8 +2665,11 @@ NameImporter::importMacroName(const clang::IdentifierInfo *II,
 }
 
 ImportedName NameImporter::importName(const clang::NamedDecl *decl,
-                                      ImportNameVersion version,
+                                      ImportNameVersion exactVersion,
                                       clang::DeclarationName givenName) {
+  // Strip bits that don't affect names.
+  auto version = exactVersion.withoutCArrayProjection();
+
   CacheKeyType key(decl, version);
   if (!givenName) {
     if (auto cachedRes = importNameCache[key]) {

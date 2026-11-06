@@ -1011,6 +1011,23 @@ Type TypeBase::getArrayElementType() {
   return arrayType->getGenericArgs()[0];
 }
 
+std::optional<APInt> TypeBase::getInlineArrayCount() {
+  if (!isInlineArray() && !is_InlineArray())
+    return std::nullopt;
+
+  auto arrayType = getAs<StructType>();
+  if (!arrayType)
+    return std::nullopt;
+
+  // InlineArray<n, T>
+  auto countType = arrayType->getGenericArgs()[0];
+
+  if (!countType->is<IntegerType>())
+    return std::nullopt;
+
+  return countType->castTo<IntegerType>()->getValue();
+}
+
 Type TypeBase::getInlineArrayElementType() {
   if (!isInlineArray() && !is_InlineArray())
     return Type();
@@ -3928,6 +3945,9 @@ static bool matches(CanType t1, CanType t2, TypeMatchOptions matchMode,
       
       // Inputs are contravariant.
       for (auto i : indices(fn2.getParams())) {
+        if (fn1Params[i].isVariadic() != fn2Params[i].isVariadic())
+          return false;
+
         if (!matches(fn2Params[i].getOldType(), fn1Params[i].getOldType(),
                      matchMode, ParameterPosition::ParameterTupleElement,
                      OptionalUnwrapping::None)) {
@@ -4059,6 +4079,17 @@ int TupleType::getNamedElementId(Identifier I) const {
 
   // Otherwise, name not found.
   return -1;
+}
+
+bool TupleType::isHomogeneous() const {
+  if (getNumElements() == 0)
+    return true;
+
+  CanType firstTy = getElementType(0)->getCanonicalType();
+  return llvm::all_of(getElementTypes(), [&](Type elemTy) {
+    return elemTy->isTypeVariableOrMember() ||
+              elemTy->getCanonicalType() == firstTy;
+  });
 }
 
 ArchetypeType::ArchetypeType(TypeKind Kind,
@@ -4990,12 +5021,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   CanType type = getCanonicalType();
   ASTContext &ctx = type->getASTContext();
 
-  if (isForeignReferenceType())
-    return lookThroughAllOptionalTypes()
-                   ->getClassDecl()
-                   ->hasRefCountingAnnotations()
-               ? ReferenceCounting::Custom
-               : ReferenceCounting::None;
+  if (auto classDecl =
+          lookThroughAllOptionalTypes()->getClassDecl()) {
+    if (auto frtBase = classDecl->getForeignReferenceSuperclassOrSelf())
+      return frtBase->hasRefCountingAnnotations() ? ReferenceCounting::Custom
+                                                  : ReferenceCounting::None;
+  }
 
   ReferenceCounting defaultRefCounting = ReferenceCounting::Unknown;
 

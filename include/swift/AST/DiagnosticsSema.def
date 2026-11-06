@@ -102,6 +102,10 @@ ERROR(could_not_find_subscript_member_tuple_did_you_mean_use_dot, none,
       "cannot access element using subscript for tuple type %0; "
       "did you mean to use '.%1'?", (Type, StringRef))
 
+ERROR(could_not_find_tuple_member_did_you_mean_use_subscript, none,
+      "cannot access element using tuple member for non-tuple type %0; "
+      "did you mean to use '[%1]'?", (Type, unsigned))
+
 ERROR(could_not_find_enum_case,none,
       "enum type %0 has no case %1; did you mean %2?",
       (Type, DeclNameRef, DeclName))
@@ -170,6 +174,11 @@ ERROR(init_candidate_inaccessible,none,
       "%0 initializer is inaccessible due to "
       "'%select{private|fileprivate|internal|package|@_spi|@_spi}1' protection level",
       (Type, AccessLevel))
+
+ERROR(candidate_inaccessible_c_array,none,
+      "%kind0 was not imported because its C array type could not be represented "
+      "as a tuple",
+      (const ValueDecl *))
 
 GROUPED_ERROR(member_from_missing_import,MemberImportVisibility,none,
       "%kind0 is not available due to missing import of defining module %1",
@@ -280,8 +289,6 @@ ERROR(no_candidates_match_argument_type,none,
 ERROR(cannot_infer_closure_parameter_type,none,
       "cannot infer type of closure parameter %0 without a type annotation",
        (StringRef))
-ERROR(cannot_infer_closure_type,none,
-      "unable to infer closure type without a type annotation", ())
 ERROR(cannot_infer_empty_closure_result_type,none,
       "cannot infer return type of empty closure", ())
 ERROR(cannot_infer_closure_result_type,none,
@@ -1484,8 +1491,8 @@ ERROR(cannot_jump_in_single_value_stmt,none,
       (StmtKind, StmtKind))
 WARNING(effect_marker_on_single_value_stmt,none,
       "'%0' has no effect on '%1' expression", (StringRef, StmtKind))
-ERROR(without_actually_discarding_requires_exactly_once,none,
-      "'withoutActuallyDiscarding' requires a '@once' function, "
+ERROR(without_actually_deiniting_requires_exactly_once,none,
+      "'withoutActuallyDeiniting' requires a '@once' function, "
       "but argument has type %0", (Type))
 ERROR(out_of_place_then_stmt,none,
       "'then' may only appear as the last statement in an 'if', 'switch', or "
@@ -3999,7 +4006,7 @@ NOTE(suggest_removing_override, none,
      "remove 'override' modifier to declare a new %0",
      (DeclBaseName))
 
-ERROR(override_unavailable, none,
+GROUPED_ERROR(override_unavailable, UnavailableOverride, none,
       "cannot override %base0 with a declaration that is marked unavailable",
       (ValueDecl *))
 
@@ -5116,6 +5123,10 @@ NOTE(delegation_here,none, "delegation occurs here", ())
 ERROR(chain_convenience_init,none,
       "must call a designated initializer of the superclass %0",
       (Type))
+ERROR(chain_foreign_reference_non_constructor_init,none,
+      "cannot %select{call|implicitly call}0 %1 with 'super.init' because it "
+      "is not a constructor of %2",
+      (bool, const ConstructorDecl *, Type))
 ERROR(delegate_chain_nonoptional_to_optional,none,
       "a non-failable initializer cannot %select{delegate|chain}0 to "
       "failable initializer %1 written with 'init?'",
@@ -5309,13 +5320,25 @@ ERROR(string_literal_broken_proto,none,
       "protocol 'ExpressibleByStringLiteral' is broken", ())
 
 // Array literals
-ERROR(should_use_dictionary_literal,none,
+ERROR(should_use_dictionary_literal_not_array_literal,none,
       "dictionary of type %0 cannot be %select{used|initialized}1 "
       "with array literal", (Type, bool))
 NOTE(meant_dictionary_lit,none,
      "did you mean to use a dictionary literal instead?", ())
 ERROR(should_use_empty_dictionary_literal,none,
       "use [:] to get an empty dictionary literal", ())
+
+ERROR(should_use_tuple_not_array_literal,none,
+      "tuple of type %0 cannot be %select{used|initialized}1 "
+      "with array literal", (Type, bool))
+NOTE(meant_tuple,none,
+     "did you mean to use a tuple instead?", ())
+
+ERROR(should_use_array_literal_not_tuple,none,
+      "array of type %0 cannot be %select{used|initialized}1 "
+      "with tuple", (Type, bool))
+NOTE(meant_array,none,
+     "did you mean to use an array literal instead?", ())
 
 // Dictionary literals
 WARNING(duplicated_literal_keys_in_dictionary_literal, none,
@@ -8415,8 +8438,6 @@ ERROR(property_wrapper_attribute_not_on_property, none,
 ERROR(property_wrapper_param_not_supported,none,
       "property wrapper attribute on parameter not yet supported on %kindonly0",
       (const ValueDecl *))
-NOTE(property_wrapper_declared_here,none,
-     "property wrapper type %0 declared here", (Identifier))
 ERROR(invalid_projection_argument,none,
       "cannot use property wrapper projection %select{argument|parameter}0",
       (bool))
@@ -8465,9 +8486,6 @@ ERROR(property_with_wrapper_overrides,none,
       "property %0 with attached wrapper cannot override another property",
       (Identifier))
 
-ERROR(property_wrapper_incompatible_property, none,
-      "property type %0 does not match that of the 'wrappedValue' property of "
-      "its wrapper type %1", (Type, Type))
 ERROR(wrapped_value_mismatch, none,
       "property type %0 does not match 'wrappedValue' type %1",
       (Type, Type))
@@ -8762,6 +8780,11 @@ ERROR(cannot_convert_default_value_type_to_argument_type, none,
 ERROR(attr_incompatible_with_back_deployed,none,
       "%0 cannot be applied to a back deployed %kind1",
       (DeclAttribute, const Decl *))
+NOTE(back_deployed_along_with_type,none,
+      "%kind0 is back deployed along with %kind1 unless it is only available "
+      "in %2 %3 or newer",
+      (const ValueDecl *, const ValueDecl *, AvailabilityDomain,
+       AvailabilityRange))
 
 WARNING(back_deployed_opaque_result_not_supported,none,
       "%0 cannot be applied to %kind1 because it has a 'some' return type",
@@ -8770,6 +8793,33 @@ WARNING(back_deployed_opaque_result_not_supported,none,
 ERROR(back_deployed_requires_body,none,
       "%0 requires that %kind1 have a body",
       (DeclAttribute, const ValueDecl *))
+
+ERROR(back_deployed_requires_frozen,none,
+      "%0 requires that %kind1 be '@frozen'",
+      (DeclAttribute, const ValueDecl *))
+
+ERROR(back_deployed_type_resilient_layout,none,
+      "%kind0 of back-deployed %kind1 cannot have type %2, whose layout is "
+      "variable at runtime",
+      (const ValueDecl *, const ValueDecl *, Type))
+ERROR(back_deployed_type_static_stored_property,none,
+      "back-deployed %kind0 cannot have static stored property %1",
+      (const ValueDecl *, const ValueDecl *))
+ERROR(back_deployed_type_nested_type_kind,none,
+      "%kind0 cannot be nested in back-deployed %kind1",
+      (const ValueDecl *, const ValueDecl *))
+ERROR(back_deployed_type_nested_requires_frozen,none,
+      "%kind0 nested in back-deployed %kind1 must be '@frozen'",
+      (const ValueDecl *, const ValueDecl *))
+
+ERROR(conformance_back_deployed_type_availability,none,
+      "conformance of back-deployed type %0 to protocol %1 must "
+      "not be available before %2 %3",
+      (Type, const ProtocolDecl *, AvailabilityDomain, AvailabilityRange))
+NOTE(conformance_back_deployed_type_availability_note,none,
+      "this module uses its own copy of %0 before %1 %2, and the conformance "
+      "would not apply to %0 from %3",
+      (Type, AvailabilityDomain, AvailabilityRange, const ModuleDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Implicit opening of existential types

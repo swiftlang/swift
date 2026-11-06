@@ -75,9 +75,9 @@ enum class DeclTypeCheckingSemantics {
   /// closure temporarily escapable.
   WithoutActuallyEscaping,
 
-  /// The withoutActuallyDiscarding(_:do:) declaration, which temporarily
+  /// The withoutActuallyDeiniting(_:do:) declaration, which temporarily
   /// converts an exactly-once function to an at-most-once function.
-  WithoutActuallyDiscarding,
+  WithoutActuallyDeiniting,
 
   /// The _openExistential(_:do:) declaration, which extracts the value inside
   /// an existential and passes it as a value of its own dynamic type.
@@ -1537,6 +1537,13 @@ bool maybeDiagnoseMissingImportForMember(
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
+/// Emit a note with a fix-it that adds an import of \p mod to \p sf, at least
+/// as permissive as \p requiredAccessLevel and consistent with how other files
+/// in the module import \p mod. Emits nothing if \p mod is imported as
+/// implementation-only elsewhere.
+void noteAddImportOfModule(SourceFile &sf, ModuleDecl *mod,
+                           AccessLevel requiredAccessLevel);
 
 // Guide ForEachStmt type-checking by indicating whether the Iterable
 // protocol should be used, thus enabling Borrowing iteration for a given

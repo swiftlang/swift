@@ -669,8 +669,9 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       // Get underlying params for both callee and caller, if declared.
       auto *calleeParam = getParameterAt(callee, argIndex);
       auto *callerParam = dyn_cast_or_null<ParamDecl>(
-          arg->getReferencedDecl(/*stopAtParenExpr=*/true).getDecl()
-      );
+          arg->getReferencedDecl(
+                 Expr::ReferencedDeclLookThrough::AllExceptParens)
+              .getDecl());
 
       // (Otherwise, we don't need to do anything.)
       if (!calleeParam || !callerParam)
@@ -2316,10 +2317,9 @@ public:
       return false;
     }
 
-    // Escaping at-most-once closures are allowed to implicitly capture
-    // `self` because the call (which is a consuming operation) would break
-    // the cycle.
-    if (hasCalledAtMostOnceSemantics(CE)) {
+    // Escaping closures whose call consumes them are allowed to implicitly
+    // capture `self` because the call would break the cycle.
+    if (isCallConsuming(CE)) {
       return false;
     }
 
@@ -2346,9 +2346,9 @@ public:
     return false;
   }
 
-  static bool hasCalledAtMostOnceSemantics(const AbstractClosureExpr *ACE) {
+  static bool isCallConsuming(const AbstractClosureExpr *ACE) {
     if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
-      return funcTy->hasCalledAtMostOnceSemantics();
+      return funcTy->isCallConsuming();
     }
 
     return false;
@@ -2974,7 +2974,7 @@ static void diagnoseInvalidSendingCaptureDeclarations(const Expr *E,
             return Action::Stop();
           }
 
-          if (!captureList->getClosureBody()->hasCalledAtMostOnceSemantics()) {
+          if (!captureList->getClosureBody()->isCallConsuming()) {
             Ctx.Diags.diagnose(
                 V->getLoc(), diag::sending_capture_decl_requires_once_closure);
             V->setInvalid();
@@ -6812,7 +6812,10 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
     DiagnoseWalker(const DeclContext *dc) : dc(dc) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto declRef = E->getReferencedDecl()) {
+      // Expressions that forward the reference of a sub-expression are skipped
+      // since the walker visits that sub-expression separately.
+      if (auto declRef =
+              E->getReferencedDecl(Expr::ReferencedDeclLookThrough::None)) {
         bool downgradeToWarning = false;
         auto *decl = declRef.getDecl();
 
@@ -6999,7 +7002,10 @@ static void diagnoseImplicitForceUnwrap(const Expr *E, const DeclContext *DC) {
             force->isForceOfImplicitlyUnwrappedOptional())
           diagnoseForce(force);
       } else if (auto *keyPath = dyn_cast<KeyPathExpr>(E)) {
-        diagnoseKeyPath(keyPath);
+        // A force in an implicit key path, such as the argument of a
+        // `subscript(dynamicMember:)` reference, can't be written explicitly.
+        if (!keyPath->isImplicit())
+          diagnoseKeyPath(keyPath);
       }
 
       return Action::Continue(E);

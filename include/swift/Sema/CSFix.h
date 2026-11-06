@@ -327,6 +327,12 @@ enum class FixKind : uint8_t {
   /// dictionary literals when used as such.
   TreatArrayLiteralAsDictionary,
 
+  /// Treat array literals as if they were tuple literals when used as such.
+  TreatArrayLiteralAsTuple,
+
+  /// Treat tuple literals as if they were array literals when used as such.
+  TreatTupleAsArrayLiteral,
+
   /// Explicitly specify the type to disambiguate between possible member base
   /// types.
   SpecifyBaseTypeForOptionalUnresolvedMember,
@@ -476,9 +482,9 @@ enum class FixKind : uint8_t {
   /// Ignore an out-of-place \c then statement.
   IgnoreOutOfPlaceThenStmt,
 
-  /// Ignore an argument to \c withoutActuallyDiscarding that isn't an
+  /// Ignore an argument to \c withoutActuallyDeiniting that isn't an
   /// exactly-once function.
-  AllowNonExactlyOnceDiscardArgument,
+  AllowNonExactlyOnceDeinitArgument,
 
   /// Ignore situations when provided number of generic arguments didn't match
   /// expected number of parameters.
@@ -944,6 +950,58 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::TreatArrayLiteralAsDictionary;
+  }
+};
+
+class TreatArrayLiteralAsTuple final : public ContextualMismatch {
+  TreatArrayLiteralAsTuple(ConstraintSystem &cs, Type tupleTy,
+                           Type arrayTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::TreatArrayLiteralAsTuple,
+                           tupleTy, arrayTy, locator) {
+      }
+
+public:
+  std::string getName() const override {
+    return "treat array literal as tuple";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static TreatArrayLiteralAsTuple *attempt(ConstraintSystem &cs,
+                                           Type tupleTy, Type arrayTy,
+                                           ConstraintLocator *loc);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::TreatArrayLiteralAsTuple;
+  }
+};
+
+class TreatTupleAsArrayLiteral final : public ContextualMismatch {
+  TreatTupleAsArrayLiteral(ConstraintSystem &cs, Type tupleTy,
+                           Type arrayTy, ConstraintLocator *locator)
+      : ContextualMismatch(cs, FixKind::TreatTupleAsArrayLiteral,
+                           tupleTy, arrayTy, locator) {
+      }
+
+public:
+  std::string getName() const override {
+    return "treat tuple as array literal";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
+  static TreatTupleAsArrayLiteral *attempt(ConstraintSystem &cs,
+                                           Type tupleTy, Type arrayTy,
+                                           ConstraintLocator *loc);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::TreatTupleAsArrayLiteral;
   }
 };
 
@@ -3930,19 +3988,19 @@ public:
   }
 };
 
-/// Diagnose an argument to \c withoutActuallyDiscarding(_:do:) that isn't an
+/// Diagnose an argument to \c withoutActuallyDeiniting(_:do:) that isn't an
 /// exactly-once function.
-class AllowNonExactlyOnceDiscardArgument final : public ConstraintFix {
+class AllowNonExactlyOnceDeinitArgument final : public ConstraintFix {
   Type ArgType;
 
-  AllowNonExactlyOnceDiscardArgument(ConstraintSystem &cs, Type argType,
-                                     ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowNonExactlyOnceDiscardArgument, locator),
+  AllowNonExactlyOnceDeinitArgument(ConstraintSystem &cs, Type argType,
+                                    ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowNonExactlyOnceDeinitArgument, locator),
         ArgType(argType) {}
 
 public:
   std::string getName() const override {
-    return "allow non-exactly-once argument to 'withoutActuallyDiscarding'";
+    return "allow non-exactly-once argument to 'withoutActuallyDeiniting'";
   }
 
   Type getArgType() const { return ArgType; }
@@ -3953,11 +4011,11 @@ public:
     return diagnose(*commonFixes.front().first);
   }
 
-  static AllowNonExactlyOnceDiscardArgument *
+  static AllowNonExactlyOnceDeinitArgument *
   create(ConstraintSystem &cs, Type argType, ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::AllowNonExactlyOnceDiscardArgument;
+    return fix->getKind() == FixKind::AllowNonExactlyOnceDeinitArgument;
   }
 };
 

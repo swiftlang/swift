@@ -61,6 +61,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// and the function has no `@_optimize(none)` attribute.
   public var shouldOptimize: Bool { bridged.shouldOptimize() }
 
+  /// True if this function is optimized for code size, e.g. with `-Osize`.
+  public var isOptimizedForSize: Bool { bridged.isOptimizedForSize() }
+
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
   
   public var hasOwnershipForTrivialValues: Bool {
@@ -244,6 +247,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
       bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
+    }
+  }
+
+  public func addSemanticsAttribute(_ attr: StaticString, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
+      bridged.addSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
 

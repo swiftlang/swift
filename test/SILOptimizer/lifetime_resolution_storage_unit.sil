@@ -121,10 +121,9 @@ bb0:
 }
 
 
-// FIXME: the `begin_access [read]` should be corrected by LifetimeResolution into a `[deinit]` or `[modify]`
 // CHECK-LABEL: sil [ossa] @basic_last_use_is_copy :
 // CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
-// CHECK:          [[BA:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*K
+// CHECK:          [[BA:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*K
 // CHECK-NEXT:     [[LD:%.*]] = load [take] [[BA]] : $*K
 // CHECK-NEXT:     end_access [[BA]] : $*K
 // CHECK-NEXT:     ignored_use [[LD]]
@@ -141,6 +140,37 @@ bb0:
   assign %val to %root
 
   %d1 = begin_access [read] [unknown] %root : $*K
+  %l1 = load [copy] %d1 : $*K
+  end_access %d1 : $*K
+  ignored_use %l1
+  destroy_value %l1
+
+  destroy_addr %root : $*K
+  dealloc_stack %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+// A static read access that ends up containing a take becomes a `[deinit]`.
+// CHECK-LABEL: sil [ossa] @basic_last_use_is_copy_static :
+// CHECK:          [[ROOT:%.*]] = mark_uninitialized [var]
+// CHECK:          [[BA:%.*]] = begin_access [deinit] [static] [[ROOT]] : $*K
+// CHECK-NEXT:     [[LD:%.*]] = load [take] [[BA]] : $*K
+// CHECK-NEXT:     end_access [[BA]] : $*K
+// CHECK-NEXT:     ignored_use [[LD]]
+// CHECK-NOT:      destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @basic_last_use_is_copy_static : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %0 = alloc_stack [lexical] [var_decl] $K, var, name "a", type $K
+  %root = mark_uninitialized [var] %0
+  specify_test "lifetime_resolution_resolve %0"
+
+  %val = apply %getFn() : $@convention(thin) () -> @owned K
+  assign %val to %root
+
+  %d1 = begin_access [read] [static] %root : $*K
   %l1 = load [copy] %d1 : $*K
   end_access %d1 : $*K
   ignored_use %l1
@@ -829,6 +859,8 @@ bb0:
 // CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) () -> @out C
 // CHECK:         [[ALLOC:%.*]] = alloc_stack $C
 // CHECK-NEXT:    copy_addr [[ROOT]] to [init] [[ALLOC]] : $*C
+//   The diagnose below is due to the @in being seen as a 'take'. Only of concern if disabling opaque values.
+// CHECK-NEXT:    diagnose [unpermitted_copy] [[ROOT]]
 // CHECK-NEXT:    apply {{%.*}}([[ALLOC]]) : $@convention(thin) (@in C) -> ()
 // CHECK-NEXT:    dealloc_stack [[ALLOC]]
 // CHECK:         apply {{%.*}}([[ROOT]]) : $@convention(thin) (@in C) -> ()
@@ -891,11 +923,11 @@ bb0:
 // CHECK:       bb0([[OUT:%.*]] : $*C, [[ARG:%.*]] : $*C):
 // CHECK:         [[ROOT:%.*]] = mark_uninitialized [var]
 // CHECK-NEXT:    copy_addr [[ARG]] to [init] [[ROOT]] : $*C
-// CHECK:         [[R1:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*C
+// CHECK:         [[R1:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*C
 // CHECK-NEXT:    copy_addr [take] [[R1]] to [init] {{%.*}} : $*C
 // CHECK:         [[M:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*C
 // CHECK-NEXT:    copy_addr [take] {{%.*}} to [init] [[M]] : $*C
-// CHECK:         [[R2:%.*]] = begin_access [read] [unknown] [[ROOT]] : $*C
+// CHECK:         [[R2:%.*]] = begin_access [modify] [unknown] [[ROOT]] : $*C
 // CHECK-NEXT:    copy_addr [take] [[R2]] to [init] [[OUT]] : $*C
 // CHECK-NOT:     destroy_addr
 // CHECK:       } // end sil function
@@ -1200,9 +1232,9 @@ bb0(%out : $*C, %arg : $*C):
 // CHECK-LABEL: sil [ossa] @cpa_chain_two_roots :
 // CHECK:         [[A:%.*]] = alloc_stack [lexical] [var_decl] $C, var, name "a"
 // CHECK-NEXT:    [[B:%.*]] = alloc_stack [lexical] [var_decl] $C, var, name "b"
-// CHECK:         [[RA:%.*]] = begin_access [read] [unknown] [[A]] : $*C
+// CHECK:         [[RA:%.*]] = begin_access [modify] [unknown] [[A]] : $*C
 // CHECK-NEXT:    copy_addr [take] [[RA]] to [init] [[B]] : $*C
-// CHECK:         [[RB:%.*]] = begin_access [read] [unknown] [[B]] : $*C
+// CHECK:         [[RB:%.*]] = begin_access [modify] [unknown] [[B]] : $*C
 // CHECK-NEXT:    [[L:%.*]] = load [take] [[RB]] : $*C
 // CHECK-NOT:     destroy_addr
 // CHECK:         return [[L]]
@@ -1727,6 +1759,159 @@ bb3:
   tuple_addr_constructor [assign] %root : $*(K, K) with (%a : $K, %b : $K)
   destroy_addr %root : $*(K, K)
   dealloc_stack %0 : $*(K, K)
+  %t = tuple ()
+  return %t
+}
+
+// A copy of a `@noImplicitCopy` binding that was never a take is still an unpermitted copy.
+// CHECK-LABEL: sil [ossa] @noimplicitcopy_copy_then_use :
+// CHECK:          [[L1:%.*]] = load [copy] {{%.*}} : $*K
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[L1]] : $K
+// CHECK:          load [take] {{%.*}} : $*K
+// CHECK:       } // end sil function
+sil [ossa] @noimplicitcopy_copy_then_use : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @noImplicitCopy @owned $K):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  %1 = alloc_stack [lexical] [var_decl] $K, var, name "c", type $K
+  store %0 to [init] %1 : $*K
+  specify_test "lifetime_resolution_resolve %1"
+
+  %l1 = load [copy] %1 : $*K
+  apply %consumeK(%l1) : $@convention(thin) (@owned K) -> ()
+  %l2 = load [copy] %1 : $*K
+  apply %useK(%l2) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %l2
+
+  destroy_addr %1
+  dealloc_stack %1
+  %t = tuple ()
+  return %t
+}
+
+// A take of a `@noImplicitCopy` binding that must become a copy is an unpermitted copy.
+// CHECK-LABEL: sil [ossa] @noimplicitcopy_take_then_use :
+// CHECK:          [[L1:%.*]] = load [copy] {{%.*}} : $*K
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[L1]] : $K
+// CHECK:       } // end sil function
+sil [ossa] @noimplicitcopy_take_then_use : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @noImplicitCopy @owned $K):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  %1 = alloc_stack [lexical] [var_decl] $K, var, name "c", type $K
+  store %0 to [init] %1 : $*K
+  specify_test "lifetime_resolution_resolve %1"
+
+  %l1 = load [take] %1 : $*K
+  apply %consumeK(%l1) : $@convention(thin) (@owned K) -> ()
+  %l2 = load [copy] %1 : $*K
+  apply %useK(%l2) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %l2
+
+  destroy_addr %1
+  dealloc_stack %1
+  %t = tuple ()
+  return %t
+}
+
+// Copying a field of a `@noImplicitCopy` binding is permitted.
+// CHECK-LABEL: sil [ossa] @noimplicitcopy_copy_field :
+// CHECK:       } // end sil function
+sil [ossa] @noimplicitcopy_copy_field : $@convention(thin) (@owned Two) -> () {
+bb0(%0 : @noImplicitCopy @owned $Two):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %consumeTwo = function_ref @consumeTwo : $@convention(thin) (@owned Two) -> ()
+  %1 = alloc_stack [lexical] [var_decl] $Two, var, name "s", type $Two
+  store %0 to [init] %1 : $*Two
+  specify_test "lifetime_resolution_resolve %1"
+
+  %a = struct_element_addr %1 : $*Two, #Two.a
+  %l1 = load [copy] %a : $*K
+  apply %consumeK(%l1) : $@convention(thin) (@owned K) -> ()
+  %l2 = load [copy] %1 : $*Two
+  apply %consumeTwo(%l2) : $@convention(thin) (@owned Two) -> ()
+
+  destroy_addr %1
+  dealloc_stack %1
+  %t = tuple ()
+  return %t
+}
+
+// Without `@noImplicitCopy`, the copy is permitted.
+// CHECK-LABEL: sil [ossa] @copyable_copy_then_use :
+// CHECK:       } // end sil function
+sil [ossa] @copyable_copy_then_use : $@convention(thin) (@owned K) -> () {
+bb0(%0 : @owned $K):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  %1 = alloc_stack [lexical] [var_decl] $K, var, name "c", type $K
+  store %0 to [init] %1 : $*K
+  specify_test "lifetime_resolution_resolve %1"
+
+  %l1 = load [copy] %1 : $*K
+  apply %consumeK(%l1) : $@convention(thin) (@owned K) -> ()
+  %l2 = load [copy] %1 : $*K
+  apply %useK(%l2) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %l2
+
+  destroy_addr %1
+  dealloc_stack %1
+  %t = tuple ()
+  return %t
+}
+
+// The borrowed value aliases the memory until its `end_borrow`, so a take inside that region
+// must be a copy.
+// CHECK-LABEL: sil [ossa] @take_within_load_borrow :
+// CHECK:          [[A:%.*]] = alloc_stack [lexical] $K
+// CHECK:          [[LB:%.*]] = load_borrow [[A]] : $*K
+// CHECK-NEXT:     load [copy] [[A]] : $*K
+// CHECK:          end_borrow [[LB]]
+// CHECK-NEXT:     destroy_addr [[A]]
+// CHECK:       } // end sil function
+sil [ossa] @take_within_load_borrow : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $K
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+  %v = apply %getK() : $@convention(thin) () -> @owned K
+  store %v to [init] %a
+  %lb = load_borrow %a
+  %l = load [copy] %a
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %consumeK(%l) : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  apply %useK(%lb) : $@convention(thin) (@guaranteed K) -> ()
+  end_borrow %lb
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: sil [ossa] @take_after_load_borrow :
+// CHECK:          [[A:%.*]] = alloc_stack [lexical] $K
+// CHECK:          [[LB:%.*]] = load_borrow [[A]] : $*K
+// CHECK:          end_borrow [[LB]]
+// CHECK-NEXT:     load [take] [[A]] : $*K
+// CHECK-NOT:      destroy_addr
+// CHECK:       } // end sil function
+sil [ossa] @take_after_load_borrow : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $K
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+  %v = apply %getK() : $@convention(thin) () -> @owned K
+  store %v to [init] %a
+  %lb = load_borrow %a
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  apply %useK(%lb) : $@convention(thin) (@guaranteed K) -> ()
+  end_borrow %lb
+  %l = load [copy] %a
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %consumeK(%l) : $@convention(thin) (@owned K) -> ()
+  destroy_addr %a
+  dealloc_stack %a
   %t = tuple ()
   return %t
 }

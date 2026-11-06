@@ -1582,7 +1582,14 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // for the call into \p AFD itself.
   emitDistributedResolvableProxyAdapterThunkForDecl(AFD);
 
-  if (AFD->isBackDeployed()) {
+  // A member of a back-deployed type that has no body, such as the implicit
+  // members of a derived conformance when the module is built from its
+  // textual interface, has nothing to use as a fallback.
+  if (AFD->isBackDeployed() && !isa<DestructorDecl>(AFD) &&
+      (AFD->hasBody() || AFD->getAttrs().hasAttribute<BackDeployedAttr>() ||
+       (isa<AccessorDecl>(AFD) &&
+        cast<AccessorDecl>(AFD)->getStorage()
+            ->getAttrs().hasAttribute<BackDeployedAttr>()))) {
     // Emit the fallback function that will be used when the original function
     // is unavailable at runtime.
     auto fallback = SILDeclRef(AFD).asBackDeploymentKind(
@@ -1945,6 +1952,14 @@ void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
     SILDeclRef deallocator(dd, SILDeclRef::Kind::Deallocator);
     emitFunctionDefinition(deallocator,
                            getFunction(deallocator, ForDefinition));
+
+    // Clients of a back-deployed type emit their own copy of its deinit when
+    // needed.
+    if (dd->isBackDeployed()) {
+      auto fallback = deallocator.asBackDeploymentKind(
+          SILDeclRef::BackDeploymentKind::Fallback);
+      emitFunctionDefinition(fallback, getFunction(fallback, ForDefinition));
+    }
   }
 }
 
@@ -2172,6 +2187,24 @@ void SILGenModule::visitEmittedAccessors(
 
     callback(accessor);
   });
+}
+
+VarDecl *
+SILGenModule::findStoredCArrayCounterpart(AbstractStorageDecl *storage) {
+  auto *var = dyn_cast<VarDecl>(storage);
+  auto *attr = storage->getAttrs().getAttribute<CArrayProjectionAttr>();
+  if (!var || !attr || var->hasStorage())
+    return nullptr;
+
+  auto *counterpart = dyn_cast_or_null<VarDecl>(attr->getCounterpart());
+  if (!counterpart || !counterpart->hasStorage())
+    return nullptr;
+
+  ASSERT(counterpart->isStatic() == var->isStatic() &&
+           counterpart->getDeclContext() == var->getDeclContext() &&
+           "counterparts not accessible via same base");
+
+  return counterpart;
 }
 
 bool

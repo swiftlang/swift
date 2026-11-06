@@ -5,13 +5,17 @@
 
 // Each case that calls a closure runs to completion, and each case that drops
 // one terminates the program. Dropping goes through
-// withoutActuallyDiscarding, which is the only way to drop an exactly-once
+// withoutActuallyDeiniting, which is the only way to drop an exactly-once
 // closure.
 //
 // RUN: %target-run %t/onone.out call | %FileCheck %s --check-prefix=CALL-call
 // RUN: %target-run %t/opt.out call | %FileCheck %s --check-prefix=CALL-call
 // RUN: %target-run %t/onone.out callWithResource | %FileCheck %s --check-prefix=CALL-callWithResource
 // RUN: %target-run %t/opt.out callWithResource | %FileCheck %s --check-prefix=CALL-callWithResource
+// RUN: %target-run %t/onone.out callOrForwardDirect | %FileCheck %s --check-prefix=CALL-callOrForward
+// RUN: %target-run %t/opt.out callOrForwardDirect | %FileCheck %s --check-prefix=CALL-callOrForward
+// RUN: %target-run %t/onone.out callOrForwardForwarded | %FileCheck %s --check-prefix=CALL-callOrForward
+// RUN: %target-run %t/opt.out callOrForwardForwarded | %FileCheck %s --check-prefix=CALL-callOrForward
 // RUN: %target-run %t/onone.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/opt.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/onone.out callGlobal | %FileCheck %s --check-prefix=CALL-callGlobal
@@ -98,6 +102,23 @@ func call(_ f: @once () -> Void) {
   print("called")
 }
 
+@_optimize(none)
+func forward(_ f: @once () -> Void) {
+  f()
+}
+
+// One path calls the closure and the other forwards it, so the closure can't
+// be deleted after the call is optimized into a direct call.
+@inline(__always)
+func callOrForward(_ direct: Bool, _ f: @once () -> Void) {
+  if direct {
+    f()
+  } else {
+    forward(f)
+  }
+  print("called")
+}
+
 @inline(never)
 func callEscaping(_ f: @escaping @once () -> Void) {
   f()
@@ -106,12 +127,12 @@ func callEscaping(_ f: @escaping @once () -> Void) {
 
 @inline(never)
 func drop(_ f: consuming @once () -> Void) {
-  withoutActuallyDiscarding(f) { _ in }
+  withoutActuallyDeiniting(f) { _ in }
 }
 
 @inline(never)
 func dropEscaping(_ f: consuming @escaping @once () -> Void) {
-  withoutActuallyDiscarding(f) { _ in }
+  withoutActuallyDeiniting(f) { _ in }
 }
 
 @inline(never)
@@ -280,6 +301,8 @@ func run(_ which: String, _ box: Box, _ resource: consuming Resource) {
     call { box.count += 1 }
   case "callWithResource":
     call { _ = consume resource }
+  case "callOrForwardDirect", "callOrForwardForwarded":
+    callOrForward(which == "callOrForwardDirect") { _ = consume resource }
   case "callEscaping":
     callEscaping { box.count += 1 }
   case "callGlobal":
@@ -356,6 +379,9 @@ default:
 
 // CALL-callWithResource: Resource r deinit
 // CALL-callWithResource-NEXT: called
+
+// CALL-callOrForward: Resource r deinit
+// CALL-callOrForward-NEXT: called
 
 // CALL-callEscaping: called
 // CALL-callEscaping-NEXT: Resource r deinit

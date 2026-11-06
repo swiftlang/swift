@@ -666,10 +666,10 @@ CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
   return {};
 }
 
-bool swift::hasIteratorCategory(const clang::CXXRecordDecl *clangDecl) {
-  clang::IdentifierInfo *name =
-      &clangDecl->getASTContext().Idents.get("iterator_category");
-  auto members = clangDecl->lookup(name);
+static bool hasTypeMember(const clang::CXXRecordDecl *clangDecl,
+                          StringRef name) {
+  clang::IdentifierInfo *id = &clangDecl->getASTContext().Idents.get(name);
+  auto members = clangDecl->lookup(id);
   if (members.empty())
     return false;
   // NOTE: If this is a templated typedef, Clang might have instantiated
@@ -678,6 +678,14 @@ bool swift::hasIteratorCategory(const clang::CXXRecordDecl *clangDecl) {
   // already complained about this. Let's assume that they are equivalent.
   // (see filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
   return isa<clang::TypeDecl>(members.front());
+}
+
+bool swift::hasIteratorCategoryOrIteratorConcept(
+    const clang::CXXRecordDecl *clangDecl) {
+  if (hasTypeMember(clangDecl, "iterator_category"))
+    return true;
+  return clangDecl->getASTContext().getLangOpts().CPlusPlus20 &&
+         hasTypeMember(clangDecl, "iterator_concept");
 }
 
 ValueDecl *
@@ -719,8 +727,9 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
       !ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator))
     return; // Don't even bother if we don't have protocols for input iterators
 
-  // FIXME: hasIteratorCategory() is more conservative than it should be because
-  // it doesn't consider an inherited iterator_category, nor iterator_concept.
+  // FIXME: hasIteratorCategoryOrIteratorConcept() is more conservative than
+  // it should be because it doesn't consider an inherited iterator_category or
+  // iterator_concept.
   // For now, checking this maintains existing behavior and ensures consistency
   // across ClangImporter, where clang::Sema isn't always readily available.
 

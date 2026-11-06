@@ -129,7 +129,7 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
          "Expect a escaping to noescape conversion");
   (void)fnType;
 
-  // For an at-most-once function value, the conversion is a
+  // For a noncopyable function value, the conversion is a
   // ownership-consuming forwarding operation, so forward `fn`'s cleanup onto
   // the result, exactly like the sibling `createConvertFunction` above does for
   // other function conversions. Mark the conversion's lifetime as already
@@ -137,8 +137,8 @@ ManagedValue SILGenBuilder::createConvertEscapeToNoEscape(
   // lifetime is already exactly as long as it needs to be, by construction.
   //
   // `OperandOwnershipClassifier` treats `ConvertEscapeToNoEscapeInst` as
-  // `ForwardingConsume` as well when the result type is at-most-once.
-  if (resultFnType->hasCalledAtMostOnceSemantics()) {
+  // `ForwardingConsume` as well when the result type is noncopyable.
+  if (resultFnType->isNoncopyable()) {
     CleanupCloner cloner(*this, fn);
     SILValue result =
         createConvertEscapeToNoEscape(loc, fn.forward(getSILGenFunction()),

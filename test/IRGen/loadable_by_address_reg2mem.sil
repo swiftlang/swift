@@ -591,3 +591,72 @@ bb0(%0 : $X, %1 : $Builtin.RawPointer):
   %4 = tuple ()
   return %4 : $()
 }
+
+struct UUIDLike {
+  var storage: InlineArray<2, UInt64>
+}
+
+// rdar://180755649
+// Bit casting a small type to a large type must only force the small type to
+// be indirect if it is a C union. Otherwise the reverse bit cast of the large
+// type produces a (now large) small type which is used by a struct.
+// CHECK-LABEL: sil @test_inline_array_bitcast_to_large_tuple :
+// CHECK:         [[A:%[0-9]+]] = unchecked_trivial_bit_cast {{%[0-9]+}} : $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) to $InlineArray<2, UInt64>
+// CHECK:         [[S:%[0-9]+]] = struct $UUIDLike ([[A]] : $InlineArray<2, UInt64>)
+// CHECK:         store [[S]] to %0 : $*UUIDLike
+// CHECK:       } // end sil function 'test_inline_array_bitcast_to_large_tuple'
+sil @test_inline_array_bitcast_to_large_tuple : $@convention(thin) (@inout UUIDLike) -> () {
+bb0(%0 : $*UUIDLike):
+  %1 = struct_element_addr %0 : $*UUIDLike, #UUIDLike.storage
+  %2 = load %1 : $*InlineArray<2, UInt64>
+  %3 = unchecked_trivial_bit_cast %2 : $InlineArray<2, UInt64> to $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+  %4 = unchecked_trivial_bit_cast %3 : $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8) to $InlineArray<2, UInt64>
+  %5 = struct $UUIDLike (%4 : $InlineArray<2, UInt64>)
+  store %5 to %0 : $*UUIDLike
+  %6 = tuple ()
+  return %6 : $()
+}
+
+struct UnionWrapper {
+  var u: member_id_t.__Unnamed_union_member_value
+}
+
+// A C union which is bit cast to a large type is forced to be indirect, so a
+// struct or tuple of it can be a user of a large value without being large.
+// CHECK-LABEL: sil @test_struct_of_c_union :
+// CHECK:         [[S:%[0-9]+]] = alloc_stack $UnionWrapper
+// CHECK:         [[U:%[0-9]+]] = alloc_stack $member_id_t.__Unnamed_union_member_value
+// CHECK:         [[F:%[0-9]+]] = struct_element_addr [[S]] : $*UnionWrapper, #UnionWrapper.u
+// CHECK:         copy_addr [take] [[U]] to [init] [[F]] : $*member_id_t.__Unnamed_union_member_value
+// CHECK:         [[R:%[0-9]+]] = load [[S]] : $*UnionWrapper
+// CHECK:         return [[R]] : $UnionWrapper
+// CHECK:       } // end sil function 'test_struct_of_c_union'
+sil @test_struct_of_c_union : $@convention(thin) (member_id_t.__Unnamed_union_member_value) -> UnionWrapper {
+bb0(%0 : $member_id_t.__Unnamed_union_member_value):
+  %1 = unchecked_trivial_bit_cast %0 : $member_id_t.__Unnamed_union_member_value to $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+  %2 = tuple_extract %1 : $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), 0
+  %3 = function_ref @usei8 : $@convention(thin) (UInt8) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (UInt8) -> ()
+  %5 = struct $UnionWrapper (%0 : $member_id_t.__Unnamed_union_member_value)
+  return %5 : $UnionWrapper
+}
+
+// CHECK-LABEL: sil @test_tuple_of_c_union :
+// CHECK:         [[T:%[0-9]+]] = alloc_stack $(member_id_t.__Unnamed_union_member_value, Int)
+// CHECK:         [[U:%[0-9]+]] = alloc_stack $member_id_t.__Unnamed_union_member_value
+// CHECK:         [[E0:%[0-9]+]] = tuple_element_addr [[T]] : $*(member_id_t.__Unnamed_union_member_value, Int), 0
+// CHECK:         copy_addr [take] [[U]] to [init] [[E0]] : $*member_id_t.__Unnamed_union_member_value
+// CHECK:         [[E1:%[0-9]+]] = tuple_element_addr [[T]] : $*(member_id_t.__Unnamed_union_member_value, Int), 1
+// CHECK:         store %1 to [[E1]] : $*Int
+// CHECK:         [[R:%[0-9]+]] = load [[T]] : $*(member_id_t.__Unnamed_union_member_value, Int)
+// CHECK:         return [[R]] : $(member_id_t.__Unnamed_union_member_value, Int)
+// CHECK:       } // end sil function 'test_tuple_of_c_union'
+sil @test_tuple_of_c_union : $@convention(thin) (member_id_t.__Unnamed_union_member_value, Int) -> (member_id_t.__Unnamed_union_member_value, Int) {
+bb0(%0 : $member_id_t.__Unnamed_union_member_value, %1 : $Int):
+  %2 = unchecked_trivial_bit_cast %0 : $member_id_t.__Unnamed_union_member_value to $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+  %3 = tuple_extract %2 : $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), 0
+  %4 = function_ref @usei8 : $@convention(thin) (UInt8) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (UInt8) -> ()
+  %6 = tuple (%0 : $member_id_t.__Unnamed_union_member_value, %1 : $Int)
+  return %6 : $(member_id_t.__Unnamed_union_member_value, Int)
+}

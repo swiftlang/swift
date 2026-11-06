@@ -265,7 +265,7 @@ LANGUAGE_FEATURE(AsyncExecutionBehaviorAttributes, 0, "@concurrent and nonisolat
 LANGUAGE_FEATURE(IsolatedConformances, 407, "Global-actor isolated conformances")
 BASELINE_LANGUAGE_FEATURE(ValueGenericsNameLookup, 452, "Value generics appearing as static members for namelookup")
 LANGUAGE_FEATURE(GeneralizedIsSameMetaTypeBuiltin, 465, "Builtin.is_same_metatype with support for noncopyable/nonescapable types")
-SUPPRESSIBLE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
+BASELINE_LANGUAGE_FEATURE(ABIAttributeSE0479, 479, "@abi attribute on functions, initializers, properties, and subscripts")
 LANGUAGE_FEATURE(AlwaysInheritActorContext, 472, "@_inheritActorContext(always)")
 LANGUAGE_FEATURE(BuiltinSelect, 0, "Builtin.select")
 LANGUAGE_FEATURE(BuiltinInterleave, 0, "Builtin.interleave and Builtin.deinterleave")
@@ -709,8 +709,22 @@ EXPERIMENTAL_FEATURE(Cells, true)
 /// Extend `@specialized` for `@specialized(exported: true, ...)`.
 EXPERIMENTAL_FEATURE(ExtendedSpecializedAttribute, false)
 
+
 /// Builtin.createSynchronousDiscardingTask
 LANGUAGE_FEATURE(BuiltinCreateSynchronousDiscardingTask, 0, "Builtin.createSynchronousDiscardingTask")
+
+/// Allow `@backDeployed(before:)` on `@frozen` structs and enums.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(BackDeployFrozenValueTypes, true)
+
+/// Import C arrays using newer types like InlineArray. This flag has no effect
+/// if the minimum deployment target is not high enough to guarantee InlineArray
+/// will be available.
+EXPERIMENTAL_FEATURE(ModernImportedCArrays, true)
+
+/// Import C arrays using newer types like InlineArray. This flag limits the
+/// availability of affected declarations and is not expected to be incorporated
+/// into a future language version.
+EXPERIMENTAL_FEATURE(ModernImportedCArraysOnly, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

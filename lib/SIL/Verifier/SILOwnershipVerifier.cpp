@@ -282,11 +282,6 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
     // FIXME: This ignores dead-end blocks. Instead, recursively call
     // gatherUsers.
     initialScopedOperand.visitScopeEndingUses(addLeafUse, addUnknownUse);
-
-    if (initialScopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
-      guaranteedPhiVerifier.verifyReborrows(
-          cast<BeginBorrowInst>(op->getUser()));
-    }
   }
 
   return foundError;
@@ -412,11 +407,6 @@ bool SILValueOwnershipChecker::gatherUsers(
         // FIXME: This ignores dead-end blocks. Instead, recursively call
         // gatherUsers.
         scopedOperand.visitScopeEndingUses(addLeafUse, addUnknownUse);
-
-        if (scopedOperand.kind == BorrowingOperandKind::BeginBorrow) {
-          guaranteedPhiVerifier.verifyReborrows(
-              cast<BeginBorrowInst>(op->getUser()));
-        }
       }
 
       if (auto *svi = dyn_cast<SingleValueInstruction>(op->getUser())) {

@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -simplification -simplify-instruction=tuple_pack_element_addr | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
 
 
 import Swift
@@ -6,12 +7,15 @@ import Builtin
 
 struct A {}
 struct B {}
+struct C {}
 
 sil @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
 
 // CHECK-LABEL: sil @simplify_scalar_index_zero
 // CHECK-NOT:     tuple_pack_element_addr
+// CHECK-NOT:     unchecked_addr_cast
 // CHECK:         [[ADDR:%[^,]+]] = tuple_element_addr %0, 0
+// CHECK-NOT:     unchecked_addr_cast
 // CHECK:         apply {{.*}}<A>([[ADDR]])
 // CHECK:       } // end sil function 'simplify_scalar_index_zero'
 sil @simplify_scalar_index_zero : $@convention(thin) (@inout (A, B)) -> () {
@@ -26,7 +30,9 @@ bb0(%tuple : $*(A, B)):
 
 // CHECK-LABEL: sil @simplify_scalar_index_one
 // CHECK-NOT:     tuple_pack_element_addr
+// CHECK-NOT:     unchecked_addr_cast
 // CHECK:         [[ADDR:%[^,]+]] = tuple_element_addr %0, 1
+// CHECK-NOT:     unchecked_addr_cast
 // CHECK:         apply {{.*}}<B>([[ADDR]])
 // CHECK:       } // end sil function 'simplify_scalar_index_one'
 sil @simplify_scalar_index_one : $@convention(thin) (@inout (A, B)) -> () {
@@ -39,18 +45,75 @@ bb0(%tuple : $*(A, B)):
   return %ret : $()
 }
 
-// A dynamic_pack_index does not get simplified, since the indexed
-// component is not statically known.
+// A pack_pack_index whose slice index is statically known gets simplified.
+// CHECK-LABEL: sil @simplify_pack_pack_index
+// CHECK-NOT:     tuple_pack_element_addr
+// CHECK-NOT:     unchecked_addr_cast
+// CHECK:         [[ADDR:%[^,]+]] = tuple_element_addr %0, 2
+// CHECK-NOT:     unchecked_addr_cast
+// CHECK:         apply {{.*}}<C>([[ADDR]])
+// CHECK:       } // end sil function 'simplify_pack_pack_index'
+sil @simplify_pack_pack_index : $@convention(thin) (@inout (A, B, C)) -> () {
+bb0(%tuple : $*(A, B, C)):
+  %inner = scalar_pack_index 1 of $Pack{B, C}
+  %idx = pack_pack_index 1, %inner of $Pack{A, B, C}
+  %addr = tuple_pack_element_addr %idx of %tuple : $*(A, B, C) as $*C
+  %use = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %use<C>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// A dynamic_pack_index with a constant operand gets simplified. The result
+// type is an opened pack element archetype, so a cast is needed.
+// CHECK-LABEL: sil @simplify_constant_dynamic_pack_index
+// CHECK-NOT:     tuple_pack_element_addr
+// CHECK:         [[ELT:%[^,]+]] = tuple_element_addr %0, 1
+// CHECK:         [[ADDR:%[^,]+]] = unchecked_addr_cast [[ELT]] to $*@pack_element({{.*}}) each Z
+// CHECK:         apply {{.*}}([[ADDR]])
+// CHECK:       } // end sil function 'simplify_constant_dynamic_pack_index'
+sil @simplify_constant_dynamic_pack_index : $@convention(thin) (@inout (A, B)) -> () {
+bb0(%tuple : $*(A, B)):
+  %i = integer_literal $Builtin.Word, 1
+  %idx = dynamic_pack_index %i of $Pack{A, B}
+  %tok = open_pack_element %idx of <each Z> at <Pack{A, B}>, shape $Z, id 1
+  %addr = tuple_pack_element_addr %idx of %tuple : $*(A, B) as $*@pack_element(1) Z
+  %use = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %use<@pack_element(1) Z>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// A dynamic_pack_index with an out-of-bounds constant operand does not get
+// simplified.
+// CHECK-LABEL: sil @dont_simplify_out_of_bounds_dynamic_pack_index
+// CHECK:         tuple_pack_element_addr
+// CHECK-NOT:     tuple_element_addr
+// CHECK:       } // end sil function 'dont_simplify_out_of_bounds_dynamic_pack_index'
+sil @dont_simplify_out_of_bounds_dynamic_pack_index : $@convention(thin) (@inout (A, B)) -> () {
+bb0(%tuple : $*(A, B)):
+  %i = integer_literal $Builtin.Word, 2
+  %idx = dynamic_pack_index %i of $Pack{A, B}
+  %tok = open_pack_element %idx of <each Z> at <Pack{A, B}>, shape $Z, id 2
+  %addr = tuple_pack_element_addr %idx of %tuple : $*(A, B) as $*@pack_element(2) Z
+  %use = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %use<@pack_element(2) Z>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// A dynamic_pack_index with a non-constant operand does not get simplified,
+// since the indexed component is not statically known.
 // CHECK-LABEL: sil @dont_simplify_dynamic_pack_index
 // CHECK:         tuple_pack_element_addr
 // CHECK:       } // end sil function 'dont_simplify_dynamic_pack_index'
 sil @dont_simplify_dynamic_pack_index : $@convention(thin) (@inout (A, B), Builtin.Word) -> () {
 bb0(%tuple : $*(A, B), %i : $Builtin.Word):
   %idx = dynamic_pack_index %i of $Pack{A, B}
-  %tok = open_pack_element %idx of <each Z> at <Pack{A, B}>, shape $Z, id 1
-  %addr = tuple_pack_element_addr %idx of %tuple : $*(A, B) as $*@pack_element(1) Z
+  %tok = open_pack_element %idx of <each Z> at <Pack{A, B}>, shape $Z, id 3
+  %addr = tuple_pack_element_addr %idx of %tuple : $*(A, B) as $*@pack_element(3) Z
   %use = function_ref @use : $@convention(thin) <T> (@in_guaranteed T) -> ()
-  apply %use<@pack_element(1) Z>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  apply %use<@pack_element(3) Z>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %ret = tuple ()
   return %ret : $()
 }

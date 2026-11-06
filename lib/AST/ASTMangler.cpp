@@ -2166,7 +2166,7 @@ static bool forEachConditionalConformance(const ProtocolConformance *conformance
 
 /// Determine whether the given protocol conformance contains a retroactive
 /// protocol conformance anywhere in it.
-static bool containsRetroactiveConformance(
+bool ASTMangler::containsRetroactiveConformance(
                                       ProtocolConformanceRef conformanceRef) {
   if (!conformanceRef.isPack() && !conformanceRef.isConcrete())
     return false;

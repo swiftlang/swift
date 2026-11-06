@@ -2624,6 +2624,15 @@ namespace {
       using Component = KeyPathExpr::Component;
       auto *anchor = getAsExpr(memberLoc->getAnchor());
 
+      // The implicit key path spans the member reference that it resolves. If
+      // the anchor is a key path, that is only one of its components.
+      SourceLoc endLoc = anchor->getEndLoc();
+      if (auto *KPE = dyn_cast<KeyPathExpr>(anchor)) {
+        if (auto kpElt =
+                memberLoc->findFirst<LocatorPathElt::KeyPathComponent>())
+          endLoc = KPE->getComponents()[kpElt->getIndex()].getSourceRange().End;
+      }
+
       auto makeKeyPath = [&](ArrayRef<Component> components) -> Expr * {
         Type keyPathTy = paramType;
 
@@ -2646,7 +2655,7 @@ namespace {
         }
 
         auto *kp = KeyPathExpr::createImplicit(ctx, /*backslashLoc*/ dotLoc,
-                                               components, anchor->getEndLoc());
+                                               components, endLoc);
         kp->setType(keyPathTy);
         cs.cacheExprTypes(kp);
 
@@ -5553,7 +5562,8 @@ namespace {
       }
 
       auto comp = KeyPathExpr::Component::forSubscript(
-          ctx, ref, args, resolvedTy, ctx.AllocateCopy(conformances));
+          ctx, ref, args, resolvedTy, ctx.AllocateCopy(conformances),
+          componentLoc);
       components.push_back(comp);
 
       auto unwrapCount =
@@ -8536,7 +8546,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         return replacement;
       }
 
-      case DeclTypeCheckingSemantics::WithoutActuallyDiscarding: {
+      case DeclTypeCheckingSemantics::WithoutActuallyDeiniting: {
         // Resolve into body(convert(closure)), where the conversion is marked
         // as a deliberate drop of the exactly-once guarantee.
         auto *args = apply->getArgs();
@@ -8555,7 +8565,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
 
         auto *conversion =
             new (ctx) FunctionConversionExpr(exactlyOnce, atMostOnceTy);
-        conversion->setWithoutActuallyDiscarding();
+        conversion->setWithoutActuallyDeiniting();
         cs.setType(conversion, atMostOnceTy);
 
         auto *argList = ArgumentList::forImplicitUnlabeled(ctx, {conversion});
@@ -9928,9 +9938,8 @@ ConstraintSystem::applySolution(Solution &solution,
       if (diagnosedErrorsViaFixes)
         return std::nullopt;
 
-      // If we didn't manage to diagnose anything well, so fall back to
-      // diagnosing mining the system to construct a reasonable error message.
-      diagnoseFailureFor(target);
+      // If we didn't manage to diagnose anything well, emit the fallback.
+      produceFallbackDiagnostic(target.getLoc());
       return std::nullopt;
     }
   }

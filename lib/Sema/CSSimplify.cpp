@@ -2167,7 +2167,7 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   case ConstraintKind::Conjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
-  case ConstraintKind::DiscardableFunctionOf:
+  case ConstraintKind::DeinitableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
@@ -2532,7 +2532,7 @@ static bool matchFunctionRepresentations(FunctionType::ExtInfo einfo1,
   case ConstraintKind::Conjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
-  case ConstraintKind::DiscardableFunctionOf:
+  case ConstraintKind::DeinitableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
@@ -3412,7 +3412,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   case ConstraintKind::Conjunction:
   case ConstraintKind::DynamicTypeOf:
   case ConstraintKind::EscapableFunctionOf:
-  case ConstraintKind::DiscardableFunctionOf:
+  case ConstraintKind::DeinitableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
@@ -5312,32 +5312,38 @@ repairViaOptionalUnwrap(ConstraintSystem &cs, Type fromType, Type toType,
   return true;
 }
 
-static bool repairArrayLiteralUsedAsDictionary(
-    ConstraintSystem &cs, Type arrayType, Type dictType,
+static bool repairMismatchedCollectionLiteral(
+    ConstraintSystem &cs, Type literalType, Type expectedType,
     ConstraintKind matchKind,
     SmallVectorImpl<RestrictionOrFix> &conversionsOrFixes,
     ConstraintLocator *loc) {
-  if (auto *fix = TreatArrayLiteralAsDictionary::attempt(cs, dictType,
-                                                         arrayType, loc)) {
-    // Ignore any attempts at promoting the value to an optional as even after
-    // stripping off all optionals above the underlying types won't match (array
-    // vs dictionary).
-    conversionsOrFixes.erase(
-        llvm::remove_if(conversionsOrFixes,
-                        [&](RestrictionOrFix &E) {
-                          if (auto restriction = E.getRestriction())
-                            return *restriction == ConversionRestrictionKind::
-                                                       ValueToOptional ||
-                                   *restriction == ConversionRestrictionKind::
-                                                       OptionalToOptional;
-                          return false;
-                        }),
-        conversionsOrFixes.end());
+  ContextualMismatch *fix =
+    TreatArrayLiteralAsDictionary::attempt(cs, expectedType, literalType, loc);
+  if (!fix)
+    fix = TreatArrayLiteralAsTuple::attempt(cs, expectedType, literalType, loc);
+  if (!fix)
+    fix = TreatTupleAsArrayLiteral::attempt(cs, expectedType, literalType, loc);
 
-    conversionsOrFixes.push_back(fix);
-    return true;
-  }
-  return false;
+  if (!fix)
+    return false;
+
+  // Ignore any attempts at promoting the value to an optional as even after
+  // stripping off all optionals above the underlying types won't match (array
+  // vs dictionary).
+  conversionsOrFixes.erase(
+      llvm::remove_if(conversionsOrFixes,
+                      [&](RestrictionOrFix &E) {
+                        if (auto restriction = E.getRestriction())
+                          return *restriction == ConversionRestrictionKind::
+                                                     ValueToOptional ||
+                                 *restriction == ConversionRestrictionKind::
+                                                     OptionalToOptional;
+                        return false;
+                      }),
+      conversionsOrFixes.end());
+
+  conversionsOrFixes.push_back(fix);
+  return true;
 }
 
 /// Let's check whether this is an out-of-order argument in binary
@@ -5739,9 +5745,9 @@ bool ConstraintSystem::repairFailures(
     return Type();
   };
 
-  if (repairArrayLiteralUsedAsDictionary(*this, lhs, rhs, matchKind,
-                                         conversionsOrFixes,
-                                         getConstraintLocator(locator)))
+  if (repairMismatchedCollectionLiteral(*this, lhs, rhs, matchKind,
+                                        conversionsOrFixes,
+                                        getConstraintLocator(locator)))
     return true;
 
   if (locator.endsWith<LocatorPathElt::ThrownErrorType>()) {
@@ -7652,7 +7658,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     case ConstraintKind::Conjunction:
     case ConstraintKind::DynamicTypeOf:
     case ConstraintKind::EscapableFunctionOf:
-    case ConstraintKind::DiscardableFunctionOf:
+    case ConstraintKind::DeinitableFunctionOf:
     case ConstraintKind::OpenedExistentialOf:
     case ConstraintKind::KeyPath:
     case ConstraintKind::KeyPathApplication:
@@ -13158,7 +13164,7 @@ ConstraintSystem::simplifyEscapableFunctionOfConstraint(
 }
 
 ConstraintSystem::SolutionKind
-ConstraintSystem::simplifyDiscardableFunctionOfConstraint(
+ConstraintSystem::simplifyDeinitableFunctionOfConstraint(
     Type type1, Type type2, TypeMatchOptions flags,
     ConstraintLocatorBuilder locator) {
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
@@ -13167,8 +13173,8 @@ ConstraintSystem::simplifyDiscardableFunctionOfConstraint(
   auto formUnsolved = [&] {
     if (flags.contains(TMF_GenerateConstraints)) {
       addUnsolvedConstraint(
-          Constraint::create(*this, ConstraintKind::DiscardableFunctionOf,
-                             type1, type2, getConstraintLocator(locator)));
+          Constraint::create(*this, ConstraintKind::DeinitableFunctionOf, type1,
+                             type2, getConstraintLocator(locator)));
       return SolutionKind::Solved;
     }
 
@@ -13182,7 +13188,7 @@ ConstraintSystem::simplifyDiscardableFunctionOfConstraint(
     // still type checks.
     auto semantics = fn2->getExtInfo().getExecutionSemantics();
     if (semantics != ExecutionSemantics::Once) {
-      if (recordFix(AllowNonExactlyOnceDiscardArgument::create(
+      if (recordFix(AllowNonExactlyOnceDeinitArgument::create(
                         *this, type2, getConstraintLocator(locator)),
                     FixImpact::TypeMismatch))
         return SolutionKind::Error;
@@ -13199,7 +13205,7 @@ ConstraintSystem::simplifyDiscardableFunctionOfConstraint(
     // Holes were already diagnosed elsewhere.
     if (type2->is<PlaceholderType>())
       return SolutionKind::Solved;
-    if (recordFix(AllowNonExactlyOnceDiscardArgument::create(
+    if (recordFix(AllowNonExactlyOnceDeinitArgument::create(
                       *this, type2, getConstraintLocator(locator)),
                   FixImpact::TypeMismatch))
       return SolutionKind::Error;
@@ -16317,7 +16323,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreContextualType:
   case FixKind::IgnoreAssignmentDestinationType:
   case FixKind::AllowConversionThroughInOut:
-  case FixKind::IgnoreCollectionElementContextualMismatch: {
+  case FixKind::IgnoreCollectionElementContextualMismatch:
+  case FixKind::TreatArrayLiteralAsTuple:
+  case FixKind::TreatTupleAsArrayLiteral: {
     auto impact = FixImpact::Mismatch;
 
     auto locator = fix->getLocator();
@@ -16449,7 +16457,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidPatternInExpr:
   case FixKind::IgnoreInvalidPlaceholder:
   case FixKind::IgnoreOutOfPlaceThenStmt:
-  case FixKind::AllowNonExactlyOnceDiscardArgument:
+  case FixKind::AllowNonExactlyOnceDeinitArgument:
   case FixKind::IgnoreMissingEachKeyword:
   case FixKind::TooManyDynamicMemberLookups:
   case FixKind::IgnoreNonMetatypeDynamicType:
@@ -16500,9 +16508,9 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
     return simplifyEscapableFunctionOfConstraint(first, second,
                                                  subflags, locator);
 
-  case ConstraintKind::DiscardableFunctionOf:
-    return simplifyDiscardableFunctionOfConstraint(first, second, subflags,
-                                                   locator);
+  case ConstraintKind::DeinitableFunctionOf:
+    return simplifyDeinitableFunctionOfConstraint(first, second, subflags,
+                                                  locator);
 
   case ConstraintKind::OpenedExistentialOf:
     return simplifyOpenedExistentialOfConstraint(first, second,
@@ -17068,8 +17076,8 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
         constraint.getLocator());
 
-  case ConstraintKind::DiscardableFunctionOf:
-    return simplifyDiscardableFunctionOfConstraint(
+  case ConstraintKind::DeinitableFunctionOf:
+    return simplifyDeinitableFunctionOfConstraint(
         constraint.getFirstType(), constraint.getSecondType(), std::nullopt,
         constraint.getLocator());
 

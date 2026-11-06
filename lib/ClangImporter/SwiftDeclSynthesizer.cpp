@@ -12,6 +12,7 @@
 
 #include "SwiftDeclSynthesizer.h"
 #include "CXXMethodBridging.h"
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
@@ -46,6 +47,7 @@
 #include "clang/Sema/Sema.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/Twine.h"
+#include "llvm/Support/TrailingObjects.h"
 
 using namespace swift;
 using namespace importer;
@@ -163,7 +165,7 @@ createForwardingParamRefExprs(AbstractFunctionDecl *funcDecl,
 }
 
 static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
-                                         NominalTypeDecl *importedDecl,
+                                         DeclContext *dc,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
@@ -178,7 +180,7 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      params, getterType, importedDecl, clangNode);
+      params, getterType, dc, clangNode);
   getterDecl->setAccess(importedFieldDecl->getFormalAccess());
   getterDecl->setIsObjC(false);
   getterDecl->setIsDynamic(false);
@@ -187,12 +189,12 @@ static AccessorDecl *makeFieldGetterDecl(ClangImporter::Implementation &Impl,
 }
 
 static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
-                                         NominalTypeDecl *importedDecl,
+                                         DeclContext *dc,
                                          VarDecl *importedFieldDecl,
                                          ClangNode clangNode = ClangNode()) {
   auto &C = Impl.SwiftContext;
   auto newValueDecl = new (C) ParamDecl(SourceLoc(), SourceLoc(), Identifier(),
-                                        SourceLoc(), C.Id_value, importedDecl);
+                                        SourceLoc(), C.Id_value, dc);
   newValueDecl->setSpecifier(ParamSpecifier::Default);
   newValueDecl->setInterfaceType(importedFieldDecl->getInterfaceType());
 
@@ -207,10 +209,10 @@ static AccessorDecl *makeFieldSetterDecl(ClangImporter::Implementation &Impl,
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false,
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      params, voidTy, importedDecl, clangNode);
+      params, voidTy, dc, clangNode);
   setterDecl->setIsObjC(false);
   setterDecl->setIsDynamic(false);
-  if (!isa<ClassDecl>(importedDecl))
+  if (!isa<ClassDecl>(dc) && !importedFieldDecl->isStatic())
     setterDecl->setSelfAccessKind(SelfAccessKind::Mutating);
   setterDecl->setAccess(importedFieldDecl->getSetterFormalAccess());
 
@@ -296,12 +298,12 @@ bool SwiftDeclSynthesizer::isUnicodeScalar(Type type) {
          found->second->isUnicodeScalar();
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                const clang::APValue &value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              const clang::APValue &value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   // Create the integer literal value.
   Expr *expr = nullptr;
   switch (value.getKind()) {
@@ -394,12 +396,12 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
                         access);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                StringRef value,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              StringRef value,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   ASTContext &ctx = ImporterImpl.SwiftContext;
 
   auto expr = new (ctx) StringLiteralExpr(value, SourceRange());
@@ -483,12 +485,12 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   return createSingleReturnBody(ctx, expr);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
-                                                DeclContext *dc, Type type,
-                                                Expr *valueExpr,
-                                                ConstantConvertKind convertKind,
-                                                bool isStatic, ClangNode ClangN,
-                                                AccessLevel access) {
+VarDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                              DeclContext *dc, Type type,
+                                              Expr *valueExpr,
+                                              ConstantConvertKind convertKind,
+                                              bool isStatic, ClangNode ClangN,
+                                              AccessLevel access) {
   auto &C = ImporterImpl.SwiftContext;
 
   VarDecl *var = nullptr;
@@ -536,28 +538,20 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
 
 // MARK: Struct default initializers
 
-/// Synthesize the body for an struct default initializer.
-static std::pair<BraceStmt *, bool>
-synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
-                                       void *context) {
-  auto constructor = cast<ConstructorDecl>(afd);
+/// Synthesize a statement that assigns `Builtin.zeroInitializer()` to self,
+/// zero-filling all of its storage.
+static ASTNode createZeroInitializeSelfStmt(ConstructorDecl *constructor) {
   ASTContext &ctx = constructor->getASTContext();
-  auto structDecl = static_cast<StructDecl *>(context);
-
-  // Use a builtin to produce a zero initializer, and assign it to self.
 
   // Construct the left-hand reference to self.
   auto *selfDecl = constructor->getImplicitSelfDecl();
   Expr *lhs = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(), /*Implicit=*/true);
-  auto selfType = structDecl->getDeclaredInterfaceType();
+  auto selfType = selfDecl->getTypeInContext();
   lhs->setType(LValueType::get(selfType));
 
-  auto emptyTuple = TupleType::getEmpty(ctx);
-
-  // Construct the right-hand call to Builtin.zeroInitializer.
-  Identifier zeroInitID = ctx.getIdentifier("zeroInitializer");
+  // Construct the call to Builtin.zeroInitializer.
   auto zeroInitializerFunc =
-      cast<FuncDecl>(getBuiltinValueDecl(ctx, zeroInitID));
+      cast<FuncDecl>(getBuiltinValueDecl(ctx, "zeroInitializer"));
   SubstitutionMap subMap = SubstitutionMap::get(
       zeroInitializerFunc->getGenericSignature(), llvm::ArrayRef(selfType),
       LookUpConformanceInModule());
@@ -573,8 +567,18 @@ synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
   call->setThrows(nullptr);
 
   auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), call, /*implicit*/ true);
-  assign->setType(emptyTuple);
+  assign->setType(TupleType::getEmpty(ctx));
+  return assign;
+}
 
+/// Synthesize the body for an struct default initializer.
+static std::pair<BraceStmt *, bool>
+synthesizeStructDefaultConstructorBody(AbstractFunctionDecl *afd,
+                                       void *context) {
+  auto constructor = cast<ConstructorDecl>(afd);
+  ASTContext &ctx = constructor->getASTContext();
+
+  auto assign = createZeroInitializeSelfStmt(constructor);
   auto *ret = ReturnStmt::createImplicit(ctx, /*expr*/ nullptr);
 
   // Create the function body.
@@ -603,8 +607,7 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
   // Mark the constructor transparent so that we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
-  constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody,
-                                  structDecl);
+  constructor->setBodySynthesizer(synthesizeStructDefaultConstructorBody);
 
   // We're done.
   return constructor;
@@ -612,12 +615,46 @@ SwiftDeclSynthesizer::createDefaultConstructor(NominalTypeDecl *structDecl) {
 
 // MARK: Struct value initializers
 
+/// Context blob for \c synthesizeValueConstructorBody , with the
+/// constructor's members stored as a trailing array.
+class ValueConstructorBodyContext final
+    : public ASTAllocated<ValueConstructorBodyContext>,
+      private llvm::TrailingObjects<ValueConstructorBodyContext, VarDecl *> {
+  friend TrailingObjects;
+
+  size_t ShouldZeroInit : 1;
+  size_t NumMembers : std::numeric_limits<size_t>::digits - 1;
+
+  ValueConstructorBodyContext(ArrayRef<VarDecl *> members, bool shouldZeroInit)
+      : ShouldZeroInit(shouldZeroInit), NumMembers(members.size()) {
+    std::uninitialized_copy(members.begin(), members.end(),
+                            getTrailingObjects());
+  }
+
+  size_t numTrailingObjects(OverloadToken<VarDecl *>) const {
+    return NumMembers;
+  }
+
+public:
+  static ValueConstructorBodyContext *
+  create(ASTContext &ctx, ArrayRef<VarDecl *> members, bool shouldZeroInit) {
+    auto size = totalSizeToAlloc<VarDecl *>(members.size());
+    auto mem = ctx.Allocate(size, alignof(ValueConstructorBodyContext));
+    return ::new (mem) ValueConstructorBodyContext(members, shouldZeroInit);
+  }
+
+  bool shouldZeroInit() const { return ShouldZeroInit; }
+
+  ArrayRef<VarDecl *> getMembers() const {
+    return {getTrailingObjects(), NumMembers};
+  }
+};
+
 /// Synthesizer callback for the body of a struct value constructor.
 static std::pair<BraceStmt *, bool>
 synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
   auto constructor = cast<ConstructorDecl>(afd);
-  ArrayRef<VarDecl *> members(static_cast<VarDecl **>(context) + 1,
-                              static_cast<uintptr_t *>(context)[0]);
+  auto *bodyContext = static_cast<ValueConstructorBodyContext *>(context);
 
   ASTContext &ctx = constructor->getASTContext();
 
@@ -626,14 +663,30 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
   auto *selfDecl = constructor->getImplicitSelfDecl();
 
+  if (bodyContext->shouldZeroInit())
+    stmts.push_back(createZeroInitializeSelfStmt(constructor));
+
   // To keep DI happy, initialize stored properties before computed.
   for (unsigned pass = 0; pass < 2; ++pass) {
     unsigned paramPos = 0;
 
-    for (auto var : members) {
+    for (auto var : bodyContext->getMembers()) {
 
       if (isa_and_nonnull<clang::IndirectFieldDecl>(var->getClangDecl()))
         continue;
+
+      // Peephole through a computed C array projection to its stored
+      // counterpart if it has one. Avoids needing ugly DI hacks.
+      bool reinterpretToTarget = false;
+      if (!var->hasStorage()) {
+        if (auto *counterpart = dyn_cast_or_null<VarDecl>(
+                importer::getDeclForCounterpartCArrayProjection(var))) {
+          if (counterpart->hasStorage()) {
+            var = counterpart;
+            reinterpretToTarget = true;
+          }
+        }
+      }
 
       if (var->hasStorage() == (pass != 0)) {
         ++paramPos;
@@ -653,7 +706,10 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
       lhs->setType(LValueType::get(var->getTypeInContext()));
 
       // Construct right-hand side.
-      auto rhs = createParamRefExpr(constructor, paramPos);
+      Expr *rhs = createParamRefExpr(constructor, paramPos);
+      if (reinterpretToTarget)
+        rhs = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+            ctx, rhs->getType(), var->getTypeInContext(), rhs);
 
       // Add assignment.
       auto assign = new (ctx) AssignExpr(lhs, SourceLoc(), rhs,
@@ -674,8 +730,11 @@ synthesizeValueConstructorBody(AbstractFunctionDecl *afd, void *context) {
 
 ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
     NominalTypeDecl *structDecl, ArrayRef<VarDecl *> members,
-    bool wantCtorParamNames, bool wantBody) {
+    ValueConstructorOptions options,
+    AccessLevel maxAccess) {
   auto &context = ImporterImpl.SwiftContext;
+  bool wantCtorParamNames =
+      options.contains(ValueConstructorFlags::WantParamNames);
 
   // Construct the set of parameters from the list of members.
   SmallVector<ParamDecl *, 8> valueParameters;
@@ -725,19 +784,21 @@ ConstructorDecl *SwiftDeclSynthesizer::createValueConstructor(
                       /*GenericParams=*/nullptr, structDecl);
 
   constructor->copyFormalAccessFrom(structDecl);
+  if (constructor->getFormalAccess() > maxAccess)
+    constructor->overwriteAccess(maxAccess);
 
   // Make the constructor transparent so we inline it away completely.
   constructor->addAttribute(new (context) TransparentAttr(/*implicit*/ true));
 
-  if (wantBody) {
-    auto memberMemory =
-        context.AllocateUninitialized<uintptr_t>(members.size() + 1);
-    memberMemory[0] = members.size();
-    for (unsigned i : indices(members)) {
-      memberMemory[i + 1] = reinterpret_cast<uintptr_t>(members[i]);
-    }
+  assert((!options.contains(ValueConstructorFlags::WantZeroInitPrologue) ||
+          options.contains(ValueConstructorFlags::WantBody)) &&
+         "zero-init prologue requires a synthesized body");
+  if (options.contains(ValueConstructorFlags::WantBody)) {
+    auto *bodyContext = ValueConstructorBodyContext::create(
+        context, members,
+        options.contains(ValueConstructorFlags::WantZeroInitPrologue));
     constructor->setBodySynthesizer(synthesizeValueConstructorBody,
-                                    memberMemory.data());
+                                    bodyContext);
   }
 
   // We're done.
@@ -794,12 +855,11 @@ synthesizeRawValueBridgingConstructorBody(AbstractFunctionDecl *afd,
 
 ConstructorDecl *SwiftDeclSynthesizer::createRawValueBridgingConstructor(
     StructDecl *structDecl, VarDecl *computedRawValue, VarDecl *storedRawValue,
-    bool wantLabel, bool wantBody) {
+    ValueConstructorOptions options) {
   auto init = createValueConstructor(structDecl, computedRawValue,
-                                     /*wantCtorParamNames=*/wantLabel,
-                                     /*wantBody=*/false);
+                                     options - ValueConstructorFlags::WantBody);
   // Insert our custom init body
-  if (wantBody) {
+  if (options.contains(ValueConstructorFlags::WantBody)) {
     init->setBodySynthesizer(synthesizeRawValueBridgingConstructorBody,
                              storedRawValue);
   }
@@ -853,7 +913,7 @@ VarDecl *SwiftDeclSynthesizer::createSmartPtrBridgingProperty(
 void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
     StructDecl *structDecl, Type storedUnderlyingType, Type bridgedType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-    bool makeUnlabeledValueInit) {
+    MakeStructRawValuedOptions options) {
   auto &ctx = ImporterImpl.SwiftContext;
 
   ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
@@ -891,15 +951,15 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
       /*InitExpr*/ nullptr, structDecl);
 
   auto init =
-      createRawValueBridgingConstructor(structDecl, computedVar, storedVar,
-                                        /*wantLabel*/ true,
-                                        /*wantBody*/ true);
+      createRawValueBridgingConstructor(
+          structDecl, computedVar, storedVar,
+          {ValueConstructorFlags::WantParamNames,
+           ValueConstructorFlags::WantBody});
 
   ConstructorDecl *unlabeledCtor = nullptr;
-  if (makeUnlabeledValueInit)
+  if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
     unlabeledCtor = createRawValueBridgingConstructor(
-        structDecl, computedVar, storedVar,
-        /*wantLabel*/ false, /*wantBody*/ true);
+        structDecl, computedVar, storedVar, ValueConstructorFlags::WantBody);
 
   if (unlabeledCtor)
     structDecl->addMember(unlabeledCtor);
@@ -917,42 +977,116 @@ void SwiftDeclSynthesizer::makeStructRawValuedWithBridge(
 void SwiftDeclSynthesizer::makeStructRawValued(
     StructDecl *structDecl, Type underlyingType,
     ArrayRef<KnownProtocolKind> synthesizedProtocolAttrs,
-    MakeStructRawValuedOptions options, AccessLevel setterAccess) {
+    MakeStructRawValuedOptions options, CArrayProjection neededCounterpart) {
+  bool needsCounterpart = neededCounterpart != CArrayProjection::Modern;
+  Type counterpartType =
+      importer::computeLegacyCArrayType({underlyingType, false},
+                                        neededCounterpart).getType();
+  ASSERT(counterpartType && "needed counterpart type should be computable");
   auto &ctx = ImporterImpl.SwiftContext;
 
   ImporterImpl.addSynthesizedProtocolAttrs(structDecl,
                                            synthesizedProtocolAttrs);
 
-  // Create a variable to store the underlying value.
-  VarDecl *var;
-  PatternBindingDecl *patternBinding;
-  auto introducer = (options.contains(MakeStructRawValuedFlags::IsLet)
-                         ? VarDecl::Introducer::Let
-                         : VarDecl::Introducer::Var);
-  std::tie(var, patternBinding) = createVarWithPattern(
-      structDecl, ctx.Id_rawValue, underlyingType, introducer,
-      options.contains(MakeStructRawValuedFlags::IsImplicit),
-      structDecl->getFormalAccess(), setterAccess);
+  // Create all the possibly-dual-projected members.
 
-  assert(var->hasStorage());
+  auto getAccessLevel = [&](CArrayProjection projection) {
+    // `getMaxAccessLevel()` only returns a cap (and may be `Open`, which a
+    // struct member can never actually have), so clamp it against the
+    // struct's own formal access, same as `getAccessLevel()` does for
+    // ordinary members.
+    return std::min(
+        structDecl->getFormalAccess(),
+        ImporterImpl.getMaxAccessLevel(projection, needsCounterpart));
+  };
 
-  // Create constructors to initialize that value from a value of the
-  // underlying type.
+  bool isReadOnly = options.contains(MakeStructRawValuedFlags::ReadOnly);
+
+  // To make sure that they print in the preferred order, we don't `addMember()`
+  // the VarDecls and PatternBindingDecls until after we've added the inits.
+  SmallVector<Decl *, 4> varMembers;
+
+  // Create the stored variable for each projection. If the modern one will be
+  // computed, it can't be a `let`; a read-only forwarder gets a private setter
+  // instead. (Registering the C array projections makes it computed.)
+  auto *var = ImporterImpl.forEachCArrayProjection(
+      neededCounterpart, [&](CArrayProjection projection) -> VarDecl * {
+    bool isModern = projection == CArrayProjection::Modern;
+    auto access = getAccessLevel(projection);
+
+    VarDecl *newVar;
+    PatternBindingDecl *patternBinding;
+    std::tie(newVar, patternBinding) = createVarWithPattern(
+        structDecl, ctx.Id_rawValue,
+        isModern ? underlyingType : counterpartType,
+        isReadOnly && !needsCounterpart
+            ? VarDecl::Introducer::Let : VarDecl::Introducer::Var,
+        !isModern || options.contains(MakeStructRawValuedFlags::IsImplicit),
+        access, isReadOnly ? AccessLevel::Private : access);
+    assert(newVar->hasStorage());
+
+    varMembers.push_back(patternBinding);
+    varMembers.push_back(newVar);
+    return newVar;
+  });
+  // The floor depends on `var` having been registered as a modern projection.
+  ImporterImpl.applyAvailabilityFloor(var);
+  VarDecl *storedVar = getDeclForCounterpartCArrayProjection(var);
+
+  // Create constructors to initialize each projection's variable from a value
+  // of its type.
+  auto makeInit = [&](bool labeled) {
+    auto *modernInit = ImporterImpl.forEachCArrayProjection(
+        neededCounterpart,
+        [&](CArrayProjection projection) -> ConstructorDecl * {
+      // Hidden storage doesn't get initializers.
+      if (projection == CArrayProjection::HiddenStorage)
+        return nullptr;
+
+      bool isModern = projection == CArrayProjection::Modern;
+
+      // In addition to the obvious differences, a modern constructor uses AST
+      // synthesis (`ValueConstructorFlags::WantBody`); a legacy constructor
+      // uses SILGen synthesis (`MemberwiseInitKind::Regular`).
+      ValueConstructorOptions ctorOptions;
+      if (labeled)
+        ctorOptions |= ValueConstructorFlags::WantParamNames;
+      if (isModern)
+        ctorOptions |= ValueConstructorFlags::WantBody;
+      auto *ctor = createValueConstructor(
+          structDecl, isModern ? var : storedVar, ctorOptions,
+          getAccessLevel(projection));
+      if (!ctorOptions.contains(ValueConstructorFlags::WantBody))
+        ctor->setIsMemberwiseInitializer(MemberwiseInitKind::Regular);
+
+      structDecl->addMember(ctor);
+      return ctor;
+    });
+    ImporterImpl.applyAvailabilityFloor(modernInit);
+    return modernInit;
+  };
+
   if (options.contains(MakeStructRawValuedFlags::MakeUnlabeledValueInit))
-    structDecl->addMember(createValueConstructor(structDecl, var,
-                                                 /*wantCtorParamNames=*/false,
-                                                 /*wantBody=*/true));
+    makeInit(/*labeled=*/false);
+  makeInit(/*labeled=*/true);
 
-  auto *initRawValue = createValueConstructor(structDecl, var,
-                                              /*wantCtorParamNames=*/true,
-                                              /*wantBody=*/true);
-  structDecl->addMember(initRawValue);
-  structDecl->addMember(patternBinding);
-  structDecl->addMember(var);
+  // Now add the vars.
+  for (Decl *var : varMembers)
+    structDecl->addMember(var);
+
+  // We cannot dual-project RawValue, so use whichever type matches the current
+  // projection. If there's no legacy type at all (the array is too big to
+  // represent as a tuple), the modern type is all we have, regardless of
+  // which projection is visible -- the struct itself is marked Internal by
+  // the caller in that case, but RawValue still needs a real type.
+  Type visibleRawValueType = underlyingType;
+  if (neededCounterpart == CArrayProjection::Legacy
+        && ImporterImpl.VisibleCArrayProjection == CArrayProjection::Legacy)
+    visibleRawValueType = counterpartType;
 
   ClangImporter::Implementation::addSynthesizedTypealias(
-      structDecl, ctx.Id_RawValue, underlyingType);
-  ImporterImpl.RawTypes[structDecl] = underlyingType;
+      structDecl, ctx.Id_RawValue, visibleRawValueType);
+  ImporterImpl.RawTypes[structDecl] = visibleRawValueType;
 }
 
 // MARK: Unions
@@ -1174,7 +1308,11 @@ static VarDecl *findAnonymousInnerFieldDecl(VarDecl *importedFieldDecl,
   for (auto decl :
        anonymousFieldTypeDecl->lookupDirect(importedFieldDecl->getName())) {
     if (auto *VD = dyn_cast<VarDecl>(decl)) {
-      return VD;
+      auto *matchingDecl =
+          importer::getDeclForCArrayProjectionMatching(VD, importedFieldDecl);
+      ASSERT(matchingDecl && "synthesizing IndirectFieldDecl accessor body "
+                             "for nonexistent C array projection");
+      return matchingDecl;
     }
   }
 
@@ -1249,8 +1387,9 @@ synthesizeIndirectFieldSetterBody(AbstractFunctionDecl *afd, void *context) {
 
 std::pair<AccessorDecl *, AccessorDecl *>
 SwiftDeclSynthesizer::makeIndirectFieldAccessors(
-    const clang::IndirectFieldDecl *indirectField, ArrayRef<VarDecl *> members,
-    NominalTypeDecl *importedStructDecl, VarDecl *importedFieldDecl) {
+    NominalTypeDecl *importedStructDecl,
+    VarDecl *importedFieldDecl,
+    VarDecl *anonymousStorageDecl) {
   auto &C = ImporterImpl.SwiftContext;
 
   auto getterDecl =
@@ -1264,25 +1403,301 @@ SwiftDeclSynthesizer::makeIndirectFieldAccessors(
   ClangImporter::Implementation::makeComputed(importedFieldDecl, getterDecl,
                                               setterDecl);
 
-  auto containingField = indirectField->chain().front();
-  VarDecl *anonymousFieldDecl = nullptr;
-
-  // Reverse scan of the members because indirect field are generated just
-  // after the corresponding anonymous type, so a reverse scan allows
-  // switching from O(n) to O(1) here.
-  for (auto decl : reverse(members)) {
-    if (decl->getClangDecl() == containingField) {
-      anonymousFieldDecl = cast<VarDecl>(decl);
-      break;
-    }
-  }
-  assert(anonymousFieldDecl && "anonymous field not generated");
   getterDecl->setBodySynthesizer(synthesizeIndirectFieldGetterBody,
-                                 anonymousFieldDecl);
+                                 anonymousStorageDecl);
   setterDecl->setBodySynthesizer(synthesizeIndirectFieldSetterBody,
-                                 anonymousFieldDecl);
+                                 anonymousStorageDecl);
 
   return {getterDecl, setterDecl};
+}
+
+// MARK: C array projections
+
+/// Synthesize the getter body for a C array variable that forwards to its
+/// other projection.
+static std::pair<BraceStmt *, bool>
+synthesizeCArrayProjectionGetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto getterDecl = cast<AccessorDecl>(afd);
+  auto forwardingDecl = cast<VarDecl>(getterDecl->getStorage());
+  auto storedDecl = static_cast<VarDecl *>(context);
+  ASTContext &ctx = getterDecl->getASTContext();
+
+  Expr *storedValueExpr;
+  if (storedDecl->getDeclContext()->getSelfNominalTypeDecl()) {
+    // auto selfDecl = `self`
+    auto selfDecl = getterDecl->getImplicitSelfDecl();
+    Expr *selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                           /*implicit=*/true);
+    selfExpr->setType(selfDecl->getInterfaceType());
+
+    // storedValueExpr = `\(selfDecl).\(storedDecl)`
+    storedValueExpr = new (ctx) MemberRefExpr(selfExpr, SourceLoc(), storedDecl,
+                                              DeclNameLoc(), /*implicit=*/true);
+  } else {
+    // storedValueExpr = `\(storedDecl)`
+    storedValueExpr = new (ctx) DeclRefExpr(storedDecl, DeclNameLoc(),
+                                            /*implicit=*/true);
+  }
+  storedValueExpr->setType(storedDecl->getInterfaceType());
+
+  // auto expr = `Builtin.reinterpretCast(\(storedValueExpr))`
+  //             (to type of forwardingDecl)
+  auto expr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+                  ctx,
+                  storedValueExpr->getType(),
+                  forwardingDecl->getInterfaceType(),
+                  storedValueExpr);
+
+  return createSingleReturnBody(ctx, expr);
+}
+
+/// Synthesize the setter body for a C array variable that forwards to its
+/// other projection.
+static std::pair<BraceStmt *, bool>
+synthesizeCArrayProjectionSetterBody(AbstractFunctionDecl *afd, void *context) {
+  auto setterDecl = cast<AccessorDecl>(afd);
+  auto storedDecl = static_cast<VarDecl *>(context);
+  ASTContext &ctx = setterDecl->getASTContext();
+
+  Expr *storedValueExpr;
+  if (storedDecl->getDeclContext()->getSelfNominalTypeDecl()) {
+    // auto selfDecl = `self`
+    auto selfDecl = setterDecl->getImplicitSelfDecl();
+    Expr *selfExpr = new (ctx) DeclRefExpr(selfDecl, DeclNameLoc(),
+                                           /*implicit=*/true);
+    selfExpr->setType(LValueType::get(selfDecl->getInterfaceType()));
+
+    // storedValueExpr = `\(selfDecl).\(storedDecl)`
+    AccessSemantics semantics = setterDecl->isInitAccessor()
+                                  ? AccessSemantics::DirectToStorage
+                                  : AccessSemantics::Ordinary;
+    storedValueExpr = new (ctx) MemberRefExpr(selfExpr, SourceLoc(), storedDecl,
+                                              DeclNameLoc(), /*implicit=*/true,
+                                              semantics);
+  } else {
+    // storedValueExpr = `\(storedDecl)`
+    storedValueExpr = new (ctx) DeclRefExpr(storedDecl, DeclNameLoc(),
+                                            /*implicit=*/true);
+  }
+  storedValueExpr->setType(LValueType::get(storedDecl->getInterfaceType()));
+
+  // auto newValueExpr = `newValue`
+  auto newValueDecl = setterDecl->getParameters()->get(0);
+  auto newValueExpr = new (ctx) DeclRefExpr(newValueDecl, DeclNameLoc(),
+                                            /*implicit*/ true);
+  newValueExpr->setType(newValueDecl->getInterfaceType());
+
+  // auto expr = `Builtin.reinterpretCast(\(newValueExpr))`
+  //             (to type of storedDecl)
+  auto expr = SwiftDeclSynthesizer::synthesizeReturnReinterpretCast(
+                  ctx,
+                  newValueDecl->getInterfaceType(),
+                  storedDecl->getInterfaceType(),
+                  newValueExpr);
+
+  // auto assign = `\(storedValueExpr) = \(expr)`
+  auto assign = new (ctx) AssignExpr(storedValueExpr, SourceLoc(), expr,
+                                     /*implicit*/ true);
+  assign->setType(TupleType::getEmpty(ctx));
+
+  auto body = BraceStmt::create(ctx, SourceLoc(), {assign}, SourceLoc(),
+                                /*implicit*/ true);
+  return {body, /*isTypeChecked=*/true};
+}
+
+std::pair<AccessorDecl *, AccessorDecl *>
+SwiftDeclSynthesizer::makeCArrayProjectionAccessors(DeclContext *dc,
+                                                VarDecl *forwardingDecl,
+                                                VarDecl *storedDecl) {
+  auto &ctx = ImporterImpl.SwiftContext;
+
+  auto getterDecl = makeFieldGetterDecl(ImporterImpl, dc, forwardingDecl);
+  getterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
+  getterDecl->setBodySynthesizer(synthesizeCArrayProjectionGetterBody, storedDecl);
+
+  // If the stored projection is read-only, don't install a setter on the
+  // forwarding projection either.
+  AccessorDecl *setterDecl = nullptr;
+  if (!storedDecl->isLet()) {
+    setterDecl = makeFieldSetterDecl(ImporterImpl, dc, forwardingDecl);
+    setterDecl->addAttribute(new (ctx) TransparentAttr(/*implicit=*/true));
+    setterDecl->setBodySynthesizer(synthesizeCArrayProjectionSetterBody,
+                                   storedDecl);
+  }
+
+  ClangImporter::Implementation::makeComputed(forwardingDecl, getterDecl,
+                                              setterDecl);
+
+  return {getterDecl, setterDecl};
+}
+
+void SwiftDeclSynthesizer::registerCArrayProjections(
+    Decl *modern, Decl *counterpart, bool addAlternate,
+    CArrayProjection counterpartProjection) {
+  auto &ctx = ImporterImpl.SwiftContext;
+  auto addAttrs = [&](ValueDecl *current, CArrayProjection projection,
+                      ValueDecl *counterpart) {
+    current->addAttribute(new (ctx)
+                            CArrayProjectionAttr(projection, counterpart));
+
+    if (ImporterImpl.VisibleCArrayProjection != projection
+            && !isa<AccessorDecl>(current))
+      current->addAttribute(new (ctx)
+                              UsableFromInlineAttr(/*implicit=*/true));
+  };
+
+  PrettyStackTraceDecl debugStack("registering C array projections of", modern);
+
+  ASSERT(counterpartProjection != CArrayProjection::Modern &&
+         "counterpart of the modern projection can't be modern");
+
+  // In practice, we should only have dual projections for ValueDecls.
+  auto modernVD = cast<ValueDecl>(modern);
+  auto counterpartVD = cast_or_null<ValueDecl>(counterpart);
+
+  // Guard against recursion or re-registration.
+  if (auto *existing =
+          modernVD->getAttrs().getAttribute<CArrayProjectionAttr>()) {
+    ASSERT(existing->getProjection() == CArrayProjection::Modern &&
+           existing->getCounterpart() == counterpartVD &&
+           "C array projections registered twice with different counterparts");
+
+    // If we're re-registering, the original registration may not have passed
+    // `addAlternate`, so add it before we return (it's idempotent anyway).
+    if (addAlternate && counterpartVD)
+      ImporterImpl.addAlternateDecl(modernVD, counterpartVD);
+    return;
+  }
+
+  // Mark the modern projection even if there's no counterpart so we give it
+  // the right availability.
+  addAttrs(modernVD, CArrayProjection::Modern, counterpartVD);
+
+  if (counterpartVD) {
+    addAttrs(counterpartVD, counterpartProjection, modernVD);
+
+    if (addAlternate)
+      ImporterImpl.addAlternateDecl(modernVD, counterpartVD);
+  }
+
+  // If we imported a stored property or global, we need to create
+  // accessors for the modern decl to forward to its stored counterpart.
+  if (auto modernVar = dyn_cast<VarDecl>(modernVD)) {
+    auto counterpartVar = cast_or_null<VarDecl>(counterpartVD);
+    if (counterpartVar && counterpartVar->hasStorage()) {
+      makeCArrayProjectionAccessors(modernVar->getDeclContext(), modernVar,
+                                    counterpartVar);
+    }
+
+    // Now that we've installed their accessors, we can assert this: modern
+    // projections can never be stored.
+    ASSERT(!modernVar->hasStorage() &&
+           "modern C array projection should not be stored");
+  }
+
+  // If we're using (computed) storage decls, register the accessors too.
+  if (auto modernASD = dyn_cast<AbstractStorageDecl>(modernVD)) {
+    auto counterpartASD = cast_or_null<AbstractStorageDecl>(counterpartVD);
+
+    for (auto modernAD : modernASD->getAllAccessors()) {
+      auto counterpartAD =
+          counterpartASD
+              ? counterpartASD->getAccessor(modernAD->getAccessorKind())
+              : nullptr;
+      registerCArrayProjections(modernAD, counterpartAD);
+    }
+  }
+
+  // Contrariwise, when a storage declaration is synthesized from an accessor,
+  // we must recursively register it. There are a couple ways that can happen.
+  
+  auto registerImplicitStorage = [&](AbstractStorageDecl *modernStorage,
+                                     AbstractStorageDecl *counterpartStorage) {
+    if (!modernStorage || modernStorage == counterpartStorage)
+      return;
+
+    // ClangImporter ignores alternates of alternates, and `modernStorage` is an
+    // alternate of `modernVD`, so we'll need to do the `addAlternateDecl` by
+    // hand.
+    registerCArrayProjections(modernStorage, counterpartStorage,
+                              /*addAlternate=*/false);
+
+    if (counterpartStorage)
+      ImporterImpl.addAlternateDecl(modernVD, counterpartStorage);
+  };
+
+  // Global functions turned into accessors using import-as-member.
+  if (auto *modernAccessor = dyn_cast<AccessorDecl>(modernVD)) {
+    auto *modernStorage = dyn_cast<VarDecl>(modernAccessor->getStorage());
+    auto *counterpartAccessor = cast_or_null<AccessorDecl>(counterpartVD);
+
+    // Distinguish import-as-member properties (whose accessors are registered
+    // first) from ordinary properties and variables (whose storage is
+    // registered first).
+    //
+    // We need an extra recursion guard here to protect against stored
+    // variables. A stored variable looks like this:
+    //
+    //   MODERN PROJECTIONS                     COUNTERPART PROJECTIONS
+    //
+    //    ┌──────────────┐                         ┌──────────────┐
+    //    │    VarDecl   │◀──────counterpart──────▶│   VarDecl    │
+    //    │  (computed)  │                         │   (stored)   │
+    //    └┬┬────────────┘                         └──────────────┘
+    //     ││ ┌──────────┐
+    //     │└▶│  getter  │───────counterpart──────▶ nullptr
+    //     │  └──────────┘
+    //     │  ┌──────────┐
+    //     └─▶│  setter  │───────counterpart──────▶ nullptr
+    //        └──────────┘
+    //
+    // We're currently processing one of the modern accessors, which has no
+    // counterpart (stored properties don't have accessors). Since
+    // there's no counterpart accessor, we would end up assuming there isn't any
+    // counterpart storage either, and so we would try to re-register the modern
+    // VarDecl as a modern-only decl. This would trip the `ASSERT()` in the main
+    // recursion guard above.
+    //
+    // Fortunately, in this scenario we have already registered the modern and
+    // counterpart VarDecls, so all we need to do is detect that the modern
+    // storage has already been registered and refuse to recurse.
+    if (modernStorage &&
+        !modernStorage->getAttrs().hasAttribute<CArrayProjectionAttr>())
+      registerImplicitStorage(
+          modernStorage,
+          counterpartAccessor
+              ? dyn_cast<VarDecl>(counterpartAccessor->getStorage())
+              : nullptr);
+  }
+
+  // Subscripts synthesized from ObjC object subscript methods.
+  if (isa<FuncDecl>(modernVD)) {
+    auto findSubscript = [&](ValueDecl *func) -> SubscriptDecl * {
+      if (func)
+        for (auto *alternate : ImporterImpl.getAlternateDecls(func))
+          if (auto *subscript = dyn_cast<SubscriptDecl>(alternate))
+            return subscript;
+      return nullptr;
+    };
+    registerImplicitStorage(findSubscript(modernVD),
+                            findSubscript(counterpartVD));
+  }
+
+  // If an operator was synthesized from a function (rather than the function
+  // being directly imported as an operator), there is one for each projection
+  // and they are projections of each other too.
+  if (auto *modernFunc = dyn_cast<FuncDecl>(modernVD)) {
+    if (!modernFunc->isOperator()) {
+      if (auto *modernOp =
+              ImporterImpl.getCXXSynthesizedOperatorFunc(modernFunc)) {
+        auto *counterpartOp = counterpartVD
+                   ? ImporterImpl.getCXXSynthesizedOperatorFunc(counterpartVD)
+                   : nullptr;
+        registerCArrayProjections(modernOp, counterpartOp,
+                                  /*addAlternate=*/false);
+      }
+    }
+  }
 }
 
 // MARK: Enum RawValue initializers
@@ -1573,8 +1988,6 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptGetterDecl(
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       params, elementTy, dc, getter->getClangNode());
 
-  thunk->setAccess(getOverridableAccessLevel(dc));
-
   if (auto objcAttr = getter->getAttrs().getAttribute<ObjCAttr>())
     thunk->addAttribute(objcAttr->clone(C));
   thunk->setIsObjC(getter->isObjC());
@@ -1616,8 +2029,6 @@ AccessorDecl *SwiftDeclSynthesizer::buildSubscriptSetterDecl(
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
       valueIndicesPL, TupleType::getEmpty(C), dc,
       setter->getClangNode());
-
-  thunk->setAccess(getOverridableAccessLevel(dc));
 
   if (auto objcAttr = setter->getAttrs().getAttribute<ObjCAttr>())
     thunk->addAttribute(objcAttr->clone(C));
@@ -2195,6 +2606,40 @@ synthesizeOperatorMethodBody(AbstractFunctionDecl *afd, void *context) {
   return createSingleReturnBody(ctx, callExpr);
 }
 
+static std::tuple<const clang::CXXRecordDecl *, const clang::CXXRecordDecl *,
+                  const clang::CXXMethodDecl *, uint8_t>
+getCacheKeyForSynthesizeCXXForwardingMethod(
+    const clang::CXXRecordDecl *derivedClass,
+    const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
+    ForwardingMethodKind forwardingMethodKind,
+    ReferenceReturnTypeBehaviorForBaseMethodSynthesis
+        referenceReturnTypeBehavior,
+    bool forceConstQualifier) {
+  uint8_t flags = forceConstQualifier ? 1 : 0;
+
+  switch (forwardingMethodKind) {
+  case ForwardingMethodKind::Base:
+    break;
+  case ForwardingMethodKind::Virtual:
+    flags |= 1 << 1;
+    break;
+  }
+
+  switch (referenceReturnTypeBehavior) {
+  case ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference:
+    break;
+  case ReferenceReturnTypeBehaviorForBaseMethodSynthesis::RemoveReference:
+    flags |= 1 << 2;
+    break;
+  case ReferenceReturnTypeBehaviorForBaseMethodSynthesis::
+      RemoveReferenceIfPointer:
+    flags |= 1 << 3;
+    break;
+  }
+
+  return {derivedClass, baseClass, method, flags};
+}
+
 clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     const clang::CXXRecordDecl *derivedClass,
     const clang::CXXRecordDecl *baseClass, const clang::CXXMethodDecl *method,
@@ -2208,6 +2653,13 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
   assert(!method->isStatic() ||
          method->getNameInfo().getName().getCXXOverloadedOperator() ==
              clang::OO_Call);
+
+  auto &cacheEntry = ImporterImpl.synthesizedForwardingMethods
+      [getCacheKeyForSynthesizeCXXForwardingMethod(
+          derivedClass, baseClass, method, forwardingMethodKind,
+          referenceReturnTypeBehavior, forceConstQualifier)];
+  if (cacheEntry)
+    return cacheEntry;
 
   // Create a new method in the derived class that calls the base method.
   clang::DeclarationName name = method->getNameInfo().getName();
@@ -2357,6 +2809,18 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     newMethod->addAttr(attr->clone(clangCtx));
   if (auto attr = method->getAttr<clang::OSReturnsNotRetainedAttr>())
     newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::CFReturnsNotRetainedAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::NSReturnsRetainedAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::NSReturnsNotRetainedAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::CFAuditedTransferAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::CFUnknownTransferAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
+  if (auto attr = method->getAttr<clang::OSConsumesThisAttr>())
+    newMethod->addAttr(attr->clone(clangCtx));
 
   llvm::SmallVector<clang::ParmVarDecl *, 4> params;
   for (auto *param : method->parameters()) {
@@ -2378,6 +2842,12 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     if (auto *attr = param->getAttr<clang::NoEscapeAttr>())
       newParam->addAttr(attr->clone(clangCtx));
     for (auto *attr : param->specific_attrs<clang::SwiftAttrAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::CFConsumedAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::NSConsumedAttr>())
+      newParam->addAttr(attr->clone(clangCtx));
+    if (auto *attr = param->getAttr<clang::OSConsumedAttr>())
       newParam->addAttr(attr->clone(clangCtx));
     params.push_back(newParam);
   }
@@ -2441,6 +2911,7 @@ clang::CXXMethodDecl *SwiftDeclSynthesizer::synthesizeCXXForwardingMethod(
     return nullptr;
 
   newMethod->setBody(returnStmt);
+  cacheEntry = newMethod;
   return newMethod;
 }
 
@@ -2560,7 +3031,7 @@ FuncDecl *SwiftDeclSynthesizer::makeVirtualMethod(
 // MARK: C++ operators
 
 FuncDecl *SwiftDeclSynthesizer::makeInstanceToStaticOperatorCallMethod(
-    const clang::CXXMethodDecl *clangMethodDecl) {
+    const clang::CXXMethodDecl *clangMethodDecl, CArrayProjection projection) {
   auto clangDC = clangMethodDecl->getParent();
   auto &ctx = ImporterImpl.SwiftContext;
 
@@ -2570,12 +3041,16 @@ FuncDecl *SwiftDeclSynthesizer::makeInstanceToStaticOperatorCallMethod(
       clangDC, clangDC, clangMethodDecl, ForwardingMethodKind::Base,
       ReferenceReturnTypeBehaviorForBaseMethodSynthesis::KeepReference,
       /*forceConstQualifier*/ true);
-  newMethod->addAttr(clang::SwiftNameAttr::CreateImplicit(
-      clangMethodDecl->getASTContext(), "callAsFunction"));
+  if (!newMethod)
+    return nullptr;
+
+  if (!newMethod->hasAttr<clang::SwiftNameAttr>())
+    newMethod->addAttr(clang::SwiftNameAttr::CreateImplicit(
+        clangMethodDecl->getASTContext(), "callAsFunction"));
 
   auto result = dyn_cast_or_null<FuncDecl>(
       ctx.getClangModuleLoader()->importDeclDirectly(newMethod));
-  return result;
+  return getDeclForCArrayProjection(result, projection);
 }
 
 // MARK: C++ properties
@@ -3251,6 +3726,8 @@ SwiftDeclSynthesizer::synthesizeStaticFactoryForCXXForeignRef(
     synthCxxMethodDecl->setImplicit();
     synthCxxMethodDecl->setImplicitlyInline();
 
+    ImporterImpl.foreignReferenceFactoryToOriginalConstructor[synthCxxMethodDecl] =
+        selectedCtorDecl;
     synthesizedFactories.push_back(synthCxxMethodDecl);
   }
 

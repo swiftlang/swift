@@ -17,7 +17,7 @@ final class Box {
 
 @inline(never)
 func drop(_ f: consuming @once () -> Void) {
-  withoutActuallyDiscarding(f) { _ in }
+  withoutActuallyDeiniting(f) { _ in }
 }
 
 @inline(never)

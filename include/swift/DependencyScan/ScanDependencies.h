@@ -78,8 +78,8 @@ namespace incremental {
 /// For the given module dependency graph captured in the 'cache',
 /// validate whether each dependency node is up-to-date w.r.t. serialization
 /// time-stamp. i.e. if any of the input files of a module dependency are newer
-/// than the serialized dependency graph, it is considered invalidated and must
-/// be re-scanned.
+/// than the serialized dependency graph, or have been added or moved, it is
+/// considered invalidated and must be re-scanned.
 void validateInterModuleDependenciesCache(
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
@@ -87,6 +87,7 @@ void validateInterModuleDependenciesCache(
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
+    const llvm::StringMap<std::string> &clangModuleMapFiles,
     bool emitRemarks = false);
 
 /// Perform a postorder DFS to locate modules whose build recipe is out-of-date
@@ -101,12 +102,14 @@ void outOfDateModuleScan(
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
-    bool emitRemarks, ModuleDependencyIDSet &visited,
+    const llvm::StringMap<std::string> &clangModuleMapFiles, bool emitRemarks,
+    ModuleDependencyIDSet &visited,
     ModuleDependencyIDSet &modulesRequiringRescan);
 
-/// Validate whether all inputs of a given module dependency
-/// are older than the cache serialization time and none of its directory
-/// dependencies have been invalidated.
+/// Validate whether all inputs of a given module dependency:
+/// 1. are older than the cache serialization time
+/// 2. have none of its directory dependencies invalidated
+/// 3. resolve to the same module map path
 bool verifyModuleDependencyUpToDate(
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
@@ -114,7 +117,7 @@ bool verifyModuleDependencyUpToDate(
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags,
     llvm::function_ref<bool(StringRef)> isDirectoryInvalidated,
-    bool emitRemarks);
+    const llvm::StringMap<std::string> &clangModuleMapFiles, bool emitRemarks);
 } // end namespace incremental
 } // end namespace dependencies
 } // end namespace swift

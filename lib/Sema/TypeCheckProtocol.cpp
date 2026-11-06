@@ -1804,6 +1804,12 @@ swift::lookupValueWitnesses(DeclContext *DC, ValueDecl *req, bool *ignoringNames
   return witnesses;
 }
 
+/// A back-deployed type omits synthesized members in the interface, so they
+/// will be re-derived by the client.
+static bool interfaceOmitsDerivedMembers(const NominalTypeDecl *nominal) {
+  return nominal && nominal->isBackDeployed();
+}
+
 bool WitnessChecker::findBestWitness(
                                ValueDecl *requirement,
                                bool *ignoringNames,
@@ -1910,7 +1916,12 @@ bool WitnessChecker::findBestWitness(
     // interface can be treated as opaque.
     // FIXME: ...but we should do something better about types.
     if (conformance && !conformance->isInvalid()) {
-      if (DC->isInSwiftinterface()) {
+      // Except a member that the compiler derives for a type whose interface
+      // omits them: it is derived later.
+      auto *nominal = DC->getSelfNominalTypeDecl();
+      bool isDerived = interfaceOmitsDerivedMembers(nominal) &&
+          DerivedConformance::getDerivableRequirement(nominal, requirement);
+      if (DC->isInSwiftinterface() && !isDerived) {
         auto match = matchWitness(ReqEnvironmentCache, Proto, conformance, DC,
                                   requirement, requirement);
         if (match.isViable()) {
@@ -4703,7 +4714,8 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
   bool canDerive = false;
 
   auto *SF = DC->getParentSourceFile();
-  if (!(SF == nullptr || SF->Kind == SourceFileKind::Interface)) {
+  if (!(SF == nullptr || (SF->Kind == SourceFileKind::Interface &&
+                          !interfaceOmitsDerivedMembers(nominal)))) {
     // Can a witness for this requirement be derived for this nominal type?
     if (auto derivable = DerivedConformance::getDerivableRequirement(
                            nominal,
@@ -5128,7 +5140,8 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
                        ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
-  if (DC->isInSwiftinterface())
+  if (DC->isInSwiftinterface() &&
+      !interfaceOmitsDerivedMembers(DC->getSelfNominalTypeDecl()))
     return ResolveWitnessResult::Missing;
 
   // Find the declaration that derives the protocol conformance.

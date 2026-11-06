@@ -3618,7 +3618,7 @@ static CanSILFunctionType getNativeSILFunctionType(
         return getSILFunctionTypeForConventions(DefaultSetterConventions());
       }
 
-      if (substInterfaceType->hasCalledAtMostOnceSemantics())
+      if (substInterfaceType->isCallConsuming())
         return getSILFunctionTypeForConventions(
             DefaultCalledAtMostOnceSemanticsConventions());
 
@@ -3829,12 +3829,12 @@ CanSILFunctionType swift::buildSILFunctionThunkType(
 
   // Add the formal parameters of the expected type to the thunk.
   //
-  // An at-most-once source function is applied inside the thunk body,
-  // which is itself the consuming use that enforces call-at-most-once, so
-  // it must be captured as `Direct_Owned`.
+  // A source function whose call consumes it is applied inside the thunk
+  // body, which is itself the consuming use, so it must be captured as
+  // `Direct_Owned`.
   auto contextConvention = fn->getTypeProperties(sourceType).isTrivial()
                                ? ParameterConvention::Direct_Unowned
-                           : sourceType->hasCalledAtMostOnceSemantics()
+                           : sourceType->isCallConsuming()
                                ? ParameterConvention::Direct_Owned
                                : ParameterConvention::Direct_Guaranteed;
   SmallVector<SILParameterInfo, 4> params;
@@ -4722,9 +4722,54 @@ static bool isImporterGeneratedAccessor(const clang::Decl *clangDecl,
   return true;
 }
 
+/// Compute the type of the initializing entry point of a constructor of a C++
+/// foreign reference type, which constructs the C++ base subobject of a Swift
+/// subclass in place.
+///
+/// It takes the constructor's arguments exactly as its allocating entry point,
+/// the static factory that ClangImporter synthesized for the constructor, does.
+/// It then takes `self`, which the C++ constructor only borrows as `this`.
+/// Since `self` is not consumed, the arguments may borrow from it across the
+/// call, e.g. a stored property of the subclass passed to a `const &`
+/// parameter.
+///
+/// The C++ constructor initializes the reference count of `self`, so it returns
+/// `self` with the same ownership as the factory returns a new object: +1 for a
+/// constructor that returns retained, +0 for one that returns unretained.
+static CanSILFunctionType
+getSILFunctionTypeForForeignReferenceInitializer(TypeConverter &TC,
+                                                 TypeExpansionContext context,
+                                                 SILDeclRef constant) {
+  auto allocatorType = TC.getConstantFunctionType(
+      context, SILDeclRef(constant.getDecl(), SILDeclRef::Kind::Allocator)
+                   .asForeign());
+  auto selfType = allocatorType->getSingleResult().getInterfaceType();
+
+  SmallVector<SILParameterInfo, 4> params(allocatorType->getParameters());
+  params.push_back(
+      SILParameterInfo(selfType, ParameterConvention::Direct_Guaranteed));
+  SILResultInfo result(selfType,
+                       allocatorType->getSingleResult().getConvention());
+
+  auto extInfo = allocatorType->getExtInfo()
+                     .intoBuilder()
+                     .withRepresentation(SILFunctionTypeRepresentation::CXXMethod)
+                     .build();
+  return SILFunctionType::get(
+      allocatorType->getInvocationGenericSignature(), extInfo,
+      allocatorType->getCoroutineKind(), allocatorType->getCalleeConvention(),
+      params, /*yields=*/{}, result, allocatorType->getOptionalErrorResult(),
+      allocatorType->getPatternSubstitutions(),
+      allocatorType->getInvocationSubstitutions(), TC.Context);
+}
+
 static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
     TypeConverter &TC, TypeExpansionContext context, SILDeclRef constant,
     TypeConverter::LoweredFormalTypes bridgedTypes) {
+  if (constant.isForeignReferenceInitializer())
+    return getSILFunctionTypeForForeignReferenceInitializer(TC, context,
+                                                            constant);
+
   auto silRep = TC.getDeclRefRepresentation(constant);
   assert(silRep != SILFunctionTypeRepresentation::Thick &&
          silRep != SILFunctionTypeRepresentation::Block);
@@ -4891,6 +4936,10 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
   if (c.isForeign) {
     if (!c.hasDecl())
       return SILFunctionTypeRepresentation::CFunctionPointer;
+
+    // A C++ constructor applied to a subclass's storage takes it as `this`.
+    if (c.isForeignReferenceInitializer())
+      return SILFunctionTypeRepresentation::CXXMethod;
 
     if (const auto *method = getImplementedCXXMethod(c.getDecl())) {
       return method->isStatic()
@@ -5403,6 +5452,19 @@ getAbstractionPatternForConstant(TypeConverter &converter, ASTContext &ctx,
   auto bridgedFn = getBridgedFunction(constant);
   if (!bridgedFn)
     return AbstractionPattern(fnType);
+
+  // The initializing entry point of a C++ foreign reference type's constructor
+  // is bridged like that constructor applied to `this`, rather than like the
+  // static factory that the initializer was imported from.
+  if (constant.isForeignReferenceInitializer()) {
+    auto cxxCtor =
+        ctx.getClangModuleLoader()->getOriginalForeignReferenceConstructor(
+            cast<ConstructorDecl>(bridgedFn));
+    ASSERT(cxxCtor && "initializer was not synthesized for a C++ constructor");
+    ASSERT(numParameterLists == 2 && "C++ constructor not curried?");
+    return AbstractionPattern::getCurriedCXXMethod(fnType, cxxCtor,
+                                                   ImportAsMemberStatus());
+  }
 
   const clang::Decl *clangDecl = bridgedFn->getClangDecl();
   if (!clangDecl) {

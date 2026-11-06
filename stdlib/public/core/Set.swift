@@ -900,6 +900,11 @@ extension Set: SetAlgebra {
   @inlinable
   public mutating func formUnion<S: Sequence>(_ other: __owned S)
   where S.Element == Element {
+    // Fast path: insert directly from the buffer like `init(_:)` does.
+    let done: Void? = other.withContiguousStorageIfAvailable { buffer in
+      unsafe _variant.formUnion(buffer)
+    }
+    if done != nil { return }
     for item in other {
       insert(item)
     }

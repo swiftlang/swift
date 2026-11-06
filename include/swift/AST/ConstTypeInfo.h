@@ -17,6 +17,7 @@
 #include "swift/AST/Type.h"
 #include <memory>
 #include <string>
+#include <variant>
 #include <vector>
 
 namespace swift {
@@ -44,7 +45,8 @@ public:
     InterpolatedString,
     NilLiteral,
     Runtime,
-    MemberFunctionCall
+    MemberFunctionCall,
+    ChainedMemberReference
   };
 
   ValueKind getKind() const { return Kind; }
@@ -504,14 +506,45 @@ private:
   std::string MemberLabel;
 };
 
+/// A chained instance property access, e.g. `.member.property` where `.member`
+/// is a static member and `.property` is an instance property on its result.
+class ChainedMemberReferenceValue : public CompileTimeValue {
+public:
+  ChainedMemberReferenceValue(std::shared_ptr<CompileTimeValue> StepValue,
+                              std::shared_ptr<CompileTimeValue> BaseValue)
+      : CompileTimeValue(ValueKind::ChainedMemberReference),
+        StepValue(StepValue), BaseValue(BaseValue) {}
+
+  std::shared_ptr<CompileTimeValue> getStepValue() const { return StepValue; }
+  std::shared_ptr<CompileTimeValue> getBaseValue() const { return BaseValue; }
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::ChainedMemberReference;
+  }
+
+private:
+  std::shared_ptr<CompileTimeValue> StepValue;
+  std::shared_ptr<CompileTimeValue> BaseValue;
+};
+
+struct RawStringSegment {
+  std::shared_ptr<CompileTimeValue> Value;
+};
+
+struct InterpolationSegment {
+  std::vector<FunctionParameter> Arguments;
+};
+
+using InterpolatedStringSegment = std::variant<RawStringSegment, InterpolationSegment>;
+
 /// A representation of an Interpolated String Literal
 class InterpolatedStringLiteralValue : public CompileTimeValue {
 public:
   InterpolatedStringLiteralValue(
-      std::vector<std::shared_ptr<CompileTimeValue>> Segments)
+      std::vector<InterpolatedStringSegment> Segments)
       : CompileTimeValue(ValueKind::InterpolatedString), Segments(Segments) {}
 
-  std::vector<std::shared_ptr<CompileTimeValue>> getSegments() const {
+  std::vector<InterpolatedStringSegment> getSegments() const {
     return Segments;
   }
 
@@ -520,7 +553,7 @@ public:
   }
 
 private:
-  std::vector<std::shared_ptr<CompileTimeValue>> Segments;
+  std::vector<InterpolatedStringSegment> Segments;
 };
 
 /// A representation of an arbitrary value that does not fall under

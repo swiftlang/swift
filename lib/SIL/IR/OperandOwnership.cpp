@@ -283,7 +283,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // later), so treat the conversion conservatively as a non-consuming pointer
 // escape.
 //
-// An at-most-once function value is single-owner and move-only-checked,
+// A noncopyable function value is single-owner and move-only-checked,
 // so pre-conversion value doesn't survive to be used again -- any further
 // use would already be diagnosed as a double consumption by the move-only
 // checker. Treat the conversion as an ordinary forwarding consume in that
@@ -292,7 +292,7 @@ OPERAND_OWNERSHIP(PointerEscape, UncheckedOwnershipConversion)
 // special-case this instruction.
 OperandOwnership OperandOwnershipClassifier::visitConvertEscapeToNoEscapeInst(
     ConvertEscapeToNoEscapeInst *i) {
-  return i->getType().castTo<SILFunctionType>()->hasCalledAtMostOnceSemantics()
+  return i->getType().castTo<SILFunctionType>()->isNoncopyable()
              ? OperandOwnership::ForwardingConsume
              : OperandOwnership::PointerEscape;
 }
@@ -661,7 +661,7 @@ OperandOwnershipClassifier::visitPartialApplyInst(PartialApplyInst *i) {
       return OperandOwnership::TrivialUse;
     }
 
-    if (i->hasCalledAtMostOnceSemantics()) {
+    if (i->isNoncopyable()) {
       auto argConv = ApplySite(i).getArgumentConvention(op);
       // Borrowed non-Copyable captures aren't owned by the closure.
       if (operandTy.isMoveOnly() && !argConv.isOwnedConventionInCaller())
@@ -847,6 +847,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnexpectedError)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, WillThrow)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AddressOfBorrowOpaque)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, UnprotectedAddressOfBorrowOpaque)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeForeignReferenceSubclassVTables)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AShr)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAShr)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, Add)

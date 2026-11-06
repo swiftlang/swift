@@ -45,6 +45,13 @@ let removeSILGenLifetimesPass = FunctionPass(name: "remove-silgen-lifetimes") {
     //  limit deletion to copies of owned values.
     case let copy as CopyValueInst where copy.operand.value.ownership == .owned:
       let original = copy.operand.value
+
+      // LifetimeResolution keeps the destroys of a pointer-escaping value, so merging the two
+      // would leave both sets of destroys behind.
+      if copy.hasDirectPointerEscape || original.hasDirectPointerEscape {
+        return
+      }
+
       // Construct a liverange of the copy's uses, and see if a destroy of the original falls within
       // its range. If so, that destroy needs to be removed too. For example, if before we have,
       //

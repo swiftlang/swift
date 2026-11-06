@@ -212,6 +212,13 @@ enum SynthComp: Comparable {
     case b(Int)
     case c(Int, String)
 }
+// Synthesized Codable on an enum with associated values.
+enum SynthEnumCode: Codable {
+    case a
+    case b(Int)
+    case c(Int, y: String)
+    case d(String, Int)
+}
 
 import Swift
 import struct Swift.Int

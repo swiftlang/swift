@@ -153,11 +153,12 @@ func localCaptureThenCall() {
 
 func captureInRegularClosure(
   f: @escaping @callable(once) () -> Void,
-  g: @escaping @callable(once) () -> Void,
+  g: @escaping @callable(once) () -> Void, // expected-error {{missing reinitialization of closure capture 'g' after consume}}
   optF: consuming (@callable(once) () -> Void)? = nil
 ) {
   _ = { [f] in f() } // expected-error {{non-'Copyable' 'f' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
-  _ = { g() } // expected-error {{non-'Copyable' 'g' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+                     // expected-note@-1 {{consumed here}}
+  _ = { g() } // expected-note {{consumed here}}
 
   guard let optF else { return }
   _ = { @callable(once) in optF() } // Ok

@@ -4416,29 +4416,29 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     }
 
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
-      if (fnTy->hasCalledAtMostOnceSemantics()) {
-      switch (ownership) {
-      case ParamSpecifier::Borrowing:
-      case ParamSpecifier::LegacyShared:
-        diagnose(
-            eltTypeRepr->getLoc(),
-            diag::execution_semantics_attr_cannot_be_used_with_borrowing,
-            getExecutionSemanticsAttrSpelling(*fnTy->getExecutionSemantics()));
-        elements.emplace_back(ErrorType::get(getASTContext()));
-        continue;
+      if (fnTy->isCallConsuming()) {
+        switch (ownership) {
+        case ParamSpecifier::Borrowing:
+        case ParamSpecifier::LegacyShared:
+          diagnose(eltTypeRepr->getLoc(),
+                   diag::execution_semantics_attr_cannot_be_used_with_borrowing,
+                   getExecutionSemanticsAttrSpelling(
+                       *fnTy->getExecutionSemantics()));
+          elements.emplace_back(ErrorType::get(getASTContext()));
+          continue;
 
-      case ParamSpecifier::InOut:
-      case ParamSpecifier::Consuming:
-      case ParamSpecifier::LegacyOwned:
-      // used by `sending`
-      case ParamSpecifier::ImplicitlyCopyableConsuming:
-        break;
-      // at-most-once is consuming by default and we don't
-      // require it be to written explicitly.
-      case ParamSpecifier::Default:
-        ownership = ParamSpecifier::Consuming;
-        break;
-      }
+        case ParamSpecifier::InOut:
+        case ParamSpecifier::Consuming:
+        case ParamSpecifier::LegacyOwned:
+        // used by `sending`
+        case ParamSpecifier::ImplicitlyCopyableConsuming:
+          break;
+        // at-most-once is consuming by default and we don't
+        // require it be to written explicitly.
+        case ParamSpecifier::Default:
+          ownership = ParamSpecifier::Consuming;
+          break;
+        }
       }
     }
 
@@ -6400,9 +6400,9 @@ TypeResolver::resolveOwnershipTypeRepr(OwnershipTypeRepr *repr,
   case ParamSpecifier::Consuming:
     if (auto *fnTy = result->getAs<FunctionType>()) {
       if (fnTy->isNoEscape()) {
-        // at-most-once functions always have consuming semantics
-        // regardless of whether they are @escaping or not.
-        if (fnTy->hasCalledAtMostOnceSemantics())
+        // A noncopyable function can be consumed regardless of whether it
+        // is @escaping or not.
+        if (fnTy->isNoncopyable())
           break;
 
         diagnoseInvalid(ownershipRepr, ownershipRepr->getLoc(),

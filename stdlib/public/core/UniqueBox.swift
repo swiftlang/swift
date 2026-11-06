@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 /// A smart pointer type that uniquely owns an instance of `Value` on the heap.
-@available(SwiftStdlib 6.4, *)
+@available(SwiftStdlib 5.0, *)
+@backDeployed(before: SwiftStdlib 6.4)
 @frozen
 @safe
 public struct UniqueBox<Value: ~Copyable>: ~Copyable {
@@ -22,7 +23,6 @@ public struct UniqueBox<Value: ~Copyable>: ~Copyable {
   ///
   /// - Parameter initialValue: The initial value to initialize the unqiue box
   ///                           with.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public init(_ initialValue: consuming Value) {
@@ -38,14 +38,11 @@ public struct UniqueBox<Value: ~Copyable>: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueBox: @unchecked Sendable where Value: Sendable & ~Copyable {}
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueBox where Value: ~Copyable {
   /// Dereferences the unique box allowing for in-place reads and writes to the
   /// stored `Value`.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public var value: Value {
     @_transparent
@@ -63,7 +60,6 @@ extension UniqueBox where Value: ~Copyable {
 
   /// Consumes the unique box and returns the instance of `Value` that was
   /// within the box.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_transparent
   public consuming func consume() -> Value {
@@ -74,14 +70,12 @@ extension UniqueBox where Value: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueBox where Value: ~Copyable {
   /// A span over the single element stored in this box.
   ///
   /// - Returns: A `Span` over the element stored in this box.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public var span: Span<Value> {
     @_lifetime(borrow self)
@@ -97,7 +91,6 @@ extension UniqueBox where Value: ~Copyable {
   /// - Returns: A `MutableSpan` over the element stored in this box.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public var mutableSpan: MutableSpan<Value> {
     @_lifetime(&self)
@@ -108,11 +101,9 @@ extension UniqueBox where Value: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.4, *)
 extension UniqueBox where Value: Copyable {
   /// Copies the value within the unqiue box and returns it in a new unique
   /// instance.
-  @available(SwiftStdlib 6.4, *)
   @export(implementation)
   public func clone() -> Self {
     UniqueBox(value)

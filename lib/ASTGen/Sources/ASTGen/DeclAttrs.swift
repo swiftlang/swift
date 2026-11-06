@@ -333,6 +333,7 @@ extension ASTGenVisitor {
         .UnsafeNonEscapableResult,
         .UsableFromInline,
         .Used,
+        .CArrayProjection,
         .WarnUnqualifiedAccess,
         .WeakLinked,
         .UnsafeSelfDependentResult:
@@ -434,7 +435,7 @@ extension ASTGenVisitor {
     case .typeAlias(let typealiasDecl):
       abiDecl = self.generate(typeAliasDecl: typealiasDecl)?.asDecl
     case .variable(let varDecl):
-      abiDecl = self.generate(variableDecl: varDecl)
+      abiDecl = self.generate(variableDecl: varDecl, isABIOnly: true)
     case .missing(_):
       // This error condition will have been diagnosed in SwiftSyntax.
       abiDecl = nil

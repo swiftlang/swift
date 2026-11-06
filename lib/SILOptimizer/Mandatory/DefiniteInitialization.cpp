@@ -3940,10 +3940,6 @@ class DefiniteInitialization : public SILFunctionTransform {
     if (getFunction()->wasDeserializedCanonical())
       return;
 
-    // LifetimeResolution handles DI already.
-    if (getFunction()->getASTContext().SILOpts.EnableLifetimeResolution)
-      return;
-
     if (checkDefiniteInitialization(*getFunction())) {
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
     }

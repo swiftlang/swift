@@ -131,6 +131,32 @@ typedef NS_ENUM(NSInteger, NSEnumAddedCasesIn2017) {
 + (void)setSetterUnavailableClass:(NSInteger)setterUnavailable __attribute__((unavailable));
 @end
 
+// The same, in a protocol that a class adopts without redeclaring the property.
+@protocol UnavailableAccessorsProtocol
+@property NSInteger getterUnavailableMirrored;
+- (NSInteger)getterUnavailableMirrored __attribute__((unavailable));
+@property NSInteger setterUnavailableMirrored;
+- (void)setSetterUnavailableMirrored:(NSInteger)setterUnavailable __attribute__((unavailable));
+@end
+
+@interface UnavailableAccessorsAdopter: NSObject <UnavailableAccessorsProtocol>
+@end
+
+// Import-as-member properties, with the getter or the setter imported first.
+typedef struct { int value; } ImportedAccessors;
+
+NSInteger getGetterFirst(const ImportedAccessors *s)
+    __attribute__((swift_name("getter:ImportedAccessors.getterFirst(self:)")));
+void setGetterFirst(ImportedAccessors *s, NSInteger v)
+    __attribute__((swift_name("setter:ImportedAccessors.getterFirst(self:_:)")))
+    __attribute__((unavailable));
+
+void setSetterFirst(ImportedAccessors *s, NSInteger v)
+    __attribute__((swift_name("setter:ImportedAccessors.setterFirst(self:_:)")));
+NSInteger getSetterFirst(const ImportedAccessors *s)
+    __attribute__((swift_name("getter:ImportedAccessors.setterFirst(self:)")))
+    __attribute__((unavailable));
+
 
 @interface UnavailableSubscript: NSObject
 - (nonnull NSString *)objectAtIndexedSubscript:(NSInteger)i __attribute__((unavailable("bad subscript getter")));

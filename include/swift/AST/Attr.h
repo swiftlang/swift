@@ -295,6 +295,10 @@ protected:
       mode : NumNonexhaustiveModeBits
     );
 
+    SWIFT_INLINE_BITFIELD(CArrayProjectionAttr, DeclAttribute, 2,
+      projection : 2
+    );
+
     SWIFT_INLINE_BITFIELD(COMAttr, DeclAttribute, 3,
       threading : 3
     );
@@ -3924,6 +3928,64 @@ public:
   }
 };
 
+/// Which of the C array projections the declaration in question belongs to.
+///
+/// This type is sometimes used to indicate which counterpart projections ought
+/// to be imported; in that context, \c Modern is a sentinel indicating that
+/// no C arrays are involved and no special behavior is needed. The order of
+/// the cases is significant for this type of logic.
+enum class CArrayProjection : uint8_t {
+  /// The modern projection, using an \c InlineArray . To avoid introducing
+  /// dependencies on \c InlineArray 's type metadata, a modern projection of a
+  /// \c VarDecl is always computed, never stored.
+  Modern = 0,
+  /// The legacy projection, using a homogeneous tuple.
+  Legacy = 1,
+  /// The hidden storage projection, using \c Builtin.FixedArray . Hidden
+  /// storage is used when a stored C array property has no legacy projection.
+  HiddenStorage = 2
+};
+
+StringRef getCArrayProjectionSpelling(CArrayProjection value);
+
+/// Indicates that the declaration contains an imported C array and therefore
+/// may be one of two projections.
+class CArrayProjectionAttr : public DeclAttribute {
+  ValueDecl *counterpart;
+
+public:
+  CArrayProjectionAttr(CArrayProjection projection, ValueDecl *counterpart)
+    : DeclAttribute(DeclAttrKind::CArrayProjection, SourceLoc(),
+                    SourceRange(), /*isImplicit=*/true),
+      counterpart(counterpart) {
+    Bits.CArrayProjectionAttr.projection = static_cast<uint8_t>(projection);
+  }
+
+  /// Which of the projections the attached declaration is.
+  CArrayProjection getProjection() const {
+    return static_cast<CArrayProjection>(Bits.CArrayProjectionAttr.projection);
+  }
+
+  /// The declaration that is the other half of this one's pair.
+  ValueDecl *getCounterpart() const {
+    return counterpart;
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::CArrayProjection;
+  }
+
+  CArrayProjectionAttr *clone(ASTContext &ctx) const {
+    return new (ctx) CArrayProjectionAttr(getProjection(),
+                                          getCounterpart());
+  }
+
+  bool isEquivalent(const CArrayProjectionAttr *other,
+                    Decl *attachedTo) const {
+    return getProjection() == other->getProjection()
+              && getCounterpart() == other->getCounterpart();
+  }
+};
 
 /// Threading model for COM coclass, specified via `@com(threading:)`.
 //Must match COMThreadingModel in the COM module.

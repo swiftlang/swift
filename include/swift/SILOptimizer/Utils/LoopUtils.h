@@ -29,6 +29,7 @@ class SILLoop;
 class DominanceInfo;
 class SILLoopInfo;
 class DeadEndBlocks;
+class SILPassManager;
 
 /// Canonicalize the loop for rotation and downstream passes.
 ///
@@ -42,6 +43,11 @@ bool canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI);
 /// Check whether it is safe to duplicate this instruction when duplicating
 /// this loop by unrolling or versioning.
 bool canDuplicateLoopInstruction(SILLoop *L, SILInstruction *Inst, DeadEndBlocks *deb);
+
+/// Rotate the loop until we hit its original latch block.
+bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
+                               SILLoopInfo *loopInfo, SILPassManager *pm,
+                               bool ignoreCost);
 
 /// A visitor that visits loops in a function in a bottom up order. It only
 /// performs the visit.
@@ -90,6 +96,8 @@ public:
     }
   }
 };
+
+bool unrollPackLoopsInFunction(SILFunction *Fun, SILPassManager *PM);
 
 } // end swift namespace
 

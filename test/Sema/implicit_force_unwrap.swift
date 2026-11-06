@@ -67,3 +67,37 @@ func testKeyPaths() {
   let _: KeyPath<C, Int?> = \C.x
   let _: KeyPath<C, Int> = \C.c!.x!
 }
+
+struct Plain {
+  var n: Int
+}
+
+@dynamicMemberLookup
+struct IUOLens {
+  subscript<T>(dynamicMember member: KeyPath<Plain, T>) -> T! { nil }
+}
+
+@dynamicMemberLookup
+struct ChainedIUOLens {
+  subscript<T>(dynamicMember member: KeyPath<IUOLens, T>) -> T { fatalError() }
+}
+
+@dynamicMemberLookup
+struct IntLens {
+  subscript(dynamicMember member: KeyPath<C, Int>) -> Int { 0 }
+}
+
+func testDynamicMemberLookupKeyPaths(
+  lens: IUOLens, chained: ChainedIUOLens, intLens: IntLens
+) {
+  let _: KeyPath<IUOLens, Int> = \IUOLens.n // expected-enabled-warning{{implicit force unwrap of implicitly unwrapped optional of type 'Int?'}}{{44-44=!}}
+  let _: KeyPath<IUOLens, Int> = \IUOLens.n.bitWidth // expected-enabled-warning{{implicit force unwrap of implicitly unwrapped optional of type 'Int?'}}{{44-44=!}}
+  let _: Int = lens.n // expected-enabled-warning{{implicit force unwrap of implicitly unwrapped optional of type 'Int?'}}{{22-22=!}}
+
+  // The force is in the implicit key path for the dynamic member reference, so
+  // it can't be written explicitly.
+  _ = chained.n
+  _ = chained.n.bitWidth
+  _ = \ChainedIUOLens.n
+  _ = intLens.x
+}

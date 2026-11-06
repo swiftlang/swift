@@ -82,6 +82,9 @@ struct ResolvableRoot {
 
   let isLexical: Bool
 
+  /// Whether the storage corresponds to a `@noImplicitCopy` parameter.
+  let isNoImplicitCopy: Bool
+
   // Does this address start fully initialized?
   let startsInitialized: Bool
 
@@ -218,6 +221,18 @@ struct ResolvableRoot {
     }
 
     extraLivenessUses = extraUses
+
+    if let arg = storage as? FunctionArgument {
+      isNoImplicitCopy = arg.isNoImplicitCopy
+    } else {
+      // For `consuming` args, we typically store the result in memory because it's mutable, so look for that store.
+      // TODO: For performance, it's worth investigating whether this set of addresses should be cached per-function.
+      let address = self.address
+      isNoImplicitCopy = address.parentFunction.arguments.contains { arg in
+        arg.isNoImplicitCopy
+          && arg.uses.users(ofType: StoreInst.self).contains { $0.source == arg && $0.destination == address }
+      }
+    }
   }
 
   // Change the storage such that it indicates a dynamic lifetime.
@@ -299,7 +314,7 @@ private struct Resolver {
     let indices = indexCache.fieldIndices(for: type)
     log("FieldIndexTrie of \(type): \n\(indices)")
 
-    self.state = Self.createBlockState(root, indices)
+    self.state = Self.createBlockState(root, indices, context)
 
     // Initialize the demand per block
     for blk in function.blocks {
@@ -426,21 +441,21 @@ private struct Resolver {
     switch kind {
     case .take where someDemand:
       // A consume with demand still below it (use-after-consume): legalize with a copy.
-      newKind = transform(kind, to: .load(.copy), root.isLexical)
+      newKind = transform(kind, to: .load(.copy), root)
 
     case .use(_, .own) where someDemand:
       // A use demanding ownership, where there is some demand following it, can only be satisfied with a copy.
-      newKind = transform(kind, to: .load(.copy), root.isLexical)
+      newKind = transform(kind, to: .load(.copy), root)
 
     case .use(_, .own) where noDemand:
       // Canonicalize it into a take, as this is the last use.
-      newKind = transform(kind, to: .load(.take), root.isLexical)
+      newKind = transform(kind, to: .load(.take), root)
 
     case .use(_, .borrow) where someDemand:
       // A noncopyable type forces a load_borrow here, since there's demand for the memory
       // after this use no matter what nested accesses we may be nested within.
       if root.address.type.objectType.isMoveOnly {
-        newKind = transform(kind, to: .loadBorrow, root.isLexical)
+        newKind = transform(kind, to: .loadBorrow, root)
         break
       }
 
@@ -454,7 +469,7 @@ private struct Resolver {
       // TODO: If ownership originally was guaranteed, yet we're choosing to do a take,
       //          we'd need to insert destroy_value's on non-consuming paths. It's probably hard to
       //          emit a load_borrow for a copyable type, given access scopes may end.
-      newKind = transform(kind, to: .load(.take), root.isLexical)
+      newKind = transform(kind, to: .load(.take), root)
 
     case let .root(r) where someDemand && !r.startsInitialized:
       // Unsatisfied demand reaching the root means there exists a use-before-init of those leaves.
@@ -470,8 +485,8 @@ private struct Resolver {
 
     // Compose this use's transfer to get the demand above it.
     current[event.range].mutatingEach {
-      $0.subtract(event.kind.kills)
-      $0.formUnion(event.kind.gens)
+      $0.subtract(event.kind.demandKill)
+      $0.formUnion(event.kind.demandGen)
     }
   }
 
@@ -487,17 +502,17 @@ private struct Resolver {
     }
   }
 
-  func transform(_ kind: EventList.Kind, to request: TransformRequest, _ isLexical: Bool) -> EventList.Kind {
-    log("requested transform \(isLexical ? "(lexical) " : "")to \(request), given \(kind))")
+  func transform(_ kind: EventList.Kind, to request: TransformRequest, _ root: ResolvableRoot) -> EventList.Kind {
+    log("requested transform \(root.isLexical ? "(lexical) " : "")to \(request), given \(kind))")
 
     let newOp: Operand
     let newDem: Demand
     switch kind {
     case let .use(op, dem):
-      newOp = transformOperand(op, to: request, wasTake: false, isLexical)
+      newOp = transformOperand(op, to: request, wasTake: false, root)
       newDem = dem
     case let .take(op, dem):
-      newOp = transformOperand(op, to: request, wasTake: true, isLexical)
+      newOp = transformOperand(op, to: request, wasTake: true, root)
       newDem = dem
     default:
       fatalError("unexpected event kind to transform: \(kind)")
@@ -511,8 +526,22 @@ private struct Resolver {
   }
 
   // Performs the requested transformation.
-  // If we're turning a take into a copy, or copying a noncopyable type, we add a `diagnose` instruction.
-  func transformOperand(_ op: Operand, to request: TransformRequest, wasTake: Bool, _ isLexical: Bool) -> Operand {
+  // If we're turning a take into a copy, or copying a noncopyable type or `@noImplicitCopy` binding,
+  // we add a `diagnose` instruction.
+  func transformOperand(_ op: Operand, to request: TransformRequest, wasTake: Bool,
+                        _ root: ResolvableRoot) -> Operand {
+
+    // Whether a copy of a value with the given type is unpermitted.
+    func isUnpermittedCopy(of type: Type) -> Bool {
+      if type.isMoveOnly || wasTake {
+        return true
+      }
+
+      // If we aren't converting from a take, then we still need to diagnose implicit copies
+      // if it was a no-implicit-copy binding.
+      return root.isNoImplicitCopy && op.value.accessPath.projectionPath.isEmpty
+    }
+
     switch op.instruction {
     case let apply as FullApplySite:
       // We can only handle transform that provides a copy to the apply.
@@ -523,14 +552,14 @@ private struct Resolver {
       // Copy the value into a temporary alloc_stack and pass that to the apply, i.e,
       //    %alloc = alloc_stack
       //    copy_addr %op to [init] %alloc
-      //    diagnose %op [unpermitted_copy]  <-- only if it's move-only
+      //    diagnose %op [unpermitted_copy]
       //    apply(%alloc) : (@in) -> ...
       //    dealloc_stack %alloc
       let type = op.value.type.objectType
       let allocBuilder = Builder(before: apply, context)
       let alloc = allocBuilder.createAllocStack(type)
       allocBuilder.createCopyAddr(from: op.value, to: alloc, takeSource: false, initializeDest: true)
-      if type.isMoveOnly {
+      if isUnpermittedCopy(of: op.value.type) {
         allocBuilder.createDiagnose(operand: op.value, kind: .unpermittedCopy)
       }
       op.set(to: alloc, context)
@@ -548,9 +577,14 @@ private struct Resolver {
       let becomesCopy = newOwnership != .take
       copyAddr.set(isTakeOfSource: !becomesCopy, context)
 
-      if becomesCopy && (wasTake || copyAddr.type.isMoveOnly) {
+      if becomesCopy && isUnpermittedCopy(of: copyAddr.type) {
         Builder(after: copyAddr, context).createDiagnose(operand: op.value, kind: .unpermittedCopy)
       }
+
+      if !becomesCopy {
+        adjustAccessForTake(copyAddr.source)
+      }
+
       return op
 
     case let load as LoadInst:
@@ -559,9 +593,14 @@ private struct Resolver {
       case let .load(newOwnership):
         load.set(ownership: newOwnership, context)
 
-        if newOwnership == .copy && (wasTake || load.type.isMoveOnly) {
+        if newOwnership == .copy && isUnpermittedCopy(of: load.type) {
           Builder(after: load, context).createDiagnose(operand: load, kind: .unpermittedCopy)
         }
+
+        if newOwnership == .take {
+          adjustAccessForTake(load.address)
+        }
+
         return load.operand
 
       // load [old] --> load_borrow
@@ -572,7 +611,7 @@ private struct Resolver {
         // Build a live range of the current users of the load.
         var loadUsers = PartitionedUses(of: load, context)
         defer { loadUsers.deinitialize() }
-        loadUsers.partitionUses(withDeinitBarriers: isLexical)
+        loadUsers.partitionUses(withDeinitBarriers: root.isLexical)
 
         assert(loadUsers.consumes.isEmpty,
           "Can't transform load with these non-destroy consumers existing: \(loadUsers.consumes)")
@@ -606,6 +645,20 @@ private struct Resolver {
     default:
       fatalError("unexpected inst to transform: \(op.instruction)")
     }
+  }
+
+  func adjustAccessForTake(_ addr: Value) {
+    assert(addr.type.isAddress)
+
+    // If there's no begin_acess [read], there's no adjustment needed.
+    guard case let .access(beginAccess) = addr.enclosingAccessScope,
+          beginAccess.accessKind == .read else {
+      return
+    }
+
+    // If it's static read, we turn it into a deinit.
+    // For a dynamic read, it needs to be reinitialized at end-of-access, so make it a modify.
+    beginAccess.set(accessKind: beginAccess.isStatic ? .deinit : .modify, context: context)
   }
 
   // Emit an `assign undef to [init]` of each given leaf of the root, right after the root's definition.
@@ -833,7 +886,7 @@ private struct Resolver {
           controlVar.update(range, initialized: false, before: kind.inst)
         case .root:
           break  // Initialized upon creation.
-        case .use, .unknown:
+        case .use, .liveness:
           break
         }
       }
@@ -882,17 +935,33 @@ private struct Resolver {
     }
   }
 
-  // FIXME: a LifetimeDependenceDefUseWalker would be better to use here.
-  private struct UseCollector : AddressDefUseWalker {
+  // Classifies every use of the root's address, following projections and access scopes, into the events of each block.
+  private struct UseCollector : AddressDefUseWalker, AddressUseVisitor {
     private(set) var uses: Dictionary<BasicBlock, EventList> = [:]
     private let indices: FieldIndexTrie
+    private let function: Function
+    let context: Context
+    private let localReachabilityCache = LocalVariableReachabilityCache()
 
-    init(_ indices: FieldIndexTrie) { self.indices = indices }
+    init(_ indices: FieldIndexTrie, _ function: Function, _ context: Context) {
+      self.indices = indices
+      self.function = function
+      self.context = context
+    }
 
     mutating func addUse(_ k:  EventList.Kind, _ range: EventList.IndexRange) {
       log("\taddUse of \(range) as \(k)")
       let blk = k.inst.parentBlock
       uses[blk, default: EventList(blk)].add(k, range)
+    }
+
+    mutating func addLiveness(_ operand: Operand) {
+      addUse(.liveness(operand.instruction), range(of: operand))
+    }
+
+    // The leaves of the root accessed by an operand.
+    func range(of operand: Operand) -> EventList.IndexRange {
+      indices.range(of: operand.value.accessPath.projectionPath)
     }
 
     mutating func collectUses(of root: ResolvableRoot) -> Bool {
@@ -907,7 +976,7 @@ private struct Resolver {
       }
 
       // Add any extra uses specific to this root.
-      root.extraLivenessUses.forEach { addUse(.unknown($0.instruction), indices.wholeRange) }
+      root.extraLivenessUses.forEach { addUse(.liveness($0.instruction), indices.wholeRange) }
 
       // Ensure correct order within each block
       for blk in uses.keys {
@@ -917,73 +986,181 @@ private struct Resolver {
       return true
     }
 
-    mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
-      let ap = address.value.accessPath
-      let inst = address.instruction
-      let path = ap.projectionPath
-      let range = indices.range(of: path)
-      log("leafUse(\(path)) of \(range) in \t\(inst)")
+    // Conservatively keep the memory initialized wherever a value depending on it is still used.
+    mutating func addDependentUses(of markDep: MarkDependenceInstruction, _ range: EventList.IndexRange) {
+      var dependentUses = Stack<Instruction>(context)
+      defer { dependentUses.deinitialize() }
+      if !gatherDependentUses(of: markDep, into: &dependentUses, localReachabilityCache, context) {
+        addFunctionExits(range)
+      }
+      for use in dependentUses {
+        addUse(.liveness(use), range)
+      }
+    }
 
+    mutating func addFunctionExits(_ range: EventList.IndexRange) {
+      for block in function.exitingBlocks {
+        addUse(.liveness(block.terminator), range)
+      }
+    }
+
+    // Implement AddressDefUseWalker
+
+    mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+      log("leafUse of \(range(of: address)) in \t\(address.instruction)")
+      // Only an unrecognized builtin aborts the classification.
+      if classifyAddress(operand: address) == .abortWalk {
+        addLiveness(address)
+      }
+      return .continueWalk
+    }
+
+    // The base of a mark_dependence on the root, one of its projections or accesses.
+    mutating func unmatchedPath(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+      return leafUse(address: address, path: path)
+    }
+
+    // Implement AddressUseVisitor
+
+    mutating func loadedAddressUse(of operand: Operand, intoValue value: Value) -> WalkResult {
+      guard let load = operand.instruction as? LoadInst else {
+        addLiveness(operand)
+        return .continueWalk
+      }
       // If the loaded SSA value is consumed by some non-destroying instruction, its demand is "own".
       func hasConsumingUser(_ op: Operand) -> Bool {
         return op.ownership == .forwardingConsume || op.instruction is MoveValueInst
       }
-
-      switch inst {
-      case let load as LoadInst:
-        switch load.loadOwnership {
-        case .take:
-            addUse(.take(address, .own), range)   // TODO: what about a take where all non-destroy users borrow?
-        case .unqualified, .copy:
-          if load.uses.filter(hasConsumingUser).isEmpty {
-            addUse(.use(address, .borrow), range)
-          } else {
-            addUse(.use(address, .own), range)
-          }
-        case .trivial:
-          // We cannot meaningfully transform `load [trivial]` into a take or copy, as it currently has no ownership.
-          // Treat it as a generic use.
-          addUse(.unknown(load), range)
-        }
-      case let store as StoringInstruction where store.destination == address.value:
-        addUse(.def(address), range)
-
-      case let apply as FullApplySite:
-        switch apply.convention(of: address) {
-        case .indirectOut:
-          addUse(.def(address), range)
-        case .indirectIn:
-          addUse(.take(address, .own), range)
-        default:
-          addUse(.unknown(address.instruction), range)
-        }
-
-      case let tac as TupleAddrConstructorInst where tac.destinationOperand == address:
-        addUse(.def(address), range)
-
-      case let srcDestInst as SourceDestAddrInstruction:
-        if srcDestInst.destinationOperand == address {
-          addUse(.def(address), range)
-        } else if srcDestInst.isTakeOfSource {
-          addUse(.take(address, .own), range)
+      let range = self.range(of: operand)
+      switch load.loadOwnership {
+      case .take:
+          addUse(.take(operand, .own), range)   // TODO: what about a take where all non-destroy users borrow?
+      case .unqualified, .copy:
+        if load.uses.filter(hasConsumingUser).isEmpty {
+          addUse(.use(operand, .borrow), range)
         } else {
-          addUse(.use(address, .own), range)
+          addUse(.use(operand, .own), range)
         }
+      case .trivial:
+        // We cannot meaningfully transform `load [trivial]` into a take or copy, as it currently has no ownership.
+        // Treat it as a generic use.
+        addUse(.liveness(load), range)
+      }
+      return .continueWalk
+    }
 
+    mutating func loadedAddressUse(of operand: Operand, intoAddress address: Operand) -> WalkResult {
+      let srcDestInst = operand.instruction as! SourceDestAddrInstruction
+      addUse(srcDestInst.isTakeOfSource ? .take(operand, .own) : .use(operand, .own), range(of: operand))
+      return .continueWalk
+    }
+
+    mutating func leafAddressUse(of operand: Operand) -> WalkResult {
+      switch operand.instruction {
+      case let store as StoringInstruction where store.destination == operand.value:
+        addUse(.def(operand), range(of: operand))
+      case let tac as TupleAddrConstructorInst where tac.destinationOperand == operand:
+        addUse(.def(operand), range(of: operand))
+      case let srcDestInst as SourceDestAddrInstruction where srcDestInst.destinationOperand == operand:
+        addUse(.def(operand), range(of: operand))
       case is DestroyAddrInst:
-        addUse(.end(address), range)
+        addUse(.end(operand), range(of: operand))
       case is DeallocStackInst:
-        // skip
         break
       default:
-        addUse(.unknown(address.instruction), range)
+        addLiveness(operand)
       }
+      return .continueWalk
+    }
+
+    mutating func appliedAddressUse(of operand: Operand, by apply: FullApplySite) -> WalkResult {
+      switch apply.convention(of: operand) {
+      case .indirectOut:
+        addUse(.def(operand), range(of: operand))
+      case .indirectIn:
+        addUse(.take(operand, .own), range(of: operand))
+      default:
+        addLiveness(operand)
+      }
+      return .continueWalk
+    }
+
+    mutating func scopedAddressUse(of operand: Operand) -> WalkResult {
+      let range = self.range(of: operand)
+      switch operand.instruction {
+      case let loadBorrow as LoadBorrowInst:
+        // The borrowed value aliases the memory until the end of its scope.
+        addUse(.liveness(loadBorrow), range)
+        for use in loadBorrow.uses {
+          if use.instruction is EndBorrowInst {
+            addUse(.liveness(use.instruction), range)
+          } else if let markDep = use.instruction as? MarkDependenceInstruction, use == markDep.baseOperand {
+            addDependentUses(of: markDep, range)
+          } else if use.endsLifetime {
+            // TODO: follow the reborrow to the end_borrows of its phi, rather than conservatively
+            //       keeping the memory initialized until the function exits.
+            addFunctionExits(range)
+          }
+        }
+      case is StoreBorrowInst:
+        addUse(.def(operand), range)
+      default:
+        addLiveness(operand)
+      }
+      return .continueWalk
+    }
+
+    mutating func dependentAddressUse(of operand: Operand, dependentValue value: Value) -> WalkResult {
+      return dependentAddressUse(of: operand)
+    }
+
+    mutating func dependentAddressUse(of operand: Operand, dependentAddress address: Value) -> WalkResult {
+      return dependentAddressUse(of: operand)
+    }
+
+    private mutating func dependentAddressUse(of operand: Operand) -> WalkResult {
+      if let markDep = operand.instruction as? MarkDependenceInstruction {
+        addDependentUses(of: markDep, range(of: operand))
+      } else {
+        addLiveness(operand)
+      }
+      return .continueWalk
+    }
+
+    // Includes the base of a mark_dependence producing an address.
+    mutating func projectedAddressUse(of operand: Operand, into value: Value) -> WalkResult {
+      return dependentAddressUse(of: operand)
+    }
+
+    mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
+      if operand.instruction is MarkDependenceInstruction {
+        addFunctionExits(range(of: operand))
+      } else {
+        addLiveness(operand)
+      }
+      return .continueWalk
+    }
+
+    mutating func scopeEndingAddressUse(of operand: Operand) -> WalkResult {
+      addLiveness(operand)
+      return .continueWalk
+    }
+
+    mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+      addLiveness(operand)
+      return .continueWalk
+    }
+
+    mutating func unknownAddressUse(of operand: Operand) -> WalkResult {
+      addLiveness(operand)
       return .continueWalk
     }
   }
 
-  static func createBlockState(_ root: ResolvableRoot, _ indices: FieldIndexTrie) -> BlockState {
-    var uc = UseCollector(indices)
+  static func createBlockState(_ root: ResolvableRoot, _ indices: FieldIndexTrie,
+                               _ context: FunctionPassContext) -> BlockState {
+    let function = root.address.parentFunction
+    var uc = UseCollector(indices, function, context)
     guard uc.collectUses(of: root) else {
       fatalError("collectUses aborted its walk?")
     }
@@ -995,7 +1172,6 @@ private struct Resolver {
 
     // Initialize an empty block state along with the accesses for that particular block.
     // We need state for all blocks, so information transits across them.
-    let function = root.address.parentFunction
     for block in function.blocks {
       let uses = uc.uses[block]
       state[block] = BlockInfo(emptyDemand, emptyAvailability, uses)
@@ -1107,7 +1283,7 @@ private struct Resolver {
       case take(Operand, Demand)        // The demand summarizes the kinds of users of this operand's instruction.
       case def(Operand)
       case end(Operand)       // An instruction representing the point at which the operand's lifetime has ended.
-      case unknown(Instruction)
+      case liveness(Instruction)       // A non-specific liveness use.
 
       var inst: Instruction {
         switch self {
@@ -1116,23 +1292,23 @@ private struct Resolver {
         case let .take(op, _): op.instruction
         case let .def(op): op.instruction
         case let .end(op): op.instruction
-        case let .unknown(inst): inst
+        case let .liveness(inst): inst
         }
       }
 
       // What is the ownership demanded by this use?
-      var gens: Demand {
+      var demandGen: Demand {
         switch self {
         case let .use(_, dem): dem
         case let .take(_, dem): dem
         case .def, .root: .nothing
         case .end: .nothing  // Demand analysis ignores lifetime ends.
-        case .unknown: .all  // to be safe
+        case .liveness: .all
         }
       }
 
       // What ownership does this use satisfy?
-      var kills: Demand {
+      var demandKill: Demand {
         switch self {
         case .def: .all
         case let .root(r) where r.startsInitialized: .all // A root that starts initialized is a def.
@@ -1147,7 +1323,7 @@ private struct Resolver {
         case let .root(r) where r.startsInitialized: .yes  // A root that starts initialized is a def.
         case .root, .take, .end: .no    // these leave the operand uninitialized.
         case .use: .unknown       // doesn't change the state
-        case .unknown: .unknown   // TODO: conservatively handle once .unknown is removed
+        case .liveness: .unknown
         }
       }
 
@@ -1155,7 +1331,7 @@ private struct Resolver {
       var availKill: Availability {
         switch self {
         case .def, .root, .take, .end: .partial    // Overwites all availability.
-        case .use, .unknown: .unknown
+        case .use, .liveness: .unknown
         }
       }
 
@@ -1167,7 +1343,7 @@ private struct Resolver {
         case .root: "root"
         case .def: "def"
         case .end: "end"
-        case .unknown: "UNKNOWN"
+        case .liveness: "liveness"
         }
 
         return name + " | \(inst)"
@@ -1210,9 +1386,9 @@ private struct Resolver {
       // Scan backwards over the uses within this block to compute its 'gen' bits, so that entry = gen ∪ (exit \ kill).
       for (use, range) in events.list.reversed() {
         demand[range].mutatingEach {
-          $0.gen.subtract(use.kills)     // a def above wipes demand generated below it
-          $0.gen.formUnion(use.gens)     // this use's own demand survives to the top
-          $0.kill.formUnion(use.kills)
+          $0.gen.subtract(use.demandKill)     // a def above wipes demand generated below it
+          $0.gen.formUnion(use.demandGen)     // this use's own demand survives to the top
+          $0.kill.formUnion(use.demandKill)
           $0.entry = $0.gen
         }
       }
@@ -1245,6 +1421,28 @@ private struct Resolver {
              """
     }
   }
+}
+
+// Gathers the uses of values depending on `markDep`. Returns false if they can't all be found.
+private func gatherDependentUses(of markDep: MarkDependenceInstruction, into uses: inout Stack<Instruction>,
+                                 _ localReachabilityCache: LocalVariableReachabilityCache,
+                                 _ context: Context) -> Bool {
+  // The walker only tracks ~Escapable and @noescape dependents; for anything else it reports
+  // success having collected nothing.
+  guard let dependence = LifetimeDependence(markDep, context),
+        !dependence.dependentValue.mayEscape else {
+    return false
+  }
+  var dependentUses = Stack<Instruction>(context)
+  defer { dependentUses.deinitialize() }
+  var walker = LifetimeDependentUseWalker(markDep.parentFunction, localReachabilityCache, context) {
+    dependentUses.push($0)
+    return .continueWalk
+  }
+  defer { walker.deinitialize() }
+  let result = walker.walkDown(dependence: dependence)
+  uses.append(contentsOf: dependentUses)
+  return result == .continueWalk
 }
 
 // Static-single assignment values (SSA), aka objects in SIL, are defined exactly once, so we
@@ -1335,6 +1533,10 @@ private struct PartitionedUses: CustomStringConvertible {
   }
 
   mutating func partitionUses(withDeinitBarriers addBarriers: Bool) {
+    if root.hasDirectPointerEscape {
+      hasUnboundedUse = true
+    }
+
     // TODO: should we use an InteriorUseWalker or some other robust walker?
     for use in root.uses {
       switch (use.ownership) {
@@ -1405,27 +1607,9 @@ private struct PartitionedUses: CustomStringConvertible {
   // The value depending on `markDep` keeps the root alive through its own uses, which are not
   // uses of the root. Record them so that liveness respects them.
   private mutating func collectDependentUses(of markDep: MarkDependenceInstruction) {
-    guard let dependence = LifetimeDependence(markDep, context) else {
-      hasUnboundedUse = true
-      return
-    }
-    // The walker only tracks ~Escapable and @noescape dependents; for anything else it reports
-    // success having collected nothing.
-    guard !dependence.dependentValue.mayEscape else {
-      hasUnboundedUse = true
-      return
-    }
-    var dependentUses = Stack<Instruction>(context)
-    defer { dependentUses.deinitialize() }
-    var walker = LifetimeDependentUseWalker(root.parentFunction, localReachabilityCache, context) {
-      dependentUses.push($0)
-      return .continueWalk
-    }
-    defer { walker.deinitialize() }
-    if walker.walkDown(dependence: dependence) == .abortWalk {
+    if !gatherDependentUses(of: markDep, into: &indirectUses, localReachabilityCache, context) {
       hasUnboundedUse = true
     }
-    indirectUses.append(contentsOf: dependentUses)
   }
 
   private mutating func addDeinitBarriers(of root: Value) {
@@ -1684,6 +1868,14 @@ private func replaceWithCopy(_ op: Operand, _ context: FunctionPassContext) {
   }
 
   op.set(to: copyValue, context)
+}
+
+extension Value {
+  /// Whether a use lets a pointer to this value escape, so that its liveness can't be derived from its uses.
+  /// An escape nested within a borrow scope is bounded by that scope instead.
+  var hasDirectPointerEscape: Bool {
+    uses.contains { $0.ownership == .pointerEscape || $0.ownership == .forwardingUnowned }
+  }
 }
 
 private extension MutableCollection {

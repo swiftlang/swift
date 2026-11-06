@@ -241,7 +241,7 @@ struct PotentialBindings {
   ConstraintSystem &CS;
 
   /// This must be incremented whenever any of the below state changes.
-  unsigned GenerationNumber = 0;
+  uint64_t GenerationNumber = 0;
 
   /// The type variable this bindings are associated with. Note that his
   /// property could change when associated with a constraint graph node
@@ -458,7 +458,7 @@ class BindingSet {
 
   /// Generation number of PotentialBindings at the time this BindingSet
   /// was constructed.
-  unsigned GenerationNumber = 0;
+  uint64_t GenerationNumber = 0;
 
   /// Flag indicating if we were in salvage when we constructed this
   /// BindingSet.
@@ -527,7 +527,7 @@ public:
 
   /// Return the generation number of the corresponding potential bindings
   /// at the time this binding set was constructed.
-  unsigned getGenerationNumber() const {
+  uint64_t getGenerationNumber() const {
     return GenerationNumber;
   }
 

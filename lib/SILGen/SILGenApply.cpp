@@ -197,7 +197,11 @@ static bool canUseStaticDispatch(SILGenFunction &SGF,
   if (constant.kind == SILDeclRef::Kind::Initializer
       && !constant.isForeign)
     return true;
-  
+
+  // So are C++ constructors that initialize a foreign reference type.
+  if (constant.isForeignReferenceInitializer())
+    return true;
+
   // Extension methods currently must be statically dispatched, unless they're
   // @objc or dynamic.
   if (isa<ExtensionDecl>(funcDecl->getDeclContext()) && !constant.isForeign)
@@ -670,6 +674,12 @@ public:
     if (isa_and_nonnull<clang::CXXConstructorDecl>(
             constant->getDecl()->getClangDecl()))
       result.foreign.self.setStatic();
+
+    // A C++ constructor that initializes a foreign reference type is imported
+    // as a static factory, but its initializing entry point takes `self` as
+    // the trailing `this` argument, like a C++ instance method.
+    if (constant->isForeignReferenceInitializer())
+      result.foreign.self = ImportAsMemberStatus();
 
     return result;
   }
@@ -7852,7 +7862,9 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
     // as well. This isn't always true for copyable bases so be less aggressive
     // in that case.
     if (base.getType().isMoveOnly()) {
-      base = base.formalAccessBorrow(SGF, loc);
+      if (!selfParam.isConsumedInCaller()) {
+        base = base.formalAccessBorrow(SGF, loc);
+      }
     } else {
       base = base.formalAccessCopy(SGF, loc);
     }

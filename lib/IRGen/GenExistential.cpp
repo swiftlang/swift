@@ -2706,6 +2706,15 @@ static llvm::Function *getDeallocateBoxedOpaqueExistentialBufferFunction(
         // affect the caches.
         Builder.emitBlock(deallocateBB);
 
+        // Embedded Swift with -no-allocations never allocates a box, so this
+        // can't be reached, and must not refer to the deallocation functions.
+        if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+            IGM.getSILModule().getOptions().NoAllocations) {
+          IGF.emitTrap("deallocating a box with -no-allocations",
+                       /*EmitUnreachable*/ true);
+          return;
+        }
+
         // Project to the existential buffer address.
         auto existentialBuffer =
             existLayout.projectExistentialBuffer(IGF, existentialContainer);
@@ -2747,6 +2756,29 @@ static llvm::Function *getDeallocateBoxedOpaqueExistentialBufferFunction(
         Builder.CreateRetVoid();
       },
       true /*noinline*/));
+}
+
+void irgen::emitEmbeddedExistentialBoxDeallocator(IRGenModule &IGM) {
+  // The Embedded casting runtime calls
+  // __swift_deallocate_boxed_opaque_existential_0 to free the box of an
+  // opaque existential after taking a non-`Copyable` payload out of it. Only
+  // compiled code knows how such a box was allocated (e.g. with
+  // TypedAllocation), so every Embedded module defines the helper.
+  //
+  // The helper only uses the existential buffer and the metadata slot, which
+  // are at the same place for any number of witness tables, so the `_0` one
+  // serves every opaque existential.
+  //
+  // With -no-allocations the helper traps instead (see above). Linking such a
+  // module with an allocating one gives two different definitions of this
+  // linkonce_odr helper, and the linker may keep the trapping one.
+  if (!IGM.Context.LangOpts.hasFeature(Feature::Embedded))
+    return;
+  // A module built only to be serialized emits no code at all.
+  if (IGM.getSILModule().getOptions().StopOptimizationAfterSerialization)
+    return;
+  (void)getDeallocateBoxedOpaqueExistentialBufferFunction(
+      IGM, OpaqueExistentialLayout(0));
 }
 
 void irgen::emitDeallocateBoxedOpaqueExistentialBuffer(
