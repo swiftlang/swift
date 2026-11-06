@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Two calls to image(for:) with the same ID, 1234. Call 1 misses the cache, records an in-progress task, and awaits it. Call 2 reenters, finds the in-progress task, and awaits the same task. Only one download happens, and both calls receive its result." font-family="Helvetica, Arial, sans-serif">
+<defs>
+<pattern id="hatch-c1" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#D84005" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#F78461" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c2" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#0070C9" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#85D0EA" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c3" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#00867D" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#58C9AF" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-neutral" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#666666" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#B2B2B2" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#B2B2B2"/></marker>
+</defs>
+<text x="24" y="173.7" font-size="18" font-weight="bold" fill="#F78461">Call 1</text>
+<text x="24" y="195.7" font-size="16" fill="#B2B2B2">"1234"</text>
+<rect x="200" y="135.0" width="570" height="83.33333333333333" rx="6" fill="#333333"/>
+<rect x="200.0" y="135.0" width="97.7" height="83.33333333333333" rx="6" fill="#D84005"/>
+<text x="248.9" y="182.7" text-anchor="middle" font-size="16" font-weight="bold" fill="#FFFFFF">miss</text>
+<rect x="297.7" y="135.0" width="276.9" height="83.33333333333333" fill="url(#hatch-c1)"/>
+<text x="436.1" y="182.7" text-anchor="middle" font-size="16" font-weight="normal" fill="#F2F2F2">awaits task</text>
+<rect x="574.6" y="135.0" width="81.4" height="83.33333333333333" rx="6" fill="#D84005"/>
+<text x="615.3" y="182.7" text-anchor="middle" font-size="16" font-weight="bold" fill="#FFFFFF">ready</text>
+<text x="24" y="297.0" font-size="18" font-weight="bold" fill="#85D0EA">Call 2</text>
+<text x="24" y="319.0" font-size="16" fill="#B2B2B2">"1234"</text>
+<rect x="200" y="258.3333333333333" width="570" height="83.33333333333333" rx="6" fill="#333333"/>
+<rect x="346.6" y="258.3333333333333" width="81.4" height="83.33333333333333" rx="6" fill="#0070C9"/>
+<text x="387.3" y="306.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#FFFFFF">found</text>
+<rect x="428.0" y="258.3333333333333" width="228.0" height="83.33333333333333" fill="url(#hatch-c2)"/>
+<text x="542.0" y="306.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#F2F2F2">awaits task</text>
+<rect x="656.0" y="258.3333333333333" width="81.4" height="83.33333333333333" rx="6" fill="#0070C9"/>
+<text x="696.7" y="306.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#FFFFFF">ready</text>
+<text x="24" y="420.3" font-size="18" font-weight="bold" fill="#B2B2B2">Task</text>
+<text x="24" y="442.3" font-size="16" fill="#B2B2B2">download</text>
+<rect x="200" y="381.66666666666663" width="570" height="83.33333333333333" rx="6" fill="#333333"/>
+<rect x="297.7" y="381.66666666666663" width="276.9" height="83.33333333333333" fill="url(#hatch-neutral)"/>
+<text x="436.1" y="429.3" text-anchor="middle" font-size="16" font-weight="normal" fill="#F2F2F2">one download</text>
+<line x1="346.6" y1="117.0" x2="346.6" y2="465.0" stroke="#6AB289" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="346.6" y="109.0" text-anchor="middle" font-size="18" font-weight="bold" fill="#6AB289">Call 2 shares the task</text>
+<line x1="200" y1="495.0" x2="770" y2="495.0" stroke="#B2B2B2" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="770" y="519.0" text-anchor="end" font-size="16" fill="#B2B2B2">time</text>
+<rect x="24" y="551" width="28" height="20" rx="4" fill="#666666"/>
+<text x="62" y="566" font-size="16" fill="#B2B2B2">Running on the actor</text>
+<rect x="277.20000000000005" y="551" width="28" height="20" rx="4" fill="url(#hatch-neutral)"/>
+<text x="315.20000000000005" y="566" font-size="16" fill="#B2B2B2">Suspended</text>
+</svg>
