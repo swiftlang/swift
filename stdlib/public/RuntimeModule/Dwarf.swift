@@ -1016,7 +1016,11 @@ class DwarfReader<S: DwarfSource & AnyObject> {
     let maximumOpsPerInstruction: UInt
     if version >= 4 {
       // .7 maximum_operations_per_instruction
-      maximumOpsPerInstruction = UInt(try cursor.read(as: Dwarf_Byte.self))
+      // A value of zero is invalid, but we treat it as 1 to avoid dividing
+      // by zero when executing the line number program.
+      maximumOpsPerInstruction = max(
+        UInt(try cursor.read(as: Dwarf_Byte.self)), 1
+      )
     } else {
       maximumOpsPerInstruction = 1
     }
@@ -3164,6 +3168,10 @@ public func testDwarfReaderFor(path: String) -> Bool {
 
     print("Call Sites:")
     print(reader.inlineCallSites)
+
+    print("Line Program:")
+    _ = try? reader.sourceLocation(for: 0x1000)
+    print("  executed")
     return true
   } else if let elfImage = try? Elf64Image(source: source) {
     print("\(path) is a 64-bit ELF image")
@@ -3192,6 +3200,10 @@ public func testDwarfReaderFor(path: String) -> Bool {
 
     print("Call Sites:")
     print(reader.inlineCallSites)
+
+    print("Line Program:")
+    _ = try? reader.sourceLocation(for: 0x1000)
+    print("  executed")
     return true
   } else {
     print("\(path) is not an ELF image")
