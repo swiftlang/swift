@@ -284,6 +284,13 @@ def generate_swift_sdk(swift_run, source_dir, build_dir, triple, sysroot,
         run_args.extend(['--sdk-name', sdk_name])
     run_args.append('--incremental')
 
+    # SwiftPM fetches the remote pins in Package.resolved before it evaluates
+    # the manifest's local path dependencies. Remove it so that building with
+    # local dependencies doesn't access the network.
+    package_resolved = os.path.join(source_dir, 'Package.resolved')
+    if os.path.exists(package_resolved):
+        shell.remove(package_resolved)
+
     # Only the override is passed: `shell.call` merges into `os.environ`
     # internally, and it also echoes the provided env dict to stderr — so
     # passing `dict(os.environ)` here would dump every host env var
