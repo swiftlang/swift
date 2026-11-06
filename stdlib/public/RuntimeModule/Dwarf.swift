@@ -2934,6 +2934,33 @@ struct DwarfLineNumberInfo {
     sequences = RangeIndex(sortedElements: found)
   }
 
+  /// Whether `path` is absolute, rather than relative to some directory.
+  private func isAbsolute(_ path: String) -> Bool {
+    if path.hasPrefix(pathSeparator) {
+      return true
+    }
+
+    // Paths from Windows toolchains might use either kind of separator, and
+    // might start with a drive letter.
+    if pathSeparator == "\\" {
+      if path.hasPrefix("/") {
+        return true
+      }
+
+      var chars = path.utf8.makeIterator()
+      if let drive = chars.next(),
+         (drive | 0x20) >= UInt8(ascii: "a"),
+         (drive | 0x20) <= UInt8(ascii: "z"),
+         chars.next() == UInt8(ascii: ":"),
+         let sep = chars.next(),
+         sep == UInt8(ascii: "\\") || sep == UInt8(ascii: "/") {
+        return true
+      }
+    }
+
+    return false
+  }
+
   /// Compute the full path for a file, given its index in the file table.
   func fullPathForFile(index: Int) -> String {
     if index >= files.count {
@@ -2941,16 +2968,27 @@ struct DwarfLineNumberInfo {
     }
 
     let info = files[index]
-    if info.path.hasPrefix(pathSeparator) {
+    if isAbsolute(info.path) {
       return info.path
     }
 
-    let dirName: String
-    if let dirIndex = info.directoryIndex,
-       dirIndex < directories.count {
+    // The directory index is optional in DWARF 5; if it's missing, the file
+    // is relative to the compilation directory, which is directory 0.
+    let dirIndex = info.directoryIndex ?? 0
+
+    var dirName: String
+    if dirIndex < directories.count {
       dirName = directories[dirIndex]
     } else {
       dirName = "<unknown>"
+    }
+
+    // A relative directory is relative to the compilation directory, unless
+    // we don't know what that is (in which case it's "." or empty).
+    if dirIndex != 0 && dirIndex < directories.count && !isAbsolute(dirName),
+       let compDir = directories.first,
+       compDir != "." && compDir != "" {
+      dirName = "\(compDir)\(pathSeparator)\(dirName)"
     }
 
     return "\(dirName)\(pathSeparator)\(info.path)"
