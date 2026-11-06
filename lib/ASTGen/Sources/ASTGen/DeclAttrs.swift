@@ -1082,7 +1082,9 @@ extension ASTGenVisitor {
     }
 
     // Diagnose what the C++ parser does in the parameter clause.
-    for argument in arguments where argument.argument.rawTokenKind == .identifier && !allowNamedParameters {
+    for argument in arguments
+    where argument.argument.presence == .present && argument.argument.rawTokenKind == .identifier && !allowNamedParameters
+  {
       self.diagnose(.diff_params_clause_expected_parameter_unnamed, at: argument.argument)
       break
     }

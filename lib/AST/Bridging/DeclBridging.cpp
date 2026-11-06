@@ -133,6 +133,42 @@ void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());
 }
 
+/// Record the ';' on the last declaration the parser would have produced for
+/// \p decl, as `Parser::parseDeclItem` does.
+static void setTrailingSemiLoc(Decl *decl, SourceLoc semiLoc) {
+  if (auto *caseDecl = dyn_cast<EnumCaseDecl>(decl)) {
+    auto elements = caseDecl->getElements();
+    if (!elements.empty())
+      decl = elements.back();
+  } else if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    VarDecl *last = nullptr;
+    for (unsigned i : range(pbd->getNumPatternEntries()))
+      pbd->getPattern(i)->forEachVariable([&](VarDecl *var) { last = var; });
+    if (last)
+      decl = last;
+  }
+  decl->TrailingSemiLoc = semiLoc;
+}
+
+void BridgedDecl_setTrailingSemiLoc(BridgedDecl cDecl, SourceLoc semiLoc) {
+  setTrailingSemiLoc(cDecl.unbridged(), semiLoc);
+}
+
+void BridgedASTNode_setTrailingSemiLoc(BridgedASTNode node,
+                                       SourceLoc semiLoc) {
+  switch (node.getKind()) {
+  case BridgedASTNodeKindExpr:
+    node.castToExpr().unbridged()->TrailingSemiLoc = semiLoc;
+    break;
+  case BridgedASTNodeKindStmt:
+    node.castToStmt().unbridged()->TrailingSemiLoc = semiLoc;
+    break;
+  case BridgedASTNodeKindDecl:
+    setTrailingSemiLoc(node.castToDecl().unbridged(), semiLoc);
+    break;
+  }
+}
+
 void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
                                     BridgedSwiftClosure closure) {
   cDecl.unbridged()->forEachDeclToHoist([&](Decl *D) {

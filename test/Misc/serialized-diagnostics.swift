@@ -3,12 +3,17 @@
 // Test swift executable
 // RUN: %target-swift-frontend -typecheck -serialize-diagnostics-path %t.dia %s -verify
 // RUN: c-index-test -read-diagnostics %t.dia > %t.deserialized_diagnostics.txt 2>&1
-// RUN: %FileCheck --input-file=%t.deserialized_diagnostics.txt %s
+// RUN: %FileCheck --input-file=%t.deserialized_diagnostics.txt %s --check-prefixes=CHECK,%if parser_astgen %{ASTGEN%} %else %{CPARSER%}
 
-var x = 1 x = 2   // expected-error {{consecutive statements on a line must be separated by ';'}} {{10-10=;}}
-// CHECK: {{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-1]]:10: error: consecutive statements on a line must be separated by ';' [] []
-// CHECK-NEXT: Number FIXITs = 1
-// CHECK-NEXT: FIXIT: ({{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-3]]:10 - {{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-3]]:10): ";"
+var x = 1 x = 2   // expected-cparser-error {{consecutive statements on a line must be separated by ';'}} {{10-10=;}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} {{10-11= \n}}
+// CPARSER: {{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-1]]:10: error: consecutive statements on a line must be separated by ';' [] []
+// ASTGEN: {{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-2]]:10: error: consecutive statements on a line must be separated by newline or ';' [] []
+// ASTGEN-NEXT: Range: {{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-3]]:11 {{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-3]]:11
+// ASTGEN-NEXT: Number FIXITs = 1
+// ASTGEN-NEXT: FIXIT: ({{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-5]]:10 - {{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-5]]:11): "
+// ASTGEN-NEXT: "
+// CPARSER-NEXT: Number FIXITs = 1
+// CPARSER-NEXT: FIXIT: ({{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-8]]:10 - {{.*[/\\]}}serialized-diagnostics.swift:[[@LINE-8]]:10): ";"
 
 var z : Int       // expected-note 2 {{previously declared here}}
 var z : Int       // expected-error {{invalid redeclaration}}

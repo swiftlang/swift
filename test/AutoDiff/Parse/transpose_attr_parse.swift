@@ -58,11 +58,11 @@ func transpose(v: Float) -> Float
 func transpose(v: Float) -> Float
 
 // expected-cparser-error @+1 {{expected a colon ':' after 'wrt'}} expected-astgen-error@+1 {{expected ':' and arguments in '@differentiable' argument}}
-@transpose(of: foo, wrt) // expected-astgen-error {{expected a parameter, which can be a function parameter index or 'self'}}
+@transpose(of: foo, wrt)
 func transpose(v: Float) -> Float
 
 // expected-cparser-error @+1 {{unexpected ',' separator}} {{19-20=}} expected-astgen-error@+1 {{expected 'wrt:' and arguments in '@differentiable' argument}}
-@transpose(of: foo,) // expected-astgen-error {{expected a parameter, which can be a function parameter index or 'self'}}
+@transpose(of: foo,)
 func transpose(v: Float) -> Float
 
 // expected-cparser-error @+2 {{expected ')' in 'transpose' attribute}}

@@ -2011,7 +2011,9 @@ extension ASTGenVisitor {
       guard let member = self.generate(memberBlockItem: node) else {
         return
       }
-      // TODO: Set semicolon loc.
+      if let semicolon = node.semicolon, semicolon.presence == .present {
+        member.setTrailingSemiLoc(self.generateSourceLoc(semicolon))
+      }
       allMembers.append(member)
 
       // Hoist 'VarDecl' and 'EnumElementDecl' to the block.

@@ -1637,6 +1637,14 @@ void BridgedDecl_setInvalid(BridgedDecl decl);
 SWIFT_NAME("BridgedDecl.attachParsedAttrs(self:_:)")
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl, BridgedDeclAttributes attrs);
 
+/// Record the location of the ';' that follows \p node, if any.
+SWIFT_NAME("BridgedASTNode.setTrailingSemiLoc(self:_:)")
+void BridgedASTNode_setTrailingSemiLoc(BridgedASTNode node,
+                                       swift::SourceLoc semiLoc);
+
+SWIFT_NAME("BridgedDecl.setTrailingSemiLoc(self:_:)")
+void BridgedDecl_setTrailingSemiLoc(BridgedDecl decl, swift::SourceLoc semiLoc);
+
 SWIFT_NAME("BridgedDecl.forEachDeclToHoist(self:_:)")
 void BridgedDecl_forEachDeclToHoist(BridgedDecl decl,
                                     BridgedSwiftClosure closure);

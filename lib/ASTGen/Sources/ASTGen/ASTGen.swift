@@ -239,6 +239,9 @@ struct ASTGenVisitor {
       guard let item = self.generateTopLevel(codeBlockItem: element) else {
         return
       }
+      if let semicolon = element.semicolon, semicolon.presence == .present {
+        item.setTrailingSemiLoc(self.generateSourceLoc(semicolon))
+      }
       if isFollowingGuard, item.kind == .decl {
         item.castToDecl().setHasTopLevelLocalContextCaptures()
       }

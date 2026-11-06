@@ -67,7 +67,16 @@ extension ASTGenVisitor {
   }
 
   func generate(codeBlockItem node: CodeBlockItemSyntax) -> BridgedASTNode? {
-    // TODO: Set semicolon loc.
+    guard let result = self.generateCodeBlockItemNode(node) else {
+      return nil
+    }
+    if let semicolon = node.semicolon, semicolon.presence == .present {
+      result.setTrailingSemiLoc(self.generateSourceLoc(semicolon))
+    }
+    return result
+  }
+
+  private func generateCodeBlockItemNode(_ node: CodeBlockItemSyntax) -> BridgedASTNode? {
     switch node.item {
     case .decl(let node):
       if let node = node.as(MacroExpansionDeclSyntax.self) {
