@@ -990,6 +990,10 @@ public:
   /// Return to the previous debug scope.
   void leaveDebugScope();
 
+  /// Enter the debug scope at the closing brace of the block that \p Loc
+  /// ends. Code emitted when falling off the end of a block runs there.
+  void enterBlockEndDebugScope(CleanupLocation Loc);
+
   InitializationPtr
   prepareIndirectResultInit(SILLocation loc,
                             AbstractionPattern origResultType,
