@@ -4,7 +4,7 @@
 
 let values = [1,2,3,]
 
-let values: [Int,] = [] // expected-note {{to match this opening '['}} expected-error {{expected ']' in array type}} expected-error {{expected pattern}} 
+let values: [Int,] = [] // expected-cparser-note {{to match this opening '['}} expected-cparser-error {{expected ']' in array type}} expected-cparser-error {{expected pattern}} expected-astgen-error {{unexpected code ',' in array type}} 
 
 // Tuple and Tuple Pattern
 
@@ -64,26 +64,26 @@ struct S {
 // String Literal Interpolation
 
 "\(1,)"
-"\(1, f:)" // expected-error {{expected expression in list of expressions}}
+"\(1, f:)" // expected-cparser-error {{expected expression in list of expressions}} expected-astgen-error {{expected value in string literal}}
 
 // Availability Spec List
 
 if #unavailable(iOS 15, watchOS 9,) { }
 
-if #available(iOS 15,) { }  // expected-error {{expected platform name}}
+if #available(iOS 15,) { }  // expected-cparser-error {{expected platform name}} expected-astgen-error {{expected version restriction in availability argument}}
 
 // Built-in Attributes
 
-@attached(extension, conformances: OptionSet,)  // expected-error {{unexpected ',' separator}} {{45-46=}}
+@attached(extension, conformances: OptionSet,)  // expected-cparser-error {{unexpected ',' separator}} {{45-46=}} expected-astgen-error {{expected value in attribute}}
 macro OptionSet<RawType>() = #externalMacro(module: "SwiftMacros", type: "OptionSetMacro")
 
-@inline(never,) // expected-error {{expected declaration}} expected-error {{expected ')' in 'inline' attribute}} 
+@inline(never,) // expected-cparser-error {{expected declaration}} expected-error {{expected ')' in 'inline' attribute}} 
 func foo() { }
 
-@available(iOS 15,) // expected-error {{expected platform name}} expected-error {{expected declaration}} 
+@available(iOS 15,) // expected-error {{expected platform name}} expected-cparser-error {{expected declaration}} 
 func foo() { }
 
-@backDeployed(before: SwiftStdlib 6.0,) // expected-error {{unexpected ',' separator}} {{38-39=}}
+@backDeployed(before: SwiftStdlib 6.0,) // expected-cparser-error {{unexpected ',' separator}} {{38-39=}} expected-astgen-error {{expected version restriction in version}}
 func foo() { }
 
 struct Foo {
@@ -92,7 +92,7 @@ struct Foo {
   var y: Int
   
   var value: (Int, Int) {
-    @storageRestrictions(initializes: x, y,)  // expected-error {{expected property name in '@storageRestrictions' list}}
+    @storageRestrictions(initializes: x, y,)  // expected-cparser-error {{expected property name in '@storageRestrictions' list}} expected-astgen-error {{expected ')' in 'storageRestrictions' attribute}}
     init(initialValue) {
       self.x = initialValue.0
       self.y = initialValue.1
@@ -102,12 +102,12 @@ struct Foo {
 
 }
 
-func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-error {{expected ',' separator}} expected-error {{unnamed parameters must be written with the empty name '_'}}
+func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-cparser-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-cparser-error {{expected ',' separator}} expected-cparser-error {{unnamed parameters must be written with the empty name '_'}} expected-astgen-error {{expected ')' to end parameter clause}} expected-astgen-note {{to match this opening '('}} expected-astgen-error {{unexpected code '(Int) -> Int)' in function}} expected-astgen-warning {{'@differentiable' has been renamed to '@differentiable(reverse)'}}
 
-@derivative(of: Self.other,) // expected-error {{unexpected ',' separator}} {{27-28=}}
+@derivative(of: Self.other,) // expected-cparser-error {{unexpected ',' separator}} {{27-28=}} expected-astgen-error {{expected 'wrt:' and arguments in '@differentiable' argument}}
 func foo() {}
 
-@transpose(of: S.instanceMethod,) // expected-error {{unexpected ',' separator}} {{32-33=}}
+@transpose(of: S.instanceMethod,) // expected-cparser-error {{unexpected ',' separator}} {{32-33=}} expected-astgen-error {{expected 'wrt:' and arguments in '@differentiable' argument}}
 func transposeInstanceMethodWrtSelf(_ other: S, t: S) -> S {
     other + t
 }
@@ -131,20 +131,20 @@ struct S<T1, T2, T3,> where T1: P1, T2: P2, { } // expected-error {{expected typ
 
 struct S: P1, P2, P3, { } // expected-error {{expected type}} 
 
-struct S<T>: P1, P2, P3, where T: Equatable { } // expected-error {{expected type}} expected-error {{expected '{' in struct}} 
+struct S<T>: P1, P2, P3, where T: Equatable { } // expected-error {{expected type}} expected-cparser-error {{expected '{' in struct}} 
 
 // Condition List
 
-if true, { } // expected-error {{expected '{' after 'if' condition}} 
+if true, { } // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}} 
 
-guard true, else { } // expected-error {{expected expression in conditional}} 
+guard true, else { } // expected-cparser-error {{expected expression in conditional}} expected-astgen-error {{expected expression in 'guard' statement}} 
 
-while true, { } // expected-error {{expected '{' after 'while' condition}} 
+while true, { } // expected-cparser-error {{expected '{' after 'while' condition}} expected-astgen-error {{expected '{' in 'while' statement}} 
 
-if #available(OSX 51,) { // expected-error {{expected platform name}}
+if #available(OSX 51,) { // expected-cparser-error {{expected platform name}} expected-astgen-error {{expected version restriction in availability argument}}
 }
 
-@available(OSX 10.7, iOS 7.0, *,) // expected-error {{expected platform name}} expected-error {{expected declaration}}
-@_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0,) // expected-error {{unexpected ',' separator}} {{62-63=}}
-@backDeployed(before: OSX 10.9,) // expected-error {{unexpected ',' separator}} {{31-32=}}
-public struct StructWithAvailability {}
+@available(OSX 10.7, iOS 7.0, *,) // expected-error {{expected platform name}} expected-cparser-error {{expected declaration}}
+@_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0,) // expected-cparser-error {{unexpected ',' separator}} {{62-63=}} expected-astgen-error {{expected version restriction in version}}
+@backDeployed(before: OSX 10.9,) // expected-cparser-error {{unexpected ',' separator}} {{31-32=}} expected-astgen-error {{expected version restriction in version}}
+public struct StructWithAvailability {} // expected-astgen-error {{expected '}' to end 'while' statement}} expected-astgen-error {{expected '}' to end 'if' statement}}

@@ -17,7 +17,7 @@ func alwaysAvailable() { }
 func availableInEnabledDomain() { }
 
 @available(EnabledDomain, *) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
-// expected-error@-1 {{expected declaration}}
+// expected-cparser-error@-1 {{expected declaration}}
 func availableInEnabledDomainWithWildcard() { }
 
 @available(EnabledDomain, introduced: 1.0) // expected-error {{unexpected version number for EnabledDomain}}
@@ -39,14 +39,14 @@ func introducedInMacOSAndAvailableInEnabledDomain() { }
 func introducedInMacOSAndAvailableInAlwaysEnabledDomain() { }
 
 @available(EnabledDomain, macOS 10.10, *) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
-// expected-error@-1 {{expected declaration}}
+// expected-cparser-error@-1 {{expected declaration}} expected-astgen-error@-1 {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
 func availableInEnabledDomainAndIntroducedInMacOS() { }
 
 @available(EnabledDomain, DisabledDomain) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
 func availableInMultipleCustomDomainsShort() { }
 
 @available(EnabledDomain, DisabledDomain, *) // expected-error {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
-// expected-error@-1 {{expected declaration}}
+// expected-cparser-error@-1 {{expected declaration}} expected-astgen-error@-1 {{expected 'available' option such as 'unavailable', 'introduced', 'deprecated', 'obsoleted', 'message', or 'renamed'}}
 func availableInMultipleCustomDomainsShortWithWildcard() { }
 
 @available(EnabledDomain, deprecated: 1.0) // expected-error {{unexpected version number for EnabledDomain}}

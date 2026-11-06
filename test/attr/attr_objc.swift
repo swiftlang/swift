@@ -180,7 +180,7 @@ func subject_genericFunc<T>(t: T) { // A top-level @objc function cannot be gene
   func subject_instanceFunc() {}
 }
 
-func subject_funcParam(a: @objc Int) { // expected-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}}
+func subject_funcParam(a: @objc Int) { // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}} expected-astgen-error {{unknown attribute 'objc'}}
 }
 
 @objc // bad-access-note-move{{subject_struct}} expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
@@ -1999,7 +1999,7 @@ class Class_ObjC2 {
   // CHECK-LABEL: @objc(isFoo) func foo() -> Bool {
 }
 
-@objc() // expected-error {{expected name within parentheses of '@objc'}}
+@objc() // expected-cparser-error {{expected name within parentheses of '@objc'}}
 class Class_ObjC3 { 
 }
 
@@ -2014,10 +2014,10 @@ extension PlainClass {
   func set(_: Float, green: Float, blue: Float, alpha: Float) { }
 
   // CHECK-LABEL: @objc(createWithRed:green:blue:alpha:) dynamic class func createWith
-  @objc(createWithRed:green blue:alpha)
+  @objc(createWithRed:green blue:alpha) // expected-astgen-error {{'@objc' method name provides names for 3 arguments, but method has 4 parameters}}
   class func createWithRed(_: Float, green: Float, blue: Float, alpha: Float) { }
-  // expected-error@-2{{missing ':' after selector piece in '@objc'}}{{28-28=:}}
-  // expected-error@-3{{missing ':' after selector piece in '@objc'}}{{39-39=:}}
+  // expected-cparser-error@-2{{missing ':' after selector piece in '@objc'}}{{28-28=:}} expected-astgen-error@-2 {{expected ':' in Objective-C selector piece}}
+  // expected-cparser-error@-3{{missing ':' after selector piece in '@objc'}}{{39-39=:}} expected-astgen-error@-3 {{unexpected code 'blue' in Objective-C selector piece}}
 
   // CHECK-LABEL: @objc(::) dynamic func badlyNamed
   @objc(::) // access-note-move{{PlainClass.badlyNamed(_:y:)}}

@@ -17,8 +17,85 @@ import ASTBridging
 import SwiftSyntax
 
 extension ASTGenVisitor {
+  /// Diagnose a 'where' clause written inside the angle brackets, which is
+  /// obsolete, with fix-its that move it to follow the declaration.
+  func diagnoseWhereInGenericParameterClause(_ node: GenericParameterClauseSyntax) {
+    guard let whereClause = node.genericWhereClause,
+      let lastParam = node.parameters.last,
+      node.rightAngle.presence == .present
+    else {
+      return
+    }
+
+    // Everything between the last parameter and the closing bracket moves.
+    let lastToken = lastParam.trailingComma?.previousToken(viewMode: .sourceAccurate) ?? lastParam.lastToken(viewMode: .sourceAccurate)
+    guard let lastToken else { return }
+    let removeStart = lastToken.endPositionBeforeTrailingTrivia
+    let removeEnd = node.rightAngle.positionAfterSkippingLeadingTrivia
+    let removeRange = self.generateCharSourceRange(
+      start: removeStart,
+      length: SourceLength(utf8Length: removeEnd.utf8Offset - removeStart.utf8Offset)
+    )
+    let movedText = String(
+      decoding: self.base[removeStart.utf8Offset..<removeEnd.utf8Offset],
+      as: UTF8.self
+    )
+
+    // The declaration's own 'where' clause, if any, absorbs the requirements.
+    let trailingWhere: GenericWhereClauseSyntax?
+    let insertAfter: TokenSyntax?
+    switch node.parent?.as(SyntaxEnum.self) {
+    case .functionDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = decl.signature.lastToken(viewMode: .sourceAccurate)
+    case .initializerDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = decl.signature.lastToken(viewMode: .sourceAccurate)
+    case .subscriptDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = decl.returnClause.lastToken(viewMode: .sourceAccurate)
+    case .structDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
+    case .classDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
+    case .enumDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
+    case .actorDecl(let decl):
+      trailingWhere = decl.genericWhereClause
+      insertAfter = (decl.inheritanceClause?.lastToken(viewMode: .sourceAccurate)) ?? node.lastToken(viewMode: .sourceAccurate)
+    default:
+      // Other declarations, typealiases included, do not get this diagnostic.
+      return
+    }
+
+    var fixIts = [CompilerDiagnosticFixIt(remove: removeRange)]
+    if let trailingWhere {
+      fixIts.append(
+        .init(
+          replace: self.generateCharSourceRange(trailingWhere.whereKeyword),
+          with: whereClause.trimmedDescription + ","
+        )
+      )
+    } else if let insertAfter {
+      fixIts.append(
+        .init(
+          replace: self.generateCharSourceRange(
+            start: insertAfter.endPositionBeforeTrailingTrivia,
+            length: SourceLength(utf8Length: 0)
+          ),
+          with: movedText
+        )
+      )
+    }
+    self.diagnose(.where_inside_brackets, at: whereClause.whereKeyword, fixIts: fixIts)
+  }
+
   func generate(genericParameterClause node: GenericParameterClauseSyntax) -> BridgedGenericParamList {
-    .createParsed(
+    self.diagnoseWhereInGenericParameterClause(node)
+    return .createParsed(
       self.ctx,
       leftAngleLoc: self.generateSourceLoc(node.leftAngle),
       parameters: node.parameters.lazy.map(self.generate).bridgedArray(in: self),
@@ -29,6 +106,7 @@ extension ASTGenVisitor {
 
   func generate(genericParameter node: GenericParameterSyntax) -> BridgedGenericTypeParamDecl {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
+    self.diagnoseDollarDeclName(node.name)
 
     var genericParameterIndex: Int?
     for (index, sibling) in (node.parent?.as(GenericParameterListSyntax.self) ?? []).enumerated() {
@@ -50,7 +128,7 @@ extension ASTGenVisitor {
         .type
       }
 
-    return .createParsed(
+    let decl = BridgedGenericTypeParamDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       specifierLoc: self.generateSourceLoc(node.specifier),
@@ -60,6 +138,13 @@ extension ASTGenVisitor {
       index: genericParameterIndex,
       paramKind: paramKind
     )
+
+    // Attributes are parsed here and diagnosed by the type checker if they do
+    // not apply.
+    var attrs = BridgedDeclAttributes()
+    self.generateDeclAttributes(attributeList: node.attributes) { attrs.add($0) }
+    decl.asDecl.attachParsedAttrs(attrs)
+    return decl
   }
 
   func generate(layoutRequirement node: LayoutRequirementSyntax) -> BridgedLayoutConstraint {
@@ -87,17 +172,25 @@ extension ASTGenVisitor {
     }
 
     let size: Int
-    guard let parsed = Int(sizeToken.text, radix: 10) else {
-      fatalError("(compiler bug) invalid size integer literal for a layout constraint")
+    if let parsed = Int(sizeToken.text, radix: 10) {
+      size = parsed
+    } else {
+      // A missing or non-numeric size token is parser recovery output, e.g.
+      // `_Trivial(, 8)`. Diagnose and carry on with 0 so the constraint is still
+      // well-formed.
+      self.diagnose(.layout_size_should_be_positive, at: sizeToken)
+      size = 0
     }
-    size = parsed
 
     let alignment: Int?
     if let alignmentToken = node.alignment {
-      guard let parsed = Int(alignmentToken.text, radix: 10) else {
-        fatalError("(compiler bug) invalid alignment integer literal for a layout constraint")
+      if let parsed = Int(alignmentToken.text, radix: 10) {
+        alignment = parsed
+      } else {
+        // E.g. `_Trivial(64, )`: the alignment is missing or not a number.
+        self.diagnose(.layout_alignment_should_be_positive, at: alignmentToken)
+        alignment = nil
       }
-      alignment = parsed
     } else {
       alignment = nil
     }
@@ -111,6 +204,10 @@ extension ASTGenVisitor {
   }
 
   func generate(genericWhereClause node: GenericWhereClauseSyntax) -> BridgedTrailingWhereClause {
+    // A trailing comma leaves the C++ parser expecting another requirement.
+    if !self.ctx.langOpts.hasFeature(.TrailingComma), let comma = node.requirements.last?.trailingComma {
+      self.diagnose(.expected_type, at: comma.nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(comma))
+    }
     let requirements  = node.requirements.lazy.map { elem -> BridgedRequirementRepr in
 
       // Unwrap 'repeat T' to  (isRequirementExpansion: true, type: T)
@@ -140,6 +237,12 @@ extension ASTGenVisitor {
           isExpansionPattern: isExpansionPattern
         )
       case .layoutRequirement(let layout):
+        // Layout constraints are only for '_specialize'.
+        if !sequence(first: Syntax(layout).parent, next: { $0?.parent }).contains(where: {
+          $0?.as(AttributeSyntax.self)?.attributeName.trimmedDescription == "_specialize"
+        }) {
+          self.diagnose(.layout_constraints_only_inside_specialize_attr, at: layout.layoutSpecifier)
+        }
         let (isExpansionPattern, leftType) = generateIsExpansionPattern(type: layout.type)
         return .createLayoutConstraint(
           subject: self.generate(type: leftType),
@@ -164,7 +267,7 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateValueOrType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr)
     }
   }
 
@@ -174,7 +277,7 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateValueOrType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr)
     }
   }
 
@@ -184,13 +287,17 @@ extension ASTGenVisitor {
       return self.generate(type: type)
 
     case .expr(let expr):
-      return self.generateValueOrType(expr: expr).asTypeRepr
+      return self.generateValueOrType(expr: expr)
     }
   }
 
-  func generateValueOrType(expr node: ExprSyntax) -> BridgedGenericArgumentExprTypeRepr {
-    let bridgedArgumentExpr: BridgedExpr
-
+  /// Generate a type from an expression that stands in either for a generic
+  /// *value* argument, such as the `2` in `Vector<Int, 2>`, or for a type that
+  /// the parser happened to hand back in expression position, such as the
+  /// `Count` in `@_rawLayout(likeArrayOf: Element, count: Count)`.
+  ///
+  /// The C++ parser's equivalent is `parseTypeOrValue`.
+  func generateValueOrType(expr node: ExprSyntax) -> BridgedTypeRepr {
     // Generic value argument expressions can be integer literals, or
     // arbitrary parenthesized integer expressions (Literal Expressions).
 
@@ -198,29 +305,35 @@ extension ASTGenVisitor {
     // language feature (LiteralExpressions), and prefix '-' for integer literals
     // is otherwise supported, we handle the '-' prefix operator here as a special
     // case by turning it into a negative IntegerLiteralExpr.
-    if case .prefixOperatorExpr(let prefixNode) = node.as(ExprSyntaxEnum.self) {
-      let op = prefixNode.operator
-      guard op.text == "-" else {
-        fatalError("Unknown prefix operator for generic argument type")
-      }
-      guard let intLitExpr = prefixNode.expression.as(IntegerLiteralExprSyntax.self) else {
-        fatalError("Unknown expression kind for generic argument type")
-      }
+    if case .prefixOperatorExpr(let prefixNode) = node.as(ExprSyntaxEnum.self),
+      prefixNode.operator.text == "-",
+      let intLitExpr = prefixNode.expression.as(IntegerLiteralExprSyntax.self)
+    {
       let bridgedIntExpr = self.generate(integerLiteralExpr: intLitExpr)
-      bridgedIntExpr.setNegative(loc: self.generateSourceLoc(op))
-      bridgedArgumentExpr = bridgedIntExpr.asExpr
-    } else if case .integerLiteralExpr(_) = node.as(ExprSyntaxEnum.self) {
-      bridgedArgumentExpr = self.generate(expr: node)
-    } else if ctx.langOpts.hasFeature(.LiteralExpressions) {
-      bridgedArgumentExpr = self.generate(expr: node)
-    } else {
-      fatalError("Unknown expression kind for generic argument type")
+      bridgedIntExpr.setNegative(loc: self.generateSourceLoc(prefixNode.operator))
+      return BridgedGenericArgumentExprTypeRepr.createParsed(
+        self.ctx,
+        expr: bridgedIntExpr.asExpr,
+        loc: self.generateSourceLoc(node)
+      ).asTypeRepr
     }
 
-    return .createParsed(
-      self.ctx,
-      expr: bridgedArgumentExpr,
-      loc: self.generateSourceLoc(node)
-    )
+    if node.is(IntegerLiteralExprSyntax.self) || ctx.langOpts.hasFeature(.LiteralExpressions) {
+      return BridgedGenericArgumentExprTypeRepr.createParsed(
+        self.ctx,
+        expr: self.generate(expr: node),
+        loc: self.generateSourceLoc(node)
+      ).asTypeRepr
+    }
+
+    // Not a value, so it has to be a type. A generic parameter reference reaches
+    // here as an expression whenever the enclosing syntax is an argument list
+    // rather than a generic argument clause.
+    if let typeRepr = self.generateTypeRepr(expr: node) {
+      return typeRepr
+    }
+
+    self.diagnose(.expected_type, at: node)
+    return BridgedErrorTypeRepr.create(self.ctx, range: self.generateSourceRange(node)).asTypeRepr
   }
 }

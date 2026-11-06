@@ -30,8 +30,8 @@ case var a:
   a = 1
 case let a:
   a = 1         // expected-error {{cannot assign}}
-case inout a: // expected-error {{'inout' may only be used on parameters}} expected-error {{'is' keyword required to pattern match against type name}}
-  a = 1 // expected-error {{cannot find 'a' in scope}}
+case inout a: // expected-error {{'inout' may only be used on parameters}} expected-cparser-error {{'is' keyword required to pattern match against type name}}
+  a = 1 // expected-cparser-error {{cannot find 'a' in scope}}
 case var var a: // expected-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
   a += 1
 case var let a: // expected-error {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
@@ -359,8 +359,8 @@ case (_?)?: break // expected-warning {{case is already handled by previous patt
 
 // <rdar://problem/20365753> Bogus diagnostic "refutable pattern match can fail"
 let (responseObject: Int?) = op1
-// expected-error @-1 {{expected ',' separator}} {{25-25=,}}
-// expected-error @-2 {{expected pattern}}
+// expected-cparser-error @-1 {{expected ',' separator}} {{25-25=,}}
+// expected-cparser-error @-2 {{expected pattern}} expected-astgen-error@-2 {{unexpected code '?' in tuple pattern}}
 // expected-error @-3 {{cannot convert value of type 'Int?' to specified type '(responseObject: _)'}}
 
 enum E<T> {

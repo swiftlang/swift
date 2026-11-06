@@ -5,31 +5,31 @@
 // SE-0144: Reject this behavior in the future.
 
 func dollarVar() {
-  var $ : Int = 42 // expected-error {{'$' is not an identifier; use backticks to escape it}} {{7-8=`$`}}
-  $ += 1 // expected-error {{'$' is not an identifier; use backticks to escape it}} {{3-4=`$`}}
-  print($) // expected-error {{'$' is not an identifier; use backticks to escape it}} {{9-10=`$`}}
+  var $ : Int = 42 // expected-cparser-error {{'$' is not an identifier; use backticks to escape it}} {{7-8=`$`}} expected-astgen-error {{'$' is not a valid identifier}}
+  $ += 1 // expected-cparser-error {{'$' is not an identifier; use backticks to escape it}} {{3-4=`$`}} expected-astgen-error {{cannot find '$' in scope; did you mean 'S'?}}
+  print($) // expected-cparser-error {{'$' is not an identifier; use backticks to escape it}} {{9-10=`$`}} expected-astgen-error {{cannot find '$' in scope; did you mean 'S'?}}
 }
 func dollarLet() {
-  let $ = 42 // expected-error {{'$' is not an identifier; use backticks to escape it}} {{7-8=`$`}}
-  print($) // expected-error {{'$' is not an identifier; use backticks to escape it}} {{9-10=`$`}}
+  let $ = 42 // expected-cparser-error {{'$' is not an identifier; use backticks to escape it}} {{7-8=`$`}} expected-astgen-error {{'$' is not a valid identifier}}
+  print($) // expected-cparser-error {{'$' is not an identifier; use backticks to escape it}} {{9-10=`$`}} expected-astgen-error {{cannot find '$' in scope; did you mean 'S'?}}
 }
 func dollarClass() {
-  class $ {} // expected-error {{'$' is not an identifier; use backticks to escape it}} {{9-10=`$`}}
+  class $ {} // expected-cparser-error {{'$' is not an identifier; use backticks to escape it}} {{9-10=`$`}} expected-astgen-error {{'$' is not a valid identifier}}
 }
 func dollarEnum() {
-  enum $ {} // expected-error {{'$' is not an identifier; use backticks to escape it}} {{8-9=`$`}}
+  enum $ {} // expected-cparser-error {{'$' is not an identifier; use backticks to escape it}} {{8-9=`$`}} expected-astgen-error {{'$' is not a valid identifier}}
 }
 func dollarStruct() {
-  struct $ {} // expected-error {{'$' is not an identifier; use backticks to escape it}} {{10-11=`$`}}
+  struct $ {} // expected-cparser-error {{'$' is not an identifier; use backticks to escape it}} {{10-11=`$`}} expected-astgen-error {{'$' is not a valid identifier}}
 }
 
 func dollarFunc() {
   func $($ dollarParam: Int) {}
-  // expected-error@-1 {{'$' is not an identifier; use backticks to escape it}} {{8-9=`$`}}
-  // expected-error@-2 {{'$' is not an identifier; use backticks to escape it}} {{10-11=`$`}}
+  // expected-cparser-error@-1 {{'$' is not an identifier; use backticks to escape it}} {{8-9=`$`}} expected-astgen-error@-1 {{'$' is not a valid identifier}}
+  // expected-cparser-error@-2 {{'$' is not an identifier; use backticks to escape it}} {{10-11=`$`}} expected-astgen-error@-2 {{'$' is not a valid identifier}}
   $($: 24)
-  // expected-error@-1 {{'$' is not an identifier; use backticks to escape it}} {{3-4=`$`}}
-  // expected-error@-2 {{'$' is not an identifier; use backticks to escape it}} {{5-6=`$`}}
+  // expected-cparser-error@-1 {{'$' is not an identifier; use backticks to escape it}} {{3-4=`$`}} expected-astgen-error@-1 {{cannot find '$' in scope; did you mean 'S'?}}
+  // expected-cparser-error@-2 {{'$' is not an identifier; use backticks to escape it}} {{5-6=`$`}} expected-astgen-error@-2 {{'$' is not a valid identifier}}
 }
 
 func escapedDollarVar() {
@@ -84,8 +84,8 @@ func $declareWithDollar() { // expected-error{{cannot declare entity named '$dec
   $label: if true { // expected-error{{cannot declare entity named '$label'}}
     break $label
   }
-  switch 0 {
-  @$dollar case _: // expected-error {{unknown attribute '$dollar'}}
+  switch 0 { // expected-astgen-error {{switch must be exhaustive}}
+  @$dollar case _: // expected-cparser-error {{unknown attribute '$dollar'}} expected-astgen-note {{remove '@unknown' to handle remaining values}}
     break
   }
   if #available($Dummy 9999, *) {} // expected-warning {{cannot find availability domain '$Dummy'}}
@@ -113,14 +113,14 @@ struct Wrapper {
   var projectedValue: String { String(wrappedValue) }
 }
 
-struct S {
+struct S { // expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}}
   @Wrapper var café = 42
 }
 
 let _ = S().$café // Okay
 
 // https://github.com/apple/swift/issues/55538
-infix operator $ // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
-infix operator `$` // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
+infix operator $ // expected-cparser-error{{'$' is considered an identifier and must not appear within an operator name}} expected-astgen-error {{'$' is not allowed in operator names}}
+infix operator `$` // expected-cparser-error{{'$' is considered an identifier and must not appear within an operator name}} expected-astgen-error {{'`$`' is considered an identifier and must not appear within an operator name}}
 
 func `$declareEscapedWithDollar`() { } // expected-error{{cannot declare entity named '$declareEscapedWithDollar'}}

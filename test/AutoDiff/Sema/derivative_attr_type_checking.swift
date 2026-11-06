@@ -436,21 +436,21 @@ extension Struct {
   }
   // The `@derivative(of:)` annotations below specify
   // .`yielding borrow` and .`yielding mutate`
-  // expected-note @+2 {{cannot register derivative for yielding borrow accessor}}
-  // expected-note @+1 {{cannot register derivative for yielding mutate accessor}}
+  // expected-cparser-note @+2 {{cannot register derivative for yielding borrow accessor}}
+  // expected-cparser-note @+1 {{cannot register derivative for yielding mutate accessor}}
   var computedProperty2: T {
     yielding borrow { yield x }
     yielding mutate { yield &x }
   }
   // The `@derivative(of:)` annotations below specify .borrow and .mutate
-  // expected-note @+2 {{cannot register derivative for yielding borrow accessor}}
-  // expected-note @+1 {{cannot register derivative for yielding mutate accessor}}
+  // expected-cparser-note @+2 {{cannot register derivative for yielding borrow accessor}}
+  // expected-cparser-note @+1 {{cannot register derivative for yielding mutate accessor}}
   var computedProperty2a: T {
     yielding borrow { yield x }
     yielding mutate { yield &x }
   }
-  // expected-note @+2 {{cannot register derivative for borrow accessor}}
-  // expected-note @+1 {{cannot register derivative for mutate accessor}}
+  // expected-cparser-note @+2 {{cannot register derivative for borrow accessor}}
+  // expected-cparser-note @+1 {{cannot register derivative for mutate accessor}}
   var computedProperty3: T {
     borrow { return x }
     mutate { return &x }
@@ -482,7 +482,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
 
-  // expected-error @+1 {{referenced declaration 'computedProperty2' could not be resolved}}
+  // expected-cparser-error @+1 {{referenced declaration 'computedProperty2' could not be resolved}} expected-astgen-error@+1 {{cannot find type 'computedProperty2' in scope}}
   @derivative(of: computedProperty2.`yielding borrow`)
   mutating func vjpPropertyYieldingBorrow(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
@@ -491,7 +491,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   }
 
 
-  // expected-error @+1 {{referenced declaration 'computedProperty2' could not be resolved}}
+  // expected-cparser-error @+1 {{referenced declaration 'computedProperty2' could not be resolved}} expected-astgen-error@+1 {{cannot find type 'computedProperty2' in scope}}
   @derivative(of: computedProperty2.`yielding mutate`)
   mutating func vjpPropertyYieldingMutate(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
@@ -500,7 +500,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   }
 
   // We can match `.borrow` or `.mutate` to a yielding borrow or mutate
-  // expected-error @+1 {{referenced declaration 'computedProperty2a' could not be resolved}}
+  // expected-cparser-error @+1 {{referenced declaration 'computedProperty2a' could not be resolved}} expected-astgen-error@+1 {{cannot find type 'computedProperty2a' in scope}}
   @derivative(of: computedProperty2a.borrow)
   mutating func vjpProperty2Borrow(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
@@ -509,7 +509,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   }
 
   // We can match `.borrow` or `.mutate` to a yielding borrow or mutate
-  // expected-error @+1 {{referenced declaration 'computedProperty2a' could not be resolved}}
+  // expected-cparser-error @+1 {{referenced declaration 'computedProperty2a' could not be resolved}} expected-astgen-error@+1 {{cannot find type 'computedProperty2a' in scope}}
   @derivative(of: computedProperty2a.mutate)
   mutating func vjpProperty2Mutate(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
@@ -517,7 +517,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
 
-  // expected-error @+1 {{referenced declaration 'computedProperty3' could not be resolved}}
+  // expected-cparser-error @+1 {{referenced declaration 'computedProperty3' could not be resolved}} expected-astgen-error@+1 {{cannot find type 'computedProperty3' in scope}}
   @derivative(of: computedProperty3.borrow)
   mutating func vjpPropertyBorrow(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
@@ -525,7 +525,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
 
-  // expected-error @+1 {{referenced declaration 'computedProperty3' could not be resolved}}
+  // expected-cparser-error @+1 {{referenced declaration 'computedProperty3' could not be resolved}} expected-astgen-error@+1 {{cannot find type 'computedProperty3' in scope}}
   @derivative(of: computedProperty3.mutate)
   mutating func vjpPropertyMutate(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector

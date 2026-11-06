@@ -4,4 +4,4 @@
 
 // This file does not end in a trailing newline; this is deliberate, don't fix it!
 
-/* expected-error {{unterminated string literal}} */ "
+/* expected-cparser-error {{unterminated string literal}} expected-astgen-error {{expected '"' to end string literal}} expected-astgen-note {{to match this opening '"'}} expected-astgen-warning {{string literal is unused}} */ "

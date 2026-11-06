@@ -7,14 +7,16 @@
 @attached(peer, names: named(BadThing))
 macro HangingMacro() = #externalMacro(module: "MacroDefinition", type: "HangingMacro")
 
-// expected-note@+1{{in declaration of 'Foo'}}
+// expected-cparser-note@+1{{in declaration of 'Foo'}}
 class Foo {
   init() {}
 
-  // expected-expansion@+5:32{{
-  //   expected-error@1{{unexpected token '}' in expanded member list}}
-  //   expected-error@2{{expected declaration}}
+  // expected-expansion@+7:32{{
+  //   expected-cparser-error@1{{unexpected token '}' in expanded member list}}
+  //   expected-cparser-error@2{{expected declaration}}
+  //   expected-astgen-error@2{{unexpected brace in member list}}
   // }}
-  // expected-note@+1 2{{in expansion of macro 'HangingMacro' on property 'result' here}}
+  // expected-cparser-note@+2 2{{in expansion of macro 'HangingMacro' on property 'result' here}}
+  // expected-astgen-note@+1 {{in expansion of macro 'HangingMacro' on property 'result' here}}
   @HangingMacro var result: Int // This comment makes it hang.
 }

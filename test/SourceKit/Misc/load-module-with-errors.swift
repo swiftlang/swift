@@ -46,7 +46,7 @@ func testInvalidTopLevelCompletion() {
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidPartialFunc()[#Void#];
   // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncBody()[#Void#];
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalClosureBody[#_#];
-  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncSignature()[#Void#];
+  // INVALID-TOP-DAG: Decl[FreeFunction]/OtherModule[errors]: invalidFuncSignature({{(\{#undefined: _#\})?}})[#Void#];
   // INVALID-TOP-DAG: Decl[GlobalVar]/OtherModule[errors]: invalidGlobalMissingInit[#String#];
   // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidGenericStruct[#InvalidGenericStruct<T, U>#];
   // INVALID-TOP-DAG: Decl[Struct]/OtherModule[errors]:   InvalidStruct[#InvalidStruct#];
@@ -104,7 +104,8 @@ func testInvalidTopLevelCompletion() {
 // CHECK: var memberE: <<error type>>
 // CHECK: mutating func set(item: <<error type>>)
 // CHECK: func invalidFuncBody()
-// CHECK: func invalidFuncSignature()
+// ASTGen recovers the malformed parameter as an error-typed parameter.
+// CHECK: func invalidFuncSignature({{(undefined: <<error type>>)?}})
 // CHECK: func invalidFuncThrows() throws
 // CHECK: func invalidFuncType() -> <<error type>>
 // CHECK: func invalidGenericFuncBody<T>(param: T) -> T

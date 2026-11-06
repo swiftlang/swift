@@ -1254,7 +1254,7 @@ func voidFuncWithEffects2() async throws {
 func voidFuncWithEffects3() throws async {
   return 1
   // expected-error@-1 {{unexpected non-void return value in void function}}
-  // expected-note@-2 {{did you mean to add a return type?}}{{-1:41-41= -> <#Return Type#>}}
+  // expected-cparser-note@-2 {{did you mean to add a return type?}}{{-1:41-41= -> <#Return Type#>}} expected-astgen-note@-2 {{did you mean to add a return type?}}
 }
 
 @available(SwiftStdlib 5.5, *)
@@ -1595,8 +1595,8 @@ func testAddMemberVsRemoveCall() {
 // Make sure we can still type-check the closure.
 do {
   _ = {
-    let x: String = 0 // expected-error {{cannot convert value of type 'Int' to specified type 'String'}}
-  }. // expected-error {{expected member name following '.'}}
+    let x: String = 0 // expected-cparser-error {{cannot convert value of type 'Int' to specified type 'String'}}
+  }. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
 }
 
 // rdar://169736579

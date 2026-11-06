@@ -110,24 +110,24 @@ _ = y2[0] // expected-error{{cannot use mutating getter on immutable value: 'y2'
 
 // Parsing errors
 struct A0 {
-  subscript // expected-error {{expected '(' for subscript parameters}}
-    i : Int
-     -> Int {
+  subscript // expected-cparser-error {{expected '(' for subscript parameters}} expected-astgen-error {{expected '(' to start parameter clause}}
+    i : Int // expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
+     -> Int { // expected-astgen-error {{expected ')' to end parameter clause}} expected-astgen-error {{expected '->' and return type in subscript}}
     get {
-      return stored
+      return stored // expected-astgen-error {{cannot find 'stored' in scope}}
     }
     set {
-      stored = value
+      stored = value // expected-astgen-error {{cannot find 'stored' in scope}} expected-astgen-error {{cannot find 'value' in scope}}
     }
   }
 
-  subscript -> Int { // expected-error {{expected '(' for subscript parameters}} {{12-12=()}}
+  subscript -> Int { // expected-cparser-error {{expected '(' for subscript parameters}} {{12-12=()}} expected-astgen-error {{expected parameter clause in subscript}}
     return 1
   }
 }
 
 struct A1 {
-  subscript (i : Int) // expected-error{{expected '->' for subscript element type}}
+  subscript (i : Int) // expected-cparser-error{{expected '->' for subscript element type}} expected-astgen-error {{expected '->' in subscript}}
      Int {
     get {
       return stored // expected-error{{cannot find 'stored' in scope}}
@@ -139,7 +139,7 @@ struct A1 {
 }
 
 struct A2 {
-  subscript (i : Int) -> // expected-error{{expected subscripting element type}}
+  subscript (i : Int) -> // expected-cparser-error{{expected subscripting element type}} expected-astgen-error {{expected return type in subscript}}
      {
     get {
       return stored // expected-error {{cannot find 'stored' in scope}}
@@ -151,8 +151,8 @@ struct A2 {
 }
 
 struct A3 {
-  subscript(i : Int) // expected-error {{expected '->' for subscript element type}}
-                     // expected-error@-1 {{expected subscripting element type}}
+  subscript(i : Int) // expected-cparser-error {{expected '->' for subscript element type}}
+                     // expected-cparser-error@-1 {{expected subscripting element type}} expected-astgen-error@-1 {{expected '->' and return type in subscript}}
   {
     get {
       return i
@@ -161,8 +161,8 @@ struct A3 {
 }
 
 struct A4 {
-  subscript(i : Int) { // expected-error {{expected '->' for subscript element type}}
-                       // expected-error@-1 {{expected subscripting element type}}
+  subscript(i : Int) { // expected-cparser-error {{expected '->' for subscript element type}}
+                       // expected-cparser-error@-1 {{expected subscripting element type}} expected-astgen-error@-1 {{expected '->' and return type in subscript}}
     get {
       return i
     }
@@ -174,8 +174,8 @@ struct A5 {
 }
 
 struct A6 {
-  subscript(i: Int)(j: Int) -> Int { // expected-error {{expected '->' for subscript element type}}
-                                     // expected-error@-1 {{function types cannot have argument labels}}
+  subscript(i: Int)(j: Int) -> Int { // expected-cparser-error {{expected '->' for subscript element type}}
+                                     // expected-cparser-error@-1 {{function types cannot have argument labels}} expected-astgen-error@-1 {{unexpected code '(j: Int)' in subscript}}
                                      // expected-note@-2 {{did you mean}}
     get {
       return i + j // expected-error {{cannot find 'j' in scope}}
@@ -200,12 +200,12 @@ class A7b {
 }
 
 struct A8 {
-  subscript(i : Int) -> Int // expected-error{{expected '{' in subscript to specify getter and setter implementation}}
+  subscript(i : Int) -> Int // expected-cparser-error{{expected '{' in subscript to specify getter and setter implementation}} expected-astgen-error {{expected '{' in subscript}}
     get {
-      return stored
+      return stored // expected-astgen-error {{cannot find 'stored' in scope}}
     }
     set {
-      stored = value
+      stored = value // expected-astgen-error {{cannot find 'stored' in scope}} expected-astgen-error {{cannot find 'value' in scope}}
     }
   }
 
@@ -225,9 +225,9 @@ struct A10 {
 }
 
 struct A11 {
-  subscript x y : Int -> Int { // expected-error {{expected '(' for subscript parameters}}
+  subscript x y : Int -> Int { // expected-cparser-error {{expected '(' for subscript parameters}} expected-astgen-error {{expected '(' to start parameter clause}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}} expected-astgen-error {{expected ')' to end parameter clause}} expected-astgen-error {{expected '->' and return type in subscript}}
     return 0
   }
 }
 
-} // expected-error{{extraneous '}' at top level}} {{1-3=}}
+} // expected-cparser-error{{extraneous '}' at top level}} {{1-3=}}

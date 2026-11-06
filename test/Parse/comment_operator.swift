@@ -14,14 +14,14 @@ _ = 1 +/*hi*/2
 // Used to work, should now be errors
 // The actual error produced is probably not important.
 // These are wrapped in functions to allow the parser to recover before the next test case.
-func test1() { _ = foo/* */?.description }    // expected-error {{expected ':' after '? ...' in ternary expression}}
+func test1() { _ = foo/* */?.description }    // expected-cparser-error {{expected ':' after '? ...' in ternary expression}} expected-astgen-error {{expected ':' and expression after '? ...' in ternary expression}}
 func test2() { _ = foo/* */! }                // expected-error {{expected expression after operator}}
-func test3() { _ = 1/**/+2 }                  // expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{result of operator '+' is unused}}
-func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{integer literal is unused}}
+func test3() { _ = 1/**/+2 }                  // expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-warning {{result of operator '+' is unused}}
+func test4() { _ = 1+/**/2 }                  // expected-error {{'+' is not a postfix unary operator}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-warning {{integer literal is unused}}
 
 // Continue to be errors
-func test5() { _ = !/* */foo }                // expected-error {{unary operator cannot be separated from its operand}}
-func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-error {{consecutive statements on a line must be separated by ';'}} expected-warning {{integer literal is unused}}
+func test5() { _ = !/* */foo }                // expected-cparser-error {{unary operator cannot be separated from its operand}} expected-astgen-error {{expected expression in function}}
+func test6() { _ = 1+/* */2 }                 // expected-error {{'+' is not a postfix unary operator}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-warning {{integer literal is unused}}
 
 // Continue to work
 _ = foo!// this is dangerous
@@ -32,4 +32,4 @@ _ = 1 +/* hi */2
 _ =/**/2
 _/**/= 2
 typealias A = () ->/* */()
-func test7(x: Int) { _ = x./* desc */ } // expected-error {{expected member name following '.'}}
+func test7(x: Int) { _ = x./* desc */ } // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}

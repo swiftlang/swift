@@ -1,3 +1,7 @@
+// The diagnostics for malformed definitions are worded differently by ASTGen;
+// see test/ASTGen/availability_macro_definition.swift.
+// UNSUPPORTED: parser_astgen
+
 // RUN: not %target-swift-frontend -typecheck %s -diagnostic-style llvm \
 // RUN:   -define-availability "_brokenParse:a b c d" \
 // RUN:   -define-availability ":a b c d" \

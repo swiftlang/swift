@@ -6,87 +6,87 @@
 
 // We don't consider this a regex literal when skipping as it has an initial
 // space.
-func a() { _ = / x*/ } // expected-error {{unexpected end of block comment}}
+func a() { _ = / x*/ } // expected-cparser-error {{unexpected end of block comment}} expected-astgen-error {{bare slash regex literal may not start with space}}
 
 // Same because of unbalanced ')'
-func b() { _ = /x)*/ } // expected-error {{unexpected end of block comment}}
+func b() { _ = /x)*/ } // expected-cparser-error {{unexpected end of block comment}}
 
 // These also fail the heuristic, but have unbalanced `{` `}`, so we don't skip.
-func c() { _ = / x}*/ } // expected-error {{regex literal may not start with space; add backslash to escape}}
-func d() { _ = / x{*/ } // expected-error {{regex literal may not start with space; add backslash to escape}}
+func c() { _ = / x}*/ } // expected-cparser-error {{regex literal may not start with space; add backslash to escape}} expected-astgen-error {{bare slash regex literal may not start with space}}
+func d() { _ = / x{*/ } // expected-cparser-error {{regex literal may not start with space; add backslash to escape}} expected-astgen-error {{bare slash regex literal may not start with space}}
 
 // Unterminated, and unbalanced `{}`.
 func e() {
-  _ = /         }
-  // expected-error@-1 {{unterminated regex literal}}
-  // expected-error@-2 {{regex literal may not start with space; add backslash to escape}}
+  _ = /         } // expected-astgen-note {{to match this opening '/'}}
+  // expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{expected '/' to end regex literal}}
+  // expected-cparser-error@-2 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-2 {{bare slash regex literal may not start with space}}
 }
 func f() {
-  _ = /         {
-  // expected-error@-1 {{unterminated regex literal}}
-  // expected-error@-2 {{regex literal may not start with space; add backslash to escape}}
+  _ = /         { // expected-astgen-note {{to match this opening '/'}}
+  // expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{expected '/' to end regex literal}}
+  // expected-cparser-error@-2 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-2 {{bare slash regex literal may not start with space}}
 }
 func g() {
   _ = /x         }
-} // expected-error {{extraneous '}' at top level}}
+} // expected-cparser-error {{extraneous '}' at top level}} expected-astgen-error {{unexpected brace in source file}}
 func h() {
   _ = /x         {
   } // The above cannot a regex literal so we skip; this `}` is to balance things out.
 }
 func i() {
   _ = /x "[abc]     {
-  // expected-error@-1 {{unterminated string literal}}
+  // expected-cparser-error@-1 {{unterminated string literal}}
 }
 func j() {
-  _ = /^ [abc]     {
-  // expected-error@-1 {{unterminated regex literal}}
+  _ = /^ [abc]     { // expected-astgen-note {{to match this opening '/'}}
+  // expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{expected '/' to end regex literal}}
 }
 func k() {
-  _ = /^ "[abc]     {
-  // expected-error@-1 {{unterminated string literal}}
+  _ = /^ "[abc]     { // expected-astgen-note {{to match this opening '/'}}
+  // expected-cparser-error@-1 {{unterminated string literal}} expected-astgen-error@-1 {{expected '/' to end regex literal}}
 }
 func l() {
-  _ = /^    } abc     {
-  // expected-error@-1 {{unterminated regex literal}}
+  _ = /^    } abc     { // expected-astgen-note {{to match this opening '/'}}
+  // expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{expected '/' to end regex literal}}
 }
 func m() {
-  _ = / "
-  // expected-error@-1 {{unterminated string literal}}
+  _ = / " // expected-astgen-note {{to match this opening '/'}} expected-astgen-error {{expected '/' to end regex literal}}
+  // expected-cparser-error@-1 {{unterminated string literal}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}
   }
-} // expected-error {{extraneous '}' at top level}}
+} // expected-cparser-error {{extraneous '}' at top level}} expected-astgen-error {{unexpected brace in source file}}
 
 // Unbalanced `}`, make sure we don't consider the string literal `{`.
-func n() { / "{"}/ } // expected-error {{regex literal may not start with space; add backslash to escape}}
+func n() { / "{"}/ } // expected-cparser-error {{regex literal may not start with space; add backslash to escape}} expected-astgen-error {{bare slash regex literal may not start with space}}
 
 func o() {
   _ = {
     0
     /x}}} /
     2
-  } // expected-error {{extraneous '}' at top level}}
-  // expected-error@-3 {{extraneous '}' at top level}}
-  // expected-error@-4 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-5 {{unterminated regex literal}}
-  // expected-warning@-6 {{regular expression literal is unused}}
+  } // expected-cparser-error {{extraneous '}' at top level}} expected-astgen-error {{unexpected braces in source file}}
+  // expected-cparser-error@-3 {{extraneous '}' at top level}}
+  // expected-cparser-error@-4 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-5 {{unterminated regex literal}} expected-astgen-error@-5 {{unexpected code '} /' in source file}}
+  // expected-cparser-warning@-6 {{regular expression literal is unused}}
   // expected-warning@-6 {{integer literal is unused}}
-} // expected-error {{extraneous '}' at top level}}
+} // expected-cparser-error {{extraneous '}' at top level}}
 
 func p() {
   _ = 2
   /x} /
     .bitWidth
-  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-3 {{unterminated regex literal}}
-  // expected-error@-3 {{value of type 'Regex<Substring>' has no member 'bitWidth'}}
-} // expected-error {{extraneous '}' at top level}}
+  // expected-cparser-error@-2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-3 {{unterminated regex literal}} expected-astgen-error@-3 {{unexpected code '/' in source file}}
+  // expected-cparser-error@-3 {{value of type 'Regex<Substring>' has no member 'bitWidth'}} expected-astgen-error@-3 {{reference to member 'bitWidth' cannot be resolved without a contextual type}}
+} // expected-cparser-error {{extraneous '}' at top level}} expected-astgen-error {{unexpected brace in source file}}
 
 func err1() { _ = / 0xG}/ }
-// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{}}
 func err2() { _ = / 0oG}/ }
-// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}
 func err3() { _ = / {"/ }
-// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}
 func err4() { _ = / {'/ }
-// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}
 func err5() { _ = / {<#placeholder#>/ }
-// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}

@@ -85,7 +85,7 @@ func g(a: Int, b: String) async throws -> String {
 @Remote
 func h(a: Int, b: String) async throws -> String {
   does not
-  // expected-error@-1{{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1{{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1{{consecutive statements on a line must be separated by newline or ';'}}
   parse
 }
 #endif

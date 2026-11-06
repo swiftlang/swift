@@ -878,19 +878,22 @@ func testPropertyWrapperMacro() {
 // Test that macros can't be used in @abi
 
 struct ABIAttrWithFreestandingMacro1 {
-  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  // expected-cparser-error@+2 {{cannot use pound literal in '@abi'}}
+  // expected-astgen-error@+1 {{macro expansion is not permitted as ABI-providing declaration}}
   @abi(#varValue)
   #varValue
   // expected-note@-1 {{in expansion of macro 'varValue' here}}
   /*
   expected-expansion@-3:3 {{
-    expected-error@2:6{{cannot use pound literal in '@abi'}}
+    expected-cparser-error@3:6{{cannot use pound literal in '@abi'}}
+    expected-astgen-error@3:6{{macro expansion is not permitted as ABI-providing declaration}}
   }}
   */
 }
 
 struct ABIAttrWithFreestandingMacro2 {
-  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  // expected-cparser-error@+2 {{cannot use pound literal in '@abi'}}
+  // expected-astgen-error@+1 {{macro expansion is not permitted as ABI-providing declaration}}
   @abi(#varValue)
   var value: Int { 0 }
 }

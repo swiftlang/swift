@@ -6,35 +6,34 @@ func ~= (x: (Int,Int), y: (Int,Int)) -> Bool {
   return true
 }
 
-func parseError1(x: Int) {
-  switch func {} // expected-error {{expected expression in 'switch' statement}} expected-error {{expected identifier in function declaration}}
-}
+// 'parseError1' is in switch_invalid_subject.swift: SwiftParser nests what follows
+// 'switch func {}' in the 'switch', which hides the diagnostics of this file.
 
 func parseError2(x: Int) {
-  switch x // expected-error {{expected '{' after 'switch' subject expression}}
+  switch x // expected-cparser-error {{expected '{' after 'switch' subject expression}} expected-astgen-error {{expected '{}' in 'switch' statement}} expected-astgen-error {{'switch' statement body must have at least one 'case' or 'default' block; add a default case}}
 }
 
 func parseError3(x: Int) {
   switch x {
-    case // expected-error {{expected pattern}} expected-error {{expected ':' after 'case'}}
+    case // expected-error {{expected pattern}} expected-cparser-error {{expected ':' after 'case'}}
   }
 }
 
 func parseError4(x: Int) {
   switch x {
-  case var z where // expected-error {{expected expression for 'where' guard of 'case'}} expected-error {{expected ':' after 'case'}}
+  case var z where // expected-cparser-error {{expected expression for 'where' guard of 'case'}} expected-astgen-error {{expected ':' in switch case}} expected-cparser-error {{expected ':' after 'case'}} expected-astgen-error {{expected expression in 'where' clause}}
   }
 }
 
 func parseError5(x: Int) {
   switch x {
-  case let z // expected-error {{expected ':' after 'case'}} expected-warning {{immutable value 'z' was never used}} {{8-13=_}}
+  case let z // expected-cparser-error {{expected ':' after 'case'}} expected-astgen-error {{expected ':' in switch case}} expected-warning {{immutable value 'z' was never used}} {{8-13=_}}
   }
 }
 
 func parseError6(x: Int) {
   switch x {
-  default // expected-error {{expected ':' after 'default'}}
+  default // expected-cparser-error {{expected ':' after 'default'}} expected-astgen-error {{expected ':' in switch case}}
   }
 }
 
@@ -73,7 +72,7 @@ default:
 // Multiple cases per case block
 switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0: // expected-error {{'case' label in a 'switch' must have at least one executable statement}} {{8-8= break}}
-case 1, case 2: // expected-error {{extraneous 'case' keyword in pattern}} {{9-14=}}
+case 1, case 2: // expected-cparser-error {{extraneous 'case' keyword in pattern}} {{9-14=}} expected-astgen-error {{unexpected 'case' keyword in switch case}}
   x = 0
 }
 
@@ -97,7 +96,7 @@ default: // expected-error {{'default' label in a 'switch' must have at least on
 
 switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
 case 0:
-  ; // expected-error {{';' statements are not allowed}} {{3-5=}}
+  ; // expected-cparser-error {{';' statements are not allowed}} {{3-5=}} expected-astgen-error {{';' statements are not allowed}}
 case 1:
   x = 0
 }
@@ -142,7 +141,7 @@ default: // expected-error{{additional 'case' blocks cannot appear after the 'de
   x = 0
 }
 
-switch x { // expected-error {{switch must be exhaustive}} expected-note{{add a default clause}}
+switch x { // expected-cparser-error {{switch must be exhaustive}} expected-cparser-note{{add a default clause}}
 default where x == 0: // expected-error{{'default' cannot be used with a 'where' guard expression}}
   x = 0
 }
@@ -164,12 +163,9 @@ case 1: // expected-error{{'case' label in a 'switch' must have at least one exe
 }
 
 
-case 0: // expected-error{{'case' label can only appear inside a 'switch' statement}}
-var y = 0
-default: // expected-error{{'default' label can only appear inside a 'switch' statement}}
-var z = 1
-
-fallthrough // expected-error{{'fallthrough' is only allowed inside a switch}}
+// The 'case', 'default' and 'fallthrough' outside of a 'switch' are in
+// switch_case_outside_switch.swift: SwiftParser takes the rest of the file as the
+// body of the first, which hides the diagnostics of what follows.
 
 switch x {
 case 0:
@@ -490,43 +486,43 @@ case .Thing:
 #endif
 }
 
-switch x {
+switch x { // expected-astgen-error {{switch must be exhaustive}}
 case 0:
   break
-@garbage case _: // expected-error {{unknown attribute 'garbage'}}
+@garbage case _: // expected-cparser-error {{unknown attribute 'garbage'}} expected-astgen-note {{remove '@unknown' to handle remaining values}}
   break
 }
 
-switch x {
+switch x { // expected-astgen-error {{switch must be exhaustive}}
 case 0:
   break
-@garbage @moreGarbage default: // expected-error {{unknown attribute 'garbage'}} expected-error {{unknown attribute 'moreGarbage'}}
+@garbage @moreGarbage default: // expected-cparser-error {{unknown attribute 'garbage'}} expected-cparser-error {{unknown attribute 'moreGarbage'}} expected-astgen-error {{unexpected code '@moreGarbage' in switch case}} expected-astgen-note {{remove '@unknown' to handle remaining values}}
   break
 }
 
-@unknown let _ = 1 // expected-error {{unknown attribute 'unknown'}}
+@unknown let _ = 1 // expected-cparser-error {{unknown attribute 'unknown'}}
 
 switch x {
 case _:
-  @unknown let _ = 1 // expected-error {{unknown attribute 'unknown'}}
+  @unknown let _ = 1 // expected-cparser-error {{unknown attribute 'unknown'}}
 }
 
 switch Whatever.Thing {
 case .Thing:
   break
-@unknown(garbage) case _: // expected-error {{unexpected '(' in attribute 'unknown'}}
+@unknown(garbage) case _: // expected-cparser-error {{unexpected '(' in attribute 'unknown'}} expected-astgen-error {{unexpected code '(garbage)' in switch case}}
   break
 }
 switch Whatever.Thing {
 case .Thing:
   break
-@unknown // expected-note {{attribute already specified here}}
-@unknown // expected-error {{duplicate attribute}}
+@unknown // expected-cparser-note {{attribute already specified here}}
+@unknown // expected-cparser-error {{duplicate attribute}} expected-astgen-error {{unexpected code '@unknown' in switch case}}
 case _:
   break
 }
 switch Whatever.Thing { // expected-warning {{switch must be exhaustive}} expected-note {{add missing case: '.Thing'}}
-@unknown @garbage(foobar) // expected-error {{unknown attribute 'garbage'}}
+@unknown @garbage(foobar) // expected-cparser-error {{unknown attribute 'garbage'}} expected-astgen-error {{unexpected code '@garbage(foobar)' in switch case}}
 case _:
   break
 }
@@ -631,7 +627,7 @@ func testReturnBeforeIncompleteUnknownDefault() {
   switch x { // expected-error {{switch must be exhaustive}}
   case 1:
     return
-  @unknown default // expected-error {{expected ':' after 'default'}}
+  @unknown default // expected-cparser-error {{expected ':' after 'default'}} expected-astgen-error {{expected ':' in switch case}}
   // expected-note@-1 {{remove '@unknown' to handle remaining values}}
   }
 }
@@ -640,14 +636,14 @@ func testReturnBeforeIncompleteUnknownDefault2() {
   switch x { // expected-error {{switch must be exhaustive}} expected-note {{add a default clause}}
   case 1:
     return
-  @unknown // expected-error {{unknown attribute 'unknown'}}
-  } // expected-error {{expected declaration}}
+  @unknown // expected-cparser-error {{unknown attribute 'unknown'}} expected-astgen-error {{expected label in switch case}}
+  } // expected-cparser-error {{expected declaration}}
 }
 
 func testIncompleteArrayLiteral() {
   switch x { // expected-error {{switch must be exhaustive}}
   case 1:
-    _ = [1 // expected-error {{expected ']' in container literal expression}} expected-note {{to match this opening '['}}
+    _ = [1 // expected-cparser-error {{expected ']' in container literal expression}} expected-astgen-error {{expected ']' to end array}} expected-note {{to match this opening '['}}
   @unknown default: // expected-note {{remove '@unknown' to handle remaining values}}
     ()
   }

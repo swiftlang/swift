@@ -8,7 +8,7 @@ extension G {
   }
 }
 
-extension { // expected-error {{expected type name in extension declaration}}
+extension { // expected-cparser-error {{expected type name in extension declaration}} expected-astgen-error {{expected type in extension}}
   struct S<T> {
     func foo(t: T) {}
   }

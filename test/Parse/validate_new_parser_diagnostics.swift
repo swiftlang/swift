@@ -11,7 +11,7 @@
 
 func bad() {
   _ = [(Int) -> async throws Int]()
-  // expected-error@-1{{'throws' may only occur before '->'}}
-  // expected-error@-2{{'async' may only occur before '->'}}
+  // expected-cparser-error@-1{{'throws' may only occur before '->'}}
+  // expected-cparser-error@-2{{'async' may only occur before '->'}} expected-astgen-error@-2 {{'async throws' must precede '->'}}
 }
 

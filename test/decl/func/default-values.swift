@@ -17,13 +17,13 @@ func h(_ x: () -> () = g) { x() }
 
 // Tuple types cannot have default values, but recover well here.
 func tupleTypes() {
-  typealias ta1 = (a : Int = ()) // expected-error{{default argument not permitted in a tuple type}}{{28-32=}}
+  typealias ta1 = (a : Int = ()) // expected-cparser-error{{default argument not permitted in a tuple type}}{{28-32=}} expected-astgen-error {{unexpected code '= ()' in tuple type}}
   // expected-error @-1{{cannot create a single-element tuple with an element label}}{{20-24=}}
-  var c1 : (a : Int, b : Int, c : Int = 3, // expected-error{{default argument not permitted in a tuple type}}{{39-42=}}
-            d = 4) = (1, 2, 3, 4) // expected-error{{default argument not permitted in a tuple type}}{{15-18=}} expected-error{{cannot find type 'd' in scope}}
+  var c1 : (a : Int, b : Int, c : Int = 3, // expected-cparser-error{{default argument not permitted in a tuple type}}{{39-42=}} expected-astgen-error {{unexpected code in tuple type}}
+            d = 4) = (1, 2, 3, 4) // expected-cparser-error{{default argument not permitted in a tuple type}}{{15-18=}} expected-cparser-error{{cannot find type 'd' in scope}} expected-astgen-error {{'(Int, Int, Int, Int)' is not convertible to '(a: Int, b: Int, c: Int)', tuples have a different number of elements}}
 }
 
-func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-error{{default argument not permitted in a tuple type}} {{45-49=}}
+func returnWithDefault() -> (a: Int, b: Int = 42) { // expected-cparser-error{{default argument not permitted in a tuple type}} {{45-49=}} expected-astgen-error {{unexpected code '= 42' in tuple type}}
   return 5 // expected-error{{cannot convert return expression of type 'Int' to return type '(a: Int, b: Int)'}}
 }
 

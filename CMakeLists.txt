@@ -1132,6 +1132,18 @@ if(SWIFT_BUILD_SARIF)
   add_definitions(-DSWIFT_BUILD_SARIF)
 endif()
 
+option(SWIFT_ENABLE_ASTGEN_BY_DEFAULT
+  "Parse source files with the swift-syntax parser and ASTGen unless \
+-disable-experimental-feature ParserASTGen is passed"
+  FALSE)
+if(SWIFT_ENABLE_ASTGEN_BY_DEFAULT)
+  if(NOT SWIFT_BUILD_SWIFT_SYNTAX)
+    message(FATAL_ERROR
+      "SWIFT_ENABLE_ASTGEN_BY_DEFAULT requires SWIFT_BUILD_SWIFT_SYNTAX")
+  endif()
+  add_definitions(-DSWIFT_ENABLE_ASTGEN_BY_DEFAULT)
+endif()
+
 if(SWIFT_BUILD_IMMEDIATE_MODE)
   add_definitions(-DSWIFT_BUILD_IMMEDIATE_MODE)
 endif()

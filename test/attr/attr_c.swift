@@ -15,24 +15,26 @@
 @c(cdecl_foo) func foo(x: Int) -> Int { return x }
 
 @c(not an identifier) func invalidName() {}
-// expected-error @-1 {{expected ')' in 'c' attribute}}
-// expected-error @-2 {{expected declaration}}
+// expected-cparser-error @-1 {{expected ')' in 'c' attribute}}
+// expected-cparser-error @-2 {{expected declaration}}
+// expected-astgen-error @-3 {{unexpected code 'an identifier' in attribute}}
 
 @c("old string syntax") func stringSyntax() {}
 // expected-error @-1 {{expected C identifier in 'c' attribute}}
-// expected-error @-2 {{expected declaration}}
+// expected-cparser-error @-2 {{expected declaration}}
 
 @c() func emptyParen() {}
 // expected-error @-1 {{expected C identifier in 'c' attribute}}
-// expected-error @-2 {{expected declaration}}
+// expected-cparser-error @-2 {{expected declaration}}
 
 @c(42) func aNumber() {}
 // expected-error @-1 {{expected C identifier in 'c' attribute}}
-// expected-error @-2 {{expected declaration}}
+// expected-cparser-error @-2 {{expected declaration}}
 
 @c(a:selector:) func selectordName() {}
-// expected-error @-1 {{expected ')' in 'c' attribute}}
-// expected-error @-2 {{expected declaration}}
+// expected-cparser-error @-1 {{expected ')' in 'c' attribute}}
+// expected-cparser-error @-2 {{expected declaration}}
+// expected-astgen-error @-3 {{unexpected code ':' in attribute}}
 
 @c func defaultName() {}
 

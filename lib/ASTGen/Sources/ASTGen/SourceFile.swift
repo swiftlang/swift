@@ -34,6 +34,14 @@ public struct ExportedSourceFile {
   /// The syntax tree for the complete source file.
   public let syntax: Syntax
 
+  /// How this buffer came to exist: `.none` for a real source file, or the kind
+  /// of macro expansion or other generated source it holds.
+  ///
+  /// The C++ parser reads the equivalent off the `SourceFile` it is parsing, as
+  /// `SF.Kind`. Consulting the *enclosing declaration's* file instead gives the
+  /// wrong answer inside a generated buffer.
+  public let generatedKind: BridgedGeneratedSourceFileKind
+
   /// A source location converter to convert `AbsolutePosition`s in `syntax` to line/column locations.
   public lazy var sourceLocationConverter: SourceLocationConverter = SourceLocationConverter(
     fileName: fileName,
@@ -44,6 +52,17 @@ public struct ExportedSourceFile {
   ///
   /// This is a cached value; access via configuredRegions(astContext:).
   var _configuredRegions: ConfiguredRegions? = nil
+
+  /// Whether placeholder errors are downgraded to warnings, as recorded when
+  /// the parser diagnostics were emitted, for the diagnostics of function
+  /// bodies that are built later.
+  var downgradePlaceholderErrorsToWarnings: Bool = false
+
+  /// The diagnostics split by whether they are inside a function body that is
+  /// built on demand.
+  ///
+  /// This is a cached value; access via heldBackDiagnostics(astContext:).
+  var _heldBackDiagnostics: HeldBackDiagnostics? = nil
 
   /// Warning group control regions for this source file
   ///
@@ -175,7 +194,20 @@ public func parseSourceFile(
     parsed = Syntax(AttributeClauseFileSyntax.parse(from: &parser))
 
   case .bodyMacroExpansion:
-    parsed = Syntax(CodeBlockFileSyntax.parse(from: &parser))
+    let block = CodeBlockFileSyntax.parse(from: &parser)
+    if block.body.leftBrace.presence == .present {
+      parsed = Syntax(block)
+    } else {
+      // The C++ parser produces no body, and no diagnostics, for an expansion
+      // that does not start with '{' (such as an empty one). Model that with an
+      // empty source file rather than a code block missing its braces.
+      var emptyParser = Parser(
+        "",
+        swiftVersion: Parser.SwiftVersion(from: ctx),
+        languageFeatures: Parser.LanguageFeatures(from: ctx)
+      )
+      parsed = Syntax(SourceFileSyntax.parse(from: &emptyParser))
+    }
   }
 
   let exportedPtr = UnsafeMutablePointer<ExportedSourceFile>.allocate(capacity: 1)
@@ -186,7 +218,8 @@ public func parseSourceFile(
       buffer: buffer,
       moduleName: moduleName,
       fileName: fileName,
-      syntax: parsed
+      syntax: parsed,
+      generatedKind: kind
     )
   )
 
@@ -222,7 +255,8 @@ public func emitParserDiagnostics(
   diagEnginePtr: UnsafeMutableRawPointer,
   sourceFilePtr: UnsafeMutablePointer<UInt8>,
   emitOnlyErrors: CInt,
-  downgradePlaceholderErrorsToWarnings: CInt
+  downgradePlaceholderErrorsToWarnings: CInt,
+  delayFunctionBodies: CInt
 ) -> CInt {
   return sourceFilePtr.withMemoryRebound(
     to: ExportedSourceFile.self,
@@ -230,8 +264,14 @@ public func emitParserDiagnostics(
   ) { sourceFile in
     var anyDiags = false
 
-    let sourceFileSyntax = sourceFile.pointee.syntax
-    let diags = ParseDiagnosticsGenerator.diagnostics(for: sourceFileSyntax)
+    sourceFile.pointee.downgradePlaceholderErrorsToWarnings = downgradePlaceholderErrorsToWarnings == 1
+    let diags: [Diagnostic]
+    if delayFunctionBodies != 0 {
+      // Diagnostics inside bodies built on demand wait for the body.
+      diags = sourceFile.pointee.heldBackDiagnostics(astContext: ctx).parserOutside
+    } else {
+      diags = ParseDiagnosticsGenerator.diagnostics(for: sourceFile.pointee.syntax)
+    }
 
     let diagnosticEngine = BridgedDiagnosticEngine(raw: diagEnginePtr)
     let configuredRegions = sourceFile.pointee.configuredRegions(astContext: ctx)
@@ -402,4 +442,38 @@ func freeVirtualFiles(
   }
   buffer.deinitialize()
   buffer.deallocate()
+}
+
+/// Parser and `#if` diagnostics split by whether they lie inside the body of a
+/// function that is built on demand.
+struct HeldBackDiagnostics {
+  /// Parser diagnostics outside any delayed body.
+  var parserOutside: [Diagnostic]
+  /// Parser diagnostics inside a delayed body, keyed by the offset of its `{`.
+  var parser: [Int: [Diagnostic]]
+  var ifConfigOutside: [Diagnostic]
+  var ifConfig: [Int: [Diagnostic]]
+}
+
+extension ExportedSourceFile {
+  mutating func heldBackDiagnostics(astContext: BridgedASTContext) -> HeldBackDiagnostics {
+    if let cached = self._heldBackDiagnostics {
+      return cached
+    }
+    let ranges = self.delayedRegions()
+    let parserDiagnostics = ParseDiagnosticsGenerator.diagnostics(for: self.syntax)
+    let (parserOutside, parserInside) = partitionDiagnostics(parserDiagnostics, byDelayedRegions: ranges)
+    let (ifConfigOutside, ifConfigInside) = partitionDiagnostics(
+      self.configuredRegions(astContext: astContext).diagnostics,
+      byDelayedRegions: ranges
+    )
+    let result = HeldBackDiagnostics(
+      parserOutside: parserOutside,
+      parser: parserInside,
+      ifConfigOutside: ifConfigOutside,
+      ifConfig: ifConfigInside
+    )
+    self._heldBackDiagnostics = result
+    return result
+  }
 }

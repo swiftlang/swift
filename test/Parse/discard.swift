@@ -3,17 +3,17 @@
 func discard<T>(_ t: T) {}
 
 func a() {
-  discard case // expected-error {{'case' label can only appear inside a 'switch' statement}}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  discard case // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{'case' can only appear inside a 'switch' statement or 'enum' declaration}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
 }
 
 func b() {
-  discard 124 // expected-error {{consecutive statements on a line must be separated by ';'}}
+  discard 124 // expected-cparser-error {{consecutive statements on a line must be separated by ';'}}
 }
 
 func c() {
-  discard where 5 == 0 // expected-error {{expected expression}}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  discard where 5 == 0 // expected-cparser-error {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{unexpected code 'where 5 == 0' in function}}
 }
 
 func c() {
@@ -22,7 +22,7 @@ func c() {
 }
 
 func c() {
-  let _ = discard self // expected-error {{consecutive statements on a line must be separated by ';'}}
+  let _ = discard self // expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}}
 }
 
 func c() {
@@ -34,16 +34,16 @@ func c() {
 }
 
 func c() {
-  _forget self  // expected-error {{consecutive statements on a line must be separated by ';'}}
+  _forget self  // expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}}
 }
 
 func c() {
   discard `self`
 }
 
-func c() {
-  discard switch  // expected-error {{expected expression in 'switch' statement}}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+func c() { // expected-astgen-note {{to match this opening '{'}}
+  discard switch  // expected-cparser-error {{expected expression in 'switch' statement}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{expected expression and '{' in 'switch' statement}}
 }
 
 func c() {
@@ -55,7 +55,7 @@ func c() {
 }
 
 func c() {
-  discard discard self // expected-error {{consecutive statements on a line must be separated by ';'}}
+  discard discard self // expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}}
 }
 
 class discard {
@@ -76,4 +76,4 @@ class discard {
       discard self.x()
     }
   }
-}
+} // expected-astgen-error {{expected '}' to end function}}

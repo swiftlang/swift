@@ -62,8 +62,8 @@ class Theodosia: Aaron {
 
     // FIXME: We could optimistically parse this as an expression instead
     // expected-error@+2 {{initializers may only be declared within a type}}
-    // expected-error@+1 {{expected parameter type following ':'}}
-    init(z: 0)
+    // expected-cparser-error@+1 {{expected parameter type following ':'}} expected-astgen-error@+1 {{expected type in parameter}}
+    init(z: 0) // expected-astgen-error {{unexpected code '0' in parameter clause}}
   }
 
   static var theodosiaVar: Aaron {
@@ -98,8 +98,8 @@ struct AaronStruct {
 
     // FIXME: We could optimistically parse this as an expression instead
     // expected-error@+2 {{initializers may only be declared within a type}}
-    // expected-error@+1 {{expected parameter type following ':'}}
-    init(y: 1)
+    // expected-cparser-error@+1 {{expected parameter type following ':'}} expected-astgen-error@+1 {{expected type in parameter}}
+    init(y: 1) // expected-astgen-error {{unexpected code '1' in parameter clause}}
   }
 
   static var aaronVar: Aaron {
@@ -110,7 +110,7 @@ struct AaronStruct {
 
     // FIXME: We could optimistically parse this as an expression instead
     // expected-error@+3 {{initializers may only be declared within a type}}
-    // expected-error@+2 {{consecutive statements on a line must be separated by ';'}}
+    // expected-cparser-error@+2 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@+2 {{consecutive statements on a line must be separated by newline or ';'}}
     // expected-error@+1 {{non-void function should return a value}}
     return init()
   }

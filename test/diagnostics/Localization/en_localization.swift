@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -localization-path %S/Inputs -locale en
+// RUN: %target-typecheck-verify-swift -localization-path %S/Inputs -locale en -disable-experimental-feature ParserASTGen
+// These tests use lexer/parser diagnostics, which ASTGen does not localize.
 
 _ = "HI!
 // expected-error@-1{{unterminated string literal}}

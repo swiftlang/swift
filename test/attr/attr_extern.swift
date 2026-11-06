@@ -5,25 +5,25 @@
 @_extern(wasm, module: "m1", name: "f1")
 func f1(x: Int) -> Int
 
-@_extern(wasm, module: "m2", name: ) // expected-error  {{expected string literal in '_extern' attribute}}
+@_extern(wasm, module: "m2", name: ) // expected-error  {{expected string literal in '_extern' attribute}} expected-astgen-error {{expected value in attribute}}
 func f2ErrorOnMissingNameLiteral(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
 @_extern(wasm, module: "m3", name) // expected-error  {{expected ':' after label 'name'}}
 func f3ErrorOnMissingNameColon(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
-@_extern(wasm, module: "m4",) // expected-error  {{expected name argument to '@_extern'}}
+@_extern(wasm, module: "m4",) // expected-cparser-error  {{expected name argument to '@_extern'}} expected-astgen-error {{expected ')' in '_extern' attribute}}
 func f4ErrorOnMissingNameLabel(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
 @_extern(wasm, module: "m5") // expected-error {{expected ',' in '_extern' attribute}}
 func f5ErrorOnMissingName(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
-@_extern(wasm, module: ) // expected-error {{expected string literal in '_extern' attribute}} expected-error {{expected ',' in '_extern' attribute}}
+@_extern(wasm, module: ) // expected-error {{expected string literal in '_extern' attribute}} expected-error {{expected ',' in '_extern' attribute}} expected-astgen-error {{expected value in attribute}}
 func f6ErrorOnMissingModuleLiteral(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
 @_extern(wasm, module) // expected-error {{expected ':' after label 'module'}} expected-error {{expected ',' in '_extern' attribute}}
 func f7ErrorOnMissingModuleColon(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
-@_extern(wasm,) // expected-error {{expected module argument to '@_extern'}} expected-error {{expected ',' in '_extern' attribute}}
+@_extern(wasm,) // expected-cparser-error {{expected module argument to '@_extern'}} expected-cparser-error {{expected ',' in '_extern' attribute}} expected-astgen-error {{expected ')' in '_extern' attribute}}
 func f8ErrorOnMissingModuleLabel(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
 @_extern(wasm, module: "m9", name: "f9")
@@ -64,7 +64,7 @@ func 🥸_implicitInvalid()
 @_extern(c)
 func omitCName()
 
-@_extern(c, ) // expected-error {{expected string literal in '_extern' attribute}}
+@_extern(c, ) // expected-cparser-error {{expected string literal in '_extern' attribute}} expected-astgen-error {{expected ')' in '_extern' attribute}}
 func editingCName() // expected-error {{expected '{' in body of function declaration}}
 
 struct StructScopeC {

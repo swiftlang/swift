@@ -49,11 +49,11 @@ let `@atSign` = 0
 let `#octothorpe` = 0
 
 // Escaped identifiers cannot contain *only* operator characters.
-let `+` = 0  // expected-error{{expected pattern}}
-let `^*^` = 0  // expected-error{{expected pattern}}
-let `.` = 0  // expected-error{{expected pattern}}
-let `?` = 0  // expected-error{{expected pattern}}
-func `+`(lhs: Int, rhs: Int) -> Int  // expected-error{{expected identifier in function declaration}}
+let `+` = 0  // expected-cparser-error{{expected pattern}} expected-astgen-error {{a raw identifier cannot contain only operator characters}}
+let `^*^` = 0  // expected-cparser-error{{expected pattern}} expected-astgen-error {{a raw identifier cannot contain only operator characters}}
+let `.` = 0  // expected-cparser-error{{expected pattern}} expected-astgen-error {{a raw identifier cannot contain only operator characters}}
+let `?` = 0  // expected-cparser-error{{expected pattern}} expected-astgen-error {{a raw identifier cannot contain only operator characters}}
+func `+`(lhs: Int, rhs: Int) -> Int  // expected-cparser-error{{expected identifier in function declaration}} expected-astgen-error {{a raw identifier cannot contain only operator characters}} expected-astgen-error {{expected '{' in body of function declaration}}
 
 @propertyWrapper
 struct `@PoorlyNamedWrapper`<`The Value`> {

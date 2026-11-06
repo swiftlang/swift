@@ -14,7 +14,7 @@ import ASTBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
-protocol DoStmtOrExprSyntax {
+protocol DoStmtOrExprSyntax: SyntaxProtocol {
   var doKeyword: TokenSyntax { get }
   var throwsClause: ThrowsClauseSyntax? { get }
   var body: CodeBlockSyntax { get }
@@ -67,7 +67,18 @@ extension ASTGenVisitor {
   }
 
   func generate(codeBlockItem node: CodeBlockItemSyntax) -> BridgedASTNode? {
-    // TODO: Set semicolon loc.
+    guard let result = self.generateCodeBlockItemNode(node) else {
+      return nil
+    }
+    // Like the C++ parser, don't record the ';' after an item that needed error
+    // recovery.
+    if let semicolon = node.semicolon, semicolon.presence == .present, !node.item.hasError {
+      result.setTrailingSemiLoc(self.generateSourceLoc(semicolon))
+    }
+    return result
+  }
+
+  private func generateCodeBlockItemNode(_ node: CodeBlockItemSyntax) -> BridgedASTNode? {
     switch node.item {
     case .decl(let node):
       if let node = node.as(MacroExpansionDeclSyntax.self) {
@@ -92,18 +103,81 @@ extension ASTGenVisitor {
           break
         }
       }
+      // SwiftParser parses `yield(...)` as a call; in a coroutine it is a
+      // `yield` statement, as it is for the C++ parser.
+      if let call = node.as(FunctionCallExprSyntax.self), let yieldStmt = self.generate(yieldCall: call) {
+        return .stmt(yieldStmt.asStmt)
+      }
       return .expr(self.generate(expr: node))
     }
   }
 
+  /// A `yield(...)` call inside a coroutine, as a `yield` statement.
+  private func generate(yieldCall call: FunctionCallExprSyntax) -> BridgedYieldStmt? {
+    guard self.declContext.isCoroutineFunction,
+      let callee = call.calledExpression.as(DeclReferenceExprSyntax.self),
+      callee.baseName.text == "yield", callee.argumentNames == nil,
+      call.trailingClosure == nil, call.additionalTrailingClosures.isEmpty,
+      let leftParen = call.leftParen
+    else {
+      return nil
+    }
+    // A list of yielded values does not take labels.
+    for argument in call.arguments {
+      guard let label = argument.label else {
+        continue
+      }
+      let start = label.positionAfterSkippingLeadingTrivia
+      self.diagnose(
+        .unexpected_label_yield,
+        at: label,
+        fixIts: [
+          .init(
+            remove: self.generateCharSourceRange(
+              start: start,
+              length: SourceLength(
+                utf8Length: argument.expression.positionAfterSkippingLeadingTrivia.utf8Offset - start.utf8Offset
+              )
+            )
+          )
+        ]
+      )
+    }
+    return .createParsed(
+      self.ctx,
+      yieldLoc: self.generateSourceLoc(callee.baseName),
+      lParenLoc: self.generateSourceLoc(leftParen),
+      yields: call.arguments.lazy.map({ self.generate(expr: $0.expression) }).bridgedArray(in: self),
+      rParenLoc: self.generateSourceLoc(call.rightParen)
+    )
+  }
+
   @inline(__always)
-  func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
+  func generate(
+    codeBlockItemList node: CodeBlockItemListSyntax,
+    skippingLeadingExpressions: Bool = false
+  ) -> [BridgedASTNode] {
     var allItems: [BridgedASTNode] = []
+    var skipping = skippingLeadingExpressions
     visitIfConfigElements(
       node,
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { codeBlockItem in
+      // After a stray label, the C++ parser skips to the start of the next
+      // statement or declaration, dropping leading expressions.
+      if skipping {
+        if case .expr = codeBlockItem.item {
+          return
+        }
+        skipping = false
+      }
+      // The statements of a 'case' outside of a 'switch' belong after it.
+      defer {
+        if let body = codeBlockItem.strayCaseBody {
+          allItems.append(contentsOf: self.generate(codeBlockItemList: body, skippingLeadingExpressions: true))
+        }
+      }
       guard let item = self.generate(codeBlockItem: codeBlockItem) else {
         return
       }
@@ -140,25 +214,73 @@ extension ASTGenVisitor {
       self.ctx,
       lBraceLoc: self.generateSourceLoc(node.leftBrace),
       elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
-      rBraceLoc: self.generateSourceLoc(node.rightBrace)
+      rBraceLoc: self.generateRBraceLoc(node.rightBrace, of: node)
     )
   }
 
+  /// A zero-width range at the end of `node`, for use as the fallback body range
+  /// of a statement whose body braces the parser had to synthesize.
+  ///
+  /// The end of the statement is inside every scope the statement introduces --
+  /// a conditional clause's, notably -- whereas the statement's *start* is not,
+  /// and the synthesized braces' own position may be anywhere.
+  func implicitBodyRange(atEndOf node: some SyntaxProtocol) -> SourceRange {
+    let end = self.generateSourceRange(node).end
+    return SourceRange(start: end, end: end)
+  }
+
+  /// Generate a statement body, supplying a range to use if the parser had to
+  /// synthesize the braces.
+  ///
+  /// A synthesized brace has a zero-width position just past the preceding token
+  /// *and its trailing trivia*, which can be outside the enclosing statement --
+  /// past the end of the line, even. A body built from it gives the statement a
+  /// range extending past what it consumed, and the statement's own child scopes
+  /// then fall outside it.
+  ///
+  /// The body is also marked implicit in that case, matching the C++ parser,
+  /// which likewise synthesizes a body it never saw braces for.
+  func generate(codeBlock node: CodeBlockSyntax, fallbackRange: SourceRange) -> BridgedBraceStmt {
+    guard node.leftBrace.presence == .present else {
+      // The body must at least contain its own contents, so prefer their extent.
+      // `fallbackRange` is only for an empty block, where there is nothing to
+      // derive a range from.
+      let contentRange = self.generateSourceRange(node.statements)
+      let range = contentRange.start.isValid ? contentRange : fallbackRange
+      return BridgedBraceStmt.createImplicit(
+        self.ctx,
+        lBraceLoc: range.start,
+        elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
+        rBraceLoc: range.end
+      )
+    }
+    return self.generate(codeBlock: node)
+  }
+
   func generateHasSymbolStmtCondition(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedStmtConditionElement {
+    // Check the shape the way `Parser::parseStmtConditionPoundHasSymbol` does.
+    if node.leftParen == nil {
+      // The C++ parser points at the token after `#_hasSymbol`.
+      self.diagnose(
+        .has_symbol_expected_lparen,
+        at: node.macroName.nextToken(viewMode: .sourceAccurate) ?? node.macroName
+      )
+    }
+
     var args = node.arguments[...]
     let symbol: BridgedExpr?
     if let arg = args.popFirst() {
       symbol = self.generate(expr: arg.expression)
-      if arg.label != nil {
-        // TODO: Diagnose
-        fatalError("unexpected label")
-      }
-      if !args.isEmpty {
-        // TODO: Diagnose
-        fatalError("extra args")
+      if let label = arg.label {
+        self.diagnose(.has_symbol_expected_rparen, at: label)
+      } else if let extra = args.first {
+        self.diagnose(.has_symbol_expected_rparen, at: extra)
       }
     } else {
       symbol = nil
+      if node.leftParen != nil {
+        self.diagnose(.has_symbol_expected_expr, at: node.rightParen ?? node.macroName)
+      }
     }
     return .createHasSymbol(
       self.ctx,
@@ -226,7 +348,11 @@ extension ASTGenVisitor {
             moduleSelector: nil,
             baseName: .init(identifier)
           )
-          let loc = BridgedDeclNameLoc.createParsed(self.generateSourceLoc(node.pattern))
+          // The reference sits at the end of the pattern: the last token of its
+          // type annotation, if it has one.
+          let refToken = node.typeAnnotation?.type.lastToken(viewMode: .sourceAccurate)
+          let loc = BridgedDeclNameLoc.createParsed(
+            refToken.map { self.generateSourceLoc($0) } ?? self.generateSourceLoc(node.pattern))
           initializer =
             BridgedUnresolvedDeclRefExpr.createParsed(
               self.ctx,
@@ -235,10 +361,52 @@ extension ASTGenVisitor {
               loc: loc
             ).asExpr
         } else {
-          // FIXME: Implement.
-          // For `if let foo.bar {`, diagnose and convert it to `if let _ =  foo.bar`
-          // For `if let (a, b) {`, diagnose it and create an error expression.
-          fatalError("unimplemented (optional binding recovery)")
+          // Not a valid unwrap condition, e.g. `if let foo.bar { }` or
+          // `if let (a, b) { }`.
+          self.diagnose(
+            .conditional_var_valid_identifiers_only,
+            at: node.pattern,
+            fixIts: [
+              .init(
+                replace: self.generateCharSourceRange(
+                  start: node.pattern.positionAfterSkippingLeadingTrivia,
+                  length: SourceLength(utf8Length: 0)
+                ),
+                with: "<#identifier#> = "
+              )
+            ]
+          )
+
+          if let exprPattern = node.pattern.as(ExpressionPatternSyntax.self) {
+            // Recover the way the C++ parser does: take the expression as the
+            // initializer and bind it to an implicit '_'.
+            //
+            // Unlike the C++ parser this keeps the BindingPattern wrapper rather
+            // than building an implicit OptionalSomePattern, which is not
+            // bridged. The verdict is the same either way; only the shape of the
+            // AST for already-invalid code differs.
+            initializer = self.generate(expr: exprPattern.expression)
+            pat = BridgedBindingPattern.createParsed(
+              self.ctx,
+              keywordLoc: keywordLoc,
+              isLet: isLet,
+              subPattern: BridgedAnyPattern.createImplicit(self.ctx).asPattern
+            ).asPattern
+            pat.setImplicit()
+          } else {
+            // Nothing usable to unwrap, e.g. a tuple pattern, or a pattern the
+            // parser could not form at all.
+            //
+            // A missing pattern has no source-accurate tokens, so its range is
+            // invalid; fall back to the condition's own range. An ErrorExpr with
+            // no location would give the condition a range with a valid start and
+            // an invalid end, which `SourceRange` asserts against.
+            let patternRange = self.generateSourceRange(node.pattern)
+            initializer = BridgedErrorExpr.create(
+              self.ctx,
+              loc: patternRange.start.isValid ? patternRange : self.generateSourceRange(node)
+            ).asExpr
+          }
         }
       }
       return .createPatternBinding(
@@ -281,7 +449,7 @@ extension ASTGenVisitor {
       deferLoc: deferLoc
     )
     self.withDeclContext(stmt.tempDecl.asDeclContext) {
-      let body = self.generate(codeBlock: node.body)
+      let body = self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node))
       stmt.tempDecl.setParsedBody(body)
       if body.hasAsyncNode() {
         stmt.makeAsync(ctx)
@@ -318,6 +486,7 @@ extension ASTGenVisitor {
   }
 
   func generate(catchItemList node: CatchItemListSyntax) -> BridgedArrayRef {
+    self.diagnoseUnboundPatternVariables(in: node.compactMap { $0.pattern })
     if node.isEmpty {
       let item = BridgedCaseLabelItemInfo(
         isDefault: false,
@@ -339,7 +508,7 @@ extension ASTGenVisitor {
       self.ctx,
       catchLoc: self.generateSourceLoc(node.catchKeyword),
       caseLabelItems: self.generate(catchItemList: node.catchItems),
-      body: self.generate(codeBlock: node.body)
+      body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node))
     )
   }
 
@@ -356,13 +525,16 @@ extension ASTGenVisitor {
     labelInfo: BridgedLabeledStmtInfo = nil
   ) -> BridgedStmt {
     if node.catchClauses.isEmpty {
-      // FIXME: Handle
-      precondition(node.throwsClause == nil)
+      // A 'throws' clause is only meaningful with a 'catch' to type. The C++
+      // parser reports this and drops the clause, keeping a plain DoStmt.
+      if let throwsClause = node.throwsClause {
+        self.diagnose(.do_throws_without_catch, at: throwsClause.throwsSpecifier)
+      }
       return BridgedDoStmt.createParsed(
         self.ctx,
         labelInfo: labelInfo,
         doLoc: self.generateSourceLoc(node.doKeyword),
-        body: self.generate(codeBlock: node.body)
+        body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node))
       ).asStmt
     } else {
       return BridgedDoCatchStmt.createParsed(
@@ -371,7 +543,7 @@ extension ASTGenVisitor {
         doLoc: self.generateSourceLoc(node.doKeyword),
         throwsLoc: self.generateSourceLoc(node.throwsClause?.throwsSpecifier),
         thrownType: self.generate(type: node.throwsClause?.type),
-        body: self.generate(codeBlock: node.body).asStmt,
+        body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node)).asStmt,
         catches: self.generate(catchClauseList: node.catchClauses)
       ).asStmt
     }
@@ -393,17 +565,23 @@ extension ASTGenVisitor {
       sequence: self.generate(expr: node.sequence),
       whereLoc: self.generateSourceLoc(node.whereClause?.whereKeyword),
       whereExpr: self.generate(expr: node.whereClause?.condition),
-      body: self.generate(codeBlock: node.body),
+      // A for-each loop introduces no scope before its body, so the statement's
+      // whole range works here and is what the C++ parser uses.
+      body: self.generate(codeBlock: node.body, fallbackRange: self.generateSourceRange(node)),
       declContext: self.declContext
     )
   }
 
   func generate(guardStmt node: GuardStmtSyntax, labelInfo: BridgedLabeledStmtInfo = nil) -> BridgedGuardStmt {
+    // See `generate(repeatStmt:)`.
+    if node.conditions.firstToken(viewMode: .sourceAccurate)?.rawTokenKind == .leftBrace {
+      self.diagnose(.missing_condition_after_guard, at: node.guardKeyword)
+    }
     return .createParsed(
       self.ctx,
       guardLoc: self.generateSourceLoc(node.guardKeyword),
       conds: self.generate(conditionElementList: node.conditions),
-      body: self.generate(codeBlock: node.body)
+      body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node))
     )
   }
 
@@ -413,7 +591,7 @@ extension ASTGenVisitor {
       labelInfo: labelInfo,
       ifLoc: self.generateSourceLoc(node.ifKeyword),
       conditions: self.generate(conditionElementList: node.conditions),
-      then: self.generate(codeBlock: node.body),
+      then: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node)),
       elseLoc: self.generateSourceLoc(node.elseKeyword),
       else: node.elseBody.map {
         switch $0 {
@@ -432,8 +610,22 @@ extension ASTGenVisitor {
       return self.generateIfStmt(ifExpr: node).asStmt
     case .switchExpr(let node):
       return self.generateSwitchStmt(switchExpr: node).asStmt
+    case .doExpr(let node):
+      // With the DoExpressions feature the parser produces a DoExpr even where a
+      // statement is expected, e.g. `do throws(E) { … } catch { … }` as a
+      // statement. Generate it as a statement, the way the other
+      // statement-shaped expressions above are.
+      return self.generate(doStmtOrExpr: node)
     default:
-      fatalError("Unhandled case!")
+      // Any other expression here is a statement-shaped expression ASTGen does
+      // not know about yet. Generating it as an expression keeps the AST
+      // well-formed rather than halting.
+      return BridgedBraceStmt.createImplicit(
+        self.ctx,
+        lBraceLoc: self.generateSourceLoc(node),
+        element: .expr(self.generate(expr: node.expression)),
+        rBraceLoc: self.generateSourceLoc(node)
+      ).asStmt
     }
   }
 
@@ -446,7 +638,9 @@ extension ASTGenVisitor {
 
   func generate(labeledStmt node: LabeledStmtSyntax) -> BridgedStmt {
     let (labelName, labelLoc) = self.generateIdentifierAndSourceLoc(node.label)
+    self.diagnoseDollarDeclName(node.label)
     let labelInfo = BridgedLabeledStmtInfo(name: labelName, loc: labelLoc)
+    let labelNode = node.label
 
     switch node.statement.as(StmtSyntaxEnum.self) {
     case .doStmt(let node):
@@ -463,7 +657,9 @@ extension ASTGenVisitor {
     case .forStmt(let node):
       return self.generate(forStmt: node, labelInfo: labelInfo).asStmt
     case .guardStmt(let node):
-      return self.generate(guardStmt: node, labelInfo: labelInfo).asStmt
+      // Labels are only valid on loops, 'if', 'switch' and 'do'.
+      self.diagnose(.invalid_label_on_stmt, at: labelNode)
+      return self.generate(guardStmt: node, labelInfo: nil).asStmt
     case .repeatStmt(let node):
       return self.generate(repeatStmt: node, labelInfo: labelInfo).asStmt
     case .whileStmt(let node):
@@ -472,24 +668,57 @@ extension ASTGenVisitor {
       break
     }
 
-    // Not a labeled statement.
-    // Should be unreachable as long as the node is parsed by 'SwiftParser'.
-    // FIXME: emit an error diagnostic.
+    // 'return', 'throw', 'defer', 'then' and the like cannot be labeled.
+    self.diagnose(.invalid_label_on_stmt, at: labelNode)
     return self.generate(stmt: node.statement)
   }
 
   func generate(repeatStmt node: RepeatStmtSyntax, labelInfo: BridgedLabeledStmtInfo = nil) -> BridgedRepeatWhileStmt {
+    // A condition cannot start with a brace: swift-syntax reads `{ true }()` as a
+    // call of a closure, but to the C++ parser the brace begins no condition.
+    if node.condition.firstToken(viewMode: .sourceAccurate)?.rawTokenKind == .leftBrace {
+      self.diagnose(.missing_condition_after_while, at: node.whileKeyword)
+    }
     return .createParsed(
       self.ctx,
       labelInfo: labelInfo,
       repeatLoc: self.generateSourceLoc(node.repeatKeyword),
       cond: self.generate(expr: node.condition),
       whileLoc: self.generateSourceLoc(node.whileKeyword),
-      body: self.generate(codeBlock: node.body).asStmt
+      body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node)).asStmt
     )
   }
 
+  /// The 1-based byte column of `position` within its line.
+  private func column(of position: AbsolutePosition) -> Int {
+    var start = position.utf8Offset
+    while start > 0 && self.base[start - 1] != UInt8(ascii: "\n") && self.base[start - 1] != UInt8(ascii: "\r") {
+      start -= 1
+    }
+    return position.utf8Offset - start + 1
+  }
+
+  /// Warn when the expression after `return` or `then` is on a different line
+  /// from the keyword but has the same indentation, since it is then taken as
+  /// the operand even though it may have been meant as a separate statement.
+  private func diagnoseUnindentedExpression(
+    after keyword: TokenSyntax,
+    _ expression: ExprSyntax?,
+    _ diagnostic: CompilerDiagnostic
+  ) {
+    guard let expression,
+      self.column(of: keyword.positionAfterSkippingLeadingTrivia)
+        == self.column(of: expression.positionAfterSkippingLeadingTrivia)
+    else {
+      return
+    }
+    self.diagnose(diagnostic, at: expression)
+    self.diagnose(.indent_expression_to_silence, at: expression)
+  }
+
   func generate(returnStmt node: ReturnStmtSyntax) -> BridgedReturnStmt {
+    self.diagnoseUnindentedExpression(
+      after: node.returnKeyword, node.expression, .unindented_code_after_return)
     return .createParsed(
       self.ctx,
       loc: self.generateSourceLoc(node.returnKeyword),
@@ -498,6 +727,8 @@ extension ASTGenVisitor {
   }
 
   func generate(thenStmt node: ThenStmtSyntax) -> BridgedThenStmt {
+    self.diagnoseUnindentedExpression(
+      after: node.thenKeyword, node.expression, .unindented_code_after_then)
     return .createParsed(
       self.ctx,
       thenLoc: self.generateSourceLoc(node.thenKeyword),
@@ -528,6 +759,7 @@ extension ASTGenVisitor {
       introducerLoc = self.generateSourceLoc(node.caseKeyword)
       terminatorLoc = self.generateSourceLoc(node.colon)
       items = self.generate(switchCaseItemList: node.caseItems)
+      self.diagnoseUnboundPatternVariables(in: node.caseItems.map { $0.pattern })
     case .default(let node):
       introducerLoc = self.generateSourceLoc(node.defaultKeyword)
       let item = BridgedCaseLabelItemInfo(
@@ -539,11 +771,49 @@ extension ASTGenVisitor {
       items = CollectionOfOne(item).bridgedArray(in: self)
       terminatorLoc = self.generateSourceLoc(node.colon)
     }
-    let body = BridgedBraceStmt.createParsed(
+    // A case needs at least one statement.
+    if node.statements.isEmpty, !node.hasError {
+      let isDefault: Bool
+      let afterColon: AbsolutePosition
+      switch node.label {
+      case .case(let label):
+        (isDefault, afterColon) = (false, label.colon.endPositionBeforeTrailingTrivia)
+      case .default(let label):
+        (isDefault, afterColon) = (true, label.colon.endPositionBeforeTrailingTrivia)
+      }
+      self.diagnose(
+        .case_stmt_without_body(isDefault),
+        at: introducerLoc,
+        fixIts: [
+          .init(
+            replace: CharSourceRange(start: SourceLoc(at: afterColon, in: self.base), byteLength: 0),
+            with: " break")
+        ]
+      )
+    }
+
+    // A switch case body has no braces in the source, so its locations have to
+    // be synthesized. They must be *valid*: `CaseStmt::getLabelItemsRange()`
+    // falls back to `SourceRange(getLoc(), getBody()->getEndLoc())` when the
+    // terminator location is invalid, and a `BraceStmt` with no elements and no
+    // brace locations has an invalid end location -- pairing a valid start with
+    // an invalid end, which `SourceRange` asserts against.
+    //
+    // `Parser::parseStmtCase` picks the same locations: the start of the body if
+    // it has any items, otherwise the position just past the label, for both.
+    // An empty body sits at the label's terminator, like the C++ parser's
+    // `PreviousLoc`. The position of the empty statement list itself would be
+    // *after* the colon's trailing trivia, and an end on trivia lexes forward
+    // into the next case, whose scope it then overlaps.
+    let bodyRange =
+      node.statements.isEmpty && terminatorLoc.isValid
+      ? SourceRange(start: terminatorLoc, end: terminatorLoc)
+      : self.generateImplicitBraceRange(node.statements)
+    let body = BridgedBraceStmt.createImplicit(
       self.ctx,
-      lBraceLoc: nil,
+      lBraceLoc: bodyRange.start,
       elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
-      rBraceLoc: nil
+      rBraceLoc: bodyRange.end
     )
 
     return .createParsedSwitchCase(
@@ -558,6 +828,8 @@ extension ASTGenVisitor {
 
   func generate(switchCaseList node: SwitchCaseListSyntax) -> BridgedArrayRef {
     var allBridgedCases: [BridgedCaseStmt] = []
+    var hasDefault = false
+    var reportedCaseAfterDefault = false
     visitIfConfigElements(node, of: SwitchCaseSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -571,10 +843,31 @@ extension ASTGenVisitor {
         return .skip
       }
     } body: { caseNode in
+      // We cannot have additional cases after a default clause. Complain on
+      // the first offender.
+      if hasDefault && !reportedCaseAfterDefault {
+        reportedCaseAfterDefault = true
+        let introducer: SyntaxProtocol
+        switch caseNode.label {
+        case .case(let label): introducer = label.caseKeyword
+        case .default(let label): introducer = label.defaultKeyword
+        }
+        self.diagnose(.case_after_default, at: introducer)
+      }
+      if case .default = caseNode.label {
+        hasDefault = true
+      }
+
+      // A `case` without its keyword is a recovery artifact, e.g. the stray
+      // `@MainActor` in `default @MainActor`. The C++ parser stops
+      // the case list there ("expected declaration") rather than forming a
+      // case, and a second, empty case that abuts the previous one breaks
+      // ASTScope's child ordering.
+      if case .case(let label) = caseNode.label, label.caseKeyword.presence == .missing {
+        return
+      }
       allBridgedCases.append(self.generate(switchCase: caseNode))
     }
-
-    // TODO: Diagnose 'case' after 'default'.
 
     return allBridgedCases.lazy.bridgedArray(in: self)
   }
@@ -607,7 +900,7 @@ extension ASTGenVisitor {
       labelInfo: labelInfo,
       whileLoc: self.generateSourceLoc(node.whileKeyword),
       cond: self.generate(conditionElementList: node.conditions),
-      body: self.generate(codeBlock: node.body).asStmt
+      body: self.generate(codeBlock: node.body, fallbackRange: self.implicitBodyRange(atEndOf: node)).asStmt
     )
   }
 
@@ -636,5 +929,100 @@ extension ASTGenVisitor {
       yields: yields,
       rParenLoc: rParenLoc
     )
+  }
+}
+
+extension CodeBlockItemSyntax {
+  /// The statements following a `case` or `default` label that is not inside a
+  /// `switch`.
+  ///
+  /// SwiftParser diagnoses the label and wraps the whole `case`, including the
+  /// statements up to the next label or the end of the block, as unexpected
+  /// syntax before an empty item. The C++ parser recovers by skipping the label
+  /// only, so the statements are still code that needs to be checked.
+  var strayCaseBody: CodeBlockItemListSyntax? {
+    // Within an '#if' clause the statements' enclosing construct is not the
+    // block they are generated into (in a switch, for one), so leave them.
+    guard self.parent?.parent?.is(IfConfigClauseSyntax.self) != true else {
+      return nil
+    }
+    guard let unexpected = self.unexpectedBeforeItem, unexpected.count == 1 else {
+      return nil
+    }
+    guard let statements = unexpected.first?.as(SwitchCaseSyntax.self)?.statements else {
+      return nil
+    }
+    // Recovery inside the statements themselves can leave them with synthesized
+    // tokens and locations that are not inside their parent's; leave them out.
+    guard !statements.hasError else {
+      return nil
+    }
+    return statements
+  }
+}
+
+extension ASTGenVisitor {
+  /// Every pattern of a `case` label or `catch` clause must bind the same
+  /// variables as the first one; diagnose each variable that does not appear
+  /// in all of them, as `parseGuardedPattern` does.
+  func diagnoseUnboundPatternVariables(in patterns: [PatternSyntax]) {
+    guard patterns.count > 1 else {
+      return
+    }
+    let first = patterns[0].boundVariables
+    for pattern in patterns.dropFirst() {
+      let repeated = pattern.boundVariables
+      for variable in repeated where !first.contains(where: { $0.text == variable.text }) {
+        self.diagnose(.extra_var_in_multiple_pattern_list(self.generateIdentifier(variable)), at: variable)
+      }
+      for variable in first where !repeated.contains(where: { $0.text == variable.text }) {
+        self.diagnose(.extra_var_in_multiple_pattern_list(self.generateIdentifier(variable)), at: variable)
+      }
+    }
+  }
+}
+
+private final class BoundVariableCollector: SyntaxVisitor {
+  var variables: [TokenSyntax] = []
+  var bindingDepth = 0
+
+  init() {
+    super.init(viewMode: .sourceAccurate)
+  }
+
+  override func visit(_ node: ValueBindingPatternSyntax) -> SyntaxVisitorContinueKind {
+    bindingDepth += 1
+    return .visitChildren
+  }
+
+  override func visitPost(_ node: ValueBindingPatternSyntax) {
+    bindingDepth -= 1
+  }
+
+  override func visit(_ node: IdentifierPatternSyntax) -> SyntaxVisitorContinueKind {
+    if bindingDepth > 0 {
+      variables.append(node.identifier)
+    }
+    return .skipChildren
+  }
+
+  override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+    // In `case let .foo(x)`, the `x` is an expression that binds a name.
+    if bindingDepth > 0, node.argumentNames == nil, node.baseName.rawTokenKind == .identifier,
+      let parent = node.parent, parent.is(ExpressionPatternSyntax.self) || parent.is(LabeledExprSyntax.self)
+    {
+      variables.append(node.baseName)
+    }
+    return .skipChildren
+  }
+}
+
+extension SyntaxProtocol {
+  /// The names this pattern binds, as written: identifiers inside a `let`,
+  /// `var` or `inout` pattern, other than `_`.
+  var boundVariables: [TokenSyntax] {
+    let collector = BoundVariableCollector()
+    collector.walk(self)
+    return collector.variables
   }
 }

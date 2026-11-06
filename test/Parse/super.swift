@@ -48,6 +48,6 @@ class D : B {
   }
 
   func bad_super_1() {
-    super.$0 // expected-error{{expected identifier or 'init'}}
+    super.$0 // expected-cparser-error{{expected identifier or 'init'}} expected-astgen-error {{expected name in member access}} expected-astgen-error {{anonymous closure argument not contained in a closure}}
   }
 }

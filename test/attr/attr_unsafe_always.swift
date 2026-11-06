@@ -1,4 +1,10 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix cxx-
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix astgen- \
+// RUN:   -enable-experimental-feature ParserASTGen
+
+// REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_ParserASTGen
+// UNSUPPORTED: parser_astgen
 
 // Parsing and placement of the '@unsafe(always)' attribute.
 
@@ -9,7 +15,7 @@
 
 @unsafe() func missingOption() { }
 // expected-error@-1{{expected 'unsafe' option such as 'always'}}
-// expected-error@-2{{expected declaration}}
+// expected-cxx-error@-2{{expected declaration}}
 
 @safe @unsafe(always) func conflicting() { }
 // expected-error@-1{{global function 'conflicting' cannot be both '@safe' and '@unsafe'}}

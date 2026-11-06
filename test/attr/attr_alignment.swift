@@ -13,13 +13,13 @@ enum AnyAlignmentEnum {}
 @_alignment // expected-error{{expected '('}}
 struct DidntSpecifyAlignment {}
 
-@_alignment() // expected-error{{must be a positive integer literal}} expected-error{{expected declaration}}
+@_alignment() // expected-error{{must be a positive integer literal}} expected-cparser-error{{expected declaration}}
 struct DidntSpecifyAlignment2 {}
 
-@_alignment("sixteen") // expected-error{{must be a positive integer literal}} expected-error{{expected declaration}}
+@_alignment("sixteen") // expected-error{{must be a positive integer literal}} expected-cparser-error{{expected declaration}}
 struct SpecifiedJunkAlignment {}
 
-@_alignment(-1) // expected-error{{must be a positive integer literal}} expected-error{{expected declaration}}
+@_alignment(-1) // expected-error{{must be a positive integer literal}} expected-cparser-error{{expected declaration}}
 struct NegativeAlignment {}
 
 @_alignment(0) // expected-error{{must be a power of two}}
@@ -28,7 +28,7 @@ struct ZeroAlignment {}
 @_alignment(3) // expected-error{{must be a power of two}}
 struct NonPowerOfTwoAlignment {}
 
-@_alignment(3.5) // expected-error{{must be a positive integer literal}} expected-error{{expected declaration}}
+@_alignment(3.5) // expected-error{{must be a positive integer literal}} expected-cparser-error{{expected declaration}}
 struct FractionalAlignment {}
 
 @_alignment(16) // expected-error{{cannot be applied to this declaration}} {{1-17=}}

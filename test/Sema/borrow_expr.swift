@@ -43,7 +43,7 @@ func testExprFailureLet() {
     // Next line is parsed as move(t) + t
     let _ = _borrow t + t
     // Next line is parsed as move(t+t)
-    let _ = _borrow (t+t) // expected-error {{'borrow' can only be applied to a local binding ('let', 'var', or parameter)}}
+    let _ = _borrow (t+t) // expected-cparser-error {{'borrow' can only be applied to a local binding ('let', 'var', or parameter)}} expected-astgen-error {{cannot find '_borrow' in scope}}
 }
 
 func testExprFailureVar() {
@@ -52,7 +52,7 @@ func testExprFailureVar() {
     // Next line is parsed as move(t) + t
     let _ = _borrow t + t
     // Next line is parsed as move(t+t)
-    let _ = _borrow (t+t) // expected-error {{'borrow' can only be applied to a local binding ('let', 'var', or parameter)}}
+    let _ = _borrow (t+t) // expected-cparser-error {{'borrow' can only be applied to a local binding ('let', 'var', or parameter)}} expected-astgen-error {{cannot find '_borrow' in scope}}
 }
 
 func letAddressOnly<T>(_ v: T) {

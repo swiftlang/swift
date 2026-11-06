@@ -1,4 +1,4 @@
-// RUN: not %target-swift-frontend -diagnostic-style=swift -typecheck %/s 2>&1 | %FileCheck %s
+// RUN: not %target-swift-frontend -diagnostic-style=swift -typecheck %/s 2>&1 | %FileCheck %s --check-prefixes=CHECK,%if parser_astgen %{ASTGEN%} %else %{CPARSER%}
 
 // REQUIRES: swift_swift_parser
 
@@ -71,11 +71,17 @@ func test(a: Int) {}
 func test(a: Int) {}
 
 // Test fallback for non-ASCII characters.
-// CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:11
-// CHECK: [[#LINE-2]] |
-// CHECK: [[#LINE]]   | let abc = "👍
-// CHECK:             | `-  error: unterminated string literal
-// CHECK: [[#LINE+1]] |
+// CPARSER: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:11
+// CPARSER: [[#LINE-2]] |
+// CPARSER: [[#LINE]]   | let abc = "👍
+// CPARSER:             | `-  error: unterminated string literal
+// CPARSER: [[#LINE+1]] |
+
+// ASTGEN: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:16
+// ASTGEN: [[#LINE-2]] |
+// ASTGEN: [[#LINE]]   | let abc = "👍
+// ASTGEN:             | `- error: expected '"' to end string literal
+// ASTGEN: [[#LINE+1]] |
 
 // CHECK: SOURCE_DIR{{[/\]+}}test{{[/\]+}}diagnostics{{[/\]+}}pretty-printed-diagnostics.swift:[[#LINE:]]:3
 // CHECK: [[#LINE-1]] |

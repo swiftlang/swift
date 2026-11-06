@@ -65,12 +65,43 @@ extension ASTGenVisitor {
     }
   }
 
+  /// `protocol<A, B>`, which was removed in favor of `A & B`. The parser reads
+  /// it as a generic type with an unexpected `protocol` keyword and diagnoses
+  /// it; build the composition it stands for.
+  func generate(legacyProtocolComposition node: IdentifierTypeSyntax, generics: GenericArgumentClauseSyntax) -> BridgedTypeRepr {
+    let protocolLoc = self.generateSourceLoc(node.unexpectedBetweenModuleSelectorAndName)
+    let components = generics.arguments.compactMap { argument -> TypeSyntax? in
+      if case .type(let type) = argument.argument, !type.is(MissingTypeSyntax.self) { return type }
+      return nil
+    }
+
+    if components.isEmpty {
+      return BridgedCompositionTypeRepr.createEmpty(self.ctx, anyKeywordLoc: protocolLoc).asTypeRepr
+    }
+    if components.count == 1 {
+      return self.generate(type: components[0])
+    }
+    return BridgedCompositionTypeRepr.createParsed(
+      self.ctx,
+      types: components.lazy.map { self.generate(type: $0) }.bridgedArray(in: self),
+      // The composition starts at `protocol`.
+      ampersandLoc: protocolLoc
+    ).asTypeRepr
+  }
+
   func generate(identifierType node: IdentifierTypeSyntax) -> BridgedTypeRepr {
     let loc = self.generateSourceLoc(node.name)
 
     // If this is the bare 'Any' keyword, produce an empty composition type.
     if node.name.keywordKind == .Any && node.genericArgumentClause == nil {
       return BridgedCompositionTypeRepr.createEmpty(self.ctx, anyKeywordLoc: loc).asTypeRepr
+    }
+    if let unexpected = node.unexpectedBetweenModuleSelectorAndName,
+      unexpected.count == 1, unexpected.first?.as(TokenSyntax.self)?.keywordKind == .protocol,
+      node.name.presence == .missing,
+      let generics = node.genericArgumentClause
+    {
+      return self.generate(legacyProtocolComposition: node, generics: generics)
     }
     if node.name.rawText == "_" {
       guard node.genericArgumentClause == nil else {
@@ -242,7 +273,7 @@ extension ASTGenVisitor {
   func generate(tupleType node: TupleTypeSyntax) -> BridgedTupleTypeRepr {
     .createParsed(
       self.ctx,
-      elements: self.generate(tupleTypeElementList: node.elements),
+      elements: self.generate(tupleTypeElementList: node.elements, isFunctionType: false),
       leftParenLoc: self.generateSourceLoc(node.leftParen),
       rightParenLoc: self.generateSourceLoc(node.rightParen)
     )
@@ -289,7 +320,7 @@ extension ASTGenVisitor {
       // FIXME: Why does `FunctionTypeSyntax` not have a `TupleTypeSyntax` child?
       argsType: BridgedTupleTypeRepr.createParsed(
         self.ctx,
-        elements: self.generate(tupleTypeElementList: node.parameters),
+        elements: self.generate(tupleTypeElementList: node.parameters, isFunctionType: true),
         leftParenLoc: self.generateSourceLoc(node.leftParen),
         rightParenLoc: self.generateSourceLoc(node.rightParen)
       ).asTypeRepr,
@@ -384,37 +415,76 @@ extension ASTGenVisitor {
     // Specifiers
     var ownership: BridgedParamSpecifier = .default
     var ownershipLoc: SourceLoc = nil
+    var ownershipSpecifier: TokenSyntax? = nil
     var isolatedLoc: SourceLoc = nil
     var constLoc: SourceLoc = nil
     var sendingLoc: SourceLoc = nil
     var lifetimeEntry: BridgedLifetimeEntry? = nil
     var nonisolatedLoc: SourceLoc = nil
+    var specifierAttributes: [BridgedTypeOrCustomAttr] = []
 
-    // TODO: Diagnostics for duplicated specifiers, and ordering.
     for node in node.specifiers {
       let loc = self.generateSourceLoc(node)
       switch node {
       case .simpleTypeSpecifier(let node):
-        switch node.specifier.keywordKind {
-        case .inout:
-          (ownership, ownershipLoc) = (.inOut, loc)
-        case .__shared:
-          (ownership, ownershipLoc) = (.legacyShared, loc)
-        case .__owned:
-          (ownership, ownershipLoc) = (.legacyOwned, loc)
-        case .borrowing:
-          (ownership, ownershipLoc) = (.borrowing, loc)
-        case .consuming:
-          (ownership, ownershipLoc) = (.consuming, loc)
+        let token = node.specifier
+        let newOwnership: BridgedParamSpecifier
+        switch token.keywordKind {
+        case .inout: newOwnership = .inOut
+        case .__shared: newOwnership = .legacyShared
+        case .__owned: newOwnership = .legacyOwned
+        case .borrowing: newOwnership = .borrowing
+        case .consuming: newOwnership = .consuming
         case .isolated:
+          if isolatedLoc.isValid {
+            self.diagnose(
+              .parameter_specifier_repeated,
+              at: token,
+              fixIts: [.init(remove: self.generateCharSourceRange(token))]
+            )
+          }
           isolatedLoc = loc
+          continue
         case ._const:
           constLoc = loc
+          continue
         case .sending:
+          // Only allow 'sending' to be written once.
+          if sendingLoc.isValid {
+            self.diagnose(
+              .sending_repeated,
+              at: token,
+              fixIts: [.init(remove: self.generateCharSourceRange(token))]
+            )
+          }
+          // 'sending' cannot be combined with 'borrowing'.
+          if ownershipLoc.isValid && ownership == .borrowing {
+            self.diagnose(.sending_cannot_be_used_with_borrowing("sending"), at: token)
+          }
           sendingLoc = loc
+          continue
         default:
           // TODO: Diagnostics.
           fatalError("(compiler bug) unrecognized type specifier")
+        }
+
+        if ownershipLoc.isValid {
+          // Only one of 'inout', 'borrowing' and 'consuming' is allowed. The
+          // first one wins, as in the C++ parser.
+          self.diagnose(
+            .parameter_specifier_repeated,
+            at: token,
+            fixIts: [.init(remove: self.generateCharSourceRange(ownershipSpecifier!))]
+          )
+        } else {
+          (ownership, ownershipLoc, ownershipSpecifier) = (newOwnership, loc, token)
+          // A specifier must come before 'sending'.
+          if sendingLoc.isValid {
+            self.diagnose(
+              .sending_before_parameter_specifier(String(syntaxText: token.rawText)),
+              at: token
+            )
+          }
         }
       case .lifetimeTypeSpecifier(let node):
         lifetimeEntry = .createParsed(
@@ -423,15 +493,30 @@ extension ASTGenVisitor {
             start: node.dependsOnKeyword,
             end: node.rightParen
           ),
-          sources: node.arguments.lazy.compactMap(self.generateLifetimeDescriptor(lifetimeSpecifierArgument:)).bridgedArray(in: self)
+          // `compactMap(in:)`, not `lazy.compactMap { }.bridgedArray`, which
+          // would run the transform -- and any diagnostic it emits -- twice.
+          sources: node.arguments.compactMap(in: self) {
+            self.generateLifetimeDescriptor(lifetimeSpecifierArgument: $0)
+          }
         )
-      case .nonisolatedTypeSpecifier(_):
-        nonisolatedLoc = loc
+      case .nonisolatedTypeSpecifier(let specifier):
+        if specifier.argument != nil {
+          // `nonisolated(nonsending)`.
+          nonisolatedLoc = loc
+        } else {
+          // A bare `nonisolated`, as in `extension C: nonisolated P`, is a
+          // simple type attribute.
+          specifierAttributes.append(
+            .typeAttr(
+              BridgedTypeAttribute.createSimple(
+                self.ctx, kind: .Nonisolated, atLoc: nil,
+                nameLoc: self.generateSourceLoc(specifier.nonisolatedKeyword))))
+        }
       }
     }
 
     // Attributes.
-    let typeAttributes = self.generateTypeAttributes(node)
+    let typeAttributes = specifierAttributes + self.generateTypeAttributes(node)
 
     if !typeAttributes.isEmpty {
       type =
@@ -496,8 +581,65 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  func generate(tupleTypeElementList node: TupleTypeElementListSyntax) -> BridgedArrayRef {
-    node.lazy.map { element in
+  /// Diagnose the labels of a tuple type element, as `Parser::parseTupleTypeBody`
+  /// does: a function type's parameters have no argument labels, and a tuple
+  /// element may have only one label.
+  private func diagnoseTupleTypeElementLabels(_ element: TupleTypeElementSyntax, isFunctionType: Bool) {
+    guard let firstName = element.firstName else { return }
+    let hasFirstLabel = firstName.rawTokenKind != .wildcard
+    if !isFunctionType {
+      if element.secondName != nil {
+        // `(a b: Int)`: remove the second label.
+        self.diagnose(
+          .tuple_type_multiple_labels,
+          at: firstName,
+          fixIts: [.init(remove: self.labelRemovalRange(element, firstName: firstName, hasFirstLabel: hasFirstLabel))]
+        )
+      }
+      return
+    }
+
+    // Arguments in function types are always unlabeled.
+    if hasFirstLabel {
+      let fixIt: CompilerDiagnosticFixIt
+      if element.secondName == nil {
+        fixIt = .init(
+          replace: CharSourceRange(start: self.generateSourceLoc(firstName), byteLength: 0), with: "_ ")
+      } else if element.secondName?.rawTokenKind == .wildcard {
+        fixIt = .init(remove: self.labelRemovalRange(element, firstName: firstName, hasFirstLabel: false))
+      } else {
+        fixIt = .init(replace: self.generateCharSourceRange(firstName), with: "_")
+      }
+      self.diagnose(
+        .function_type_argument_label(self.generateIdentifier(firstName)),
+        at: firstName,
+        fixIts: [fixIt]
+      )
+    }
+  }
+
+  /// The range to delete to drop a tuple element's extra label.
+  private func labelRemovalRange(
+    _ element: TupleTypeElementSyntax, firstName: TokenSyntax, hasFirstLabel: Bool
+  ) -> CharSourceRange {
+    if !hasFirstLabel {
+      // `_ b: Int`: remove from the first name up to the type.
+      return self.generateCharSourceRange(
+        start: firstName.positionAfterSkippingLeadingTrivia,
+        length: SourceLength(
+          utf8Length: element.type.positionAfterSkippingLeadingTrivia.utf8Offset
+            - firstName.positionAfterSkippingLeadingTrivia.utf8Offset))
+    }
+    // `a b: Int`: remove the text between the first name and the second.
+    let start = firstName.endPositionBeforeTrailingTrivia
+    let end = element.secondName!.endPositionBeforeTrailingTrivia
+    return self.generateCharSourceRange(
+      start: start, length: SourceLength(utf8Length: end.utf8Offset - start.utf8Offset))
+  }
+
+  func generate(tupleTypeElementList node: TupleTypeElementListSyntax, isFunctionType: Bool) -> BridgedArrayRef {
+    node.compactMap(in: self) { element -> BridgedTupleTypeElement? in
+      self.diagnoseTupleTypeElementLabels(element, isFunctionType: isFunctionType)
       let (firstName, firstNameLoc) =
         self.generateIdentifierAndSourceLoc(element.firstName)
       let (secondName, secondNameLoc) = self.generateIdentifierAndSourceLoc(element.secondName)
@@ -521,7 +663,7 @@ extension ASTGenVisitor {
         Type: type,
         TrailingCommaLoc: self.generateSourceLoc(element.trailingComma)
       )
-    }.bridgedArray(in: self)
+    }
   }
 }
 
@@ -599,10 +741,52 @@ extension ASTGenVisitor {
         )
       )
 
+    case .prefixOperatorExpr(let node) where node.operator.rawText == "~":
+      // '~Copyable' in a position where the parser was expecting an expression,
+      // e.g. the 'except:' argument of '@_preInverseGenerics'.
+      guard let constraint = self.generateTypeRepr(expr: node.expression) else {
+        break
+      }
+      return BridgedInverseTypeRepr.createParsed(
+        self.ctx,
+        tildeLoc: self.generateSourceLoc(node.operator),
+        constraint: constraint
+      ).asTypeRepr
+
     case .sequenceExpr(let node):
-      // TODO: Support composition type?
-      _ = node
-      break
+      // A composition written where the parser was expecting an expression, e.g.
+      // '~Copyable & ~Escapable' as the 'except:' argument of
+      // '@_preInverseGenerics'. The elements alternate between operands and '&'.
+      var types: [BridgedTypeRepr] = []
+      var firstAmpersandLoc: SourceLoc = nil
+      for (index, element) in node.elements.enumerated() {
+        if index % 2 == 1 {
+          guard let binaryOperator = element.as(BinaryOperatorExprSyntax.self),
+            binaryOperator.operator.rawText == "&"
+          else {
+            // Some other operator, so this is not a composition.
+            return nil
+          }
+          if firstAmpersandLoc == nil {
+            firstAmpersandLoc = self.generateSourceLoc(binaryOperator.operator)
+          }
+          continue
+        }
+        guard let type = self.generateTypeRepr(expr: element) else {
+          return nil
+        }
+        types.append(type)
+      }
+      // An even number of elements means a trailing '&' with nothing after it;
+      // the parser has already diagnosed that.
+      guard types.count > 1, node.elements.count == types.count * 2 - 1 else {
+        return nil
+      }
+      return BridgedCompositionTypeRepr.createParsed(
+        self.ctx,
+        types: types.lazy.bridgedArray(in: self),
+        ampersandLoc: firstAmpersandLoc
+      ).asTypeRepr
 
     case .tupleExpr(let node):
       // TODO: Support tuple type?
@@ -618,7 +802,8 @@ extension ASTGenVisitor {
       break
     }
 
-    // TODO: Diagnose
-    fatalError("invalid/unimplemented expression for type")
+    // Not a type. Every caller checks for nil and reports something appropriate
+    // for the position, so there is nothing to diagnose here.
+    return nil
   }
 }

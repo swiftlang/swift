@@ -36,6 +36,13 @@ BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern) {
   return cPattern.unbridged()->getSingleVar();
 }
 
+void BridgedPattern_markWildcardsAsAsyncLet(BridgedPattern cPattern) {
+  cPattern.unbridged()->forEachNode([](Pattern *P) {
+    if (auto *AP = dyn_cast<AnyPattern>(P))
+      AP->setIsAsyncLet();
+  });
+}
+
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  SourceLoc loc) {
   return new (cContext.unbridged()) AnyPattern(loc);
@@ -43,6 +50,28 @@ BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
 
 BridgedAnyPattern BridgedAnyPattern_createImplicit(BridgedASTContext cContext) {
   return AnyPattern::createImplicit(cContext.unbridged());
+}
+
+BridgedBindingPattern BridgedBindingPattern_createParsedWithIntroducer(
+    BridgedASTContext cContext, SourceLoc keywordLoc,
+    BridgedVarDeclIntroducer cIntroducer, BridgedPattern cSubPattern) {
+  VarDecl::Introducer introducer;
+  switch (cIntroducer) {
+  case BridgedVarDeclIntroducerLet:
+    introducer = VarDecl::Introducer::Let;
+    break;
+  case BridgedVarDeclIntroducerVar:
+    introducer = VarDecl::Introducer::Var;
+    break;
+  case BridgedVarDeclIntroducerInOut:
+    introducer = VarDecl::Introducer::InOut;
+    break;
+  case BridgedVarDeclIntroducerBorrowing:
+    introducer = VarDecl::Introducer::Borrowing;
+    break;
+  }
+  return BindingPattern::createParsed(cContext.unbridged(), keywordLoc,
+                                      introducer, cSubPattern.unbridged());
 }
 
 BridgedBindingPattern

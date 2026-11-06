@@ -63,6 +63,10 @@ BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
                                     specs, rParenLoc, isUnavailability);
 }
 
+void BridgedPoundAvailableInfo_setInvalid(BridgedPoundAvailableInfo info) {
+  info.unbridged()->setInvalid();
+}
+
 BridgedStmtConditionElement BridgedStmtConditionElement_createHasSymbol(
     BridgedASTContext cContext, SourceLoc poundLoc, SourceLoc lParenLoc,
     BridgedNullableExpr cSymbolExpr, SourceLoc rParenLoc) {
@@ -89,6 +93,16 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
                                                  SourceLoc rBLoc) {
   return BraceStmt::create(cContext.unbridged(), lBLoc, {element.unbridged()},
                            rBLoc,
+                           /*Implicit=*/true);
+}
+
+BridgedBraceStmt
+BridgedBraceStmt_createImplicitWithElements(BridgedASTContext cContext,
+                                            SourceLoc lBLoc,
+                                            BridgedArrayRef elements,
+                                            SourceLoc rBLoc) {
+  return BraceStmt::create(cContext.unbridged(), lBLoc,
+                           elements.unbridged<ASTNode>(), rBLoc,
                            /*Implicit=*/true);
 }
 

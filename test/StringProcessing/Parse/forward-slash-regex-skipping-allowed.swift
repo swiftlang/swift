@@ -17,9 +17,9 @@
 var : Int // expected-error{{expected pattern}}
 
 // Balanced `{}`, so okay.
-func a() { / {}/ }
-func b() { / \{}/ }
-func c() { / {"{"}/ }
+func a() { / {}/ } // expected-astgen-error {{bare slash regex literal may not start with space}}
+func b() { / \{}/ } // expected-astgen-error {{bare slash regex literal may not start with space}}
+func c() { / {"{"}/ } // expected-astgen-error {{bare slash regex literal may not start with space}}
 
 // Some cases of infix '/' that we should continue to skip.
 func d() {

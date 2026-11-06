@@ -29,9 +29,12 @@ extension ASTGenVisitor {
 
     switch result {
     case .generated(_):
-      guard node.attributes.isEmpty && node.modifiers.isEmpty else {
-        // TODO: Diagnose.
-        fatalError("attributes not applied")
+      // A built-in pound is not a declaration, so it cannot carry attributes or
+      // modifiers. The C++ parser fails to parse a declaration at the pound and
+      // reports that, but still evaluates the directive, so keep the generated
+      // node rather than dropping it.
+      if !node.attributes.isEmpty || !node.modifiers.isEmpty {
+        self.diagnose(.expected_decl, at: node.pound)
       }
       break
     case .ignored:
@@ -43,6 +46,14 @@ extension ASTGenVisitor {
 
   /// Handle built in pound keywords.
   func maybeGenerateBuiltinPound(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> MaybeGenerated<BridgedASTNode> {
+    // '#Module::name' is always a macro expansion, even if 'name' matches a
+    // builtin pound keyword (e.g., '#Testing::sourceLocation').
+    if node.moduleSelector != nil {
+      return .ignored
+    }
+
+    self.diagnoseLegacyLineDirective(node)
+
     let macroNameText = node.macroName.rawText;
 
     // '#file', '#line' etc.
@@ -86,8 +97,20 @@ extension ASTGenVisitor {
       return .generated(nil)
 
     case ._hasSymbol, .available, .unavailable:
-      // TODO: Diagnose
-      fatalError("stmt condition outside control flow statement")
+      // These are conditions, not expressions. The C++ parser
+      // (`Parser::parseExprPrimary`) parses them here anyway for better
+      // recovery, rejects them, and yields an ErrorExpr; do the same.
+      self.diagnose(
+        .special_condition_outside_if_stmt_guard(
+          "#" + String(syntaxText: node.macroName.rawText)
+        ),
+        at: node.macroName
+      )
+      return .generated(
+        .expr(
+          BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
+        )
+      )
       // return .generated(nil)
 
     case .none, .assert:
@@ -109,14 +132,15 @@ extension ASTGenVisitor {
   }
 
   func handlePoundDiagnostic(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax, kind: PoundDiagnosticKind) {
+    let isError = kind == .error
 
     switch node.parent?.kind {
     case .codeBlockItem, .memberBlockItem, .switchCaseList, nil:
       break
     default:
-      // TODO: Diagnose.
-      fatalError("#error/#warning must be declaration level")
-      // return
+      // Not at declaration level. The parser rejects this placement, so there is
+      // nothing to add here.
+      return
     }
 
     guard
@@ -124,22 +148,151 @@ extension ASTGenVisitor {
       node.trailingClosure == nil,
       node.additionalTrailingClosures.isEmpty
     else {
-      // TODO: Diagnose.
-      fatalError("#error/#warning with generic specialization")
+      // Recovery output; the parser has already diagnosed it.
+      return
     }
 
-    guard node.arguments.count == 1,
-          let arg = node.arguments.first,
-          arg.label == nil,
-          let literal = arg.expression.as(StringLiteralExprSyntax.self),
-          let message = literal.representedLiteralValue
+    // The C++ parser rejects attributes and modifiers, but still diagnoses the
+    // directive itself. swift-syntax diagnoses them already in a member list,
+    // but not among statements and top-level declarations.
+    if let decl = node.as(MacroExpansionDeclSyntax.self), node.parent?.kind != .memberBlockItem,
+      !decl.attributes.isEmpty || !decl.modifiers.isEmpty
+    {
+      self.diagnose(.expected_decl, at: decl.pound)
+    }
+
+    // Check the shape of the directive the way `Parser::parseDeclPoundDiagnostic`
+    // does. swift-syntax parses `#error` as a macro expansion, so the malformed
+    // forms the C++ parser rejects -- no parentheses, an unbalanced parenthesis,
+    // text that is not a string literal, trailing tokens -- come out as
+    // ordinary-looking expansions or as unrelated statements, and the tokens
+    // have to be examined directly.
+    func atStartOfLine(_ token: TokenSyntax) -> Bool {
+      token.leadingTrivia.contains { $0.isNewline }
+    }
+    func insertion(_ text: String, at position: AbsolutePosition) -> CompilerDiagnosticFixIt {
+      .init(replace: self.generateCharSourceRange(start: position, length: SourceLength(utf8Length: 0)), with: text)
+    }
+
+    let nameToken = node.macroName
+    guard var token = nameToken.nextToken(viewMode: .sourceAccurate), token.rawTokenKind != .endOfFile,
+      !atStartOfLine(token)
     else {
-      // TODO: Diagnose.
-      fatalError("expected single simple string literal in #error/#warning")
+      // E.g. `#warning` alone on its line.
+      let next = nameToken.nextToken(viewMode: .sourceAccurate) ?? nameToken
+      self.diagnose(
+        .pound_diagnostic_expected_parens(isError),
+        at: next,
+        fixIts: [insertion("(\"<#message#>\")", at: nameToken.endPositionBeforeTrailingTrivia)]
+      )
+      return
+    }
+
+    let lParen = token
+    var previous = nameToken
+    let hadLParen = token.rawTokenKind == .leftParen
+    if hadLParen {
+      previous = token
+      guard let next = token.nextToken(viewMode: .sourceAccurate) else { return }
+      token = next
+    }
+
+    // Anything but a string literal: `#warning(oops, forgot the quotes)`.
+    func isStringLiteralStart(_ token: TokenSyntax) -> Bool {
+      switch token.rawTokenKind {
+      case .stringQuote, .multilineStringQuote, .rawStringPoundDelimiter: return true
+      default: return false
+      }
+    }
+    guard isStringLiteralStart(token) else {
+      let wordsStart = token
+      var stopper = token
+      var lastConsumed = previous
+      while stopper.rawTokenKind != .endOfFile, stopper.rawTokenKind != .rightParen, !atStartOfLine(stopper) {
+        lastConsumed = stopper
+        guard let next = stopper.nextToken(viewMode: .sourceAccurate) else { break }
+        stopper = next
+      }
+      let wordsStartPosition = wordsStart.positionAfterSkippingLeadingTrivia
+      let wordsEndPosition = lastConsumed.endPositionBeforeTrailingTrivia
+      var fixIts: [CompilerDiagnosticFixIt] = []
+      if wordsEndPosition != wordsStartPosition {
+        fixIts.append(insertion(hadLParen ? "\"" : "(\"", at: wordsStartPosition))
+        fixIts.append(insertion(stopper.rawTokenKind == .rightParen ? "\"" : "\")", at: wordsEndPosition))
+      }
+      self.diagnose(
+        .pound_diagnostic_expected_string(isError),
+        at: SourceLoc(at: wordsStartPosition, in: self.base),
+        fixIts: fixIts
+      )
+      return
+    }
+
+    var literalAncestor: Syntax? = Syntax(token)
+    while let candidate = literalAncestor, !candidate.is(StringLiteralExprSyntax.self) {
+      literalAncestor = candidate.parent
+    }
+    guard let literal = literalAncestor?.as(StringLiteralExprSyntax.self),
+      let literalLast = literal.lastToken(viewMode: .sourceAccurate)
+    else {
+      return
+    }
+
+    var after = literalLast.nextToken(viewMode: .sourceAccurate)
+    var hadRParen = false
+    if let rParen = after, rParen.rawTokenKind == .rightParen {
+      hadRParen = true
+      after = rParen.nextToken(viewMode: .sourceAccurate)
+    }
+
+    if let after, after.rawTokenKind != .endOfFile, !atStartOfLine(after) {
+      self.diagnose(.extra_tokens_pound_diagnostic_directive(isError), at: after)
+      return
+    }
+
+    if !hadLParen && !hadRParen {
+      // E.g. `#warning "foo"`.
+      self.diagnose(
+        .pound_diagnostic_expected_parens(isError),
+        at: lParen,
+        highlight: Syntax(literal),
+        fixIts: [
+          insertion("(", at: literal.positionAfterSkippingLeadingTrivia),
+          insertion(")", at: literal.endPositionBeforeTrailingTrivia),
+        ]
+      )
+      return
+    } else if hadRParen && !hadLParen {
+      // E.g. `#warning "foo")`.
+      self.diagnose(
+        .pound_diagnostic_expected("(", isError),
+        at: literal,
+        fixIts: [insertion("(", at: literal.positionAfterSkippingLeadingTrivia)]
+      )
+      return
+    } else if hadLParen && !hadRParen {
+      // E.g. `#warning("foo"`.
+      self.diagnose(
+        .pound_diagnostic_expected(")", isError),
+        at: literalLast,
+        fixIts: [insertion(")", at: literal.endPositionBeforeTrailingTrivia)]
+      )
+      return
+    }
+
+    guard literal.segments.allSatisfy({ $0.is(StringSegmentSyntax.self) }) else {
+      self.diagnose(.pound_diagnostic_interpolation(isError), at: literal, highlight: Syntax(literal))
+      return
+    }
+
+    guard let message = literal.representedLiteralValue else {
+      // A malformed literal, e.g. an unterminated multi-line string. The lexer
+      // has already reported it; there is no message to relay.
+      return
     }
 
     // Unconditionally emit the diagnostic. Inactive #if regions are not generated.
-    self.diagnose(.poundDiagnostic(literal, message: message, isError: kind == .error))
+    self.diagnose(.poundDiagnostic(literal, message: message, isError: isError))
   }
 
   func generatePoundAssertStmt(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedPoundAssertStmt? {
@@ -170,6 +323,14 @@ extension ASTGenVisitor {
     guard node.lastToken(viewMode: .sourceAccurate) == node.macroName else {
       // TODO: Diagnose.
       fatalError("magic identifier token with arguments")
+    }
+
+    // `#file` is spelled the same for two kinds, and the name lookup finds the
+    // first. It means `#fileID` only with ConciseMagicFile, and `#filePath`
+    // otherwise.
+    var kind = kind
+    if kind == .fileIDSpelledAsFile, !self.ctx.langOpts.hasFeature(.ConciseMagicFile) {
+      kind = .filePathSpelledAsFile
     }
 
     return BridgedMagicIdentifierLiteralExpr.createParsed(
@@ -203,21 +364,68 @@ extension ASTGenVisitor {
     )
   }
 
+  /// The location of `token`, or of `node`'s pound keyword when the parser
+  /// synthesized `token` during recovery.
+  ///
+  /// A synthesized token still has a position -- a zero-width one past the
+  /// preceding token and its trailing trivia -- so diagnosing at it can land
+  /// well away from the construct it belongs to.
+  func generateSourceLoc(
+    _ token: TokenSyntax?,
+    orPoundOf node: some FreestandingMacroExpansionSyntax
+  ) -> SourceLoc {
+    let loc = self.generateSourceLocIfPresent(token)
+    if loc == nil {
+      return self.generateSourceLoc(node.pound)
+    }
+    return loc
+  }
+
+  /// Where to report that `#selector`/`#keyPath` was written with something the
+  /// grammar does not admit after the keyword -- a generic argument clause or a
+  /// trailing closure.
+  ///
+  /// The C++ parser has no production for either, so it stops right after the
+  /// keyword and reports a missing '(' there. Point at whichever of the two
+  /// appeared, matching that column.
+  func poundArgumentListMismatchLoc(
+    _ node: some FreestandingMacroExpansionSyntax
+  ) -> SourceLoc {
+    if let genericArgumentClause = node.genericArgumentClause {
+      return self.generateSourceLoc(genericArgumentClause)
+    }
+    if let trailingClosure = node.trailingClosure {
+      return self.generateSourceLoc(trailingClosure)
+    }
+    return self.generateSourceLoc(node.additionalTrailingClosures)
+  }
+
   func generateObjCSelectorExpr(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedExpr {
     guard
       node.genericArgumentClause == nil,
       node.trailingClosure == nil,
       node.additionalTrailingClosures.isEmpty
     else {
-      // TODO: Diagnose.
-      fatalError("#selector with generic specialization")
+      // `#selector` takes neither generic arguments nor a trailing closure. The
+      // C++ parser has no grammar for either, so it fails looking for the '('
+      // that should have followed the keyword.
+      self.diagnose(
+        .expr_selector_expected_lparen,
+        at: self.poundArgumentListMismatchLoc(node)
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
 
     var args = node.arguments[...]
     guard let arg = args.popFirst() else {
-      // TODO: Diagnose
-      fatalError("expected an argument for #selector")
-      // return ErrorExpr
+      // `#selector()`. The C++ parser reports the missing method expression and
+      // recovers with an ErrorExpr; nothing here needs the argument. It points
+      // at the ')', so fall back to the pound if recovery synthesized one.
+      self.diagnose(
+        .expr_selector_expected_method_expr,
+        at: self.generateSourceLoc(node.rightParen, orPoundOf: node)
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     let kind: BridgedObjCSelectorKind
     switch arg.label?.rawText {
@@ -225,15 +433,18 @@ extension ASTGenVisitor {
     case "getter": kind = .getter
     case "setter": kind = .setter
     case _?:
-      // TODO: Diagnose
-      fatalError("unexpected argument label in #selector")
-      // return ErrorExpr
+      // Only 'getter:' and 'setter:' are labels here. The C++ parser has no
+      // grammar for any other label: it parses the label as the method
+      // expression and then fails looking for the ')' at the colon.
+      self.diagnose(.expr_selector_expected_rparen, at: self.generateSourceLoc(arg.colon, orPoundOf: node))
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     let expr = self.generate(expr: arg.expression)
     guard args.isEmpty else {
-      // TODO: Diagnose
-      fatalError("unexpected argument in #selector")
-      // return ErrorExpr
+      // `#selector` takes exactly one argument; the C++ parser stops after it
+      // and fails looking for the ')' at the comma.
+      self.diagnose(.expr_selector_expected_rparen, at: self.generateSourceLoc(arg.trailingComma, orPoundOf: node))
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     return BridgedObjCSelectorExpr.createParsed(
       self.ctx,
@@ -252,13 +463,20 @@ extension ASTGenVisitor {
       node.trailingClosure == nil,
       node.additionalTrailingClosures.isEmpty
     else {
-      // TODO: Diagnose.
-      fatalError("#keyPath with generic specialization")
+      // As with `#selector`, neither form has a grammar, so the C++ parser fails
+      // looking for the '(' that should have followed the keyword.
+      self.diagnose(
+        .expr_keypath_expected_lparen,
+        at: self.poundArgumentListMismatchLoc(node)
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
 
     var names: [BridgedDeclNameRef] = []
     var nameLocs: [BridgedDeclNameLoc] = []
 
+    /// Collect the dotted chain of names in `node`, returning true if it is not
+    /// one -- the only shape `#keyPath` accepts.
     func collectNames(expr node: ExprSyntax) -> Bool {
       if let declRefExpr = node.as(DeclReferenceExprSyntax.self) {
         let nameAndLoc = self.generateDeclNameRef(declReferenceExpr: declRefExpr)
@@ -268,8 +486,10 @@ extension ASTGenVisitor {
       }
       if let memberExpr = node.as(MemberAccessExprSyntax.self) {
         guard let base = memberExpr.base else {
-          // TODO: Diagnose
-          fatalError("unexpected expression in #keyPath")
+          // An implicit member reference such as `#keyPath(.p)`: there is no
+          // base to walk into.
+          self.diagnose(.expr_keypath_expected_property_or_type, at: memberExpr)
+          return true
         }
         if collectNames(expr: base) {
           return true
@@ -279,30 +499,37 @@ extension ASTGenVisitor {
         nameLocs.append(nameAndLoc.loc)
         return false
       }
-      // TODO: Diagnose
-      fatalError("unexpected expression in #keyPath")
-      // return true
+      // Anything else -- an operator expression, a parenthesized one, a literal.
+      // The C++ parser reports this at the start of the offending expression.
+      self.diagnose(.expr_keypath_expected_property_or_type, at: node)
+      return true
     }
 
     var args = node.arguments[...]
     guard let arg = args.popFirst() else {
-      // TODO: Diagnose
-      fatalError("expected an argument for #keyPath")
-      // return ErrorExpr
+      // `#keyPath()`. As with `#selector()`, the C++ parser reports the missing
+      // name at the ')' and recovers with an ErrorExpr.
+      self.diagnose(
+        .expr_keypath_expected_property_or_type,
+        at: self.generateSourceLoc(node.rightParen, orPoundOf: node)
+      )
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     guard arg.label == nil else {
-      // TODO: Diagnose
-      fatalError("unexpected argument label  #keyPath")
-
+      // `#keyPath` takes no labels; the C++ parser parses the label as the first
+      // name and then fails looking for the ')' at the colon.
+      self.diagnose(.expr_keypath_expected_rparen, at: self.generateSourceLoc(arg.colon, orPoundOf: node))
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
     if /*hadError=*/collectNames(expr: arg.expression) {
       return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr;
     }
 
     guard args.isEmpty else {
-      // TODO: Diagnose
-      fatalError("unexpected argument in #keyPath")
-      // return ErrorExpr
+      // `#keyPath` takes exactly one argument; the C++ parser stops after it and
+      // fails looking for the ')' at the comma.
+      self.diagnose(.expr_keypath_expected_rparen, at: self.generateSourceLoc(arg.trailingComma, orPoundOf: node))
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
 
     return BridgedKeyPathExpr.createParsedPoundKeyPath(

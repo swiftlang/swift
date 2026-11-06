@@ -47,7 +47,7 @@ enum DeepOuter {
 }
 
 // Trivia is permitted between `@` and the attribute name
-@ diagnose(DeprecatedDeclaration, as: error) // expected-warning {{extraneous whitespace between '@' and attribute name}}
+@ diagnose(DeprecatedDeclaration, as: error) // expected-cparser-warning {{extraneous whitespace between '@' and attribute name}} expected-astgen-warning {{extraneous whitespace after '@' is not permitted; this is an error in Swift 6}}
 func spacedAttribute() -> Bool {
   return dep() // expected-error {{'dep()' is deprecated}}
 }

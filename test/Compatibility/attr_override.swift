@@ -3,8 +3,8 @@
 @override // expected-error {{'override' can only be specified on class members}} {{1-11=}} expected-error {{'override' is a declaration modifier, not an attribute}} {{1-2=}}
 func virtualAttributeCanNotBeUsedInSource() {}
 
-class MixedKeywordsAndAttributes { // expected-note {{in declaration of 'MixedKeywordsAndAttributes'}}
-  // expected-error@+1 {{expected declaration}} expected-error@+1 {{consecutive declarations on a line must be separated by ';'}} {{11-11=;}}
+class MixedKeywordsAndAttributes { // expected-cparser-note {{in declaration of 'MixedKeywordsAndAttributes'}}
+  // expected-cparser-error@+1 {{expected declaration}} expected-astgen-error@+1 {{method does not override any method from its superclass}} expected-cparser-error@+1 {{consecutive declarations on a line must be separated by ';'}} {{11-11=;}} expected-astgen-error@+1 {{unexpected code '@inline(never)' in function}}
   override @inline(never) func f1() {}
 }
 

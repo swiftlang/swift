@@ -2,9 +2,9 @@
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -module-name Swift -parse-stdlib
 
-// expected-warning@+2{{'@expression' has been removed in favor of '@freestanding(expression)'}}
+// expected-cparser-warning@+2{{'@expression' has been removed in favor of '@freestanding(expression)'}}
 // expected-warning@+1{{external macro implementation type 'A.B' could not be found for macro 'myMacro()'}}
-@expression macro myMacro() = #externalMacro(module: "A", type: "B")
+@expression macro myMacro() = #externalMacro(module: "A", type: "B") // expected-astgen-error {{unknown attribute 'expression'}} expected-astgen-error {{macro 'myMacro()' must declare its applicable roles via '@freestanding' or '@attached'}}
 
 // Protocols needed for string literals to work
 public protocol ExpressibleByUnicodeScalarLiteral {

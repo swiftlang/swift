@@ -78,7 +78,7 @@ func test3(_ a: ZeroOneTwoThree) {
      ZeroOneTwoThree.Zero // expected-error {{cannot convert value of type 'ZeroOneTwoThree' to specified type 'Int'}}
 
   // expected-warning @+1 {{unused}}
-  test3 ZeroOneTwoThree.Zero // expected-error {{function is unused}} expected-error{{consecutive statements}} {{8-8=;}}
+  test3 ZeroOneTwoThree.Zero // expected-error {{function is unused}} expected-cparser-error{{consecutive statements}} {{8-8=;}} expected-astgen-error {{consecutive statements}}{{8-9= \n  }}
   test3 (ZeroOneTwoThree.Zero)
   test3(ZeroOneTwoThree.Zero)
   test3 // expected-error {{function is unused}}
@@ -254,7 +254,7 @@ func units(_ x: Int) -> distance {
 
 
 
-var %% : distance -> distance // expected-error {{expected pattern}} 
+var %% : distance -> distance // expected-error {{expected pattern}} expected-astgen-error {{unexpected code '%% : distance -> distance' in source file}}
 
 func badTupleElement() {
   typealias X = (x : Int, y : Int)
@@ -324,8 +324,8 @@ func useSynthesizedMember() {
 
 // Non-materializable argument type
 enum Lens<T> {
-  case foo(inout T) // expected-error {{'inout' may only be used on function or initializer parameters}}
-  case bar(inout T, Int) // expected-error {{'inout' may only be used on function or initializer parameters}}
+  case foo(inout T) // expected-error {{'inout' may only be used on function or initializer parameters}} expected-astgen-error {{unexpected 'inout' keyword before parameter}} expected-astgen-error {{expected 'inout' in type specifier}}
+  case bar(inout T, Int) // expected-error {{'inout' may only be used on function or initializer parameters}} expected-astgen-error {{unexpected 'inout' keyword before parameter}} expected-astgen-error {{expected 'inout' in type specifier}}
 
   case baz((inout T) -> ()) // ok
   case quux((inout T, inout T) -> ()) // ok
@@ -335,7 +335,7 @@ enum Lens<T> {
 // now and we shouldn't pretend to.
 // rdar://46684504
 enum HasVariadic {
-  case variadic(x: Int...) // expected-error {{variadic enum cases are not supported}}
+  case variadic(x: Int...) // expected-cparser-error {{variadic enum cases are not supported}} expected-astgen-error {{unexpected code '...' in parameter clause}}
 }
 
 // https://github.com/apple/swift/issues/44784

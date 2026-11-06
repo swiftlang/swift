@@ -4,4 +4,4 @@
 func 1() {}
 #sourceLocation()
 
-// CHECK: anything.swift:1:6: error: function name
+// CHECK: anything.swift:1:6: error: {{function name|identifier}} can only start with a letter or underscore, not a number

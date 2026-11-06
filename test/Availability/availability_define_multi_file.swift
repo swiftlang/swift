@@ -1,3 +1,7 @@
+// The diagnostics for malformed definitions are worded differently by ASTGen;
+// see test/ASTGen/availability_macro_definition.swift.
+// UNSUPPORTED: parser_astgen
+
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t --leading-lines
 

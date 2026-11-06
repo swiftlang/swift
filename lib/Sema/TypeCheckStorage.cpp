@@ -730,7 +730,8 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
   // If the pattern binding appears in a type or library file context, then
   // it must bind at least one variable.
   if (!contextAllowsPatternBindingWithoutVariables(binding->getDeclContext())) {
-    if (vars.empty()) {
+    // An invalid binding was already diagnosed when it was formed.
+    if (vars.empty() && !binding->isInvalid()) {
       // Selector for error message.
       enum : unsigned {
         Property,

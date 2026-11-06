@@ -268,12 +268,33 @@ SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 swift::Identifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
                                                   BridgedStringRef cStr);
 
+/// If \p name is the real name of a module that was aliased with
+/// -module-alias, return the alias; otherwise return an empty string.
+SWIFT_NAME("BridgedASTContext.aliasForAliasedRealModuleName(self:_:)")
+BridgedStringRef
+BridgedASTContext_aliasForAliasedRealModuleName(BridgedASTContext cContext,
+                                                swift::Identifier name);
+
+/// Whether declarations named with a '$' prefix are allowed at \p loc: the
+/// language option is on, or the location is inside a macro expansion or a
+/// module interface.
+SWIFT_NAME("BridgedASTContext.allowsDollarIdentifierDecls(self:at:in:)")
+bool BridgedASTContext_allowsDollarIdentifierDecls(BridgedASTContext cContext,
+                                                   swift::SourceLoc loc,
+                                                   BridgedDeclContext cDC);
+
 SWIFT_NAME("BridgedASTContext.getDollarIdentifier(self:_:)")
 swift::Identifier
 BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);
 
 SWIFT_NAME("getter:BridgedASTContext.langOpts(self:)")
 BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext);
+
+/// Whether the effective language mode is at least `major.minor`, which must
+/// name a supported language mode (e.g. 4.2 or 5.0).
+SWIFT_NAME("BridgedLangOptions.isLanguageModeAtLeast(self:major:minor:)")
+bool BridgedLangOptions_isLanguageModeAtLeast(BridgedLangOptions cLangOpts,
+                                              SwiftInt major, SwiftInt minor);
 
 SWIFT_NAME("BridgedLangOptions.hasAttributeNamed(self:_:)")
 bool BridgedLangOptions_hasAttributeNamed(BridgedLangOptions cLangOpts,
@@ -545,7 +566,18 @@ public:
 
   BridgedDiagnosticArgument(SwiftInt i);
   BridgedDiagnosticArgument(BridgedStringRef s);
+  BridgedDiagnosticArgument(swift::Identifier identifier);
 };
+
+/// Create an argument holding an unsigned value.
+///
+/// This is a factory rather than a constructor because the diagnostic engine
+/// formats signed and unsigned arguments differently, so a diagnostic declared
+/// as taking `unsigned` must be given an unsigned argument, and an overload set
+/// on integer width would be ambiguous in Swift.
+SWIFT_NAME("BridgedDiagnosticArgument.unsigned(_:)")
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createUnsigned(unsigned value);
 
 class BridgedFixIt {
 public:
@@ -582,12 +614,21 @@ public:
 };
 
 // FIXME: Can we bridge InFlightDiagnostic?
+///
+/// If \p warnUntilMajor is nonzero, the diagnostic is downgraded to a warning
+/// in language modes before that major version.
 SWIFT_NAME("BridgedDiagnosticEngine.diagnose(self:at:_:_:highlightAt:"
-           "highlightLength:fixIts:)")
+           "highlightLength:fixIts:warnUntilMajor:)")
 void BridgedDiagnosticEngine_diagnose(
     BridgedDiagnosticEngine, swift::SourceLoc loc, swift::DiagID diagID,
     BridgedArrayRef arguments, swift::SourceLoc highlightStart,
-    uint32_t hightlightLength, BridgedArrayRef fixIts);
+    uint32_t hightlightLength, BridgedArrayRef fixIts, SwiftInt warnUntilMajor);
+
+/// Whether \p diagID is declared `PointsToFirstBadToken`: when reported at a
+/// token that starts a line, it is reported at the end of the previous token.
+SWIFT_NAME("BridgedDiagnosticEngine.pointsToFirstBadToken(self:_:)")
+bool BridgedDiagnosticEngine_pointsToFirstBadToken(BridgedDiagnosticEngine,
+                                                   swift::DiagID diagID);
 
 SWIFT_NAME("BridgedDiagnosticEngine.getLocationFromExternalSource(self:path:line:column:)")
 swift::SourceLoc BridgedDiagnostic_getLocationFromExternalSource(
@@ -639,6 +680,20 @@ BRIDGED_INLINE bool BridgedDeclContext_isTypeContext(BridgedDeclContext dc);
 SWIFT_NAME("getter:BridgedDeclContext.isModuleScopeContext(self:)")
 BRIDGED_INLINE bool
 BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc);
+
+/// Whether a 'deinit' may be declared directly in this context: a struct, enum,
+/// or class, or an `@_objcImplementation` extension.
+SWIFT_NAME("getter:BridgedDeclContext.allowsDestructorDecl(self:)")
+bool BridgedDeclContext_allowsDestructorDecl(BridgedDeclContext dc);
+
+/// Whether this context is a protocol, where an 'associatedtype' is allowed.
+SWIFT_NAME("getter:BridgedDeclContext.isProtocolContext(self:)")
+bool BridgedDeclContext_isProtocolContext(BridgedDeclContext dc);
+
+/// Whether this context is a coroutine function (a `_read`/`_modify`
+/// accessor, ...), inside which `yield` is a keyword.
+SWIFT_NAME("getter:BridgedDeclContext.isCoroutineFunction(self:)")
+bool BridgedDeclContext_isCoroutineFunction(BridgedDeclContext dc);
 
 SWIFT_NAME("getter:BridgedDeclContext.isClosureExpr(self:)")
 BRIDGED_INLINE bool BridgedDeclContext_isClosureExpr(BridgedDeclContext dc);
@@ -708,6 +763,36 @@ SWIFT_NAME("BridgedOptionalPlatformKind.init(from:)")
 BridgedOptionalPlatformKind
 PlatformKind_fromIdentifier(swift::Identifier ident);
 
+/// The platform name closest to \p cStr, for a "did you mean" suggestion, or an
+/// empty string if there is no close match.
+BridgedStringRef PlatformKind_closestCorrectedString(BridgedStringRef cStr);
+
+/// The name of \p kind as it should appear in a diagnostic, e.g.
+/// "'yielding borrow'".
+SWIFT_NAME("getter:swift.AccessorKind.nameForDiagnostic(self:)")
+BridgedStringRef AccessorKind_nameForDiagnostic(swift::AccessorKind kind);
+
+/// The name of \p kind as it should appear in a diagnostic, with control over
+/// whether it is prefixed with an article ("a 'yielding borrow' accessor") and
+/// whether the underscored spelling is used ("a '_read' accessor").
+SWIFT_NAME("swift.AccessorKind.diagnosticName(self:article:underscored:)")
+BridgedStringRef AccessorKind_nameForDiagnosticStyled(swift::AccessorKind kind,
+                                                      bool article,
+                                                      bool underscored);
+
+/// Whether \p kind is only available with the CoroutineAccessors feature.
+SWIFT_NAME("getter:swift.AccessorKind.requiresCoroutineAccessorsFeature(self:)")
+bool AccessorKind_requiresCoroutineAccessorsFeature(swift::AccessorKind kind);
+
+/// The bare source spelling of \p kind, e.g. "set". Unlike
+/// `nameForDiagnostic`, this is not quoted and not composed.
+SWIFT_NAME("getter:swift.AccessorKind.name(self:)")
+BridgedStringRef AccessorKind_name(swift::AccessorKind kind);
+
+/// Whether \p kind may carry `async`/`throws` effects specifiers.
+SWIFT_NAME("getter:swift.AccessorKind.allowsEffectsSpecifiers(self:)")
+bool AccessorKind_allowsEffectsSpecifiers(swift::AccessorKind kind);
+
 SWIFT_NAME("BridgedAvailabilityMacroMap.has(self:name:)")
 bool BridgedAvailabilityMacroMap_hasName(BridgedAvailabilityMacroMap map,
                                          BridgedStringRef name);
@@ -745,6 +830,13 @@ BRIDGED_INLINE bool BridgedAvailabilityDomainOrIdentifier_isDomain(
 SWIFT_NAME("getter:BridgedAvailabilityDomainOrIdentifier.asIdentifier(self:)")
 BRIDGED_INLINE swift::Identifier
 BridgedAvailabilityDomainOrIdentifier_getAsIdentifier(
+    BridgedAvailabilityDomainOrIdentifier cVal);
+
+/// The platform \p cVal denotes, whether it is still an identifier or has
+/// already been resolved to a domain. A domain that is not a platform, such as
+/// the wildcard domain or a custom one, yields `PlatformKind::none`.
+SWIFT_NAME("BridgedOptionalPlatformKind.init(from:)")
+BridgedOptionalPlatformKind PlatformKind_fromDomainOrIdentifier(
     BridgedAvailabilityDomainOrIdentifier cVal);
 
 SWIFT_NAME("BridgedAvailabilitySpec.createWildcard(_:loc:)")
@@ -870,9 +962,37 @@ bool BridgedDeclAttribute_shouldBeRejectedByParser(swift::DeclAttrKind kind);
 SWIFT_NAME("BridgedDeclAttribute.isDeclModifier(_:)")
 bool BridgedDeclAttribute_isDeclModifier(swift::DeclAttrKind kind);
 
+/// Whether \p name can be parsed as a (possibly qualified or compound)
+/// declaration name, as the argument of `@available(..., renamed:)` must be.
+SWIFT_NAME("isParsableDeclName(_:)")
+bool BridgedStringRef_isParsableDeclName(BridgedStringRef name);
+
 SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
                                BridgedDeclAttribute add);
+
+/// The result of checking a new attribute against those already on a
+/// declaration; see `BridgedDeclAttributes_checkDuplicate`.
+struct BridgedDuplicateAttributeInfo {
+  bool isDuplicate;
+  /// Whether the attribute is a declaration modifier (affects the wording).
+  bool isModifier;
+  /// Whether both are access-level attributes that specify different levels,
+  /// which is diagnosed differently from a plain duplicate.
+  bool hasDifferentAccessLevel;
+  swift::SourceLoc newLoc;
+  swift::SourceLoc previousLoc;
+  /// The ranges of the attributes, including any '@', for highlighting.
+  swift::CharSourceRange newRange;
+  swift::CharSourceRange previousRange;
+};
+
+/// Check whether \p newAttr duplicates an attribute in \p attrs of a kind that
+/// may appear only once, as `Parser::parseNewDeclAttribute` does.
+SWIFT_NAME("BridgedDeclAttributes.checkDuplicate(_:self:_:)")
+BridgedDuplicateAttributeInfo BridgedDeclAttributes_checkDuplicate(
+    BridgedASTContext cContext, const BridgedDeclAttributes *_Nonnull attrs,
+    BridgedDeclAttribute newAttr);
 
 SWIFT_NAME("BridgedDeclAttributes.hasAttribute(self:_:)")
 bool BridgedDeclAttributes_hasAttribute(
@@ -952,6 +1072,21 @@ BridgedPreInverseGenericsAttr
 BridgedPreInverseGenericsAttr_createParsed(BridgedASTContext cContext,
                                            swift::SourceLoc atLoc,
                                            swift::SourceRange range);
+
+SWIFT_NAME("BridgedPreInverseGenericsAttr.createParsed(_:atLoc:range:exceptType:)")
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsedWithExcept(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedTypeRepr cExceptType);
+
+/// Create the attribute for the `@_preInverseGenericsExceptCopyable` shorthand,
+/// whose `except:` type is `~Copyable` and is already resolved rather than
+/// written in source.
+SWIFT_NAME("BridgedPreInverseGenericsAttr.createParsedExceptCopyable(_:atLoc:range:)")
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsedExceptCopyable(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range);
 
 SWIFT_NAME(
     "BridgedBackDeployedAttr.createParsed(_:atLoc:range:platform:version:)")
@@ -1058,6 +1193,16 @@ SWIFT_NAME("BridgedExclusivityAttr.createParsed(_:atLoc:range:mode:)")
 BridgedExclusivityAttr BridgedExclusivityAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedExclusivityAttrMode cMode);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedNonexhaustiveMode {
+  BridgedNonexhaustiveModeError,
+  BridgedNonexhaustiveModeWarning,
+};
+
+SWIFT_NAME("BridgedNonexhaustiveAttr.createParsed(_:atLoc:range:mode:)")
+BridgedNonexhaustiveAttr BridgedNonexhaustiveAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedNonexhaustiveMode cMode);
 
 SWIFT_NAME("BridgedExposeAttr.createParsed(_:atLoc:range:name:kind:)")
 BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
@@ -1202,6 +1347,10 @@ BRIDGED_INLINE swift::MacroRole unbridge(BridgedMacroRole cRole);
 SWIFT_NAME("BridgedMacroRole.init(from:)")
 BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str);
 
+SWIFT_NAME("BridgedMacroRole.isSupported(self:in:)")
+bool BridgedMacroRole_isSupported(BridgedMacroRole role,
+                                  BridgedASTContext cContext);
+
 SWIFT_NAME("getter:BridgedMacroRole.isAttached(self:)")
 BRIDGED_INLINE bool BridgedMacroRole_isAttached(BridgedMacroRole role);
 
@@ -1234,6 +1383,11 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceLoc atLoc,
                                                    swift::SourceRange range,
                                                    swift::Identifier name);
+
+/// Whether \p diagGroupName names a known diagnostic group. An unknown group
+/// must be diagnosed and the attribute dropped before calling
+/// BridgedDiagnoseAttr_createParsed.
+bool BridgedDiagnoseAttr_isKnownGroup(swift::Identifier diagGroupName);
 
 SWIFT_NAME("BridgedDiagnoseAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
 BridgedDiagnoseAttr
@@ -1477,8 +1631,19 @@ BridgedCallableAttr BridgedCallableAttr_createParsed(BridgedASTContext cContext,
 
 struct BridgedFingerprint;
 
+SWIFT_NAME("BridgedDecl.setInvalid(self:)")
+void BridgedDecl_setInvalid(BridgedDecl decl);
+
 SWIFT_NAME("BridgedDecl.attachParsedAttrs(self:_:)")
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl, BridgedDeclAttributes attrs);
+
+/// Record the location of the ';' that follows \p node, if any.
+SWIFT_NAME("BridgedASTNode.setTrailingSemiLoc(self:_:)")
+void BridgedASTNode_setTrailingSemiLoc(BridgedASTNode node,
+                                       swift::SourceLoc semiLoc);
+
+SWIFT_NAME("BridgedDecl.setTrailingSemiLoc(self:_:)")
+void BridgedDecl_setTrailingSemiLoc(BridgedDecl decl, swift::SourceLoc semiLoc);
 
 SWIFT_NAME("BridgedDecl.forEachDeclToHoist(self:_:)")
 void BridgedDecl_forEachDeclToHoist(BridgedDecl decl,
@@ -1489,6 +1654,18 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedStaticSpelling {
   BridgedStaticSpellingStatic,
   BridgedStaticSpellingClass
 };
+
+/// Create an argument holding a static spelling, for a diagnostic declared as
+/// taking `StaticSpellingKind`.
+SWIFT_NAME("BridgedDiagnosticArgument.staticSpelling(_:)")
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createStaticSpelling(BridgedStaticSpelling spelling);
+
+/// Create an argument holding a declaration attribute, for a diagnostic
+/// declared as taking `DeclAttribute`.
+SWIFT_NAME("BridgedDiagnosticArgument.declAttribute(_:)")
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createDeclAttribute(BridgedDeclAttribute attribute);
 
 struct BridgedAccessorRecord {
   swift::SourceLoc lBraceLoc;
@@ -1523,12 +1700,14 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedVarDeclIntroducer {
 };
 
 SWIFT_NAME("BridgedPatternBindingDecl.createParsed(_:declContext:attributes:"
-           "staticLoc:staticSpelling:introducerLoc:introducer:entries:)")
+           "staticLoc:staticSpelling:introducerLoc:introducer:entries:"
+           "isTopLevelGlobal:)")
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedDeclAttributes cAttrs, swift::SourceLoc staticLoc,
     BridgedStaticSpelling cStaticSpelling, swift::SourceLoc introducerLoc,
-    BridgedVarDeclIntroducer cIntorducer, BridgedArrayRef cBindingEntries);
+    BridgedVarDeclIntroducer cIntorducer, BridgedArrayRef cBindingEntries,
+    bool isTopLevelGlobal);
 
 SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
            "argNameLoc:paramName:paramNameLoc:defaultValue:"
@@ -1573,12 +1752,62 @@ BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
 SWIFT_NAME("BridgedParamDecl.setImplicit(self:)")
 BRIDGED_INLINE void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl);
 
+/// Whether this parameter has a name that can be written in source, so that a
+/// diagnostic can suggest it.
+SWIFT_NAME("getter:BridgedParamDecl.hasName(self:)")
+BRIDGED_INLINE bool BridgedParamDecl_hasName(BridgedParamDecl cDecl);
+
+/// The parameter's name as it appears in source. The returned string is owned by
+/// the identifier table, so it outlives the call.
+SWIFT_NAME("getter:BridgedParamDecl.nameStr(self:)")
+BRIDGED_INLINE BridgedStringRef
+BridgedParamDecl_getNameStr(BridgedParamDecl cDecl);
+
 SWIFT_NAME("BridgedConstructorDecl.setParsedBody(self:_:)")
 void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
                                           BridgedBraceStmt body);
 
 SWIFT_NAME("BridgedFuncDecl.setParsedBody(self:_:)")
 void BridgedFuncDecl_setParsedBody(BridgedFuncDecl decl, BridgedBraceStmt body);
+
+/// Mark \p decl as possibly capturing bindings introduced by a top-level 'guard'
+/// statement, so that SILGen computes its capture list even though the function
+/// is not itself in a local context. Applies to any function that follows such a
+/// 'guard' at file scope.
+SWIFT_NAME("BridgedDecl.setHasTopLevelLocalContextCaptures(self:)")
+void BridgedDecl_setHasTopLevelLocalContextCaptures(BridgedDecl decl);
+
+/// Record that the body of the function-like declaration \p decl spans
+/// \p range ('{' through '}') and will be built on demand.
+SWIFT_NAME("BridgedDecl.setBodyDelayed(self:range:hasNestedTypeDeclarations:)")
+void BridgedDecl_setBodyDelayed(BridgedDecl decl, swift::SourceRange range,
+                                bool hasNestedTypeDeclarations);
+
+/// Record that the members of the nominal type or extension \p decl will be
+/// built on demand, and what its body is known to contain.
+SWIFT_NAME("BridgedDecl.setMembersDelayed(self:hasOperatorDeclarations:hasNestedClassDeclarations:hasDerivativeDeclarations:)")
+void BridgedDecl_setMembersDelayed(BridgedDecl decl,
+                                   bool hasOperatorDeclarations,
+                                   bool hasNestedClassDeclarations,
+                                   bool hasDerivativeDeclarations);
+
+/// Record the fingerprint of the tokens of the body of a function-like
+/// declaration whose body was built eagerly. Incremental recompilation compares
+/// these to find the bodies that changed.
+SWIFT_NAME("BridgedDecl.setBodyFingerprint(self:_:)")
+void BridgedDecl_setBodyFingerprint(BridgedDecl decl,
+                                    BridgedFingerprint fingerprint);
+
+SWIFT_NAME("BridgedDecl.setHasNestedTypeDeclarations(self:_:)")
+void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value);
+
+/// Provide the body built for a function-like declaration whose body was
+/// delayed with \c BridgedDecl_setBodyDelayed. \p fingerprint hashes the
+/// tokens of the body, which incremental recompilation compares to find the
+/// bodies that changed.
+SWIFT_NAME("BridgedDecl.setDelayedBodyParsed(self:_:fingerprint:)")
+void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body,
+                                      BridgedFingerprint fingerprint);
 
 SWIFT_NAME("BridgedDestructorDecl.setParsedBody(self:_:)")
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
@@ -1833,6 +2062,13 @@ void BridgedAbstractStorageDecl_setAccessors(
 //===----------------------------------------------------------------------===//
 // MARK: AccessorDecl
 //===----------------------------------------------------------------------===//
+
+/// The location of the accessor of the given kind that \p storage already has,
+/// or an invalid location if it has none.
+SWIFT_NAME("BridgedAbstractStorageDecl.accessorLoc(self:_:)")
+swift::SourceLoc
+BridgedAbstractStorageDecl_getAccessorLoc(BridgedAbstractStorageDecl storage,
+                                          swift::AccessorKind kind);
 
 SWIFT_NAME("BridgedAccessorDecl.setParsedBody(self:_:)")
 void BridgedAccessorDecl_setParsedBody(BridgedAccessorDecl decl,
@@ -2455,6 +2691,9 @@ BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
     swift::SourceLoc lParenLoc, BridgedArrayRef cSpecs,
     swift::SourceLoc rParenLoc, bool isUnavailability);
 
+SWIFT_NAME("BridgedPoundAvailableInfo.setInvalid(self:)")
+void BridgedPoundAvailableInfo_setInvalid(BridgedPoundAvailableInfo info);
+
 SWIFT_NAME("BridgedStmtConditionElement.createHasSymbol(_:poundLoc:lParenLoc:"
            "symbol:rParenLoc:)")
 BridgedStmtConditionElement BridgedStmtConditionElement_createHasSymbol(
@@ -2484,6 +2723,19 @@ BridgedBraceStmt BridgedBraceStmt_createImplicit(BridgedASTContext cContext,
                                                  swift::SourceLoc lBLoc,
                                                  BridgedASTNode element,
                                                  swift::SourceLoc rBLoc);
+
+/// Create an implicit brace statement with brace locations.
+///
+/// Distinct from `createParsed`, which infers implicitness from whether the left
+/// brace location is valid. A brace that is implicit but still has locations --
+/// a switch case body, say, whose extent is known but which has no braces in the
+/// source -- has to say so explicitly.
+SWIFT_NAME("BridgedBraceStmt.createImplicit(_:lBraceLoc:elements:rBraceLoc:)")
+BridgedBraceStmt
+BridgedBraceStmt_createImplicitWithElements(BridgedASTContext cContext,
+                                            swift::SourceLoc lBLoc,
+                                            BridgedArrayRef elements,
+                                            swift::SourceLoc rBLoc);
 
 SWIFT_NAME("BridgedBraceStmt.hasAsyncNode(self:)")
 bool BridgedBraceStmt_hasAsyncNode(BridgedBraceStmt braceStmt);
@@ -2837,6 +3089,12 @@ BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
                                                BridgedTypeRepr base,
                                                swift::SourceLoc specifierLoc);
 
+SWIFT_NAME("BridgedConstValueTypeRepr.createParsed(_:base:atLoc:)")
+BridgedConstValueTypeRepr
+BridgedConstValueTypeRepr_createParsed(BridgedASTContext cContext,
+                                       BridgedTypeRepr base,
+                                       swift::SourceLoc atLoc);
+
 SWIFT_NAME("BridgedDeclRefTypeRepr.createParsed(_:base:name:nameLoc:"
            "genericArguments:angleRange:)")
 BridgedDeclRefTypeRepr BridgedDeclRefTypeRepr_createParsed(
@@ -2998,6 +3256,11 @@ void BridgedTypeRepr_dump(BridgedTypeRepr type);
 SWIFT_NAME("getter:BridgedPattern.singleVar(self:)")
 BridgedNullableVarDecl BridgedPattern_getSingleVar(BridgedPattern cPattern);
 
+/// Mark every wildcard in \p pattern as belonging to an `async let`, as the
+/// C++ parser does for the pattern of `async let _ = ...`.
+SWIFT_NAME("BridgedPattern.markWildcardsAsAsyncLet(self:)")
+void BridgedPattern_markWildcardsAsAsyncLet(BridgedPattern cPattern);
+
 SWIFT_NAME("BridgedAnyPattern.createParsed(_:loc:)")
 BridgedAnyPattern BridgedAnyPattern_createParsed(BridgedASTContext cContext,
                                                  swift::SourceLoc loc);
@@ -3010,6 +3273,11 @@ BridgedBindingPattern
 BridgedBindingPattern_createParsed(BridgedASTContext cContext,
                                    swift::SourceLoc keywordLoc, bool isLet,
                                    BridgedPattern cSubPattern);
+
+SWIFT_NAME("BridgedBindingPattern.createParsed(_:keywordLoc:introducer:subPattern:)")
+BridgedBindingPattern BridgedBindingPattern_createParsedWithIntroducer(
+    BridgedASTContext cContext, swift::SourceLoc keywordLoc,
+    BridgedVarDeclIntroducer introducer, BridgedPattern cSubPattern);
 
 SWIFT_NAME("BridgedBindingPattern.createImplicitCatch(_:loc:)")
 BridgedBindingPattern

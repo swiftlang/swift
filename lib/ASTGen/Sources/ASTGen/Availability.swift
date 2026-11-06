@@ -50,7 +50,13 @@ extension ASTGenVisitor {
     // E.g.
     //   @available(macOS, introduced: 10.12, deprecated: 11.2)
     //   @available(*, unavailable, message: "out of service")
-    let attr = self.generateAvailableAttrExtended(atLoc: atLoc, range: range, args: args, isSPI: isSPI)
+    let attr = self.generateAvailableAttrExtended(
+      atLoc: atLoc,
+      range: range,
+      attrName: attrName,
+      args: args,
+      isSPI: isSPI
+    )
     if let attr {
       return [attr]
     } else {
@@ -71,7 +77,13 @@ extension ASTGenVisitor {
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool
   ) -> [BridgedAvailableAttr] {
+    self.availabilitySpecListIsInvalid = false
     let specs = self.generateAvailabilitySpecList(args: args, context: .availableAttr)
+    // As in the C++ parser, an invalid specification list drops the attribute.
+    if self.availabilitySpecListIsInvalid {
+      self.availabilitySpecListIsInvalid = false
+      return []
+    }
 
     var isFirst = true
     var result: [BridgedAvailableAttr] = []
@@ -121,18 +133,31 @@ extension ASTGenVisitor {
     return result
   }
 
+  /// The source spelling of an availability attribute kind, for diagnostics.
+  func attrKindSpelling(_ kind: BridgedAvailableAttrKind) -> String {
+    switch kind {
+    case .default: return "available"
+    case .deprecated: return "deprecated"
+    case .unavailable: return "unavailable"
+    case .noAsync: return "noasync"
+    @unknown default: return "available"
+    }
+  }
+
   func generateAvailableAttrExtended(
     atLoc: SourceLoc,
     range: SourceRange,
+    attrName: SyntaxText,
     args: AvailabilityArgumentListSyntax,
     isSPI: Bool
   ) -> BridgedAvailableAttr? {
     var args = args[...]
+    let attrNameText = String(syntaxText: attrName)
 
     // The platfrom.
     guard let platformToken = args.popFirst()?.argument.as(TokenSyntax.self) else {
-      // TODO: Diangose
-      fatalError("missing first arg")
+      self.diagnose(.attr_availability_expected_platform(attrNameText), at: range.start)
+      return nil
     }
     let domain = self.generateIdentifierAndSourceLoc(platformToken)
 
@@ -146,13 +171,7 @@ extension ASTGenVisitor {
       case invalid
     }
     var argState = AttrArgumentState<Argument, UInt8>(.invalid)
-    var attrKind: BridgedAvailableAttrKind = .default {
-      willSet {
-        if attrKind != .default {
-          fatalError("resetting attribute kind")
-        }
-      }
-    }
+    var attrKind: BridgedAvailableAttrKind = .default
 
     struct VersionAndRange {
       let version: VersionTuple
@@ -164,40 +183,108 @@ extension ASTGenVisitor {
     var obsoleted: VersionAndRange? = nil
     var message: BridgedStringRef? = nil
     var renamed: BridgedStringRef? = nil
+    /// Set when an argument was diagnosed; as in the C++ parser, that drops the
+    /// attribute.
+    var anyArgumentInvalid = false
+
+    /// Record `newKind`, diagnosing if a conflicting kind was already given.
+    func setAttrKind(_ newKind: BridgedAvailableAttrKind, _ spelling: String, at token: TokenSyntax) {
+      guard attrKind == .default else {
+        self.diagnose(
+          .attr_availability_multiple_kinds(attrNameText, spelling, attrKindSpelling(attrKind)),
+          at: token
+        )
+        return
+      }
+      attrKind = newKind
+    }
 
     func generateVersion(arg: AvailabilityLabeledArgumentSyntax, into target: inout VersionAndRange?) {
-      guard let versionSytnax = arg.value.as(VersionTupleSyntax.self) else {
-        // TODO: Diagnose
-        fatalError("expected version after introduced, deprecated, or obsoleted")
+      guard
+        let versionSytnax = arg.value.as(VersionTupleSyntax.self),
+        let version = VersionTuple(parsing: versionSytnax.trimmedDescription)
+      else {
+        self.diagnose(.attr_availability_expected_version(attrNameText), at: arg.value)
+        anyArgumentInvalid = true
+        return
       }
-      guard let version = VersionTuple(parsing: versionSytnax.trimmedDescription) else {
-        // TODO: Diagnose
-        fatalError("invalid version string")
+      // A version cannot be empty (`0`, `0.0`): warn, until Swift 6.
+      if version.components.allSatisfy({ $0 == 0 }) {
+        self.diagnose(
+          CompilerDiagnostic.attr_availability_expected_version(attrNameText).warnUntilLanguageMode(6),
+          at: versionSytnax
+        )
+        anyArgumentInvalid = true
+        return
       }
       if target != nil {
-        // TODO: Diagnose duplicated.
+        self.diagnose(
+          .attr_availability_invalid_duplicate(String(syntaxText: arg.label.rawText)),
+          at: arg.label
+        )
+        return
       }
 
       target = .init(version: version, range: self.generateSourceRange(versionSytnax))
     }
 
+    /// Generate a string-literal argument, diagnosing the ways it can be
+    /// ill-formed. Returns nil if it was not usable.
+    func generateStringArgument(
+      arg: AvailabilityLabeledArgumentSyntax,
+      into target: inout BridgedStringRef?
+    ) {
+      let label = String(syntaxText: arg.label.rawText)
+      guard let literal = arg.value.as(SimpleStringLiteralExprSyntax.self) else {
+        self.diagnose(.attr_expected_string_literal(attrNameText), at: arg.value)
+        anyArgumentInvalid = true
+        return
+      }
+      guard let text = self.generateStringLiteralTextIfNotInterpolated(expr: literal) else {
+        // `generateStringLiteralTextIfNotInterpolated` has diagnosed.
+        anyArgumentInvalid = true
+        return
+      }
+      // The replacement named by 'renamed:' has to be a declaration name.
+      if label == "renamed", !isParsableDeclName(text) {
+        self.diagnose(.attr_availability_invalid_renamed(attrNameText), at: range.start)
+        anyArgumentInvalid = true
+        return
+      }
+      guard target == nil else {
+        self.diagnose(.attr_availability_invalid_duplicate(label), at: arg.label)
+        return
+      }
+      target = text
+    }
+
+    var sawArgument = false
     while let arg = args.popFirst() {
+      sawArgument = true
       switch arg.argument {
-      case .availabilityVersionRestriction(_):
-        fatalError("platformVersion in extended args")
+      case .availabilityVersionRestriction(let platformVersion):
+        // E.g. `@available(EnabledDomain, macOS 10.10, *)`: shorthand
+        // specifications cannot follow a platform given in the extended form.
+        self.diagnose(
+          .attr_availability_expected_option(attrNameText),
+          at: platformVersion
+        )
 
       case .token(let arg):
         // 'deprecated', 'unavailable, 'noasync' changes the mode.
         switch arg.rawText {
         case "deprecated":
-          attrKind = .deprecated
+          setAttrKind(.deprecated, "deprecated", at: arg)
         case "unavailable":
-          attrKind = .unavailable
+          setAttrKind(.unavailable, "unavailable", at: arg)
         case "noasync":
-          attrKind = .noAsync
+          setAttrKind(.noAsync, "noasync", at: arg)
+        case "*":
+          // A wildcard is only meaningful in the shorthand form; the C++ parser
+          // reports it as an unexpected option here.
+          self.diagnose(.attr_availability_expected_option(attrNameText), at: arg)
         default:
-          // TODO: Diagnose
-          continue
+          self.diagnose(.attr_availability_expected_option(attrNameText), at: arg)
         }
 
       case .availabilityLabeledArgument(let arg):
@@ -224,34 +311,22 @@ extension ASTGenVisitor {
         case .obsoleted:
           generateVersion(arg: arg, into: &obsoleted)
         case .message:
-          guard let literal = arg.value.as(SimpleStringLiteralExprSyntax.self) else {
-            // TODO: Diagnose.
-            fatalError("invalid argument type for 'message:'")
-          }
-          guard let _message = self.generateStringLiteralTextIfNotInterpolated(expr: literal) else {
-            fatalError("invalid literal value")
-          }
-          guard message == nil else {
-            fatalError("duplicated 'message' argument")
-          }
-          message = _message
+          generateStringArgument(arg: arg, into: &message)
         case .renamed:
-          guard let literal = arg.value.as(SimpleStringLiteralExprSyntax.self) else {
-            // TODO: Diagnose.
-            fatalError("invalid argument type for 'renamed:'")
-          }
-          guard let _renamed = self.generateStringLiteralTextIfNotInterpolated(expr: literal) else {
-            fatalError("invalid literal value")
-          }
-          guard renamed == nil else {
-            fatalError("duplicated 'message' argument")
-          }
-          renamed = _renamed
+          generateStringArgument(arg: arg, into: &renamed)
         case .invalid:
-          // TODO: Diagnose
-          fatalError("invalid labeled argument")
+          self.diagnose(.attr_availability_expected_option(attrNameText), at: arg.label)
         }
       }
+    }
+
+    if anyArgumentInvalid {
+      return nil
+    }
+
+    // The platform has to be followed by at least one annotation.
+    if !sawArgument, !self.ctx.langOpts.hasFeature(.CustomAvailability) {
+      self.diagnose(.attr_expected_comma(attrNameText, false), at: Syntax(platformToken).nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(platformToken))
     }
 
     return BridgedAvailableAttr.createParsed(
@@ -285,6 +360,15 @@ extension ASTGenVisitor {
     let version = self.generate(versionTuple: node.platformVersion.version)
     let specs = self.generateAvailabilitySpecList(args: node.specs, context: .macro)
 
+    // A wildcard can only be the sole specification of a macro.
+    if specs.count > 1 {
+      for arg in node.specs {
+        if case .token(let tok) = arg.argument, tok.rawText == "*" {
+          self.diagnose(.attr_availability_wildcard_in_macro, at: tok)
+        }
+      }
+    }
+
     let specsBuffer = UnsafeMutableBufferPointer<BridgedAvailabilitySpec>.allocate(capacity: specs.count)
     _ = specsBuffer.initialize(from: specs)
 
@@ -309,6 +393,17 @@ extension ASTGenVisitor {
       let version = self.generate(versionTuple: versionNode)
       let versionRange = self.generateSourceRange(versionNode)
 
+      // A version cannot be empty (`0`, `0.0`): the C++ parser warns, until
+      // Swift 6, and drops the whole specification.
+      if let versionNode, let version, version.components.allSatisfy({ $0 == 0 }) {
+        self.diagnose(
+          CompilerDiagnostic.avail_query_expected_version_number.warnUntilLanguageMode(6),
+          at: versionNode
+        )
+        self.availabilitySpecListIsInvalid = true
+        return
+      }
+
       if context != .macro {
         // Try expand macro first.
         let expanded = ctx.availabilityMacroMap.get(
@@ -329,25 +424,58 @@ extension ASTGenVisitor {
           }
           return
         }
+
+        // A macro name with a version it does not define is an error, not a
+        // domain for Sema to resolve.
+        if ctx.availabilityMacroMap.has(name: domainNode.rawText.bridged) {
+          self.availabilitySpecListIsInvalid = true
+          // A malformed version has already been diagnosed by the parser.
+          if versionNode != nil && version == nil {
+            return
+          }
+          self.diagnose(
+            .attr_availability_unknown_version(
+              versionNode?.trimmedDescription ?? "0",
+              String(syntaxText: domainNode.rawText)
+            ),
+            at: versionNode.map(Syntax.init) ?? Syntax(domainNode)
+          )
+          return
+        }
       }
 
-      // Was not a macro, it should be a valid platform name.
-      let platform = self.generateIdentifierAndSourceLoc(domainNode)
-      guard let version = version else {
-        // TODO: Diagnostics.
-        fatalError("expected version")
+      // Not a macro, so the domain is an identifier to be resolved during type
+      // checking.
+      //
+      // Deliberately does *not* require a version here. A custom availability
+      // domain has no version, and a versioned domain that is missing one is
+      // diagnosed after the domain resolves, by
+      // `diag::avail_query_expected_version_number` in `MiscDiagnostics.cpp`.
+      // The C++ parser behaves the same way: `Parser::parseAvailabilitySpec`
+      // only parses a version if the next token is a number, and otherwise
+      // records an empty one.
+      guard domainNode.presence == .present else {
+        // A missing domain token means the parser already recovered and
+        // diagnosed; don't add a spec with an empty name for Sema to resolve.
+        return
       }
+      let platform = self.generateIdentifierAndSourceLoc(domainNode)
       // FIXME: Wasting ASTContext memory.
       // 'AvailabilitySpec' is 'ASTAllocated' but created spec is ephemeral in context of `@available` attributes.
       let spec = BridgedAvailabilitySpec.createForDomainIdentifier(
         self.ctx,
         name: platform.identifier,
         nameLoc: platform.sourceLoc,
-        version: version.bridged,
+        version: version?.bridged ?? BridgedVersionTuple(),
         versionRange: versionRange
       )
       result.append(spec)
     }
+
+    /// The most recent shorthand specification, e.g. the `OSX 10.0` in
+    /// `@available(OSX 10.0, ...)`. Used to diagnose a labeled argument that
+    /// follows one, which is not allowed.
+    var lastShorthand: PlatformVersionSyntax? = nil
 
     for parsed in node {
       switch parsed.argument {
@@ -360,10 +488,40 @@ extension ASTGenVisitor {
       case .token(let tok):
         handle(domainNode: tok, versionNode: nil)
       case .availabilityVersionRestriction(let platformVersion):
+        lastShorthand = platformVersion
         handle(domainNode: platformVersion.platform, versionNode: platformVersion.version)
-      default:
-        // TODO: Diagnostics.
-        fatalError("invalid argument kind for availability spec")
+      case .availabilityLabeledArgument(let arg):
+        // E.g. `@available(OSX 10.0, deprecated: 10.12)`. A labeled argument
+        // cannot be mixed with the shorthand form; the two spellings of
+        // `@available` are parsed by different paths.
+        guard let lastShorthand else {
+          // No preceding shorthand to blame, so this is a malformed argument
+          // list that the parser has already diagnosed.
+          continue
+        }
+        let label = String(syntaxText: arg.label.rawText)
+        var fixIts: [CompilerDiagnosticFixIt] = []
+        // Suggest turning `OSX 10.0, introduced: ...` into
+        // `OSX, introduced: 10.0`, by inserting the label after the platform.
+        let insertion = self.generateCharSourceRange(
+          start: lastShorthand.platform.endPositionBeforeTrailingTrivia,
+          length: SourceLength(utf8Length: 0)
+        )
+        if label == "introduced" || label == "deprecated" {
+          fixIts.append(.init(replace: insertion, with: ", introduced:"))
+        }
+        self.diagnose(
+          .avail_query_argument_and_shorthand_mix_not_allowed(
+            label,
+            lastShorthand.trimmedDescription
+          ),
+          at: arg.label
+        )
+        if !fixIts.isEmpty {
+          // The C++ parser attaches this note to the shorthand specification,
+          // not to the offending label.
+          self.diagnose(.avail_query_meant_introduced, at: lastShorthand, fixIts: fixIts)
+        }
       }
     }
 
@@ -372,53 +530,181 @@ extension ASTGenVisitor {
 
   typealias GeneratedPlatformVersion = (platform: swift.PlatformKind, version: BridgedVersionTuple)
 
-  func generate(platformVersionList node: PlatformVersionItemListSyntax) -> [GeneratedPlatformVersion] {
-    var result: [GeneratedPlatformVersion] = []
+  struct GeneratedPlatformVersionList {
+    var versions: [GeneratedPlatformVersion] = []
+
+    /// Whether an entry was dropped for naming something that is not a platform
+    /// -- an unrecognized name, or a macro that expanded to just a wildcard.
+    ///
+    /// When this is true the caller must *not* report
+    /// `diag::attr_availability_need_platform_version` even if `versions` is
+    /// empty: a diagnostic was already emitted for the dropped entry, and the
+    /// C++ parser suppresses the second one the same way (via its
+    /// `EmptyPlatformAndVersions` flag).
+    var droppedNonPlatform = false
+
+    /// Whether the list failed to parse, so the attribute is dropped. The C++
+    /// parser stops at the first entry it cannot parse.
+    var hadError = false
+
+    /// Whether the caller should report that no platform version was given.
+    var needsPlatformVersionDiagnostic: Bool {
+      versions.isEmpty && !droppedNonPlatform
+    }
+  }
+
+  /// Generate the platform-version list of an attribute such as
+  /// `@backDeployed(before:)` or `@_originallyDefinedIn(module:_:)`.
+  func generate(
+    platformVersionList node: PlatformVersionItemListSyntax,
+    attrName: String
+  ) -> GeneratedPlatformVersionList {
+    var result = GeneratedPlatformVersionList()
+
+    /// Warn, with a spelling suggestion if one is close enough. The entry is
+    /// skipped -- the C++ parser also only warns.
+    func diagnoseUnknownPlatform(_ platformToken: TokenSyntax) {
+      let platformName = platformToken.rawText
+      let corrected = PlatformKind_closestCorrectedString(platformName.bridged)
+      if corrected.count > 0 {
+        let correctedText = String(bridged: corrected)
+        self.diagnose(
+          .attr_availability_suggest_platform(
+            String(syntaxText: platformName),
+            attrName,
+            correctedText
+          ),
+          at: platformToken,
+          fixIts: [
+            .init(replace: self.generateCharSourceRange(platformToken), with: correctedText)
+          ]
+        )
+      } else {
+        self.diagnose(
+          .attr_availability_unknown_platform(String(syntaxText: platformName), attrName),
+          at: platformToken
+        )
+      }
+    }
 
     for element in node {
       let platformVersionNode = element.platformVersion
-      let platformName =  platformVersionNode.platform.rawText
+      let platformToken = platformVersionNode.platform
+      let platformName = platformToken.rawText
       let version = self.generate(versionTuple: platformVersionNode.version)?.bridged ?? BridgedVersionTuple()
 
-      // A wildcard is not a platform, and it carries no version to record. The
-      // legacy parser diagnoses it and skips the entry.
-      // TODO: Diagnostics.
-      if platformName == "*" {
+      // A missing platform token is a parser recovery artifact, e.g. from a
+      // trailing comma; the parser has already diagnosed it.
+      guard platformToken.presence == .present else {
+        result.droppedNonPlatform = true
         continue
       }
 
       // If the name is a platform name, use it.
-      let platform = BridgedOptionalPlatformKind(from: platformName.bridged)
-      guard !platform.hasValue else {
-        result.append((platform: platform.value, version: version))
+      //
+      // `*` is not a platform: wildcards are not meaningful in this kind of
+      // list. Note this deliberately does not set `droppedNonPlatform`,
+      // matching the C++ parser, which still reports an otherwise-empty list as
+      // needing a platform version.
+      if platformName == "*" {
+        self.diagnose(.attr_availability_wildcard_ignored(attrName), at: platformToken)
         continue
       }
 
-      // If there's matching macro, use it.
+      // Only the major and minor version numbers are used.
+      if let versionNode = platformVersionNode.version, versionNode.components.count > 1 {
+        self.diagnose(
+          .attr_availability_platform_version_major_minor_only(attrName),
+          at: versionNode
+        )
+      }
+
+      // An availability macro is looked up before anything else; naming a macro
+      // with a version it does not define is an error.
       let expanded = ctx.availabilityMacroMap.get(
         name: platformName.bridged,
         version: version
       )
+      if expanded.isEmpty, ctx.availabilityMacroMap.has(name: platformName.bridged) {
+        self.diagnose(
+          .attr_availability_unknown_version(
+            platformVersionNode.version?.trimmedDescription ?? "0",
+            String(syntaxText: platformName)
+          ),
+          at: platformVersionNode
+        )
+        result.hadError = true
+        continue
+      }
+
+      // A version cannot be empty (`0`, `0.0`): warn, until Swift 6, and give up
+      // on the attribute.
+      if let versionNode = platformVersionNode.version,
+        let parsed = self.generate(versionTuple: versionNode),
+        parsed.components.allSatisfy({ $0 == 0 })
+      {
+        self.diagnose(
+          CompilerDiagnostic.attr_availability_expected_version(attrName).warnUntilLanguageMode(6),
+          at: versionNode
+        )
+        result.hadError = true
+        continue
+      }
+
+      // Everything but a macro needs a version. An unknown name is warned about
+      // first.
+      if platformVersionNode.version == nil, !ctx.availabilityMacroMap.has(name: platformName.bridged) {
+        if !BridgedOptionalPlatformKind(from: platformName.bridged).hasValue {
+          diagnoseUnknownPlatform(platformToken)
+        }
+        self.diagnose(
+          .attr_availability_expected_version(attrName),
+          at: platformToken.nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(platformToken)
+        )
+        result.hadError = true
+        continue
+      }
+
+      let platform = BridgedOptionalPlatformKind(from: platformName.bridged)
+      if platform.hasValue {
+        result.versions.append((platform: platform.value, version: version))
+        continue
+      }
+
+      // If there's matching macro, use it.
       if !expanded.isEmpty {
+        var specs: [BridgedAvailabilitySpec] = []
         expanded.withElements(ofType: UnsafeRawPointer.self) { buffer in
-          for ptr in buffer {
-            let spec = BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: ptr))
-            let domainOrIdentifier = spec.domainOrIdentifier
-            precondition(!domainOrIdentifier.isDomain)
-            let platform = BridgedOptionalPlatformKind(from: domainOrIdentifier.asIdentifier)
-            guard platform.hasValue else {
-              // TODO: Diagnose?
-              continue
-            }
-            result.append((platform: platform.value, version: spec.rawVersion))
+          specs = buffer.map {
+            BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: $0))
           }
+        }
+
+        // A macro that expands to just a wildcard contributes no platform
+        // version, but is not an error either. The C++ parser special-cases
+        // exactly this shape; the general loop below would instead fall through
+        // to `attr_availability_need_platform_version`.
+        if specs.count == 1, specs[0].isWildcard {
+          result.droppedNonPlatform = true
+          continue
+        }
+
+        for spec in specs {
+          // A spec that came from the macro map may carry a resolved domain
+          // rather than an identifier -- a wildcard is one -- so ask for the
+          // platform in a way that accepts either.
+          let platform = BridgedOptionalPlatformKind(from: spec.domainOrIdentifier)
+          guard platform.hasValue else {
+            continue
+          }
+          result.versions.append((platform: platform.value, version: spec.rawVersion))
         }
         continue
       }
 
-      // Error.
-      // TODO: Diagnostics
-      fatalError("invalid platform name")
+      // Neither a platform nor a macro.
+      result.droppedNonPlatform = true
+      diagnoseUnknownPlatform(platformToken)
     }
     return result
   }
@@ -431,15 +717,20 @@ extension ASTGenVisitor {
     case "#unavailable":
       specListContext = .poundUnavailable
     default:
-      // TODO: Diagnostics?
-      fatalError("invalid availabilityKeyword")
+      // The grammar admits only these two spellings for an
+      // AvailabilityConditionSyntax keyword, so anything else is a swift-syntax
+      // invariant violation rather than bad user input.
+      preconditionFailure(
+        "AvailabilityConditionSyntax keyword is neither '#available' nor '#unavailable'"
+      )
     }
+    self.availabilitySpecListIsInvalid = false
     let specs = self.generateAvailabilitySpecList(
       args: node.availabilityArguments,
       context: specListContext
     )
 
-    return .createParsed(
+    let info = BridgedPoundAvailableInfo.createParsed(
       self.ctx,
       poundLoc: self.generateSourceLoc(node.availabilityKeyword),
       lParenLoc: self.generateSourceLoc(node.leftParen),
@@ -447,6 +738,13 @@ extension ASTGenVisitor {
       rParenLoc: self.generateSourceLoc(node.rightParen),
       isUnavailable: specListContext == .poundUnavailable
     )
+    // As in the C++ parser, a specification list that failed to parse makes
+    // the whole condition invalid.
+    if self.availabilitySpecListIsInvalid {
+      info.setInvalid()
+      self.availabilitySpecListIsInvalid = false
+    }
+    return info
   }
 
 }

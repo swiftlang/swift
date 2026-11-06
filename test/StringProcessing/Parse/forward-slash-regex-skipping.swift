@@ -94,7 +94,7 @@ func z() { _ = /]/ }
 func a1() { _ = /:/ }
 func a2() { _ = /;/ }
 func a3() { _ = /)/ }
-func a4() { _ = / / } // expected-error {{regex literal may not start with space; add backslash to escape}}
+func a4() { _ = / / } // expected-cparser-error {{regex literal may not start with space; add backslash to escape}} expected-astgen-error {{bare slash regex literal may not start with space}}
 func a5() { _ = /\ / }
 
 prefix operator /

@@ -3,6 +3,10 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_ClosureIsolation
 
+// swift-syntax does not parse the 'nonisolated' closure modifier of the
+// ClosureIsolation feature: it takes `{ nonisolated in ... }` as a parameter name.
+// UNSUPPORTED: parser_astgen
+
 func acceptClosure<T>(_: () -> T) { }
 func acceptSendableClosure<T>(_: @Sendable () -> T) { }
 

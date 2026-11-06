@@ -12,20 +12,20 @@ func introducedFollowedByDeprecated() {}
 @available(OSX 10.0, deprecated: 10.12)
 // expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'OSX 10.0'}}
 // expected-note@-2 {{did you mean to specify an introduction version?}} {{15-15=, introduced:}}
-// expected-error@-3 {{expected declaration}}
+// expected-cparser-error@-3 {{expected declaration}} expected-astgen-error@-3 {{must handle potential future platforms with '*'}}
 func shorthandFollowedByDeprecated() {}
 
-@available(OSX 10.0, introduced: 10.12)
+@available(OSX 10.0, introduced: 10.12) // expected-astgen-note {{did you mean to specify an introduction version?}}
 // expected-error@-1 {{'introduced' can't be combined with shorthand specification 'OSX 10.0'}}
-// expected-error@-2 {{expected declaration}}
+// expected-cparser-error@-2 {{expected declaration}} expected-astgen-error@-2 {{must handle potential future platforms with '*'}}
 func shorthandFollowedByIntroduced() {}
 
 @available(iOS 6.0, OSX 10.8, *) // no error
 func availableOnMultiplePlatforms() {}
 
-@available(iOS 6.0, OSX 10.0, deprecated: 10.12)
+@available(iOS 6.0, OSX 10.0, deprecated: 10.12) // expected-astgen-note {{did you mean to specify an introduction version?}}
 // expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'OSX 10.0'}}
-// expected-error@-2 {{expected declaration}}
+// expected-cparser-error@-2 {{expected declaration}} expected-astgen-error@-2 {{must handle potential future platforms with '*'}}
 func twoShorthandsFollowedByDeprecated() {}
 
 
@@ -67,11 +67,11 @@ func swiftMessage() {}
 @available(swift 5, deprecated: 6)
 // expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'swift 5'}}
 // expected-note@-2 {{did you mean to specify an introduction version?}} {{17-17=, introduced:}}
-// expected-error@-3 {{expected declaration}}
+// expected-cparser-error@-3 {{expected declaration}}
 func swiftShorthandFollowedByDeprecated() {}
 
 @available(*, unavailable, message: "\("message")")
-// expected-error@-1{{'message' cannot be an interpolated string literal}}
+// expected-cparser-error@-1{{'message' cannot be an interpolated string literal}} expected-astgen-error@-1{{argument cannot be an interpolated string literal}}
 func interpolatedMessage() {}
 
 @available(*, unavailable, message: """
@@ -88,12 +88,12 @@ emptyMessage()
 // expected-error@-1{{'emptyMessage()' is unavailable:  }}
 // expected-note@-4{{'emptyMessage()' has been explicitly marked unavailable here}}
 
-// expected-error@+1{{'message' cannot be an extended escaping string literal}}
+// expected-cparser-error@+1{{'message' cannot be an extended escaping string literal}} expected-astgen-error@+1{{argument cannot be an extended escaping string literal}}
 @available(*, unavailable, message: #"""
   foobar message.
   """#)
 func extendedEscapedMultilineMessage() {}
 
-// expected-error@+1{{'renamed' cannot be an extended escaping string literal}}
+// expected-cparser-error@+1{{'renamed' cannot be an extended escaping string literal}} expected-astgen-error@+1{{argument cannot be an extended escaping string literal}}
 @available(*, unavailable, renamed: #"available()"#)
 func extendedEscapedRenamed() {}

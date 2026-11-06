@@ -1,3 +1,6 @@
+// SwiftParser words and structures the errors for '[;' differently.
+// UNSUPPORTED: parser_astgen
+
 // Note we use '--implicit-check-not' to ensure we exhaustively match errors.
 // RUN: not %target-swift-frontend -parse -experimental-skip-all-function-bodies -diagnostic-style=llvm %s 2>&1 | %FileCheck --implicit-check-not='error:' %s
 

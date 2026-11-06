@@ -24,7 +24,7 @@ func test7(@_inheritActorContext _: Int?) {} // Ok
 struct S {
   init(@_inheritActorContext(always) _: @escaping @Sendable () async -> Void) {} // Ok
 
-  var test: @_inheritActorContext () async -> Void { // expected-error {{attribute can only be applied to declarations, not types}}
+  var test: @_inheritActorContext () async -> Void { // expected-cparser-error {{attribute can only be applied to declarations, not types}} expected-astgen-error {{unknown attribute '_inheritActorContext'}}
     { }
   }
 

@@ -18,6 +18,7 @@ import BasicBridging
 
 fileprivate protocol ValueParameterSyntax: SyntaxProtocol {
   var optionalAttributes: AttributeListSyntax? { get }
+  var modifiers: DeclModifierListSyntax { get }
   /// The `firstName` with optional type.
   ///
   /// This is the lowest denominator between `FunctionParameterSyntax` and `EnumCaseParameterSyntax`.
@@ -87,6 +88,17 @@ extension ClosureParameterSyntax: ValueParameterSyntax {
 }
 
 extension ASTGenVisitor {
+  /// A parameter context that does not admit a keyword argument, i.e. a parameter
+  /// written with both an argument label and a parameter name.
+  ///
+  /// The raw values are the `%select` indices of
+  /// `diag::parameter_operator_keyword_argument`.
+  enum KeywordArgumentlessContext: UInt {
+    case `operator` = 0
+    case closure = 1
+    case enumElement = 2
+  }
+
   func generate(functionParameter node: FunctionParameterSyntax, for context: ParameterContext, at index: Int) -> BridgedParamDecl {
     // For non-subscripts, the argument name is defaulted to the parameter name.
     let argNameByDefault: Bool
@@ -96,20 +108,92 @@ extension ASTGenVisitor {
     case .function, .initializer, .macro:
       argNameByDefault = true
     }
-    return self.makeParamDecl(node, argNameByDefault: argNameByDefault, at: index)
+    return self.makeParamDecl(
+      node,
+      argNameByDefault: argNameByDefault,
+      keywordArgumentlessContext: context == .operator ? .operator : nil,
+      at: index
+    )
   }
 
   func generate(enumCaseParameter node: EnumCaseParameterSyntax, at index: Int) -> BridgedParamDecl {
-    self.makeParamDecl(node, argNameByDefault: true, at: index)
+    self.makeParamDecl(
+      node,
+      argNameByDefault: true,
+      keywordArgumentlessContext: .enumElement,
+      at: index
+    )
   }
 
   func generate(closureParameter node: ClosureParameterSyntax, at index: Int) -> BridgedParamDecl {
-    self.makeParamDecl(node, argNameByDefault: false, at: index)
+    self.makeParamDecl(
+      node,
+      argNameByDefault: false,
+      keywordArgumentlessContext: .closure,
+      at: index
+    )
+  }
+
+  /// Apply the specifiers that were written *before* the parameter name, e.g.
+  /// `isolated` in `isolated Int`, to the parameter's type.
+  ///
+  /// The C++ parser treats them as specifiers of the type, and diagnoses
+  /// that they should have been written in front of the type; the warning
+  /// becomes an error in Swift 6. ASTGen would otherwise drop them.
+  private func applyParameterTypeModifiers(
+    _ modifiers: DeclModifierListSyntax,
+    to base: BridgedTypeRepr
+  ) -> BridgedTypeRepr {
+    var type = base
+    var hasIsolated = false
+    var hasSending = false
+    for modifier in modifiers {
+      let name = modifier.name
+      switch name.keywordKind {
+      case .isolated, ._const, .sending:
+        if name.keywordKind == .sending && !self.ctx.langOpts.hasFeature(.SendingArgsAndResults) {
+          continue
+        }
+        self.diagnose(
+          .parameter_specifier_as_attr_disallowed(name.text)
+            .warnUntilLanguageMode(6),
+          at: name
+        )
+        if name.keywordKind == .isolated && hasIsolated || name.keywordKind == .sending && hasSending {
+          self.diagnose(
+            .parameter_specifier_repeated,
+            at: name,
+            fixIts: [.init(remove: self.generateCharSourceRange(name))]
+          )
+          continue
+        }
+        let loc = self.generateSourceLoc(name)
+        switch name.keywordKind {
+        case .isolated:
+          hasIsolated = true
+          type = BridgedIsolatedTypeRepr.createParsed(self.ctx, base: type, specifierLoc: loc).asTypeRepr
+        case ._const:
+          type = BridgedCompileTimeLiteralTypeRepr.createParsed(self.ctx, base: type, specifierLoc: loc)
+            .asTypeRepr
+        default:
+          hasSending = true
+          type = BridgedSendingTypeRepr.createParsed(self.ctx, base: type, specifierLoc: loc).asTypeRepr
+        }
+      default:
+        break
+      }
+    }
+    return type
   }
 
   /// Generate a ParamDecl. If `argNameByDefault` is true, then the parameter's
   /// argument label is inferred from the first name if no second name is present.
-  private func makeParamDecl(_ node: some ValueParameterSyntax, argNameByDefault: Bool, at index: Int) -> BridgedParamDecl {
+  private func makeParamDecl(
+    _ node: some ValueParameterSyntax,
+    argNameByDefault: Bool,
+    keywordArgumentlessContext: KeywordArgumentlessContext? = nil,
+    at index: Int
+  ) -> BridgedParamDecl {
     var attrs = BridgedDeclAttributes()
 
     // Attributes.
@@ -127,18 +211,90 @@ extension ASTGenVisitor {
     let argName: Identifier
     let argNameLoc: SourceLoc
 
+    // If 'let' or 'var' is being used as an argument label, allow it but
+    // warn. Closure parameters have no argument labels.
+    if keywordArgumentlessContext != .closure, let firstName = node.optionalFirstName,
+      // The parser turns a keyword used as an argument label into an
+      // identifier token, so compare the written text.
+      firstName.text == "let" || firstName.text == "var"
+        || (firstName.text == "inout" && self.ctx.langOpts.hasFeature(.ReferenceBindings))
+    {
+      self.diagnose(
+        .parameter_let_var_as_attr(firstName.text),
+        at: firstName,
+        fixIts: [.init(replace: self.generateCharSourceRange(firstName), with: "`\(firstName.text)`")]
+      )
+    }
+
+    if keywordArgumentlessContext != .closure {
+      for nameNode in [node.optionalFirstName, node.secondName] {
+        if let nameNode {
+          self.diagnoseDollarDeclName(nameNode)
+        }
+      }
+    }
+
     // Map the first name and second name to argument name and parameter name.
     // If we have both, use them. If we only have one, then use that as the
     // parameter name, inferring it as the argument name if we're allowed to.
     switch (node.optionalFirstName, node.secondName) {
+    // `_ name: T` is not a keyword argument: '_' means the parameter has no
+    // argument label, which is allowed everywhere. Only a *named* label is
+    // rejected, matching the C++ parser's `!param.FirstName.empty()`.
+    case let (argNameNode?, paramNameNode?)
+    where keywordArgumentlessContext != nil && self.generateIdentifier(argNameNode) != nil:
+      // An operator, closure or enum case cannot have a keyword argument. The
+      // C++ parser reports this and then collapses the two names into one,
+      // keeping the parameter name; leaving the argument label in place produces
+      // a closure parameter with an API name, which Sema asserts against.
+      self.diagnose(
+        .parameter_operator_keyword_argument(keywordArgumentlessContext!.rawValue),
+        at: argNameNode,
+        fixIts: [
+          .init(
+            remove: self.generateCharSourceRange(
+              start: argNameNode.positionAfterSkippingLeadingTrivia,
+              length: SourceLength(
+                utf8Length: paramNameNode.positionAfterSkippingLeadingTrivia.utf8Offset
+                  - argNameNode.positionAfterSkippingLeadingTrivia.utf8Offset
+              )
+            )
+          )
+        ]
+      )
+      (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(paramNameNode)
+      (argName, argNameLoc) = argNameByDefault ? (paramName, nil) : (nil, nil)
     case let (argNameNode?, paramNameNode?):
       (argName, argNameLoc) = self.generateIdentifierAndSourceLoc(argNameNode)
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(paramNameNode)
+
+      // If the first and second names are equivalent and non-empty, and we
+      // would have an argument label by default, complain.
+      if argNameByDefault, self.generateIdentifier(argNameNode) != nil, argNameNode.text == paramNameNode.text {
+        self.diagnose(
+          .parameter_extraneous_double_up(argName),
+          at: argNameNode,
+          fixIts: [
+            .init(
+              remove: self.generateCharSourceRange(
+                start: argNameNode.positionAfterSkippingLeadingTrivia,
+                length: SourceLength(
+                  utf8Length: paramNameNode.positionAfterSkippingLeadingTrivia.utf8Offset
+                    - argNameNode.positionAfterSkippingLeadingTrivia.utf8Offset
+                )
+              )
+            )
+          ]
+        )
+      }
     case (let nameNode?, nil), (nil, let nameNode?):
       // The (nil, nameNode?) case should never happen (since a single label
       // should be the firstName), but treat it the same it to be defensive.
       (paramName, paramNameLoc) = self.generateIdentifierAndSourceLoc(nameNode)
-      (argName, argNameLoc) = argNameByDefault ? (paramName, paramNameLoc) : (nil, nil)
+      // The argument label is the parameter name, but has no location of its own:
+      // there is nothing written for it, and the C++ parser leaves it invalid.
+      // (A fix-it that renames the label depends on that.)
+      (argName, argNameLoc) = argNameByDefault ? (paramName, nil) : (nil, nil)
     default:
       (argName, argNameLoc, paramName, paramNameLoc) = (nil, nil, nil, nil)
     }
@@ -151,6 +307,22 @@ extension ASTGenVisitor {
           base: base,
           ellipsisLoc: self.generateSourceLoc(ellipsis)
         ).asTypeRepr
+    }
+
+    if let base = type {
+      type = self.applyParameterTypeModifiers(node.modifiers, to: base)
+    }
+
+    // A `@const` parameter is a const value in its type, as well as an attribute.
+    if let base = type, attrs.hasAttribute(.ConstVal),
+      let constAttribute = node.optionalAttributes?.lazy.compactMap({ $0.as(AttributeSyntax.self) })
+        .first(where: { $0.attributeName.trimmedDescription == "const" })
+    {
+      type = BridgedConstValueTypeRepr.createParsed(
+        self.ctx,
+        base: base,
+        atLoc: self.generateSourceLoc(constAttribute.atSign)
+      ).asTypeRepr
     }
 
     let initContext: BridgedDefaultArgumentInitializer?
@@ -225,12 +397,64 @@ extension ASTGenVisitor {
       params.append(param)
     }
 
+    let parenLocs = self.generateParenLocs(
+      leftParen: node.leftParen,
+      rightParen: node.rightParen,
+      isEmpty: params.isEmpty,
+      in: node
+    )
     return .createParsed(
       self.ctx,
-      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      leftParenLoc: parenLocs.left,
       parameters: params.lazy.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: parenLocs.right
     )
+  }
+
+  /// The locations of a parameter clause's parentheses, as a pair.
+  ///
+  /// Three constraints have to hold together. `ParameterList` asserts that both
+  /// locations are valid or neither is, so they cannot be decided
+  /// independently. A parenthesis the parser synthesized during recovery has a
+  /// zero-width position just past the preceding token, which can land on
+  /// whatever follows -- the body's '{', say -- making the parameter list's
+  /// range overlap the body's and tripping the ASTScope child-ordering check.
+  /// And `ParameterList::getSourceRange` falls back to the parameters' own
+  /// extent when the left paren is invalid, but yields an *invalid* range if
+  /// there are no parameters either, which ASTScope also rejects.
+  ///
+  /// So: use the real parentheses when both are there. Otherwise report none and
+  /// let the range come from the parameters -- unless there are no parameters, in
+  /// which case collapse to a zero-width location where the parentheses belong.
+  func generateParenLocs(
+    leftParen: TokenSyntax?,
+    rightParen: TokenSyntax?,
+    isEmpty: Bool,
+    in clause: some SyntaxProtocol
+  ) -> (left: SourceLoc, right: SourceLoc) {
+    if let leftParen, leftParen.presence == .present,
+      let rightParen, rightParen.presence == .present
+    {
+      return (self.generateSourceLoc(leftParen), self.generateSourceLoc(rightParen))
+    }
+    guard isEmpty else {
+      return (nil, nil)
+    }
+    // With no parameters either, the range would be invalid, which ASTScope also
+    // rejects, so collapse to a zero-width location. It has to be the *start of a
+    // token belonging to the declaration*, not the position where the parentheses
+    // would have gone: `getCharSourceRangeOfScope` extends a scope's end with
+    // `Lexer::getLocForEndOfToken`, so an end that sits on trailing trivia lexes
+    // forward into whatever declaration comes next and overlaps it.
+    //
+    // The C++ parser ends up at the declaration's name for the same reason, e.g.
+    // for `func f` with no parameter clause.
+    if let precedingToken = clause.previousToken(viewMode: .sourceAccurate) {
+      let loc = self.generateSourceLoc(precedingToken)
+      return (loc, loc)
+    }
+    let loc = self.generateSourceLoc(clause)
+    return (loc, loc)
   }
 
   func generate(enumCaseParameterClause node: EnumCaseParameterClauseSyntax) -> BridgedParameterList {
@@ -241,16 +465,23 @@ extension ASTGenVisitor {
       params.append(param)
     }
 
+    let parenLocs = self.generateParenLocs(
+      leftParen: node.leftParen,
+      rightParen: node.rightParen,
+      isEmpty: params.isEmpty,
+      in: node
+    )
     return .createParsed(
       self.ctx,
-      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      leftParenLoc: parenLocs.left,
       parameters: params.lazy.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: parenLocs.right
     )
   }
 
   func generate(accessorParameters node: AccessorParametersSyntax) -> BridgedParameterList {
     let (name, nameLoc) = self.generateIdentifierAndSourceLoc(node.name)
+    self.diagnoseDollarDeclName(node.name)
     let param = BridgedParamDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -262,11 +493,18 @@ extension ASTGenVisitor {
       defaultValue: nil,
       defaultValueInitContext: nil
     )
+    let parenLocs = self.generateParenLocs(
+      leftParen: node.leftParen,
+      rightParen: node.rightParen,
+      // An accessor parameter clause always has exactly one parameter.
+      isEmpty: false,
+      in: node
+    )
     return .createParsed(
       self.ctx,
-      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      leftParenLoc: parenLocs.left,
       parameters: CollectionOfOne(param).bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: parenLocs.right
     )
   }
 
@@ -278,11 +516,17 @@ extension ASTGenVisitor {
       params.append(param)
     }
 
+    let parenLocs = self.generateParenLocs(
+      leftParen: node.leftParen,
+      rightParen: node.rightParen,
+      isEmpty: params.isEmpty,
+      in: node
+    )
     return .createParsed(
       self.ctx,
-      leftParenLoc: self.generateSourceLoc(node.leftParen),
+      leftParenLoc: parenLocs.left,
       parameters: params.lazy.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: parenLocs.right
     )
   }
 

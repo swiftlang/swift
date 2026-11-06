@@ -19,7 +19,7 @@ if #_hasSymbol(foo), #_hasSymbol(bar) {}
 guard #_hasSymbol(foo) else { fatalError() }
 while #_hasSymbol(foo) {}
 
-if #_hasSymbol(foo) == false {} // expected-error {{expected '{' after 'if' condition}}
+if #_hasSymbol(foo) == false {} // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{#_hasSymbol may only be used as condition of an 'if', 'guard' or 'while' statement}}
 
 _ = #_hasSymbol(foo) {} // expected-error {{#_hasSymbol may only be used as condition of}}
 
@@ -31,17 +31,17 @@ if let _ = Optional(5), !#_hasSymbol(foo) {} {} // expected-error {{#_hasSymbol 
 
 if #_hasSymbol {} // expected-error {{expected '(' in #_hasSymbol directive}}
 
-// expected-error@+3 {{expected ')' in #_hasSymbol condition}}
-// expected-error@+2 {{expected '{' after 'if' condition}}
-// expected-note@+1 {{to match this opening '('}}
-if #_hasSymbol(struct) {} // expected-error {{expected expression in #_hasSymbol}}
+// expected-cparser-error@+3 {{expected ')' in #_hasSymbol condition}}
+// expected-cparser-error@+2 {{expected '{' after 'if' condition}} expected-astgen-error@+2 {{expected identifier in struct}} expected-astgen-error@+2 {{unexpected code ')' in struct}} expected-astgen-error@+2 {{expected value and ')' to end macro expansion}} expected-astgen-error@+2 {{expected '{' in 'if' statement}}
+// expected-cparser-note@+1 {{to match this opening '('}}
+if #_hasSymbol(struct) {} // expected-cparser-error {{expected expression in #_hasSymbol}}
 
-// expected-error@+3 {{expected ')' in #_hasSymbol condition}}
-// expected-error@+2 {{expected '{' after 'if' condition}}
-// expected-note@+1 {{to match this opening '('}}
+// expected-cparser-error@+3 {{expected ')' in #_hasSymbol condition}}
+// expected-cparser-error@+2 {{expected '{' after 'if' condition}} expected-astgen-error@+2 {{unexpected code 'bar' in macro expansion}}
+// expected-cparser-note@+1 {{to match this opening '('}}
 if #_hasSymbol(foo bar) {}
 
-// expected-error@+2 {{expected ')' in #_hasSymbol condition}}
-// expected-note@+1 {{to match this opening '('}}
+// expected-cparser-error@+2 {{expected ')' in #_hasSymbol condition}} expected-astgen-error@+2 {{extra trailing closure passed in call}} expected-astgen-error@+2 {{expected ')' to end macro expansion}} expected-astgen-error@+2 {{expected body in 'if' statement}} expected-astgen-error@+2 {{expected '}' to end 'if' statement}}
+// expected-cparser-note@+1 {{to match this opening '('}} expected-astgen-note@+1 {{to match this opening '('}}
 if #_hasSymbol(foo {}
 

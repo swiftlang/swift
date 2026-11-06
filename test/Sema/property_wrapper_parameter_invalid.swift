@@ -121,8 +121,8 @@ protocol P {
 }
 
 enum E {
-  // expected-error@+1 {{expected parameter name followed by ':'}}
-  case one(@Wrapper value: Int)
+  // expected-cparser-error@+1 {{expected parameter name followed by ':'}} expected-astgen-error@+1 {{unexpected code ': Int' in parameter clause}}
+  case one(@Wrapper value: Int) // expected-astgen-error {{unknown attribute 'Wrapper'}} expected-astgen-error {{cannot find type 'value' in scope}}
 }
 
 // expected-error@+1 {{function cannot be declared public because its parameter uses an internal API wrapper type}}

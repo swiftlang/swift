@@ -18,6 +18,6 @@ class A {
 class B {
   var bar: Bool = false
   func baz() {
-    bar = A.default.foo(arg: self.) // expected-error {{expected member name following '.'}}
+    bar = A.default.foo(arg: self.) // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
   }
 }

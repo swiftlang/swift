@@ -43,10 +43,10 @@ distributed actor D {
   */
 
   distributed var distSetGet: String { // expected-error {{'distributed' computed property 'distSetGet' cannot have setter}}
-    set distributed { // expected-error {{expected '{' to start setter definition}}
+    set distributed { // expected-cparser-error {{expected '{' to start setter definition}} expected-astgen-error {{unexpected code 'distributed' in accessor}}
       _ = newValue
     }
-    get distributed {
+    get distributed { // expected-astgen-error {{unexpected code 'distributed' in accessor}}
       "okey"
     }
   }

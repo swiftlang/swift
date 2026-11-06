@@ -10,34 +10,34 @@ func asyncGlobal3() throws async { } // expected-error{{'async' must precede 'th
 
 func asyncGlobal3(fn: () throws -> Int) rethrows async { } // expected-error{{'async' must precede 'rethrows'}}{{50-56=}}{{41-41=async }}
 
-func asyncGlobal4() -> Int async { } // expected-error{{'async' may only occur before '->'}}{{28-34=}}{{21-21=async }}
+func asyncGlobal4() -> Int async { } // expected-cparser-error{{'async' may only occur before '->'}}{{28-34=}}{{21-21=async }} expected-astgen-error {{'async' must precede '->'}}
 
 func asyncGlobal5() -> Int async throws { }
-// expected-error@-1{{'async' may only occur before '->'}}{{28-34=}}{{21-21=async }}
-// expected-error@-2{{'throws' may only occur before '->'}}{{34-41=}}{{21-21=throws }}
+// expected-cparser-error@-1{{'async' may only occur before '->'}}{{28-34=}}{{21-21=async }}
+// expected-cparser-error@-2{{'throws' may only occur before '->'}}{{34-41=}}{{21-21=throws }} expected-astgen-error@-2 {{'async throws' must precede '->'}}
 
 func asyncGlobal6() -> Int throws async { }
-// expected-error@-1{{'throws' may only occur before '->'}}{{28-35=}}{{21-21=throws }}
-// expected-error@-2{{'async' may only occur before '->'}}{{35-41=}}{{21-21=async }}
+// expected-cparser-error@-1{{'throws' may only occur before '->'}}{{28-35=}}{{21-21=throws }}
+// expected-cparser-error@-2{{'async' may only occur before '->'}}{{35-41=}}{{21-21=async }} expected-astgen-error@-2 {{'throws async' must precede '->'}}
 
-func asyncGlobal7() throws -> Int async { } // expected-error{{'async' may only occur before '->'}}{{35-41=}}{{21-21=async }}
+func asyncGlobal7() throws -> Int async { } // expected-cparser-error{{'async' may only occur before '->'}}{{35-41=}}{{21-21=async }} expected-astgen-error {{'async' must precede '->'}}
 
-func asyncGlobal8() async throws async -> async Int async {}
+func asyncGlobal8() async throws async -> async Int async {} // expected-astgen-note {{'async' declared here}}
 // expected-error@-1{{'async' has already been specified}} {{34-40=}}
-// expected-error@-2{{'async' has already been specified}} {{43-49=}}
-// expected-error@-3{{'async' has already been specified}} {{53-59=}}
+// expected-cparser-error@-2{{'async' has already been specified}} {{43-49=}} expected-astgen-error@-2 {{'async' must precede '->'}}
+// expected-cparser-error@-3{{'async' has already been specified}} {{53-59=}} expected-astgen-error@-3 {{'async' must precede '->'}}
 
 class X {
   init() async { }
 
-  deinit async { } // expected-error{{deinitializers cannot have a name}}
+  deinit async { } // expected-cparser-error{{deinitializers cannot have a name}}
 
   func f() async { }
 
-  subscript(x: Int) async -> Int { // expected-error{{expected '->' for subscript element type}}
-    // expected-error@-1{{single argument function types require parentheses}}
-    // expected-error@-2{{cannot find type 'async' in scope}}
-    // expected-note@-3{{cannot use module 'async' as a type}}
+  subscript(x: Int) async -> Int { // expected-cparser-error{{expected '->' for subscript element type}}
+    // expected-cparser-error@-1{{single argument function types require parentheses}}
+    // expected-cparser-error@-2{{cannot find type 'async' in scope}} expected-astgen-error@-2 {{unexpected code 'async' in subscript}}
+    // expected-cparser-note@-3{{cannot use module 'async' as a type}}
     get {
       return 0
     }
@@ -58,7 +58,7 @@ func testTypeExprs() {
   let _ = [() async throws -> ()]()
   let _ = [() throws async -> ()]()  // expected-error{{'async' must precede 'throws'}}{{22-28=}}{{15-15=async }}
 
-  let _ = [() -> async ()]() // expected-error{{'async' may only occur before '->'}}{{18-24=}}{{15-15=async }}
+  let _ = [() -> async ()]() // expected-cparser-error{{'async' may only occur before '->'}}{{18-24=}}{{15-15=async }} expected-astgen-error {{'async' must precede '->'}}
 }
 
 // Parsing await syntax.

@@ -51,7 +51,7 @@ let f: @convention(c) (Int) -> Int = genericFunc // expected-error{{cannot be fo
 func ct1() -> () { print("") }
 
 let ct1ref0 : @convention(c, cType: "void (*)(void)") () -> () = ct1
-let ct1ref1 : @convention(c, cType: "void (*)(void)") = ct1 // expected-error{{expected type}}
-let ct1ref2 : @convention(c, ) () -> () = ct1 // expected-error{{expected 'cType' label in 'convention' attribute}}
-let ct1ref3 : @convention(c, cType) () -> () = ct1 // expected-error{{expected ':' after 'cType' for 'convention' attribute}}
-let ct1ref4 : @convention(c, cType: ) () -> () = ct1 // expected-error{{expected string literal containing clang type for 'cType' in 'convention' attribute}}
+let ct1ref1 : @convention(c, cType: "void (*)(void)") = ct1 // expected-error{{expected type}} expected-astgen-error {{'@convention' only applies to function types}}
+let ct1ref2 : @convention(c, ) () -> () = ct1 // expected-cparser-error{{expected 'cType' label in 'convention' attribute}}
+let ct1ref3 : @convention(c, cType) () -> () = ct1 // expected-cparser-error{{expected ':' after 'cType' for 'convention' attribute}}
+let ct1ref4 : @convention(c, cType: ) () -> () = ct1 // expected-cparser-error{{expected string literal containing clang type for 'cType' in 'convention' attribute}} expected-astgen-error {{expected value in attribute}} expected-astgen-error {{expected string literal}}

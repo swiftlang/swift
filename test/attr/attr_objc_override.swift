@@ -2,8 +2,8 @@
 //
 // REQUIRES: objc_interop
 
-class MixedKeywordsAndAttributes { // expected-note{{in declaration of 'MixedKeywordsAndAttributes'}}
-  // expected-error@+1 {{expected declaration}} expected-error@+1 {{consecutive declarations on a line must be separated by ';'}} {{11-11=;}}
+class MixedKeywordsAndAttributes { // expected-cparser-note{{in declaration of 'MixedKeywordsAndAttributes'}}
+  // expected-cparser-error@+1 {{expected declaration}} expected-astgen-error@+1 {{method does not override any method from its superclass}} expected-cparser-error@+1 {{consecutive declarations on a line must be separated by ';'}} {{11-11=;}} expected-astgen-error@+1 {{unexpected code '@objc' in function}}
   override @objc func f1() {}
 }
 

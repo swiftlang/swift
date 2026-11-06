@@ -14,9 +14,9 @@ default @diagnose(StrictMemorySafety, as: error)
 default @diagnose(StrictMemorySafety, as: warning); default @diagnose(StrictMemorySafety, as: error)
 
 default @diagnose(StrictMemorySafety, as: error) func frog() {}
-// expected-error@-1:49 {{consecutive statements on a line must be separated by ';'}}{{49-49=;}}
+// expected-cparser-error@-1:49 {{consecutive statements on a line must be separated by ';'}}{{49-49=;}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
 
-default func bizarre() {}
+default func bizarre() {} // expected-astgen-error {{expected identifier in file-level default}}
 // expected-error@-1:9 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
 default foo
@@ -25,7 +25,7 @@ default foo
 default `nonisolated`
 // expected-error@-1:9 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
-default =
+default = // expected-astgen-error {{expected identifier in file-level default}} expected-astgen-error {{unexpected code '=' in source file}}
 // expected-error@-1:9 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
 default @foo
@@ -33,17 +33,17 @@ default @foo
 // expected-note@-2:9 {{a file-level default must be '@MainActor', 'nonisolated', '@available', or '@diagnose'}}
 
 // Looking on the next line would risk cascading errors.
-default
-// expected-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+default // expected-astgen-error {{expected identifier in file-level default}}
+// expected-cparser-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}} expected-astgen-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 nonisolated func bar() {}
 
-default
-// expected-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+default // expected-astgen-error {{expected identifier in file-level default}}
+// expected-cparser-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}} expected-astgen-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 @available(*, deprecated, message: "no more baz!")
 func baz() {}
 
-default
-// expected-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+default // expected-astgen-error {{expected identifier in file-level default}}
+// expected-cparser-error@-1:8 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}} expected-astgen-error@-1 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
 
 // TODO: in the future, consider a more nuanced recovery for ':' in file level default?
 
@@ -60,7 +60,7 @@ func braceMismatch() {
   // expected-error@-1:3 {{'default' label can only appear inside a 'switch' statement}} {{none}}
 
 private default @diagnose(StrictMemorySafety, as: error)
-// expected-error@-1:1 {{attribute cannot be attached to a file-level default}}
+// expected-cparser-error@-1:1 {{attribute cannot be attached to a file-level default}}
 
 default @inlinable
 // expected-error@-1:9 {{'@inlinable' is not a valid file-level default}}
@@ -97,13 +97,13 @@ default @MyActor
 
 do {
   default @MainActor // expected-error@:3 {{declaration is only valid at file scope}}
-  default: @MainActor // expected-error@:3 {{'default' label can only appear inside a 'switch' statement}}
-} // expected-error@:1 {{expected declaration}}
+  default: @MainActor // expected-error@:3 {{'default' label can only appear inside a 'switch' statement}} expected-astgen-error {{expected declaration after attribute}}
+} // expected-cparser-error@:1 {{expected declaration}}
 
 func test() {
   default @MainActor // expected-error@:3 {{declaration is only valid at file scope}}
-  default: @MainActor // expected-error@:3 {{'default' label can only appear inside a 'switch' statement}}
-} // expected-error@:1 {{expected declaration}}
+  default: @MainActor // expected-error@:3 {{'default' label can only appear inside a 'switch' statement}} expected-astgen-error {{expected declaration after attribute}}
+} // expected-cparser-error@:1 {{expected declaration}}
 
 struct S {
   var x: Int {
@@ -113,31 +113,31 @@ struct S {
 
   default @MainActor func lion() {}
   // expected-error@-1:3 {{declaration is only valid at file scope}}
-  // expected-error@-2:21 {{consecutive declarations on a line must be separated by ';'}}{{21-21=;}}
+  // expected-cparser-error@-2:21 {{consecutive declarations on a line must be separated by ';'}}{{21-21=;}} expected-astgen-error@-2 {{consecutive declarations on a line must be separated by newline or ';'}}
 
   default nonisolated subscript(a: Int) -> Bool { false }
   // expected-error@-1:3 {{declaration is only valid at file scope}}
-  // expected-error@-2:22 {{consecutive declarations on a line must be separated by ';'}}{{22-22=;}}
+  // expected-cparser-error@-2:22 {{consecutive declarations on a line must be separated by ';'}}{{22-22=;}} expected-astgen-error@-2 {{consecutive declarations on a line must be separated by newline or ';'}}
 
   default: func lamb() {}
-  // expected-error@-1:10 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
-  // expected-error@-2:11 {{consecutive declarations on a line must be separated by ';'}}{{11-11=;}}
+  // expected-cparser-error@-1:10 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+  // expected-cparser-error@-2:11 {{consecutive declarations on a line must be separated by ';'}}{{11-11=;}} expected-astgen-error@-2 {{unexpected code 'default:' in struct}}
 
   default: nonisolated func lobster() {}
-  // expected-error@-1:10 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
-  // expected-error@-2:11 {{consecutive declarations on a line must be separated by ';'}}{{11-11=;}}
+  // expected-cparser-error@-1:10 {{expected '@MainActor', 'nonisolated', '@available', or '@diagnose' after 'default'}}
+  // expected-cparser-error@-2:11 {{consecutive declarations on a line must be separated by ';'}}{{11-11=;}} expected-astgen-error@-2 {{unexpected code 'default:' in struct}}
 }
 
 do {
   @objc default @MainActor
   // expected-error@-1:9 {{declaration is only valid at file scope}}
-  // expected-error@-2:4 {{attribute cannot be attached to a file-level default}}
+  // expected-cparser-error@-2:4 {{attribute cannot be attached to a file-level default}} expected-astgen-error@-2 {{unexpected code '@objc' before file-level default}}
 }
 
 switch 3 {
 case 3: print("3")
 default nonisolated
-// expected-error@-1:9 {{expected ':' after 'default'}}
+// expected-cparser-error@-1:9 {{expected ':' after 'default'}} expected-astgen-error@-1 {{expected ':' in switch case}}
 // expected-error@-2:9 {{cannot find 'nonisolated' in scope}}
 }
 
@@ -151,11 +151,11 @@ default: nonisolated
 
 switch 5 {
 case 5: print("5");
-default @MainActor
-// expected-error@-1:9 {{expected ':' after 'default'}}
-} // expected-error {{expected declaration}}
+default @MainActor // expected-astgen-error {{expected label in switch case}} expected-astgen-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+// expected-cparser-error@-1:9 {{expected ':' after 'default'}} expected-astgen-error@-1 {{expected ':' in switch case}}
+} // expected-cparser-error {{expected declaration}}
 
 switch 6 {
 case 6: print("6");
-default: @MainActor
-} // expected-error {{expected declaration}}
+default: @MainActor // expected-astgen-error {{'default' label in a 'switch' must have at least one executable statement}} expected-astgen-error {{expected label in switch case}} expected-astgen-error {{additional 'case' blocks cannot appear after the 'default' block of a 'switch'}}
+} // expected-cparser-error {{expected declaration}}

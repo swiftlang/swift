@@ -6,31 +6,31 @@ if #available(OSX 51, *) {
 }
 
 // Disallow use as an expression.
-if (#available(OSX 51, *)) {}  // expected-error {{#available may only be used as condition of an 'if', 'guard'}}
+if (#available(OSX 51, *)) {}  // expected-cparser-error {{#available may only be used as condition of an 'if', 'guard'}} expected-astgen-error {{availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'}}
 
-let x = #available(OSX 51, *)  // expected-error {{#available may only be used as condition of}}
+let x = #available(OSX 51, *)  // expected-cparser-error {{#available may only be used as condition of}} expected-astgen-error {{availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'}}
 
-(#available(OSX 51, *) ? 1 : 0) // expected-error {{#available may only be used as condition of an}}
+(#available(OSX 51, *) ? 1 : 0) // expected-cparser-error {{#available may only be used as condition of an}} expected-astgen-error {{availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'}}
 
-if !#available(OSX 52, *) { // expected-error {{#available cannot be used as an expression, did you mean to use '#unavailable'?}} {{4-15=#unavailable}}
+if !#available(OSX 52, *) { // expected-cparser-error {{#available cannot be used as an expression, did you mean to use '#unavailable'?}} {{4-15=#unavailable}} expected-astgen-error {{availability condition cannot be used in an expression; did you mean '#unavailable'?}}
 }
-if let _ = Optional(5), !#available(OSX 52, *) { // expected-error {{#available cannot be used as an expression, did you mean to use '#unavailable'?}} {{25-36=#unavailable}}
-}
-
-if #available(OSX 51, *) && #available(OSX 52, *) { // expected-error {{expected ',' joining parts of a multi-clause condition}} {{25-28=,}}
+if let _ = Optional(5), !#available(OSX 52, *) { // expected-cparser-error {{#available cannot be used as an expression, did you mean to use '#unavailable'?}} {{25-36=#unavailable}} expected-astgen-error {{availability condition cannot be used in an expression; did you mean '#unavailable'?}}
 }
 
-
-if #available { // expected-error {{expected availability condition}}
+if #available(OSX 51, *) && #available(OSX 52, *) { // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{25-28=,}} expected-astgen-error {{expected ',' joining parts of a multi-clause condition}}{{25-26=}}{{29-29=, }}{{26-29=}}
 }
 
-if #available( { // expected-error {{expected platform name}} expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+
+if #available { // expected-cparser-error {{expected availability condition}} expected-astgen-error {{expected '(', '@availability' arguments, and ')' in availability condition}}
 }
 
-if #available() { // expected-error {{expected platform name}}
+if #available( { // expected-cparser-error {{expected platform name}} expected-cparser-error {{expected ')'}} expected-astgen-error {{expected platform and ')' to end availability condition}} expected-cparser-note {{to match this opening '('}}
 }
 
-if #available(OSX { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+if #available() { // expected-cparser-error {{expected platform name}} expected-astgen-error {{expected version restriction in availability argument}}
+}
+
+if #available(OSX { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-astgen-error {{expected version number}}
 }
 
 if #available(OSX) { // expected-error {{expected version number}}
@@ -42,7 +42,7 @@ if #available(OSX 0) { // expected-warning {{expected version number; this is an
 if #available(OSX 0.0) { // expected-warning {{expected version number; this is an error in the Swift 6 language mode}}
 }
 
-if #available(OSX 51 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+if #available(OSX 51 { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-astgen-error {{must handle potential future platforms with '*'}}
 }
 
 if #available(iDishwasherOS 0) { // expected-warning {{expected version number; this is an error in the Swift 6 language mode}}
@@ -77,16 +77,16 @@ if #available(OSX 51, iOS 8.0) { }  // expected-error {{must handle potential fu
 if #available(iOS 8.0, *) {
 }
 
-if #available(iOSApplicationExtension, unavailable) { // expected-error {{'unavailable' can't be combined with shorthand specification 'iOSApplicationExtension'}}
+if #available(iOSApplicationExtension, unavailable) { // expected-cparser-error {{'unavailable' can't be combined with shorthand specification 'iOSApplicationExtension'}} expected-astgen-error {{expected version number}} expected-astgen-warning {{cannot find availability domain 'unavailable'}}
 // expected-error@-1 {{condition required for target platform}}
-// expected-note@-2 {{did you mean to specify an introduction version?}}
+// expected-cparser-note@-2 {{did you mean to specify an introduction version?}}
 }
 	
 // Want to make sure we can parse this. Perhaps we should not let this validate, though.
 if #available(*) {
 }
 
-if #available(* { // expected-error {{expected ')' in availability query}} expected-note {{to match this opening '('}}
+if #available(* { // expected-cparser-error {{expected ')' in availability query}} expected-astgen-error {{expected ')' to end availability condition}} expected-note {{to match this opening '('}}
 }
 
 // Multiple platforms
@@ -94,13 +94,13 @@ if #available(OSX 51, iOS 8.0, *) {
 }
 
 
-if #available(OSX 51, { // expected-error {{expected platform name}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+if #available(OSX 51, { // expected-cparser-error {{expected platform name}} expected-astgen-error {{expected version restriction in availability argument}} // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-astgen-error {{must handle potential future platforms with '*'}}
 }
 
-if #available(OSX 51,) { // expected-error {{expected platform name}}
+if #available(OSX 51,) { // expected-cparser-error {{expected platform name}} expected-astgen-error {{expected version restriction in availability argument}} expected-astgen-error {{must handle potential future platforms with '*'}}
 }
 
-if #available(OSX 51, iOS { // expected-error {{expected ')'}} expected-note {{to match this opening '('}}
+if #available(OSX 51, iOS { // expected-error {{expected ')'}} expected-note {{to match this opening '('}} expected-astgen-error {{expected version number}}
 }
 
 if #available(OSX 51, iOS 8.0, iDishwasherOS 51) { // expected-warning {{cannot find availability domain 'iDishwasherOS'}}
@@ -111,7 +111,7 @@ if #available(iDishwasherOS 51, OSX 51) { // expected-warning {{cannot find avai
 // expected-error@-1 {{must handle potential future platforms with '*'}}
 }
 
-if #available(OSX 51 || iOS 8.0) {// expected-error {{'||' cannot be used in an availability condition}}
+if #available(OSX 51 || iOS 8.0) {// expected-cparser-error {{'||' cannot be used in an availability condition}} expected-astgen-error {{expected ',' joining platforms in availability condition}} expected-astgen-error {{must handle potential future platforms with '*'}}
 }
 
 // Emit Fix-It removing un-needed >=, for the moment.

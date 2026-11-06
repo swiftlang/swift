@@ -50,16 +50,16 @@ func notLiterals() {
 
   var x: Int? = nil { get { } } // expected-error {{variable with getter/setter cannot have an initial value}}
   _ = 1 {}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{9-9=do }}
   _ = "hello" {}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{15-15=do }}
   _ = [42] {}
   // expected-error@-1 {{cannot call value of non-function type '[Int]'}}
   _ = (6765, 10946, 17711) {}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{28-28=do }}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{closure expression is unused}} expected-astgen-error@-2 {{cannot call value of non-function type '(Int, Int, Int)'}} expected-cparser-note@-2 {{did you mean to use a 'do' statement?}} {{28-28=do }}
 }
 
 class C {
@@ -77,15 +77,15 @@ var c = C().map
   $0 + 1
 }
 
-var c2 = C().map // expected-note{{callee is here}}
+var c2 = C().map // expected-cparser-note{{callee is here}}
 
-{ // expected-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
+{ // expected-cparser-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
   $0 + 1
 }
 
-var c3 = C().map // expected-note{{callee is here}}
+var c3 = C().map // expected-cparser-note{{callee is here}}
 // blah blah blah
-{ // expected-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
+{ // expected-cparser-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
   $0 + 1
 }
 
@@ -94,7 +94,7 @@ var c3 = C().map // expected-note{{callee is here}}
 // <rdar://problem/16835718> Ban multiple trailing closures
 func multiTrailingClosure(_ a : () -> (), b : () -> ()) {  // expected-note {{'multiTrailingClosure(_:b:)' declared here}}
   multiTrailingClosure({}) {} // ok
-  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter 'b' in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{27-27=do }}
+  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter 'b' in call}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{27-27=do }}
 }
 
 func labeledArgumentAndTrailingClosure() {
@@ -134,14 +134,14 @@ let intArray = [someInt]
 limitXY(someInt, toGamut: intArray) {}  // expected-error{{extra trailing closure passed in call}}
 
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lousy diagnostics
-func retBool(x: () -> Int) -> Bool {}
+func retBool(x: () -> Int) -> Bool {} // expected-astgen-note {{'retBool(x:)' declared here}} expected-astgen-note {{'retBool(x:)' declared here}}
 func maybeInt(_: () -> Int) -> Int? {}
-func twoClosureArgs(_:()->Void, _:()->Void) -> Bool {}
+func twoClosureArgs(_:()->Void, _:()->Void) -> Bool {} // expected-astgen-note {{'twoClosureArgs' declared here}}
 class Foo23036383 {
   init() {}
-  func map(_: (Int) -> Int) -> Int? {}
-  func meth1(x: Int, _: () -> Int) -> Bool {}
-  func meth2(_: Int, y: () -> Int) -> Bool {}
+  func map(_: (Int) -> Int) -> Int? {} // expected-astgen-note {{'map' declared here}}
+  func meth1(x: Int, _: () -> Int) -> Bool {} // expected-astgen-note {{'meth1(x:_:)' declared here}}
+  func meth2(_: Int, y: () -> Int) -> Bool {} // expected-astgen-note {{'meth2(_:y:)' declared here}}
   func filter(by: (Int) -> Bool) -> [Int] {}
 }
 enum MyErr : Error {
@@ -157,8 +157,8 @@ func r23036383(foo: Foo23036383?, obj: Foo23036383) {
   }
   if retBool { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{13-14=(x: }} {{19-19=)}}
   }
-  if retBool() { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{14-16=x: }} {{21-21=)}}
-  } else if retBool( ) { 0 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{21-24=x: }} {{29-29=)}}
+  if retBool() { 1 } {  // expected-cparser-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{14-16=x: }} {{21-21=)}} expected-astgen-error {{cannot call value of non-function type 'Bool'}} expected-astgen-error {{missing argument for parameter 'x' in call}}
+  } else if retBool( ) { 0 } {  // expected-cparser-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{21-24=x: }} {{29-29=)}} expected-astgen-error {{cannot call value of non-function type 'Bool'}} expected-astgen-error {{missing argument for parameter 'x' in call}}
   }
 
   if let _ = maybeInt { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{28-28=)}}
@@ -168,14 +168,14 @@ func r23036383(foo: Foo23036383?, obj: Foo23036383) {
 
   if let _ = foo?.map {$0+1} {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{29-29=)}}
   }
-  if let _ = foo?.map() {$0+1} {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{23-25=}} {{31-31=)}}
+  if let _ = foo?.map() {$0+1} {  // expected-cparser-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{23-25=}} {{31-31=)}} expected-astgen-error {{cannot call value of non-function type 'Int?'}} expected-astgen-error {{missing argument for parameter #1 in call}}
   }
   if let _ = foo, retBool { 1 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{26-27=(x: }} {{32-32=)}}
   }
 
-  if obj.meth1(x: 1) { 0 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{20-22=, }} {{27-27=)}}
+  if obj.meth1(x: 1) { 0 } {  // expected-cparser-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{20-22=, }} {{27-27=)}} expected-astgen-error {{cannot call value of non-function type 'Bool'}} expected-astgen-error {{missing argument for parameter #2 in call}}
   }
-  if obj.meth2(1) { 0 } {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{17-19=, y: }} {{24-24=)}}
+  if obj.meth2(1) { 0 } {  // expected-cparser-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{17-19=, y: }} {{24-24=)}} expected-astgen-error {{cannot call value of non-function type 'Bool'}} expected-astgen-error {{missing argument for parameter 'y' in call}}
   }
 
   for _ in obj.filter {$0 > 4} {  // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(by: }} {{31-31=)}}
@@ -211,7 +211,7 @@ func r23036383(foo: Foo23036383?, obj: Foo23036383) {
   if let _ = foo?.map {$0+1}.map({$0+1}).map{$0+1} {} // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{45-45=(}} {{51-51=)}}
   // expected-warning@-1 {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{22-23=(}} {{29-29=)}}
 
-  if twoClosureArgs({}) {} {} // expected-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{23-25=, }} {{27-27=)}}
+  if twoClosureArgs({}) {} {} // expected-cparser-warning {{trailing closure in this context is confusable with the body of the statement; pass as a parenthesized argument to silence this warning}} {{23-25=, }} {{27-27=)}} expected-astgen-error {{cannot call value of non-function type 'Bool'}} expected-astgen-error {{missing argument for parameter #2 in call}}
 
   if let _ = (foo?.map {$0+1}.map({$0+1}).map{$0+1}) {} // OK
 

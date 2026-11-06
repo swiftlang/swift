@@ -67,7 +67,7 @@ func basictest() {
 
   var tuple4 = (1, 2)        // Tuple literal.
   var tuple5 = (1, 2, 3, 4)  // Tuple literal.
-  var tuple6 = (1 2)  // expected-error {{expected ',' separator}} {{18-18=,}}
+  var tuple6 = (1 2)  // expected-cparser-error {{expected ',' separator}} {{18-18=,}} expected-astgen-error {{unexpected code '2' in tuple}}
 
   // Brace expressions.
   var brace3 = {
@@ -232,17 +232,17 @@ func test_unary1() {
   x = *x      // expected-error {{'*' is not a prefix unary operator}}
   x = x*      // expected-error {{'*' is not a postfix unary operator}}
   x = +(-x)
-  x = + -x // expected-error {{unary operator cannot be separated from its operand}} {{8-9=}}
+  x = + -x // expected-cparser-error {{unary operator cannot be separated from its operand}} {{8-9=}} expected-astgen-error {{expected expression in function}}
 }
 func test_unary2() {
   var x: Int
   // FIXME: second diagnostic is redundant.
-  x = &; // expected-error {{expected expression after unary operator}} expected-error {{expected expression in assignment}}
+  x = &; // expected-cparser-error {{expected expression after unary operator}} expected-cparser-error {{expected expression in assignment}} expected-astgen-error {{expected expression in function}}
 }
 func test_unary3() {
   var x: Int
   // FIXME: second diagnostic is redundant.
-  x = &, // expected-error {{expected expression after unary operator}} expected-error {{expected expression in assignment}}
+  x = &, // expected-cparser-error {{expected expression after unary operator}} expected-cparser-error {{expected expression in assignment}} expected-astgen-error {{expected expression in function}}
 }
 
 func test_as_1() {
@@ -250,7 +250,7 @@ func test_as_1() {
 }
 func test_as_2() {
   let x: Int = 1
-  x as [] // expected-error {{expected element type}} {{9-9= <#type#>}}
+  x as [] // expected-cparser-error {{expected element type}} {{9-9= <#type#>}} expected-astgen-error {{expected type in array type}}
 }
 
 func test_lambda1() {
@@ -280,9 +280,9 @@ func test_lambda2() {
 }
 
 func test_lambda3() {
-  { () -> protocol<Int> in
+  { () -> protocol<Int> in // expected-astgen-warning {{result of call to closure returning 'Int' is unused}}
     // expected-error @-1 {{'protocol<...>' composition syntax has been removed and is not needed here}} {{11-24=Int}}
-    // expected-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
+    // expected-cparser-error @-2 {{non-protocol, non-class type 'Int' cannot be used within a protocol-constrained type}}
     return 1
   }()
 }
@@ -430,15 +430,15 @@ var fl_a = 0.0
 var fl_b: Double = 1.0
 var fl_c: Float = 2.0
 // FIXME: crummy diagnostic
-var fl_d: Float = 2.0.0 // expected-error {{expected named member of numeric literal}}
+var fl_d: Float = 2.0.0 // expected-cparser-error {{expected named member of numeric literal}} expected-astgen-error {{value of type 'Double' has no member '0'}}
 var fl_e: Float = 1.0e42
 var fl_f: Float = 1.0e+  // expected-error {{expected a digit in floating point exponent}} 
 var fl_g: Float = 1.0E+42
 var fl_h: Float = 2e-42
-var vl_i: Float = -.45   // expected-error {{'.45' is not a valid floating point literal; it must be written '0.45'}} {{20-20=0}}
+var vl_i: Float = -.45   // expected-cparser-error {{'.45' is not a valid floating point literal; it must be written '0.45'}} {{20-20=0}} expected-astgen-error {{'.45' is not a valid floating point literal; it must be written '0.45'}}
 var fl_j: Float = 0x1p0
 var fl_k: Float = 0x1.0p0
-var fl_l: Float = 0x1.0 // expected-error {{hexadecimal floating point literal must end with an exponent}}
+var fl_l: Float = 0x1.0 // expected-cparser-error {{hexadecimal floating point literal must end with an exponent}} expected-astgen-error {{value of type 'Int' has no member '0'}}
 var fl_m: Float = 0x1.FFFFFEP-2
 var fl_n: Float = 0x1.fffffep+2
 var fl_o: Float = 0x1.fffffep+ // expected-error {{expected a digit in floating point exponent}}
@@ -472,81 +472,44 @@ var fl_bad_separator2: Double = 0x1p_ // expected-error {{'_' is not a valid fir
 
 var st_a = ""
 var st_b: String = ""
-var st_c = "asdfasd    // expected-error {{unterminated string literal}}
+// The unterminated string literals that were here, in 'stringliterals' and in
+// 'testSingleQuoteStringLiterals', are in expressions_string_literals.swift.
+
+func testSingleQuoteStringLiterals() {
+  _ = 'abc' // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+  _ = 'abc' + "def" // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+
+  _ = 'ab\nc' // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\nc"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+
+  _ = "abc\('def')" // expected-cparser-error{{single-quoted string literal found, use '"'}}{{13-18="def"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+  _ = 'ab\("c")' // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-17="ab\\("c")"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+  _ = 'a\('b')c' // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-17="a\\('b')c"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+                 // expected-cparser-error@-1{{single-quoted string literal found, use '"'}}{{11-14="b"}} expected-astgen-error@-1 {{Single-quoted string literal found, use '"'}}
+
+  _ = "a'c"
+
+  _ = 'ab\'c' // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-14="ab'c"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+
+  _ = 'ab"c' // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-13="ab\\"c"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+  _ = 'ab\"c' // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\"c"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+  _ = 'ab\\"c' // expected-cparser-error{{single-quoted string literal found, use '"'}}{{7-15="ab\\\\\\"c"}} expected-astgen-error {{Single-quoted string literal found, use '"'}}
+}
 
 var st_d = " \t\n\r\"\'\\  "  // Valid simple escapes
 var st_e = " \u{12}\u{0012}\u{00000078} "  // Valid unicode escapes
 var st_u1 = " \u{1} "
 var st_u2 = " \u{123} "
-var st_u3 = " \u{1234567} " // expected-error {{invalid unicode scalar}}
+var st_u3 = " \u{1234567} " // expected-cparser-error {{invalid unicode scalar}} expected-astgen-error {{invalid escape sequence in literal}}
 var st_u4 = " \q "  // expected-error {{invalid escape sequence in literal}}
 
-var st_u5 = " \u{FFFFFFFF} "  // expected-error {{invalid unicode scalar}}
+var st_u5 = " \u{FFFFFFFF} "  // expected-cparser-error {{invalid unicode scalar}} expected-astgen-error {{invalid escape sequence in literal}}
 var st_u6 = " \u{D7FF} \u{E000} "  // Fencepost UTF-16 surrogate pairs.
-var st_u7 = " \u{D800} "  // expected-error {{invalid unicode scalar}}
-var st_u8 = " \u{DFFF} "  // expected-error {{invalid unicode scalar}}
+var st_u7 = " \u{D800} "  // expected-cparser-error {{invalid unicode scalar}} expected-astgen-error {{invalid escape sequence in literal}}
+var st_u8 = " \u{DFFF} "  // expected-cparser-error {{invalid unicode scalar}} expected-astgen-error {{invalid escape sequence in literal}}
 var st_u10 = " \u{0010FFFD} "  // Last valid codepoint, 0xFFFE and 0xFFFF are reserved in each plane
-var st_u11 = " \u{00110000} "  // expected-error {{invalid unicode scalar}}
+var st_u11 = " \u{00110000} "  // expected-cparser-error {{invalid unicode scalar}} expected-astgen-error {{invalid escape sequence in literal}}
 
-func stringliterals(_ d: [String: Int]) {
 
-  // rdar://11385385
-  let x = 4
-  "Hello \(x+1) world"  // expected-warning {{string literal is unused}}
-  
-  // expected-error @+1 {{unterminated string literal}}
-  "Error: \(x+1"; // expected-error {{cannot find ')' to match opening '(' in string interpolation}}
-
-  // expected-error @+1 {{unterminated string literal}}
-  "Error: \(x+1   // expected-error {{cannot find ')' to match opening '(' in string interpolation}}
-  ;    // expected-error {{';' statements are not allowed}}
-
-  // rdar://14050788 [DF] String Interpolations can't contain quotes
-  "test \("nested")"
-  "test \("\("doubly nested")")"
-  "test \(d["hi"])"
-  "test \("quoted-paren )")"
-  "test \("quoted-paren (")"
-  "test \("\\")"
-  "test \("\n")"
-  "test \("\")" // expected-error {{cannot find ')' to match opening '(' in string interpolation}} expected-error {{unterminated string literal}}
-
-  "test \
-  // expected-error @-1 {{unterminated string literal}} expected-error @-1 {{invalid escape sequence in literal}}
-  "test \("\
-  // expected-error @-1 {{cannot find ')' to match opening '(' in string interpolation}} expected-error @-1 {{unterminated string literal}}
-  "test newline \("something" +
-    "something else")"
-  // expected-error @-2 {{cannot find ')' to match opening '(' in string interpolation}}
-  // expected-error @-2 {{unterminated string literal}} expected-error @-3 {{unterminated string literal}}
-
-  // expected-warning @+2 {{variable 'x2' was never used; consider replacing with '_' or removing it}}
-  // expected-error @+1 {{unterminated string literal}}
-  var x2 : () = ("hello" + "
-  ;
-}
-
-func testSingleQuoteStringLiterals() {
-  _ = 'abc' // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
-  _ = 'abc' + "def" // expected-error{{single-quoted string literal found, use '"'}}{{7-12="abc"}}
-
-  _ = 'ab\nc' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\nc"}}
-
-  _ = "abc\('def')" // expected-error{{single-quoted string literal found, use '"'}}{{13-18="def"}}
-  _ = 'ab\("c")' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="ab\\("c")"}}
-  _ = 'a\('b')c' // expected-error{{single-quoted string literal found, use '"'}}{{7-17="a\\('b')c"}}
-                 // expected-error@-1{{single-quoted string literal found, use '"'}}{{11-14="b"}}
-
-  _ = "abc' // expected-error{{unterminated string literal}}
-  _ = 'abc" // expected-error{{unterminated string literal}}
-  _ = "a'c"
-
-  _ = 'ab\'c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab'c"}}
-
-  _ = 'ab"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-13="ab\\"c"}}
-  _ = 'ab\"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-14="ab\\"c"}}
-  _ = 'ab\\"c' // expected-error{{single-quoted string literal found, use '"'}}{{7-15="ab\\\\\\"c"}}
-}
 
 // <rdar://problem/17128913>
 var s = ""
@@ -762,13 +725,13 @@ func dictionaryLiterals() {
 func invalidDictionaryLiteral() {
   // FIXME: lots of unnecessary diagnostics.
 
-  var a = [1: ; // expected-error {{expected value in dictionary literal}}
-  var b = [1: ;] // expected-error {{expected value in dictionary literal}}
-  var c = [1: "one" ;] // expected-error {{expected key expression in dictionary literal}} expected-error {{expected ',' separator}} {{20-20=,}}
-  var d = [1: "one", ;] // expected-error {{expected key expression in dictionary literal}}
-  var e = [1: "one", 2] // expected-error {{expected ':' in dictionary literal}}
-  var f = [1: "one", 2 ;] // expected-error {{expected ':' in dictionary literal}}
-  var g = [1: "one", 2: ;] // expected-error {{expected value in dictionary literal}}
+  var a = [1: ; // expected-cparser-error {{expected value in dictionary literal}} expected-astgen-error {{expected value in dictionary element}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{expected ']' to end dictionary}}
+  var b = [1: ;] // expected-cparser-error {{expected value in dictionary literal}} expected-astgen-error {{expected value in dictionary element}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{expected ']' to end dictionary}} expected-astgen-error {{unexpected code ']' in function}}
+  var c = [1: "one" ;] // expected-cparser-error {{expected key expression in dictionary literal}} expected-astgen-error {{expected ']' to end dictionary}} expected-cparser-error {{expected ',' separator}} {{20-20=,}} expected-astgen-error {{expected ',' in dictionary element}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{unexpected code ']' in function}}
+  var d = [1: "one", ;] // expected-cparser-error {{expected key expression in dictionary literal}} expected-astgen-error {{expected ']' to end dictionary}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{unexpected code ']' in function}}
+  var e = [1: "one", 2] // expected-cparser-error {{expected ':' in dictionary literal}} expected-astgen-error {{expected ':' and value in dictionary element}}
+  var f = [1: "one", 2 ;] // expected-cparser-error {{expected ':' in dictionary literal}} expected-astgen-error {{expected ':' and value in dictionary element}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{expected ']' to end dictionary}} expected-astgen-error {{unexpected code ']' in function}}
+  var g = [1: "one", 2: ;] // expected-cparser-error {{expected value in dictionary literal}} expected-astgen-error {{expected value in dictionary element}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{expected ']' to end dictionary}} expected-astgen-error {{unexpected code ']' in function}}
 }
 
 // Other overloads of `joined(separator:)` have multiple issues - argument is a String and element of the base should be `String` of conform to `StringProtocol`.
@@ -968,13 +931,13 @@ let _ = 0xFFF_FFFF_FFFF_FFFF as Int64
 
 // rdar://problem/20289969 - string interpolation with comment containing ')' or '"'
 let _ = "foo \(42 /* ) " ) */)"
-let _ = "foo \(foo // )  " // expected-error {{cannot find ')' to match opening '(' in string interpolation}} expected-error {{unterminated string literal}}
-let _ = "foo \(42 /*
+let _ = "foo \(foo // )  " // expected-cparser-error {{cannot find ')' to match opening '(' in string interpolation}} expected-astgen-error {{expected '"' to end string literal}} expected-cparser-error {{unterminated string literal}} expected-astgen-error {{expected ')' in string literal}} expected-astgen-note {{to match this opening '"'}} expected-astgen-note {{to match this opening '('}} expected-astgen-error {{cannot find 'foo' in scope}}
+let _ = "foo \(42 /* // expected-astgen-note {{to match this opening '('}}
                    * multiline comment
                    */)end"
-// expected-error @-3 {{cannot find ')' to match opening '(' in string interpolation}} expected-error @-3 {{unterminated string literal}}
-// expected-error @-2 {{expected expression}}
-// expected-error @-3 {{unterminated string literal}}
+// expected-cparser-error @-3 {{cannot find ')' to match opening '(' in string interpolation}} expected-cparser-error @-3 {{unterminated string literal}}
+// expected-cparser-error @-2 {{expected expression}}
+// expected-cparser-error @-3 {{unterminated string literal}} expected-astgen-error@-3 {{expected ')' in string literal}}
 
 // https://github.com/apple/swift/issues/66192
 func I66192(_: Int) {}

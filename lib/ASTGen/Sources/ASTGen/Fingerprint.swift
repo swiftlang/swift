@@ -36,6 +36,8 @@ extension StableHasher {
     )
     self.combine(UInt(truncatingIfNeeded: buffer.count))
     self.combine(bytes: buffer)
+    // Separate tokens with a null byte, as `Parser::recordTokenHash` does.
+    self.combine(UInt8(0))
   }
 }
 
@@ -53,21 +55,68 @@ final class FingerprintVisitor: SyntaxVisitor {
     Fingerprint(core: hasher.finalize())
   }
 
+  /// Whether to hash the tokens of function bodies and other code blocks,
+  /// rather than skipping them as part of a declaration's own fingerprint.
+  var includesBodies = false
+
+  /// The fingerprint of a function body: a hash of the tokens the C++ parser
+  /// would have consumed for it, i.e., those in active `#if` clauses.
+  static func fingerprint(
+    ofBody body: some SyntaxProtocol,
+    configuredRegions: ConfiguredRegions
+  ) -> Fingerprint {
+    let visitor = FingerprintVisitor(configuredRegions: configuredRegions)
+    visitor.includesBodies = true
+    visitor.walk(body)
+    return visitor.finalize()
+  }
+
   override func visit(_ token: TokenSyntax) -> SyntaxVisitorContinueKind {
-    // Collect all token texts.
-    hasher.combine(text: token.rawText)
+    // Collect all token texts, except for the end-of-file token and missing
+    // tokens, which the C++ parser never consumes.
+    if !token.rawText.isEmpty {
+      hasher.combine(text: token.rawText)
+    }
     return .skipChildren
   }
 
+  /// The member block being fingerprinted. Its own tokens are hashed; the
+  /// member blocks of nominal types and extensions nested inside it are not,
+  /// because those have fingerprints of their own.
+  var root: MemberBlockSyntax?
+
   override func visit(_ node: MemberBlockSyntax) -> SyntaxVisitorContinueKind {
-    // Skip nominal decl / extension member blocks.
+    // Skip nested nominal decl / extension member blocks, unless hashing a
+    // body, which covers the local types declared inside it. Like the C++
+    // parser, only record the braces of a skipped block.
+    if includesBodies || node == root {
+      return .visitChildren
+    }
+    hasher.combine(text: node.leftBrace.rawText)
+    hasher.combine(text: node.rightBrace.rawText)
     return .skipChildren
+  }
+
+  override func visit(_ node: AccessorBlockSyntax) -> SyntaxVisitorContinueKind {
+    // The statements of an implicit getter (`var p: Int { return 0 }`) are a
+    // function body just like a `CodeBlockSyntax`, but are not wrapped in one.
+    if case .getter = node.accessors, !includesBodies {
+      hasher.combine(text: node.leftBrace.rawText)
+      hasher.combine(text: node.rightBrace.rawText)
+      return .skipChildren
+    }
+    return .visitChildren
   }
 
   override func visit(_ node: CodeBlockSyntax) -> SyntaxVisitorContinueKind {
     // Skip function bodies.
     // FIXME: Don't skip closure bodies or other control flow statement blocks.
     //        E.g. 'var val = { if condition { "foo" } else { "bar" } }()'
+    if includesBodies {
+      return .visitChildren
+    }
+    hasher.combine(text: node.leftBrace.rawText)
+    hasher.combine(text: node.rightBrace.rawText)
     return .skipChildren
   }
 
@@ -94,6 +143,7 @@ func getSourceFileFingerprint(
 extension ASTGenVisitor {
   func generateFingerprint(declGroup node: some DeclGroupSyntax) -> Fingerprint {
     let visitor = FingerprintVisitor(configuredRegions: self.configuredRegions)
+    visitor.root = node.memberBlock
     visitor.walk(node.memberBlock)
     return visitor.finalize()
   }

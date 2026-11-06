@@ -3,9 +3,9 @@
 /** Basics *******************************************************************/
 
 // Function types can't be rethrows right now.
-let r1 = {() rethrows -> Int in 0} // expected-error {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} {{14-22=throws}}
-let r2 : () rethrows -> Int = { 0 } // expected-error {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} {{13-21=throws}}
-let r3 : Optional<() rethrows -> ()> = nil // expected-error {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} {{22-30=throws}}
+let r1 = {() rethrows -> Int in 0} // expected-cparser-error {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} {{14-22=throws}} expected-astgen-error {{expected throwing specifier; did you mean 'throws'?}} {{23-23=throws }} {{14-23=}}
+let r2 : () rethrows -> Int = { 0 } // expected-cparser-error {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} {{13-21=throws}} expected-astgen-error {{expected throwing specifier; did you mean 'throws'?}} {{22-22=throws }} {{13-22=}}
+let r3 : Optional<() rethrows -> ()> = nil // expected-cparser-error {{only function declarations may be marked 'rethrows'; did you mean 'throws'?}} {{22-30=throws}} expected-astgen-error {{expected throwing specifier; did you mean 'throws'?}} {{31-31=throws }} {{22-31=}}
 
 func f1(_ f: () throws -> ()) rethrows { try f() }
 func f2(_ f: () -> ()) rethrows { f() } // expected-error {{'rethrows' function must take a throwing function argument}}

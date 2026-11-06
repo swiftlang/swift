@@ -33,15 +33,10 @@ func h() {}
 #endif
 
 
-// <https://twitter.com/practicalswift/status/829066902869786625>
-#if // expected-error {{incomplete condition in conditional compilation directive}}
-#if 0 == // expected-error {{incomplete condition in conditional compilation directive}}
-#if 0= // expected-error {{incomplete condition in conditional compilation directive}} expected-error {{'=' must have consistent whitespace on both sides}}
-class Foo {
-  #if // expected-error {{incomplete condition in conditional compilation directive}}
-  #if 0 == // expected-error {{incomplete condition in conditional compilation directive}}
-  #if 0= // expected-error {{incomplete condition in conditional compilation directive}} expected-error {{'=' must have consistent whitespace on both sides}}
-}
+// The incomplete conditions that used to be here are in
+// basicParseErrors_incomplete.swift: SwiftParser nests everything after one in
+// the body of its clause, which hides the diagnostics that the rest of this
+// file checks.
 
 struct S {
   #if FOO
@@ -89,12 +84,12 @@ struct S {
 #if _endian(mid) // expected-warning {{unknown endianness for build configuration '_endian'}}
 #endif
 
-LABEL: #if true // expected-error {{expected statement}}
+LABEL: #if true // expected-cparser-error {{expected statement}} expected-astgen-error {{unexpected code ':' in source file}} expected-astgen-error {{cannot find 'LABEL' in scope}}
 func fn_i() {}
 #endif
 fn_i() // OK
 
-try #if false // expected-error {{expected expression}}
+try #if false // expected-cparser-error {{expected expression}} expected-astgen-error {{unexpected 'try' keyword in source file}}
 #else
 func fn_j() {}
 #endif
@@ -150,7 +145,7 @@ undefinedFunc() // expected-error {{cannot find 'undefinedFunc' in scope}}
 
 #if FOO
 #else if BAR
-// expected-error@-1 {{unexpected 'if' keyword following '#else' conditional compilation directive; did you mean '#elseif'?}} {{1-9=#elseif}}
+// expected-cparser-error@-1 {{unexpected 'if' keyword following '#else' conditional compilation directive; did you mean '#elseif'?}} {{1-9=#elseif}} expected-astgen-error@-1 {{unexpected 'if' keyword following '#else' conditional compilation directive; did you mean '#elseif'?}}
 #else
 #endif
 

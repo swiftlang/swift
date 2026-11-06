@@ -39,21 +39,21 @@ class C8 { }
 protocol P1 { }
 // expected-error@-2 {{expected 'interface:', 'implementation:', or 'threading:' in '@com' attribute}}
 
-@com(interface "")
+@com(interface "") // expected-astgen-error {{expected 'interface:', 'implementation:', or 'threading:' in '@com' attribute}}
 protocol P2 { }
-// expected-error@-2 {{expected ':' after label 'interface'}}
+// expected-cparser-error@-2 {{expected ':' after label 'interface'}} expected-astgen-error@-2 {{unexpected code '""' in attribute}}
 
-@com(interface: 42)
+@com(interface: 42) // expected-astgen-error {{expected string literal in 'com' attribute}}
 protocol P3 { }
-// expected-error@-2 {{expected string literal in 'com' attribute}}
+// expected-cparser-error@-2 {{expected string literal in 'com' attribute}} expected-astgen-error@-2 {{expected string literal}}
 
 @com(label: "label")
 protocol P4 { }
 // expected-error@-2 {{unknown label 'label' in '@com' attribute; expected 'interface:', 'implementation:', or 'threading:'}}
 
-@com(implementation: 42)
+@com(implementation: 42) // expected-astgen-error {{expected string literal in 'com' attribute}}
 protocol P5 { }
-// expected-error@-2 {{expected string literal in 'com' attribute}}
+// expected-cparser-error@-2 {{expected string literal in 'com' attribute}} expected-astgen-error@-2 {{expected string literal}}
 
 @com(implementation: "00000000-0000-0000-0000-000000000009", threading: apartment)
 protocol P6 { }
