@@ -18,13 +18,13 @@
 // NOT-CONFIG: error: CAS cannot be initialized from the specified '-cas-*' options: no CAS options provided
 
 // RUN: %target-swift-frontend-plain -c -cache-compile-job -cas-path %t/cas %s -o %t/test.o @%t/MyApp.cmd
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain -c -cache-compile-job -cas-path %t/cas %s -o %t/test.o @%t/MyApp.cmd > %t/cache_key.json
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action validate-outputs %t/cache_key.json
+// RUN: %cache-tool validate-outputs -cas-path %t/cas %t/cache_key.json
 
 /// make sure validate fails if the cas is cleared.
 // RUN: rm -rf %t/cas
-// RUN: not %cache-tool -cas-path %t/cas -cache-tool-action validate-outputs %t/cache_key.json 2>&1 | %FileCheck %s
+// RUN: not %cache-tool validate-outputs -cas-path %t/cas %t/cache_key.json 2>&1 | %FileCheck %s
 
 // CHECK: failed to find output for cache key
 

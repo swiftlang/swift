@@ -6,7 +6,7 @@
 
 // RUN: touch %t/A.swift
 // RUN: %target-swift-frontend -emit-module -module-cache-path %t/clang-module-cache %t/A.swift -o %t/A.swiftmodule -I %S/../ScanDependencies/Inputs/Swift -swift-version 6 -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib -O
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/A.swiftmodule > %t/A.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/A.swiftmodule > %t/A.casid
 
 // B
 
@@ -15,7 +15,7 @@
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/B-deps.json B> %t/B.cmd
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/B-deps.json > %t/B-map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/B-map.json > %t/B-map.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/B-map.json > %t/B-map.casid
 
 // RUN: echo %t/B.swift > %t/inputs.FileList
 // RUN: %target-swift-frontend-plain -emit-module -o %t/B.swiftmodule -g \
@@ -31,7 +31,7 @@
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Main> %t/Main.cmd
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map.json > %t/map.casid
 
 // RUN: rm %t/A.swiftmodule %t/A.swift
 // RUN: echo %s > %t/inputs.FileList
