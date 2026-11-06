@@ -1102,6 +1102,39 @@ protocol MetatypeMarker {}
 @objc protocol MetatypeObjCMarker {}
 #endif
 
+// https://github.com/swiftlang/swift/issues/70645
+// A class metatype bridges to its class object when ObjC interop is enabled.
+// Elsewhere every metatype is boxed instead, but always into the same box, so
+// that the object has a stable identity either way.
+CastsTests.test("Bridging a metatype to AnyObject keeps its identity") {
+  class C {}
+  func bridge<T>(_ t: T) -> AnyObject { return t as AnyObject }
+  func cast<T>(_ t: T) -> AnyObject? { return t as? AnyObject }
+
+  let c = C.self as AnyObject
+  expectTrue(c === C.self as AnyObject)
+  expectTrue(c === bridge(C.self))
+  expectTrue(c === cast(C.self))
+  expectTrue(c === (C.self as Any.Type) as AnyObject)
+  expectTrue(c === Optional(C.self) as AnyObject)
+  expectTrue(c === bridge(Optional(C.self)))
+  expectTrue(c as? C.Type == C.self)
+
+#if !_runtime(_ObjC)
+  // On ObjC platforms these still get a new box for every conversion.
+  struct S {}
+  let s = S.self as AnyObject
+  expectTrue(s === S.self as AnyObject)
+  expectTrue(s === cast(S.self))
+  expectTrue(s as? S.Type == S.self)
+  expectFalse(s === c)
+
+  let p = MetatypeMarker.self as AnyObject
+  expectTrue(p === MetatypeMarker.self as AnyObject)
+  expectTrue(p as? MetatypeMarker.Protocol == MetatypeMarker.self)
+#endif
+}
+
 // A class metatype is an object when ObjC interop is enabled, so it can satisfy
 // a bare `AnyObject` bound, an @objc protocol, or a superclass constraint the
 // class object is actually an instance of. A Swift protocol conformance declared
