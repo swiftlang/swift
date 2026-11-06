@@ -618,8 +618,16 @@ static bool checkDistributedTargetResultType(
   // --- Special case: `-> some/any P` where P is a `@Resolvable protocol`
   // Wire format encodes the actor's `id` as a Codable ActorID,
   // so the existential/opaque does not need to conform to the serialization requirement.
+  //
+  // Substitutions also apply to a limited set of known containers, e.g. `[any P]` becomes `[$P]`,
+  // so it is that wire type which must conform to the requirement.
   bool skipCodableCheck = false;
-  auto resolvableMatch = findDistributedResolvableExistentialOrOpaqueProtocol(resultType);
+  Type serializationCheckedType = resultType;
+  auto containerShape = getDistributedResolvableContainerShape(resultType);
+  if (!isDistributedResolvableContainerAllowed(valueDecl))
+    containerShape = std::nullopt;
+  auto resolvableMatch = findDistributedResolvableExistentialOrOpaqueProtocol(
+      containerShape ? containerShape->elementType : resultType);
   if (resolvableMatch.isAmbiguous) {
     if (diagnose) {
       valueDecl->diagnose(
@@ -659,8 +667,11 @@ static bool checkDistributedTargetResultType(
       return true;
     }
 
-    // `@Resolvable protocol` result — skip Codable check, wire uses actor ID
-    skipCodableCheck = true;
+    // `@Resolvable protocol` result - skip Codable check, wire uses actor ID
+    if (containerShape)
+      serializationCheckedType = getDistributedResolvableProtocolStubSubstitutedType(resultType);
+    else
+      skipCodableCheck = true;
   }
 
   if (!skipCodableCheck) {
@@ -677,7 +688,8 @@ static bool checkDistributedTargetResultType(
     // Collect extra "SerializationRequirement: SomeProtocol" requirements
     auto srl = serializationRequirement->getExistentialLayout();
     for (auto serializationReq: srl.getProtocols()) {
-      auto conformance = checkConformance(resultType, serializationReq);
+      auto conformance =
+          checkConformance(serializationCheckedType, serializationReq);
       if (conformance.isInvalid()) {
         if (diagnose) {
           llvm::StringRef conformanceToSuggest = isCodableRequirement ?
@@ -1000,8 +1012,15 @@ bool CheckDistributedFunctionRequest::evaluate(
       auto paramTy = func->mapTypeIntoEnvironment(param->getInterfaceType());
 
       // --- Special case: `param: some/any P` where P is a `@Resolvable protocol`.
+      // A container of `any P` (e.g. `[any P]`) travels as the same container
+      // of `$P`, so it is that wire type which must conform to the requirement.
       bool skipSerializationRequirementCheck = false;
-      auto resolvableMatch = findDistributedResolvableExistentialOrOpaqueProtocol(paramTy);
+      Type serializationCheckedType = paramTy;
+      auto containerShape = getDistributedResolvableContainerShape(paramTy);
+      if (!isDistributedResolvableContainerAllowed(func))
+        containerShape = std::nullopt;
+      auto resolvableMatch = findDistributedResolvableExistentialOrOpaqueProtocol(
+          containerShape ? containerShape->elementType : paramTy);
       if (resolvableMatch.isAmbiguous) {
         func->diagnose(
             diag::distributed_actor_func_param_resolvable_protocol_composition_ambiguous,
@@ -1045,7 +1064,10 @@ bool CheckDistributedFunctionRequest::evaluate(
         // We know it is a distributed actor protocol on the same actor system.
         // We also know that it is a `@Resolvable protocol` and `any/some P`,
         // which does itself not conform to e.g. `Codable`
-        skipSerializationRequirementCheck = true;
+        if (containerShape)
+          serializationCheckedType = getDistributedResolvableProtocolStubSubstitutedType(paramTy);
+        else
+          skipSerializationRequirementCheck = true;
       }
 
       if (!skipSerializationRequirementCheck) {
@@ -1062,7 +1084,7 @@ bool CheckDistributedFunctionRequest::evaluate(
 
         auto srl = serializationReqType->getExistentialLayout();
         for (auto req: srl.getProtocols()) {
-          if (!checkConformance(paramTy, req)) {
+          if (!checkConformance(serializationCheckedType, req)) {
             auto diag = func->diagnose(
                 diag::distributed_actor_func_param_not_codable,
                 param->getArgumentName(), param->getInterfaceType(), func,

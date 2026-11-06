@@ -60,7 +60,6 @@ func test() async throws {
   // CHECK: >> remoteCall: on:main.$Service, target:main.$Service.getArray(a1:a2:), invocation:FakeInvocationEncoder(genericSubs: [main.$Service], arguments: [[[ARGS:.*]]], returnType: Optional(Swift.Array<Swift.Int>), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.Array<Swift.Int>
   // CHECK: > execute distributed target: main.$Service.getArray(a1:a2:), identifier: $s4main8$ServiceC8getArray2a12a2SaySiGAG_SSSgtYaKFTE
   // CHECK: > decode generic subs: [main.$Service]
-  // CHECK: > decode return type: Swift.Array<Swift.Int>
   // CHECK: > decode argument: [1, 2, 3]
   // CHECK: > decode argument: Optional("second")
   print("reply 2: \(r2)")
@@ -70,7 +69,6 @@ func test() async throws {
   // CHECK: remoteCall: on:main.$Service, target:main.$Service.getArrayGeneric(a1:a2:gen:), invocation:FakeInvocationEncoder(genericSubs: [main.$Service, Swift.Int], arguments: [[[ARGS:.*]]], returnType: Optional(Swift.Array<Swift.Int>), errorType: Optional(Swift.Error)), throwing:Swift.Error, returning:Swift.Array<Swift.Int>
   // CHECK: > execute distributed target: main.$Service.getArrayGeneric(a1:a2:gen:), identifier: $s4main8$ServiceC15getArrayGeneric2a12a23genSaySiGAH_SSSgqd__tYaKSeRd__SERd__lFTE
   // CHECK: > decode generic subs: [main.$Service, Swift.Int]
-  // CHECK: > decode return type: Swift.Array<Swift.Int>
   // CHECK: > decode argument: [1, 2, 3]
   // CHECK: > decode argument: Optional("third")
   // CHECK: > decode argument: 12

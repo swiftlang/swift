@@ -23,6 +23,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/TypeDecoder.h"
+#include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/Concurrent.h"
 #include "swift/Runtime/Debug.h"
@@ -3199,11 +3200,65 @@ unsigned swift_func_getParameterCount(const char *typeNameStart,
   return parameterList->getNumChildren();
 }
 
+/// Returns the target function's return type, computed from the target's accessor function type.
+///
+/// Falls back to demangling the target's declared function type when the
+/// accessor record is absent (should never happen for distributed functions),
+/// or when it recorded no formal result (Void-returning),
+/// when it lowered to multiple results (tuple),
+/// or when any resolving the metadata fails in any way.
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_SPI
 const Metadata *_Nullable
 swift_func_getReturnTypeInfo(const char *typeNameStart, size_t typeNameLength,
                              GenericEnvironmentDescriptor *genericEnv,
                              const void * const *genericArguments) {
+  if (auto *record = runtime::swift_findAccessibleFunction(typeNameStart,
+                                                           typeNameLength)) {
+    DemanglerForRuntimeTypeResolution<StackAllocatedDemangler<1024>> demangler;
+
+    auto mangledType =
+        Demangle::makeSymbolicMangledNameStringRef(record->FunctionType.get());
+    if (NodePointer node = demangler.demangleTypeRef(mangledType)) {
+      // The record holds a lowered (SIL) function type; unwrap any 'Type' /
+      // 'DependentGenericType' layers the mangling introduces
+      if (auto *implFnType = node->findByKind(Node::Kind::ImplFunctionType,
+                                              /*maxDepth=*/3)) {
+        NodePointer resultType = nullptr;
+        bool multipleResults = false;
+        for (auto *child : *implFnType) {
+          if (child->getKind() != Node::Kind::ImplResult)
+            continue;
+          if (resultType) {
+            multipleResults = true;
+            break;
+          }
+          resultType = child;
+        }
+        if (resultType && !multipleResults) {
+          if (auto *resultTypeNode = resultType->getLastChild()) {
+            SubstGenericParametersFromMetadata substFn(genericEnv,
+                                                       genericArguments);
+            auto request = MetadataRequest(MetadataState::Complete);
+            auto typeInfoOrErr = swift_getTypeByMangledNode(
+                request, demangler, resultTypeNode,
+                /*arguments=*/genericArguments,
+                /*substGenericParam=*/
+                [&substFn](unsigned depth, unsigned index) {
+                  return substFn.getMetadata(depth, index).Ptr;
+                },
+                /*SubstDependentWitnessTableFn=*/
+                [&substFn](const Metadata *type, unsigned index) {
+                  return substFn.getWitnessTable(type, index);
+                });
+            if (!typeInfoOrErr.isError())
+              return typeInfoOrErr.getType().getMetadata();
+          }
+        }
+      }
+    }
+  }
+
+  // Fall back to the target's declared function type.
   StackAllocatedDemangler<1024> demangler;
 
   auto *funcType =

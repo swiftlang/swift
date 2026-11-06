@@ -215,10 +215,14 @@ private:
   CanSILFunctionType Type;
 
   /// When non-null, the accessor body dispatches through this SIL function
-  /// instead of \c Target's SIL function. The accessor's record/linking
-  /// name still comes from \c Target. Whoever constructs us decides why
-  /// the dispatch differs (today: `@Resolvable` resolvable-proxy-adapter
-  /// thunk).
+  /// instead of \c Target's SIL function (or witness, for a protocol
+  /// requirement). The accessor's record/linking name still comes from
+  /// \c Target. Whoever constructs us decides why the dispatch differs
+  /// (today: `@Resolvable` resolvable-proxy-adapter thunk).
+  ///
+  /// For a protocol requirement the redirect has the requirement's
+  /// `witness_method` signature, so it receives the same arguments,
+  /// including the dynamically found `Self` metadata and witness table.
   SILFunction *DispatchTo = nullptr;
 
   mutable std::optional<WitnessMetadata> Witness;
@@ -231,8 +235,12 @@ public:
       // Use the dispatch target's lowered type so argument decoding,
       // result handling, etc. all speak its signature.
       Type = (DispatchTo ? DispatchTo : thunk)->getLoweredFunctionType();
+    } else if (DispatchTo) {
+      assert(DispatchTo->getLoweredFunctionType()->getRepresentation() ==
+                 SILFunctionTypeRepresentation::WitnessMethod &&
+             "requirement redirect must use the witness_method convention");
+      Type = DispatchTo->getLoweredFunctionType();
     } else {
-      assert(!DispatchTo && "no dispatch redirect on protocol requirements");
       auto *requirement = cast<AbstractFunctionDecl *>(target);
       Type = IGF.IGM.getSILTypes().getConstantFunctionType(
           IGF.IGM.getMaximalTypeExpansionContext(),
@@ -259,6 +267,14 @@ public:
     auto isolated = Type->maybeGetIsolatedParameter();
     return isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading);
   }
+
+  /// The protocol requirement the accessor was generated for, when the
+  /// accessor is being emitted for a protocol requirement.
+  AbstractFunctionDecl *getRequirement() const {
+    return Target.dyn_cast<AbstractFunctionDecl *>();
+  }
+
+  bool hasDispatchRedirect() const { return DispatchTo != nullptr; }
 
   bool isGeneric() const {
     auto sig = Type->getInvocationGenericSignature();
@@ -338,15 +354,13 @@ private:
   std::pair<llvm::Value *, llvm::Value *>
   emitLoadOfUnownedExecutor(llvm::Value *actor, llvm::Value *actorWTable);
 
-  /// Load witness table addresses (if any) from the given buffer
-  /// into the given argument explosion.
-  ///
-  /// Number of witnesses to load is provided by \c numTables but
-  /// it's checked against the number of \c expectedWitnessTables.
-  void emitLoadOfWitnessTables(llvm::Value *witnessTables,
-                               llvm::Value *numTables,
-                               unsigned expectedWitnessTables,
-                               Explosion &arguments);
+  /// Load the generic arguments (type metadata and witness tables) of the
+  /// target from the buffers prepared by the runtime into the given argument
+  /// explosion.
+  void emitLoadOfGenericArguments(llvm::Value *substitutions,
+                                  llvm::Value *witnessTables,
+                                  llvm::Value *numTables,
+                                  Explosion &arguments);
 
   /// Emit an async return from accessor which does cleanup of
   /// all the argument allocations.
@@ -504,19 +518,30 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   // accessor speaks `$P` end-to-end and no IR-level existential boxing /
   // result-buffer juggling is needed. The linking identity (the symbol
   // emitted into the accessor record) stays the regular thunk's name.
+  //
+  // A protocol requirement's accessor (used for calls through a `$P` stub)
+  // likewise dispatches to the requirement's own adapter, which calls the
+  // witness and converts its result to `$P`.
   SILFunction *dispatchTo = nullptr;
   if (auto *thunk = target.dyn_cast<SILFunction *>()) {
     if (auto *afd = thunk->getDeclRef().getAbstractFunctionDecl()) {
       if (auto *adapter = findResolvableProxyAdapterThunkDecl(afd))
         dispatchTo = getSILModule().lookUpFunction(SILDeclRef(adapter));
     }
+  } else {
+    auto *requirement = cast<AbstractFunctionDecl *>(target);
+    if (auto *adapter = findResolvableProxyAdapterThunkDecl(requirement))
+      if (adapter->hasBody())
+        dispatchTo = getSILModule().lookUpFunction(SILDeclRef(adapter));
   }
 
   // Determine whether the target thunk has a leading isolated `Builtin.ImplicitActor`.
   // If so, the accessor must gain an additional leading `isolated (any Actor)?` parameter.
   CanSILFunctionType targetTy;
-  if (auto *thunk = target.dyn_cast<SILFunction *>()) {
-    targetTy = (dispatchTo ? dispatchTo : thunk)->getLoweredFunctionType();
+  if (dispatchTo) {
+    targetTy = dispatchTo->getLoweredFunctionType();
+  } else if (auto *thunk = target.dyn_cast<SILFunction *>()) {
+    targetTy = thunk->getLoweredFunctionType();
   } else {
     auto *requirement = cast<AbstractFunctionDecl *>(target);
     targetTy = getSILTypes().getConstantFunctionType(
@@ -634,23 +659,28 @@ void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
     // Therefore, we need to substitute the type with the proxy type `$P`,
     // so that the user implemented `decodeNextArgument<$P>` receives
     // a SerializationRequirement-conforming type (and e.g. can `Decodable::init(from:)` decode it).
-    if (auto *thunk = Target.getThunk()) {
-      if (auto *funcDecl = findOriginalDistributedFuncDecl(
-              thunk->getDeclRef().getAbstractFunctionDecl())) {
-        auto *params = funcDecl->getParameters();
-        if (i < params->size()) {
-          Type origParamTy = params->get(i)->getInterfaceType();
-          if (auto *env = funcDecl->getGenericEnvironment())
-            origParamTy = env->mapTypeIntoEnvironment(origParamTy);
+    AbstractFunctionDecl *funcDecl = nullptr;
+    if (auto *thunk = Target.getThunk())
+      funcDecl = findOriginalDistributedFuncDecl(
+          thunk->getDeclRef().getAbstractFunctionDecl());
+    else if (Target.hasDispatchRedirect())
+      funcDecl = findOriginalDistributedFuncDecl(Target.getRequirement());
+    if (funcDecl) {
+      auto *params = funcDecl->getParameters();
+      if (i < params->size()) {
+        Type origParamTy = params->get(i)->getInterfaceType();
+        if (auto *env = funcDecl->getGenericEnvironment())
+          origParamTy = env->mapTypeIntoEnvironment(origParamTy);
 
-          if (auto match = findDistributedResolvableExistentialOrOpaqueProtocol(
-                  origParamTy)) {
-            if (auto *stub = getDistributedResolvableProtocolStubDecl(match.proto)) {
-              auto stubTy =
-                  stub->getDeclaredInterfaceType()->getCanonicalType();
-              argumentTy = IGF.emitTypeMetadataRef(stubTy);
-            }
-          }
+        // A container of `any P` (e.g. `[any P]`) is likewise decoded as
+        // the same container of `$P`.
+        if (Type wireTy = getDistributedResolvableProtocolStubSubstitutedType(origParamTy)) {
+          // The value is decoded into a buffer sized by this metadata and
+          // passed as the target's parameter, so they must agree exactly
+          ASSERT(param.getInterfaceType() == wireTy->getCanonicalType() &&
+                 "decoded @Resolvable argument type must match the target's "
+                 "parameter type");
+          argumentTy = IGF.emitTypeMetadataRef(wireTy->getCanonicalType());
         }
       }
     }
@@ -990,35 +1020,128 @@ void DistributedAccessor::lookupWitnessTables(
   }
 }
 
-void DistributedAccessor::emitLoadOfWitnessTables(llvm::Value *witnessTables,
-                                                  llvm::Value *numTables,
-                                                  unsigned expectedWitnessTables,
-                                                  Explosion &arguments) {
-  auto contBB = IGF.createBasicBlock("");
-  auto unreachableBB = IGF.createBasicBlock("incorrect-witness-tables");
+void DistributedAccessor::emitLoadOfGenericArguments(
+    llvm::Value *substitutions, llvm::Value *witnessTables,
+    llvm::Value *numTables, Explosion &arguments) {
+  auto targetTy = Target.getType();
 
-  auto incorrectNum = IGF.Builder.CreateICmpNE(
-      numTables, llvm::ConstantInt::get(IGM.SizeTy, expectedWitnessTables));
+  // The runtime prepares the buffers according to the generic environment
+  // of the accessible function record, which is the target's whole
+  // invocation generic signature without marker protocols:
+  //   - substitutions: one metadata per key generic parameter, in order,
+  //   - witness tables: one per conformance requirement which needs a
+  //     witness table, in requirement order.
+  //
+  // The target does not take all of them, the ones it can recover itself are
+  // fulfilled from other sources. A protocol requirement (`witness_method`)
+  // gets `Self` and its conformances from the actor's own metadata and
+  // witness table, never from the caller provided `Self` substitution. A
+  // method of a generic actor gets the actor's generic parameters from
+  // `self`. So load every generic argument the target does take from its
+  // exact position in the buffers.
+  auto envSig = targetTy->getInvocationGenericSignature()
+                    .withoutMarkerProtocols()
+                    .getCanonicalSignature();
 
-  // Make sure that we have a correct number of witness tables provided to us.
-  IGF.Builder.CreateCondBr(incorrectNum, unreachableBB, contBB);
-  {
-    IGF.Builder.emitBlock(unreachableBB);
-    IGF.Builder.CreateUnreachable();
+  llvm::DenseMap<CanType, unsigned> keyArgumentIndex;
+  envSig->forEachParam([&](GenericTypeParamType *param, bool canonical) {
+    if (canonical) {
+      unsigned index = keyArgumentIndex.size();
+      keyArgumentIndex[param->getCanonicalType()] = index;
+    }
+  });
+
+  SmallVector<std::pair<CanType, ProtocolDecl *>, 4> envWitnessTables;
+  for (const auto &req : envSig.getRequirements()) {
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+    auto *proto = req.getProtocolDecl();
+    if (!Lowering::TypeConverter::protocolRequiresWitnessTable(proto))
+      continue;
+    envWitnessTables.push_back({req.getFirstType()->getCanonicalType(), proto});
   }
 
-  IGF.Builder.emitBlock(contBB);
+  // Make sure that we have a correct number of witness tables provided to us
+  {
+    auto contBB = IGF.createBasicBlock("");
+    auto failBB = IGF.createBasicBlock("incorrect-witness-tables");
 
-  witnessTables = IGF.Builder.CreateBitCast(witnessTables, IGM.PtrTy);
+    auto incorrectNum = IGF.Builder.CreateICmpNE(
+        numTables, llvm::ConstantInt::get(IGM.SizeTy, envWitnessTables.size()));
+    IGF.Builder.CreateCondBr(incorrectNum, failBB, contBB);
+    {
+      IGF.Builder.emitBlock(failBB);
+      IGF.emitTrap("incorrect number of witness tables",
+                   /*EmitUnreachable=*/true);
+    }
+    IGF.Builder.emitBlock(contBB);
+  }
 
-  for (unsigned i = 0, n = expectedWitnessTables; i != n; ++i) {
-    auto offset = Size(i * IGM.getPointerSize());
-    auto alignment = IGM.getPointerAlignment();
+  llvm::Value *substitutionBuffer =
+      IGF.Builder.CreateBitCast(substitutions, IGM.TypeMetadataPtrPtrTy);
+  llvm::Value *witnessTableBuffer =
+      IGF.Builder.CreateBitCast(witnessTables, IGM.PtrTy);
 
-    auto witnessTableAddr = IGF.emitAddressAtOffset(
-        witnessTables, Offset(offset), IGM.Int8PtrPtrTy, Alignment(alignment));
+  llvm::SmallVector<llvm::Type *, 4> targetGenericArguments;
+  llvm::SmallVector<PolymorphicSignatureExpandedTypeSource, 4> sources;
+  auto expandedSignature = expandPolymorphicSignature(
+      IGM, targetTy, targetGenericArguments, &sources);
+  assert(expandedSignature.numShapes == 0 &&
+         "Distributed actors don't support variadic generics");
+  (void)expandedSignature;
 
-    arguments.add(IGF.Builder.CreateLoad(witnessTableAddr));
+  auto loadMetadata = [&](unsigned index) {
+    auto offset =
+        Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
+    llvm::Align alignment =
+        IGM.DataLayout.getABITypeAlign(IGM.TypeMetadataPtrTy);
+    auto addr = IGF.emitAddressAtOffset(substitutionBuffer, Offset(offset),
+                                        IGM.TypeMetadataPtrTy,
+                                        Alignment(alignment.value()));
+    return IGF.Builder.CreateLoad(addr, "substitution");
+  };
+
+  auto loadWitnessTable = [&](unsigned index) {
+    auto offset = Size(index * IGM.getPointerSize());
+    auto addr = IGF.emitAddressAtOffset(witnessTableBuffer, Offset(offset),
+                                        IGM.Int8PtrPtrTy,
+                                        IGM.getPointerAlignment());
+    return IGF.Builder.CreateLoad(addr);
+  };
+
+  for (const auto &source : sources) {
+    source.visit(
+        [&](const GenericRequirement &reqt) {
+          auto type = reqt.getTypeParameter();
+          switch (reqt.getKind()) {
+          case GenericRequirement::Kind::Metadata: {
+            auto found = keyArgumentIndex.find(type);
+            ASSERT(found != keyArgumentIndex.end() &&
+                   "generic argument of distributed target is not a key "
+                   "argument of its generic environment");
+            arguments.add(loadMetadata(found->second));
+            return;
+          }
+          case GenericRequirement::Kind::WitnessTable: {
+            auto found = llvm::find(
+                envWitnessTables, std::make_pair(type, reqt.getProtocol()));
+            ASSERT(found != envWitnessTables.end() &&
+                   "witness table of distributed target is not a "
+                   "requirement of its generic environment");
+            arguments.add(
+                loadWitnessTable(std::distance(envWitnessTables.begin(), found)));
+            return;
+          }
+          case GenericRequirement::Kind::Shape:
+          case GenericRequirement::Kind::MetadataPack:
+          case GenericRequirement::Kind::WitnessTablePack:
+          case GenericRequirement::Kind::Value:
+            llvm_unreachable("unsupported generic argument of distributed target");
+          }
+        },
+        [&](const MetadataSource &) {
+          llvm_unreachable("unexpected metadata source of distributed target");
+        });
   }
 }
 
@@ -1145,38 +1268,10 @@ void DistributedAccessor::emit() {
     decodeArguments(decoder, argTypes, arguments);
   }
 
-  // Add all of the substitutions to the explosion
+  // Add all of the generic arguments to the explosion
   if (Target.isGeneric()) {
-    // swift.type **
-    llvm::Value *substitutionBuffer =
-        IGF.Builder.CreateBitCast(substitutions, IGM.TypeMetadataPtrPtrTy);
-
-    // Collect the generic arguments expected by the distributed thunk.
-    // We need this to determine the expected number of witness tables
-    // to load from the buffer provided by the caller.
-    llvm::SmallVector<llvm::Type *, 4> targetGenericArguments;
-    auto expandedSignature =
-        expandPolymorphicSignature(IGM, targetTy, targetGenericArguments);
-    assert(expandedSignature.numShapes == 0 &&
-           "Distributed actors don't support variadic generics");
-
-    // Generic arguments associated with the distributed thunk directly
-    // e.g. `distributed func echo<T, U>(...)`
-
-    for (unsigned index = 0; index < expandedSignature.numTypeMetadataPtrs; ++index) {
-      auto offset =
-          Size(index * IGM.DataLayout.getTypeAllocSize(IGM.TypeMetadataPtrTy));
-      llvm::Align alignment =
-          IGM.DataLayout.getABITypeAlign(IGM.TypeMetadataPtrTy);
-
-      auto substitution = IGF.emitAddressAtOffset(
-          substitutionBuffer, Offset(offset), IGM.TypeMetadataPtrTy,
-          Alignment(alignment.value()));
-      arguments.add(IGF.Builder.CreateLoad(substitution, "substitution"));
-    }
-
-    emitLoadOfWitnessTables(witnessTables, numWitnessTables,
-                            expandedSignature.numWitnessTablePtrs, arguments);
+    emitLoadOfGenericArguments(substitutions, witnessTables, numWitnessTables,
+                               arguments);
   }
 
   // A `nonisolated(nonsending)` target must be entered on the expected isolation (it does not hop by itself).
@@ -1244,6 +1339,18 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
     return FunctionPointer::forDirect(
         FunctionPointer::Kind(Type), fnPtr,
         IGM.getAddrOfSILFunction(callee, NotForDefinition), signature);
+  }
+
+  // The requirement's adapter is called directly, the witness metadata is
+  // passed to it like to a witness
+  if (DispatchTo) {
+    auto fpKind = classifyFunctionPointerKind(DispatchTo);
+    auto signature = IGM.getSignature(Type, fpKind);
+    auto *fnPtr = llvm::ConstantExpr::getBitCast(
+        IGM.getAddrOfAsyncFunctionPointer(DispatchTo), IGM.PtrTy);
+    return FunctionPointer::forDirect(
+        FunctionPointer::Kind(Type), fnPtr,
+        IGM.getAddrOfSILFunction(DispatchTo, NotForDefinition), signature);
   }
 
   auto *requirementDecl = cast<AbstractFunctionDecl *>(Target);

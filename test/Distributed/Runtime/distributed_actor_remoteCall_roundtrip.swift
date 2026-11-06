@@ -53,12 +53,11 @@ func test() async throws {
   // CHECK: > encode return type: Swift.String
   // CHECK: > done recording
   // CHECK: >> remoteCall
-  // CHECK: > decode return type: Swift.String
   // CHECK: > decode argument: Caplin
-  // CHECK: << onReturn: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
+  // CHECK: << onReturn: Echo: Caplin (impl on: ActorAddress(address: "<id-{{[0-9]+}}>"))
 
   print("got: \(reply)")
-  // CHECK: got: Echo: Caplin (impl on: ActorAddress(address: "<unique-id>"))
+  // CHECK: got: Echo: Caplin (impl on: ActorAddress(address: "<id-{{[0-9]+}}>"))
 }
 
 @main struct Main {

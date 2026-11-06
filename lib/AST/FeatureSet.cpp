@@ -14,6 +14,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
@@ -523,6 +524,30 @@ UNINTERESTING_FEATURE(DistributedActorResignRemoteID)
 // TODO: Detect scope arguments anywhere in the declaration's interface type,
 // which are printed even when elided, and explicit scope parameters.
 static bool usesFeatureScopeRestrictions(Decl *decl) { return false; }
+
+static bool usesFeatureDistributedAnyResolvableInContainers(Decl *decl) {
+  auto usesContainerShape = [](Type ty) {
+    return ty && getDistributedResolvableContainerShape(ty).has_value();
+  };
+
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(decl)) {
+    if (!func->isDistributed())
+      return false;
+    for (auto *param : *func->getParameters()) {
+      if (usesContainerShape(param->getInterfaceType()))
+        return true;
+    }
+    if (auto *fn = dyn_cast<FuncDecl>(func))
+      return usesContainerShape(fn->getResultInterfaceType());
+    return false;
+  }
+
+  if (auto *var = dyn_cast<VarDecl>(decl)) {
+    return var->isDistributed() && usesContainerShape(var->getInterfaceType());
+  }
+
+  return false;
+}
 
 static bool usesFeatureCoroutineAccessors(Decl *decl) {
   auto accessorDeclUsesFeatureCoroutineAccessors = [](AccessorDecl *accessor) {

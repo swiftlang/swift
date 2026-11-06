@@ -61,21 +61,6 @@ static void forwardParameters(AbstractFunctionDecl *afd,
   }
 }
 
-static Type getDistributedResolvableProtocolStubType(Type ty) {
-  if (!ty)
-    return Type();
-  auto match = findDistributedResolvableExistentialOrOpaqueProtocol(ty);
-  if (!match)
-    return Type();
-  auto *stub = getDistributedResolvableProtocolStubDecl(match.proto);
-  if (!stub)
-    return Type();
-  auto stubTy = stub->getDeclaredInterfaceType();
-  if (!stubTy || stubTy->hasError())
-    return Type();
-  return stubTy;
-}
-
 /// Build `try $P.resolve(id: <idExpr>, using: <systemExpr>)`.
 static Expr *createDistributedResolveCall(ASTContext &C,
                                           Type actorTy,
@@ -91,6 +76,133 @@ static Expr *createDistributedResolveCall(ASTContext &C,
   auto *resolveCall =
       CallExpr::createImplicit(C, resolveExpr, resolveArgList);
   return TryExpr::createImplicit(C, SourceLoc(), resolveCall);
+}
+
+/// Build the conversion of a `@Resolvable` value \p valueExpr of type
+/// \p valueTy to the type it travels as on the wire, resolving every
+/// `any P` / `some P` in it as a `$P` reference using \p systemExpr:
+///
+///   - `any P`:                `try $P.resolve(id: v.id, using: system)`
+///   - `[any P]`, `(any P)?`:  `try v.map { e in try $P.resolve(id: e.id, using: system) }`
+///   - `[K: any P]`:           `try v.mapValues { e in ... }`
+///   - `InlineArray<N, any P>`: `try InlineArray<N, $P> { i in ... v[i] ... }`
+///
+/// Returns null when \p valueTy has no `@Resolvable` part.
+static Expr *createDistributedResolvableWireConversion(ASTContext &C,
+                                                       DeclContext *DC,
+                                                       Type valueTy,
+                                                       Expr *valueExpr,
+                                                       Expr *systemExpr) {
+  Type wireTy = getDistributedResolvableProtocolStubSubstitutedType(valueTy);
+  if (!wireTy)
+    return nullptr;
+
+  auto containerShape = getDistributedResolvableContainerShape(valueTy);
+  if (!containerShape) {
+    auto *idExpr = UnresolvedDotExpr::createImplicit(C, valueExpr, C.Id_id);
+    return createDistributedResolveCall(C, wireTy, idExpr, systemExpr);
+  }
+
+  using Kind = DistributedResolvableContainerShape::Kind;
+  Type stubTy = getDistributedResolvableProtocolStubSubstitutedType(containerShape->elementType);
+  bool isInlineArray = containerShape->kind == Kind::InlineArray;
+
+  // { (__element: any P) -> $P in return try $P.resolve(id: __element.id, using: system) }
+  // or, for InlineArray, which is initialized from its indices:
+  // { (__index: Int) -> $P in return try $P.resolve(id: value[__index].id, using: system) }
+  auto *closure = new (C) ClosureExpr(
+      DeclAttributes(), SourceRange(), /*capturedSelfDecl=*/nullptr,
+      /*params=*/nullptr, SourceLoc(), SourceLoc(), /*thrownType=*/nullptr,
+      SourceLoc(), SourceLoc(), TypeExpr::createImplicit(stubTy, C), DC);
+  closure->setImplicit();
+
+  Type closureParamTy = isInlineArray ? C.getIntType()
+                                      : containerShape->elementType;
+  auto *closureParam = ParamDecl::createImplicit(
+      C, Identifier(), C.getIdentifier(isInlineArray ? "__index" : "__element"),
+      closureParamTy->mapTypeOutOfEnvironment(), closure);
+  closure->setParameterList(ParameterList::create(C, {closureParam}));
+
+  Expr *elementExpr =
+      new (C) DeclRefExpr(ConcreteDeclRef(closureParam), DeclNameLoc(),
+                          /*implicit=*/true);
+  if (isInlineArray) {
+    auto *subscriptArgs = ArgumentList::forImplicitUnlabeled(C, {elementExpr});
+    elementExpr = SubscriptExpr::create(C, valueExpr, subscriptArgs,
+                                        ConcreteDeclRef(), /*implicit=*/true);
+  }
+  auto *elementIdExpr = UnresolvedDotExpr::createImplicit(C, elementExpr, C.Id_id);
+  auto *resolveCall =
+      createDistributedResolveCall(C, stubTy, elementIdExpr, systemExpr);
+  closure->setBody(BraceStmt::create(
+      C, SourceLoc(),
+      {ReturnStmt::createImplicit(C, SourceLoc(), resolveCall)}, SourceLoc(),
+      /*implicit=*/true));
+
+  Expr *convertCall;
+  if (isInlineArray) {
+    auto *initArgs = ArgumentList::forImplicitUnlabeled(C, {closure});
+    convertCall = CallExpr::createImplicit(
+        C, TypeExpr::createImplicit(wireTy, C), initArgs);
+  } else {
+    auto methodName = containerShape->kind == Kind::DictionaryValue
+                          ? C.getIdentifier("mapValues")
+                          : C.getIdentifier("map");
+    auto *method = UnresolvedDotExpr::createImplicit(C, valueExpr, methodName);
+    convertCall = CallExpr::createImplicit(
+        C, method, ArgumentList::forImplicitUnlabeled(C, {closure}));
+  }
+  return TryExpr::createImplicit(C, SourceLoc(), convertCall);
+}
+
+/// Whether a value of the `@Resolvable` wire type of \p declaredTy needs an
+/// explicit conversion back to \p declaredTy. `$P`, `[$P]`, `$P?` and
+/// `[K: $P]` implicitly upcast to `any P`, `[any P]`, ... but `InlineArray`
+/// has no such covariance.
+static bool distributedResolvableWireTypeNeedsExplicitUpcast(Type declaredTy) {
+  auto containerShape = getDistributedResolvableContainerShape(declaredTy);
+  return containerShape && containerShape->kind ==
+                               DistributedResolvableContainerShape::Kind::InlineArray;
+}
+
+/// Build the conversion of \p wireValueExpr, of the `@Resolvable` wire type
+/// of \p declaredTy, back to \p declaredTy. Only needed when
+/// `distributedResolvableWireTypeNeedsExplicitUpcast` is true:
+///
+///   `InlineArray<N, any P> { (__index: Int) -> any P in return w[__index] }`
+///
+/// \p wireValueExpr is evaluated once per element, so it must be a reference
+/// to a variable.
+static Expr *createDistributedResolvableFromWireConversion(ASTContext &C,
+                                                           DeclContext *DC,
+                                                           Type declaredTy,
+                                                           Expr *wireValueExpr) {
+  assert(distributedResolvableWireTypeNeedsExplicitUpcast(declaredTy));
+  auto containerShape = getDistributedResolvableContainerShape(declaredTy);
+
+  auto *closure = new (C) ClosureExpr(
+      DeclAttributes(), SourceRange(), /*capturedSelfDecl=*/nullptr,
+      /*params=*/nullptr, SourceLoc(), SourceLoc(), /*thrownType=*/nullptr,
+      SourceLoc(), SourceLoc(),
+      TypeExpr::createImplicit(containerShape->elementType, C), DC);
+  closure->setImplicit();
+
+  auto *indexParam = ParamDecl::createImplicit(
+      C, Identifier(), C.getIdentifier("__index"), C.getIntType(), closure);
+  closure->setParameterList(ParameterList::create(C, {indexParam}));
+
+  auto *indexRef = new (C) DeclRefExpr(ConcreteDeclRef(indexParam),
+                                       DeclNameLoc(), /*implicit=*/true);
+  auto *elementExpr = SubscriptExpr::create(
+      C, wireValueExpr, ArgumentList::forImplicitUnlabeled(C, {indexRef}),
+      ConcreteDeclRef(), /*implicit=*/true);
+  closure->setBody(BraceStmt::create(
+      C, SourceLoc(), {ReturnStmt::createImplicit(C, SourceLoc(), elementExpr)},
+      SourceLoc(), /*implicit=*/true));
+
+  return CallExpr::createImplicit(
+      C, TypeExpr::createImplicit(declaredTy, C),
+      ArgumentList::forImplicitUnlabeled(C, {closure}));
 }
 
 
@@ -353,34 +465,24 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         // This way the remote side will decode it as `$P` proxy, which conforms to `P`,
         // so the `some/any P` parameter is correctly filled in by a `$P` instance on
         // the recipient without ever knowing the concrete type of the sender.
-        if (auto resolvableMatch =
-                findDistributedResolvableExistentialOrOpaqueProtocol(paramTy)) {
-          if (auto *stub = getDistributedResolvableProtocolStubDecl(resolvableMatch.proto)) {
-            auto stubInterfaceTy = stub->getDeclaredInterfaceType();
-            if (stubInterfaceTy && !stubInterfaceTy->hasError()) {
-              // Important! We replace the type of the parameter with `$P`
-              paramTy = thunk->mapTypeIntoEnvironment(stubInterfaceTy);
+        //
+        // A container of `any P` (e.g. `[any P]`) is sent as the same
+        // container of `$P`, resolving every element.
+        if (Type wireTy = getDistributedResolvableProtocolStubSubstitutedType(paramTy)) {
+          // Get the `system` from the actor that the call is being made on.
+          auto *systemRef = new (C) DeclRefExpr(
+              ConcreteDeclRef(systemVar), dloc, implicit);
 
-              // --- We then have to make the parameter be actually a `$P`
-              // TODO: It would be simpler if we did just create a new `$P`,
-              //  but we'd need to allow `self.id = id` inside distributed actors;
-              //  Once we allow that, we can just create an instance without this fake resolve.
-              {
-                // paramRef.id
-                auto *paramIdExpr = UnresolvedDotExpr::createImplicit(
-                    C, argumentDeclRefExpr, C.Id_id);
+          // try $P.resolve(id: paramRef.id, using: system)
+          // We have enforced in sema that the system must be compatible.
+          // TODO: It would be simpler if we did just create a new `$P`,
+          //  but we'd need to allow `self.id = id` inside distributed actors;
+          //  Once we allow that, we can just create an instance without this fake resolve.
+          argumentDeclRefExpr = createDistributedResolvableWireConversion(
+              C, thunk, paramTy, argumentDeclRefExpr, systemRef);
 
-                // Get the `system` from the actor that the call is being made on.
-                auto *systemRef = new (C) DeclRefExpr(
-                    ConcreteDeclRef(systemVar), dloc, implicit);
-
-                // try $P.resolve(id: paramRef.id, using: system)
-                // We have enforced in sema that the system must be compatible.
-                argumentDeclRefExpr = createDistributedResolveCall(
-                    C, stubInterfaceTy, paramIdExpr, systemRef);
-              }
-            }
-          }
+          // Important! We replace the type of the parameter with `$P`
+          paramTy = thunk->mapTypeIntoEnvironment(wireTy);
         }
 
         auto boundRCAType =
@@ -470,7 +572,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
     auto resultType = thunk->mapTypeIntoEnvironment(func->getResultInterfaceType());
 
     // --- `@Resolvable protocol` result: substitute `$P` for `any/some P`
-    if (Type stubTy = getDistributedResolvableProtocolStubType(resultType))
+    if (Type stubTy = getDistributedResolvableProtocolStubSubstitutedType(resultType))
       resultType = thunk->mapTypeIntoEnvironment(stubTy);
 
     auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
@@ -609,7 +711,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
           func->mapTypeIntoEnvironment(func->getResultInterfaceType());
 
       // --- `@Resolvable protocol` result: substitute `$P` for `any/some P`
-      if (Type stubTy = getDistributedResolvableProtocolStubType(resultType))
+      if (Type stubTy = getDistributedResolvableProtocolStubSubstitutedType(resultType))
         resultType = func->mapTypeIntoEnvironment(stubTy);
 
       auto *metaTypeRef = TypeExpr::createImplicit(resultType, C);
@@ -627,6 +729,29 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
         CallExpr::createImplicit(C, systemRemoteCallRef, remoteCallArgs);
     remoteCallExpr = AwaitExpr::createImplicit(C, sloc, remoteCallExpr);
     remoteCallExpr = TryExpr::createImplicit(C, sloc, remoteCallExpr);
+
+    // A `@Resolvable` wire result which doesn't implicitly upcast to the
+    // declared result (`InlineArray<N, $P>`) is converted element-wise:
+    //   let __wireResult = try await system.remoteCall(...)
+    //   return InlineArray<N, any P> { __index in __wireResult[__index] }
+    Type declaredResultTy =
+        isVoidReturn ? Type()
+                     : func->mapTypeIntoEnvironment(func->getResultInterfaceType());
+    if (declaredResultTy &&
+        distributedResolvableWireTypeNeedsExplicitUpcast(declaredResultTy)) {
+      VarDecl *wireResultVar =
+          VarDeclBuilder(thunk, C.getIdentifier("__wireResult"))
+              .introducer(VarDecl::Introducer::Let);
+      remoteBranchStmts.push_back(PatternBindingDecl::createImplicit(
+          C, StaticSpellingKind::None,
+          NamedPattern::createImplicit(C, wireResultVar), remoteCallExpr,
+          thunk));
+      remoteBranchStmts.push_back(wireResultVar);
+
+      remoteCallExpr = createDistributedResolvableFromWireConversion(
+          C, thunk, declaredResultTy,
+          new (C) DeclRefExpr(ConcreteDeclRef(wireResultVar), dloc, implicit));
+    }
 
     auto returnRemoteCall =
         ReturnStmt::createImplicit(C, sloc, remoteCallExpr);
@@ -821,6 +946,12 @@ static FuncDecl *createDistributedThunkFunction(FuncDecl *func) {
 ///     let __result = try await self.echo(g)
 ///     return try $P.resolve(id: __result.id, using: self.actorSystem)
 ///   }
+///
+/// A `distributed` protocol requirement gets the same adapter as a member of
+/// the protocol, so `self` is the generic `Self` and the call dispatches
+/// through the witness table. It is used for calls made through a `$P` stub,
+/// where the recipient's distributed target accessor only knows the
+/// requirement, not the concrete conformer.
 static std::pair<BraceStmt *, bool>
 deriveBodyDistributed_resolvableProxyAdapterThunk(AbstractFunctionDecl *thunk,
                                                   void *context) {
@@ -867,6 +998,14 @@ deriveBodyDistributed_resolvableProxyAdapterThunk(AbstractFunctionDecl *thunk,
     } else {
       SmallVector<Expr *, 4> forwardingParams;
       forwardParameters(thunk, forwardingParams);
+      // `InlineArray<N, $P>` doesn't implicitly upcast to `InlineArray<N, any P>`
+      for (unsigned i : indices(*func->getParameters())) {
+        Type funcParamTy = func->mapTypeIntoEnvironment(
+            func->getParameters()->get(i)->getInterfaceType());
+        if (distributedResolvableWireTypeNeedsExplicitUpcast(funcParamTy))
+          forwardingParams[i] = createDistributedResolvableFromWireConversion(
+              C, thunk, funcParamTy, forwardingParams[i]);
+      }
       auto forwardingArgList = ArgumentList::forImplicitCallTo(
           DeclNameRef(func->getName()), forwardingParams, C);
       auto funcDeclRef = createDistributedTargetRef(C, selfRefExpr, func);
@@ -884,7 +1023,7 @@ deriveBodyDistributed_resolvableProxyAdapterThunk(AbstractFunctionDecl *thunk,
   Type resultType =
       thunk->mapTypeIntoEnvironment(func->getResultInterfaceType());
   Type proxyResultTy =
-      isVoidReturn ? Type() : getDistributedResolvableProtocolStubType(resultType);
+      isVoidReturn ? Type() : getDistributedResolvableProtocolStubSubstitutedType(resultType);
 
   SmallVector<ASTNode, 4> stmts;
   if (!proxyResultTy) {
@@ -906,16 +1045,16 @@ deriveBodyDistributed_resolvableProxyAdapterThunk(AbstractFunctionDecl *thunk,
     stmts.push_back(resultVar);
 
     // return try $P.resolve(id: __result.id, using: self.actorSystem)
+    // or, for a container of `any P`, e.g. `[any P]`:
+    // return try __result.map { try $P.resolve(id: $0.id, using: self.actorSystem) }
     auto *resultRef =
         new (C) DeclRefExpr(ConcreteDeclRef(resultVar), dloc, implicit);
-    auto *resultIdExpr =
-        UnresolvedDotExpr::createImplicit(C, resultRef, C.Id_id);
 
     auto *systemRef = UnresolvedDotExpr::createImplicit(
         C, new (C) DeclRefExpr(selfDecl, dloc, implicit), C.Id_actorSystem);
 
-    Expr *resolveCall = createDistributedResolveCall(
-        C, proxyResultTy, resultIdExpr, systemRef);
+    Expr *resolveCall = createDistributedResolvableWireConversion(
+        C, thunk, resultType, resultRef, systemRef);
 
     auto returnResolve = ReturnStmt::createImplicit(C, sloc, resolveCall);
     stmts.push_back(returnResolve);
@@ -970,7 +1109,7 @@ createDistributedResolvableProxyAdapterThunkDecl(DeclContext *DC,
     // `$P`; rewrite the parameter to `$P` in either case.
     Type paramTy = funcParam->getInterfaceType();
     Type mappedParamTy = func->mapTypeIntoEnvironment(paramTy);
-    if (Type proxyTy = getDistributedResolvableProtocolStubType(mappedParamTy))
+    if (Type proxyTy = getDistributedResolvableProtocolStubSubstitutedType(mappedParamTy))
       paramTy = proxyTy;
     paramDecl->setInterfaceType(paramTy);
 
@@ -980,7 +1119,7 @@ createDistributedResolvableProxyAdapterThunkDecl(DeclContext *DC,
 
   // --- Prepare the result type, adapting a `@Resolvable` result to `$P`.
   Type resultTy = func->getResultInterfaceType();
-  if (Type proxyTy = getDistributedResolvableProtocolStubType(
+  if (Type proxyTy = getDistributedResolvableProtocolStubSubstitutedType(
           func->mapTypeIntoEnvironment(resultTy)))
     resultTy = proxyTy;
 
@@ -1025,6 +1164,33 @@ createDistributedResolvableProxyAdapterThunkDecl(DeclContext *DC,
   return thunk;
 }
 
+/// Whether the protocol requirement \p func gets a 'resolvable proxy
+/// adapter' with a body.
+///
+/// A call through a `$P` stub is dispatched on the recipient by the
+/// requirement's distributed target accessor, which does not know the
+/// concrete conformer and so cannot use the conformer's own adapter. Instead,
+/// the requirement gets an adapter of its own, generic over `Self`, which
+/// calls the requirement through the witness table and converts the result
+/// to `$P`.
+static bool
+distributedRequirementNeedsResolvableProxyAdapterBody(FuncDecl *func) {
+  auto *proto = dyn_cast<ProtocolDecl>(func->getDeclContext());
+  if (!proto)
+    return false;
+
+  // The requirement accessor which dispatches to it is only emitted in the
+  // protocol's module
+  if (!proto->getParentSourceFile())
+    return false;
+
+  // Embedded Swift does not emit distributed target accessors
+  if (func->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+
+  return true;
+}
+
 static FuncDecl *
 createDistributedResolvableProxyAdapterThunkFunction(FuncDecl *func) {
   auto DC = func->getDeclContext();
@@ -1033,9 +1199,16 @@ createDistributedResolvableProxyAdapterThunkFunction(FuncDecl *func) {
   assert(thunk &&
          "couldn't create a distributed resolvable proxy adapter thunk");
 
-  if (func->hasBody())
+  if (func->hasBody()) {
     thunk->setBodySynthesizer(
         deriveBodyDistributed_resolvableProxyAdapterThunk, func);
+  } else if (distributedRequirementNeedsResolvableProxyAdapterBody(func)) {
+    // Only ever referenced by the requirement's distributed target accessor,
+    // which is emitted in the same file as the protocol
+    thunk->overwriteAccess(AccessLevel::FilePrivate);
+    thunk->setBodySynthesizer(
+        deriveBodyDistributed_resolvableProxyAdapterThunk, func);
+  }
 
   return thunk;
 }
@@ -1049,14 +1222,14 @@ distributedTargetNeedsResolvableProxyAdapterThunk(AbstractFunctionDecl *func) {
   // Does the result need a type substitution?
   if (auto *fn = dyn_cast<FuncDecl>(func)) {
     auto resultTy = fn->mapTypeIntoEnvironment(fn->getResultInterfaceType());
-    if (getDistributedResolvableProtocolStubType(resultTy))
+    if (getDistributedResolvableProtocolStubSubstitutedType(resultTy))
       return true;
   }
 
   // Do any of the parameters need type substitution?
   for (auto *param : *func->getParameters()) {
     auto paramTy = func->mapTypeIntoEnvironment(param->getInterfaceType());
-    if (getDistributedResolvableProtocolStubType(paramTy))
+    if (getDistributedResolvableProtocolStubSubstitutedType(paramTy))
       return true;
   }
 
@@ -1213,7 +1386,7 @@ static IfStmt *buildEmbeddedDispatchBranch(
 
     // If `paramTy` is `any P` / `some P` with `@Resolvable`, swap in
     // the stub type `$P`. Otherwise leave unchanged.
-    if (Type stubTy = getDistributedResolvableProtocolStubType(paramTy))
+    if (Type stubTy = getDistributedResolvableProtocolStubSubstitutedType(paramTy))
       paramTy = stubTy;
 
     auto paramVarName =
@@ -1311,15 +1484,12 @@ static IfStmt *buildEmbeddedDispatchBranch(
     //     $P.resolve(id: __result.id, using: self.actorSystem)
     Expr *resultArgExpr = new (C) DeclRefExpr(
         ConcreteDeclRef(resultVar), dloc, implicit);
-    if (Type stubTy = getDistributedResolvableProtocolStubType(returnTy)) {
-      auto *resultIdExpr = UnresolvedDotExpr::createImplicit(
-          C, new (C) DeclRefExpr(ConcreteDeclRef(resultVar), dloc, implicit),
-          C.Id_id);
+    if (getDistributedResolvableProtocolStubSubstitutedType(returnTy)) {
       auto *selfSystemExpr = UnresolvedDotExpr::createImplicit(
           C, new (C) DeclRefExpr(selfDecl, dloc, implicit),
           C.Id_actorSystem);
-      resultArgExpr = createDistributedResolveCall(
-          C, stubTy, resultIdExpr, selfSystemExpr);
+      resultArgExpr = createDistributedResolvableWireConversion(
+          C, thunk, returnTy, resultArgExpr, selfSystemExpr);
     }
 
     // try await resultHandler.onReturn(value: <__result or $P.resolve(...)>)

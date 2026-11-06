@@ -339,6 +339,14 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: %._buffer._storage = getelementptr inbounds{{.*}} [[ARRAY_TYPE:%.*]], ptr %._buffer, i32 0, i32 0
 // CHECK: [[TYPED_ARG_1:%.*]] = load ptr, ptr %._buffer._storage
 
+/// ---> Check whether the number of witness tables matches the generic environment
+
+// CHECK: [[IS_INCORRECT_WITNESSES:%.*]] = icmp ne i64 [[NUM_WITNESS_TABLES]], 4
+// CHECK-NEXT: br i1 [[IS_INCORRECT_WITNESSES]], label %incorrect-witness-tables, label [[LOAD_WITNESS_TABLES:%.*]]
+// CHECK: incorrect-witness-tables:
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+
 /// ---> Load generic argument substitutions from the caller-provided buffer
 
 // CHECK: [[SUB_T_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[GENERIC_SUBS]], i64 0
@@ -347,13 +355,6 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: [[SUB_U:%.*]] = load ptr, ptr [[SUB_U_ADDR]]
 
 /// --> Load witness tables from caller-provided buffer
-
-/// First, check whether the number of witness tables matches expected
-
-// CHECK: [[IS_INCORRECT_WITNESSES:%.*]] = icmp ne i64 [[NUM_WITNESS_TABLES]], 4
-// CHECK-NEXT: br i1 [[IS_INCORRECT_WITNESSES]], label %incorrect-witness-tables, label [[LOAD_WITNESS_TABLES:%.*]]
-// CHECK: incorrect-witness-tables:
-// CHECK-NEXT: unreachable
 
 // CHECK: [[T_ENCODABLE_ADDR:%.*]] = getelementptr inbounds ptr, ptr [[WITNESS_TABLES]], i64 0
 // CHECK-NEXT: [[T_ENCODABLE:%.*]] = load ptr, ptr [[T_ENCODABLE_ADDR]]

@@ -4337,6 +4337,11 @@ static bool isSynthesizedDefaultImplementionThunk(SILGenFunction &SGF) {
   if (!SGF.FunctionDC)
     return false;
 
+  // The resolvable proxy adapter of a distributed protocol requirement is a
+  // member of the protocol, but not a default implementation
+  if (SGF.F.isThunk() == IsDistributedProxyAdapterThunk)
+    return false;
+
   auto *decl = SGF.FunctionDC->getAsDecl();
   if (!decl)
     return false;

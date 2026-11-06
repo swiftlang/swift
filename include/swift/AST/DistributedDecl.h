@@ -94,6 +94,54 @@ struct ResolvableProtocolMatch {
 /// conformance to a @Resolvable protocol.
 ResolvableProtocolMatch findDistributedResolvableExistentialOrOpaqueProtocol(Type T);
 
+/// A stdlib container type for which we support existential to stub type substitution,
+/// same as we do for plain parameter/return types of type `any P` where `P` is an
+/// existential of a `@Resolvable` protocol.
+///
+///
+/// Specifically, this lists the containers we support a specialization of the type across
+/// the remote call boundary, e.g. `[any P]`, `(any P)?`, `[K: any P]`
+/// turn into `[$P]`, `$P?, or `[K, $P]`.
+///
+/// On the wire such a value travels as the same container of the `$P` stub type which is the actor identifier.
+struct DistributedResolvableContainerShape {
+  enum class Kind {
+      Optional,
+      Array,
+      DictionaryValue,
+      InlineArray
+  };
+
+  Kind kind;
+  /// The container type as declared, e.g. `[String: any P]`.
+  Type containerType;
+  /// The `any P` element type.
+  Type elementType;
+
+  /// Rebuild the container with \p newElementType in place of the element,
+  /// e.g. `[String: any P]` -> `[String: $P]`.
+  Type withElementType(Type newElementType) const;
+};
+
+/// Match \p T against the container shapes that may carry a `@Resolvable`
+/// existential element. Never matches in Embedded Swift.
+///
+/// This does not check the 'DistributedAnyResolvableInContainers' feature,
+/// which only gates declarations compiled from source in this compilation,
+/// see 'isDistributedResolvableContainerAllowed'.
+std::optional<DistributedResolvableContainerShape>
+getDistributedResolvableContainerShape(Type T);
+
+/// Whether \p decl may use a `@Resolvable` container shape. Declarations
+/// from already compiled modules always may, those compiled from source here
+/// only when the 'DistributedAnyResolvableInContainers' feature is enabled.
+bool isDistributedResolvableContainerAllowed(const ValueDecl *decl);
+
+/// Get the type a `@Resolvable` parameter or result travels as on the wire:
+/// `$P` for `any P` / `some P`, or the container of `$P` for a matched
+/// container shape. Returns a null type when \p T has no `@Resolvable` part.
+Type getDistributedResolvableProtocolStubSubstitutedType(Type T);
+
 /// Get the concrete `ActorSystem` to which protocol \p proto's
 /// `Self.ActorSystem` is constrained.
 Type getResolvableProtocolConcreteActorSystemType(ProtocolDecl *proto);

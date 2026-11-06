@@ -68,7 +68,7 @@ distributed actor Worker: LifecycleWatch {
       //      return await __secretlyKnownToBeLocal.terminated(actor: terminatedID)
       //    }
     }
-    // CHECK: terminated (on ActorAddress(address: "<unique-id>")): ActorAddress(address: "<terminated-id>")
+    // CHECK: terminated (on ActorAddress(address: "<id-{{[0-9]+}}>")): ActorAddress(address: "<terminated-id>")
 
     print("OK") // CHECK: OK
   }

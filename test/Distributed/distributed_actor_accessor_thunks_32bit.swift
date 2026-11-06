@@ -385,9 +385,18 @@ public distributed actor MyOtherActor {
 // CHECK-NEXT: %._buffer._storage.rawValue = getelementptr inbounds %Ts14_BridgeStorageV, %Ts14_BridgeStorageV* %._buffer._storage, i32 0, i32 0
 // CHECK-NEXT: [[TYPED_ARG_1:%.*]] = load %swift.bridge*, %swift.bridge** %._buffer._storage.rawValue
 
+/// ---> Check whether the number of witness tables matches the generic environment
+
+// CHECK: [[IS_INCORRECT_WITNESSES:%.*]] = icmp ne i32 [[NUM_WITNESS_TABLES]], 4
+// CHECK-NEXT: br i1 [[IS_INCORRECT_WITNESSES]], label %incorrect-witness-tables, label [[LOAD_WITNESS_TABLES:%.*]]
+// CHECK: incorrect-witness-tables:
+// CHECK-NEXT: call void @llvm.trap()
+// CHECK-NEXT: unreachable
+
 /// ---> Load generic argument substitutions from the caller-provided buffer
 
 // CHECK: [[GENERIC_SUBS_BUF:%.*]] = bitcast i8* [[GENERIC_SUBS]] to %swift.type**
+// CHECK-NEXT: [[WITNESS_BUF:%.*]] = bitcast i8* [[WITNESS_TABLES]] to i8***
 // CHECK-NEXT: [[SUB_T_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENERIC_SUBS_BUF]], i32 0
 // CHECK-NEXT: [[SUB_T:%.*]] = load %swift.type*, %swift.type** [[SUB_T_ADDR]]
 // CHECK-NEXT: [[SUB_U_ADDR:%.*]] = getelementptr inbounds %swift.type*, %swift.type** [[GENERIC_SUBS_BUF]], i32 1
@@ -395,14 +404,6 @@ public distributed actor MyOtherActor {
 
 /// --> Load witness tables from caller-provided buffer
 
-/// First, check whether the number of witness tables matches expected
-
-// CHECK: [[IS_INCORRECT_WITNESSES:%.*]] = icmp ne i32 [[NUM_WITNESS_TABLES]], 4
-// CHECK-NEXT: br i1 [[IS_INCORRECT_WITNESSES]], label %incorrect-witness-tables, label [[LOAD_WITNESS_TABLES:%.*]]
-// CHECK: incorrect-witness-tables:
-// CHECK-NEXT: unreachable
-
-// CHECK: [[WITNESS_BUF:%.*]] = bitcast i8* [[WITNESS_TABLES]] to i8***
 // CHECK-NEXT: [[T_ENCODABLE_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[WITNESS_BUF]], i32 0
 // CHECK-NEXT: [[T_ENCODABLE:%.*]] = load i8**, i8*** [[T_ENCODABLE_ADDR]]
 // CHECK-NEXT: [[T_DECODABLE_ADDR:%.*]] = getelementptr inbounds i8**, i8*** [[WITNESS_BUF]], i32 1

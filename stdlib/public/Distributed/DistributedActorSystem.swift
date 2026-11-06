@@ -855,8 +855,9 @@ extension DistributedActorSystem {
     }
 
     do {
-      let returnType = try invocationDecoder.decodeReturnType() ?? returnTypeFromTypeInfo
-      // let errorType = try invocationDecoder.decodeErrorType() // TODO(distributed): decide how to use when typed throws are done
+      // The return type is taken off the function type of the target accessor,
+      // which is the type it actually produces into the result buffer, rather
+      // than from 'decodeReturnType' / 'decodeErrorType'
 
       // If the target actor is a local instance, tell the runtime to enter
       // the distributed accessor with the target actor as its isolation.
@@ -919,13 +920,13 @@ extension DistributedActorSystem {
       // we must properly deinitialize it.
       executeDistributedTargetHasThrown = false
 
-      if returnType == Void.self {
+      if returnTypeFromTypeInfo == Void.self {
         try await handler.onReturnVoid()
       } else {
         try unsafe await self.invokeHandlerOnReturn(
           handler: handler,
           resultBuffer: resultBuffer,
-          metatype: returnType
+          metatype: returnTypeFromTypeInfo
         )
       }
     } catch {

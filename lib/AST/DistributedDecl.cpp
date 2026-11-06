@@ -304,6 +304,87 @@ swift::findDistributedResolvableExistentialOrOpaqueProtocol(Type T) {
   return match;
 }
 
+Type DistributedResolvableContainerShape::withElementType(Type newElementType) const {
+  auto *bound = containerType->castTo<NominalType>();
+  SmallVector<Type, 2> args(bound->getGenericArgs().begin(),
+                            bound->getGenericArgs().end());
+  // The element is the last generic argument of every supported container:
+  // `Optional<E>`, `Array<E>`, `Dictionary<K, E>` and `InlineArray<N, E>`
+  args.back() = newElementType;
+  return NominalType::get(bound->getDecl(), bound->getParent(), args,
+                          bound->getASTContext());
+}
+
+std::optional<DistributedResolvableContainerShape>
+swift::getDistributedResolvableContainerShape(Type T) {
+  if (!T || T->hasError())
+    return std::nullopt;
+
+  auto *bound = T->getAs<NominalType>();
+  if (!bound || !bound->hasGenericArgs())
+    return std::nullopt;
+
+  auto &C = bound->getASTContext();
+  if (C.LangOpts.hasFeature(Feature::Embedded))
+    return std::nullopt;
+
+  using Kind = DistributedResolvableContainerShape::Kind;
+  auto *decl = bound->getDecl();
+  Kind kind;
+  if (decl == C.getOptionalDecl())
+    kind = Kind::Optional;
+  else if (decl == C.getArrayDecl())
+    kind = Kind::Array;
+  else if (decl == C.getDictionaryDecl())
+    kind = Kind::DictionaryValue;
+  else if (decl == C.getInlineArrayDecl())
+    kind = Kind::InlineArray;
+  else
+    return std::nullopt;
+
+  // Only `any P` elements: a `some P` element would make the function generic,
+  // and need a generic substitution recorded for it
+  Type elementTy = bound->getGenericArgs().back();
+  if (!elementTy->isAnyExistentialType())
+    return std::nullopt;
+
+  auto match = findDistributedResolvableExistentialOrOpaqueProtocol(elementTy);
+  if (!match && !match.isAmbiguous)
+    return std::nullopt;
+
+  return DistributedResolvableContainerShape{kind, T, elementTy};
+}
+
+bool swift::isDistributedResolvableContainerAllowed(const ValueDecl *decl) {
+  // A declaration from an already compiled module was checked when that
+  // module was built, with that module's features
+  if (!decl->getDeclContext()->getParentSourceFile())
+    return true;
+  return decl->getASTContext().LangOpts.hasFeature(
+      Feature::DistributedAnyResolvableInContainers);
+}
+
+Type swift::getDistributedResolvableProtocolStubSubstitutedType(Type T) {
+  if (!T)
+    return Type();
+
+  auto containerShape = getDistributedResolvableContainerShape(T);
+  auto match = findDistributedResolvableExistentialOrOpaqueProtocol(
+      containerShape ? containerShape->elementType : T);
+  if (!match)
+    return Type();
+  auto *stub = getDistributedResolvableProtocolStubDecl(match.proto);
+  if (!stub)
+    return Type();
+  auto stubTy = stub->getDeclaredInterfaceType();
+  if (!stubTy || stubTy->hasError())
+    return Type();
+
+  if (containerShape)
+    return containerShape->withElementType(stubTy);
+  return stubTy;
+}
+
 Type swift::getResolvableProtocolConcreteActorSystemType(ProtocolDecl *proto) {
   auto sysTy = getConcreteReplacementForProtocolActorSystemType(proto);
   if (!sysTy || sysTy->is<GenericTypeParamType>() ||

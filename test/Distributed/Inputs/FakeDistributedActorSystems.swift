@@ -313,6 +313,10 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
   var activeActors: [ActorID: any DistributedActor] = [:]
   var forcedNextRemoteCallReply: Any? = nil
 
+  /// Every actor gets a distinct sequential ID, so that calls on one of many
+  /// active actors reach the right one
+  var nextID: Int = 0
+
   public init() {}
 
   public func shutdown() {
@@ -327,7 +331,8 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
     where Act: DistributedActor {
-    let id = ActorAddress(parse: "<unique-id>")
+    nextID += 1
+    let id = ActorAddress(parse: "<id-\(nextID)>")
     print("| assign id: \(id) for \(actorType)")
     return id
   }
@@ -639,6 +644,10 @@ public final class FakeCustomSerializationRoundtripActorSystem: DistributedActor
   var activeActors: [ActorID: any DistributedActor] = [:]
   var forcedNextRemoteCallReply: Any? = nil
 
+  /// Every actor gets a distinct sequential ID, so that calls on one of many
+  /// active actors reach the right one
+  var nextID: Int = 0
+
   public init() {}
 
   public func shutdown() {
@@ -653,7 +662,8 @@ public final class FakeCustomSerializationRoundtripActorSystem: DistributedActor
 
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
     where Act: DistributedActor {
-    let id = ActorAddress(parse: "<unique-id>")
+    nextID += 1
+    let id = ActorAddress(parse: "<id-\(nextID)>")
     print("| assign id: \(id) for \(actorType)")
     return id
   }

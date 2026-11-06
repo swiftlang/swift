@@ -34,7 +34,7 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
     let system = DefaultDistributedActorSystem()
 
     let actor = Worker(actorSystem: system)
-    // CHECK: assign id: ActorAddress(address: "<unique-id>") for Worker
+    // CHECK: assign id: ActorAddress(address: "<id-{{[0-9]+}}>") for Worker
 
     // compilation check:
     let _: Encodable = actor
@@ -44,14 +44,14 @@ typealias DefaultDistributedActorSystem = FakeRoundtripActorSystem
     let json = FakeEncoder()
     let encoded = try! json.encode(actor)
     print("encoded = \(encoded)")
-    // CHECK: encoded = <unique-id>;
+    // CHECK: encoded = <id-{{[0-9]+}}>;
 
     let decoder = FakeDecoder()
     decoder.userInfo[.actorSystemKey] = system
     let back = try! decoder.decode(encoded, as: Worker.self)
-    // CHECK: | resolve ActorAddress(address: "<unique-id>")
+    // CHECK: | resolve ActorAddress(address: "<id-{{[0-9]+}}>")
 
     print("back = \(back)")
-    // CHECK: back = Worker(ActorAddress(address: "<unique-id>"))
+    // CHECK: back = Worker(ActorAddress(address: "<id-{{[0-9]+}}>"))
   }
 }
