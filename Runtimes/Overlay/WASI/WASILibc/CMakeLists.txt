@@ -12,6 +12,8 @@ set_target_properties(swiftWASILibc PROPERTIES
   Swift_MODULE_NAME WASILibc)
 target_compile_definitions(swiftWASILibc PRIVATE
   $<$<BOOL:${SwiftOverlay_ENABLE_REFLECTION}>:SWIFT_ENABLE_REFLECTION>)
+target_compile_options(swiftWASILibc PRIVATE
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>")
 target_link_libraries(swiftWASILibc PUBLIC
   SwiftWASILibc)
 target_link_libraries(swiftWASILibc PRIVATE

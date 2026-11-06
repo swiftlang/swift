@@ -3,6 +3,8 @@ add_library(swift_math
   Math.swift)
 set_target_properties(swift_math PROPERTIES
   Swift_MODULE_NAME _math)
+target_compile_options(swift_math PRIVATE
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-sil-opaque-values>")
 target_link_libraries(swift_math PRIVATE
   SwiftAndroid
   swiftCore
