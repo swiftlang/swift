@@ -581,6 +581,50 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   return result;
 }
 
+TinyPtrVector<ValueDecl *>
+importer::lookupDirectWithoutExtensions(NominalTypeDecl *decl, DeclName name) {
+  ASTContext &ctx = decl->getASTContext();
+  auto *clangImporter =
+      static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+
+  TinyPtrVector<ValueDecl *> result;
+
+  if (name.getBaseName().isOperator()) {
+    auto underlyingId = getOperatorName(ctx, name.getBaseIdentifier());
+    TinyPtrVector<ValueDecl *> underlyingFuncs = evaluateOrDefault(
+        ctx.evaluator, ClangRecordMemberLookup({decl, underlyingId}), {});
+    for (auto it : underlyingFuncs) {
+      if (auto synthesizedFunc =
+              clangImporter->getCXXSynthesizedOperatorFunc(cast<FuncDecl>(it)))
+        result.push_back(synthesizedFunc);
+    }
+  } else {
+    // See if there is a Clang decl with the given name.
+    result = evaluateOrDefault(ctx.evaluator,
+                               ClangRecordMemberLookup({decl, name}), {});
+  }
+
+  // Check if there are any synthesized Swift members that match the name.
+  for (auto member : decl->getCurrentMembersWithoutLoading()) {
+    if (auto namedMember = dyn_cast<ValueDecl>(member)) {
+      if (namedMember->hasName() && namedMember->getName().matchesRef(name) &&
+          // Make sure we don't add duplicate entries, as that would wrongly
+          // imply that lookup is ambiguous.
+          !llvm::is_contained(result, namedMember)) {
+        result.push_back(namedMember);
+      }
+    }
+  }
+
+  // ClangRecordMemberLookup matches by base name only.
+  if (name.isCompoundName())
+    llvm::erase_if(result, [&](ValueDecl *found) {
+      return !found->getName().matchesRef(name);
+    });
+
+  return result;
+}
+
 namespace {
 /// Essentially a pair<CXXMethodDecl *, AccessSpecifier>, from qualified lookup.
 ///
