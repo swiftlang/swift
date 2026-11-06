@@ -38,6 +38,7 @@
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "clang/AST/Decl.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
@@ -4023,6 +4024,16 @@ void LargeLoadableHeuristic::visit(SILArgument *arg) {
     }
   }
 }
+
+static bool isImportedCUnion(SILType ty) {
+  auto *structDecl = ty.getStructDecl();
+  if (!structDecl)
+    return false;
+  auto *recordDecl =
+      dyn_cast_or_null<clang::RecordDecl>(structDecl->getClangDecl());
+  return recordDecl && recordDecl->isUnion();
+}
+
 void LargeLoadableHeuristic::visit(SILInstruction *i) {
   if (!UseAggressiveHeuristic)
     return;
@@ -4030,7 +4041,8 @@ void LargeLoadableHeuristic::visit(SILInstruction *i) {
   // Heuristic to make sure that UncheckedBitCast on C unions don't cause
   // trouble (the type of a union has a single llvm register representing the
   // bitwidth).
-  if (auto *bitcast = dyn_cast<UncheckedTrivialBitCastInst>(i)) {
+  if (auto *bitcast = dyn_cast<UncheckedTrivialBitCastInst>(i);
+      bitcast && isImportedCUnion(bitcast->getOperand()->getType())) {
     auto opdTy = bitcast->getOperand()->getType();
     auto numRegs = numRegisters(opdTy);
     if (numRegs < NumRegistersLargeType) {
@@ -4787,6 +4799,59 @@ protected:
                                       LoadOwnershipQualifier::Unqualified);
     e->replaceAllUsesWith(enumVal);
     assignment.markForDeletion(e);
+  }
+
+  void visitStructInst(StructInst *s) {
+    assert(!assignment.isLargeLoadableType(s->getType()));
+    auto builder = assignment.getBuilder(s->getIterator());
+    auto structAddr = assignment.createAllocStack(s->getType());
+
+    auto fieldIt = s->getStructDecl()->getStoredProperties().begin();
+    for (auto &opd : s->getAllOperands()) {
+      auto projAddr = builder.createStructElementAddr(
+          s->getLoc(), structAddr, *fieldIt,
+          opd.get()->getType().getAddressType());
+      fieldIt++;
+
+      if (assignment.contains(opd.get())) {
+        auto opdAddr = assignment.getAddressForValue(opd.get());
+        builder.createCopyAddr(s->getLoc(), opdAddr, projAddr, IsTake,
+                               IsInitialization);
+      } else {
+        builder.createStore(s->getLoc(), opd.get(), projAddr,
+                            StoreOwnershipQualifier::Unqualified);
+      }
+    }
+
+    auto structVal = builder.createLoad(s->getLoc(), structAddr,
+                                        LoadOwnershipQualifier::Unqualified);
+    s->replaceAllUsesWith(structVal);
+    assignment.markForDeletion(s);
+  }
+
+  void visitTupleInst(TupleInst *t) {
+    assert(!assignment.isLargeLoadableType(t->getType()));
+    auto builder = assignment.getBuilder(t->getIterator());
+    auto tupleAddr = assignment.createAllocStack(t->getType());
+
+    for (auto &opd : t->getAllOperands()) {
+      auto projAddr = builder.createTupleElementAddr(
+          t->getLoc(), tupleAddr, opd.getOperandNumber(),
+          opd.get()->getType().getAddressType());
+      if (assignment.contains(opd.get())) {
+        auto opdAddr = assignment.getAddressForValue(opd.get());
+        builder.createCopyAddr(t->getLoc(), opdAddr, projAddr, IsTake,
+                               IsInitialization);
+      } else {
+        builder.createStore(t->getLoc(), opd.get(), projAddr,
+                            StoreOwnershipQualifier::Unqualified);
+      }
+    }
+
+    auto tupleVal = builder.createLoad(t->getLoc(), tupleAddr,
+                                       LoadOwnershipQualifier::Unqualified);
+    t->replaceAllUsesWith(tupleVal);
+    assignment.markForDeletion(t);
   }
 
   void visitApplySite(ApplySite apply) {
