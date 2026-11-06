@@ -1877,7 +1877,18 @@ function(add_swift_target_library_single target name)
   endif()
 
   if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
-    embedded_amend_archive_commands_on_darwin_host(${target} "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
+    # The object produced by the Swift compiler is an EXTERNAL_OBJECT, which
+    # $<TARGET_OBJECTS:...> does not include, so pass it on explicitly.
+    set(_swift_external_objects)
+    foreach(_src ${SWIFTLIB_SINGLE_SOURCES})
+      get_source_file_property(_is_external_object "${_src}" EXTERNAL_OBJECT)
+      if(_is_external_object)
+        list(APPEND _swift_external_objects "${_src}")
+      endif()
+    endforeach()
+    embedded_amend_archive_commands_on_darwin_host(
+      ${target} "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}"
+      ${_swift_external_objects})
   endif()
 
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
@@ -4049,16 +4060,14 @@ function(add_embedded_swift_target_library prefix library_name)
       endif()
     endif()
 
-    # Static archives whose target triple is ELF/EABI/wasm need a different
-    # archiver when cross-built from a macOS host. embedded_amend_archive_
-    # commands_on_darwin_host is a no-op for other targets/hosts, so it's
-    # safe to call unconditionally — every embedded library is static.
-    embedded_amend_archive_commands_on_darwin_host(${prefix}-${mod} ${triple})
-
     add_dependencies(${prefix} ${prefix}-${mod})
   endforeach()
 endfunction()
 
+# Any additional arguments are object files that are not visible to
+# $<TARGET_OBJECTS:...> (in particular the object produced by the Swift
+# compiler, which is an EXTERNAL_OBJECT) and which must be added to the
+# rebuilt archive.
 function(embedded_amend_archive_commands_on_darwin_host target triple)
   # This is a temporary solution while we work on porting the build
   # on the Embedded stdlib to the Runtime build system, where each platform
@@ -4075,6 +4084,7 @@ function(embedded_amend_archive_commands_on_darwin_host target triple)
           $<TARGET_FILE:${target}>
           "$<JOIN:$<TARGET_PROPERTY:${target},STATIC_LIBRARY_OPTIONS>,;>"
           "$<JOIN:$<TARGET_OBJECTS:${target}>,;>"
+          ${ARGN}
         COMMAND ${CMAKE_COMMAND} -E touch $<TARGET_FILE:${target}>
         VERBATIM
         COMMAND_EXPAND_LISTS)
