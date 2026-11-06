@@ -34,7 +34,7 @@ class CImplicitMainActor: P {
   func f() { } // okay! conformance above is isolated
 }
 
-// If the protocol itself is isolated, don't do anything.
+// All of the protocol's requirements are isolated, so the conformance isn't.
 extension CExplicitMainActor: Q {
   func g() { }
 }
@@ -77,6 +77,23 @@ struct Landmark: Codable {
   var foundingYear: Int
 }
 
+// The protocol is main actor-isolated, but the witness for its 'nonisolated'
+// requirement is main actor-isolated too, so the conformance is isolated.
+protocol R {
+  nonisolated func h()
+}
+
+struct SImplicitMainActorWitness: R {
+  func h() {
+    onMain()
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/83610
+protocol PEquatable: Equatable { }
+
+struct SViaInheritedEquatable: PEquatable { }
+
 func acceptSendablePMeta<T: Sendable & P>(_: T.Type) { }
 func acceptSendableQMeta<T: Sendable & Q>(_: T.Type) { }
 
@@ -97,4 +114,7 @@ nonisolated func testConformancesFromNonisolated() {
   let _: any Hashable.Type = HashableStruct.self // expected-error{{main actor-isolated conformance of 'HashableStruct' to 'Hashable' cannot be used in nonisolated context}}
   let _: any RawRepresentable.Type = RawRepresentableEnum.self
   let _: any Encodable.Type = CodableClass.self // expected-error{{main actor-isolated conformance of 'CodableClass' to 'Encodable' cannot be used in nonisolated context}}
+
+  let _: any R.Type = SImplicitMainActorWitness.self // expected-error{{main actor-isolated conformance of 'SImplicitMainActorWitness' to 'R' cannot be used in nonisolated context}}
+  let _: any PEquatable.Type = SViaInheritedEquatable.self // expected-error{{main actor-isolated conformance of 'SViaInheritedEquatable' to 'PEquatable' cannot be used in nonisolated context}}
 }
