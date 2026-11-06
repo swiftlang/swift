@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-clang %S/Inputs/tsan_invisible_barrier.c -c -o %t/tsan_invisible_barrier.o
+// RUN: %target-clang -x c %S/Inputs/tsan_invisible_barrier.c -c -o %t/tsan_invisible_barrier.o
 // RUN: %target-swiftc_driver %s %t/tsan_invisible_barrier.o -import-objc-header %S/Inputs/tsan_invisible_barrier.h -Onone -parse-as-library -g -sanitize=thread %import-libdispatch -o %t/test-Onone
 // RUN: %target-codesign %t/test-Onone
 // RUN: env %env-TSAN_OPTIONS=abort_on_error=0 not %target-run %t/test-Onone 2>&1 | %FileCheck %s --dump-input=fail
