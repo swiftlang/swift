@@ -541,7 +541,12 @@ public:
   translateDeclContext(const clang::DeclContext *dc);
 
   /// Translate a Clang effective context into a context kind and name.
-  std::optional<StoredContext> translateContext(EffectiveClangContext context);
+  ///
+  /// \param member The declaration being placed into the context, if any. See
+  /// resolveContext().
+  std::optional<StoredContext>
+  translateContext(EffectiveClangContext context,
+                   const clang::NamedDecl *member = nullptr);
 
   /// Add an entry to the lookup table.
   ///
@@ -597,7 +602,13 @@ private:
 public:
   /// Lookup an unresolved context name and resolve it to a Clang
   /// named declaration.
-  const clang::NamedDecl *resolveContext(StringRef unresolvedName);
+  ///
+  /// \param member The declaration being placed into the context, if any.
+  /// An Objective-C protocol is only a valid context for a member that can
+  /// be nested in a Swift protocol, i.e. a typedef imported as a typealias.
+  const clang::NamedDecl *
+  resolveContext(StringRef unresolvedName,
+                 const clang::NamedDecl *member = nullptr);
 
   /// Lookup the set of entities with the given base name.
   ///

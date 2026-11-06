@@ -7759,8 +7759,15 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
       Impl.importSourceLoc(decl->getLocation()), /*generic params*/ nullptr,
       dc);
 
+  // A typealias imported into a protocol has the protocol's generic signature
+  // and is sugared on the protocol's 'Self', neither of which is available in
+  // the compatibility alias's context, so use its underlying type instead.
+  auto *typeAlias = dyn_cast<TypeAliasDecl>(typeDecl);
+  bool isProtocolMemberAlias =
+      typeAlias && typeAlias->getDeclContext()->getSelfProtocolDecl();
+
   auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl);
-  if (GTD && !isa<ProtocolDecl>(GTD)) {
+  if (GTD && !isa<ProtocolDecl>(GTD) && !isProtocolMemberAlias) {
     alias->setGenericSignature(GTD->getGenericSignature());
     if (GTD->hasGenericParamList()) {
       alias->getASTContext().evaluator.cacheOutput(
@@ -7769,7 +7776,10 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
     }
   }
 
-  alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
+  if (isProtocolMemberAlias)
+    alias->setUnderlyingType(typeAlias->getUnderlyingType());
+  else
+    alias->setUnderlyingType(typeDecl->getDeclaredInterfaceType());
 
   // Record that this is the official version of this declaration.
   auto cacheKey = Impl.getImportedDeclsKey(decl, getVersionWithoutProjection());
@@ -11782,8 +11792,8 @@ ClangImporter::Implementation::importDeclContextOf(
     if (!submodule) return nullptr;
 
     if (auto lookupTable = findLookupTable(*submodule)) {
-      if (auto clangDecl
-            = lookupTable->resolveContext(context.getUnresolvedName())) {
+      if (auto clangDecl = lookupTable->resolveContext(
+              context.getUnresolvedName(), dyn_cast<clang::NamedDecl>(decl))) {
         // Import the Clang declaration.
         auto swiftDecl = importDeclForDeclContext(decl,
                                                   context.getUnresolvedName(),
