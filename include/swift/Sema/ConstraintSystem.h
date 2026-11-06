@@ -1021,6 +1021,12 @@ private:
   /// The constraint graph.
   ConstraintGraph CG;
 
+  /// The current bindings generation number. This is incremented every
+  /// time a binding set changes, so that we take the maximum generation
+  /// number of a collection of binding sets and compare it against a
+  /// saved value to check if any of those binding sets changed.
+  uint64_t BindingGenerationNumber = 0;
+
   /// Information about the remaining disjunctions we have yet to attempt
   /// in this path.
   llvm::DenseMap<Constraint *, SolverDisjunction> RemainingDisjunctions;
@@ -1112,6 +1118,10 @@ public:
   /// This is not trail-protected state; it's just a cache for some
   /// information about Decls.
   ConformanceCache CC;
+
+  uint64_t getNextBindingGenerationNumber() {
+    return ++BindingGenerationNumber;
+  }
 
 private:
   /// Describes the current solver state.

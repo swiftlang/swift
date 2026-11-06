@@ -753,8 +753,11 @@ ConflictReason swift::constraints::checkConversion(ConformanceCache &cache,
         auto lhsParam = lhsParams[i];
         auto rhsParam = rhsParams[i];
 
-        if (lhsParam.isInOut() != rhsParam.isInOut())
+        if (lhsParam.isInOut() != rhsParam.isInOut() &&
+            (!lhsParam.getPlainType()->is<TypeVariableType>() ||
+             !lhsParam.getPlainType()->castTo<TypeVariableType>()->getImpl().canBindToInOut())) {
           return ConflictReason(ConflictFlag::FunctionParamFlags);
+        }
 
         if (lhsParam.isVariadic() != rhsParam.isVariadic())
           return ConflictReason(ConflictFlag::FunctionParamFlags);
