@@ -3567,7 +3567,9 @@ namespace {
         // A foreign reference type can be subclassed from Swift only if it has
         // a virtual destructor: deleting a Swift subclass through a base
         // pointer must run the most-derived destructor.
-        else if (cxxRecordDecl &&
+        else if (cxxRecordDecl && cxxRecordDecl->hasDefinition() &&
+                 cxxRecordDecl->getNumVBases() == 0 &&
+                 classDecl->hasRefCountingAnnotations() &&
                  Impl.SwiftContext.LangOpts.hasFeature(
                      Feature::ForeignReferenceTypeSubclassing)) {
           auto dtor = cxxRecordDecl->getDestructor();
