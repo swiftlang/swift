@@ -129,7 +129,7 @@ func testSendingCaptures() {
   class NS {
     func test() {
       _ = { @callable(once) [sending self] in
-        // expected-forbiddenx-cparser-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}} expected-forbiddenx-astgen-error@-1 {{cannot find 'sending' in scope}}
+        // expected-forbiddenx-cparser-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}}
         // expected-forbiddenx-cparser-error@-2 {{expected 'weak', 'unowned', or no specifier in capture list}} expected-forbiddenx-astgen-error@-2 {{unexpected 'self' keyword in closure capture clause}}
         _ = self
       }
@@ -138,12 +138,12 @@ func testSendingCaptures() {
 
   let ns = NS()
   _ = { @callable(once) [sending ns] in
-    // expected-forbiddenx-cparser-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}} expected-forbiddenx-astgen-error@-1 {{cannot find 'sending' in scope}}
+    // expected-forbiddenx-cparser-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}}
     // expected-forbiddenx-cparser-error@-2 {{expected 'weak', 'unowned', or no specifier in capture list}} expected-forbiddenx-astgen-error@-2 {{unexpected code 'ns' in closure capture clause}}
     ns
   }
   _ = { @callable(once) [x = 42, sending ns = NS()] in
-    // expected-forbiddenx-cparser-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}} expected-forbiddenx-astgen-error@-1 {{cannot find 'sending' in scope}}
+    // expected-forbiddenx-cparser-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}}
     // expected-forbiddenx-cparser-error@-2 {{expected 'weak', 'unowned', or no specifier in capture list}} expected-forbiddenx-astgen-error@-2 {{unexpected code 'ns = NS()' in closure capture clause}}
     _ = x
     _ = ns

@@ -169,7 +169,8 @@ struct ASTGenVisitor {
       // A top-level statement in a script cannot begin with a closure: that is
       // ambiguous with a trailing closure.
       if declContext.parentSourceFile.isScriptMode,
-        let first = node.firstToken(viewMode: .sourceAccurate), first.rawTokenKind == .leftBrace
+        let first = node.firstToken(viewMode: .sourceAccurate), first.rawTokenKind == .leftBrace,
+        first.parent?.is(ClosureExprSyntax.self) == true, !node.hasError
       {
         self.diagnose(.statement_begins_with_closure, at: first)
       }

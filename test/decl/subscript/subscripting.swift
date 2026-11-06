@@ -186,12 +186,12 @@ class WillSetInSubscript {
   }
 }
 
-subscript(i: Int) -> Int { // expected-cparser-error{{'subscript' functions may only be declared within a type}}
+subscript(i: Int) -> Int { // expected-error{{'subscript' functions may only be declared within a type}}
   get {}
 }
 
 func f() {  // expected-note * {{did you mean 'f'?}}
-  subscript (i: Int) -> Int { // expected-cparser-error{{'subscript' functions may only be declared within a type}}
+  subscript (i: Int) -> Int { // expected-error{{'subscript' functions may only be declared within a type}}
     get {}
   }
 }
