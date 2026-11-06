@@ -87,13 +87,6 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     return EXIT_FAILURE;
   }
 
-  llvm::Triple Target;
-  if (auto *A = ParsedArgs.getLastArg(OPT_target)) {
-    Target = llvm::Triple(A->getValue());
-  } else {
-    Target = llvm::Triple(llvm::sys::getDefaultTargetTriple());
-  }
-
   std::string OutputFile;
   if (auto *A = ParsedArgs.getLastArg(OPT_o)) {
     OutputFile = A->getValue();
@@ -101,54 +94,12 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     OutputFile = "-";
   }
 
-  Invocation.setMainExecutablePath(MainExecutablePath);
-  Invocation.setModuleName("swift_synthesize_interface");
-
-  if (auto *A = ParsedArgs.getLastArg(OPT_resource_dir)) {
-    Invocation.setRuntimeResourcePath(A->getValue());
-  }
-
-  std::string SDK = "";
-  if (auto *A = ParsedArgs.getLastArg(OPT_sdk)) {
-    SDK = A->getValue();
-  }
-  Invocation.setSDKPath(SDK);
-  Invocation.setTargetTriple(Target);
-
-  for (const auto *A : ParsedArgs.filtered(OPT_Xcc)) {
-    Invocation.getClangImporterOptions().ExtraArgs.push_back(A->getValue());
-  }
-
-  std::vector<SearchPathOptions::SearchPath> FrameworkSearchPaths;
-  for (const auto *A : ParsedArgs.filtered(OPT_F)) {
-    FrameworkSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
-  }
-  for (const auto *A : ParsedArgs.filtered(OPT_Fsystem)) {
-    FrameworkSearchPaths.push_back({A->getValue(), /*isSystem*/ true});
-  }
-  Invocation.setFrameworkSearchPaths(FrameworkSearchPaths);
-  Invocation.getSearchPathOptions().LibrarySearchPaths =
-      ParsedArgs.getAllArgValues(OPT_L);
-  std::vector<SearchPathOptions::SearchPath> ImportSearchPaths;
-  for (const auto *A : ParsedArgs.filtered(OPT_I)) {
-    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
-  }
-  for (const auto *A : ParsedArgs.filtered(OPT_Isystem)) {
-    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ true});
-  }
-  Invocation.setImportSearchPaths(ImportSearchPaths);
-
   // Add default toolchain-relative plugin paths.
   SmallString<261> toolchainRoot{MainExecutablePath};
   llvm::sys::path::remove_filename(toolchainRoot); // remove executable name
   llvm::sys::path::remove_filename(toolchainRoot); // remove 'bin'
 
   SearchPathOptions &SearchPathOpts = Invocation.getSearchPathOptions();
-
-  SmallString<261> inProcPluginServerPath;
-  driver::appendInProcPluginServerPath(toolchainRoot, inProcPluginServerPath);
-  SearchPathOpts.InProcessPluginServerPath =
-      std::string(inProcPluginServerPath);
 
   SmallString<261> defaultPluginPath;
   driver::appendPluginsPath(toolchainRoot, defaultPluginPath);
@@ -162,44 +113,16 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
       PluginSearchOption::PluginPath{std::string(localPluginPath)});
 #endif
 
-  Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
-  Invocation.getLangOptions().AttachCommentsToDecls = true;
-  Invocation.getLangOptions().setCxxInteropFromArgs(
-      ParsedArgs, Diags, Invocation.getFrontendOptions());
-  Invocation.computeCXXStdlibOptions();
-
-  if (ParsedArgs.hasArg(OPT_disable_safe_interop_wrappers))
-    Invocation.getLangOptions().DisableSafeInteropWrappers = true;
-
-  if (parseFeatureArgs(Invocation.getLangOptions(), ParsedArgs, Diags))
+  Invocation.setModuleName("swift_synthesize_interface");
+  if (Invocation.parseModuleLoadingArgs(ParsedArgs, Diags,
+                                        /*workingDirectory=*/{},
+                                        MainExecutablePath) ||
+      Diags.hadAnyError()) {
     return EXIT_FAILURE;
-
-  std::string ModuleCachePath = "";
-  if (auto *A = ParsedArgs.getLastArg(OPT_module_cache_path)) {
-    ModuleCachePath = A->getValue();
   }
-  Invocation.setClangModuleCachePath(ModuleCachePath);
-  Invocation.getClangImporterOptions().ModuleCachePath = ModuleCachePath;
+
+  Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getClangImporterOptions().ImportForwardDeclarations = true;
-  Invocation.setDefaultPrebuiltCacheIfNecessary();
-
-  if (auto *A = ParsedArgs.getLastArg(OPT_language_mode)) {
-    using version::Version;
-    auto SwiftVersion = A->getValue();
-    bool isValid = false;
-    if (auto Version = VersionParser::parseVersionString(
-            SwiftVersion, SourceLoc(), nullptr)) {
-      if (auto Effective = Version.value().getEffectiveLanguageVersion()) {
-        Invocation.getLangOptions().EffectiveLanguageVersion = *Effective;
-        isValid = true;
-      }
-    }
-    if (!isValid) {
-      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
-                     "-swift-version", SwiftVersion);
-      return EXIT_FAILURE;
-    }
-  }
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {

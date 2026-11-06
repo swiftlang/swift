@@ -71,6 +71,11 @@ public:
   bool convert(
       SmallVectorImpl<std::unique_ptr<llvm::MemoryBuffer>> *buffers);
 
+  /// Populates the subset of FrontendOptions that governs module loading,
+  /// module caches, module aliases, implicit imports, availability domains,
+  /// and plugins.
+  bool convertModuleLoadingOptions();
+
   static FrontendOptions::ActionType
   determineRequestedAction(const llvm::opt::ArgList &);
 };

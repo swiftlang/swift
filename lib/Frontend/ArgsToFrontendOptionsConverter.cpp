@@ -64,29 +64,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_index_store_path)) {
     Opts.IndexStorePath = A->getValue();
   }
-  if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
-    Opts.PrebuiltModuleCachePath = A->getValue();
-  }
-  if (auto envPrebuiltModuleCachePath =
-      llvm::sys::Process::GetEnv("SWIFT_OVERLOAD_PREBUILT_MODULE_CACHE_PATH")) {
-    Opts.PrebuiltModuleCachePath = *envPrebuiltModuleCachePath;
-  }
-
-  if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
-    Opts.ExplicitModulesOutputPath = A->getValue();
-  } else {
-    SmallString<128> defaultPath;
-    clang::driver::Driver::getDefaultModuleCachePath(defaultPath);
-    Opts.ExplicitModulesOutputPath = defaultPath.str().str();
-  }
-  if (const Arg *A = Args.getLastArg(OPT_sdk_module_cache_path)) {
-    Opts.ExplicitSDKModulesOutputPath = A->getValue();
-  } else {
-    Opts.ExplicitSDKModulesOutputPath = Opts.ExplicitModulesOutputPath;
-  }
-  if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
-    Opts.BackupModuleInterfaceDir = A->getValue();
-  }
   if (const Arg *A = Args.getLastArg(OPT_bridging_header_directory_for_print)) {
     Opts.BridgingHeaderDirForPrint = A->getValue();
   }
@@ -143,8 +120,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   for (auto A : Args.getAllArgValues(options::OPT_allowable_client)) {
     Opts.AllowableClients.insert(StringRef(A).str());
   }
-
-  Opts.DisableImplicitModules |= Args.hasArg(OPT_disable_implicit_swift_modules);
 
   Opts.ImportPrescan |= Args.hasArg(OPT_import_prescan);
 
@@ -206,8 +181,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
-
-  Opts.IgnoreSwiftSourceInfo |= Args.hasArg(OPT_ignore_module_source_info);
   computeHelpOptions();
 
   if (Args.hasArg(OPT_print_target_info)) {
@@ -300,8 +273,6 @@ bool ArgsToFrontendOptionsConverter::convert(
     // generating prebuilt module cache, don't need synchronization. We should avoid
     // using lock files for them.
     Opts.DisableInterfaceFileLock = true;
-  } else {
-    Opts.DisableInterfaceFileLock |= Args.hasArg(OPT_disable_interface_lockfile);
   }
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::Immediate &&
@@ -396,9 +367,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   // This must be called after computing module name, module abi name,
-  // and module link name. If computing module aliases is unsuccessful,
-  // return early.
-  if (!computeModuleAliases())
+  // and module link name.
+  if (convertModuleLoadingOptions())
     return true;
 
   if (const Arg *A = Args.getLastArg(OPT_serialize_debugging_options,
@@ -414,7 +384,6 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.ImportUnderlyingModule |= Args.hasArg(OPT_import_underlying_module);
   Opts.EnableIncrementalDependencyVerifier |= Args.hasArg(OPT_verify_incremental_dependencies);
   Opts.UseSharedResourceFolder = !Args.hasArg(OPT_use_static_resource_dir);
-  Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
   if (const Arg *A = Args.getLastArg(options::OPT_clang_header_expose_decls)) {
     Opts.ClangHeaderExposedDecls =
         llvm::StringSwitch<
@@ -450,10 +419,6 @@ bool ArgsToFrontendOptionsConverter::convert(
         {splitArg.first.str(), splitArg.second.str()});
   }
 
-  Opts.StrictImplicitModuleContext = Args.hasArg(OPT_strict_implicit_module_context,
-                                                 OPT_no_strict_implicit_module_context,
-                                                 false);
-
   computeImportObjCHeaderOptions();
   computeImplicitImportModuleNames(OPT_import_module, /*isTestable=*/false);
   computeImplicitImportModuleNames(OPT_testable_import_module, /*isTestable=*/true);
@@ -475,7 +440,48 @@ bool ArgsToFrontendOptionsConverter::convert(
     Opts.BlocklistConfigFilePaths.push_back(A);
   }
 
+  return false;
+}
+
+bool ArgsToFrontendOptionsConverter::convertModuleLoadingOptions() {
+  using namespace options;
+
+  if (const Arg *A = Args.getLastArg(OPT_prebuilt_module_cache_path)) {
+    Opts.PrebuiltModuleCachePath = A->getValue();
+  }
+  if (auto envPrebuiltModuleCachePath =
+          llvm::sys::Process::GetEnv("SWIFT_OVERLOAD_PREBUILT_MODULE_CACHE_PATH")) {
+    Opts.PrebuiltModuleCachePath = *envPrebuiltModuleCachePath;
+  }
+
+  if (const Arg *A = Args.getLastArg(OPT_module_cache_path)) {
+    Opts.ExplicitModulesOutputPath = A->getValue();
+  } else {
+    SmallString<128> defaultPath;
+    clang::driver::Driver::getDefaultModuleCachePath(defaultPath);
+    Opts.ExplicitModulesOutputPath = defaultPath.str().str();
+  }
+  if (const Arg *A = Args.getLastArg(OPT_sdk_module_cache_path)) {
+    Opts.ExplicitSDKModulesOutputPath = A->getValue();
+  } else {
+    Opts.ExplicitSDKModulesOutputPath = Opts.ExplicitModulesOutputPath;
+  }
+  if (const Arg *A = Args.getLastArg(OPT_backup_module_interface_path)) {
+    Opts.BackupModuleInterfaceDir = A->getValue();
+  }
+
+  Opts.DisableBuildingInterface = Args.hasArg(OPT_disable_building_interface);
+  Opts.DisableImplicitModules |=
+      Args.hasArg(OPT_disable_implicit_swift_modules);
+  Opts.DisableInterfaceFileLock |= Args.hasArg(OPT_disable_interface_lockfile);
+  Opts.IgnoreSwiftSourceInfo |= Args.hasArg(OPT_ignore_module_source_info);
+  Opts.StrictImplicitModuleContext =
+      Args.hasArg(OPT_strict_implicit_module_context,
+                  OPT_no_strict_implicit_module_context, false);
   Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
+
+  if (!computeModuleAliases())
+    return true;
 
   if (computeAvailabilityDomains())
     return true;
@@ -614,6 +620,8 @@ void ArgsToFrontendOptionsConverter::computeDumpScopeMapLocations() {
 
 bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
   using namespace options;
+
+  Opts.AvailabilityDomains = FrontendOptions::CustomAvailabilityDomains();
 
   bool hadError = false;
   llvm::SmallSet<std::string, 4> seenDomains;

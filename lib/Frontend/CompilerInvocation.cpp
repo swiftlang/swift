@@ -4625,19 +4625,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (!mainExecutablePath.empty()) {
-    setMainExecutablePath(mainExecutablePath);
-  }
-
-  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs, Diags);
-  SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
-
-  if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {
-    return true;
-  }
-
-  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
-                    FrontendOpts)) {
+  if (parseModuleLoadingArgs(ParsedArgs, Diags, workingDirectory,
+                             mainExecutablePath)) {
     return true;
   }
 
@@ -4645,18 +4634,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
-                             workingDirectory, LangOpts, FrontendOpts,
-                             CASOpts)) {
-    return true;
-  }
-
   ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
-
-  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
-                          CASOpts, FrontendOpts, workingDirectory)) {
-    return true;
-  }
 
   if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts,
                    TypeCheckerOpts, Diags, LangOpts, ClangImporterOpts)) {
@@ -4678,18 +4656,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  SDKInfo = parseSDKSettings(*llvm::vfs::createPhysicalFileSystem(), LangOpts,
-                             SearchPathOpts, Diags);
-
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
-  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
-  setDefaultPrebuiltCacheIfNecessary();
-  setDefaultInProcessPluginServerPathIfNecessary();
-
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
-  setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
-  computeCXXStdlibOptions();
   computeAArch64TBIOptions();
 
   if (LangOpts.hasFeature(Feature::Embedded)) {
@@ -4723,6 +4691,64 @@ bool CompilerInvocation::parseArgs(
     ParsedArgs.hasFlag(OPT_enable_aggressive_reg2mem,
                        OPT_disable_aggressive_reg2mem,
                        SILOpts.UseAggressiveReg2MemForCodeSize);
+
+  return false;
+}
+
+bool CompilerInvocation::parseModuleLoadingArgs(
+    llvm::opt::ArgList &ParsedArgs, DiagnosticEngine &Diags,
+    StringRef workingDirectory, StringRef mainExecutablePath) {
+  using namespace options;
+
+  ArgsToFrontendOptionsConverter converter(Diags, ParsedArgs, FrontendOpts);
+  if (converter.convertModuleLoadingOptions()) {
+    return true;
+  }
+
+  if (!mainExecutablePath.empty()) {
+    setMainExecutablePath(mainExecutablePath);
+  }
+
+  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs, Diags);
+  SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
+
+  if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {
+    return true;
+  }
+
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
+                    FrontendOpts)) {
+    return true;
+  }
+
+  if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
+                             workingDirectory, LangOpts, FrontendOpts,
+                             CASOpts)) {
+    return true;
+  }
+
+  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
+                          CASOpts, FrontendOpts, workingDirectory)) {
+    return true;
+  }
+
+  SDKInfo = parseSDKSettings(*llvm::vfs::createPhysicalFileSystem(), LangOpts,
+                             SearchPathOpts, Diags);
+
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
+  setDefaultPrebuiltCacheIfNecessary();
+  setDefaultInProcessPluginServerPathIfNecessary();
+
+  setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
+  computeCXXStdlibOptions();
+
+  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::NoneAction &&
+      LangOpts.hasFeature(Feature::Embedded)) {
+    setCommonEmbeddedSwiftOptions(
+        EmbeddedSwiftContext::FullCompilation,
+        ParsedArgs.hasArg(OPT_enforce_exclusivity_EQ));
+  }
 
   // With Swift 6, enable @_spiOnly by default. This also enables proper error
   // reporting of ioi references from spi decls.
