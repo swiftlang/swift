@@ -46,14 +46,15 @@ final class MutableLeafField {
   let mid = Mid()
 
   // A `var` at the end of a chain of `let` links: the dependence stops at the
-  // access scope for `mutableD`.
+  // copy loaded within the access scope for `mutableD`.
   //
   // CHECK-LABEL: sil hidden [ossa] @$s4test16MutableLeafFieldC7getDatas4SpanVySiGyF : $@convention(method) (@guaranteed MutableLeafField) -> @lifetime(borrow 0) @owned Span<Int> {
   // CHECK: bb0(%0 : @guaranteed $MutableLeafField):
   // CHECK: [[LEAF:%.*]] = ref_element_addr %{{.*}}, #Leaf.mutableD
   // CHECK: [[ACCESS:%.*]] = begin_access [read] [dynamic] [[LEAF]]
+  // CHECK: [[COPY:%.*]] = load [copy] [[ACCESS]]
   // CHECK: [[SPAN:%.*]] = apply %{{.*}} : $@convention(method) <τ_0_0> (@guaranteed Array<τ_0_0>) -> @lifetime(borrow 0) @owned Span<τ_0_0>
-  // CHECK: mark_dependence [unresolved] [[SPAN]] on [[ACCESS]]
+  // CHECK: mark_dependence [unresolved] [[SPAN]] on [[COPY]]
   // CHECK-LABEL: } // end sil function '$s4test16MutableLeafFieldC7getDatas4SpanVySiGyF'
   @_lifetime(borrow self)
   func getData() -> Span<Int> {

@@ -236,7 +236,7 @@ private extension LifetimeDependentApply.LifetimeSourceInfo {
         return
       }
       // Create a new dependence on the apply's access to the argument.
-      for varIntroducer in gatherVariableIntroducers(for: source.value, ignoreTrivialCopies: !source.isInout, context) {
+      for varIntroducer in gatherVariableIntroducers(for: source.value, isInoutAccess: source.isInout, context) {
         let scope = LifetimeDependence.Scope(base: varIntroducer, context)
         log("Scoped lifetime from \(source.value)")
         log("  scope: \(scope)")
@@ -333,20 +333,21 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
 }
 
 /// Walk up the value dependence chain to find the best-effort variable declaration. Used to find the source of a borrow
-/// dependence or to print the source variable in a diagnostic message.
+/// dependence.
 ///
 /// Returns an array with at least one introducer value.
 ///
 /// The walk stops at:
 /// - a variable declaration (begin_borrow [var_decl], move_value [var_decl])
 /// - a begin_access for a mutable variable access
+/// - a copy loaded from an access of class storage (see `VariableIntroducerUseDefWalker.isAccessedClassStorage`)
 /// - the value or address "root" of the dependence chain
-func gatherVariableIntroducers(for value: Value, ignoreTrivialCopies: Bool, _ context: Context)
+func gatherVariableIntroducers(for value: Value, isInoutAccess: Bool, _ context: Context)
   -> SingleInlineArray<Value>
 {
   var introducers = SingleInlineArray<Value>()
-  var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value,
-                                                     ignoreTrivialCopies: ignoreTrivialCopies) {
+  var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value, needsAccessScope: true,
+                                                     isInoutAccess: isInoutAccess) {
     introducers.push($0)
     return .continueWalk
   }
@@ -418,8 +419,12 @@ func gatherVariableIntroducers(for value: Value, ignoreTrivialCopies: Bool, _ co
 struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, LifetimeDependenceUseDefAddressWalker {
   let context: Context
 
+  // True if the walk must find a scope that the dependent value can be used within (LifetimeDependenceInsertion). False
+  // if it only finds the variable to name in a diagnostic.
+  let needsAccessScope: Bool
+
   // If the scoped value is trivial, then only the variable's lexical scope is relevant, and access scopes can be
-  // ignored.
+  // ignored. An inout dependence, however, is always on the access scope.
   let isTrivialScope: Bool
 
   // This visited set is only really needed for instructions with
@@ -429,9 +434,11 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
   // Call \p visit rather than calling this directly.
   private let visitorClosure: (Value) -> WalkResult
 
-  init(_ context: Context, scopedValue: Value, ignoreTrivialCopies: Bool, _ visitor: @escaping (Value) -> WalkResult) {
+  init(_ context: Context, scopedValue: Value, needsAccessScope: Bool, isInoutAccess: Bool,
+       _ visitor: @escaping (Value) -> WalkResult) {
     self.context = context
-    if ignoreTrivialCopies {
+    self.needsAccessScope = needsAccessScope
+    if needsAccessScope && !isInoutAccess {
       self.isTrivialScope = scopedValue.type.isAddress
         ? scopedValue.type.objectType.isTrivial(in: scopedValue.parentFunction)
         : scopedValue.isTrivial(context)
@@ -481,7 +488,34 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefValueWalker, Lif
     if let inst = value.definingInstruction, VariableScopeInstruction(inst) != nil {
       return visitorClosure(value)
     }
+    if needsAccessScope, let load = value as? LoadInst, load.loadOwnership == .copy,
+       isAccessedClassStorage(load.address) {
+      return visitorClosure(value)
+    }
     return walkUpDefault(value: value, owner)
+  }
+
+  /// Is `address` an access of class storage? If so, a copy loaded from it is the variable introducer rather than the
+  /// access:
+  ///
+  ///     %access = begin_access [read] [dynamic] (ref_element_addr %ref, #C.field)
+  ///     %copy = load [copy] %access    // variable introducer
+  ///     end_access %access
+  ///     %dependent = apply %getter(%copy)
+  ///
+  /// A class property's storage is not a variable whose scope the dependent value must stay within: the copy keeps the
+  /// borrowed object alive independent of the property's storage. Depending on the access instead would require it to
+  /// cover all dependent uses, and the access's reference may itself be a temporary whose borrow scope has already
+  /// ended, so a mark_dependence on the access would be invalid. LifetimeDependenceScopeFixup extends the copy instead.
+  private func isAccessedClassStorage(_ address: Value) -> Bool {
+    let access = address.accessBaseWithScopes
+    guard let beginAccess = access.innermostAccess, beginAccess.unsafeAddressorSelf == nil else {
+      return false
+    }
+    if case .class = access.base {
+      return true
+    }
+    return false
   }
 
   /// Override to check for on-stack variables before following an initializer.
@@ -502,5 +536,5 @@ let variableIntroducerTest = FunctionTest("variable_introducer") {
     function, arguments, context in
   let value = arguments.takeValue()
   print("Variable introducers of: \(value)")
-  print(gatherVariableIntroducers(for: value, ignoreTrivialCopies: false, context))
+  print(gatherVariableIntroducers(for: value, isInoutAccess: false, context))
 }
