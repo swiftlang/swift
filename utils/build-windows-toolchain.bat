@@ -95,9 +95,49 @@ if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME
 set "DebugInfoArg="
 if not "%DEBUG_INFO%"=="" set "DebugInfoArg=-DebugInfo"
 
+:: Build the arguments for build-sdk.ps1, which builds each Windows SDK in its
+:: own process. The SDK of the host architecture is always built because the
+:: toolchain is built against it.
+set "SDKArchs=X64,X86,Arm64"
+if not "%WINDOWS_SDKS%"=="" set "SDKArchs=%WINDOWS_SDKS%"
+set "HostArch=%HOST_ARCH_NAME%"
+if "%HostArch%"=="" set "HostArch=%PROCESSOR_ARCHITECTURE%"
+set "HostSDKArch=X64"
+if /i "%HostArch%"=="ARM64" set "HostSDKArch=Arm64"
+set "SDKArchList=,%SDKArchs%,"
+if /i "!SDKArchList:,%HostSDKArch%,=!"=="!SDKArchList!" set "SDKArchs=%HostSDKArch%,%SDKArchs%"
+
+set "SDKArgs=%HostArchNameArg% -SourceCache %SourceRoot% -BinaryCache %BuildRoot% -ArtifactCache %BuildRoot%\ArtifactCache -BuildRoot %BuildRoot% %DebugInfoArg% -Summary"
+if "%INCLUDE_PACKAGING%"=="" set "SDKArgs=%SDKArgs% -LinkModes dynamic"
+
+:: The SDKs of the other architectures are staged separately, so that the
+:: processes do not install into the same directories, and merged afterwards.
+set "SDKStaging=%BuildRoot%\SDKStaging"
+set "SDKLogs=%BuildRoot%\build-sdk"
+set "PlatformRoot=%BuildRoot%\Program Files\Swift\Platforms\Windows.platform"
+set "ScriptDir=%~dp0"
+
 call :CloneRepositories || (exit /b 1)
 
+:: Build the Stage1 toolchain, which the SDKs are built with.
 :: We only have write access to BuildRoot, so use that as the image root.
+powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
+  %HostArchNameArg% ^
+  -SourceCache %SourceRoot% ^
+  -BinaryCache %BuildRoot% ^
+  -ArtifactCache %BuildRoot%\ArtifactCache ^
+  -BuildRoot %BuildRoot% ^
+  -ObjectStore %BuildRoot%\ObjectStore ^
+  %WindowsSDKArgs% ^
+  %DebugInfoArg% ^
+  -Phase Bootstrap ^
+  -Summary ^
+  -Trace || (exit /b 1)
+
+:: Build the Windows SDKs in parallel.
+call :BuildSDKs || (exit /b 1)
+
+:: Build the rest of the toolchain against the SDKs.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
@@ -110,6 +150,7 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %TestArg% ^
   %SBoMArg% ^
   %DebugInfoArg% ^
+  -Phase Toolchain ^
   -Summary ^
   -Trace || (exit /b 1)
 
@@ -126,6 +167,66 @@ if not "%DEBUG_INFO%"=="" (
 rd /s /q %LocalAppData%\clang\ModuleCache
 
 goto :end
+endlocal
+
+:BuildSDKs
+setlocal enableextensions enabledelayedexpansion
+
+if exist "%SDKLogs%" rd /s /q "%SDKLogs%"
+md "%SDKLogs%"
+
+for %%A in (%SDKArchs%) do call :StartSDK %%A
+
+:: Wait for every process to write its exit code.
+:WaitForSDKs
+set "Pending="
+for %%A in (%SDKArchs%) do if not exist "%SDKLogs%\%%A.exit" set "Pending=1"
+if defined Pending (
+  ping -n 16 127.0.0.1 > nul
+  goto :WaitForSDKs
+)
+
+:: Replay the logs, one architecture after the other.
+set "Failed="
+for %%A in (%SDKArchs%) do (
+  echo ===== build-sdk.ps1 -Architecture %%A =====
+  type "%SDKLogs%\%%A.log"
+  set /p ExitCode=<"%SDKLogs%\%%A.exit"
+  if not "!ExitCode!"=="0" (
+    echo build-sdk.ps1 -Architecture %%A failed with exit code !ExitCode!
+    set "Failed=1"
+  )
+)
+if defined Failed exit /b 1
+
+:: Merge the staged SDKs into the platform of the toolchain.
+for %%A in (%SDKArchs%) do (
+  if /i not "%%A"=="%HostSDKArch%" (
+    robocopy "%SDKStaging%\%%A\Windows.platform" "%PlatformRoot%" /E /NFL /NDL /NJH /NJS /NP > nul
+    if errorlevel 8 exit /b 1
+  )
+)
+
+:: robocopy leaves a nonzero errorlevel when it copied files.
+exit /b 0
+endlocal
+
+:StartSDK
+setlocal enableextensions disabledelayedexpansion
+
+set "PlatformRootArg="
+if /i not "%~1"=="%HostSDKArch%" set "PlatformRootArg=-PlatformRoot %SDKStaging%\%~1\Windows.platform"
+
+:: `start` cannot return an exit code, so the process records it in a file.
+> "%SDKLogs%\%~1.cmd" (
+  echo @echo off
+  echo powershell.exe -ExecutionPolicy RemoteSigned -File "%ScriptDir%build-sdk.ps1" -Architecture %~1 %SDKArgs% %PlatformRootArg% ^> "%SDKLogs%\%~1.log" 2^>^&1
+  echo ^> "%SDKLogs%\%~1.tmp" echo %%errorlevel%%
+  echo move /y "%SDKLogs%\%~1.tmp" "%SDKLogs%\%~1.exit" ^> nul
+)
+start "build-sdk %~1" /b cmd /c "%SDKLogs%\%~1.cmd"
+
+goto :eof
 endlocal
 
 :CloneRepositories
