@@ -3131,7 +3131,13 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
 }
 
 llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
-  assert(!method.getOverridden() && "must always be base method");
+  // The type ID is that of the method that introduces the vtable slot. Usually
+  // that is a method that doesn't override anything, but an override can also
+  // introduce a slot of its own. For example, a public override of an internal
+  // method needs a new slot because clients outside the module can't see the
+  // overridden method's slot (an ABI-incompatible override is another case).
+  assert((!method.getOverridden() || method.requiresNewVTableEntry()) &&
+         "must always be base method");
 
   auto entity = LinkEntity::forMethodDescriptor(method);
   auto mangled = entity.mangleAsString(IGM.Context);
