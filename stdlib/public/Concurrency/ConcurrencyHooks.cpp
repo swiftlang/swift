@@ -22,7 +22,7 @@
 #include "TaskPrivate.h"
 
 #if SWIFT_CONCURRENCY_EMBEDDED
-#include "swift/EmbeddedPlatform.h"
+#include "swift/EmbeddedPlatform+Concurrency.h"
 #endif
 
 using namespace swift;

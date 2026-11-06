@@ -188,7 +188,8 @@ SWIFT_CC(swift) void
                                                    void * _Nullable conditionContext);
 
 // -- Main executor functions that Embedded Swift executors must implement ----
-// EmbeddedPlatform.h declares the other functions such an executor implements.
+// EmbeddedPlatform+Concurrency.h declares the other functions such an executor
+// implements.
 
 /// Enqueue a job on the main executor, which may be the global executor.
 void _swift_concurrency_enqueueMainExecutor(SwiftJob * _Nonnull job);

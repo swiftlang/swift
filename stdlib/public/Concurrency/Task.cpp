@@ -41,7 +41,7 @@
 #include "swift/Threading/Mutex.h"
 
 #if SWIFT_CONCURRENCY_EMBEDDED
-#include "swift/EmbeddedPlatform.h"
+#include "swift/EmbeddedPlatform+Concurrency.h"
 #endif
 #include <atomic>
 #include <new>
@@ -2705,7 +2705,7 @@ void swift::swift_continuation_logFailedCheck(const char *message) {
 #if SWIFT_CONCURRENCY_EMBEDDED
 SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
 static void swift_task_asyncMainDrainQueueImpl() {
-  _swift_concurrency_asyncMainDrainQueue();
+  _swift_concurrency_asyncMain();
 }
 #else
 extern "C" SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)

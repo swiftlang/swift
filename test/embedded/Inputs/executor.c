@@ -1,7 +1,7 @@
 /* A custom executor to test that we can build an external executor
    and use it with libswift_Concurrency.a. */
 
-#include <swift/EmbeddedPlatform.h>
+#include <swift/EmbeddedPlatform+Concurrency.h>
 #include <swift/ExecutorImpl.h>
 
 #include <assert.h>
@@ -161,7 +161,7 @@ bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
 
 /// Drain the main executor's queue, processing jobs enqueued on it; this
 /// should never return.
-void _swift_concurrency_asyncMainDrainQueue(void) {
+void _swift_concurrency_asyncMain(void) {
   debug("executor: running\n");
   while (true) {
     SwiftJob *job = job_heap_pop();
