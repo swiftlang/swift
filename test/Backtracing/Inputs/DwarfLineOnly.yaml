@@ -1,0 +1,58 @@
+## A hand-crafted ELF object that has a DWARF v5 line number program but no
+## .debug_info or .debug_abbrev (for instance because they have been stripped),
+## so the DwarfReader has to make up its units from .debug_line -- see
+## DwarfReaderLookups.swift.
+##
+## Line table: 0x1000 line 42, 0x1010 line 50, 0x1020 end_sequence
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_line:
+    - Version:           5
+      AddressSize:       8
+      SegmentSelectorSize: 0
+      MinInstLength:     1
+      MaxOpsPerInst:     1
+      DefaultIsStmt:     1
+      LineBase:          251
+      LineRange:         14
+      OpcodeBase:        13
+      StandardOpcodeLengths: [ 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1 ]
+      DirectoryEntryFormat:
+        - ContentType:     DW_LNCT_path
+          Form:            DW_FORM_string
+      Directories:
+        - - CStr: "/src"
+      FileNameEntryFormat:
+        - ContentType:     DW_LNCT_path
+          Form:            DW_FORM_string
+        - ContentType:     DW_LNCT_directory_index
+          Form:            DW_FORM_udata
+      FileNames:
+        - - CStr: "file.c"
+          - Value: 0
+        - - CStr: "file.c"
+          - Value: 0
+      Opcodes:
+        - Opcode:    DW_LNS_extended_op
+          ExtLen:    9
+          SubOpcode: DW_LNE_set_address
+          Data:      0x1000
+        - Opcode:    DW_LNS_advance_line
+          SData:     41
+        - Opcode:    DW_LNS_copy
+        - Opcode:    DW_LNS_advance_pc
+          Data:      0x10
+        - Opcode:    DW_LNS_advance_line
+          SData:     8
+        - Opcode:    DW_LNS_copy
+        - Opcode:    DW_LNS_advance_pc
+          Data:      0x10
+        - Opcode:    DW_LNS_extended_op
+          ExtLen:    1
+          SubOpcode: DW_LNE_end_sequence
