@@ -49,6 +49,10 @@
 //    - Opens $dir/stats-$timestamp-$name-$random.json for writing
 //    - Calls llvm::PrintStatisticsJSON(ostream) and/or its own writer
 //
+// With -incremental-build-stats, it collects only the counters and timers in
+// IncrementalBuildStatistics.def, and skips LLVM's statistics, so that the
+// file holds the same keys with or without assertions.
+//
 // Generally we make one of these per-process: either early in the life of the
 // driver, or early in the life of the frontend.
 
@@ -178,6 +182,10 @@ private:
   /// Whether we are printing all stats even if they are zero.
   bool IsPrintingZeroStats;
 
+  /// Whether we collect only the statistics in IncrementalBuildStatistics.def,
+  /// rather than every statistic.
+  bool IsCollectingIncrementalBuildStatsOnly;
+
   void publishAlwaysOnStatsToLLVM();
   void printAlwaysOnStatsAndTimers(raw_ostream &OS);
 
@@ -190,7 +198,8 @@ private:
                        bool TraceEvents,
                        bool ProfileEvents,
                        bool ProfileEntities,
-                       bool PrintZeroStats);
+                       bool PrintZeroStats,
+                       bool IncrementalBuildStats);
 public:
   UnifiedStatsReporter(StringRef ProgramName,
                        StringRef ModuleName,
@@ -205,10 +214,16 @@ public:
                        bool TraceEvents,
                        bool ProfileEvents,
                        bool ProfileEntities,
-                       bool PrintZeroStats);
+                       bool PrintZeroStats,
+                       bool IncrementalBuildStats = false);
   ~UnifiedStatsReporter();
 
   bool fineGrainedTimers() const { return FineGrainedTimers; }
+
+  /// Whether this process collects any counter of the subsystem \p Name: the
+  /// name prefix of a counter in Statistics.def, such as "AST" or "SILModule".
+  /// Code that fills a subsystem's counters in bulk checks this first.
+  bool isCollectingSubsystem(StringRef Name) const;
 
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();

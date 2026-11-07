@@ -338,11 +338,12 @@ void CompilerInstance::recordPrimaryInputBuffer(unsigned BufID) {
 static bool shouldEnableRequestReferenceTracking(const CompilerInstance &CI) {
   // Enable request reference dependency tracking when we're either writing
   // dependencies for incremental mode, verifying dependencies, or collecting
-  // stats.
+  // stats. The incremental build statistics don't need it: their set has no
+  // counters of referenced names.
   auto &opts = CI.getInvocation().getFrontendOptions();
   return opts.InputsAndOutputs.hasReferenceDependenciesFilePath() ||
          opts.EnableIncrementalDependencyVerifier ||
-         !opts.StatsOutputDir.empty();
+         (!opts.StatsOutputDir.empty() && !opts.IncrementalBuildStats);
 }
 
 bool CompilerInstance::setUpASTContextIfNeeded() {
@@ -447,7 +448,8 @@ void CompilerInstance::setupStatsReporter() {
       Invoke.getFrontendOptions().TraceStats,
       Invoke.getFrontendOptions().ProfileEvents,
       Invoke.getFrontendOptions().ProfileEntities,
-      Invoke.getFrontendOptions().PrintZeroStats);
+      Invoke.getFrontendOptions().PrintZeroStats,
+      Invoke.getFrontendOptions().IncrementalBuildStats);
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
   getASTContext().setStatsReporter(Reporter.get());
@@ -994,9 +996,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   }
 
   // If memory statistics were requested, start tracking per-module materialized
-  // decl counts now, before any significant deserialization occurs.
+  // decl counts now, before any significant deserialization occurs. The
+  // incremental build statistics don't need them: their set has no Clang
+  // memory counters.
   if (FEOpts.CompilerDebuggingOpts.PrintClangStats ||
-      !FEOpts.StatsOutputDir.empty())
+      (!FEOpts.StatsOutputDir.empty() && !FEOpts.IncrementalBuildStats))
     clangImporter->enableMemoryStatistics();
 
   // Configure ModuleInterfaceChecker for the ASTContext.
@@ -2073,7 +2077,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
 
   performSILOptimizations(Invocation, silModule);
 
-  if (auto *stats = getStatsReporter())
+  auto *stats = getStatsReporter();
+  if (stats && stats->isCollectingSubsystem("SILModule"))
     countStatsPostSILOpt(*stats, *silModule);
 
   {

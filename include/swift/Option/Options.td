@@ -450,6 +450,11 @@ def fine_grained_timers: Flag<["-"], "fine-grained-timers">,
 def trace_stats_events: Flag<["-"], "trace-stats-events">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Trace changes to stats in -stats-output-dir">;
+def incremental_build_stats: Flag<["-"], "incremental-build-stats">,
+  Flags<[FrontendOption, HelpHidden, DoesNotAffectIncrementalBuild,
+         CacheInvariant]>,
+  HelpText<"Collect only the statistics that measure incremental build "
+           "performance in -stats-output-dir">;
 def experimental_skip_non_inlinable_function_bodies:
   Flag<["-"], "experimental-skip-non-inlinable-function-bodies">,
   Flags<[FrontendOption, HelpHidden]>,

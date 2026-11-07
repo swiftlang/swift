@@ -1,0 +1,87 @@
+//===--- IncrementalBuildStatistics.def - Incremental Stats -----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file lists the statistics that -incremental-build-stats collects: the
+// counters and timers that measure incremental build performance. The timer
+// for the whole frontend process is always collected, so it isn't listed.
+//
+// INCREMENTAL_BUILD_COUNTER(Subsystem, Id)
+//   - A counter from Statistics.def, with the same Subsystem and Id
+//
+// INCREMENTAL_BUILD_TIMER(EventName)
+//   - The event name of a FrontendStatsTracer, as a string literal
+//
+//===----------------------------------------------------------------------===//
+
+#ifdef INCREMENTAL_BUILD_COUNTER
+
+// The job
+INCREMENTAL_BUILD_COUNTER(Frontend, WallClockMicroseconds)
+
+// Parsing
+INCREMENTAL_BUILD_COUNTER(Parse, NumFunctionsParsed)
+INCREMENTAL_BUILD_COUNTER(Parse, NumIterableDeclContextParsed)
+
+// Type checking
+INCREMENTAL_BUILD_COUNTER(Sema, NumDeclsTypechecked)
+INCREMENTAL_BUILD_COUNTER(Sema, NumDeclsDeserialized)
+INCREMENTAL_BUILD_COUNTER(Sema, NumConstraintScopes)
+INCREMENTAL_BUILD_COUNTER(Sema, NumSolverBytesAllocated)
+
+// SIL generation
+INCREMENTAL_BUILD_COUNTER(SILModule, NumSILGenFunctions)
+INCREMENTAL_BUILD_COUNTER(SILModule, NumSILGenWitnessTables)
+INCREMENTAL_BUILD_COUNTER(SILModule, NumSILGenVtables)
+
+// SIL processing
+INCREMENTAL_BUILD_COUNTER(SILModule, NumSILOptFunctions)
+
+// IR generation and LLVM
+INCREMENTAL_BUILD_COUNTER(IRModule, NumIRFunctions)
+INCREMENTAL_BUILD_COUNTER(IRModule, NumIRBasicBlocks)
+INCREMENTAL_BUILD_COUNTER(IRModule, NumIRInsts)
+INCREMENTAL_BUILD_COUNTER(LLVM, NumLLVMBytesOutput)
+
+#endif
+
+#ifdef INCREMENTAL_BUILD_TIMER
+
+// Parsing and import resolution
+INCREMENTAL_BUILD_TIMER("parse-and-resolve-imports")
+INCREMENTAL_BUILD_TIMER("Import resolution")
+
+// Type checking
+INCREMENTAL_BUILD_TIMER("perform-sema")
+INCREMENTAL_BUILD_TIMER("typecheck-decl")
+INCREMENTAL_BUILD_TIMER("typecheck-stmt")
+INCREMENTAL_BUILD_TIMER("typecheck-expr")
+INCREMENTAL_BUILD_TIMER("build-rewrite-system")
+INCREMENTAL_BUILD_TIMER("import-clang-decl")
+
+// SIL generation
+INCREMENTAL_BUILD_TIMER("SILGen")
+INCREMENTAL_BUILD_TIMER("SILGen-function")
+
+// SIL processing and serialization
+INCREMENTAL_BUILD_TIMER("SIL-processing")
+INCREMENTAL_BUILD_TIMER("SIL-mandatory-passes")
+INCREMENTAL_BUILD_TIMER("SIL optimization")
+INCREMENTAL_BUILD_TIMER("Serialization, swiftmodule")
+INCREMENTAL_BUILD_TIMER("Serialization, swiftdoc")
+INCREMENTAL_BUILD_TIMER("Serialization, swiftsourceinfo")
+
+// IR generation and LLVM. No timer covers LLVM alone: its time is
+// SIL-and-LLVM-processing minus SIL-processing minus IRGen.
+INCREMENTAL_BUILD_TIMER("IRGen")
+INCREMENTAL_BUILD_TIMER("SIL-and-LLVM-processing")
+
+#endif
