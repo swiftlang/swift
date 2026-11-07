@@ -53,15 +53,12 @@ static_assert(std::is_move_assignable<MoveOnlyStruct>::value,
 static_assert(std::is_copy_constructible<CopyableStruct>::value,
               "a copyable Swift type must still be copy constructible");
 
-// The moved-from flag is stored after the Swift value, so the Swift value is
-// still at offset zero and can be handed to Swift as-is. A boxed value needs no
-// flag.
-static_assert(swift::_impl::isOpaqueLayout<MoveOnlyStruct>
-                  ? sizeof(MoveOnlyStruct) == sizeof(void *)
-                  : sizeof(MoveOnlyStruct) > 2 * sizeof(swift::Int),
-              "the moved-from flag is stored next to the Swift value");
-static_assert(std::is_standard_layout<MoveOnlyStruct>::value,
-              "the Swift value must stay at offset zero");
+static_assert(sizeof(MoveOnlyStruct) == sizeof(void *),
+              "a type without extra inhabitants uses boxed storage");
+static_assert(sizeof(MoveOnlyWithRef) == sizeof(void *),
+              "an extra inhabitant adds no state storage");
+static_assert(std::is_standard_layout<MoveOnlyWithRef>::value,
+              "the inline Swift value must stay at offset zero");
 
 static void useMovedFrom(const char *mode) {
   auto s = makeMoveOnlyStruct(1);

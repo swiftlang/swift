@@ -217,6 +217,17 @@ public:
       const NominalTypeDecl *TD,
       ResilienceExpansion expansion = ResilienceExpansion::Maximal);
 
+  struct ExtraInhabitant {
+    /// Significant bits and an invalid value, in target memory byte order.
+    SmallVector<uint8_t, 8> mask;
+    SmallVector<uint8_t, 8> value;
+  };
+
+  /// Returns an extra inhabitant whose representation is fixed for clients,
+  /// or \c None if the type has no statically known extra inhabitants.
+  std::optional<ExtraInhabitant>
+  getTypeExtraInhabitant(const NominalTypeDecl *TD);
+
   /// Whether the type has a fixed layout and can be copied and taken with a
   /// byte copy and destroyed without any action, using only properties visible
   /// to clients.
