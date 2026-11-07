@@ -4135,7 +4135,10 @@ public:
     if (Method->hasAttr<clang::CFReturnsRetainedAttr>())
       return ResultConvention::Owned;
     if (Method->hasAttr<clang::CFReturnsNotRetainedAttr>())
-      return ResultConvention::Autoreleased;
+      // Foreign reference types are never autoreleased.
+      return tl.getLoweredType().isForeignReferenceType()
+                 ? ResultConvention::Unowned
+                 : ResultConvention::Autoreleased;
 
     // Otherwise, infer based on the method family.
     if (isImplicitPlusOneCFResult())

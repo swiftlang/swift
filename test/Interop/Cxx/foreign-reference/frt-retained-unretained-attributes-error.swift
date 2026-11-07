@@ -8,6 +8,7 @@ import CxxStdlib
 
 let frtLocalVar1 = global_function_returning_FRT_with_both_attrs_returns_retained_returns_unretained()
 let frtLocalVar2 = StructWithStaticMethodsReturningFRTWithBothAttributesReturnsRetainedAndReturnsUnretained.StaticMethodReturningFRT()
+let frtLocalVar2a = global_function_returning_FRT_with_returns_retained_cf_returns_not_retained()
 let frtLocalVar3 = StructWithAPIsReturningCxxFrt.StaticMethodReturningCxxFrt() // expected-warning {{cannot infer ownership of foreign reference value returned by 'StaticMethodReturningCxxFrt()'}}
 let frtLocalVar4 = StructWithAPIsReturningCxxFrt.StaticMethodReturningCxxFrtWithAnnotation()
 let frtLocalVar5 = global_function_returning_cxx_frt() // expected-warning {{cannot infer ownership of foreign reference value returned by 'global_function_returning_cxx_frt()'}}
@@ -16,6 +17,7 @@ let frtLocalVar7 = StructWithAPIsReturningNonCxxFrt.StaticMethodReturningNonCxxF
 let frtLocalVar8 = StructWithAPIsReturningNonCxxFrt.StaticMethodReturningNonCxxFrtWithAnnotation()
 let frtLocalVar9 = global_function_returning_non_cxx_frt()
 let frtLocalVar10 = global_function_returning_non_cxx_frt_with_annotations()
+let frtLocalVar10a = global_function_returning_non_cxx_frt_with_cf_annotation()
 let frtLocalVar11 = StructWithAPIsReturningImmortalReference.StaticMethodReturningImmortalReference()
 let frtLocalVar12 = StructWithAPIsReturningImmortalReference.StaticMethodReturningImmortalReferenceWithAnnotation()
 let frtLocalVar13 = global_function_returning_immortal_reference()

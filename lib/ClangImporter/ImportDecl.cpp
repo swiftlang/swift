@@ -179,8 +179,10 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
     const clang::NamedDecl *decl)
     : hasReturnsRetained(decl->hasAttr<clang::OSReturnsRetainedAttr>() ||
+                         decl->hasAttr<clang::CFReturnsRetainedAttr>() ||
                          hasSwiftAttribute(decl, {"returns_retained"})),
       hasReturnsUnretained(decl->hasAttr<clang::OSReturnsNotRetainedAttr>() ||
+                           decl->hasAttr<clang::CFReturnsNotRetainedAttr>() ||
                            hasSwiftAttribute(decl, {"returns_unretained"})) {}
 
 #ifndef NDEBUG
@@ -4337,7 +4339,10 @@ namespace {
           }
         }
       } else {
-        if (attrInfo.hasRetainAttr()) {
+        // Do not diagnose CF_RETURNS_(NOT_)RETAINED here.
+        if (attrInfo.hasRetainAttr() &&
+            !decl->hasAttr<clang::CFReturnsRetainedAttr>() &&
+            !decl->hasAttr<clang::CFReturnsNotRetainedAttr>()) {
           if (const auto *functionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
             // Skip diagnostics for template instantiations and template-dependent
             // return types. We cannot determine at import time whether T or T* will
