@@ -35,7 +35,7 @@ add_swift_target_library(swiftSwiftPrivateLibcExtras ${SWIFT_STDLIB_LIBRARY_BUIL
   "${SWIFT_SOURCE_DIR}/stdlib/linker-support/magic-symbols-for-install-name.c"
 
   SWIFT_MODULE_DEPENDS SwiftPrivate
-  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS} ${swift_private_libc_extras_flags}
+  SWIFT_COMPILE_FLAGS ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS} ${swift_private_libc_extras_flags} -Xfrontend -enable-sil-opaque-values
   SWIFT_MODULE_DEPENDS_OSX ${swift_private_libc_extras_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_IOS ${swift_private_libc_extras_darwin_dependencies}
   SWIFT_MODULE_DEPENDS_TVOS ${swift_private_libc_extras_darwin_dependencies}
