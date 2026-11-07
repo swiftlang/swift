@@ -1481,6 +1481,14 @@ function maybe_lfts() {
     esac
 }
 
+function swift_compilation_mode() {
+    if [[ "$1" == "Debug" ]] ; then
+        echo incremental
+    else
+        echo wholemodule
+    fi
+}
+
 function common_swift_flags() {
     if [ "${module_cache}" == "" ] ; then
         echo "error: a module cache path has not been set"
@@ -1825,6 +1833,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     -DCMAKE_C_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_CXX_FLAGS_RELWITHDEBINFO="-O2 -DNDEBUG"
                     -DCMAKE_BUILD_TYPE:STRING="${SWIFT_BUILD_TYPE}"
+                    -DCMAKE_Swift_COMPILATION_MODE:STRING="$(swift_compilation_mode "${SWIFT_BUILD_TYPE}")"
                     -DLLVM_ENABLE_ASSERTIONS:BOOL=$(true_false "${SWIFT_ENABLE_ASSERTIONS}")
                     -DSWIFT_ANALYZE_CODE_COVERAGE:STRING=$(toupper "${SWIFT_ANALYZE_CODE_COVERAGE}")
                     -DSWIFT_STDLIB_BUILD_TYPE:STRING="${SWIFT_STDLIB_BUILD_TYPE}"
@@ -2302,6 +2311,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     "${llbuild_cmake_options[@]}"
 
                     -DCMAKE_BUILD_TYPE:STRING="${LLBUILD_BUILD_TYPE}"
+                    -DCMAKE_Swift_COMPILATION_MODE:STRING="$(swift_compilation_mode "${LLBUILD_BUILD_TYPE}")"
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_INSTALL_PREFIX:PATH="$(get_host_install_prefix ${host})"
@@ -2403,6 +2413,7 @@ for host in "${ALL_HOSTS[@]}"; do
                   cmake_options=(
                     ${cmake_options[@]}
                     -DCMAKE_BUILD_TYPE:STRING="${XCTEST_BUILD_TYPE}"
+                    -DCMAKE_Swift_COMPILATION_MODE:STRING="$(swift_compilation_mode "${XCTEST_BUILD_TYPE}")"
                     -DCMAKE_C_COMPILER:PATH="${CLANG_BIN}/clang"
                     -DCMAKE_CXX_COMPILER:PATH="${CLANG_BIN}/clang++"
                     -DCMAKE_Swift_COMPILER:PATH=${SWIFTC_BIN}

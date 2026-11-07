@@ -215,6 +215,8 @@ def build_xctest(args, toolchain, source_dir, build_dir,
         build_dir=os.path.join(build_dir, 'xctest', swift_host_triple))
     append_platform_cmake_options(xctest.cmake_options, [])
     xctest.cmake_options.define('BUILD_SHARED_LIBS', 'FALSE')
+    xctest.cmake_options.define(
+        'CMAKE_Swift_COMPILATION_MODE', 'wholemodule')
 
     xctest.build_with_cmake(
         [], args.build_variant, [],
