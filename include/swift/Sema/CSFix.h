@@ -1226,6 +1226,13 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
+  /// The overloads could disagree on parts of the types unrelated to
+  /// transferability, e.g. `throws`, but the problem is the same in all of
+  /// them.
+  bool diagnoseForAmbiguity(CommonFixesArray commonFixes) const override {
+    return diagnose(*commonFixes.front().first);
+  }
+
   static DropNonTransferableAttribute *create(ConstraintSystem &cs,
                                               FunctionType *fromType,
                                               FunctionType *toType,
