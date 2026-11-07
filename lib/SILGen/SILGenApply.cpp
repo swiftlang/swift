@@ -5567,22 +5567,48 @@ private:
 
 namespace {
 /// Cleanup to end a coroutine application.
-class EndCoroutineApply : public Cleanup {
+///
+/// The borrows to end before the coroutine is ended live in a tail allocated
+/// after the cleanup (see CleanupManager::pushCleanupWithTail), since cleanups
+/// are memcpy'd around and never destroyed, so they cannot own memory. The
+/// tail is read relative to 'this' because the cleanup stack relocates
+/// cleanups.
+class EndCoroutineApply final
+    : public Cleanup,
+      private llvm::TrailingObjects<EndCoroutineApply, BeginBorrowInst *> {
+  friend TrailingObjects;
+
   SILValue ApplyToken;
   bool CanUnwind;
-  std::vector<BeginBorrowInst *> BorrowedMoveOnlyValues;
+  unsigned NumBorrowedMoveOnlyValues = 0;
+
+  ArrayRef<BeginBorrowInst *> getBorrowedMoveOnlyValues() {
+    return getTrailingObjects(NumBorrowedMoveOnlyValues);
+  }
+
 public:
+  /// The tail size to push this cleanup with, to hold up to \p capacity
+  /// borrows.
+  static size_t getTailSize(unsigned capacity) {
+    return additionalSizeToAlloc<BeginBorrowInst *>(capacity);
+  }
+
   EndCoroutineApply(SILValue applyToken, bool CanUnwind)
       : ApplyToken(applyToken), CanUnwind(CanUnwind) {}
 
   void setBorrowedMoveOnlyValues(ArrayRef<BeginBorrowInst *> values) {
-    BorrowedMoveOnlyValues.insert(BorrowedMoveOnlyValues.end(),
-                                  values.begin(), values.end());
+    assert(NumBorrowedMoveOnlyValues == 0 && "borrowed values already set");
+    assert(getTailSize(values.size()) <=
+               allocated_size() - sizeof(EndCoroutineApply) &&
+           "not enough tail storage for the borrowed values");
+    llvm::copy(values, getTrailingObjects());
+    NumBorrowedMoveOnlyValues = values.size();
   }
 
   void emit(SILGenFunction &SGF, CleanupLocation l, ForUnwind_t forUnwind) override {
-    for (auto i = BorrowedMoveOnlyValues.rbegin(), e = BorrowedMoveOnlyValues.rend();
-         i != e; ++i) {
+    auto borrowedValues = getBorrowedMoveOnlyValues();
+    for (auto i = borrowedValues.rbegin(), e = borrowedValues.rend(); i != e;
+         ++i) {
       SGF.B.createEndBorrow(l, *i);
       SGF.B.createDestroyValue(l, (*i)->getOperand());
     }
@@ -5653,7 +5679,8 @@ CleanupHandle SILGenFunction::emitBeginApply(
 
   // Push a cleanup to end the application.
   // TODO: destroy all the arguments at exactly this point?
-  Cleanups.pushCleanup<EndCoroutineApply>(token, canUnwind);
+  Cleanups.pushCleanupWithTail<EndCoroutineApply>(
+      EndCoroutineApply::getTailSize(yieldValues.size()), token, canUnwind);
   auto endApplyHandle = getTopCleanup();
 
   // Manage all the yielded values.
