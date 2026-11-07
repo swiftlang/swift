@@ -1587,7 +1587,7 @@ private:
       os << "void";
     }
 
-    os << ')';
+    os << ") SWIFT_NOEXCEPT";
 
     // Finish the result type.
     multiPart.finish();
@@ -1627,7 +1627,6 @@ private:
     assert(FD->getCDeclKind() && "not a C-exported function");
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
-    os << " SWIFT_NOEXCEPT";
     printFunctionClangAttributes(FD, funcTy, resultTy);
     printAvailability(FD);
     os << ";\n";
