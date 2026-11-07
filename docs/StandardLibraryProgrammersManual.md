@@ -4,7 +4,7 @@ This is meant to be a guide to people working on the standard library. It covers
 
 TODO: Should this subsume or link to [StdlibRationales.rst](https://github.com/swiftlang/swift/blob/main/docs/StdlibRationales.rst)?
 
-TODO: Should this subsume or link to [AccessControlInStdlib.rst](https://github.com/swiftlang/swift/blob/main/docs/AccessControlInStdlib.rst)
+TODO: Should this subsume or link to [AccessControlInStdlib.md](AccessControlInStdlib.md)
 
 In this document, "stdlib" refers to the core standard library (`stdlib/public/core`), our Swift overlays for system frameworks (`stdlib/public/Darwin/*`, `stdlib/public/Windows/*`, etc.), as well as the auxiliary and prototype libraries under `stdlib/private`.
 
