@@ -401,11 +401,22 @@ class RefCountBitsT {
       newValue == Offsets::UnownedRefCountMask >> Offsets::UnownedRefCountShift;
   }
 
+  // The strong extra refcount stored in the bits of an immortal object.
+  //
+  // Retain and release operate on this field with an unconditional add/subtract
+  // and rely on UseSlowRC being set to detect that they must take the slow
+  // path. A release on an object whose strong extra refcount is zero would
+  // clear the UseSlowRC bit, and the object would turn back into a regular
+  // mortal object with a very high refcount. Setting a nonzero strong extra
+  // refcount avoids that.
+  static constexpr uint32_t ImmortalStrongExtraRefCount = 2;
+
   SWIFT_ALWAYS_INLINE
   void setIsImmortal(bool value) {
     assert(value);
     setField(IsImmortal, Offsets::IsImmortalMask);
     setField(UseSlowRC, value);
+    setStrongExtraRefCount(ImmortalStrongExtraRefCount);
   }
 
   SWIFT_ALWAYS_INLINE
@@ -420,7 +431,8 @@ class RefCountBitsT {
 
   SWIFT_ALWAYS_INLINE
   static constexpr BitsType immortalBits() {
-    return (BitsType(2) << Offsets::StrongExtraRefCountShift) |
+    return (BitsType(ImmortalStrongExtraRefCount)
+              << Offsets::StrongExtraRefCountShift) |
            (BitsType(Offsets::IsImmortalMask)) |
            (BitsType(1) << Offsets::UseSlowRCShift);
   }
