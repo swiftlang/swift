@@ -1070,7 +1070,13 @@ extension ASTGenVisitor {
       // the initializer and drops it.
       self.diagnose(.disallowed_init, at: initializer.equal)
       initializerDisallowed = true
-    } else if let initializer = binding.initializer {
+    } else if let initializer = binding.initializer,
+      !(initializer.equal.presence == .missing
+        && initializer.value.as(MemberAccessExprSyntax.self)?.declName.baseName.presence == .missing)
+    {
+      // `var x.: T` has no `=` and a bare `.` for a value. The C++ parser
+      // reads no initializer there, and one made of an error expression makes
+      // property wrapper synthesis fail without a diagnostic.
       // Create a PatternBindingInitializer if we're not in a local context (this
       // ensures that property initializers are correctly treated as being in a
       // local context).

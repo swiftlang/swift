@@ -1021,10 +1021,10 @@ struct WrapperRequiresP<T: P> {
 struct UsesWrapperRequiringP {
   // expected-cparser-note@-1{{in declaration of}}
   
-  @WrapperRequiresP var x.: UsesWrapperRequiringP // expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}}
-  // expected-cparser-error@-1{{expected member name following '.'}} expected-astgen-error@-1 {{unexpected code ': UsesWrapperRequiringP' in struct}}
-  // expected-cparser-error@-2{{expected declaration}} expected-astgen-error@-2 {{expected name in member access}}
-  // expected-cparser-error@-3{{type annotation missing in pattern}} expected-astgen-error@-3 {{expected '=' in variable}}
+  @WrapperRequiresP var x.: UsesWrapperRequiringP // expected-astgen-error {{unexpected code ': UsesWrapperRequiringP' in struct}}
+  // expected-cparser-error@-1{{expected member name following '.'}} expected-astgen-error@-1 {{expected name in member access}}
+  // expected-cparser-error@-2{{expected declaration}} expected-astgen-error@-2 {{expected '=' in variable}}
+  // expected-error@-3{{type annotation missing in pattern}}
 }
 
 // rdar://problem/51588022
