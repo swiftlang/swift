@@ -16,6 +16,9 @@
 // RUN: %yaml2obj %S/Inputs/DwarfArangesLine.yaml -o %t/arangesline.o
 // RUN: %target-run %t/DwarfReaderLookups %t/arangesline.o 0x1008 0x1018 0x1020 0x2000 | %FileCheck %s --check-prefix=ARANGES
 
+// RUN: %yaml2obj %S/Inputs/DwarfRelativeDirs.yaml -o %t/relativedirs.o
+// RUN: %target-run %t/DwarfReaderLookups %t/relativedirs.o 0x1008 0x1018 0x1028 0x2008 | %FileCheck %s --check-prefix=PATHS
+
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: backtracing
 // REQUIRES: executable_test
@@ -132,6 +135,23 @@ struct DwarfReaderLookups {
     // ARANGES-NEXT: function: <none>
     // ARANGES-NEXT: address 0x2000:
     // ARANGES-NEXT: function: <none>
+
+    // A directory in the line number table that isn't absolute is relative to
+    // the compilation directory (directory 0), and a file with no directory
+    // index is in the compilation directory.
+
+    // PATHS: address 0x1008:
+    // PATHS-NEXT: location: /src/sub/other.c:10:0
+    // PATHS-NEXT: function: <none>
+    // PATHS-NEXT: address 0x1018:
+    // PATHS-NEXT: location: /abs/abs.c:20:0
+    // PATHS-NEXT: function: <none>
+    // PATHS-NEXT: address 0x1028:
+    // PATHS-NEXT: location: /src/file.c:30:0
+    // PATHS-NEXT: function: <none>
+    // PATHS-NEXT: address 0x2008:
+    // PATHS-NEXT: location: /other/nodir.c:5:0
+    // PATHS-NEXT: function: <none>
 
     if !testDwarfLookupsFor(path: CommandLine.arguments[1],
                             addresses: addresses) {
