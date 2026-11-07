@@ -449,6 +449,33 @@ extension ASTGenVisitor {
         self.diagnoseRenamedAttribute(node, to: "diagnose", warning: true)
         return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
 
+      // Old spelling for `@freestanding(expression)`.
+      case nil where attrName == "expression":
+        let start = node.atSign.positionAfterSkippingLeadingTrivia
+        let end = node.attributeName.endPositionBeforeTrailingTrivia
+        self.diagnose(
+          .macro_expression_attribute_removed,
+          at: node.attributeName,
+          fixIts: [
+            .init(
+              replace: self.generateCharSourceRange(
+                start: start, length: SourceLength(utf8Length: end.utf8Offset - start.utf8Offset)),
+              with: "@freestanding(expression)")
+          ]
+        )
+        return handle(
+          BridgedMacroRoleAttr.createParsed(
+            self.ctx,
+            atLoc: self.generateSourceLoc(node.atSign),
+            range: self.generateAttrSourceRange(node),
+            syntax: .freestanding,
+            lParenLoc: nil,
+            role: .expression,
+            names: BridgedArrayRef(),
+            conformances: BridgedArrayRef(),
+            rParenLoc: nil
+          ).asDeclAttribute)
+
       // Removed attributes. The C++ parser diagnoses and drops them.
       case nil where attrName == "_unsafeSendable" || attrName == "_unsafeMainActor":
         self.diagnose(

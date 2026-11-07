@@ -240,12 +240,12 @@ func testDisembodiedStringInterpolation(x: Int) {
 }
 
 func testNoComponents() {
-  let _: KeyPath<A, A> = \A // expected-cparser-error{{must have at least one component}}
-  let _: KeyPath<C, A> = \C // expected-cparser-error{{must have at least one component}}
+  let _: KeyPath<A, A> = \A // expected-cparser-error{{must have at least one component}} expected-astgen-error {{key path must have at least one component}}
+  let _: KeyPath<C, A> = \C // expected-cparser-error{{must have at least one component}} expected-astgen-error {{key path must have at least one component}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  let _: KeyPath<A, C> = \A // expected-cparser-error{{must have at least one component}}
+  let _: KeyPath<A, C> = \A // expected-cparser-error{{must have at least one component}} expected-astgen-error {{key path must have at least one component}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  _ = \A // expected-cparser-error {{key path must have at least one component}}
+  _ = \A // expected-error {{key path must have at least one component}}
 }
 
 struct TupleStruct {
@@ -1162,8 +1162,8 @@ func testSyntaxErrors() {
   _ = \[a];
   _ = \.a?; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
   _ = \.a!; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
-  _ = \A     ;
-  _ = \A,    ; // expected-astgen-error {{unexpected code ',' in function}}
+  _ = \A     ; // expected-astgen-error {{key path must have at least one component}}
+  _ = \A,    ; // expected-astgen-error {{unexpected code ',' in function}} expected-astgen-error {{key path must have at least one component}}
   _ = \A<    ; // expected-astgen-note {{to match this opening '<'}} expected-astgen-error {{expected '>' to end generic argument clause}}
   _ = \A.  ; // expected-cparser-error{{expected member name following '.'}} expected-astgen-error {{expected identifier in key path property component}}
   _ = \A.a ; // expected-astgen-error {{value of type 'A' has no member 'a'}}
@@ -1185,7 +1185,7 @@ func testSyntaxErrors() {
 func f_56996() {
   _ = \Int.byteSwapped.signum()
   _ = \Int.byteSwapped.init() // expected-error {{static member 'init()' cannot be used on instance of type 'Int'}}
-  _ = \Int // expected-cparser-error {{key path must have at least one component}}
+  _ = \Int // expected-error {{key path must have at least one component}}
   _ = \Int? // expected-cparser-error {{key path must have at least one component}}
   _ = \Int. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected identifier in key path property component}}
 }

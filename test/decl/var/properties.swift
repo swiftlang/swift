@@ -276,7 +276,7 @@ var x2 { // expected-error{{computed property must have an explicit type}} {{7-7
   }
 }
 
-var (x3): X { // expected-cparser-error{{getter/setter can only be defined for a single variable}} expected-astgen-error {{getter/setter can only be defined for a single variable}}
+var (x3): X { // expected-error {{getter/setter can only be defined for a single variable}}
   get {
     return _x
   }
@@ -325,16 +325,16 @@ var extraTokensInAccessorBlock3: X {
 }
 
 var extraTokensInAccessorBlock4: X {
-  get blah wibble // expected-cparser-error{{expected '{' to start getter definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
+  get blah wibble // expected-error {{expected '{' to start getter definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
 }
 var extraTokensInAccessorBlock5: X {
-  set blah wibble // expected-cparser-error{{expected '{' to start setter definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
+  set blah wibble // expected-error {{expected '{' to start setter definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
 }
 var extraTokensInAccessorBlock6: X { // expected-error{{non-member observing properties require an initializer}}
-  willSet blah wibble // expected-cparser-error{{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
+  willSet blah wibble // expected-error {{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
 }
 var extraTokensInAccessorBlock7: X { // expected-error{{non-member observing properties require an initializer}}
-  didSet blah wibble // expected-cparser-error{{expected '{' to start 'didSet' definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
+  didSet blah wibble // expected-error {{expected '{' to start 'didSet' definition}} expected-astgen-error {{unexpected code 'blah wibble' in variable}}
 }
 
 var extraTokensInAccessorBlock8: X {
@@ -344,13 +344,13 @@ var extraTokensInAccessorBlock8: X {
 }
 
 var extraTokensInAccessorBlock9: Int {
-  get // expected-cparser-error {{expected '{' to start getter definition}}
+  get // expected-error {{expected '{' to start getter definition}}
     var a = b // expected-astgen-error {{unexpected code 'var a = b' in variable}}
 }
 
 struct extraTokensInAccessorBlock10 {
   var x: Int {
-    get // expected-cparser-error {{expected '{' to start getter definition}}
+    get // expected-error {{expected '{' to start getter definition}}
       var a = b // expected-astgen-error {{unexpected code 'var a = b' in variable}}
   }
 
@@ -408,11 +408,11 @@ var x21: X {
   }
 }
 
-var x23: Int, x24: Int { // expected-cparser-error{{'var' declarations with multiple variables cannot have explicit getters/setters}} expected-astgen-error {{'var' declarations with multiple variables cannot have explicit getters/setters}}
+var x23: Int, x24: Int { // expected-error {{'var' declarations with multiple variables cannot have explicit getters/setters}}
   return 42
 }
 
-var x25: Int { // expected-cparser-error{{'var' declarations with multiple variables cannot have explicit getters/setters}} expected-astgen-error {{'var' declarations with multiple variables cannot have explicit getters/setters}}
+var x25: Int { // expected-error {{'var' declarations with multiple variables cannot have explicit getters/setters}}
   return 42
 }, x26: Int // expected-warning{{variable 'x26' was never used; consider replacing with '_' or removing it}}
 
@@ -833,13 +833,13 @@ struct WillSetDidSetProperties {
 struct WillSetDidSetDisambiguate1 {
   var willSet: Int
   var x: (() -> ()) -> Int = takeTrailingClosure {
-    willSet = 42 // expected-cparser-error {{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code '= 42' in variable}}
+    willSet = 42 // expected-error {{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code '= 42' in variable}}
   }
 }
 struct WillSetDidSetDisambiguate1Attr {
   var willSet: Int
   var x: (() -> ()) -> Int = takeTrailingClosure {
-    willSet = 42 // expected-cparser-error {{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code '= 42' in variable}}
+    willSet = 42 // expected-error {{expected '{' to start 'willSet' definition}} expected-astgen-error {{unexpected code '= 42' in variable}}
   }
 }
 

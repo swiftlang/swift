@@ -3,10 +3,10 @@
 
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-feature CodeItemMacros -module-name MacrosTest
 
-@expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro") // expected-astgen-error {{unknown attribute 'expression'}} expected-astgen-error {{macro 'stringify' must declare its applicable roles via '@freestanding' or '@attached'}} expected-astgen-error {{only a freestanding expression macro can produce a result of type '(T, String)'}} expected-astgen-note {{make this macro a freestanding expression macro}} expected-astgen-note {{remove the result type if the macro does not produce a value}}
-// expected-cparser-note@-1 3{{'stringify' declared here}}
+@expression macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+// expected-note@-1 3{{'stringify' declared here}}
 // expected-warning@-2{{external macro implementation type}}
-// expected-cparser-warning@-3{{'@expression' has been removed in favor of '@freestanding(expression)'}}{{1-12=@freestanding(expression)}}
+// expected-warning@-3{{'@expression' has been removed in favor of '@freestanding(expression)'}}{{1-12=@freestanding(expression)}}
 @freestanding(expression) macro missingMacro1(_: Any) = MissingModule.MissingType // expected-note{{'missingMacro1' declared here}}
 // expected-warning@-1{{external macro definitions are now written using #externalMacro}}
 // expected-warning@-2{{external macro implementation type}}
@@ -97,12 +97,12 @@ macro genericDeclMacro<T: Numeric, U: Numeric>(_ x: T, _ y: U)
 // expected-note @-2 {{where 'U' = 'String'}}
 
 func testDiags(a: Int, b: Int) {
-  let s = #stringify<Int, Int>(a + b) // expected-cparser-error{{generic type 'stringify' specialized with too many type parameters (got 2, but expected 1)}} expected-astgen-error {{no macro named 'stringify'}}
+  let s = #stringify<Int, Int>(a + b) // expected-error{{generic type 'stringify' specialized with too many type parameters (got 2, but expected 1)}}
 
   _ = #stringify()
-  // expected-cparser-error@-1{{missing argument for parameter #1 in macro expansion}} expected-astgen-error@-1 {{no macro named 'stringify'}}
+  // expected-error@-1{{missing argument for parameter #1 in macro expansion}}
   _ = #stringify(label: a + b)
-  // expected-cparser-error@-1{{extraneous argument label 'label:' in macro expansion}} expected-astgen-error@-1 {{no macro named 'stringify'}}
+  // expected-error@-1{{extraneous argument label 'label:' in macro expansion}}
 
   _ = #multiArgMacro() // expected-error{{missing arguments for parameters #1, 'second' in macro expansion}}
   _ = #multiArgMacro(1, 2) // expected-error{{missing argument label 'second:' in macro expansion}}{{25-25=second: }}
@@ -133,7 +133,7 @@ func testDiags(a: Int, b: Int) {
 
 func shadow(a: Int, b: Int, stringify: Int) {
   _ = #stringify(a + b)
-  // expected-cparser-error@-1{{external macro implementation type 'MacroDefinition.StringifyMacro' could not be found for macro 'stringify'; plugin for module 'MacroDefinition' not found}} expected-astgen-error@-1 {{no macro named 'stringify'}}
+  // expected-error@-1{{external macro implementation type 'MacroDefinition.StringifyMacro' could not be found for macro 'stringify'; plugin for module 'MacroDefinition' not found}}
 }
 
 func testMissing() {

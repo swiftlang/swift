@@ -134,6 +134,10 @@ void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());
 }
 
+bool BridgedSourceFile_isInterface(BridgedSourceFile sf) {
+  return sf.unbridged()->Kind == SourceFileKind::Interface;
+}
+
 void BridgedASTContext_recordFunctionBodyParsed(BridgedASTContext cContext) {
   if (auto *stats = cContext.unbridged().Stats)
     ++stats->getFrontendCounters().NumFunctionsParsed;

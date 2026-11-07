@@ -713,6 +713,11 @@ BridgedDeclContext_getParentSourceFile(BridgedDeclContext dc);
 SWIFT_NAME("getter:BridgedSourceFile.isScriptMode(self:)")
 BRIDGED_INLINE bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf);
 
+/// Whether \p sf is a module interface (`.swiftinterface`), in which accessors
+/// need no bodies.
+SWIFT_NAME("getter:BridgedSourceFile.isInterface(self:)")
+bool BridgedSourceFile_isInterface(BridgedSourceFile sf);
+
 SWIFT_NAME("BridgedSourceFile.addTopLevelDecl(self:_:)")
 BRIDGED_INLINE void BridgedSourceFile_addTopLevelDecl(BridgedSourceFile sf,
                                                       BridgedDecl decl);

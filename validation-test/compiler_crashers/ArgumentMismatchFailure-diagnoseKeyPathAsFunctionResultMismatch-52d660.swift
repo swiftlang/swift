@@ -1,7 +1,4 @@
 // {"kind":"typecheck","original":"fc2877a1","signature":"swift::constraints::ArgumentMismatchFailure::diagnoseKeyPathAsFunctionResultMismatch() const","signatureAssert":"Assertion failed: (Index < Length && \"Invalid index!\"), function operator[]","signatureNext":"ArgumentMismatchFailure::diagnoseAsError"}
-// ASTGen builds a different AST for this input and does not reach the crash.
-// Expect it to fail, so that we notice if it crashes again.
-// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 @propertyWrapper struct a<b> {
   var c: PartialKeyPath<AnyObject>

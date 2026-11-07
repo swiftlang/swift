@@ -831,6 +831,26 @@ extension ASTGenVisitor {
 
   func generate(keyPathExpr node: KeyPathExprSyntax) -> BridgedExpr {
     guard !node.components.isEmpty else {
+      // `\e`: the C++ parser reads the name as an expression that is the whole
+      // root of a key path with no components, which the type checker diagnoses.
+      if let root = node.root?.as(IdentifierTypeSyntax.self),
+        root.genericArgumentClause == nil, root.name.presence == .present
+      {
+        let nameAndLoc = self.generateDeclNameRef(moduleSelector: root.moduleSelector, baseName: root.name)
+        let rootExpr: BridgedExpr? = BridgedUnresolvedDeclRefExpr.createParsed(
+          self.ctx,
+          name: nameAndLoc.name,
+          kind: .ordinary,
+          loc: nameAndLoc.loc
+        ).asExpr
+        return BridgedKeyPathExpr.createParsed(
+          self.ctx,
+          backslashLoc: self.generateSourceLoc(node.backslash),
+          parsedRoot: rootExpr.asNullable,
+          parsedPath: BridgedExpr?.none.asNullable,
+          hasLeadingDot: false
+        ).asExpr
+      }
       // FIXME: Diagnostics KeyPath expression without any component.
       return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }

@@ -55,7 +55,7 @@ func unsupportedOperator() {
     var x: Int
   }
   _ = \.^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '.^' in function}}
-  _ = \S^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '^' in function}}
+  _ = \S^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '^' in function}} expected-astgen-error {{key path must have at least one component}}
   _ = \S.x^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '^' in function}}
   _ = \.x^ // expected-cparser-error {{invalid component of Swift key path}} expected-astgen-error {{unexpected code '^' in function}} expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
 }

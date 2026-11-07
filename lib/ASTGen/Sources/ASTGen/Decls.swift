@@ -484,7 +484,8 @@ extension ASTGenVisitor {
     accessorDecl node: AccessorDeclSyntax,
     kind: swift.AccessorKind,
     for storage: BridgedAbstractStorageDecl,
-    allowBody: Bool = true
+    allowBody: Bool = true,
+    requireBody: Bool = false
   ) -> BridgedAccessorDecl? {
     var attrs = BridgedDeclAttributes()
 
@@ -561,6 +562,17 @@ extension ASTGenVisitor {
     if allowBody, let body = node.body {
       self.attachBody(body, to: accessor.asDecl, declContext: accessor.asDeclContext) {
         accessor.setParsedBody($0)
+      }
+    } else if requireBody, node.body == nil, !attrs.hasAttribute(.SILGenName),
+      !self.declContext.parentSourceFile.isInterface
+    {
+      // Outside of a protocol, an accessor needs a body unless it is
+      // `@_silgen_name` or in a module interface. The C++ parser diagnoses this at the next token.
+      let name = String(bridged: kind.diagnosticName(article: false, underscored: false))
+      if let next = node.lastToken(viewMode: .sourceAccurate)?.nextToken(viewMode: .sourceAccurate) {
+        self.diagnose(.expected_lbrace_accessor(name), at: next)
+      } else {
+        self.diagnose(.expected_lbrace_accessor(name), at: node)
       }
     }
     return accessor
@@ -889,7 +901,7 @@ extension ASTGenVisitor {
               )
             }
           }
-          guard let decl = self.generate(accessorDecl: node, kind: kind, for: storage, allowBody: allowBody) else {
+          guard let decl = self.generate(accessorDecl: node, kind: kind, for: storage, allowBody: allowBody, requireBody: !inProtocol) else {
             return nil
           }
           generated.append(ParsedAccessor(kind: kind, node: node, decl: decl))
@@ -1247,7 +1259,11 @@ extension ASTGenVisitor {
       if let block = current.as(MemberBlockSyntax.self) {
         return block.parent?.is(ProtocolDeclSyntax.self) == true
       }
-      guard current.is(MemberBlockItemSyntax.self) || current.is(MemberBlockItemListSyntax.self) else {
+      // Members of a protocol may be inside `#if`.
+      guard current.is(MemberBlockItemSyntax.self) || current.is(MemberBlockItemListSyntax.self)
+        || current.is(IfConfigDeclSyntax.self) || current.is(IfConfigClauseSyntax.self)
+        || current.is(IfConfigClauseListSyntax.self)
+      else {
         return false
       }
       parent = current.parent
