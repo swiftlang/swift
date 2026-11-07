@@ -289,7 +289,11 @@ public func emitParserDiagnostics(
       {
         diagnosticSeverity = .warning
       } else {
-        diagnosticSeverity = diag.diagMessage.severity
+        diagnosticSeverity = severityForParserDiagnostic(
+          diag,
+          default: diag.diagMessage.severity,
+          isSwift6: ctx.langOpts.isLanguageModeAtLeast(major: 6, minor: 0)
+        )
       }
 
       if emitOnlyErrors != 0, diagnosticSeverity != .error {

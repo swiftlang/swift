@@ -168,7 +168,8 @@ extension ASTGenVisitor {
         // TODO: Diagnostics.
         fatalError("(compiler bug) size is nil, but alignment is not nil?")
       }
-      return constraint
+      // A trivial constraint without any size is not one of exact size 0.
+      return .getLayoutConstraint(self.ctx, kind: .trivial)
     }
 
     let size: Int

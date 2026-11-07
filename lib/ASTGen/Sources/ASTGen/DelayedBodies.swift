@@ -563,3 +563,20 @@ public func buildMembers(
   }
   return visitor.generateFingerprint(declGroup: declNode).bridged
 }
+
+
+/// The severity to report `diagnostic` with. A specifier such as `sending`,
+/// `isolated` or `_const` written before a parameter name is a warning until
+/// Swift 6, which `SpecifierOnParameterName` does not know about.
+func severityForParserDiagnostic(
+  _ diagnostic: Diagnostic,
+  default severity: DiagnosticSeverity,
+  isSwift6: Bool
+) -> DiagnosticSeverity {
+  if !isSwift6, let message = diagnostic.diagMessage as? SpecifierOnParameterName,
+    message.misplacedSpecifiers.allSatisfy({ ["sending", "isolated", "_const"].contains($0.text) })
+  {
+    return .warning
+  }
+  return severity
+}

@@ -185,10 +185,10 @@ public func anotherFuncWithTwoGenericParameters<X: P, Y>(x: X, y: Y) {
 func funcWithForbiddenSpecializeRequirement<T>(_ t: T) {
 }
 
-@_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject) // expected-astgen-error {{no type for 'T' can satisfy both 'T : _RefCountedObject' and 'T : _Trivial(0)'}}
-// expected-cparser-error@-1{{no type for 'T' can satisfy both 'T : _RefCountedObject' and 'T : _Trivial(64)'}} expected-astgen-error@-1 {{no type for 'T' can satisfy both 'T : _Trivial(0)' and 'T : _Trivial(64)'}}
+@_specialize(where T: _Trivial(32), T: _Trivial(64), T: _Trivial, T: _RefCountedObject)
+// expected-error@-1{{no type for 'T' can satisfy both 'T : _RefCountedObject' and 'T : _Trivial(64)'}}
 // expected-error@-2{{no type for 'T' can satisfy both 'T : _Trivial(64)' and 'T : _Trivial(32)'}}
-@_specialize(where T: _Trivial, T: _Trivial(64)) // expected-astgen-error {{no type for 'T' can satisfy both 'T : _Trivial(64)' and 'T : _Trivial(0)'}}
+@_specialize(where T: _Trivial, T: _Trivial(64))
 @_specialize(where T: _RefCountedObject, T: _NativeRefCountedObject)
 @_specialize(where Array<T> == Int) // expected-error{{generic signature requires types 'Array<T>' and 'Int' to be the same}}
 // expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
@@ -205,7 +205,7 @@ public protocol Proto: class {
 // expected-error@-1 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
 // expected-note@-2 {{missing constraint for 'T' in '_specialize' attribute}}
 @_specialize(where T: _Trivial)
-// expected-cparser-error@-1{{no type for 'T' can satisfy both 'T : _NativeClass' and 'T : _Trivial'}} expected-astgen-error@-1 {{no type for 'T' can satisfy both 'T : _NativeClass' and 'T : _Trivial(0)'}}
+// expected-error@-1{{no type for 'T' can satisfy both 'T : _NativeClass' and 'T : _Trivial'}}
 // expected-error@-2 {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 1)}}
 // expected-note@-3 {{missing constraint for 'T' in '_specialize' attribute}}
 @_specialize(where T: _Trivial(64))

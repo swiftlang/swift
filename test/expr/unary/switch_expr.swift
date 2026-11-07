@@ -498,8 +498,8 @@ do {
 // We currently prefer to parse these as trailing closures. We may want to tell
 // the user to just wrap the expression in parens.
 do {
-  _ = (switch fatalError() {}, 1) // expected-cparser-error {{expected '{' after 'switch' subject expression}} expected-astgen-error {{cannot call value of non-function type 'Never'}}
-  // expected-cparser-error@-1 {{extra trailing closure passed in call}} expected-astgen-error@-1 {{unexpected code in 'switch' statement}}
+  _ = (switch fatalError() {}, 1) // expected-cparser-error {{expected '{' after 'switch' subject expression}} expected-astgen-error {{unexpected code in 'switch' statement}}
+  // expected-error@-1 {{extra trailing closure passed in call}}
   // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
   _ = (switch fatalError() { #if FOO

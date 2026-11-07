@@ -622,6 +622,24 @@ extension ASTGenVisitor {
 
     self.diagnoseTrailingClosureAfterNewlines(node)
 
+    // A trailing closure that follows an already-parenthesized call, e.g.,
+    // in a statement condition, is parsed as a call of the call. The C++
+    // parser makes it the trailing closure of the parenthesized call.
+    if node.leftParen == nil, node.arguments.isEmpty, node.trailingClosure != nil,
+      let inner = node.calledExpression.as(FunctionCallExprSyntax.self),
+      inner.leftParen != nil, inner.trailingClosure == nil
+    {
+      let callee = self.generate(expr: inner.calledExpression, postfixIfConfigBaseExpr: postfixIfConfigBaseExpr)
+      let arguments = generateArgumentList(
+        leftParen: inner.leftParen,
+        labeledExprList: inner.arguments,
+        rightParen: inner.rightParen,
+        trailingClosure: node.trailingClosure,
+        additionalTrailingClosures: node.additionalTrailingClosures
+      )
+      return .createParsed(self.ctx, fn: callee, args: arguments)
+    }
+
     let callee = self.generate(expr: node.calledExpression, postfixIfConfigBaseExpr: postfixIfConfigBaseExpr)
     let arguments = generateArgumentList(
       leftParen: node.leftParen,
