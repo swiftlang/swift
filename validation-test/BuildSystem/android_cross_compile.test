@@ -8,6 +8,7 @@
 # CHECK-NOT: cmake --build {{.*}}/llvm-android-aarch64 {{.*}} install-llvm
 # CHECK: cmake {{.*}}-DSWIFT_INCLUDE_TOOLS:BOOL=FALSE{{.*}}/swift
 # CHECK: Skipping building Foundation Macros for android-aarch64, because the host tools are not being built
+# CHECK: cmake {{.*}}-DCMAKE_ANDROID_STL_TYPE=c++_shared {{.*}}corelibs-foundation
 # CHECK: Skipping installing Foundation Macros for android-aarch64, because the host tools are not being built
 # CHECK: Skipping building Testing Macros for android-aarch64, because the host tools are not being built
 # CHECK: Skipping installing Testing Macros for android-aarch64, because the host tools are not being built
