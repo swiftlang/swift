@@ -43,7 +43,7 @@ SWIFT_INLINE_THUNK String(const char *cString) noexcept {
 #else
     auto res = _impl::$sS2SycfC();
 #endif
-    memcpy(_getOpaquePointer(), &res, sizeof(res));
+    memcpy(_storage, &res, sizeof(res));
     return;
   }
 #ifdef __EmbeddedSwift__
@@ -51,7 +51,7 @@ SWIFT_INLINE_THUNK String(const char *cString) noexcept {
 #else
   auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(cString);
 #endif
-  memcpy(_getOpaquePointer(), &res, sizeof(res));
+  memcpy(_storage, &res, sizeof(res));
 }
 
 /// Constructs a Swift string from a C++ string.
@@ -61,7 +61,7 @@ SWIFT_INLINE_THUNK String(const std::string &str) noexcept {
 #else
   auto res = _impl::$sSS7cStringSSSPys4Int8VG_tcfC(str.c_str());
 #endif
-  memcpy(_getOpaquePointer(), &res, sizeof(res));
+  memcpy(_storage, &res, sizeof(res));
 }
 
 /// Casts the Swift String value to a C++ std::string.
