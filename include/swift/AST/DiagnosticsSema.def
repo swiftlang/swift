@@ -5728,7 +5728,7 @@ GROUPED_ERROR(expression_unused_closure,NoUsage,NoUsage,
       "closure expression is unused", ())
 GROUPED_ERROR(expression_unused_function,NoUsage,NoUsage,
       "function is unused", ())
-GROUPED_WARNING(expression_unused_lvalue,NoUsage,NoUsage,
+GROUPED_ERROR(expression_unused_lvalue,NoUsage,NoUsage,
       "%select{"
         "variable|"
         "property is accessed but result|"
