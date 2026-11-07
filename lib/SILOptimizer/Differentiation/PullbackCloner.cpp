@@ -269,7 +269,10 @@ private:
   SILValueCategory getTangentValueCategory(SILValue v) {
     // Tangent value category table:
     //
-    // Let $L be a loadable type and $*A be an address-only type.
+    // Let $L be a loadable type and $*A be an address-only type. In
+    // opaque-value form (the pullback is not in lowered-address form), an
+    // address-only type is an object too, so "loadable" below also holds for
+    // it.
     //
     // Original type | Tangent type loadable? | Tangent value category and type
     // --------------|------------------------|--------------------------------
@@ -291,7 +294,8 @@ private:
     // then the tangent value category is "object".
     auto tanSpace = getTangentSpace(remapType(v->getType()).getASTType());
     auto tanASTType = tanSpace->getCanonicalType();
-    if (v->getType().isObject() && getTypeLowering(tanASTType).isLoadable())
+    if (v->getType().isObject() &&
+        getTypeLowering(tanASTType).isLoadableOrOpaque(getPullback()))
       return SILValueCategory::Object;
     // Otherwise, the tangent value category is "address".
     return SILValueCategory::Address;
@@ -931,6 +935,12 @@ public:
   /// parameters.
   void emitZeroDerivativesForNonvariedResult(SILValue origNonvariedResult);
 
+  /// Completes the lifetimes in the pullback, and lowers it if it is in
+  /// opaque-value form. Differentiation runs after AddressLowering, so nothing
+  /// else would lower it, for example for an imported original.
+  /// TODO: update this after moving AddressLowering later than this pass.
+  void completeAndLowerPullback();
+
   /// Public helper so that our users can get the underlying newly created
   /// function.
   SILFunction &getPullback() const { return vjpCloner.getPullback(); }
@@ -1189,8 +1199,10 @@ public:
                                   ? *applyInfo.originalPullbackType
                                   : pullbackType;
     actualPullbackType = actualPullbackType->getUnsubstitutedType(getModule());
+    SILFunctionConventions pullbackConv(
+        actualPullbackType, SILAddressConventions::forFunction(getPullback()));
     SmallVector<AllocStackInst *, 4> pullbackIndirectResults;
-    for (auto indRes : actualPullbackType->getIndirectFormalResults()) {
+    for (auto indRes : pullbackConv.getIndirectSILResults()) {
       auto *alloc = builder.createAllocStack(
           loc, remapType(indRes.getSILStorageInterfaceType()));
       pullbackIndirectResults.push_back(alloc);
@@ -1202,6 +1214,7 @@ public:
     unsigned firstYieldResultIndex = firstSemanticParamResultIdx +
       conv.getNumAutoDiffSemanticResultParameters();
 
+    unsigned seedIdx = 0;
     for (auto resultIndex : applyInfo.config.resultIndices->getIndices()) {
       if (resultIndex >= firstYieldResultIndex)
         continue;
@@ -1214,16 +1227,33 @@ public:
       case SILValueCategory::Object:
         // Adjoint for normal try_apply result is available in the normal
         // destination BB. Get it from there.
-        seed =
-            (fai.getKind() == FullApplySiteKind::TryApplyInst
-                 ? tryApplyAdjoints.at(cast<TryApplyInst>(fai.getInstruction()))
-                 : materializeAdjointDirect(getAdjointValue(bb, origResult),
-                                            loc));
+        if (fai.getKind() == FullApplySiteKind::TryApplyInst) {
+          seed = tryApplyAdjoints.at(cast<TryApplyInst>(fai.getInstruction()));
+          // A non-trivial adjoint is kept in a buffer.
+          if (seed->getType().isAddress()) {
+            seed = builder.emitLoadValueOperation(loc, seed,
+                                                  LoadOwnershipQualifier::Copy);
+            recordTemporary(seed);
+          }
+        } else {
+          seed = materializeAdjointDirect(getAdjointValue(bb, origResult), loc);
+        }
         break;
       case SILValueCategory::Address:
         seed = getAdjointBuffer(bb, origResult);
         break;
       }
+      // In opaque-value form, the seed of a pullback parameter that is not
+      // `inout` is passed by value, while the adjoint of an `inout` result is a
+      // buffer. Pass a copy of its contents.
+      auto seedParams = pullbackConv.getParameters();
+      if (seed->getType().isAddress() && seedIdx < seedParams.size() &&
+          !pullbackConv.isSILIndirect(seedParams[seedIdx])) {
+        seed = builder.emitLoadValueOperation(loc, seed,
+                                              LoadOwnershipQualifier::Copy);
+        recordTemporary(seed);
+      }
+      ++seedIdx;
       args.push_back(seed);
     }
 
@@ -1414,7 +1444,8 @@ public:
         auto structTy = remapType(si->getType()).getASTType();
 #ifndef NDEBUG
         auto tangentVectorTy = getTangentSpace(structTy)->getCanonicalType();
-        assert(!getTypeLowering(tangentVectorTy).isAddressOnly());
+        assert(
+            getTypeLowering(tangentVectorTy).isLoadableOrOpaque(getPullback()));
         assert(tangentVectorTy->getStructDecl());
 #endif
 
@@ -1937,10 +1968,11 @@ public:
   void visitMoveValueInst(MoveValueInst *mvi) {
     switch (getTangentValueCategory(mvi)) {
     case SILValueCategory::Address:
-      LLVM_DEBUG(getADDebugStream() << "AutoDiff does not support move_value with "
-                 "SILValueCategory::Address");
+      LLVM_DEBUG(getADDebugStream()
+                 << "AutoDiff does not support move_value with "
+                    "SILValueCategory::Address");
       getContext().emitNondifferentiabilityError(
-        mvi, getInvoker(), diag::autodiff_expression_not_differentiable_note);
+          mvi, getInvoker(), diag::autodiff_expression_not_differentiable_note);
       errorOccurred = true;
       return;
     case SILValueCategory::Object:
@@ -2008,6 +2040,64 @@ public:
     builder.emitZeroIntoBuffer(uccai->getLoc(), adjDest, IsInitialization);
   }
 
+  /// Handle `unconditional_checked_cast` instruction, the object form of
+  /// `unconditional_checked_cast_addr` used with opaque values.
+  ///   Original: y = unconditional_checked_cast x
+  ///    Adjoint: adj[x] += unconditional_checked_cast adj[y]
+  void visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *ucci) {
+    auto *bb = ucci->getParent();
+    auto loc = ucci->getLoc();
+    SILValue src = ucci->getOperand();
+    // Cast through buffers, using the address form of the cast.
+    SILValue adjDest;
+    AllocStackInst *adjDestTemp = nullptr;
+    switch (getTangentValueCategory(ucci)) {
+    case SILValueCategory::Object: {
+      auto adjCopy = builder.emitCopyValueOperation(
+          loc, materializeAdjointDirect(getAdjointValue(bb, ucci), loc));
+      adjDestTemp = builder.createAllocStack(loc, adjCopy->getType());
+      builder.emitStoreValueOperation(loc, adjCopy, adjDestTemp,
+                                      StoreOwnershipQualifier::Init);
+      adjDest = adjDestTemp;
+      break;
+    }
+    case SILValueCategory::Address:
+      adjDest = getAdjointBuffer(bb, ucci);
+      break;
+    }
+    auto srcTanType = getRemappedTangentType(src->getType());
+    auto *castBuf = builder.createAllocStack(loc, srcTanType);
+    builder.createUnconditionalCheckedCastAddr(
+        loc, ucci->getCheckedCastOptions(), adjDest,
+        adjDest->getType().getASTType(), castBuf, srcTanType.getASTType());
+    switch (getTangentValueCategory(src)) {
+    case SILValueCategory::Object: {
+      auto castValue = builder.emitLoadValueOperation(
+          loc, castBuf, LoadOwnershipQualifier::Take);
+      recordTemporary(castValue);
+      addAdjointValue(bb, src, makeConcreteAdjointValue(castValue), loc);
+      break;
+    }
+    case SILValueCategory::Address:
+      addToAdjointBuffer(bb, src, castBuf, loc);
+      builder.emitDestroyAddrAndFold(loc, castBuf);
+      break;
+    }
+    builder.createDeallocStack(loc, castBuf);
+    // The cast consumed the adjoint of the result: reset it.
+    switch (getTangentValueCategory(ucci)) {
+    case SILValueCategory::Object:
+      builder.createDeallocStack(loc, adjDestTemp);
+      setAdjointValue(
+          bb, ucci,
+          makeZeroAdjointValue(getRemappedTangentType(ucci->getType())));
+      break;
+    case SILValueCategory::Address:
+      builder.emitZeroIntoBuffer(loc, adjDest, IsInitialization);
+      break;
+    }
+  }
+
   /// Handle `enum` instruction.
   ///   Original: y = enum $Enum, #Enum.some!enumelt, x
   ///    Adjoint: adj[x] += adj[y]
@@ -2029,14 +2119,18 @@ public:
     }
 
     auto adjOpt = getAdjointValue(bb, ei);
-    auto adjStruct = materializeAdjointDirect(adjOpt, loc);
-
-    VarDecl *adjOptVar =
-      getASTContext().getOptionalTanValueDecl(adjStruct->getType().getASTType());
-    auto *adjVal = builder.createStructExtract(loc, adjStruct, adjOptVar);
+    // Project out of a copy: the adjoint may be a guaranteed value of an
+    // address-only type, which cannot be forwarded through a projection.
+    auto adjStruct = builder.emitCopyValueOperation(
+        loc, materializeAdjointDirect(adjOpt, loc));
+    auto *adjDestructure = builder.createDestructureStruct(loc, adjStruct);
+    assert(adjDestructure->getNumResults() == 1 &&
+           "`Optional.TangentVector` has a single field");
+    SILValue adjVal = adjDestructure->getResult(0);
 
     EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
     auto *adjData = builder.createUncheckedEnumData(loc, adjVal, someElemDecl);
+    recordTemporary(adjData);
 
     addAdjointValue(bb, ei->getOperand(), makeConcreteAdjointValue(adjData), loc);
   }
@@ -2322,6 +2416,7 @@ bool PullbackCloner::Implementation::run() {
     // handle this case. See TF-876 for context.
     if (!getActivityInfo().isVaried(origResult, getConfig().parameterIndices)) {
       emitZeroDerivativesForNonvariedResult(origResult);
+      completeAndLowerPullback();
       return false;
     }
   }
@@ -2616,6 +2711,20 @@ bool PullbackCloner::Implementation::run() {
                    << " as the adjoint of original indirect result "
                    << origResult);
       }
+    } else if (getTangentValueCategory(origResult) ==
+               SILValueCategory::Address) {
+      // In opaque-value form, the seed of an original `inout` result that is
+      // not a differentiation parameter is passed by value, while its adjoint
+      // is a buffer. Assign a copy of the seed as the adjoint buffer.
+      auto *seedBufCopy = createFunctionLocalAllocation(seed->getType(), pbLoc);
+      builder.emitStoreValueOperation(
+          pbLoc, builder.emitCopyValueOperation(pbLoc, seed), seedBufCopy,
+          StoreOwnershipQualifier::Init);
+      setAdjointBuffer(originalExitBlock, origResult, seedBufCopy);
+      LLVM_DEBUG(getADDebugStream()
+                 << "Assigned seed buffer " << *seedBufCopy
+                 << " as the adjoint of original indirect result "
+                 << origResult);
     } else {
       addAdjointValue(originalExitBlock, origResult, makeConcreteAdjointValue(seed),
                       pbLoc);
@@ -2880,13 +2989,8 @@ bool PullbackCloner::Implementation::run() {
   }
   builder.createReturn(pbLoc, joinElements(retElts, builder, pbLoc));
 
-  if (!errorOccurred) {
-    auto *pm = &getContext().getPassManager();
-    pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(&pullback);
-    completeAllLifetimes(pm, &pullback);
-    lowerAddress(pm, &pullback);
-    pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
-  }
+  if (!errorOccurred)
+    completeAndLowerPullback();
 
 #ifndef NDEBUG
   bool leakFound = false;
@@ -2956,7 +3060,7 @@ void PullbackCloner::Implementation::emitZeroDerivativesForNonvariedResult(
     auto resultType =
         pullback.mapTypeIntoEnvironment(resultInfo.getInterfaceType())
             ->getCanonicalType();
-    if (resultInfo.isFormalDirect())
+    if (!pullback.getConventions().isSILIndirect(resultInfo))
       directResults.push_back(builder.emitZero(pbLoc, resultType));
     else
       builder.emitZeroIntoBuffer(pbLoc, *indirectResultIt++, IsInitialization);
@@ -2965,6 +3069,20 @@ void PullbackCloner::Implementation::emitZeroDerivativesForNonvariedResult(
   LLVM_DEBUG(getADDebugStream()
              << "Generated pullback for " << getOriginal().getName() << ":\n"
              << pullback);
+}
+
+void PullbackCloner::Implementation::completeAndLowerPullback() {
+  auto &pullback = getPullback();
+  auto *pm = &getContext().getPassManager();
+  pm->getSwiftPassInvocation()->initializeNestedSwiftPassInvocation(&pullback);
+  completeAllLifetimes(pm, &pullback);
+#ifndef NDEBUG
+  // Verify the pullback in the form that it was generated in.
+  if (!pullback.hasLoweredAddresses())
+    pullback.verify();
+#endif
+  lowerAddress(pm, &pullback);
+  pm->getSwiftPassInvocation()->deinitializeNestedSwiftPassInvocation();
 }
 
 AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
@@ -3033,9 +3151,26 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
                                            MetatypeRepresentation::Thin);
   auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
   auto metatype = builder.createMetatype(pbLoc, metatypeSILType);
-  // apply %init_fn(%optTanAdjBuf, %optArgBuf, %metatype)
-  builder.createApply(pbLoc, initFnRef, subMap,
-                      {optTanAdjBuf, optArgBuf, metatype});
+  if (getPullback().hasLoweredAddresses()) {
+    // apply %init_fn(%optTanAdjBuf, %optArgBuf, %metatype)
+    builder.createApply(pbLoc, initFnRef, subMap,
+                        {optTanAdjBuf, optArgBuf, metatype});
+  } else {
+    // In opaque-value form, the argument is passed by value and the result is
+    // returned directly.
+    bool isArgConsumed = initFn->getLoweredFunctionType()
+                             ->getParameters()
+                             .front()
+                             .isConsumedInCallee();
+    auto optArg = builder.emitLoadValueOperation(pbLoc, optArgBuf,
+                                                 LoadOwnershipQualifier::Take);
+    auto optTanAdj =
+        builder.createApply(pbLoc, initFnRef, subMap, {optArg, metatype});
+    if (!isArgConsumed)
+      builder.emitDestroyValueOperation(pbLoc, optArg);
+    builder.emitStoreValueOperation(pbLoc, optTanAdj, optTanAdjBuf,
+                                    StoreOwnershipQualifier::Init);
+  }
   builder.createDeallocStack(pbLoc, optArgBuf);
   return optTanAdjBuf;
 }
@@ -3332,6 +3467,21 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
       case SILValueCategory::Object: {
         auto bbArgAdj = getAdjointValue(bb, bbArg);
         auto concreteBBArgAdj = materializeAdjointDirect(bbArgAdj, pbLoc);
+        // The seed is used in the pullback blocks of the `try_apply`, which can
+        // be reached without going through this block, so a copy made here
+        // would not dominate its use. In opaque-value form, keep a non-trivial
+        // seed in a local buffer, which is initialized throughout the pullback.
+        if (!getPullback().hasLoweredAddresses() &&
+            !concreteBBArgAdj->getType().isTrivial(getPullback())) {
+          auto *seedBuf = createFunctionLocalAllocation(
+              concreteBBArgAdj->getType(), pbLoc, /*zeroInitialize*/ true);
+          builder.emitStoreValueOperation(
+              pbLoc, builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj),
+              seedBuf, StoreOwnershipQualifier::Assign);
+          auto [_, inserted] = tryApplyAdjoints.try_emplace(tai, seedBuf);
+          assert(inserted && "should have unique adjoint for try_apply");
+          break;
+        }
         auto concreteBBArgAdjCopy =
             builder.emitCopyValueOperation(pbLoc, concreteBBArgAdj);
 
@@ -3465,10 +3615,13 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
          "Getter should have one semantic result");
   auto origResult = origFormalResults[*getConfig().resultIndices->begin()];
 
-  auto tangentVectorSILTy = pullback.getConventions().getResults().front()
-      .getSILStorageType(getModule(),
-                         pullback.getLoweredFunctionType(),
-                         TypeExpansionContext::minimal());
+  auto tangentVectorSILTy =
+      pullback.getConventions()
+          .getResults()
+          .front()
+          .getSILStorageType(getModule(), pullback.getLoweredFunctionType(),
+                             TypeExpansionContext::minimal())
+          .getObjectType();
   auto tangentVectorTy = tangentVectorSILTy.getASTType();
   auto *tangentVectorDecl = tangentVectorTy->getStructDecl();
 
@@ -4122,8 +4275,16 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   // per pullback bb instead of all in the pullback entry: TF-1075.
   builder.emitDestroyOperation(loc, eltAdjBuffer);
   // apply %subscript_fn<T.TangentVector>(%elt_adj, %index_int, %array_adj)
-  builder.createApply(loc, subscriptFnRef, subMap,
-                      {eltAdjBuffer, eltIndexInt, arrayAdjoint});
+  if (getPullback().hasLoweredAddresses()) {
+    builder.createApply(loc, subscriptFnRef, subMap,
+                        {eltAdjBuffer, eltIndexInt, arrayAdjoint});
+  } else {
+    // In opaque-value form, the element adjoint is returned directly.
+    auto eltAdj = builder.createApply(loc, subscriptFnRef, subMap,
+                                      {eltIndexInt, arrayAdjoint});
+    builder.emitStoreValueOperation(loc, eltAdj, eltAdjBuffer,
+                                    StoreOwnershipQualifier::Init);
+  }
   return eltAdjBuffer;
 }
 

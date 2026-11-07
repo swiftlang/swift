@@ -37,6 +37,22 @@ namespace autodiff {
 // moved to a shared location.
 //===----------------------------------------------------------------------===//
 
+/// Gives a newly created \p thunk the SIL stage of the function \p from that it
+/// is derived from, and puts it in lowered-address form.
+///
+/// The thunk bodies below are always emitted in lowered-address form: they take
+/// and return tangents indirectly and use stack buffers. That holds whatever
+/// the form of \p from is. With opaque values, \p from can still be in
+/// opaque-value form, as Differentiation can run before AddressLowering. The
+/// thunk must not inherit that form: it would then be read as holding opaque
+/// values. Marking it lowered also makes AddressLowering skip it. Where \p from
+/// is already lowered this changes nothing.
+static void inheritDerivedFromInLoweredForm(SILFunction *thunk,
+                                            const SILFunction *from) {
+  thunk->inheritDerivedFrom(from);
+  thunk->setHasLoweredAddresses(true);
+}
+
 CanSILFunctionType buildThunkType(SILFunction *fn,
                                   CanSILFunctionType &sourceType,
                                   CanSILFunctionType &expectedType,
@@ -161,12 +177,7 @@ SILFunction *getOrCreateReabstractionThunk(SILOptFunctionBuilder &fb,
   if (!thunk->empty())
     return thunk;
 
-  // Differentiation runs after AddressLowering, so this thunk is synthesized
-  // into an already-lowered module and its body below is emitted in
-  // lowered-address form. Record that (matching the caller) so the per-function
-  // conventions used here -- and read by later passes -- don't treat the
-  // thunk's address arguments as opaque values.
-  thunk->inheritDerivedFrom(caller);
+  inheritDerivedFromInLoweredForm(thunk, caller);
 
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
@@ -461,7 +472,7 @@ getOrCreateSubsetParametersThunkForLinearMap(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  thunk->inheritDerivedFrom(parentThunk);
+  inheritDerivedFromInLoweredForm(thunk, parentThunk);
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   TangentBuilder builder(entry, adContext);
@@ -813,7 +824,7 @@ getOrCreateSubsetParametersThunkForDerivativeFunction(
   if (!thunk->empty())
     return {thunk, interfaceSubs};
 
-  thunk->inheritDerivedFrom(caller);
+  inheritDerivedFromInLoweredForm(thunk, caller);
   thunk->setGenericEnvironment(genericEnv);
   auto *entry = thunk->createBasicBlock();
   SILBuilder builder(entry);
