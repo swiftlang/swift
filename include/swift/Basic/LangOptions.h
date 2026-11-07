@@ -761,6 +761,12 @@ namespace swift {
       return getVersionForTriple(Target);
     }
 
+    /// Returns the minimum deployment target version, or `std::nullopt` if
+    /// the target has no meaningful deployment version.
+    std::optional<llvm::VersionTuple> getDeploymentTargetVersion() const {
+      return getDeploymentTargetVersionForTriple(Target);
+    }
+
     /// Sets an implicit platform condition.
     void addPlatformConditionValue(PlatformConditionKind Kind, StringRef Value) {
       assert(!Value.empty());

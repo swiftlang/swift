@@ -86,7 +86,15 @@ namespace swift {
   /// returned.
   StringRef getPlatformNameForTriple(const llvm::Triple &triple);
 
-  /// Returns the version tuple for a given target triple
+  /// Returns the deployment target version for a given target triple, or
+  /// `std::nullopt` if the triple has no meaningful deployment version.
+  std::optional<llvm::VersionTuple>
+  getDeploymentTargetVersionForTriple(const llvm::Triple &triple);
+
+  /// Returns the version tuple for a given target triple.
+  ///
+  /// Returns v0.0.0 if Swift does not define a deployment target version for
+  /// the target platform.
   llvm::VersionTuple getVersionForTriple(const llvm::Triple &triple);
 
   /// Returns the platform Kind for Darwin triples.
