@@ -1279,25 +1279,23 @@ public:
       if (var->isAsyncLet()) {
         // If the initializer could throw, we will have a 'try' in the
         // application of its autoclosure.
-        // FIXME: The type checker should record the thrown error type in
-        // the AST.
-        bool throws = false;
+        CallExpr *callExpr = nullptr;
         if (auto init = var->getParentInitializer()) {
           if (auto await = dyn_cast<AwaitExpr>(init))
             init = await->getSubExpr();
-          if (isa<TryExpr>(init))
-            throws = true;
+          if (auto tryExpr = dyn_cast<TryExpr>(init))
+            init = tryExpr->getSubExpr();
+          callExpr = dyn_cast<CallExpr>(init);
         }
 
         result.merge(Classification::forAsync(
                         ConditionalEffectKind::Always,
                         PotentialEffectReason::forAsyncLet()));
-        if (throws) {
-          ASTContext &ctx = var->getASTContext();
+        if (callExpr && callExpr->isThrowsSet()) {
+          Type thrownError = callExpr->throws().getThrownErrorType();
           result.merge(Classification::forThrows(
-                         /*FIXME:*/ctx.getErrorExistentialType(),
-                         ConditionalEffectKind::Always,
-                         PotentialEffectReason::forAsyncLet()));
+              thrownError, ConditionalEffectKind::Always,
+              PotentialEffectReason::forAsyncLet()));
         }
 
         return result;
@@ -1967,7 +1965,6 @@ public:
       //
       // An autoclosure callee here only appears in a narrow case where
       // we're in the initializer of an 'async let'.
-      // FIXME: handle typed async let
       if (fnRef.isAutoClosure()) {
         switch (kind) {
         case EffectKind::Async:
@@ -1975,12 +1972,21 @@ public:
                           ConditionalEffectKind::Always,
                           PotentialEffectReason::forApply()));
           break;
-        case EffectKind::Throws:
+        case EffectKind::Throws: {
+          auto *autoclosure = cast<AutoClosureExpr>(fnRef.getClosure());
+          Type thrownError;
+          // Async-let closures erase their errors, but the synthetic call
+          // already records the inferred error type.
+          if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet) {
+            thrownError = call->throws().getThrownErrorType();
+          } else {
+            thrownError = /*FIXME:*/ctx.getErrorExistentialType();
+          }
           result.merge(Classification::forThrows(
-                         /*FIXME:*/ctx.getErrorExistentialType(),
-                         ConditionalEffectKind::Always,
-                         PotentialEffectReason::forApply()));
+              thrownError, ConditionalEffectKind::Always,
+              PotentialEffectReason::forApply()));
           break;
+        }
         case EffectKind::Unsafe:
           llvm_unreachable("@unsafe isn't handled in applies");
         }
