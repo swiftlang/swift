@@ -192,8 +192,7 @@ bool ValueBase::isGuaranteedForwarding() const {
   if (phi && phi->isPhi()) {
     return phi->isGuaranteedForwarding();
   }
-
-  return isBorrowAccessorResult();
+  return false;
 }
 
 bool ValueBase::isBeginApplyToken() const {

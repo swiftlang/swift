@@ -137,6 +137,7 @@ struct BridgedPostDomTree {
 
 struct BridgedOptimizerUtilities {
   typedef void (* _Nonnull UpdateFunctionFn)(BridgedContext, BridgedFunction);
+  typedef bool (* _Nonnull ChangeFunctionFn)(BridgedContext, BridgedFunction);
   typedef void (* _Nonnull UpdateLifetimeFunctionFn)(BridgedContext, BridgedFunction, bool);
   typedef void (* _Nonnull UpdateLifetimeValuesFn)(BridgedContext, BridgedArrayRef, BridgedArrayRef);
   typedef BridgedInstruction (* _Nonnull UpdateInstructionFn)(BridgedContext, BridgedInstruction);
@@ -147,6 +148,7 @@ struct BridgedOptimizerUtilities {
   static void registerDebugReconstructionSimplification(
       UpdateFunctionFn simplifyDebugReconstructionBlocksFn,
       UpdateInstructionFn simplifyDebugReconstructionBlockFn);
+  static void registerBorrowAccessorFixup(ChangeFunctionFn fixupBorrowAccessorsFn);
 };
 
 struct BridgedLoopTree {

@@ -28,6 +28,7 @@
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SILOptimizer/Utils/GenericCloner.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -381,15 +382,17 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
 
 static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
                           SILFunction *caller) {
-  // The `self` parameter of a borrow accessor with an indirect return
-  // cannot be promoted, since the returned address might point into the
-  // parameter.
+  // The `self` parameter of a borrow accessor cannot be promoted, since the
+  // returned address might point into the parameter, or the returned value
+  // might borrow from the parameter's memory location.
   //
   // TODO: It may be possible to promote `self` and the result if and only
   // if both the parameter and result do or do not get promoted in unison.
   if (substType->getNumResults() == 1
-      && substType->getSingleResult().getConvention()
-           == ResultConvention::GuaranteedAddress
+      && (substType->getSingleResult().getConvention()
+            == ResultConvention::GuaranteedAddress
+          || substType->getSingleResult().getConvention()
+            == ResultConvention::Guaranteed)
       && substType->getSelfParameterIndex() == paramIdx) {
     return false;
   }
@@ -2993,7 +2996,7 @@ FullApplySite ReabstractionThunkGenerator::createApplyAndReturn(
     assert(VoidTy.isVoid());
     returnValue = Builder.createTuple(Loc, VoidTy, {});
   }
-  Builder.createReturn(Loc, returnValue);
+  createThunkReturn(Builder, Loc, returnValue);
 
   return as;
 }

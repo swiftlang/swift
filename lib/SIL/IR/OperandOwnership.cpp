@@ -544,8 +544,7 @@ OperandOwnershipClassifier::visitDropDeinitInst(DropDeinitInst *i) {
 // This does not apply to uses that begin an explicit borrow scope in the
 // caller, such as begin_apply.
 static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
-                                                bool hasScopeInCaller,
-                                                bool forwardsGuaranteedValues) {
+                                                bool hasScopeInCaller) {
 
   switch (argConv) {
   case SILArgumentConvention::Indirect_In_CXX:
@@ -573,9 +572,6 @@ static OperandOwnership getFunctionArgOwnership(SILArgumentConvention argConv,
   case SILArgumentConvention::Direct_Guaranteed: {
     if (hasScopeInCaller) {
       return OperandOwnership::Borrow;
-    }
-    if (forwardsGuaranteedValues) {
-      return OperandOwnership::GuaranteedForwarding;
     }
     return OperandOwnership::InstantaneousUse;
   }
@@ -610,9 +606,15 @@ OperandOwnershipClassifier::visitFullApply(FullApplySite apply) {
     }
   }();
 
-  auto argOwnership = getFunctionArgOwnership(
-      argConv, /*hasScopeInCaller*/ apply.beginsCoroutineEvaluation(),
-      /*forwardsGuaranteedValues*/ apply.hasGuaranteedResult());
+  // The @guaranteed self of a borrow accessor is borrowed over the scope of
+  // the result, like the operand of a begin_borrow.
+  bool hasScopeInCaller = apply.beginsCoroutineEvaluation();
+  if (auto *ai = dyn_cast<ApplyInst>(apply.getInstruction())) {
+    if (ai->getSelfObjectOfGuaranteedBorrowAccessorResult() == &op) {
+      hasScopeInCaller = true;
+    }
+  }
+  auto argOwnership = getFunctionArgOwnership(argConv, hasScopeInCaller);
 
   // OSSA cleanup needs to handle each of these callee ownership cases.
   //
@@ -684,8 +686,7 @@ OperandOwnership OperandOwnershipClassifier::visitYieldInst(YieldInst *i) {
   auto fnType = i->getFunction()->getLoweredFunctionType();
   SILArgumentConvention argConv(
     fnType->getYields()[getOperandIndex()].getConvention());
-  return getFunctionArgOwnership(argConv, /*hasScopeInCaller*/ false,
-                                 /*forwardsGuaranteedValues*/ false);
+  return getFunctionArgOwnership(argConv, /*hasScopeInCaller*/ false);
 }
 
 OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {

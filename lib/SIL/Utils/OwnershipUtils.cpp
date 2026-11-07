@@ -476,6 +476,7 @@ bool swift::findUsesOfSimpleValue(SILValue value,
 bool swift::visitGuaranteedForwardingPhisForSSAValue(
     SILValue value, function_ref<bool(Operand *)> visitor) {
   assert(isa<BeginBorrowInst>(value) || isa<LoadBorrowInst>(value) ||
+         BorrowedValue(value).kind == BorrowedValueKind::BorrowAccessor ||
          (isa<SILPhiArgument>(value) &&
           value->getOwnershipKind() == OwnershipKind::Guaranteed));
   // guaranteedForwardingOps is a collection of all transitive
@@ -657,6 +658,9 @@ void BorrowingOperandKind::print(llvm::raw_ostream &os) const {
   case Kind::BeginAsyncLet:
     os << "BeginAsyncLet";
     return;
+  case Kind::BorrowAccessor:
+    os << "BorrowAccessor";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -690,7 +694,8 @@ bool BorrowingOperand::hasEmptyRequiredEndingUses() const {
   case BorrowingOperandKind::BeginApply:
   case BorrowingOperandKind::BeginAsyncLet:
   case BorrowingOperandKind::PartialApplyStack:
-  case BorrowingOperandKind::MarkDependenceNonEscaping: {
+  case BorrowingOperandKind::MarkDependenceNonEscaping:
+  case BorrowingOperandKind::BorrowAccessor: {
     return op->getUser()->hasUsesOfAnyResult();
   }
   case BorrowingOperandKind::Branch: {
@@ -718,7 +723,8 @@ bool BorrowingOperand::visitScopeEndingUses(
       return visitUnknownUse(op);
     }
     LLVM_FALLTHROUGH;
-  case BorrowingOperandKind::BeginBorrow: {
+  case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BorrowAccessor: {
     bool deadBorrow = true;
     for (auto *use : cast<SingleValueInstruction>(op->getUser())->getUses()) {
       if (use->isLifetimeEnding()) {
@@ -850,6 +856,7 @@ SILValue BorrowingOperand::getBorrowIntroducingUserResult() const {
     return SILValue();
 
   case BorrowingOperandKind::BeginBorrow:
+  case BorrowingOperandKind::BorrowAccessor:
     return cast<SingleValueInstruction>(op->getUser());
 
   case BorrowingOperandKind::BorrowedFrom: {
@@ -919,6 +926,7 @@ SILValue BorrowingOperand::getDependentUserResult() const {
   case BorrowingOperandKind::Yield:
   case BorrowingOperandKind::PartialApplyStack:
   case BorrowingOperandKind::BeginAsyncLet:
+  case BorrowingOperandKind::BorrowAccessor:
     return SILValue();
   }
   llvm_unreachable("covered switch");
@@ -949,6 +957,9 @@ void BorrowedValueKind::print(llvm::raw_ostream &os) const {
     return;
   case BorrowedValueKind::DereferenceBorrow:
     os << "DereferenceBorrow";
+    return;
+  case BorrowedValueKind::BorrowAccessor:
+    os << "BorrowAccessor";
     return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
@@ -984,6 +995,7 @@ bool BorrowedValue::visitLocalScopeEndingUses(
   case BorrowedValueKind::DereferenceBorrow:
   case BorrowedValueKind::Phi:
   case BorrowedValueKind::BeginApplyToken:
+  case BorrowedValueKind::BorrowAccessor:
     for (auto *use : lookThroughBorrowedFromUser(value)->getUses()) {
       if (isa<ExtendLifetimeInst>(use->getUser())) {
         if (!visitor(use))
@@ -1683,7 +1695,8 @@ void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
                               visitGuaranteedForwardingPhiBaseValuePair) {
   assert(borrow.kind == BorrowedValueKind::BeginBorrow ||
          borrow.kind == BorrowedValueKind::LoadBorrow ||
-         borrow.kind == BorrowedValueKind::DereferenceBorrow);
+         borrow.kind == BorrowedValueKind::DereferenceBorrow ||
+         borrow.kind == BorrowedValueKind::BorrowAccessor);
   // A GuaranteedForwardingPhi can have different base values on different
   // control flow paths.
   // For that reason, worklist stores (GuaranteedForwardingPhi operand, base
@@ -1828,6 +1841,16 @@ public:
       case BorrowedValueKind::BeginBorrow:
         return std::move(*this).visitBorrowIntroducers(
             cast<BeginBorrowInst>(value)->getOperand(), visitor);
+
+      case BorrowedValueKind::BorrowAccessor:
+        if (auto *selfOperand =
+                cast<ApplyInst>(value)
+                    ->getSelfObjectOfGuaranteedBorrowAccessorResult()) {
+          return std::move(*this).visitBorrowIntroducers(selfOperand->get(),
+                                                         visitor);
+        }
+        // An @in_guaranteed self has no enclosing def.
+        return true;
 
       case BorrowedValueKind::LoadBorrow:
       case BorrowedValueKind::DereferenceBorrow:
@@ -2047,6 +2070,17 @@ protected:
       recursivelyFindBorrowIntroducers(
         cast<BeginBorrowInst>(incomingValue)->getOperand(), enclosingDefs,
         visitedValues);
+      break;
+    }
+    case BorrowedValueKind::BorrowAccessor: {
+      // An @in_guaranteed self has no enclosing def.
+      if (auto *selfOperand =
+              cast<ApplyInst>(incomingValue)
+                  ->getSelfObjectOfGuaranteedBorrowAccessorResult()) {
+        LocalValueSetVector visitedValues;
+        recursivelyFindBorrowIntroducers(selfOperand->get(), enclosingDefs,
+                                         visitedValues);
+      }
       break;
     }
     case BorrowedValueKind::LoadBorrow:

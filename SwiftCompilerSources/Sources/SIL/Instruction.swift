@@ -1788,6 +1788,24 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
   public var specializationInfo: SpecializationInfo { bridged.ApplyInst_getSpecializationInfo() }
 
   public override var mayCallFunction: Bool { true }
+
+  /// A non-trivial object typed self of a borrow accessor with guaranteed result.
+  public var selfObjectOfGuaranteedBorrowAccessorResult: Operand? {
+    guard hasGuaranteedResult, !type.isTrivial(in: parentFunction),
+          let selfOperand = selfArgumentOperand, !selfOperand.value.type.isAddress else {
+      return nil
+    }
+    return selfOperand
+  }
+
+  /// A non-trivial address typed self of a borrow accessor with guaranteed result.
+  public var selfAddressOfGuaranteedBorrowAccessorResult: Value? {
+    guard hasGuaranteedResult, !type.isTrivial(in: parentFunction),
+          let selfAddress = selfArgument, selfAddress.type.isAddress else {
+      return nil
+    }
+    return selfAddress
+  }
 }
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}

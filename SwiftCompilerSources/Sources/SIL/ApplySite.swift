@@ -203,6 +203,11 @@ extension ApplySite {
     functionConvention.hasSelfParameter ? arguments.last : nil
   }
 
+  /// The `self` argument operand, or nil if the callee has no `self` parameter.
+  public var selfArgumentOperand: Operand? {
+    functionConvention.hasSelfParameter ? argumentOperands.last : nil
+  }
+
   /// Returns true when this apply has per-argument SILLocations stored on it.
   ///
   /// Per-argument locations are reserved today for the IsolationHistory

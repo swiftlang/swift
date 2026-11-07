@@ -1969,6 +1969,16 @@ bool swift::createBorrowScopeForPhiOperands(SILPhiArgument *newPhi) {
   return GuaranteedPhiBorrowFixup().createExtendedNestedBorrowScope(newPhi);
 }
 
+TermInst *swift::createThunkReturn(SILBuilder &builder, SILLocation loc,
+                                  SILValue result) {
+  if (auto *apply = dyn_cast<ApplyInst>(result)) {
+    if (BorrowedValue(apply)) {
+      return builder.createReturnBorrow(loc, result, {result});
+    }
+  }
+  return builder.createReturn(loc, result);
+}
+
 bool swift::extendStoreBorrow(StoreBorrowInst *sbi,
                               SmallVectorImpl<Operand *> &newUses,
                               InstModCallbacks callbacks) {
@@ -2122,4 +2132,18 @@ void swift::completeLifetimes(SILPassManager *pm, ArrayRef<SILValue> values, Arr
     completeLifetimeFunction({pm->getSwiftPassInvocation()->getCurrent()},
                              ArrayRef(bridgedValues), ArrayRef(bridgedEnds));
   }
+}
+
+static BridgedOptimizerUtilities::ChangeFunctionFn fixupBorrowAccessorsFunction;
+
+void BridgedOptimizerUtilities::registerBorrowAccessorFixup(ChangeFunctionFn fixupBorrowAccessorsFn) {
+  fixupBorrowAccessorsFunction = fixupBorrowAccessorsFn;
+}
+
+bool swift::fixupBorrowAccessors(SILPassManager *pm, SILFunction *f) {
+  if (!fixupBorrowAccessorsFunction) {
+    // If SwiftCompilerSources are not enabled or in SourceKit unit tests
+    return false;
+  }
+  return fixupBorrowAccessorsFunction({pm->getSwiftPassInvocation()->getCurrent()}, {f});
 }

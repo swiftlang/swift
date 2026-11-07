@@ -27,6 +27,7 @@ public struct S {
 // CHECK:   [[BORROW_FN:%.*]] = function_ref @$s{{.*}}1SV1k{{.*}}vb
 // CHECK:   [[RESULT:%.*]] = apply [[BORROW_FN]]([[BORROW]])
 // CHECK:   [[COPY:%.*]] = copy_value [[RESULT]]
+// CHECK:   end_borrow [[RESULT]]
 // CHECK:   end_borrow [[BORROW]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK: } // end sil function '$s{{.*}}7testVaryyF'
@@ -36,6 +37,7 @@ public struct S {
 // CHECK-EVOLUTION:   [[BORROW_FN:%.*]] = function_ref @$s{{.*}}1SV1k{{.*}}vb
 // CHECK-EVOLUTION:   [[RESULT:%.*]] = apply [[BORROW_FN]]([[ACCESS]])
 // CHECK-EVOLUTION:   [[COPY:%.*]] = copy_value [[RESULT]]
+// CHECK-EVOLUTION:   end_borrow [[RESULT]]
 // CHECK-EVOLUTION:   end_access [[ACCESS]]
 // CHECK-EVOLUTION: } // end sil function '$s{{.*}}7testVaryyF'
 func testVar() {
@@ -53,6 +55,7 @@ func testVar() {
 // CHECK:   [[BORROW_FN:%.*]] = function_ref @$s{{.*}}1SV1k{{.*}}vb
 // CHECK:   [[RESULT:%.*]] = apply [[BORROW_FN]]([[BORROW]])
 // CHECK:   [[COPY:%.*]] = copy_value [[RESULT]]
+// CHECK:   end_borrow [[RESULT]]
 // CHECK:   end_borrow [[BORROW]]
 // CHECK:   end_access [[ACCESS]]
 // CHECK:   return [[COPY]]
@@ -64,6 +67,7 @@ func testVar() {
 // CHECK-EVOLUTION:   [[BORROW_FN:%.*]] = function_ref @$s{{.*}}1SV1k{{.*}}vb
 // CHECK-EVOLUTION:   [[RESULT:%.*]] = apply [[BORROW_FN]]([[ACCESS]])
 // CHECK-EVOLUTION:   [[COPY:%.*]] = copy_value [[RESULT]]
+// CHECK-EVOLUTION:   end_borrow [[RESULT]]
 // CHECK-EVOLUTION:   end_access [[ACCESS]]
 // CHECK-EVOLUTION:   return [[COPY]]
 // CHECK-EVOLUTION: } // end sil function '$s{{.*}}9testInout{{.*}}'

@@ -2257,3 +2257,127 @@ bb2(%7 : @reborrow $X):
   %11 = tuple ()
   return %11 : $()
 }
+
+struct XWrapper {
+  @_hasStorage var x: X
+}
+
+sil @borrow_x : $@convention(method) (@guaranteed XWrapper) -> @guaranteed X
+sil @borrow_x_from_address : $@convention(method) (@in_guaranteed XWrapper) -> @guaranteed X
+
+// An `end_borrow` of a borrow accessor result with a @guaranteed self protects the interior
+// pointers of the result, like an `end_borrow` of a `begin_borrow`.
+// CHECK-LABEL: @test_end_borrow_of_borrow_accessor_result
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:   %4 = ref_element_addr %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:   %6 = ref_element_addr %1 : $X, #X.a
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_end_borrow_of_borrow_accessor_result : $@convention(thin) (@guaranteed XWrapper, @guaranteed X) -> () {
+bb0(%0 : @guaranteed $XWrapper, %1 : @guaranteed $X):
+  specify_test "memory_effects"
+  %2 = function_ref @borrow_x : $@convention(method) (@guaranteed XWrapper) -> @guaranteed X
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed XWrapper) -> @guaranteed X
+  %4 = ref_element_addr %3 : $X, #X.a
+  end_borrow %3 : $X
+  %6 = ref_element_addr %1 : $X, #X.a
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// An `end_borrow` of a borrow accessor result with an @in_guaranteed self also has effects on
+// the self memory location, like an `end_borrow` of a `load_borrow`.
+// CHECK-LABEL: @test_end_borrow_of_borrow_accessor_result_with_address_self
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:   %0 = argument of bb0 : $*XWrapper
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32
+// CHECK-NEXT:   r=0,w=0
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:   %4 = ref_element_addr %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_end_borrow_of_borrow_accessor_result_with_address_self : $@convention(thin) (@inout XWrapper, @inout Int32) -> () {
+bb0(%0 : $*XWrapper, %1 : $*Int32):
+  specify_test "memory_effects"
+  %2 = function_ref @borrow_x_from_address : $@convention(method) (@in_guaranteed XWrapper) -> @guaranteed X
+  %3 = apply %2(%0) : $@convention(method) (@in_guaranteed XWrapper) -> @guaranteed X
+  %4 = ref_element_addr %3 : $X, #X.a
+  end_borrow %3 : $X
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// The scope of a borrow accessor result is an immutable scope for an [immutable] field of the
+// result: a call within the scope cannot write the field, but a call after the scope can.
+// CHECK-LABEL: @test_immutable_ref_of_borrow_accessor_result
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %6 = apply %5() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %3 = ref_element_addr [immutable] %2 : $X, #X.a
+// CHECK-NEXT:   r=1,w=0
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     %8 = apply %5() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %3 = ref_element_addr [immutable] %2 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_immutable_ref_of_borrow_accessor_result : $@convention(thin) (@guaranteed XWrapper) -> Int32 {
+bb0(%0 : @guaranteed $XWrapper):
+  specify_test "memory_effects"
+  %1 = function_ref @borrow_x : $@convention(method) (@guaranteed XWrapper) -> @guaranteed X
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed XWrapper) -> @guaranteed X
+  %3 = ref_element_addr [immutable] %2 : $X, #X.a
+  %4 = load [trivial] %3 : $*Int32
+  %5 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %6 = apply %5() : $@convention(thin) () -> ()
+  end_borrow %2 : $X
+  %8 = apply %5() : $@convention(thin) () -> ()
+  return %4 : $Int32
+}
+
+// An `end_borrow` of a reborrowed borrow accessor result with an @in_guaranteed self has
+// effects on the self memory location, like an `end_borrow` of a reborrowed `load_borrow`.
+// CHECK-LABEL: @test_end_borrow_of_reborrowed_borrow_accessor_result
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %6 : $X
+// CHECK-NEXT:   %0 = argument of bb0 : $*XWrapper
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %6 : $X
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_end_borrow_of_reborrowed_borrow_accessor_result : $@convention(thin) (@inout XWrapper, @inout Int32) -> () {
+bb0(%0 : $*XWrapper, %1 : $*Int32):
+  specify_test "memory_effects"
+  %2 = function_ref @borrow_x_from_address : $@convention(method) (@in_guaranteed XWrapper) -> @guaranteed X
+  %3 = apply %2(%0) : $@convention(method) (@in_guaranteed XWrapper) -> @guaranteed X
+  br bb1(%3)
+
+bb1(%5 : @reborrow $X):
+  %6 = borrowed %5 from ()
+  end_borrow %6 : $X
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// An `end_borrow` of a borrow accessor result with a @guaranteed self has no effects on an
+// unrelated global.
+// CHECK-LABEL: @test_end_borrow_of_borrow_accessor_result_global
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:     %1 = global_addr @globalX1 : $*X
+// CHECK-NEXT:   r=0,w=0
+sil [ossa] @test_end_borrow_of_borrow_accessor_result_global : $@convention(thin) (@guaranteed XWrapper) -> () {
+bb0(%0 : @guaranteed $XWrapper):
+  specify_test "memory_effects"
+  %1 = global_addr @globalX1 : $*X
+  %2 = function_ref @borrow_x : $@convention(method) (@guaranteed XWrapper) -> @guaranteed X
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed XWrapper) -> @guaranteed X
+  end_borrow %3 : $X
+  %5 = tuple ()
+  return %5 : $()
+}

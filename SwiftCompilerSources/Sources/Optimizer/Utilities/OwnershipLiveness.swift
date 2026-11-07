@@ -700,6 +700,17 @@ extension InteriorUseWalker: AddressUseVisitor {
     if apply is BeginApplyInst {
       return scopedAddressUse(of: operand)
     }
+    // Like a load_borrow, a borrow accessor borrows the memory location of an @in_guaranteed self over the scope of
+    // its result.
+    if let apply = apply as? ApplyInst, let borrow = BeginBorrowValue(apply),
+       let selfAddress = apply.selfAddressOfGuaranteedBorrowAccessorResult, selfAddress == operand.value {
+      if handleInner(borrowed: apply) == .abortWalk {
+        return .abortWalk
+      }
+      return borrow.scopeEndingOperands.walk {
+        useVisitor($0)
+      }
+    }
     return leafAddressUse(of: operand)
   }
 
@@ -809,10 +820,6 @@ extension InteriorUseWalker {
     }
     if let inst = operand.instruction as? ForwardingInstruction {
       return inst.forwardedResults.walk { walkDownUses(of: $0) }
-    }
-    // TODO: Represent apply of borrow accessors as ForwardingOperation and use that over ForwardingInstruction
-    if let apply = operand.instruction as? FullApplySite, apply.hasGuaranteedResult {
-      return walkDownUses(of: apply.singleDirectResult!)
     }
     // TODO: verify that ForwardInstruction handles all .forward operand ownership and assert that only phis can be
     // reached: assert(Phi(using: operand) != nil)
