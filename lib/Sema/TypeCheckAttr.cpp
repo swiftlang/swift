@@ -9706,7 +9706,10 @@ void AttributeChecker::visitLifetimeAttr(LifetimeAttr *attr) {
 }
 
 void AttributeChecker::visitAddressableSelfAttr(AddressableSelfAttr *attr) {
-  if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters)) {
+  // Allowed in safe interop wrappers, which need it to keep references into a
+  // borrowed self valid.
+  if (!Ctx.LangOpts.hasFeature(Feature::AddressableParameters) &&
+      !Ctx.SourceMgr.isImportMacroGeneratedLoc(attr->getLocation())) {
     Ctx.Diags.diagnose(attr->getLocation(), diag::addressable_not_enabled);
   }
   
