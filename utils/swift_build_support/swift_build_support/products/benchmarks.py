@@ -59,7 +59,7 @@ class Benchmarks(product.Product):
             # we need to prefer the libraries we just built
             env['DYLD_LIBRARY_PATH'] = os.path.join(
                 _get_toolchain_path(host_target, self, self.args),
-                'usr', 'lib', 'swift', 'macosx')
+                'lib', 'swift', 'macosx')
         return env
 
     def test(self, host_target):
@@ -98,17 +98,8 @@ class Benchmarks(product.Product):
 
 
 def _get_toolchain_path(host_target, product, args):
-    # TODO check if we should prefer using product.install_toolchain_path
-    # this logic initially was inside run_build_script_helper
-    # and was factored out so it can be used in testing as well
-
-    toolchain_path = product.host_install_destdir(host_target)
-    if platform.system() == 'Darwin':
-        # The prefix is an absolute path, so concatenate without os.path.
-        toolchain_path += \
-            targets.darwin_toolchain_prefix(args.install_prefix)
-
-    return toolchain_path
+    return targets.toolchain_path(product.host_install_destdir(host_target),
+                                  args.install_prefix)
 
 
 def run_build_script_helper(host_target, product, args):
