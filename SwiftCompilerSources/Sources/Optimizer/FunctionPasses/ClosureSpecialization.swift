@@ -1058,12 +1058,7 @@ private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ c
   defer { needDestroy.deinitialize() }
 
   for clonedArg in clonedArguments {
-    if let beginBorrow = clonedArg as? BeginBorrowInst {
-      Builder.insertCleanupAtFunctionExits(of: beginBorrow.parentFunction, context) { builder in
-        builder.createEndBorrow(of: beginBorrow)
-      }
-      completeLifetime(of: beginBorrow, context)
-    }
+    addMissingEndBorrowsRecursively(value: clonedArg, context)
     findValuesWhichNeedDestroyRecursively(value: clonedArg, needDestroy: &needDestroy)
   }
 
@@ -1072,6 +1067,33 @@ private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ c
       builder.createDestroyValue(operand: valueToDestroy)
     }
     completeLifetime(of: valueToDestroy, context)
+  }
+}
+
+/// Adds end_borrows for the begin_borrow which is created for an owned closure argument, but also
+/// for begin_borrows inside the cloned closure value chain. The latter can come from a previous
+/// round of closure specialization, e.g.
+/// ```
+///   %1 = partial_apply %closure
+///   %2 = begin_borrow %1           // created by the previous specialization round
+///   %3 = convert_function %2
+///   apply %function(%3) : (@guaranteed () -> ()) -> ()
+/// ```
+/// The cloner only clones the value chain and not the end_borrows of the begin_borrow.
+///
+/// Inner borrow scopes are visited first so that their end_borrows are inserted before the end_borrows
+/// of outer scopes.
+private func addMissingEndBorrowsRecursively(value: Value, _ context: FunctionPassContext) {
+  if let beginBorrow = value as? BeginBorrowInst, beginBorrow.scopeEndingOperands.isEmpty {
+    Builder.insertCleanupAtFunctionExits(of: beginBorrow.parentFunction, context) { builder in
+      builder.createEndBorrow(of: beginBorrow)
+    }
+    completeLifetime(of: beginBorrow, context)
+  }
+  if let svi = value as? SingleValueInstruction {
+    for op in svi.operands {
+      addMissingEndBorrowsRecursively(value: op.value, context)
+    }
   }
 }
 
