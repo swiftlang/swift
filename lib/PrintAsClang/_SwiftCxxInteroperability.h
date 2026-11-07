@@ -313,15 +313,15 @@ static inline const constexpr bool isSwiftBridgedCxxRecord = false;
 /// Returns the opaque pointer to the given value.
 template <class T>
 SWIFT_INLINE_THUNK const void *_Nonnull getOpaquePointer(const T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<const OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<const void *>(&value);
 }
 
 template <class T>
 SWIFT_INLINE_THUNK void *_Nonnull getOpaquePointer(T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<void *>(&value);
 }
 

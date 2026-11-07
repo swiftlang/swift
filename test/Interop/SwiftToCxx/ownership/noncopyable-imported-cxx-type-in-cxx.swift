@@ -11,8 +11,9 @@
 // RUN:   -I %S/Inputs \
 // RUN:   -clang-header-expose-decls=all-public \
 // RUN:   -emit-clang-header-path %t/imported.h
-// RUN: %FileCheck --implicit-check-not=_isMovedFrom %s < %t/imported.h
+// RUN: %FileCheck %s < %t/imported.h
 // RUN: %FileCheck --check-prefix=PAYLOAD %s < %t/imported.h
+// RUN: %FileCheck --check-prefix=IMPORTED %s < %t/imported.h
 
 // RUN: echo '#include "cxx-move-only.h"' > %t/combined.h
 // RUN: cat %t/imported.h >> %t/combined.h
@@ -55,3 +56,10 @@ public enum EnumWithOptionalCxxPayload: ~Copyable {
 
 // Handing ownership of an imported C++ value to Swift is not supported.
 // CHECK: // Unavailable in C++: Swift global function 'consumeCxx(_:)'.
+
+// Scope these checks to the imported declarations. Swift standard library
+// wrappers in the same header can have their own moved-from state.
+// IMPORTED-LABEL: namespace Imported SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Imported") {
+// IMPORTED-NOT: _isMovedFrom
+// IMPORTED-NOT: CxxMoveOnly final
+// IMPORTED: } // namespace Imported

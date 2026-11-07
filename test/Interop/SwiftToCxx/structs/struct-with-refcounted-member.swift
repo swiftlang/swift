@@ -37,17 +37,29 @@ public func identity<T>(_ value: T) -> T {
 // CHECK:      class SWIFT_SYMBOL({{.*}}) StructWithRefcountedMember final {
 // CHECK-NEXT: public:
 // CHECK-NEXT:   SWIFT_INLINE_THUNK ~StructWithRefcountedMember() noexcept {
+// CHECK-NEXT:     if (_isMovedFrom()) return;
 // CHECK-NEXT:     void *reference;
 // CHECK-NEXT:     memcpy(&reference, _getOpaquePointer(), sizeof(reference));
 // CHECK-NEXT:     swift::_impl::swift_release(reference);
 // CHECK-NEXT:   }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember(const StructWithRefcountedMember &other) noexcept {
+// CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember(StructWithRefcountedMember &&other) noexcept {
+// CHECK:          memcpy(_storage, other._storage, sizeof(void *));
+// CHECK-NEXT:     other._setMovedFrom();
+// CHECK:        SWIFT_INLINE_THUNK StructWithRefcountedMember(const StructWithRefcountedMember &other) noexcept {
+// CHECK-NEXT:     if (other._isMovedFrom()) {
+// CHECK-NEXT:       _setMovedFrom();
+// CHECK-NEXT:       return;
+// CHECK-NEXT:     }
 // CHECK-NEXT:     void *reference;
 // CHECK-NEXT:     memcpy(&reference, other._getOpaquePointer(), sizeof(reference));
 // CHECK-NEXT:     swift::_impl::swift_retain(reference);
-// CHECK-NEXT:     memcpy(_getOpaquePointer(), &reference, sizeof(reference));
+// CHECK-NEXT:     memcpy(_storage, &reference, sizeof(reference));
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember &operator =(const StructWithRefcountedMember &other) noexcept {
+// CHECK-NEXT:     if (_isMovedFrom() || other._isMovedFrom()) {
+// CHECK-NEXT:       *this = StructWithRefcountedMember(other);
+// CHECK-NEXT:       return *this;
+// CHECK-NEXT:     }
 // CHECK-NEXT:     void *newReference;
 // CHECK-NEXT:     memcpy(&newReference, other._getOpaquePointer(), sizeof(newReference));
 // CHECK-NEXT:     swift::_impl::swift_retain(newReference);
@@ -68,6 +80,7 @@ public func identity<T>(_ value: T) -> T {
 }
 
 // FIXED-LABEL: SWIFT_INLINE_THUNK ~FrozenReference() noexcept {
+// FIXED-NEXT:    if (_isMovedFrom()) return;
 // FIXED-NEXT:    void *reference;
 // FIXED-NEXT:    memcpy(&reference, _getOpaquePointer(), sizeof(reference));
 // FIXED-NEXT:    swift::_impl::swift_release(reference);
@@ -101,6 +114,7 @@ public func returnNewReferenceEnum() -> ReferenceEnum {
 
 // A singleton enum has the ownership operations of its payload.
 // FIXED-LABEL: SWIFT_INLINE_THUNK ~ReferenceEnum() noexcept {
+// FIXED-NEXT:    if (_isMovedFrom()) return;
 // FIXED-NEXT:    void *reference;
 // FIXED-NEXT:    memcpy(&reference, _getOpaquePointer(), sizeof(reference));
 // FIXED-NEXT:    swift::_impl::swift_release(reference);
@@ -116,6 +130,7 @@ public struct UnknownReference {
 
 // AnyObject uses native reference counting when Objective-C interop is disabled.
 // CHECK-LABEL: SWIFT_INLINE_THUNK ~UnknownReference() noexcept {
+// CHECK-NEXT:    if (_isMovedFrom()) return;
 // CHECK-objc:    vwTable->destroy(_getOpaquePointer(), metadata._0);
 // CHECK-nonobjc-NEXT: void *reference;
 // CHECK-nonobjc-NEXT: memcpy(&reference, _getOpaquePointer(), sizeof(reference));
