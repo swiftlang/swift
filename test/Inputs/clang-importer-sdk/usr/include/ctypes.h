@@ -313,6 +313,25 @@ struct StructWithUnnamedRecordArrays {
   } s;
 };
 
+// Anonymous members that contain arrays.
+typedef struct {
+  struct { int b[2]; };
+} AnonStruct;
+
+// The shape of Metal's MTLPackedFloat3: an anonymous union of a struct and an
+// array.
+typedef struct {
+  union {
+    struct { float x, y, z; };
+    float elements[3];
+  };
+} PackedFloat3;
+
+// A named member of anonymous type (the shape of in6_addr).
+typedef struct {
+  struct { int a[2]; } inner;
+} NamedMember;
+
 //===---
 // Bitfields
 //===---
