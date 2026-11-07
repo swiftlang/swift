@@ -309,7 +309,7 @@ extension ASTGenVisitor {
 
   /// Obtains the C++ start location of `token`.
   ///
-  /// A closing token the parser synthesized during recovery has a zero-width
+  /// A token that ends its parent, which the parser synthesized during recovery, has a zero-width
   /// position just past the preceding token *and its trailing trivia*, which can
   /// lie beyond the construct that contains it. The C++ parser gives a token it
   /// did not find the start of the previous token it consumed
@@ -317,13 +317,13 @@ extension ASTGenVisitor {
   /// contents end, so do the same.
   @inline(__always)
   func generateSourceLoc(_ token: TokenSyntax) -> SourceLoc {
-    // This applies to closing tokens only: a missing token that starts or
-    // continues a construct, such as the `var` of a declaration or the `{` of a
-    // `switch` whose subject is another `switch`, must not move back into what
-    // precedes it.
+    // This applies to a missing token that ends its parent -- a closing
+    // delimiter, the ':' of a `case` -- and not to one that opens a construct,
+    // such as the `{` of a `switch` whose subject is another `switch`: that
+    // must not move back into what precedes it.
     if token.presence == .missing,
-      token.rawTokenKind == .rightParen || token.rawTokenKind == .rightBrace
-        || token.rawTokenKind == .rightSquare || token.rawTokenKind == .rightAngle,
+      token.rawTokenKind != .leftParen, token.rawTokenKind != .leftBrace,
+      token.rawTokenKind != .leftSquare, token.rawTokenKind != .leftAngle,
       let parent = token.parent,
       let lastInParent = parent.lastToken(viewMode: .sourceAccurate),
       lastInParent.endPosition <= token.position,
