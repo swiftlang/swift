@@ -40,6 +40,9 @@ namespace index {
 /// \param indexSystemModules If true, emit index data for imported serialized
 /// swift system modules.
 ///
+/// \param indexBinaryModules If true, also emit index data for imported
+/// serialized swift modules built from a textual interface outside the SDK.
+///
 /// \param skipStdlib If indexing system modules, don't index the standard
 /// library.
 ///
@@ -55,7 +58,8 @@ namespace index {
 /// \param pathRemapper Remapper to use for paths in index data.
 bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
                     StringRef indexStorePath, bool indexClangModules,
-                    bool indexSystemModules, bool skipStdlib,
+                    bool indexSystemModules, bool indexBinaryModules,
+                    bool skipStdlib,
                     bool includeLocals, bool compress, bool isDebugCompilation,
                     bool isExplicitModuleBuild, StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
@@ -82,6 +86,9 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
 /// \param indexSystemModules If true, emit index data for imported serialized
 /// swift system modules.
 ///
+/// \param indexBinaryModules If true, also emit index data for imported
+/// serialized swift modules built from a textual interface outside the SDK.
+///
 /// \param skipStdlib If indexing system modules, don't index the standard
 /// library.
 ///
@@ -98,7 +105,8 @@ bool indexAndRecord(SourceFile *primarySourceFile, StringRef indexUnitToken,
 bool indexAndRecord(ModuleDecl *module, ArrayRef<std::string> indexUnitTokens,
                     StringRef moduleUnitToken, StringRef indexStorePath,
                     bool indexClangModules, bool indexSystemModules,
-                    bool skipStdlib, bool includeLocals, bool compress,
+                    bool indexBinaryModules, bool skipStdlib,
+                    bool includeLocals, bool compress,
                     bool isDebugCompilation, bool isExplicitModuleBuild,
                     StringRef targetTriple,
                     const DependencyTracker &dependencyTracker,
