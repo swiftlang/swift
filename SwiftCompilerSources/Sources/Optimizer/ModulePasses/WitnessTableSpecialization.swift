@@ -34,6 +34,7 @@ import SIL
 ///
 /// All witness methods of a specialized witness table are specialized, even if they are never
 /// called. Therefore the pass doesn't run on functions which are optimized for code size.
+/// It also doesn't run on functions which are not optimized, e.g. `@_optimize(none)`.
 /// Witness methods which cannot be specialized, e.g. generic method requirements, keep the original
 /// generic witness.
 ///
@@ -51,7 +52,8 @@ let witnessTableSpecialization = ModulePass(name: "witness-table-specialization"
   var visited = Set<Conformance>()
 
   for function in moduleContext.functions
-    where function.isDefinition && !function.isGeneric && !function.isOptimizedForSize
+    where function.isDefinition && !function.isGeneric &&
+          function.shouldOptimize && !function.isOptimizedForSize
   {
     for inst in function.instructions {
       guard let initExistential = inst as? InitExistentialInstruction else {
