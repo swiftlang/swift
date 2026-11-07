@@ -493,8 +493,6 @@ public:
   void setNextWaitingTask(AsyncTask *task);
 };
 
-#if !SWIFT_CONCURRENCY_EMBEDDED
-
 /// A status record that represents a task deadline.
 ///
 /// The clock and instant are pointers to *borrowed* for the duration of withDeadline values,
@@ -582,8 +580,6 @@ public:
 static_assert(sizeof(TaskDeadlineStatusRecord) <=
                   NumWords_TaskDeadline * sizeof(void *),
               "TaskDeadlineStatusRecord must fit in NumWords_TaskDeadline");
-
-#endif // !SWIFT_CONCURRENCY_EMBEDDED
 
 /// A status record which represents a scoped cancellation scope that is
 /// independent of whole-task cancellation.
