@@ -60,6 +60,10 @@ public protocol GreeterWithSPISystem: DistributedActor where ActorSystem == Fake
 // CHECK-NEXT: Distributed._DistributedActorStub
 // CHECK-NEXT: {
 // CHECK:   public typealias ActorSystem = FakeActorSystemWithSPI
+// CHECK:   @available(*, unavailable, message: "stub '$GreeterWithSPISystem' can only be resolved as a remote reference, use '$GreeterWithSPISystem.resolve(id:using:)'")
+// CHECK-NEXT:   init(actorSystem: ActorSystem) {
+// CHECK-NEXT:     fatalError()
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 
 // CHECK: @_spi(DistributedSPIForTesting)

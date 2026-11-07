@@ -67,6 +67,10 @@ protocol Base4<Fruit, Animal>: DistributedActor where ActorSystem == LocalTestin
 // CHECK-NEXT:   Animal: Codable & Hashable
 // CHECK-NEXT: {
 // CHECK-NEXT:   typealias ActorSystem = LocalTestingDistributedActorSystem
+// CHECK:        @available(*, unavailable, message: "stub '$Base4' can only be resolved as a remote reference, use '$Base4.resolve(id:using:)'")
+// CHECK-NEXT:   init(actorSystem: ActorSystem) {
+// CHECK-NEXT:     fatalError()
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
 
 @Resolvable
@@ -86,4 +90,8 @@ public protocol DistributedWorker<WorkItem, WorkResult>: DistributedActor where 
 // CHECK-NEXT:   WorkResult: Sendable & Codable
 // CHECK-NEXT: {
 // CHECK:        public typealias ActorSystem = LocalTestingDistributedActorSystem
+// CHECK:        @available(*, unavailable, message: "stub '$DistributedWorker' can only be resolved as a remote reference, use '$DistributedWorker.resolve(id:using:)'")
+// CHECK-NEXT:   init(actorSystem: ActorSystem) {
+// CHECK-NEXT:     fatalError()
+// CHECK-NEXT:   }
 // CHECK-NEXT: }
