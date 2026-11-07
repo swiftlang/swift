@@ -120,6 +120,39 @@ bb0(%0 : $*StructWithStructWithStoredProperties):
 }
 
 
+// rdar://170348611 - look through the move-only wrapper cast of a copyable
+// 'consuming' value to find the accessed stored property.
+// CHECK-LABEL: @accessSeparateStoredPropertiesThroughMoveOnlyWrapper
+// CHECK-NEXT: ([.f modify, .g read])
+sil private [ossa] @accessSeparateStoredPropertiesThroughMoveOnlyWrapper : $@convention(thin) (@inout_aliasable @moveOnly StructWithStoredProperties) -> () {
+bb0(%0 : $*@moveOnly StructWithStoredProperties):
+  %1 = begin_access [modify] [unknown] %0 : $*@moveOnly StructWithStoredProperties
+  %2 = moveonlywrapper_to_copyable_addr %1 : $*@moveOnly StructWithStoredProperties
+  %3 = struct_element_addr %2 : $*StructWithStoredProperties, #StructWithStoredProperties.f
+  end_access %1 : $*@moveOnly StructWithStoredProperties
+  %5 = begin_access [read] [unknown] %0 : $*@moveOnly StructWithStoredProperties
+  %6 = moveonlywrapper_to_copyable_addr %5 : $*@moveOnly StructWithStoredProperties
+  %7 = struct_element_addr %6 : $*StructWithStoredProperties, #StructWithStoredProperties.g
+  end_access %5 : $*@moveOnly StructWithStoredProperties
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// The cast has more than one projection user, so the whole value is accessed.
+// CHECK-LABEL: @accessMultipleStoredPropertiesThroughMoveOnlyWrapper
+// CHECK-NEXT: ([modify])
+sil private [ossa] @accessMultipleStoredPropertiesThroughMoveOnlyWrapper : $@convention(thin) (@inout_aliasable @moveOnly StructWithStoredProperties) -> () {
+bb0(%0 : $*@moveOnly StructWithStoredProperties):
+  %1 = begin_access [modify] [unknown] %0 : $*@moveOnly StructWithStoredProperties
+  %2 = moveonlywrapper_to_copyable_addr %1 : $*@moveOnly StructWithStoredProperties
+  %3 = struct_element_addr %2 : $*StructWithStoredProperties, #StructWithStoredProperties.f
+  %4 = struct_element_addr %2 : $*StructWithStoredProperties, #StructWithStoredProperties.g
+  end_access %1 : $*@moveOnly StructWithStoredProperties
+  %6 = tuple ()
+  return %6 : $()
+}
+
+
 // CHECK-LABEL: @accessSeparateStoredPropertiesOfSameCaptureOppositeOfDeclarationOrder
 // CHECK-NEXT: ([.f read, .g modify])
 sil private [ossa] @accessSeparateStoredPropertiesOfSameCaptureOppositeOfDeclarationOrder : $@convention(thin) (@inout_aliasable StructWithStoredProperties) -> () {
