@@ -4,8 +4,6 @@
 // RUN: %target-build-swift %s -parse-as-library -Xfrontend -disable-availability-checking -Onone -I %t -L %t -lImageBase -Xlinker -rpath -Xlinker %t -o %t/image-base.exe
 // RUN: %target-run %t/image-base.exe | %FileCheck %s
 
-// UNSUPPORTED: use_os_stdlib
-// UNSUPPORTED: back_deployment_runtime
 // REQUIRES: executable_test
 // REQUIRES: backtracing
 // REQUIRES: OS=linux-gnu
