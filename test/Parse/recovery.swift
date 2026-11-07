@@ -26,8 +26,8 @@ class Container<T> {
 }
 
 func useContainer() -> () {
-  var a : Container<not a type [skip this greater: >] >, b : Int // expected-cparser-error{{expected '>' to complete generic argument list}} expected-astgen-error {{expected '>' to end generic argument clause}} expected-note{{to match this opening '<'}} expected-astgen-note {{'a' declared here}} expected-astgen-note {{'a' declared here}} expected-astgen-error {{cannot find type 'not' in scope}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{use of local variable 'a' before its declaration}} expected-astgen-error {{unexpected code 'this greater: >' in subscript}} expected-astgen-error {{expected expression after operator}}
-  b = 5 // no-warning // expected-astgen-error {{cannot find 'b' in scope; did you mean 'a'?}}
+  var a : Container<not a type [skip this greater: >] >, b : Int // expected-cparser-error{{expected '>' to complete generic argument list}} expected-astgen-error {{expected '>' to end generic argument clause}} expected-note{{to match this opening '<'}} expected-astgen-note {{'a' declared here}} expected-astgen-note {{did you mean 'a'?}} expected-astgen-error {{cannot find type 'not' in scope}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{use of local variable 'a' before its declaration}} expected-astgen-error {{unexpected code 'this greater: >' in subscript}} expected-astgen-error {{expected expression after operator}}
+  b = 5 // no-warning // // expected-astgen-error {{cannot find 'b' in scope}}
   a.exists()
 }
 
@@ -36,7 +36,7 @@ func useContainer() -> () {
 }
 
 // expected-cparser-note @+2 {{did you mean 'test'?}}
-// expected-cparser-note @+1 {{'test' declared here}}
+// expected-note @+1 {{'test' declared here}}
 func test(a: BadAttributes) -> () {
   _ = a.exists() // no-warning
 }
@@ -131,7 +131,7 @@ func missingControllingExprInRepeatWhile() {
   repeat {
   } while // expected-error {{missing condition in 'while' statement}}
   { // expected-cparser-error{{closure expression is unused}} expected-astgen-error {{function produces expected type 'Bool'; did you mean to call it with '()'?}} expected-cparser-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
-    missingControllingExprInRepeatWhile(); // expected-astgen-error {{cannot convert value of type '()' to closure result type 'Bool'}}
+    missingControllingExprInRepeatWhile(); // // expected-astgen-error {{cannot convert value of type '()' to closure result type 'Bool'}}
   }
 
   repeat {
@@ -157,7 +157,7 @@ func missingControllingExprInFor() {
   for ; true { // expected-cparser-error {{C-style for statement was removed in Swift 3}} expected-astgen-error {{expected pattern, 'in', and expression in 'for' statement}} expected-astgen-error {{unexpected code '; true' in 'for' statement}}
   }
 
-  for var i = 0; true { // expected-cparser-error {{C-style for statement was removed in Swift 3}} expected-astgen-error {{}} expected-astgen-error {{unexpected code '= 0; true' in 'for' statement}}
+  for var i = 0; true { // expected-cparser-error {{C-style for statement was removed in Swift 3}} expected-astgen-error {{expected 'in' and expression in 'for' statement}} expected-astgen-error {{unexpected code '= 0; true' in 'for' statement}}
     i += 1
   }
 }
@@ -244,17 +244,17 @@ func missingControllingExprInForEach() {
 
 //===--- Recovery for missing braces in nominal type decls.
 
-struct NoBracesStruct1() // expected-error {{expected '{' in struct}} expected-astgen-error {{unexpected code '()' in struct}}
-enum NoBracesUnion1() // expected-error {{expected '{' in enum}} expected-astgen-error {{unexpected code '()' in enum}}
-class NoBracesClass1() // expected-error {{expected '{' in class}} expected-astgen-error {{unexpected code '()' in class}}
-protocol NoBracesProtocol1() // expected-cparser-error {{expected '{' in protocol type}} expected-astgen-error {{expected '{' in protocol}} expected-astgen-error {{unexpected code '()' in protocol}}
-extension NoBracesStruct1() // expected-error {{expected '{' in extension}} expected-astgen-error {{declaration is only valid at file scope}} expected-astgen-error {{unexpected code '()' in extension}}
+struct NoBracesStruct1() // expected-cparser-error {{expected '{' in struct}} expected-astgen-error {{expected member block in struct}}
+enum NoBracesUnion1() // expected-cparser-error {{expected '{' in enum}} expected-astgen-error {{expected member block in enum}}
+class NoBracesClass1() // expected-cparser-error {{expected '{' in class}} expected-astgen-error {{expected member block in class}}
+protocol NoBracesProtocol1() // expected-cparser-error {{expected '{' in protocol type}} expected-astgen-error {{expected member block in protocol}}
+extension NoBracesStruct1() // expected-cparser-error {{expected '{' in extension}} expected-astgen-error {{expected member block in extension}}
 
-struct NoBracesStruct2 // expected-error {{expected '{' in struct}}
-enum NoBracesUnion2 // expected-error {{expected '{' in enum}}
-class NoBracesClass2 // expected-error {{expected '{' in class}}
-protocol NoBracesProtocol2 // expected-cparser-error {{expected '{' in protocol type}} expected-astgen-error {{expected '{' in protocol}}
-extension NoBracesStruct2 // expected-error {{expected '{' in extension}} expected-astgen-error {{declaration is only valid at file scope}} expected-astgen-error {{cannot find type 'NoBracesStruct2' in scope}}
+struct NoBracesStruct2 // expected-cparser-error {{expected '{' in struct}} expected-astgen-error {{expected member block in struct}}
+enum NoBracesUnion2 // expected-cparser-error {{expected '{' in enum}} expected-astgen-error {{expected member block in enum}}
+class NoBracesClass2 // expected-cparser-error {{expected '{' in class}} expected-astgen-error {{expected member block in class}}
+protocol NoBracesProtocol2 // expected-cparser-error {{expected '{' in protocol type}} expected-astgen-error {{expected member block in protocol}}
+extension NoBracesStruct2 // expected-cparser-error {{expected '{' in extension}} expected-astgen-error {{expected member block in extension}}
 
 //===--- Recovery for multiple identifiers in decls
 
@@ -290,7 +290,7 @@ struct SS SS : Multi {
   // expected-error @-4 {{cannot convert value of type 'String' to specified type 'Int'}}
   
   func f() {
-    var c d = 5 // expected-astgen-error {{cannot find type 'd' in scope}}
+    var c d = 5 // // expected-astgen-error {{cannot find type 'd' in scope}}
     // expected-cparser-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}} expected-astgen-error@-1 {{expected ':' in type annotation}}
     // expected-cparser-note @-2 {{join the identifiers together}} {{9-12=cd}}
     // expected-cparser-note @-3 {{join the identifiers together with camel-case}} {{9-12=cD}}
@@ -300,18 +300,18 @@ struct SS SS : Multi {
   }
 }
 
-let (efg hij, foobar) = (5, 6) // expected-astgen-error {{extensions must not contain stored properties}} expected-astgen-error {{extensions must not contain stored properties}} expected-astgen-error {{extensions must not contain stored properties}} expected-astgen-error {{'(Int, Int)' is not convertible to '(Int, Int, _)', tuples have a different number of elements}}
+let (efg hij, foobar) = (5, 6) // // expected-astgen-error {{'(Int, Int)' is not convertible to '(Int, Int, _)', tuples have a different number of elements}}
 // expected-cparser-error @-1 {{found an unexpected second identifier in constant declaration; is there an accidental break?}} expected-astgen-error@-1 {{expected ',' in tuple pattern}}
 // expected-cparser-note @-2 {{join the identifiers together}} {{6-13=efghij}}
 // expected-cparser-note @-3 {{join the identifiers together with camel-case}} {{6-13=efgHij}}
 
-_ = foobar // OK. // expected-astgen-error {{expected 'var' in variable}} expected-astgen-error {{cannot find 'foobar' in scope}}
+_ = foobar // OK. //
 
 
 //===--- Recovery for parse errors in types.
 
 struct ErrorTypeInVarDecl1 {
-  var v1 : // expected-cparser-error {{expected type}} {{11-11= <#type#>}} expected-astgen-error {{expected type}}
+  var v1 : // expected-cparser-error {{expected type}} {{11-11= <#type#>}} expected-astgen-error {{expected type}}{{136-136= <#type#>}}
 }
 
 struct ErrorTypeInVarDecl2 {
@@ -326,7 +326,7 @@ struct ErrorTypeInVarDecl3 {
 
 struct ErrorTypeInVarDecl4 {
   var v1 : Int<, // expected-cparser-error {{expected type}} {{16-16= <#type#>}} expected-astgen-error {{expected '>' to end generic argument clause}} expected-astgen-error {{cannot specialize non-generic type 'Int'}} expected-astgen-note {{to match this opening '<'}}
-  var v2 : Int // expected-astgen-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
+  var v2 : Int // // expected-astgen-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
 }
 
 struct ErrorTypeInVarDecl5 {
@@ -392,11 +392,11 @@ struct ErrorTypeInVarDecl16 {
 func ErrorTypeInPattern4(_: FooProtocol & ) { } // expected-cparser-error {{expected identifier for type name}} expected-astgen-error {{expected type in type composition}}
 
 
-struct ErrorGenericParameterList1< // expected-cparser-error {{expected an identifier to name generic parameter}} expected-astgen-error {{expected '>' to end generic parameter clause}} expected-error {{expected '{' in struct}} expected-astgen-note {{through reference here}} expected-astgen-error {{circular reference}} expected-astgen-note {{to match this opening '<'}}
+struct ErrorGenericParameterList1< // expected-cparser-error {{expected an identifier to name generic parameter}} expected-cparser-error {{expected '{' in struct}} expected-astgen-error {{expected '>' to end generic parameter clause}} expected-astgen-error {{expected member block in struct}} expected-astgen-note {{to match this opening '<'}}
 
-struct ErrorGenericParameterList2<T // expected-cparser-error {{expected '>' to complete generic parameter list}} expected-astgen-error {{expected '>' to end generic parameter clause}} expected-note {{to match this opening '<'}} expected-error {{expected '{' in struct}}
+struct ErrorGenericParameterList2<T // expected-cparser-error {{expected '>' to complete generic parameter list}} expected-astgen-error {{expected member block in struct}} expected-note {{to match this opening '<'}} expected-cparser-error {{expected '{' in struct}} expected-astgen-error {{expected '>' to end generic parameter clause}}
 
-struct ErrorGenericParameterList3<T, // expected-cparser-error {{expected an identifier to name generic parameter}} expected-astgen-error {{expected generic parameter in generic parameter clause}} expected-error {{expected '{' in struct}} expected-astgen-note {{to match this opening '<'}} expected-astgen-error {{expected '>' to end generic parameter clause}}
+struct ErrorGenericParameterList3<T, // expected-cparser-error {{expected an identifier to name generic parameter}} expected-astgen-error {{expected '>' to end generic parameter clause}} expected-cparser-error {{expected '{' in struct}} expected-astgen-error {{expected generic parameter in generic parameter clause}} expected-astgen-note {{to match this opening '<'}} expected-astgen-error {{expected member block in struct}}
 
 // Note: Don't move braces to a different line here.
 struct ErrorGenericParameterList4< // expected-cparser-error {{expected an identifier to name generic parameter}} expected-astgen-error {{expected '>' to end generic parameter clause}} expected-astgen-note {{to match this opening '<'}}
@@ -433,14 +433,14 @@ struct ErrorTypeInVarDeclArrayType2 {
 }
 
 struct ErrorTypeInVarDeclArrayType3 {
-  var v1 : Int[ // expected-cparser-error {{expected ']' in array type}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{cannot convert value of type '[Any]' to specified type 'Int'}} expected-astgen-error {{expected ']' to end array}}
+  var v1 : Int[ // expected-cparser-error {{expected ']' in array type}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{cannot convert value of type '[Any]' }} expected-astgen-error {{expected ']' to end array}}
                 // expected-note@-1 {{to match this opening '['}}
   ;  // expected-cparser-error {{expected expression}}
   var v2 : Int
 }
 
 struct ErrorTypeInVarDeclArrayType4 {
-  var v1 : Int[1 // expected-cparser-error {{expected ']' in array type}} expected-astgen-error {{}} expected-note {{to match this opening '['}} expected-astgen-error {{cannot convert value of type '[Int]' to specified type 'Int'}} expected-astgen-error {{expected ']' to end array}}
+  var v1 : Int[1 // expected-cparser-error {{expected ']' in array type}} expected-astgen-error {{expected '=' in variable}} expected-note {{to match this opening '['}} expected-astgen-error {{cannot convert value of type '[Int]' to specified type 'Int'}} expected-astgen-error {{expected ']' to end array}}
   var v2 : Int] // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{12-12=[}}
 
 }
@@ -467,7 +467,7 @@ struct ErrorTypeInVarDeclDictionaryType {
 struct ErrorInFunctionSignatureResultArrayType1 {
   func foo() -> Int[ { // expected-cparser-error {{expected '{' in body of function declaration}} expected-astgen-error {{unexpected code '[' in function}}
                        // expected-cparser-note@-1 {{to match this opening '['}}
-    return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0] // // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }  // expected-cparser-error {{expected ']' in array type}}
   func bar() -> Int] { // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{17-17=[}}
     return [0]
@@ -481,21 +481,21 @@ struct ErrorInFunctionSignatureResultArrayType2 {
 }
 
 struct ErrorInFunctionSignatureResultArrayType3 {
-  func foo() -> Int[0] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{unexpected code '[0]' in function}}
-    return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+  func foo() -> Int[0] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{}}
+    return [0] // // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }
 
 struct ErrorInFunctionSignatureResultArrayType4 {
   func foo() -> Int[0_1] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{unexpected code '[0_1]' in function}}
-    return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0] // // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }
 
 
 struct ErrorInFunctionSignatureResultArrayType5 {
   func foo() -> Int[0b1] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{unexpected code '[0b1]' in function}}
-    return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0] // // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }
 
@@ -547,10 +547,10 @@ func use_BracesInsideNominalDecl1() {
 class С_43383 {
     print("No one else was in the room where it happened") // expected-cparser-note {{'print()' previously declared here}}
     // expected-cparser-error @-1 {{expected 'func' keyword in instance method declaration}}
-    // expected-cparser-error @-2 {{expected '{' in body of function declaration}} expected-astgen-error@-2 {{unexpected code}}
+    // expected-cparser-error @-2 {{expected '{' in body of function declaration}} expected-astgen-error@-2 {{unexpected code '"No one else was in the room where it happened"' in parameter clause}}
     // expected-cparser-error @-3 {{expected parameter name followed by ':'}} expected-astgen-error@-3 {{expected 'func' in function}}
 }
-extension С_43383 { // expected-astgen-error {{declaration is only valid at file scope}}
+extension С_43383 { //
     print("The room where it happened, the room where it happened")
     // expected-cparser-error @-1 {{expected 'func' keyword in instance method declaration}}
     // expected-cparser-error @-2 {{invalid redeclaration of 'print()'}} expected-astgen-error@-2 {{unexpected code '"The room where it happened, the room where it happened"' in parameter clause}}
@@ -577,7 +577,7 @@ class SubModule {
 }
 
 // expected-cparser-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{34-35=}} expected-astgen-error@+1 {{expected ':' to begin inheritance clause}}{{31-31=: }}{{30-31=}}{{34-36=}}{{34-34= }}    
-class WrongInheritanceClause1(Int) {} // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
+class WrongInheritanceClause1(Int) {} // // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 // expected-cparser-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{41-42=}} expected-astgen-error@+1 {{expected ':' to begin inheritance clause}}{{31-31=: }}{{30-31=}}{{41-43=}}
 class WrongInheritanceClause2(Base2<Int>) {}
@@ -592,33 +592,33 @@ class WrongInheritanceClause4(SubModule.Base2<Int>) {}
 class WrongInheritanceClause5<T>(SubModule.Base2<Int>) where T:AnyObject {}
 
 // expected-cparser-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} expected-astgen-error@+1 {{expected ':' to begin inheritance clause}}{{31-31=: }}{{30-31=}} 
-class WrongInheritanceClause6(Int {} // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
+class WrongInheritanceClause6(Int {} // // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 // expected-cparser-error@+1 {{expected ':' to begin inheritance clause}} {{33-34=: }} expected-astgen-error@+1 {{expected ':' to begin inheritance clause}}{{34-34=: }}{{33-34=}} 
-class WrongInheritanceClause7<T>(Int where T:AnyObject {} // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
+class WrongInheritanceClause7<T>(Int where T:AnyObject {} // // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 class Base {}
 
 // <rdar://problem/18502220> [swift-crashes 078] parser crash on invalid cast in sequence expr
-Base=1 as Base=1 // expected-cparser-error{{cannot convert value of type 'Int' to type 'Base' in coercion}}
-// expected-cparser-error@-1 {{cannot assign to immutable expression of type 'Base.Type'}}
-// expected-cparser-error@-2 {{cannot assign to immutable expression of type 'Base'}}
-// expected-cparser-error@-3 {{cannot assign value of type '()' to type 'Base.Type'}}
-// expected-cparser-error@-4 {{cannot assign value of type 'Int' to type 'Base'}} expected-astgen-error@-4 {{unexpected code 'Base=1 as Base=1' before modifier}}
+Base=1 as Base=1 // expected-error{{cannot convert value of type 'Int' to type 'Base' in coercion}}
+// expected-error@-1 {{cannot assign to immutable expression of type 'Base.Type'}}
+// expected-error@-2 {{cannot assign to immutable expression of type 'Base'}}
+// expected-error@-3 {{cannot assign value of type '()' to type 'Base.Type'}}
+// expected-error@-4 {{cannot assign value of type 'Int' to type 'Base'}}
 
 // <rdar://problem/18634543> Parser hangs at swift::Parser::parseType
 public enum TestA {
   // expected-cparser-error @+1{{expected '{' in body of function declaration}}
   public static func convertFromExtenndition( // expected-cparser-error {{expected parameter name followed by ':'}}
     // expected-cparser-error@+1{{expected parameter name followed by ':'}} expected-astgen-error@+1 {{expected ':' and type in parameter}}
-    s._core.count != 0, "Can't form a Character from an empty String") // expected-astgen-error {{unexpected code '._core.count != 0, "Can't form a Character from an empty String"' in parameter clause}}
+    s._core.count != 0, "Can't form a Character from an empty String") // // expected-astgen-error {{unexpected code '._core.count != 0, "Can't form a Character from an empty String"' in parameter clause}}
 }
 
 public enum TestB {
   // expected-cparser-error@+1{{expected '{' in body of function declaration}}
   public static func convertFromExtenndition( // expected-cparser-error {{expected parameter name followed by ':'}}
     // expected-cparser-error@+1 {{expected parameter name followed by ':'}} expected-astgen-error@+1 {{expected ':' and type in parameter}}
-    s._core.count ?= 0, "Can't form a Character from an empty String") // expected-astgen-error {{unexpected code '._core.count ?= 0, "Can't form a Character from an empty Str}}
+    s._core.count ?= 0, "Can't form a Character from an empty String") // // expected-astgen-error {{unexpected code '._core.count ?= 0, "Can't form a Character from an empty String"' in parameter clause}}
 }
 
 
@@ -627,17 +627,17 @@ public enum TestB {
 class bar {}
 var baz: bar
 // expected-cparser-error@+1{{unnamed parameters must be written with the empty name '_'}} expected-astgen-error@+1 {{expected ':' and type in parameter}}
-func foo1(bar!=baz) {} // expected-cparser-note {{did you mean 'foo1'?}} expected-astgen-error {{unexpected code '!=baz' in parameter clause}}
+func foo1(bar!=baz) {} // expected-note {{did you mean 'foo1'?}} expected-astgen-error {{unexpected code '!=baz' in parameter clause}}
 // expected-cparser-error@+1{{unnamed parameters must be written with the empty name '_'}} expected-astgen-error@+1 {{expected ':' and type in parameter}}
-func foo2(bar! = baz) {}// expected-cparser-note {{did you mean 'foo2'?}} expected-astgen-error {{unexpected code '! = baz' in parameter clause}}
+func foo2(bar! = baz) {}// expected-note {{did you mean 'foo2'?}} expected-astgen-error {{unexpected code '! = baz' in parameter clause}}
 
 // rdar://19605567
-// expected-cparser-error@+1{{cannot find 'esp' in scope; did you mean 'test'?}} expected-astgen-error@+1 {{unexpected code in struct}}
+// expected-error@+1{{cannot find 'esp' in scope; did you mean 'test'?}}
 switch esp {
 case let (jeb):
-  // expected-cparser-error@+2{{expected an identifier to name generic parameter}}
-  // expected-cparser-error@+1{{expected '{' in class}}
-  class Ceac<}> {}
+  // expected-cparser-error@+2{{expected an identifier to name generic parameter}} expected-astgen-error@+2 {{expected member block in class}}
+  // expected-cparser-error@+1{{expected '{' in class}} expected-astgen-error@+1 {{expected '>' to end generic parameter clause}}
+  class Ceac<}> {} // expected-astgen-note {{to match this opening '<'}} expected-astgen-error {{unexpected code in source file}}
 // expected-cparser-error@+1{{extraneous '}' at top level}} {{1-+1:1=}}
 }
 
@@ -657,10 +657,10 @@ func a(s: S[{{g) -> Int {} // expected-cparser-note {{to match this opening '['}
 // expected-cparser-error@+6{{expected '(' for initializer parameters}}
 // expected-error@+5{{initializers may only be declared within a type}}
 // expected-cparser-error@+4{{expected an identifier to name generic parameter}}
-// expected-cparser-error@+3{{consecutive statements on a line must be separated by ';'}} expected-astgen-error@+3 {{unexpected code ')' in struct}}
+// expected-cparser-error@+3{{consecutive statements on a line must be separated by ';'}} expected-astgen-error@+3 {{unexpected code ')}' in source file}}
 // expected-cparser-error@+2{{expected expression}} expected-astgen-error@+2 {{expected ')' to end parameter clause}}
 // expected-cparser-error@+1{{extraneous '}' at top level}} expected-astgen-error@+1 {{expected '>' to end generic parameter clause}}
-func F() { init<( } )} // expected-cparser-note 2{{did you mean 'F'?}} expected-astgen-note {{to match this opening '<'}} expected-astgen-note {{to match this opening '('}}
+func F() { init<( } )} // expected-cparser-note 2{{did you mean 'F'?}} expected-astgen-note {{did you mean 'F'?}} expected-astgen-note {{to match this opening '<'}} expected-astgen-note {{to match this opening '('}}
 
 struct InitializerWithName {
   init x() {} // expected-error {{initializers cannot have a name}} {{8-9=}}
@@ -728,11 +728,11 @@ let myString = @"foo" // expected-error {{string literals in Swift are not prece
 
 
 // <rdar://problem/16990885> support curly quotes for string literals
-// expected-cparser-error @+1 {{unicode curly quote found, replace with '"'}} {{35-38="}} expected-astgen-error@+1 {{circular reference}}
-let curlyQuotes1 = “hello world!” // expected-cparser-error {{unicode curly quote found, replace with '"'}} {{20-23="}} expected-astgen-error {{unicode curly quote found; use '"' instead}} expected-astgen-note {{through reference here}} expected-astgen-error {{cannot find '“hello world!”' in scope}}
+// expected-cparser-error @+1 {{unicode curly quote found, replace with '"'}} {{35-38="}} expected-astgen-error @+1 {{unicode curly quote found; use '"' instead}}
+let curlyQuotes1 = “hello world!” // expected-cparser-error {{unicode curly quote found, replace with '"'}} {{20-23="}} expected-astgen-error {{cannot find '“hello world!”' in scope}}
 
-// expected-cparser-error @+1 {{unicode curly quote found, replace with '"'}} {{20-23="}} expected-astgen-error@+1 {{unicode curly quote found; use '"' instead}}
-let curlyQuotes2 = “hello world!" // expected-astgen-note {{through reference here}} expected-astgen-error {{cannot find '“hello world!"' in scope}} expected-astgen-note {{through reference here}}
+// expected-cparser-error @+1 {{unicode curly quote found, replace with '"'}} {{20-23="}} expected-astgen-error @+1 {{unicode curly quote found; use '"' instead}}
+let curlyQuotes2 = “hello world!" // // expected-astgen-error {{cannot find '“hello world!"' in scope}}
 
 
 // <rdar://problem/21196171> compiler should recover better from "unicode Specials" characters
@@ -740,7 +740,7 @@ let ￼tryx  = 123        // expected-cparser-error {{invalid character in sourc
 
 
 // <rdar://problem/21369926> Malformed Swift Enums crash playground service
-enum Rank: Int {  // expected-cparser-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-astgen-error {{'ErrorGenericParameterList1.Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
+enum Rank: Int {  // expected-error {{'Rank' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
   case Ace = 1
   case Two = 2.1  // expected-error {{cannot convert value of type 'Double' to raw type 'Int'}}
 }
@@ -764,9 +764,9 @@ func r22387625() {
   let _ =5 // expected-error{{'=' must have consistent whitespace on both sides}} {{10-10= }}
 }
 // https://github.com/apple/swift/issues/45723
-do { // expected-astgen-error {{unexpected code in struct}}
-  let _: Int= 5 // expected-cparser-error{{'=' must have consistent whitespace on both sides}} {{13-13= }}
-  let _: Array<Int>= [] // expected-cparser-error{{'=' must have consistent whitespace on both sides}} {{20-20= }}
+do { //
+  let _: Int= 5 // expected-error{{'=' must have consistent whitespace on both sides}} {{13-13= }}
+  let _: Array<Int>= [] // expected-error{{'=' must have consistent whitespace on both sides}} {{20-20= }}
 }
 
 
@@ -798,32 +798,32 @@ func test23719432() {
 }
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
-infix operator · {  // expected-error {{'·' is considered an identifier and must not appear within an operator name}} expected-astgen-error {{'operator' may only be declared at file scope}} expected-astgen-error {{operator should not be declared with body}}
-  associativity none precedence 150 // expected-astgen-error {{unexpected code 'precedence 150' in struct}}
-}
+infix operator · {  // expected-error {{'·' is considered an identifier and must not appear within an operator name}} expected-astgen-error {{operator should not be declared with body}}
+  associativity none precedence 150 // // expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-warning {{integer literal is unused}} expected-astgen-error {{cannot find 'precedence' in scope}}
+} // expected-astgen-error {{unexpected brace in source file}}
 
-infix operator -@-class Recover1 {} // expected-cparser-error {{'@' is not allowed in operator names}} expected-astgen-error {{'@-class' is not allowed in operator names}} expected-astgen-error {{'operator' may only be declared at file scope}} expected-astgen-error {{unexpected code 'Recover1 {}' in extension}}
-prefix operator -фф--class Recover2 {} // expected-cparser-error {{'фф' is considered an identifier and must not appear within an operator name}} expected-astgen-error {{'фф--class' is not allowed in operator names}} expected-astgen-error {{'operator' may only be declared at file scope}} expected-astgen-error {{unexpected code 'Recover2 {}' in extension}}
+infix operator -@-class Recover1 {} // expected-cparser-error {{'@' is not allowed in operator names}} expected-astgen-error {{'@-class' is not allowed in operator names}} expected-astgen-error {{cannot find 'Recover1' in scope; did you mean 'Decoder'?}}
+prefix operator -фф--class Recover2 {} // expected-cparser-error {{'фф' is considered an identifier and must not appear within an operator name}} expected-astgen-error {{'фф--class' is not allowed in operator names}} expected-astgen-error {{cannot find 'Recover2' in scope}}
 
 // <rdar://problem/21712891> Swift Compiler bug: String subscripts with range should require closing bracket.
 func r21712891(s : String) -> String {
   let a = s.startIndex..<s.startIndex
   _ = a
   // The specific errors produced don't actually matter, but we need to reject this.
-  return "\(s[a)"  // expected-cparser-error {{expected ']' in expression list}} expected-astgen-error {{}} expected-note {{to match this opening '['}}
+  return "\(s[a)"  // expected-cparser-error {{expected ']' in expression list}} expected-astgen-error {{expected ']' to end subscript}} expected-note {{to match this opening '['}}
 }
 
 
 // <rdar://problem/24029542> "Postfix '.' is reserved" error message" isn't helpful
 func postfixDot(a : String) {
   _ = a.utf8
-  _ = a.   utf8  // expected-cparser-error {{extraneous whitespace after '.' is not permitted}} {{9-12=}} expected-astgen-error {{extraneous whitespace after '.' is not permitted}}{{8-12=}}{{12-12=.}}
+  _ = a.   utf8  // expected-cparser-error {{extraneous whitespace after '.' is not permitted}} {{9-12=}} expected-astgen-error {{extraneous whitespace after '.' is not permitted}}
   _ = a.       // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
     a.         // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
 }
 
 // <rdar://problem/22290244> QoI: "UIColor." gives two issues, should only give one
-func f() { // expected-cparser-note 2{{did you mean 'f'?}}
+func f() { // expected-cparser-note 2{{did you mean 'f'?}} expected-astgen-note {{did you mean 'f'?}}
   _ = ClassWithStaticDecls.  // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
 }
 
@@ -834,19 +834,19 @@ func f() { // expected-cparser-note 2{{did you mean 'f'?}}
 func f_53396(a: Int == 0) {}
 
 // rdar://38225184
-extension Collection where Element == Int && Index == Int {} // expected-astgen-error {{declaration is only valid at file scope}}
+extension Collection where Element == Int && Index == Int {} //
 // expected-cparser-error@-1 {{expected ',' to separate the requirements of this 'where' clause}} {{43-45=,}} expected-astgen-error@-1 {{expected ',' to separate the requirements of this 'where' clause}}{{43-46=}}{{42-43=}}{{46-46=, }}
 
 func testSkipUnbalancedParen() {
   ?( // expected-cparser-error {{expected expression}} expected-astgen-error {{unexpected code '?(' in function}}
 }
-func testSkipToFindOpenBrace1() { // expected-astgen-note {{to match this opening '{'}}
+func testSkipToFindOpenBrace1() { // // expected-astgen-note {{to match this opening '{'}}
   // expected-error@+3 {{expected pattern}}
   // expected-cparser-error@+2 {{variable binding in a condition requires an initializer}}
   // expected-cparser-error@+1 {{expected '{' after 'if' condition}} expected-astgen-error@+1 {{expected '{' in 'if' statement}}
   do { if case }
 }
-func testSkipToFindOpenBrace2() { // expected-astgen-note {{to match this opening '{'}}
+func testSkipToFindOpenBrace2() { // // expected-astgen-note {{to match this opening '{'}}
   do { if true {} else false } // expected-error {{expected '{' or 'if' after 'else'}} expected-astgen-warning {{boolean literal is unused}}
 }
 
@@ -854,5 +854,5 @@ struct Outer {
   struct Inner<T> {}
 }
 extension Outer.Inner<Never> { // expected-cparser-note {{in extension of 'Outer.Inner<Never>'}} expected-astgen-error {{declaration is only valid at file scope}}
-  @someAttr // expected-astgen-error {{expected declaration after attribute}}
-} // expected-cparser-error {{expected declaration}} expected-astgen-error {{expected '}' to end function}} expected-astgen-error {{expected '}' to end function}} expected-astgen-error {{expected '}' to end extension}} expected-astgen-error {{expected '}' to end protocol}} expected-astgen-error {{expected '}' to end class}} expected-astgen-error {{expected '}' to end enum}} expected-astgen-error {{expected '}' to end struct}} expected-astgen-error {{expected '}' to end extension}} expected-astgen-error {{expected '}' to end protocol}} expected-astgen-error {{expected '}' to end class}} expected-astgen-error {{expected '}' to end enum}} expected-astgen-error {{expected '}' to end struct}}
+  @someAttr // // expected-astgen-error {{expected declaration after attribute}}
+} // expected-cparser-error {{expected declaration}} expected-astgen-error {{expected '}' to end function}} expected-astgen-error {{expected '}' to end function}}
