@@ -1,13 +1,16 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -target %target-swift-5.1-abi-triple -module-name Lib -o %t/Lib.swiftmodule %t/Lib.swift
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify -I %t -module-name main %t/main.swift -o /dev/null
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -enable-sil-opaque-values -verify -I %t -module-name main %t/main.swift -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix noov- -I %t -module-name main %t/main.swift -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -target %target-swift-5.1-abi-triple -enable-sil-opaque-values -verify -verify-additional-prefix ov- -I %t -module-name main %t/main.swift -o /dev/null
 
 // REQUIRES: concurrency
 
 // A borrowing switch over a resilient enum reads the payload through
 // unchecked_borrow_enum_data_addr. The payload stays in the enum's region.
+//
+// With opaque values, region isolation runs before AddressLowering and can name the
+// value that is sent, so the diagnostic differs in wording.
 
 //--- Lib.swift
 public struct Box<T>: ~Copyable {
@@ -44,8 +47,8 @@ func noncopyableCount<T>(_ s: borrowing NoncopyableState<T>) -> Int {
 func noncopyableSendPayload(_ s: borrowing NoncopyableState<NonSendable>) async {
   switch s {
   case .box(let box):
-    await sink(box.value) // expected-error {{sending value of non-Sendable type 'NonSendable' risks causing data races}}
-    // expected-note @-1 {{sending value of non-Sendable type 'NonSendable' to main actor-isolated global function 'sink' risks causing races in between code in the current isolation context and main actor-isolated uses}}
+    await sink(box.value) // expected-noov-error {{sending value of non-Sendable type 'NonSendable' risks causing data races}} expected-ov-error {{sending 'box.value' risks causing data races}}
+    // expected-noov-note @-1 {{sending value of non-Sendable type 'NonSendable' to main actor-isolated global function 'sink' risks causing races in between code in the current isolation context and main actor-isolated uses}} expected-ov-note @-1 {{sending 'box.value' to main actor-isolated global function 'sink' risks causing data races between main actor-isolated code and code in the current isolation context}}
   default: break
   }
 }
