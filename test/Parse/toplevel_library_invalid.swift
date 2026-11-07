@@ -2,6 +2,7 @@
 
 let x = 42
 x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}
+// expected-note@-1 {{top-level code is only allowed in 'main.swift'}}
 x + x; // expected-error {{expressions are not allowed at the top level}} expected-warning {{result of operator '+' is unused}}
 // Make sure we don't crash on closures at the top level
 ({ }) // expected-error {{expressions are not allowed at the top level}} expected-error{{function is unused}}
