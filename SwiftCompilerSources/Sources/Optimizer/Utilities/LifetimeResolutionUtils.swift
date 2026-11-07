@@ -30,12 +30,22 @@ struct StateIndexSpace: CustomStringConvertible {
 
     /// `self` in a root class initializer, whose elements are the stored properties of the instance.
     case rootClassSelf
+
+    /// The memory holding `self` in a derived class initializer. Its elements are the own stored properties of the
+    /// instance, its superclass part, and the reference held in the memory.
+    case derivedClassSelf
   }
 
   /// What the state at an index is about.
   enum Element: Equatable {
     /// A leaf of `fields`.
     case field(Int)
+
+    /// The superclass part of a class instance, which `super.init` initializes.
+    case superclass
+
+    /// The reference to the instance held in memory.
+    case reference
   }
 
   let mode: Mode
@@ -43,17 +53,24 @@ struct StateIndexSpace: CustomStringConvertible {
   /// The fields of the root, which are the first elements of the space.
   let fields: FieldIndexTrie
 
+  /// The type of the instance that the root holds, which is the type of the `reference` element.
+  let instanceType: Type
+
   /// The elements that are initialized where the root begins.
   let initiallyInitialized: IndexRange
 
-  init(_ mode: Mode, fields: FieldIndexTrie, initiallyInitialized: Bool) {
+  init(_ mode: Mode, fields: FieldIndexTrie, instanceType: Type, initiallyInitialized: Bool) {
     self.mode = mode
     self.fields = fields
+    self.instanceType = instanceType
     self.initiallyInitialized = initiallyInitialized ? 0..<fields.leafCount : 0..<0
   }
 
   /// The number of elements.
-  var count: Int { fields.leafCount }
+  var count: Int { mode == .derivedClassSelf ? fields.leafCount + 2 : fields.leafCount }
+
+  private var superclassIndex: Int? { mode == .derivedClassSelf ? fields.leafCount : nil }
+  private var referenceIndex: Int? { mode == .derivedClassSelf ? fields.leafCount + 1 : nil }
 
   var isEmpty: Bool { count == 0 }
 
@@ -64,7 +81,7 @@ struct StateIndexSpace: CustomStringConvertible {
   var fieldRange: IndexRange { 0..<fields.leafCount }
 
   /// The elements needed by a use of a class instance as a whole, as opposed to one of its stored properties.
-  var instanceRange: IndexRange { wholeRange }
+  var instanceRange: IndexRange { superclassIndex.map { 0..<($0 + 1) } ?? wholeRange }
 
   /// The maximal ranges of elements that are all initialized, or all uninitialized, where the root begins.
   var initialRanges: [(range: IndexRange, initialized: Bool)] {
@@ -76,14 +93,21 @@ struct StateIndexSpace: CustomStringConvertible {
 
   func element(at index: Int) -> Element {
     assert(wholeRange.contains(index), "index \(index) out of range \(wholeRange)")
-    return .field(index)
+    switch index {
+    case superclassIndex: return .superclass
+    case referenceIndex: return .reference
+    default: return .field(index)
+    }
   }
 
   func range(of element: Element) -> IndexRange? {
+    let index: Int?
     switch element {
-    case .field(let leaf):
-      return fieldRange.contains(leaf) ? leaf..<(leaf + 1) : nil
+    case .field(let leaf): index = fieldRange.contains(leaf) ? leaf : nil
+    case .superclass: index = superclassIndex
+    case .reference: index = referenceIndex
     }
+    return index.map { $0..<($0 + 1) }
   }
 
   /// The fields selected by a projection path from the root.
@@ -98,19 +122,23 @@ struct StateIndexSpace: CustomStringConvertible {
 
   /// Whether the element at `index` is a part of the storage that has an address.
   func hasAddress(_ index: Int) -> Bool {
-    fieldRange.contains(index)
+    fieldRange.contains(index) || index == referenceIndex
   }
 
   /// The type of the part of the storage at `index`.
   func leafType(_ index: Int) -> Type {
     precondition(hasAddress(index), "element \(element(at: index)) has no address")
-    return fields.leafType(index)
+    return index == referenceIndex ? instanceType : fields.leafType(index)
   }
 
   /// Emits the projections from the root's `base` address down to the part of the storage at `index`, and passes
   /// its address to `body`. See FieldIndexTrie.withElementAddress.
   func withElementAddress(forIndex index: Int, from base: Value, _ builder: Builder, _ body: (Value) -> ()) {
     precondition(hasAddress(index), "element \(element(at: index)) has no address")
+    if index == referenceIndex {
+      body(base)
+      return
+    }
     fields.withElementAddress(forLeaf: index, from: base, builder, body)
   }
 
@@ -125,6 +153,10 @@ struct StateIndexSpace: CustomStringConvertible {
       var path: SmallProjectionPath? = nil
       fields.forEachCoveringSubtree(of: [leaf]) { if path == nil { path = $0 } }
       return "field \(path.map { $0.isEmpty ? "<root>" : $0.description } ?? "?")"
+    case .superclass:
+      return "superclass"
+    case .reference:
+      return "reference"
     }
   }
 
@@ -230,6 +262,7 @@ let lifetimeResolutionStateSpaceTest = FunctionTest("lifetime_resolution_state_s
   let space = root.stateIndexSpace(&indexCache)
   print(space)
   print("instanceRange: \(space.instanceRange)")
+  print("immutableLeaves: \(root.immutableLeaves(space).sorted())")
 
   assert(space.wholeRange == 0..<space.count)
   assert(space.fieldRange.lowerBound == 0 && space.fieldRange.upperBound <= space.count)

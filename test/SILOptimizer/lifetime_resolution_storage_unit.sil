@@ -2044,3 +2044,192 @@ bb0(%0 : @owned $RC):
   apply %consumeRC(%self) : $@convention(thin) (@owned RC) -> ()
   return %self
 }
+
+class DBase {
+  init()
+}
+
+class DSelf : DBase {
+  var k: K
+  let n: Builtin.Int64
+  override init()
+}
+
+// As in DefiniteInitialization, a function named `superinit` stands in for `super.init` in SIL tests.
+sil @superinit : $@convention(method) (@owned DBase) -> @owned DBase
+sil @useDBase : $@convention(thin) (@guaranteed DBase) -> ()
+
+// The initial store of `self` and the store of `super.init`'s result both initialize the memory, which holds
+// no reference before either. Stored properties are initialized by their first def, before or after `super.init`.
+// CHECK-LABEL: sil [ossa] @derivedself_defs :
+// CHECK:          [[SELF:%.*]] = mark_uninitialized [derivedself]
+// CHECK-NEXT:     store %0 to [init] [[SELF]]
+// CHECK:          [[K1:%.*]] = ref_element_addr {{.*}} #DSelf.k
+// CHECK:          assign {{.*}} to [init] [[K1]]
+// CHECK:          [[N1:%.*]] = ref_element_addr {{.*}} #DSelf.n
+// CHECK:          assign {{.*}} to [init] [[N1]]
+// CHECK:          load [take] [[SELF]]
+// CHECK:          [[RESULT:%.*]] = unchecked_ref_cast
+// CHECK-NEXT:     store [[RESULT]] to [init] [[SELF]]
+// CHECK:          [[K2:%.*]] = ref_element_addr {{.*}} #DSelf.k
+// CHECK:          assign {{.*}} to [reassign] [[K2]]
+// CHECK:          load [copy] [[SELF]]
+// CHECK-NEXT:     destroy_addr [[SELF]]
+// CHECK:       } // end sil function
+sil [ossa] @derivedself_defs : $@convention(method) (@owned DSelf) -> @owned DSelf {
+bb0(%0 : @owned $DSelf):
+  %1 = alloc_stack [lexical] [var_decl] $DSelf, let, name "self"
+  specify_test "lifetime_resolution_resolve %1"
+  %self = mark_uninitialized [derivedself] %1
+  store %0 to [assign] %self
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+
+  %b1 = load_borrow %self
+  %k1 = ref_element_addr %b1, #DSelf.k
+  %v1 = apply %getK() : $@convention(thin) () -> @owned K
+  assign %v1 to %k1
+  %n1 = ref_element_addr %b1, #DSelf.n
+  %i1 = integer_literal $Builtin.Int64, 1
+  assign %i1 to %n1
+  end_borrow %b1
+
+  %t = load [take] %self
+  %u = upcast %t to $DBase
+  %f = function_ref @superinit : $@convention(method) (@owned DBase) -> @owned DBase
+  %r = apply %f(%u) : $@convention(method) (@owned DBase) -> @owned DBase
+  %c = unchecked_ref_cast %r to $DSelf
+  store %c to [assign] %self
+
+  %b2 = load_borrow %self
+  %k2 = ref_element_addr %b2, #DSelf.k
+  %v2 = apply %getK() : $@convention(thin) () -> @owned K
+  assign %v2 to %k2
+  end_borrow %b2
+
+  %l = load [copy] %self
+  destroy_addr %self
+  dealloc_stack %1
+  return %l
+}
+
+// `super.init` needs every stored property, so `k` is marked as uninitialized after the initial store of `self`.
+// CHECK-LABEL: sil [ossa] @derivedself_uninit_field_at_super_init :
+// CHECK:          [[SELF:%.*]] = mark_uninitialized [derivedself]
+// CHECK-NEXT:     store %0 to [init] [[SELF]]
+// CHECK-NEXT:     [[B:%.*]] = load_borrow [[SELF]]
+// CHECK-NEXT:     [[K:%.*]] = ref_element_addr [[B]] : $DSelf, #DSelf.k
+// CHECK-NEXT:     assign undef to [init] [[K]] : $*K
+// CHECK-NEXT:     end_borrow [[B]]
+// CHECK-NOT:      assign undef
+// CHECK:       } // end sil function
+sil [ossa] @derivedself_uninit_field_at_super_init : $@convention(method) (@owned DSelf) -> @owned DSelf {
+bb0(%0 : @owned $DSelf):
+  %1 = alloc_stack [lexical] [var_decl] $DSelf, let, name "self"
+  specify_test "lifetime_resolution_resolve %1"
+  %self = mark_uninitialized [derivedself] %1
+  store %0 to [init] %self
+
+  %b1 = load_borrow %self
+  %n1 = ref_element_addr %b1, #DSelf.n
+  %i1 = integer_literal $Builtin.Int64, 1
+  assign %i1 to %n1
+  end_borrow %b1
+
+  %t = load [take] %self
+  %u = upcast %t to $DBase
+  %f = function_ref @superinit : $@convention(method) (@owned DBase) -> @owned DBase
+  %r = apply %f(%u) : $@convention(method) (@owned DBase) -> @owned DBase
+  %c = unchecked_ref_cast %r to $DSelf
+  store %c to [init] %self
+  %l = load [copy] %self
+  destroy_addr %self
+  dealloc_stack %1
+  return %l
+}
+
+// A use of all of `self` needs its superclass part, before `super.init` initializes it.
+// CHECK-LABEL: sil [ossa] @derivedself_use_before_super_init :
+// CHECK:          [[SELF:%.*]] = mark_uninitialized [derivedself]
+// CHECK-NEXT:     store %0 to [init] [[SELF]]
+// CHECK-NEXT:     diagnose [missing_super_init] [[SELF]] : $*DSelf
+// CHECK-NOT:      assign undef
+// CHECK:       } // end sil function
+sil [ossa] @derivedself_use_before_super_init : $@convention(method) (@owned DSelf) -> @owned DSelf {
+bb0(%0 : @owned $DSelf):
+  %1 = alloc_stack [lexical] [var_decl] $DSelf, let, name "self"
+  specify_test "lifetime_resolution_resolve %1"
+  %self = mark_uninitialized [derivedself] %1
+  store %0 to [init] %self
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+
+  %b1 = load_borrow %self
+  %k1 = ref_element_addr %b1, #DSelf.k
+  %v1 = apply %getK() : $@convention(thin) () -> @owned K
+  assign %v1 to %k1
+  %n1 = ref_element_addr %b1, #DSelf.n
+  %i1 = integer_literal $Builtin.Int64, 1
+  assign %i1 to %n1
+  end_borrow %b1
+
+  %l1 = load [copy] %self
+  %u1 = upcast %l1 to $DBase
+  %useDBase = function_ref @useDBase : $@convention(thin) (@guaranteed DBase) -> ()
+  apply %useDBase(%u1) : $@convention(thin) (@guaranteed DBase) -> ()
+  destroy_value %u1
+
+  %t = load [take] %self
+  %u = upcast %t to $DBase
+  %f = function_ref @superinit : $@convention(method) (@owned DBase) -> @owned DBase
+  %r = apply %f(%u) : $@convention(method) (@owned DBase) -> @owned DBase
+  %c = unchecked_ref_cast %r to $DSelf
+  store %c to [init] %self
+  %l = load [copy] %self
+  destroy_addr %self
+  dealloc_stack %1
+  return %l
+}
+
+// The superclass part may only be initialized once.
+// CHECK-LABEL: sil [ossa] @derivedself_super_init_twice :
+// CHECK:          [[SELF:%.*]] = mark_uninitialized [derivedself]
+// CHECK:          apply {{.*}} : $@convention(method) (@owned DBase) -> @owned DBase
+// CHECK:          store {{.*}} to [init] [[SELF]]
+// CHECK-NEXT:     diagnose [let_reinit] [[SELF]] : $*DSelf
+// CHECK-NEXT:     load [take] [[SELF]]
+// CHECK:          store {{.*}} to [init] [[SELF]]
+// CHECK:       } // end sil function
+sil [ossa] @derivedself_super_init_twice : $@convention(method) (@owned DSelf) -> @owned DSelf {
+bb0(%0 : @owned $DSelf):
+  %1 = alloc_stack [lexical] [var_decl] $DSelf, let, name "self"
+  specify_test "lifetime_resolution_resolve %1"
+  %self = mark_uninitialized [derivedself] %1
+  store %0 to [init] %self
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+
+  %b1 = load_borrow %self
+  %k1 = ref_element_addr %b1, #DSelf.k
+  %v1 = apply %getK() : $@convention(thin) () -> @owned K
+  assign %v1 to %k1
+  %n1 = ref_element_addr %b1, #DSelf.n
+  %i1 = integer_literal $Builtin.Int64, 1
+  assign %i1 to %n1
+  end_borrow %b1
+
+  %f = function_ref @superinit : $@convention(method) (@owned DBase) -> @owned DBase
+  %t1 = load [take] %self
+  %u1 = upcast %t1 to $DBase
+  %r1 = apply %f(%u1) : $@convention(method) (@owned DBase) -> @owned DBase
+  %c1 = unchecked_ref_cast %r1 to $DSelf
+  store %c1 to [init] %self
+
+  %t2 = load [take] %self
+  %u2 = upcast %t2 to $DBase
+  %r2 = apply %f(%u2) : $@convention(method) (@owned DBase) -> @owned DBase
+  %c2 = unchecked_ref_cast %r2 to $DSelf
+  store %c2 to [init] %self
+
+  %l = load [copy] %self
+  destroy_addr %self
+  dealloc_stack %1
+  return %l
+}

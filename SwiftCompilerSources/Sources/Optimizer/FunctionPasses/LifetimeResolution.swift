@@ -71,9 +71,12 @@ struct ResolvableRoot {
   let storage: Value
 
   /// The address that all accesses project from: the `mark_uninitialized` itself for
-  /// an `alloc_stack`, or the `project_box` for an `alloc_box`. For a class instance, it is
-  /// instead the `mark_uninitialized` reference whose stored properties are projected.
+  /// an `alloc_stack`, or the `project_box` for an `alloc_box`. For `self` in a root class
+  /// initializer, it is instead the `mark_uninitialized` reference whose stored properties are projected.
   let address: Value
+
+  /// How the elements of the storage's state are laid out.
+  let mode: StateIndexSpace.Mode
 
   /// The source variable, for diagnostics.
   let varDecl: VarDecl?
@@ -117,8 +120,23 @@ struct ResolvableRoot {
       return address.nextInstruction
   }
 
+  /// The instruction after which markers for uses before initialization are inserted. For derived class `self`,
+  /// it is the initial store of `self`, after which its stored properties can be projected.
+  var markerInsertionPoint: Instruction {
+    if mode == .derivedClassSelf, let initialStore = Self.findInitialStoreOfDerivedSelf(markUninitialized!) {
+      return initialStore
+    }
+    return startInstruction
+  }
+
+  /// Whether the storage is a class instance whose stored properties are tracked: `self` in a class initializer.
+  var isClassInstance: Bool { mode != .storage }
+
   /// Whether the storage is the instance referenced by `address`, i.e., `self` in a root class initializer.
-  var isClassInstance: Bool { !address.type.isAddress }
+  var isInstanceReference: Bool { mode == .rootClassSelf }
+
+  /// `self` in an initializer whose stored properties are tracked individually.
+  var tracksStoredProperties: Bool { isRootSelf || mode == .derivedClassSelf }
 
   /// Whether the binding is a `let` (vs a `var`), which may only be initialized once.
   var isLet: Bool { !(storage is FunctionArgument) && (varDecl?.isLet ?? false) }
@@ -134,10 +152,7 @@ struct ResolvableRoot {
   /// The elements of the storage that may only be initialized once: all of a `let` binding,
   /// or the `let` stored properties of `self` in a struct or class initializer.
   func immutableLeaves(_ space: StateIndexSpace) -> Set<Int> {
-    switch markUninitialized?.kind {
-    case .variable?, nil:
-      return isLet ? Set(space.wholeRange) : []
-    case .rootSelf?, .crossModuleRootSelf?:
+    if tracksStoredProperties {
       let function = address.parentFunction
       let type = address.type.objectType
       guard let fields = type.getNominalFields(in: function) else {
@@ -151,6 +166,10 @@ struct ResolvableRoot {
         leaves.formUnion(space.range(ofFieldPath: SmallProjectionPath(kind, index: field)))
       }
       return leaves
+    }
+    switch markUninitialized?.kind {
+    case .variable?, nil:
+      return isLet ? Set(space.wholeRange) : []
     default:
       return []
     }
@@ -176,9 +195,12 @@ struct ResolvableRoot {
         // So, treat the storage as being born initialized
         startsInitialized = mu.kind == .rootSelf && !indicies.hasFields
 
+        let isResolvableDerivedSelf = mu.kind == .derivedSelf && Self.findInitialStoreOfDerivedSelf(mu) != nil
+        mode = isResolvableDerivedSelf ? .derivedClassSelf : .storage
       } else {
         address = storage
         startsInitialized = false
+        mode = .storage
       }
 
       varDecl = allocStack.varDecl
@@ -194,6 +216,7 @@ struct ResolvableRoot {
       varDecl = allocBox.varDecl
       isLexical = boxIsLexical
       startsInitialized = false
+      mode = .storage
 
       // Treat any lifetime ends or copies of the box itself as extra uses.
       let box: Value = markUninitialized ?? storage
@@ -207,6 +230,7 @@ struct ResolvableRoot {
       markUninitialized = nil
       varDecl = arg.findVarDecl()
       isLexical = arg.isLexical
+      mode = .storage
 
       switch arg.convention {
       case .indirectIn:
@@ -237,6 +261,7 @@ struct ResolvableRoot {
       varDecl = (val as? FunctionArgument)?.findVarDecl()
       isLexical = (val as? Argument)?.isLexical ?? false
       startsInitialized = !indexCache.fieldIndices(forClassInstance: val.type).hasFields
+      mode = .rootClassSelf
 
     default:
       return nil
@@ -259,11 +284,9 @@ struct ResolvableRoot {
 
   /// The elements of the dataflow state tracked for this storage.
   func stateIndexSpace(_ indexCache: inout FieldIndexTrieCache) -> StateIndexSpace {
-    if isClassInstance {
-      return StateIndexSpace(.rootClassSelf, fields: indexCache.fieldIndices(forClassInstance: address.type),
-                             initiallyInitialized: startsInitialized)
-    }
-    return StateIndexSpace(.storage, fields: indexCache.fieldIndices(for: address.type),
+    let fields = isClassInstance ? indexCache.fieldIndices(forClassInstance: address.type.objectType)
+                                 : indexCache.fieldIndices(for: address.type)
+    return StateIndexSpace(mode, fields: fields, instanceType: address.type.objectType,
                            initiallyInitialized: startsInitialized)
   }
 
@@ -296,6 +319,25 @@ struct ResolvableRoot {
       }
     }
     return nil
+  }
+
+  /// The store of the initializer's `self` argument into the memory holding derived class `self`, if every use
+  /// of the memory is recognized and there is exactly one such store.
+  /// FIXME: This is probably too pedantic; can we just trust the derivedSelf on the mark_uninitialized?
+  private static func findInitialStoreOfDerivedSelf(_ markUninitialized: MarkUninitializedInst) -> StoreInst? {
+    var initialStore: StoreInst? = nil
+    for use in markUninitialized.uses {
+      switch DerivedSelfUse(use) {
+      case .initialStore(let store):
+        if initialStore != nil { return nil }
+        initialStore = store
+      case .unknown:
+        return nil
+      default:
+        break
+      }
+    }
+    return initialStore
   }
 
   // A stack-backed local `let` or `var`; its `mark_uninitialized [var]` is the address.
@@ -346,7 +388,7 @@ private struct Resolver {
     log("StateIndexSpace of \(root.address.type): \n\(space)")
 
     // The reference to a class instance is itself an SSA value, whose copies and destroys are resolved first.
-    if root.isClassInstance {
+    if root.isInstanceReference {
       resolveSingleDef(root.address, context)
     }
 
@@ -518,7 +560,13 @@ private struct Resolver {
     case .root(_, initialized: false) where someDemand:
       // Unsatisfied demand reaching the root means there exists a use-before-init of those leaves.
       let demanded = event.range.filter { current[$0] != .nothing }
-      initializeWithUndef(leaves: demanded, of: root, space)
+      initializeWithUndef(leaves: demanded.filter { space.fieldRange.contains($0) }, of: root, space)
+      if let superclass = space.range(of: .superclass), demanded.contains(superclass.lowerBound) {
+        Builder(after: root.markerInsertionPoint, context)
+          .createDiagnose(operand: root.address, kind: .missingSuperInit)
+      }
+      assert(space.range(of: .reference).map { !demanded.contains($0.lowerBound) } ?? true,
+             "the reference is defined right after the root")
 
     default:
       break
@@ -713,7 +761,7 @@ private struct Resolver {
 
   // Emit an `assign undef to [init]` of each given leaf of the root, right after the root's definition.
   func initializeWithUndef(leaves: [Int], of root: ResolvableRoot, _ space: StateIndexSpace) {
-    let builder = Builder(after: root.startInstruction, context)
+    let builder = Builder(after: root.markerInsertionPoint, context)
     for leaf in leaves {
       space.withElementAddress(forIndex: leaf, from: root.address, builder) { address in
         let undef = Undef.get(type: address.type.objectType, context)
@@ -805,7 +853,7 @@ private struct Resolver {
             Builder(before: op.instruction, context).createDiagnose(operand: op.value, kind: .letReinit)
           }
 
-          let nontrivial = space.fieldLeaves(in: range).filter { !space.leafType($0).isTrivial(in: function) }
+          let nontrivial = range.filter { space.hasAddress($0) && !space.leafType($0).isTrivial(in: function) }
           if nontrivial.isEmpty {
             // Nothing needs to be destroyed, but LetPropertyLowering relies on knowing the initializations.
             makeDef(op.instruction, initialization: summary == .no)
@@ -826,6 +874,26 @@ private struct Resolver {
             destroysBeforeInit.append((op.instruction, current, range))
             makeDef(op.instruction, initialization: true)
           }
+        case let .superInit(op):
+          // FIXME: what about `.partial` availability? Suppose they did `if c { super.init }; super.init`.
+          if current[range].contains(where: { $0.contains(.yes) }) {
+            Builder(before: op.instruction, context).createDiagnose(operand: op.value, kind: .letReinit)
+          }
+
+        case let .end(op) where root.mode == .derivedClassSelf:
+          // Only whether the memory holds the reference decides how to end its lifetime.
+          let reference = space.range(of: .reference)!
+          switch current[reference.lowerBound] {
+          case .yes:
+            break
+          case .no:
+            context.erase(instruction: op.instruction)
+            didDelete = true
+          default:
+            partialDestroys.append((op.instruction, current, reference))
+            didDelete = true
+          }
+
         case let .end(op):
           assert(summary != .unknown, "missing information!")
 
@@ -836,7 +904,7 @@ private struct Resolver {
 
           // If completely unavailable (consumed), it's lifetime ended earlier, so delete this one.
           // A class instance must still be deallocated, though.
-          if summary == .no && !root.isClassInstance {
+          if summary == .no && !root.isInstanceReference {
             context.erase(instruction: op.instruction)
             didDelete = true
             break
@@ -881,11 +949,11 @@ private struct Resolver {
     }
 
     for (destroy, avail, range) in partialDestroys {
-      if root.isClassInstance {
+      if root.isInstanceReference {
         endInstanceLifetime(at: destroy, avail, root, space, controlVar)
         continue
       }
-      destroyAvailableFields(avail, range, before: destroy, root, space, controlVar)
+      destroyAvailableElements(avail, range, before: destroy, root, space, controlVar)
 
       // Everything in range is now uninitialized.
       controlVar?.update(range, initialized: false, before: destroy)
@@ -893,7 +961,7 @@ private struct Resolver {
     }
 
     for (def, avail, range) in destroysBeforeInit {
-      destroyAvailableFields(avail, range, before: def, root, space, controlVar)
+      destroyAvailableElements(avail, range, before: def, root, space, controlVar)
     }
 
     if let controlVar {
@@ -938,7 +1006,7 @@ private struct Resolver {
 
       for (kind, range) in events.list where range.contains(where: conditionalLeaves.contains) {
         switch kind {
-        case .def:
+        case .def, .superInit:
           controlVar.update(range, initialized: true, before: kind.inst)
         case .take, .end:
           controlVar.update(range, initialized: false, before: kind.inst)
@@ -988,20 +1056,20 @@ private struct Resolver {
       }
     }
 
-    destroyAvailableFields(deallocAvail, space.fieldRange, before: deallocPoint, root, space, controlVar)
+    destroyAvailableElements(deallocAvail, space.fieldRange, before: deallocPoint, root, space, controlVar)
     let builder = Builder(before: deallocPoint, location: destroy.location, context)
     let metatype = builder.createMetatype(ofInstanceType: instance.type.canonicalType, representation: .thick)
     builder.createDeallocPartialRef(instance, metatype: metatype)
     context.erase(instruction: destroy)
   }
 
-  // Destroys only the available fields of partially available memory, testing the control variable
-  // for fields that are only conditionally available.
-  func destroyAvailableFields(_ current: [Availability], _ range: EventList.IndexRange, before inst: Instruction,
-                              _ root: ResolvableRoot, _ space: StateIndexSpace, _ controlVar: ControlVariable?) {
-    log("destroying available fields before \(inst)")
+  // Destroys only the available elements of partially available memory, testing the control variable
+  // for elements that are only conditionally available.
+  func destroyAvailableElements(_ current: [Availability], _ range: EventList.IndexRange, before inst: Instruction,
+                                _ root: ResolvableRoot, _ space: StateIndexSpace, _ controlVar: ControlVariable?) {
+    log("destroying available elements before \(inst)")
 
-    for leaf in space.fieldLeaves(in: range) {
+    for leaf in range where space.hasAddress(leaf) {
       if current[leaf] == .no || space.leafType(leaf).isTrivial(in: function) {
         continue
       }
@@ -1055,6 +1123,12 @@ private struct Resolver {
 
     mutating func addUse(_ k:  EventList.Kind, _ range: EventList.IndexRange) {
       log("\taddUse of \(range) as \(k)")
+      switch k {
+      case .def, .take, .use:
+        assert(range.allSatisfy(space.hasAddress), "\(k) of elements without an address: \(range)")
+      default:
+        break
+      }
       let blk = k.inst.parentBlock
       uses[blk, default: EventList(blk)].add(k, range)
     }
@@ -1077,8 +1151,12 @@ private struct Resolver {
         addUse(.root(root, initialized: initialized), range)
       }
 
-      let result = root.isClassInstance ? walkDownUses(ofClassInstance: address)
-                                        : walkDownUses(ofAddress: address, path: Path())
+      let result: WalkResult
+      switch root.mode {
+      case .storage: result = walkDownUses(ofAddress: address, path: Path())
+      case .rootClassSelf: result = walkDownUses(ofClassInstance: address)
+      case .derivedClassSelf: result = walkDownUses(ofDerivedSelf: address)
+      }
       if result == .abortWalk {
         return false
       }
@@ -1112,6 +1190,42 @@ private struct Resolver {
       }
     }
 
+    // The uses of the memory holding `self` in a derived class initializer.
+    mutating func walkDownUses(ofDerivedSelf address: Value) -> WalkResult {
+      let superclass = space.range(of: .superclass)!
+      let reference = space.range(of: .reference)!
+      for use in address.uses {
+        switch DerivedSelfUse(use) {
+        case .initialStore, .storeBack:
+          addUse(.def(use), reference)
+        case .borrow(let loadBorrow):
+          addUse(.liveness(loadBorrow), reference)
+          for end in loadBorrow.uses.users(ofType: EndBorrowInst.self) {
+            addUse(.liveness(end), reference)
+          }
+          if walkDownUses(ofClassInstance: loadBorrow) == .abortWalk {
+            return .abortWalk
+          }
+        case .copy(let load):
+          addUse(.liveness(load), space.wholeRange)
+        case .superInit(let load, _):
+          // `super.init` needs the own stored properties, but only takes the reference to the instance.
+          if !space.fieldRange.isEmpty {
+            addUse(.liveness(load), space.fieldRange)
+          }
+          addUse(.superInit(use), superclass)
+          addUse(.take(use, .own), reference)
+        case .destroy:
+          addUse(.end(use), space.wholeRange)
+        case .ignored:
+          break
+        case .unknown:
+          return .abortWalk
+        }
+      }
+      return .continueWalk
+    }
+
     // Implement ClassInstanceUseWalker
 
     mutating func storedPropertyUse(_ projection: RefElementAddrInst) -> WalkResult {
@@ -1119,7 +1233,8 @@ private struct Resolver {
     }
 
     mutating func instanceUse(_ use: Operand) -> WalkResult {
-      if use.instruction is DestroyValueInst {
+      // A value loaded from memory holding `self` doesn't end the lifetime of the instance.
+      if use.instruction is DestroyValueInst && space.mode == .rootClassSelf {
         addUse(.end(use), space.instanceRange)
       } else {
         addUse(.liveness(use.instruction), space.instanceRange)
@@ -1405,6 +1520,7 @@ private struct Resolver {
       case use(Operand, Demand)         // The demand summarizes the kinds of users of this operand's instruction.
       case take(Operand, Demand)        // The demand summarizes the kinds of users of this operand's instruction.
       case def(Operand)
+      case superInit(Operand) // `self` passed to `super.init`, which initializes the superclass part of the instance.
       case end(Operand)       // An instruction representing the point at which the operand's lifetime has ended.
       case liveness(Instruction)       // A non-specific liveness use.
 
@@ -1414,6 +1530,7 @@ private struct Resolver {
         case let .use(op, _): op.instruction
         case let .take(op, _): op.instruction
         case let .def(op): op.instruction
+        case let .superInit(op): op.instruction
         case let .end(op): op.instruction
         case let .liveness(inst): inst
         }
@@ -1424,7 +1541,7 @@ private struct Resolver {
         switch self {
         case let .use(_, dem): dem
         case let .take(_, dem): dem
-        case .def, .root: .nothing
+        case .def, .superInit, .root: .nothing
         case .end: .nothing  // Demand analysis ignores lifetime ends.
         case .liveness: .all
         }
@@ -1433,7 +1550,7 @@ private struct Resolver {
       // What ownership does this use satisfy?
       var demandKill: Demand {
         switch self {
-        case .def: .all
+        case .def, .superInit: .all
         case .root(_, initialized: true): .all // A root that starts initialized is a def.
         default: .nothing
         }
@@ -1442,7 +1559,7 @@ private struct Resolver {
       // What availability does this event establish? (forward analysis)
       var availGen: Availability {
         switch self {
-        case .def: .yes
+        case .def, .superInit: .yes
         case .root(_, initialized: true): .yes  // A root that starts initialized is a def.
         case .root, .take, .end: .no    // these leave the operand uninitialized.
         case .use: .unknown       // doesn't change the state
@@ -1453,7 +1570,7 @@ private struct Resolver {
       // What prior availability does this event overwrite?
       var availKill: Availability {
         switch self {
-        case .def, .root, .take, .end: .partial    // Overwites all availability.
+        case .def, .superInit, .root, .take, .end: .partial    // Overwites all availability.
         case .use, .liveness: .unknown
         }
       }
@@ -1465,6 +1582,7 @@ private struct Resolver {
         case let .take(_, dem): "take(\(dem))"
         case .root: "root"
         case .def: "def"
+        case .superInit: "super.init"
         case .end: "end"
         case .liveness: "liveness"
         }

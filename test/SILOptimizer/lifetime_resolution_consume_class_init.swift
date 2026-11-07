@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify %s -o /dev/null
 
-// The stored properties of `self` in a root class initializer may be consumed, after which
+// The stored properties of `self` in a class initializer may be consumed, after which
 // they must be reinitialized before `self` is used as a whole.
 
 class Tree {}
@@ -155,5 +155,50 @@ class Generic<T> {
     u = x
     _ = consume t // expected-note {{partially consumed here}} // expected-note {{write 'copy self.t' to keep 'self.t' valid after this consume}}
     print(self) // expected-error {{cannot use 'self' after partial consume}}
+  }
+}
+
+class Base {
+  init() {}
+}
+
+class DerivedReinitBeforeSuper: Base {
+  var t: Tree?
+  override init() {
+    t = Tree()
+    _ = consume t
+    t = Tree()
+    super.init()
+    observe(self)
+  }
+}
+
+class DerivedConsumeBeforeSuper: Base {
+  var t: Tree?
+  override init() {
+    t = Tree()
+    _ = consume t // expected-note {{partially consumed here}} // expected-note {{write 'copy self.t' to keep 'self.t' valid after this consume}}
+    super.init() // expected-error {{cannot use 'self' after partial consume}}
+  }
+}
+
+class DerivedReinitAfterSuper: Base {
+  var t: Tree?
+  override init() {
+    t = Tree()
+    super.init()
+    _ = consume t
+    t = Tree()
+    observe(self)
+  }
+}
+
+class DerivedUseSelfAfterConsume: Base {
+  var t: Tree?
+  override init() {
+    t = Tree()
+    super.init()
+    _ = consume t // expected-note {{partially consumed here}} // expected-note {{write 'copy self.t' to keep 'self.t' valid after this consume}}
+    observe(self) // expected-error {{cannot use 'self' after partial consume}}
   }
 }
