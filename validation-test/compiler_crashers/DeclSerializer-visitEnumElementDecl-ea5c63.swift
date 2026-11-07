@@ -1,6 +1,7 @@
 // {"extraArgs":["-experimental-allow-module-with-compiler-errors","-emit-module-path","/dev/null"],"kind":"emit-sil","original":"2a782ae8","signature":"swift::serialization::Serializer::DeclSerializer::visitEnumElementDecl(swift::EnumElementDecl const*)","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast","signatureNext":"Serializer::DeclSerializer::visit"}
-// The crash depends on the C++ parser's handling of this input.
-// UNSUPPORTED: parser_astgen
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -emit-sil -experimental-allow-module-with-compiler-errors -emit-module-path /dev/null %s
 // REQUIRES: objc_interop
 @objc enum a: Int {

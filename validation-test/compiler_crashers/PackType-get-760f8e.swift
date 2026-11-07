@@ -1,6 +1,7 @@
 // {"kind":"typecheck","original":"7d0a36fd","signature":"swift::PackType::get(swift::ASTContext const&, llvm::ArrayRef<swift::Type>)","signatureAssert":"Assertion failed: (!eltTy->is<PackType>() && \"Cannot have pack directly inside another pack\"), function get","signatureNext":"TupleTypeElt"}
-// The crash depends on the C++ parser's handling of this input.
-// UNSUPPORTED: parser_astgen
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 func a<each b, each c, each d>(
   repeat each b -> each c,

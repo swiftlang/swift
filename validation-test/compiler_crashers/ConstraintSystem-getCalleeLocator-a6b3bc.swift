@@ -1,6 +1,7 @@
 // {"kind":"typecheck","original":"901f9c6d","signature":"swift::constraints::ConstraintSystem::getCalleeLocator(swift::constraints::ConstraintLocator*, bool, llvm::function_ref<swift::Type (swift::Expr*)>, llvm::function_ref<swift::Type (swift::Type)>, llvm::function_ref<std::__1::optional<swift::constraints::SelectedOverload> (swift::constraints::ConstraintLocator*)>)","signatureAssert":"Assertion failed: (!fnTy->is<TypeVariableType>()), function operator()","signatureNext":"ConstraintSystem::hasPreconcurrencyCallee"}
-// The crash depends on the C++ parser's handling of this input.
-// UNSUPPORTED: parser_astgen
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 let a = [].reduce([]) {
   0 && a($1 == a

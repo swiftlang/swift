@@ -1,6 +1,7 @@
 // {"kind":"typecheck","original":"d5861276","signature":"swift::constraints::ConstraintSystem::repairFailures(swift::Type, swift::Type, swift::constraints::ConstraintKind, swift::optionset::OptionSet<swift::constraints::ConstraintSystem::TypeMatchFlags, unsigned int>, llvm::SmallVectorImpl<swift::constraints::RestrictionOrFix>&, swift::constraints::ConstraintLocatorBuilder)","signatureAssert":"Assertion failed: (Index < Length && \"Invalid index!\"), function operator[]","signatureNext":"ConstraintSystem::matchTypes"}
-// The crash depends on the C++ parser's handling of this input.
-// UNSUPPORTED: parser_astgen
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 actor a {
     f<each b, c>(

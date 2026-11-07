@@ -1,6 +1,7 @@
 // {"kind":"typecheck","signature":"swift::Type llvm::function_ref<swift::Type (swift::SubstitutableType*)>::callback_fn<swift::GenericEnvironment::mapElementTypeIntoPackContext(swift::Type) const::$_0>(long, swift::SubstitutableType*)","signatureAssert":"Assertion failed: (!elementEnv || elementEnv == archetype->getGenericEnvironment()), function operator()","signatureNext":"InFlightSubstitution::substType"}
-// The crash depends on the C++ parser's handling of this input.
-// UNSUPPORTED: parser_astgen
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 func a<each b, each c>(d: repeat each b e: repeat each c) {
   for f  repeat each e {

@@ -1,4 +1,7 @@
 // {"extraArgs":["-experimental-allow-module-with-compiler-errors","-cxx-interoperability-mode=default","-emit-clang-header-min-access","internal","-emit-clang-header-path","/dev/null"],"kind":"typecheck","original":"3b35217d","signature":"swift::LoweredFunctionSignature::visitParameterList(llvm::function_ref<void (swift::LoweredFunctionSignature::IndirectResultValue const&)>, llvm::function_ref<void (swift::LoweredFunctionSignature::DirectParameter const&)>, llvm::function_ref<void (swift::LoweredFunctionSignature::IndirectParameter const&)>, llvm::function_ref<void (swift::LoweredFunctionSignature::GenericRequirementParameter const&)>, llvm::function_ref<void (swift::LoweredFunctionSignature::MetadataSourceParameter const&)>, llvm::function_ref<void (swift::LoweredFunctionSignature::ContextParameter const&)>, llvm::function_ref<void (swift::LoweredFunctionSignature::ErrorResultValue const&)>) const","signatureAssert":"Assertion failed: (currentSilParam == silParamMapping.size()), function visitParameterList","signatureNext":"IRABIDetailsProviderImpl::getFunctionLoweredSignature"}
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck -experimental-allow-module-with-compiler-errors -cxx-interoperability-mode=default -emit-clang-header-min-access internal -emit-clang-header-path /dev/null %s
 @propertyWrapper struct a
   func b(@a c: (

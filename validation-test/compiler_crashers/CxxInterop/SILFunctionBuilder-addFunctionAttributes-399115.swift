@@ -1,6 +1,7 @@
 // {"extraArgs":["-experimental-allow-module-with-compiler-errors","-cxx-interoperability-mode=default","-emit-clang-header-min-access","internal","-emit-clang-header-path","/dev/null"],"kind":"typecheck","original":"2596137b","signature":"swift::SILFunctionBuilder::addFunctionAttributes(swift::SILFunction*, swift::DeclAttributes&, swift::SILModule&, llvm::function_ref<swift::SILFunction* (swift::SILLocation, swift::SILDeclRef)>, swift::SILDeclRef)","signatureAssert":"Assertion failed: (replacedFunc->getLoweredFunctionType() == F->getLoweredFunctionType() || replacedFunc->getLoweredFunctionType()->hasOpaqueArchetype()), function addFunctionAttributes","signatureNext":"SILFunctionBuilder::getOrCreateFunction"}
-// The crash depends on the C++ parser's handling of this input.
-// UNSUPPORTED: parser_astgen
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck -experimental-allow-module-with-compiler-errors -cxx-interoperability-mode=default -emit-clang-header-min-access internal -emit-clang-header-path /dev/null %s
 dynamic func a<b: Numeric>(b ) -> b
 @_dynamicReplacement(for:a) func c<b>(b ) -> b

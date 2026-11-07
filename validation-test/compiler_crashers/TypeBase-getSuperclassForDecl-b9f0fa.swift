@@ -1,6 +1,7 @@
 // {"kind":"typecheck","original":"77effdcf","signature":"swift::TypeBase::getSuperclassForDecl(swift::ClassDecl const*, bool)","signatureAssert":"Assertion failed: (isa<ClassDecl>(nominalDecl) && \"expected a class here\"), function getSuperclassForDecl","signatureNext":"TypeChecker::substMemberTypeWithBase"}
-// The crash depends on the C++ parser's handling of this input.
-// UNSUPPORTED: parser_astgen
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a: b
   protocol c {
