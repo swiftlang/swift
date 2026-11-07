@@ -54,7 +54,13 @@ void TangentBuilder::emitZeroIntoBuffer(SILLocation loc, SILValue buffer,
       loc, SILType::getPrimitiveObjectType(metatypeType));
   auto subMap = SubstitutionMap::getProtocolSubstitutions(
       additiveArithmeticProto, astType, confRef);
-  createApply(loc, getter, subMap, {buffer, metatype});
+  if (getFunction().hasLoweredAddresses()) {
+    createApply(loc, getter, subMap, {buffer, metatype});
+  } else {
+    // In opaque-value form, the getter returns the zero value directly.
+    auto zero = createApply(loc, getter, subMap, {metatype});
+    emitStoreValueOperation(loc, zero, buffer, StoreOwnershipQualifier::Init);
+  }
   emitDestroyValueOperation(loc, getter);
 }
 
@@ -114,8 +120,15 @@ void TangentBuilder::emitInPlaceAdd(
   auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
   auto metatype = createMetatype(loc, metatypeSILType);
   // %2 = apply $0(%lhs, %rhs, %1)
-  createApply(loc, witnessMethod, subMap,
-              {destinationBuffer, operand, metatype});
+  // In opaque-value form, the guaranteed `rhs` parameter is an object.
+  SILValue rhs = operand;
+  bool loadedOperand =
+      !getFunction().hasLoweredAddresses() && operand->getType().isAddress();
+  if (loadedOperand)
+    rhs = emitLoadValueOperation(loc, operand, LoadOwnershipQualifier::Copy);
+  createApply(loc, witnessMethod, subMap, {destinationBuffer, rhs, metatype});
+  if (loadedOperand)
+    emitDestroyValueOperation(loc, rhs);
   emitDestroyValueOperation(loc, witnessMethod);
 }
 
@@ -160,8 +173,23 @@ void TangentBuilder::emitAddIntoBuffer(SILLocation loc,
   auto metatypeSILType = SILType::getPrimitiveObjectType(metatypeType);
   auto metatype = createMetatype(loc, metatypeSILType);
   // %2 = apply %0(%result, %new, %old, %1)
-  createApply(loc, witnessMethod, subMap,
-              {destinationBuffer, rhsAddress, lhsAddress, metatype});
+  if (getFunction().hasLoweredAddresses()) {
+    createApply(loc, witnessMethod, subMap,
+                {destinationBuffer, rhsAddress, lhsAddress, metatype});
+  } else {
+    // In opaque-value form, the operands are objects and the sum is returned
+    // directly.
+    auto rhsValue =
+        emitLoadValueOperation(loc, rhsAddress, LoadOwnershipQualifier::Copy);
+    auto lhsValue =
+        emitLoadValueOperation(loc, lhsAddress, LoadOwnershipQualifier::Copy);
+    auto sum =
+        createApply(loc, witnessMethod, subMap, {rhsValue, lhsValue, metatype});
+    emitDestroyValueOperation(loc, lhsValue);
+    emitDestroyValueOperation(loc, rhsValue);
+    emitStoreValueOperation(loc, sum, destinationBuffer,
+                            StoreOwnershipQualifier::Init);
+  }
   emitDestroyValueOperation(loc, witnessMethod);
 }
 

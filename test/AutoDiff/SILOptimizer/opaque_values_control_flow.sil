@@ -1,0 +1,180 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -differentiation -sil-verify-all -emit-sorted-sil %s | %FileCheck %s
+
+// Differentiation of opaque-values SIL with control flow and coroutines, run
+// directly with `sil-opt`, so the results do not depend on where AddressLowering
+// sits in the pipeline.
+//
+// The pullbacks are generated in opaque-value form, where the adjoint of an
+// address-only value is a value, and Differentiation lowers them as soon as it
+// has generated them: the checks are for the lowered pullbacks. The adjoints
+// are added up with `+` rather than zero-initialized and added in place with
+// `+=`, which is what the checks for `+` and `+=` show. The inputs are the SIL
+// that Differentiation receives when AddressLowering runs after it.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+// A conditional: the two paths merge in a block that takes the result as an
+// argument, so the adjoint of that value is passed along to the paths.
+// CHECK-LABEL: sil private [ossa] @branch{{.*}}TJp{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned {{.*}}) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[RESULT:%.*]] : $*τ_0_0.TangentVector, [[SEED:%.*]] : $*τ_0_0.TangentVector, {{%.*}} : @owned {{.*}}):
+// CHECK:         switch_enum {{%.*}} : $_AD__branch_bb3__Pred{{.*}}
+// CHECK:         #AdditiveArithmetic."+" :
+// CHECK:         copy_addr {{%.*}} to [init] [[RESULT]] : $*τ_0_0.TangentVector
+sil [ossa] @branch : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, Bool) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : $Bool):
+  debug_value %0 : $T, let, name "x", argno 1
+  debug_value %1 : $Bool, let, name "flag", argno 2
+  %4 = struct_extract %1 : $Bool, #Bool._value
+  cond_br %4, bb1, bb2
+
+bb1:
+  %6 = function_ref @step : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %7 = apply %6<T>(%0) : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  br bb3(%7 : $T)
+
+bb2:
+  %9 = copy_value %0 : $T
+  br bb3(%9 : $T)
+
+bb3(%11 : @owned $T):
+  return %11 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @branch : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, Bool) -> @out T {
+}
+
+// A loop: the pullback reads what the VJP stored for each iteration from a
+// context that lives on the heap, and runs the loop backwards.
+// CHECK-LABEL: sil private [ossa] @looped{{.*}}TJp{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @guaranteed Builtin.NativeObject) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[LOOP_RESULT:%.*]] : $*τ_0_0.TangentVector, [[LOOP_SEED:%.*]] : $*τ_0_0.TangentVector, [[CONTEXT:%.*]] : @guaranteed $Builtin.NativeObject):
+// CHECK:         builtin "autoDiffProjectTopLevelSubcontext"([[CONTEXT]] : $Builtin.NativeObject) : $Builtin.RawPointer
+// CHECK:       [[HEADER:bb[0-9]+]]({{%.*}} : $(predecessor: _AD__looped_bb1__Pred{{.*}})):
+// CHECK:         #AdditiveArithmetic."+" :
+// CHECK:         br [[HEADER]]({{%.*}} : $(predecessor: _AD__looped_bb1__Pred{{.*}}))
+sil [ossa] @looped : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, Int) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : $Int):
+  debug_value %0 : $T, let, name "x", argno 1
+  debug_value %1 : $Int, let, name "n", argno 2
+  %4 = alloc_stack [lexical] [var_decl] $T, var, name "r", type $T
+  %5 = copy_value %0 : $T
+  store %5 to [init] %4 : $*T
+  %7 = alloc_stack [var_decl] $Int, var, name "i", type $Int
+  %8 = integer_literal $Builtin.IntLiteral, 0
+  %9 = metatype $@thin Int.Type
+  %10 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %11 = apply %10(%8, %9) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  store %11 to [trivial] %7 : $*Int
+  br bb1
+
+bb1:
+  %14 = metatype $@thin Int.Type
+  %15 = begin_access [read] [static] %7 : $*Int
+  %16 = load [trivial] %15 : $*Int
+  end_access %15 : $*Int
+  %18 = function_ref @$sSi1loiySbSi_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Bool
+  %19 = apply %18(%16, %1, %14) : $@convention(method) (Int, Int, @thin Int.Type) -> Bool
+  %20 = struct_extract %19 : $Bool, #Bool._value
+  cond_br %20, bb2, bb3
+
+bb2:
+  %22 = begin_access [read] [static] %4 : $*T
+  %23 = load [copy] %22 : $*T
+  end_access %22 : $*T
+  %25 = function_ref @step : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  %26 = apply %25<T>(%23) : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0) -> @out τ_0_0
+  destroy_value %23 : $T
+  %28 = begin_access [modify] [static] %4 : $*T
+  store %26 to [assign] %28 : $*T
+  end_access %28 : $*T
+  %31 = metatype $@thin Int.Type
+  %32 = integer_literal $Builtin.IntLiteral, 1
+  %33 = metatype $@thin Int.Type
+  %34 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %35 = apply %34(%32, %33) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %36 = begin_access [modify] [static] %7 : $*Int
+  %37 = function_ref @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
+  %38 = apply %37(%36, %35, %31) : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
+  end_access %36 : $*Int
+  br bb1
+
+bb3:
+  %41 = begin_access [read] [static] %4 : $*T
+  %42 = load [copy] %41 : $*T
+  end_access %41 : $*T
+  dealloc_stack %7 : $*Int
+  destroy_addr %4 : $*T
+  dealloc_stack %4 : $*T
+  return %42 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @looped : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, Int) -> @out T {
+}
+
+// A coroutine that yields its argument for modification.
+sil [ossa] @modify : $@yield_once @convention(thin) <T where T : Differentiable> (@inout T) -> @yields @inout T {
+bb0(%0 : $*T):
+  yield %0 : $*T, resume bb1, unwind bb2
+
+bb1:
+  %2 = tuple ()
+  return %2 : $()
+
+bb2:
+  unwind
+}
+
+// The identity function, and the callee of `branch` and `looped`.
+// CHECK-LABEL: sil private [ossa] @step{{.*}}TJpSpSr : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector) -> @out τ_0_0.TangentVector {
+// CHECK:       bb0([[STEP_RESULT:%.*]] : $*τ_0_0.TangentVector, [[STEP_SEED:%.*]] : $*τ_0_0.TangentVector):
+// CHECK-NOT:     alloc_stack
+// CHECK-NOT:     #AdditiveArithmetic
+// CHECK:         copy_addr [[STEP_SEED]] to [init] [[STEP_RESULT]] : $*τ_0_0.TangentVector
+sil [ossa] @step : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T):
+  debug_value %0 : $T, let, name "x", argno 1
+  %2 = copy_value %0 : $T
+  return %2 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0] [results 0] <T where T : Differentiable> @step : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T) -> @out T {
+}
+
+// Replaces a value through the yield of a coroutine. The pullback of the call
+// calls the pullback of the coroutine, itself a coroutine, with the adjoint of
+// the value as the buffer that it modifies in place.
+// CHECK-LABEL: sil private [ossa] @viaModify{{.*}}TJp{{.*}} : $@convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@in_guaranteed τ_0_0.TangentVector, @owned @callee_guaranteed @substituted <τ_0_0> (@inout τ_0_0) -> () for <τ_0_0.TangentVector>) -> (@out τ_0_0.TangentVector, @out τ_0_0.TangentVector) {
+// CHECK:         #AdditiveArithmetic."+="
+// CHECK:         [[COROUTINE:%.*]] = convert_function {{%.*}} : $@callee_guaranteed (@inout τ_0_0.TangentVector) -> () to $@yield_once @callee_guaranteed (@inout τ_0_0.TangentVector) -> @yields @inout τ_0_0.TangentVector
+// CHECK:         ({{%.*}}, [[TOKEN:%.*]]) = begin_apply [[COROUTINE]]({{%.*}})
+// CHECK:         end_apply [[TOKEN]] as $()
+// CHECK-NOT:     #AdditiveArithmetic."+="
+// CHECK:         return
+sil [ossa] @viaModify : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $T):
+  %2 = alloc_stack $T
+  %3 = copy_value %0 : $T
+  store %3 to [init] %2 : $*T
+  %5 = function_ref @modify : $@yield_once @convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@inout τ_0_0) -> @yields @inout τ_0_0
+  (%6, %7) = begin_apply %5<T>(%2) : $@yield_once @convention(thin) <τ_0_0 where τ_0_0 : Differentiable> (@inout τ_0_0) -> @yields @inout τ_0_0
+  %8 = copy_value %1 : $T
+  store %8 to [assign] %6 : $*T
+  end_apply %7 as $()
+  %10 = load [take] %2 : $*T
+  dealloc_stack %2 : $*T
+  return %10 : $T
+}
+
+sil_differentiability_witness [reverse] [parameters 0 1] [results 0] <T where T : Differentiable> @viaModify : $@convention(thin) <T where T : Differentiable> (@in_guaranteed T, @in_guaranteed T) -> @out T {
+}
+
+sil [transparent] [serialized] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+
+sil [transparent] [serialized] @$sSi1loiySbSi_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Bool
+
+sil [transparent] [serialized] @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> ()
