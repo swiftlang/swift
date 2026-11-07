@@ -990,6 +990,14 @@ void ConjunctionStep::SolverSnapshot::replaySolution(const Solution &solution) {
   CS.replaySolution(solution,
                     /*shouldIncreaseScore=*/false);
 
+  // A closure's captures, e.g. its capture list entries, could be solved as
+  // part of its body.
+  auto *conjunctionLocator = Conjunction->getLocator();
+  if (conjunctionLocator->directlyAt<ClosureExpr>()) {
+    CS.resolveClosureTransferability(
+        castToExpr<ClosureExpr>(conjunctionLocator->getAnchor()));
+  }
+
   if (!CS.shouldAttemptFixes())
     return;
 

@@ -12462,6 +12462,71 @@ void ConstraintSystem::removePreconcurrencyClosure(
   ASSERT(erased);
 }
 
+/// Collect the types of the values that \p closure captures: its capture list
+/// entries and the declarations from outside of it that it references. The
+/// captures of local functions it references are diagnosed when captures are
+/// computed.
+static void collectCaptureTypes(
+    ConstraintSystem &cs, ClosureExpr *closure,
+    SmallVectorImpl<TupleTypeElt> &types,
+    llvm::function_ref<bool(Type)> isSuitable = [](auto) { return true; }) {
+  auto addType = [&](VarDecl *var) {
+    Type type;
+    if (auto csType = cs.getTypeIfAvailable(var))
+      type = cs.simplifyType(csType);
+    else if (var->hasInterfaceType())
+      type = var->getTypeInContext();
+    else
+      return;
+
+    type = type->getWithoutSpecifierType()->getReferenceStorageReferent();
+    if (!type->hasError() && isSuitable(type))
+      types.push_back(type);
+  };
+
+  // The closure owns its capture list entries even if it doesn't use them.
+  if (auto *captureList =
+          getAsExpr<CaptureListExpr>(cs.getParentExpr(closure))) {
+    for (auto &entry : captureList->getCaptureList())
+      addType(entry.getVar());
+  }
+
+  TypeVarRefCollector collector(cs, closure, cs.getConstraintLocator(closure));
+  closure->walk(collector);
+  for (auto *var : collector.getReferencedVars()) {
+    auto *varDC = var->getDeclContext();
+    if (var->isLocalCapture() && varDC != closure &&
+        !varDC->isChildContextOf(closure))
+      addType(var);
+  }
+}
+
+void ConstraintSystem::resolveClosureTransferability(ClosureExpr *closure) {
+  auto *closureType = simplifyType(getType(closure))->castTo<FunctionType>();
+  auto dependency =
+      closureType->getTypeDependencyFor(TypeDependenceKind::Transferable);
+  auto *transferability =
+      dependency ? dependency->getAs<TypeVariableType>() : nullptr;
+  if (!transferability)
+    return;
+
+  ASSERT(transferability->getImpl()
+             .getLocator()
+             ->isLastElement<LocatorPathElt::ClosureTransferability>());
+
+  SmallVector<TupleTypeElt, 4> captureTypes;
+  collectCaptureTypes(
+      *this, closure, captureTypes, [&transferability](Type captureTy) {
+        SmallPtrSetVector<TypeVariableType *, 4> referencedTypeVars;
+        captureTy->getTypeVariables(referencedTypeVars);
+        return !referencedTypeVars.count(transferability);
+      });
+
+  addConstraint(ConstraintKind::Bind, transferability,
+                TupleType::get(captureTypes, getASTContext()),
+                transferability->getImpl().getLocator());
+}
+
 bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
                                       Type contextualType,
                                       ConstraintLocatorBuilder locator) {
@@ -12759,6 +12824,21 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
     }
   }
 
+  // Attempt to infer transferability of the closure based on its captures.
+  // If the closure is already either ~Transferable or @Sendable, there is
+  // nothing to do here.
+  if (getASTContext().LangOpts.hasFeature(Feature::NontransferableTypes) &&
+      !(closureExtInfo.isNonTransferable() || closureExtInfo.isSendable())) {
+    // Some captures, e.g. capture list entries, only get types with the body
+    // of the closure, which binds this once they are all known.
+    auto *transferability = createTypeVariable(
+        getConstraintLocator(closure,
+                             ConstraintLocator::ClosureTransferability),
+        /*options=*/0);
+    closureExtInfo = closureExtInfo.withTypeDependency(
+        TypeDependenceKind::Transferable, transferability);
+  }
+
   // Propagate sending result from the contextual type to the closure.
   if (auto contextualFnType = contextualType->getAs<FunctionType>()) {
     if (contextualFnType->hasExtInfo() && contextualFnType->hasSendingResult())
@@ -12789,7 +12869,17 @@ bool ConstraintSystem::resolveClosure(TypeVariableType *typeVar,
   setTargetFor(closure, target);
 
   // Generate constraints from the body of this closure.
-  return !generateConstraints(AnyFunctionRef{closure}, closure->getBody());
+  if (generateConstraints(AnyFunctionRef{closure}, closure->getBody()))
+    return false;
+
+  // The body of a single-expression closure, including its capture list, is
+  // generated here, otherwise it's solved as a conjunction.
+  if (!getAppliedResultBuilderTransform(AnyFunctionRef{closure}) &&
+      closure->hasSingleExpressionBody()) {
+    resolveClosureTransferability(closure);
+  }
+
+  return true;
 }
 
 bool ConstraintSystem::resolvePackExpansion(TypeVariableType *typeVar,
