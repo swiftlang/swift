@@ -2907,6 +2907,10 @@ bool ContextualFailure::diagnoseAsError() {
 
     ParameterListInfo info(
         params, choice, hasAppliedSelf(solution, overload->choice));
+    auto missingParamIdx = llvm::find_if(
+        indices(params), [&info](const unsigned paramIdx) -> bool {
+          return !info.hasDefaultArgument(paramIdx);
+        });
     auto numMissingArgs = llvm::count_if(
         indices(params), [&info](const unsigned paramIdx) -> bool {
           return !info.hasDefaultArgument(paramIdx);
@@ -2931,7 +2935,7 @@ bool ContextualFailure::diagnoseAsError() {
       }
     } else {
       emitDiagnostic(diag::expected_argument_in_contextual_member,
-                     choice, params.front().getPlainType());
+                     choice, params[*missingParamIdx].getPlainType());
     }
 
     return true;
