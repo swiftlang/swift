@@ -458,7 +458,7 @@ struct NumberWrtStruct: Differentiable {
     return a*x + b*y
   }
 
-  @differentiable(reverse, wrt: -1) // expected-cparser-error {{expected a parameter, which can be a function parameter name, parameter index, or 'self'}} expected-astgen-error {{expected arguments in '@differentiable' argument}} expected-astgen-error {{unexpected code '-1' in attribute}} expected-astgen-error {{unknown parameter name ''}}
+  @differentiable(reverse, wrt: -1) // expected-cparser-error {{expected a parameter, which can be a function parameter name, parameter index, or 'self'}} expected-astgen-error {{expected arguments in differentiability argument}} expected-astgen-error {{unexpected code '-1' in attribute}} expected-astgen-error {{unknown parameter name ''}}
   @differentiable(reverse, wrt: (1, x)) // expected-error {{parameters must be specified in original order}}
   func foo2(_ x: Float, _ y: Float) -> Float {
     return a*x + b*y

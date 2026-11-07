@@ -393,7 +393,7 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
-      self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
+      self.diagnoseEmptyScopeList(node)
       return nil
     }
     if let trailingComma = args.last?.trailingComma {
@@ -417,6 +417,15 @@ extension ASTGenVisitor {
       parensRange: self.generateAttrParensRange(attribute: node),
       restrictions: restrictions.lazy.bridgedArray(in: self)
     )
+  }
+
+  /// Diagnose `@_scoped()`: the parentheses are there, the scopes are not.
+  func diagnoseEmptyScopeList(_ node: AttributeSyntax) {
+    if let rightParen = node.rightParen, node.leftParen != nil, rightParen.presence == .present {
+      self.diagnose(.expected_scope(node.attributeName.trimmedDescription), at: rightParen)
+    } else {
+      self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
+    }
   }
 
   func generateScopeRestriction(_ arg: LabeledExprSyntax) -> BridgedScopeRestrictionRepr? {
@@ -485,7 +494,7 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, let arg = args.first else {
-      self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
+      self.diagnoseEmptyScopeList(node)
       return nil
     }
     guard args.count == 1, arg.label == nil, arg.trailingComma == nil,

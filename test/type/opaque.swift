@@ -84,7 +84,7 @@ func asArrayElem() -> [some P] { return [1] }
 typealias Foo = some P // expected-error{{'some' types are only permitted}}
 
 func blibble(blobble: some P) {}
-func blib() -> P & some Q { return 1 } // expected-cparser-error{{'some' should appear at the beginning}} expected-astgen-error {{unexpected code 'Q' in function}} expected-astgen-error {{cannot find type 'some' in scope}}
+func blib() -> P & some Q { return 1 } // expected-error{{'some' should appear at the beginning}}
 func blab() -> some P? { return 1 }
 func blorb<T: some P>(_: T) { } // expected-error{{'some' types are only permitted}}
 func blub<T>() -> T where T == some P { return 1 } // expected-error{{'some' types are only permitted}}
@@ -481,9 +481,9 @@ protocol SomeProtocolA {}
 protocol SomeProtocolB {}
 protocol SomeProtocolC {}
 struct SomeStructC: SomeProtocolA, SomeProtocolB, SomeProtocolC {}
-let someProperty: SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-cparser-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-19=some }} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{cannot find type 'some' in scope}} expected-astgen-error {{cannot assign to immutable expression of type '(any SomeProtocolB).Type'}} expected-astgen-error {{cannot assign value of type 'SomeStructC' to type '(any SomeProtocolB).Type'}}
-let someOtherProperty: some SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-cparser-error {{'some' should appear at the beginning of a composition}}{{45-50=}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{cannot find type 'some' in scope}} expected-astgen-error {{cannot assign to immutable expression of type '(any SomeProtocolB).Type'}} expected-astgen-error {{cannot assign value of type 'SomeStructC' to type '(any SomeProtocolB).Type'}}
-let someThirdProperty: some SomeProtocolA & SomeProtocolB & some SomeProtocolC = SomeStructC() // expected-cparser-error {{'some' should appear at the beginning of a composition}}{{61-66=}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{cannot find type 'some' in scope}} expected-astgen-error {{cannot assign to immutable expression of type '(any SomeProtocolC).Type'}} expected-astgen-error {{cannot assign value of type 'SomeStructC' to type '(any SomeProtocolC).Type'}}
+let someProperty: SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-cparser-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-19=some }} expected-astgen-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-32=some SomeProtocolA}}
+let someOtherProperty: some SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-error {{'some' should appear at the beginning of a composition}}{{45-50=}}
+let someThirdProperty: some SomeProtocolA & SomeProtocolB & some SomeProtocolC = SomeStructC() // expected-error {{'some' should appear at the beginning of a composition}}{{61-66=}}
 
 // An opaque result type on a protocol extension member effectively
 // contains an invariant reference to 'Self', and therefore cannot

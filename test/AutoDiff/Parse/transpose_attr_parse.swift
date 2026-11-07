@@ -53,29 +53,29 @@ func transpose(v: Float) -> Float
 @transpose(of: 3)
 func transpose(v: Float) -> Float
 
-// expected-cparser-error @+1 {{expected label 'wrt:' in '@transpose' attribute}} expected-astgen-error@+1 {{expected 'wrt:' in '@differentiable' argument}}
+// expected-cparser-error @+1 {{expected label 'wrt:' in '@transpose' attribute}} expected-astgen-error@+1 {{expected 'wrt:' in differentiability argument}}
 @transpose(of: foo, blah) // expected-astgen-error {{expected a parameter, which can be a function parameter index or 'self'}}
 func transpose(v: Float) -> Float
 
-// expected-cparser-error @+1 {{expected a colon ':' after 'wrt'}} expected-astgen-error@+1 {{expected ':' and arguments in '@differentiable' argument}}
+// expected-cparser-error @+1 {{expected a colon ':' after 'wrt'}} expected-astgen-error@+1 {{expected ':' and arguments in differentiability argument}}
 @transpose(of: foo, wrt)
 func transpose(v: Float) -> Float
 
-// expected-cparser-error @+1 {{unexpected ',' separator}} {{19-20=}} expected-astgen-error@+1 {{expected 'wrt:' and arguments in '@differentiable' argument}}
+// expected-cparser-error @+1 {{unexpected ',' separator}} {{19-20=}} expected-astgen-error@+1 {{expected 'wrt:' and arguments in differentiability argument}}
 @transpose(of: foo,)
 func transpose(v: Float) -> Float
 
-// expected-cparser-error @+2 {{expected ')' in 'transpose' attribute}}
-// expected-cparser-error @+1 {{expected declaration}}
-@transpose(of: foo, wrt: 0,) // expected-astgen-error {{expected ')' in 'transpose' attribute}} expected-astgen-error {{expected declaration}}
+// expected-error @+2 {{expected ')' in 'transpose' attribute}}
+// expected-error @+1 {{expected declaration}}
+@transpose(of: foo, wrt: 0,)
 func transpose(v: Float) -> Float
 
-// expected-cparser-error @+1 {{expected a parameter, which can be a function parameter index or 'self'}}
-@transpose(of: foo, wrt: v) // expected-astgen-error {{expected a parameter, which can be a function parameter index or 'self'}}
+// expected-error @+1 {{expected a parameter, which can be a function parameter index or 'self'}}
+@transpose(of: foo, wrt: v)
 func transpose(v: Float) -> Float
 
-// expected-cparser-error @+1 {{expected a parameter, which can be a function parameter index or 'self'}}
-@transpose(of: foo, wrt: (0, v)) // expected-astgen-error {{expected a parameter, which can be a function parameter index or 'self'}}
+// expected-error @+1 {{expected a parameter, which can be a function parameter index or 'self'}}
+@transpose(of: foo, wrt: (0, v))
 func transpose(v: Float) -> Float
 
 // NOTE: The "expected ',' separator" diagnostic is not ideal.

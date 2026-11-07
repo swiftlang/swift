@@ -438,7 +438,7 @@ var fl_h: Float = 2e-42
 var vl_i: Float = -.45   // expected-cparser-error {{'.45' is not a valid floating point literal; it must be written '0.45'}} {{20-20=0}} expected-astgen-error {{'.45' is not a valid floating point literal; it must be written '0.45'}}
 var fl_j: Float = 0x1p0
 var fl_k: Float = 0x1.0p0
-var fl_l: Float = 0x1.0 // expected-cparser-error {{hexadecimal floating point literal must end with an exponent}} expected-astgen-error {{value of type 'Int' has no member '0'}}
+var fl_l: Float = 0x1.0 // expected-error {{hexadecimal floating point literal must end with an exponent}}
 var fl_m: Float = 0x1.FFFFFEP-2
 var fl_n: Float = 0x1.fffffep+2
 var fl_o: Float = 0x1.fffffep+ // expected-error {{expected a digit in floating point exponent}}

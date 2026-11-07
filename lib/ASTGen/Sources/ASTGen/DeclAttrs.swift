@@ -91,6 +91,28 @@ extension ASTGenVisitor {
       sawStatic = true
 
       // TODO: Diagnose duplicated attrs.
+      // Only variables, functions and subscripts can be static; the C++ parser
+      // reports it for every other declaration once the declaration is
+      // parsed, at the declaration's location, and drops the modifier.
+      if let declNode = node.parent?.parent, !declNode.is(VariableDeclSyntax.self),
+        !declNode.is(FunctionDeclSyntax.self), !declNode.is(SubscriptDeclSyntax.self),
+        !declNode.is(AccessorDeclSyntax.self), !declNode.is(MacroExpansionDeclSyntax.self)
+      {
+        let declLoc: Syntax?
+        if let named = declNode.asProtocol(NamedDeclSyntax.self) {
+          declLoc = Syntax(named.name)
+        } else {
+          declLoc = node.parent?.as(DeclModifierListSyntax.self)?.last?.nextToken(viewMode: .sourceAccurate)
+            .map(Syntax.init)
+        }
+        self.diagnose(
+          .decl_not_static(spelling),
+          at: declLoc ?? Syntax(node),
+          fixIts: [self.tidyRemovalFixIt(node)]
+        )
+        return
+      }
+
       // TODO: Diagnose if allowStatic is false.
       // TODO: Diagnose 'class' for non-class decls.
 

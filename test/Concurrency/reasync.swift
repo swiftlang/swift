@@ -11,7 +11,7 @@ func reasyncFunction(_: () async -> ()) reasync {}
 func reasyncRethrowsFunction(_: () async throws -> ()) reasync rethrows {}
 
 func rethrowsReasyncFunction(_: () async throws -> ()) rethrows reasync {}
-// expected-cparser-error@-1 {{'reasync' must precede 'rethrows'}}{{65-73=}}{{56-56=reasync }} expected-astgen-error@-1 {{'reasync' must precede 'rethrows'}}{{65-73=}}{{56-56=async }}
+// expected-error@-1 {{'reasync' must precede 'rethrows'}}{{65-73=}}{{56-56=reasync }}
 
 func asyncReasyncFunction(_: () async throws -> ()) async reasync {} // expected-astgen-note {{'async' declared here}}
 // expected-cparser-error@-1 {{'reasync' has already been specified}}{{59-67=}} expected-astgen-error@-1 {{'reasync' conflicts with 'async'}}

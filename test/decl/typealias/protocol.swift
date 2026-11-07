@@ -3,7 +3,7 @@
 // Tests for typealias inside protocols
 
 protocol Bad {
-  associatedtype X<T>  // expected-cparser-error {{associated types must not have a generic parameter list}} expected-astgen-error {{consecutive declarations on a line must be separated by newline or ';'}} expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected parameter clause in function signature}}
+  associatedtype X<T>  // expected-error {{associated types must not have a generic parameter list}}
   typealias Y<T>       // expected-cparser-error {{expected '=' in type alias declaration}} expected-astgen-error {{expected '=' and type in typealias declaration}}
 }
 

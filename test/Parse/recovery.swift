@@ -65,10 +65,10 @@ func braceStmt3() {
 
 static func toplevelStaticFunc() {} // expected-error {{static methods may only be declared on a type}} {{1-8=}}
 
-static struct StaticStruct {} // expected-cparser-error {{declaration cannot be marked 'static'}} {{1-8=}} expected-astgen-error {{static properties may only be declared on a type}}
-static class StaticClass {} // expected-cparser-error {{declaration cannot be marked 'static'}} {{1-8=}} expected-astgen-error {{static properties may only be declared on a type}}
-static protocol StaticProtocol {} // expected-cparser-error {{declaration cannot be marked 'static'}} {{1-8=}} expected-astgen-error {{static properties may only be declared on a type}}
-static typealias StaticTypealias = Int // expected-cparser-error {{declaration cannot be marked 'static'}} {{1-8=}} expected-astgen-error {{static properties may only be declared on a type}}
+static struct StaticStruct {} // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
+static class StaticClass {} // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
+static protocol StaticProtocol {} // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
+static typealias StaticTypealias = Int // expected-error {{declaration cannot be marked 'static'}} {{1-8=}}
 
 class ClassWithStaticDecls {
   class var a = 42 // expected-error {{class stored properties not supported}}
@@ -300,7 +300,7 @@ struct SS SS : Multi {
   }
 }
 
-let (efg hij, foobar) = (5, 6) // // expected-astgen-error {{'(Int, Int)' is not convertible to '(Int, Int, _)', tuples have a different number of elements}}
+let (efg hij, foobar) = (5, 6) // expected-astgen-error {{'(Int, Int)' is not convertible to '(Int, Int, _)', tuples have a different number of elements}}
 // expected-cparser-error @-1 {{found an unexpected second identifier in constant declaration; is there an accidental break?}} expected-astgen-error@-1 {{expected ',' in tuple pattern}}
 // expected-cparser-note @-2 {{join the identifiers together}} {{6-13=efghij}}
 // expected-cparser-note @-3 {{join the identifiers together with camel-case}} {{6-13=efgHij}}
@@ -467,7 +467,7 @@ struct ErrorTypeInVarDeclDictionaryType {
 struct ErrorInFunctionSignatureResultArrayType1 {
   func foo() -> Int[ { // expected-cparser-error {{expected '{' in body of function declaration}} expected-astgen-error {{unexpected code '[' in function}}
                        // expected-cparser-note@-1 {{to match this opening '['}}
-    return [0] // // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }  // expected-cparser-error {{expected ']' in array type}}
   func bar() -> Int] { // expected-error {{unexpected ']' in type; did you mean to write an array type?}} {{17-17=[}}
     return [0]
@@ -482,20 +482,20 @@ struct ErrorInFunctionSignatureResultArrayType2 {
 
 struct ErrorInFunctionSignatureResultArrayType3 {
   func foo() -> Int[0] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{}}
-    return [0] // // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }
 
 struct ErrorInFunctionSignatureResultArrayType4 {
   func foo() -> Int[0_1] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{unexpected code '[0_1]' in function}}
-    return [0] // // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }
 
 
 struct ErrorInFunctionSignatureResultArrayType5 {
   func foo() -> Int[0b1] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{unexpected code '[0b1]' in function}}
-    return [0] // // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
+    return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }
 
@@ -577,7 +577,7 @@ class SubModule {
 }
 
 // expected-cparser-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{34-35=}} expected-astgen-error@+1 {{expected ':' to begin inheritance clause}}{{31-31=: }}{{30-31=}}{{34-36=}}{{34-34= }}    
-class WrongInheritanceClause1(Int) {} // // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
+class WrongInheritanceClause1(Int) {} // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 // expected-cparser-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} {{41-42=}} expected-astgen-error@+1 {{expected ':' to begin inheritance clause}}{{31-31=: }}{{30-31=}}{{41-43=}}
 class WrongInheritanceClause2(Base2<Int>) {}
@@ -592,10 +592,10 @@ class WrongInheritanceClause4(SubModule.Base2<Int>) {}
 class WrongInheritanceClause5<T>(SubModule.Base2<Int>) where T:AnyObject {}
 
 // expected-cparser-error@+1 {{expected ':' to begin inheritance clause}} {{30-31=: }} expected-astgen-error@+1 {{expected ':' to begin inheritance clause}}{{31-31=: }}{{30-31=}} 
-class WrongInheritanceClause6(Int {} // // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
+class WrongInheritanceClause6(Int {} // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 // expected-cparser-error@+1 {{expected ':' to begin inheritance clause}} {{33-34=: }} expected-astgen-error@+1 {{expected ':' to begin inheritance clause}}{{34-34=: }}{{33-34=}} 
-class WrongInheritanceClause7<T>(Int where T:AnyObject {} // // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
+class WrongInheritanceClause7<T>(Int where T:AnyObject {} // expected-astgen-error {{inheritance from non-protocol, non-class type 'Int'}}
 
 class Base {}
 
@@ -611,14 +611,14 @@ public enum TestA {
   // expected-cparser-error @+1{{expected '{' in body of function declaration}}
   public static func convertFromExtenndition( // expected-cparser-error {{expected parameter name followed by ':'}}
     // expected-cparser-error@+1{{expected parameter name followed by ':'}} expected-astgen-error@+1 {{expected ':' and type in parameter}}
-    s._core.count != 0, "Can't form a Character from an empty String") // // expected-astgen-error {{unexpected code '._core.count != 0, "Can't form a Character from an empty String"' in parameter clause}}
+    s._core.count != 0, "Can't form a Character from an empty String") // expected-astgen-error {{unexpected code '._core.count != 0, "Can't form a Character from an empty String"' in parameter clause}}
 }
 
 public enum TestB {
   // expected-cparser-error@+1{{expected '{' in body of function declaration}}
   public static func convertFromExtenndition( // expected-cparser-error {{expected parameter name followed by ':'}}
     // expected-cparser-error@+1 {{expected parameter name followed by ':'}} expected-astgen-error@+1 {{expected ':' and type in parameter}}
-    s._core.count ?= 0, "Can't form a Character from an empty String") // // expected-astgen-error {{unexpected code '._core.count ?= 0, "Can't form a Character from an empty String"' in parameter clause}}
+    s._core.count ?= 0, "Can't form a Character from an empty String") // expected-astgen-error {{unexpected code '._core.count ?= 0, "Can't form a Character from an empty String"' in parameter clause}}
 }
 
 

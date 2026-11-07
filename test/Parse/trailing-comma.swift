@@ -104,10 +104,10 @@ struct Foo {
 
 func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-cparser-error {{expected ',' separator}} expected-astgen-error {{unexpected code '(Int) -> Int)' in function}} expected-cparser-error {{unnamed parameters must be written with the empty name '_'}} expected-astgen-error {{expected ')' to end parameter clause}} expected-astgen-note {{to match this opening '('}}
 
-@derivative(of: Self.other,) // expected-cparser-error {{unexpected ',' separator}} {{27-28=}} expected-astgen-error {{expected 'wrt:' and arguments in '@differentiable' argument}}
+@derivative(of: Self.other,) // expected-cparser-error {{unexpected ',' separator}} {{27-28=}} expected-astgen-error {{expected 'wrt:' and arguments in differentiability argument}}
 func foo() {}
 
-@transpose(of: S.instanceMethod,) // expected-cparser-error {{unexpected ',' separator}} {{32-33=}} expected-astgen-error {{expected 'wrt:' and arguments in '@differentiable' argument}}
+@transpose(of: S.instanceMethod,) // expected-cparser-error {{unexpected ',' separator}} {{32-33=}} expected-astgen-error {{expected 'wrt:' and arguments in differentiability argument}}
 func transposeInstanceMethodWrtSelf(_ other: S, t: S) -> S {
     other + t
 }

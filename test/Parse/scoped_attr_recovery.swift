@@ -25,7 +25,7 @@ func missingLParen(b: @_scoped S) {}
 // expected-error@-1:32{{expected '(' in '_scoped' attribute}}
 
 func emptyRestrictionList(b: @_scoped() S) {}
-// expected-cparser-error@-1:39{{expected identifier or 'self' in '_scoped' attribute}} expected-astgen-error@-1 {{expected '(' in '_scoped' attribute}}
+// expected-error@-1:39{{expected identifier or 'self' in '_scoped' attribute}}
 
 func ampersandWithoutName(b: @_scoped(&) S) {}
 // expected-cparser-error@-1:39{{expected identifier or 'self' in '_scoped' attribute}} expected-astgen-error@-1 {{invalid argument in '_scoped' attribute}}
@@ -94,7 +94,7 @@ func repeatedAttribute(a: Int, b: @_scoped(a) @_scoped(a) S) {}
 // expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
 
 @_scopeParams(&a) func accessScopeParam() {}
-// expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{}}
+// expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
 
 @_scopeParams(0) func integerScopeParam() {}
 // expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
@@ -155,7 +155,7 @@ func accessScopeMissingLParen(a: borrowing @_accessScope Pair) {}
 // expected-error@-1:58{{expected '(' in '_accessScope' attribute}}
 
 func emptyAccessScope(a: borrowing @_accessScope() Pair) {}
-// expected-cparser-error@-1:50{{expected identifier or 'self' in '_accessScope' attribute}} expected-astgen-error@-1 {{expected '(' in '_accessScope' attribute}}
+// expected-error@-1:50{{expected identifier or 'self' in '_accessScope' attribute}}
 
 func accessScopeList(a: borrowing Int, b: borrowing Int, c: borrowing @_accessScope(&a, &b) Pair) {}
 // expected-cparser-error@-1:87{{expected ')' in '_accessScope' attribute}} expected-astgen-error@-1 {{invalid argument in '_accessScope' attribute}}

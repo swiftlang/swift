@@ -116,7 +116,6 @@ extension Parser.LanguageFeatures {
     mapFeature(.OnceFunctions, to: .onceFunctions)
     mapFeature(.CoroutineFunctions, to: .coroutineFunctions)
     mapFeature(.ExtendedSpecializedAttribute, to: .extendedSpecializedAttribute)
-    mapFeature(.NamedOpaqueTypes, to: .namedOpaqueTypes)
     mapFeature(.BareSlashRegexLiterals, to: .bareSlashRegexLiterals)
   }
 }

@@ -31,7 +31,21 @@ extension ASTGenVisitor {
     case .classRestrictionType(let node):
       return self.generate(classRestrictionType: node).asTypeRepr
     case .compositionType(let node):
-      return self.generate(compositionType: node).asTypeRepr
+      let composition = self.generate(compositionType: node).asTypeRepr
+      // `P & some Q` is diagnosed by the parser, which then makes the whole
+      // composition opaque (or existential), as if the keyword were in front.
+      if node.parent?.is(SomeOrAnyTypeSyntax.self) != true,
+        let misplaced = node.elements.lazy.compactMap({
+          $0.unexpectedBeforeType?.compactMap { $0.as(TokenSyntax.self) }.first
+        }).first
+      {
+        let loc = self.generateSourceLoc(misplaced)
+        if misplaced.text == "some" {
+          return BridgedOpaqueReturnTypeRepr.createParsed(self.ctx, someKeywordLoc: loc, base: composition).asTypeRepr
+        }
+        return BridgedExistentialTypeRepr.createParsed(self.ctx, anyKeywordLoc: loc, base: composition).asTypeRepr
+      }
+      return composition
     case .dictionaryType(let node):
       return self.generate(dictionaryType: node).asTypeRepr
     case .functionType(let node):
