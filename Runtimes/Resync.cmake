@@ -260,3 +260,17 @@ copy_library_sources(RegexBuilder "Sources" "Supplemental/StringProcessing"
 copy_library_sources("linker-support" "" "Supplemental/Differentiation")
 copy_library_sources(include "" "Supplemental/Distributed")
 copy_library_sources(include "" "Supplemental/Observation")
+
+# Test support libraries
+copy_library_sources(include "" "Testing")
+foreach(library
+    SwiftPrivate
+    SwiftPrivateThreadExtras
+    SwiftPrivateLibcExtras
+    StdlibUnittest
+    StdlibCollectionUnittest
+    StdlibUnicodeUnittest
+    RuntimeUnittest
+    DifferentiationUnittest)
+  copy_library_sources(${library} "private" "Testing")
+endforeach()
