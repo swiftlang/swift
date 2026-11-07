@@ -122,7 +122,7 @@ if let x = opt, let y = opt, x != y,
 }
 
 // Leading boolean conditional.
-if 1 != 2, let x = opt, // expected-astgen-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+if 1 != 2, let x = opt, // // expected-astgen-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
    y = opt,  // expected-cparser-error {{expected 'let' in conditional}} {{4-4=let }} expected-astgen-error {{unexpected code before optional binding}}
    x != y,
    let a = opt, var b = opt { // expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
@@ -155,17 +155,17 @@ func testIfCase(_ a : Int?) {
   if case nil = a, a != nil {}
   if case let (b?) = a, b != 42 {}
   
-  if let case (b?) = a, b != 42 {}  // expected-cparser-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-10=}} {{14-14= let}} expected-astgen-error {{expected pattern in optional binding}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{'case' can only appear inside a 'switch' statement or 'enum' declaration}} expected-astgen-error {{unwrap condition requires a valid identifier}}
+  if let case (b?) = a, b != 42 {}  // expected-cparser-error {{pattern matching binding is spelled with 'case let', not 'let case'}} {{6-10=}} {{14-14= let}} expected-astgen-error {{pattern matching binding is spelled with 'case let', not 'let case'}}{{6-10=}}{{15-15=let }}
   
   if a != nil, let c = a, case nil = a { _ = c}
   
-  if let p? = a {_ = p}  // expected-cparser-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
+  if let p? = a {_ = p}  // expected-error {{pattern matching in a condition implicitly unwraps optionals}} {{11-12=}}
   
   
-  if let .some(x) = a {_ = x}  // expected-cparser-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
+  if let .some(x) = a {_ = x}  // expected-error {{pattern matching in a condition requires the 'case' keyword}} {{6-6=case }}
 
-  if case _ = a {}  // expected-cparser-warning {{'if' condition is always true}}
-  while case _ = a {}  // expected-cparser-warning {{'while' condition is always true}} expected-astgen-error {{expected '}' to end 'if' statement}}
+  if case _ = a {}  // expected-warning {{'if' condition is always true}}
+  while case _ = a {}  // expected-warning {{'while' condition is always true}}
 
 }
 

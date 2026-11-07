@@ -79,21 +79,21 @@ multiple_trailing_with_defaults(duration: 42) {} // expected-warning{{backward m
 
 multiple_trailing_with_defaults(duration: 42) {} completion: {}
 
-func test_multiple_trailing_syntax_without_labels() { // expected-astgen-note {{to match this opening '{'}}
+func test_multiple_trailing_syntax_without_labels() { //
   func fn(f: () -> Void, g: () -> Void) {}
 
   fn {} g: {} // Ok
 
   fn {} _: {} // expected-error {{missing argument label 'g:' in call}} {{9-10=g}} {{none}}
 
-  fn {} g: <#T##() -> Void#> // expected-error {{editor placeholder in source file}} expected-astgen-error {{expected '{' to start closure}}
+  fn {} g: <#T##() -> Void#> // expected-error {{editor placeholder in source file}}
 
   func multiple(_: () -> Void, _: () -> Void) {}
 
   multiple {} _: { }
 
   func mixed_args_1(a: () -> Void, _: () -> Void) {}
-  func mixed_args_2(_: () -> Void, a: () -> Void, _: () -> Void) {} // expected-cparser-note {{'mixed_args_2(_:a:_:)' declared here}}
+  func mixed_args_2(_: () -> Void, a: () -> Void, _: () -> Void) {} // expected-note {{'mixed_args_2(_:a:_:)' declared here}}
 
   mixed_args_1 {} _: {}
 
@@ -101,9 +101,9 @@ func test_multiple_trailing_syntax_without_labels() { // expected-astgen-note {{
 
   mixed_args_2 {} a: {} _: {}
 
-  mixed_args_2 {} _: {} // expected-cparser-error@:18 {{missing argument for parameter 'a' in call}} {{18-18= a: <#() -> Void#>}} {{none}}
+  mixed_args_2 {} _: {} // expected-error@:18 {{missing argument for parameter 'a' in call}} {{18-18= a: <#() -> Void#>}} {{none}}
 
-  mixed_args_2 {} _: {} _: {} // expected-cparser-error@:16 {{missing argument label 'a:' in call}} {{19-20=a}} {{none}}
+  mixed_args_2 {} _: {} _: {} // expected-error@:16 {{missing argument label 'a:' in call}} {{19-20=a}} {{none}}
 }
 
 func produce(fn: () -> Int?, default d: () -> Int) -> Int { // expected-note {{declared here}}
@@ -131,4 +131,4 @@ struct IsolationTest {
       nonisolated parameter in return parameter // expected-cparser-error {{the parameter list of a 'nonisolated' closure requires parentheses}} {{19-19=(}} {{29-29=)}}
     }
   }
-} // expected-astgen-error {{expected '}' to end function}}
+} //
