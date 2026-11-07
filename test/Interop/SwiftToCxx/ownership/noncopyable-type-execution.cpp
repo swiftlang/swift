@@ -12,8 +12,14 @@
 // RUN: not --crash %target-run %t/swift-noncopyable-execution borrow-moved-from 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 // RUN: not --crash %target-run %t/swift-noncopyable-execution consume-moved-from 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 // RUN: not --crash %target-run %t/swift-noncopyable-execution call-on-moved-from 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution call-on-moved-from-generic 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution borrow-moved-from-generic 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution borrow-moved-from-inline 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution consume-moved-from-inline 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution call-on-moved-from-inline 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 
-// Repeat with boxed values.
+// With library evolution, resilient types are boxed and frozen types still
+// use their extra inhabitants.
 // RUN: %target-swift-frontend %S/noncopyable-type-in-cxx.swift -module-name Noncopyable -enable-library-evolution -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/noncopyable.h
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-noncopyable-execution.o
 // RUN: %target-interop-build-swift %S/noncopyable-type-in-cxx.swift -enable-library-evolution -o %t/swift-noncopyable-execution -Xlinker %t/swift-noncopyable-execution.o -module-name Noncopyable -Xfrontend -enable-experimental-feature -Xfrontend GenerateBindingsForNoncopyableTypesInCXX -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -22,6 +28,11 @@
 // RUN: not --crash %target-run %t/swift-noncopyable-execution borrow-moved-from 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 // RUN: not --crash %target-run %t/swift-noncopyable-execution consume-moved-from 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 // RUN: not --crash %target-run %t/swift-noncopyable-execution call-on-moved-from 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution call-on-moved-from-generic 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution borrow-moved-from-generic 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution borrow-moved-from-inline 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution consume-moved-from-inline 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
+// RUN: not --crash %target-run %t/swift-noncopyable-execution call-on-moved-from-inline 2>&1 | %FileCheck --check-prefix=MOVED-FROM %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_GenerateBindingsForNoncopyableTypesInCXX
@@ -50,6 +61,21 @@ static_assert(std::is_move_constructible<MoveOnlyStruct>::value,
 static_assert(std::is_move_assignable<MoveOnlyStruct>::value,
               "a noncopyable Swift type must be move assignable");
 
+static_assert(!std::is_copy_constructible<Unique<swift::Int>>::value,
+              "a generic noncopyable Swift type must not be copy constructible");
+static_assert(std::is_nothrow_move_constructible<Unique<swift::Int>>::value,
+              "a generic noncopyable Swift type must be move constructible");
+static_assert(!std::is_copy_constructible<Handle<swift::Int>>::value,
+              "a generic noncopyable Swift type must not be copy constructible");
+static_assert(!swift::isUsableInGenericContext<Unique<swift::Int>>,
+              "a noncopyable type cannot be a generic argument");
+static_assert(sizeof(Unique<swift::Int>) == sizeof(void *),
+              "a boxed value needs no moved-from flag");
+static_assert(sizeof(Handle<swift::Int>) == sizeof(void *),
+              "a fixed generic layout without extra inhabitants is boxed");
+static_assert(!swift::_impl::isOpaqueLayout<ReadyHandle<swift::Int>>,
+              "a frozen generic layout with extra inhabitants stays inline");
+
 static_assert(std::is_copy_constructible<CopyableStruct>::value,
               "a copyable Swift type must still be copy constructible");
 
@@ -65,6 +91,12 @@ static void useMovedFrom(const char *mode) {
   auto t = std::move(s);
   auto e = MoveOnlyEnum::a(1);
   auto f = std::move(e);
+  auto u = Unique<swift::Int>::init(1);
+  auto v = std::move(u);
+  auto h = Handle<swift::Int>::init(1);
+  auto i = std::move(h);
+  auto ready = ReadyHandle<swift::Int>::init(1, true);
+  auto liveReady = std::move(ready);
   // MOVED-FROM: about to use a moved-from value
   printf("about to use a moved-from value\n");
   fflush(stdout);
@@ -74,6 +106,16 @@ static void useMovedFrom(const char *mode) {
     consumeMoveOnlyStruct(std::move(s));
   else if (!strcmp(mode, "call-on-moved-from"))
     (void)e.isA();
+  else if (!strcmp(mode, "call-on-moved-from-generic"))
+    (void)h.getRaw();
+  else if (!strcmp(mode, "borrow-moved-from-generic"))
+    (void)borrowUnique(u);
+  else if (!strcmp(mode, "borrow-moved-from-inline"))
+    (void)borrowReadyHandle(ready);
+  else if (!strcmp(mode, "consume-moved-from-inline"))
+    consumeReadyHandle(std::move(ready));
+  else if (!strcmp(mode, "call-on-moved-from-inline"))
+    (void)ready.isReady();
   // MOVED-FROM-NOT: unreachable
   printf("unreachable\n");
 }
@@ -83,6 +125,8 @@ int main(int argc, char **argv) {
     useMovedFrom(argv[1]);
     return 0;
   }
+
+  assert(sizeof(ReadyHandle<swift::Int>) == readyHandleStride());
 
   // A value returned from Swift is live, so its deinit runs once.
   // CHECK: destroy MoveOnlyStruct(42)
@@ -221,6 +265,110 @@ int main(int argc, char **argv) {
     auto e = MoveOnlyEnum::c(Ref::init());
     auto f = std::move(e);
     assert(f.isC());
+  }
+
+  // A frozen fixed generic layout stays inline. The Bool supplies a nonzero
+  // sentinel and the Int is ignored after repeated moves from an empty value.
+  // CHECK-NEXT: destroy ReadyHandle(91)
+  // CHECK-NEXT: destroy ReadyHandle(90)
+  // CHECK-NEXT: destroy ReadyHandle(92)
+  {
+    auto a = ReadyHandle<swift::Int>::init(90, true);
+    auto b = ReadyHandle<swift::Int>::init(91, false);
+    auto &alias = a;
+    a = std::move(alias);
+    assert(a.value() == 90);
+    assert(a.isReady());
+
+    auto live = std::move(a);
+    auto empty = std::move(a);
+    b = std::move(empty);
+    b = std::move(live);
+    assert(borrowReadyHandle(b) == 90);
+    assert(b.isReady());
+
+    std::swap(b, live);
+    assert(live.value() == 90);
+    consumeReadyHandle(std::move(live));
+    b = ReadyHandle<swift::Int>::init(92, false);
+    assert(!b.isReady());
+  }
+
+  // A generic noncopyable value is moved and consumed like the others.
+  // CHECK-NEXT: destroy Unique
+  {
+    auto u = Unique<swift::Int>::init(5);
+    assert(u.get() == 5);
+    u.set(6);
+    auto v = std::move(u);
+    assert(borrowUnique(v) == 6);
+    consumeUnique(std::move(v));
+  }
+
+  // Assigning into a live object destroys its value, and the class reference
+  // that the value owns.
+  // CHECK-NEXT: destroy Unique
+  // CHECK-NEXT: destroy Ref
+  // CHECK-NEXT: assigned
+  // CHECK-NEXT: destroy Unique
+  // CHECK-NEXT: destroy Ref
+  {
+    auto a = makeUnique(Ref::init());
+    auto b = makeUnique(Ref::init());
+    std::swap(a, b);
+    a = std::move(b);
+    printf("assigned\n");
+  }
+
+  // A vector reallocates while one of its elements is moved from.
+  // CHECK-NEXT: destroy Handle(70)
+  // CHECK-NEXT: destroy Handle(71)
+  {
+    std::vector<Handle<swift::Int>> v;
+    v.reserve(1);
+    v.push_back(Handle<swift::Int>::init(70));
+    auto h = std::move(v[0]);
+    v.push_back(Handle<swift::Int>::init(71));
+    assert(h.getRaw() == 70);
+    consumeHandle(std::move(h));
+    v.pop_back();
+    v.pop_back();
+  }
+
+  // A concrete specialization is passed and returned directly.
+  // CHECK-NEXT: destroy Unique
+  {
+    auto u = makeUniqueInt(7);
+    auto v = std::move(u);
+    assert(borrowUniqueInt(v) == 7);
+    consumeUniqueInt(std::move(v));
+  }
+
+  {
+    auto f = Flag<swift::Int>::on(1);
+    auto g = std::move(f);
+    assert(g.isOn());
+    switch (g) {
+    case Flag<swift::Int>::cases::on:
+      break;
+    case Flag<swift::Int>::cases::off:
+      assert(false);
+      break;
+    }
+  }
+
+  {
+    auto s = Slot<swift::Int>::full(1);
+    auto t = std::move(s);
+    assert(t.isFull());
+    auto e = Slot<swift::Int>::empty();
+    switch (e) {
+    case Slot<swift::Int>::cases::full:
+      assert(false);
+      break;
+    case Slot<swift::Int>::cases::empty:
+      break;
+    }
   }
 
   // CHECK-NEXT: done

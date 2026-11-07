@@ -322,7 +322,29 @@ bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(
   // per specialization, so only an always-noncopyable type qualifies.
   if (typeDecl->canBeCopyable() != TypeDecl::CanBeInvertible::Never)
     return false;
-  return !typeDecl->isGenericContext();
+  // Only a type's own generic parameters become C++ template parameters.
+  if (typeDecl->getDeclContext()->isGenericContext())
+    return false;
+  if (typeDecl->hasGenericParamList()) {
+    // FIXME: The member alias for a generic type nested in another type refers
+    // to generic parameters that are not in scope.
+    if (!typeDecl->getDeclContext()->isModuleScopeContext())
+      return false;
+    auto genericSignature = typeDecl->getGenericSignature();
+    // The header printer only supports scalar type parameters.
+    for (auto *param : genericSignature.getGenericParams()) {
+      if (param->isParameterPack() || param->isValue())
+        return false;
+    }
+    // Generic parameters with suppressed requirements, such as T: ~Copyable
+    // or T: ~Escapable, are not supported yet.
+    SmallVector<Requirement, 2> reqs;
+    SmallVector<InverseRequirement, 2> inverseReqs;
+    genericSignature->getRequirementsWithInverses(reqs, inverseReqs);
+    if (!inverseReqs.empty())
+      return false;
+  }
+  return true;
 }
 
 bool swift::cxx_translation::isNoncopyableValueTypeExposableToCxx(Type type) {
