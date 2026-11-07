@@ -800,7 +800,7 @@ overloaded { print("hi") } // single-expression closure => typechecked with body
 overloaded { print("hi"); print("bye") } // multiple expression closure without explicit returns; can default to any return type
 // expected-error@-1 {{ambiguous use of 'overloaded'}}
 
-func not_overloaded(_ handler: () -> Int) {} // expected-astgen-note {{'not_overloaded' declared here}}
+func not_overloaded(_ handler: () -> Int) {} //
 
 not_overloaded { } // empty body
 // expected-error@-1 {{cannot convert value of type '()' to closure result type 'Int'}}
@@ -1148,15 +1148,15 @@ struct R_76250381<Result, Failure: Error> {
 // expected-error@-1 {{contextual closure type '(Range<Int>.Element) -> ()' (aka '(Int) -> ()') expects 1 argument, but 4 were used in closure body}}
 
 // rdar://77022842 - crash due to a missing argument to a ternary operator
-func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) { // expected-astgen-note {{to match this opening '{'}}
+func rdar77022842(argA: Bool? = nil, argB: Bool? = nil) { //
   if let a = argA ?? false, if let b = argB ?? {
     // expected-warning@-1 {{initializer for conditional binding has non-optional type 'Bool'}}
     // expected-error@-2 {{cannot convert value of type 'Bool?' to expected argument type '(() -> ())?'}}
     // expected-error@-3 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
     // expected-error@-4 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
     // expected-error@-5 {{'if' must have an unconditional 'else' to be used as expression}}
-  } // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}}
-} // expected-astgen-error {{expected '{' in 'if' statement}}
+  } // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected body in 'if' statement}} expected-astgen-error {{expected body in 'if' statement}}
+} //
 
 // rdar://76058892 - spurious ambiguity diagnostic
 func rdar76058892() {
@@ -1423,4 +1423,4 @@ do {
   let _: [Int: Set<String>] = s.map(\.x)
       .reduce([:], { x, y in x.merging(y, uniquingKeysWith: +) })
       .mapValues { Set($0) }
-} // expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end function}}
+} //

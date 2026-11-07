@@ -17,7 +17,7 @@ do {
 
   do {
     if something() {
-    // expected-error@+1:11 {{expected '{' or 'if' after 'else'}}{{none}} expected-astgen-error@+2:10 {{expected '}' to end 'if' statement}}
+    // expected-error@+1:11 {{expected '{' or 'if' after 'else'}}{{none}} expected-astgen-error@+1:11 {{expected '}' to end 'if' statement}}
     } else
     foo()
   }

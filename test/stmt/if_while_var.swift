@@ -72,27 +72,27 @@ class D : B {}// expected-note * {{did you mean 'D'?}}
 
 // TODO poor recovery in these cases
 if let {}
-// expected-cparser-error@-1 {{expected '{' after 'if' condition}} expected-astgen-error@-1 {{expected '{' in 'if' statement}}
+// expected-cparser-error@-1 {{expected '{' after 'if' condition}} expected-astgen-error@-1 {{expected body in 'if' statement}}
 // expected-error@-2 {{unwrap condition requires a valid identifier}}
 // expected-warning@-3 {{initializer for conditional binding has non-optional type '() -> ()'}}
 
-if let x = { } // expected-cparser-error{{'{' after 'if'}} expected-astgen-error {{expected '{' in 'if' statement}} expected-warning{{initializer for conditional binding has non-optional type '() -> ()'}} expected-astgen-note {{did you mean 'x'?}} expected-astgen-note {{did you mean 'x'?}} expected-astgen-note {{did you mean 'x'?}} expected-astgen-note {{did you mean 'x'?}}
-// expected-cparser-warning@-1{{value 'x' was defined but never used}}
+if let x = { } // expected-cparser-error{{'{' after 'if'}} expected-astgen-error {{expected body in 'if' statement}} expected-warning{{initializer for conditional binding has non-optional type '() -> ()'}}
+// expected-warning@-1{{value 'x' was defined but never used}}
 
 if let x = foo() {
   _ = x
 } else {
   // TODO: more contextual error? "x is only available on the true branch"?
-  use(x) // expected-cparser-error{{cannot find 'x' in scope}} expected-astgen-error {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
+  use(x) // expected-error{{cannot find 'x' in scope}}
 }
 
 if let x = foo() {
   use(x)
-} else if let y = foo() { // expected-cparser-note {{did you mean 'y'?}}
-  use(x) // expected-cparser-error{{cannot find 'x' in scope}} expected-astgen-error {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
+} else if let y = foo() { // expected-note {{did you mean 'y'?}}
+  use(x) // expected-error{{cannot find 'x' in scope}}
   use(y)
 } else {
-  use(x) // expected-cparser-error{{cannot find 'x' in scope}} expected-astgen-error {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
+  use(x) // expected-error{{cannot find 'x' in scope}}
   use(y) // expected-error{{cannot find 'y' in scope}}
 }
 
@@ -108,8 +108,8 @@ if var opt {
   opt = 10
 }
 
-if let x = opt {} // expected-cparser-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
-if var x = opt {} // expected-cparser-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
+if let x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
+if var x = opt {} // expected-warning {{value 'x' was defined but never used; consider replacing with boolean test}} {{4-12=}} {{15-15= != nil}}
 
 // <rdar://problem/20800015> Fix error message for invalid if-let
 let someInteger = 1
@@ -118,21 +118,21 @@ if case let y? = someInteger { _ = y }  // expected-error {{optional pattern '?'
 
 // Test multiple clauses on "if let".
 if let x = opt, let y = opt, x != y,
-   let a = opt, var b = opt { // expected-cparser-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-cparser-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+   let a = opt, var b = opt { // expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
 }
 
 // Leading boolean conditional.
-if 1 != 2, let x = opt,
+if 1 != 2, let x = opt, // expected-astgen-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
    y = opt,  // expected-cparser-error {{expected 'let' in conditional}} {{4-4=let }} expected-astgen-error {{unexpected code before optional binding}}
    x != y,
-   let a = opt, var b = opt { // expected-cparser-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-cparser-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
+   let a = opt, var b = opt { // expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}
 }
 
 // <rdar://problem/20457938> typed pattern is not allowed on if/let condition
-if 1 != 2, let x : Int? = opt {} // expected-cparser-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+if 1 != 2, let x : Int? = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 // expected-warning @-1 {{explicitly specified type 'Int?' adds an additional level of optional to the initializer, making the optional check always succeed}} {{20-24=Int}}
 
-if 1 != 2, case let x? : Int? = 42 {} // expected-cparser-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+if 1 != 2, case let x? : Int? = 42 {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 // expected-warning @-1 {{non-optional expression of type 'Int' used in a check for optionals}}
 
 
@@ -140,9 +140,9 @@ if 1 != 2, case let x? : Int? = 42 {} // expected-cparser-warning {{immutable va
 // Test error recovery.
 // <rdar://problem/19939746> Improve error recovery for malformed if statements
 if 1 != 2, { // expected-error {{cannot convert value of type '() -> ()' to expected condition type 'Bool'}}
-} // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}}
+} // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected body in 'if' statement}}
 if 1 != 2, 4 == 57 {}
-if 1 != 2, 4 == 57, let x = opt {} // expected-cparser-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+if 1 != 2, 4 == 57, let x = opt {} // expected-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 
 // Test that these don't cause the parser to crash.
 if true { if a == 0; {} }   // expected-error {{cannot find 'a' in scope}} expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{unexpected ';' separator}}
@@ -199,7 +199,7 @@ func useInt(_ x: Int) {}
 
 func testWhileScoping(_ a: Int?) {
   while let x = a { }
-  useInt(x) // expected-cparser-error{{cannot find 'x' in scope}} expected-astgen-error {{cannot convert value of type '() -> ()' to expected argument type 'Int'}}
+  useInt(x) // expected-error{{cannot find 'x' in scope}}
 }
 
 func testWhileShorthand(_ b: Int?) {
@@ -306,4 +306,4 @@ do {
   let a = 1
   let b = Int?.none
   if let c = b ?? a { _ = c } // expected-warning{{initializer for conditional binding has non-optional type 'Int'}}
-} // expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end 'if' statement}}
+} //

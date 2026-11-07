@@ -102,7 +102,7 @@ struct Foo {
 
 }
 
-func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-cparser-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-cparser-error {{expected ',' separator}} expected-cparser-error {{unnamed parameters must be written with the empty name '_'}} expected-astgen-error {{expected ')' to end parameter clause}} expected-astgen-note {{to match this opening '('}} expected-astgen-error {{unexpected code '(Int) -> Int)' in function}} expected-astgen-warning {{'@differentiable' has been renamed to '@differentiable(reverse)'}}
+func f(in: @differentiable(reverse,) (Int) -> Int) { } // expected-warning {{@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}} expected-cparser-error {{expected ',' separator}} expected-astgen-error {{unexpected code '(Int) -> Int)' in function}} expected-cparser-error {{unnamed parameters must be written with the empty name '_'}} expected-astgen-error {{expected ')' to end parameter clause}} expected-astgen-note {{to match this opening '('}}
 
 @derivative(of: Self.other,) // expected-cparser-error {{unexpected ',' separator}} {{27-28=}} expected-astgen-error {{expected 'wrt:' and arguments in '@differentiable' argument}}
 func foo() {}
@@ -135,11 +135,11 @@ struct S<T>: P1, P2, P3, where T: Equatable { } // expected-error {{expected typ
 
 // Condition List
 
-if true, { } // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}} 
+if true, { } // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected body in 'if' statement}} 
 
 guard true, else { } // expected-cparser-error {{expected expression in conditional}} expected-astgen-error {{expected expression in 'guard' statement}} 
 
-while true, { } // expected-cparser-error {{expected '{' after 'while' condition}} expected-astgen-error {{expected '{' in 'while' statement}} 
+while true, { } // expected-cparser-error {{expected '{' after 'while' condition}} expected-astgen-error {{expected code block in 'while' statement}} 
 
 if #available(OSX 51,) { // expected-cparser-error {{expected platform name}} expected-astgen-error {{expected version restriction in availability argument}}
 }
@@ -147,4 +147,4 @@ if #available(OSX 51,) { // expected-cparser-error {{expected platform name}} ex
 @available(OSX 10.7, iOS 7.0, *,) // expected-error {{expected platform name}} expected-cparser-error {{expected declaration}}
 @_originallyDefinedIn(module: "HighLevel", OSX 10.9, iOS 13.0,) // expected-cparser-error {{unexpected ',' separator}} {{62-63=}} expected-astgen-error {{expected version restriction in version}}
 @backDeployed(before: OSX 10.9,) // expected-cparser-error {{unexpected ',' separator}} {{31-32=}} expected-astgen-error {{expected version restriction in version}}
-public struct StructWithAvailability {} // expected-astgen-error {{expected '}' to end 'while' statement}} expected-astgen-error {{expected '}' to end 'if' statement}}
+public struct StructWithAvailability {} //

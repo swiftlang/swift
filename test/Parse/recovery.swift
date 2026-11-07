@@ -80,7 +80,7 @@ func missingControllingExprInIf() {
   if
 
   if { // expected-error {{missing condition in 'if' statement}}
-  } // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}}
+  } // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected body in 'if' statement}}
   // expected-error@-2 {{cannot convert value of type 'Void' to expected condition type 'Bool'}}
   // expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
   // expected-error@-4 {{'if' must have an unconditional 'else' to be used as expression}}
@@ -102,11 +102,11 @@ func missingControllingExprInIf() {
   }
 
   // <rdar://problem/18940198>
-  if { { } } // expected-error{{missing condition in 'if' statement}} expected-error{{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{8-8=do }} expected-astgen-error {{expected '}' to end 'if' statement}}
+  if { { } } // expected-error{{missing condition in 'if' statement}} expected-error{{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{8-8=do }}
 }
 
 func missingControllingExprInWhile() {
-  while // expected-cparser-error {{expected expression, var, or let in 'while' condition}} expected-astgen-error {{expected expression in 'while' statement}} expected-astgen-error {{expected '{' in 'while' statement}}
+  while // expected-cparser-error {{expected expression, var, or let in 'while' condition}} expected-astgen-error {{expected expression and code block in 'while' statement}}
 
   while { // expected-error {{missing condition in 'while' statement}}
   }
@@ -124,7 +124,7 @@ func missingControllingExprInWhile() {
   }
 
   // <rdar://problem/18940198>
-  while { { } } // expected-error{{missing condition in 'while' statement}} expected-error{{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{11-11=do }} expected-astgen-error {{expected '}' to end 'while' statement}}
+  while { { } } // expected-error{{missing condition in 'while' statement}} expected-error{{closure expression is unused}} expected-note {{did you mean to use a 'do' statement?}} {{11-11=do }}
 }
 
 func missingControllingExprInRepeatWhile() {
@@ -165,7 +165,7 @@ func missingControllingExprInFor() {
 func missingControllingExprInForEach() {
   // expected-error @+3 {{expected pattern}}
   // expected-cparser-error @+2 {{expected Sequence expression for for-each loop}}
-  // expected-cparser-error @+1 {{expected '{' to start the body of for-each loop}} expected-astgen-error@+1 {{expected '{' in 'for' statement}}
+  // expected-cparser-error @+1 {{expected '{' to start the body of for-each loop}}
   for
 
   // expected-error @+2 {{expected pattern}}
@@ -234,8 +234,8 @@ func missingControllingExprInForEach() {
     }
   }
 
-  for // expected-error {{expected pattern}} expected-cparser-error {{Sequence expression for for-each loop}} expected-astgen-error {{expected '{' in 'for' statement}}
-  ; // expected-cparser-error {{expected '{' to start the body of for-each loop}} expected-astgen-error {{standalone ';' statements are not allowed}} expected-astgen-error {{expected '}' to end 'for' statement}} expected-astgen-error {{expected '}' to end 'for' statement}}
+  for // expected-error {{expected pattern}} expected-cparser-error {{Sequence expression for for-each loop}}
+  ; // expected-cparser-error {{expected '{' to start the body of for-each loop}}
 }
 
 // 'missingControllingExprInSwitch' is in recovery_switch.swift: SwiftParser

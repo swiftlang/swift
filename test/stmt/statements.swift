@@ -208,28 +208,28 @@ func VoidReturn3() {
 //===--- If statement.
 
 func IfStmt1() {
-  if 1 > 0 // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected '{' in 'if' statement}}
-  _ = 42 // expected-astgen-error {{expected '}' to end 'if' statement}}
+  if 1 > 0 // expected-cparser-error {{expected '{' after 'if' condition}} expected-astgen-error {{expected body in 'if' statement}}
+  _ = 42 //
 }
 
 func IfStmt2() {
   if 1 > 0 {
-  } else // expected-error {{expected '{' or 'if' after 'else'}}
-  _ = 42 // expected-astgen-error {{expected '}' to end 'if' statement}}
+  } else // expected-error {{expected '{' or 'if' after 'else'}} expected-astgen-error {{expected '}' to end 'if' statement}}
+  _ = 42 //
 }
 func IfStmt3() {
   if 1 > 0 {
   } else 1 < 0 { // expected-cparser-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}} expected-astgen-error {{unexpected code '1 < 0' in 'if' statement}}
     _ = 42
-  } else { // expected-astgen-error {{unexpected code in function}}
+  } else { // // expected-astgen-error {{unexpected code in function}}
   }
 }
 
 //===--- While statement.
 
 func WhileStmt1() {
-  while 1 > 0 // expected-cparser-error {{expected '{' after 'while' condition}} expected-astgen-error {{expected '{' in 'while' statement}}
-  _ = 42 // expected-astgen-error {{expected '}' to end 'while' statement}}
+  while 1 > 0 // expected-cparser-error {{expected '{' after 'while' condition}} expected-astgen-error {{expected code block in 'while' statement}}
+  _ = 42 //
 }
 
 //===-- Do statement.
@@ -240,11 +240,11 @@ func DoStmt() {
 }
 
 
-func DoWhileStmt1() { // expected-astgen-note {{to match this opening '{'}}
+func DoWhileStmt1() { //
   // expected-cparser-note@+2 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
   // expected-cparser-note@+1 {{did you mean separate 'do' and 'while' statements?}} {{+1:5-5=\n}}
   do { // expected-cparser-error {{'do-while' statement is not allowed}}
-  } while true // expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{expected '{' in 'while' statement}}
+  } while true // // expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{expected code block in 'while' statement}}
 }
 
 func DoWhileStmt2() {
@@ -446,12 +446,12 @@ func r23684220(_ b: Any) {
 // <rdar://problem/21080671> QoI: try/catch (instead of do/catch) creates silly diagnostics
 func f21080671() {
   try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{function is unused}} expected-astgen-warning {{no calls to throwing functions occur within 'try' expression}}
-  } catch { } // expected-astgen-error {{unexpected code 'catch { }' in function}}
+  } catch { } // // expected-astgen-error {{unexpected code 'catch { }' in function}}
   
   
   try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{function is unused}} expected-astgen-warning {{no calls to throwing functions occur within 'try' expression}}
     f21080671()
-  } catch let x as Int { // expected-astgen-error {{unexpected 'catch' keyword in function}} expected-astgen-error {{type annotation missing in pattern}} expected-astgen-error {{unexpected code in function}}
+  } catch let x as Int { // // expected-astgen-error {{unexpected 'catch' keyword in function}} expected-astgen-error {{type annotation missing in pattern}} expected-astgen-error {{unexpected code in function}}
   } catch {
   }
 }
@@ -630,7 +630,7 @@ outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{+2:14-23=
 } while true
 
 // Errors in case syntax
-class // expected-astgen-error {{expected identifier and member block in class}}
+class // // expected-astgen-error {{expected identifier and member block in class}}
 case, // expected-cparser-error {{expected identifier in enum 'case' declaration}} expected-cparser-error {{expected identifier after comma in enum 'case' declaration}} expected-cparser-error {{enum 'case' is not allowed outside of an enum}} expected-astgen-error {{'case' can only appear inside a 'switch' statement or 'enum' declaration}}
-case  // expected-cparser-error {{expected identifier in enum 'case' declaration}} expected-cparser-error {{enum 'case' is not allowed outside of an enum}} expected-astgen-error {{expected '}' to end function}}
+case  // expected-cparser-error {{expected identifier in enum 'case' declaration}} expected-cparser-error {{enum 'case' is not allowed outside of an enum}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser
