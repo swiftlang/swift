@@ -275,6 +275,32 @@ public:
                                        ::std::forward<A>(args)...);
   }
 
+  /// Push a new active cleanup followed by \p tailBytes of storage that is
+  /// part of the cleanup's allocation. Cleanups are memcpy'd around and never
+  /// destroyed, so this is how a cleanup can have variable-sized data. The
+  /// cleanup must access the tail relative to 'this', and the tail must be
+  /// trivially relocatable.
+  template <class T, class... A>
+  T &pushCleanupWithTail(size_t tailBytes, A &&...args) {
+#ifndef NDEBUG
+    CleanupsDepth oldTop = stack.stable_begin();
+#endif
+
+    T &cleanup =
+        stack.pushWithTail<T, A...>(tailBytes, ::std::forward<A>(args)...);
+    T &result = static_cast<T &>(
+        initCleanup(cleanup, sizeof(T) + tailBytes, CleanupState::Active));
+    assert(result.allocated_size() == sizeof(T) + tailBytes &&
+           "cleanup allocation doesn't fit in allocatedSize");
+
+#ifndef NDEBUG
+    auto newTop = stack.begin();
+    ++newTop;
+    assert(newTop == stack.find(oldTop));
+#endif
+    return result;
+  }
+
   /// Emit the given active cleanup now and transition it to being inactive.
   void popAndEmitCleanup(CleanupHandle handle, CleanupLocation loc,
                          ForUnwind_t forUnwind);
