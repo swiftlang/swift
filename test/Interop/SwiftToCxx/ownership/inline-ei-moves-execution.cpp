@@ -82,6 +82,11 @@ template <class T> static void checkMoves(T value, const Ref &ref) {
   T copied(value);
   assert(copied.check());
   assert(retainCount(ref) == count + 1);
+  T replaced(value);
+  replaced = std::move(copied);
+  assert(replaced.check());
+  assert(retainCount(ref) == count + 1);
+  copied = std::move(replaced);
   T assigned(value);
   assigned = value;
   auto &copyAlias = assigned;
