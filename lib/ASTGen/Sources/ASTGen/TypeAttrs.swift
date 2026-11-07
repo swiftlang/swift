@@ -183,7 +183,22 @@ extension ASTGenVisitor {
   ///   @convention(c, cType: "int (*)(int)")
   ///   ```
   func generateConventionTypeAttr(attribute node: AttributeSyntax) -> BridgedConventionTypeAttr? {
-    self.generateWithLabeledExprListArguments(attribute: node) { args in
+    // `@convention(c, )` and `@convention(c, cType)` are accepted by the parser
+    // but the C++ parser requires a `cType: "..."` argument after the comma.
+    if let all = node.arguments?.as(LabeledExprListSyntax.self), let rightParen = node.rightParen {
+      if all.count == 1, let comma = all.first?.trailingComma {
+        let next = comma.nextToken(viewMode: .sourceAccurate) ?? rightParen
+        self.diagnose(.convention_attribute_ctype_expected_label, at: next)
+        return nil
+      }
+      if all.count == 2, let second = all.last, second.label == nil,
+        second.expression.as(DeclReferenceExprSyntax.self)?.baseName.text == "cType"
+      {
+        self.diagnose(.convention_attribute_ctype_expected_colon, at: rightParen)
+        return nil
+      }
+    }
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
       let nameAndLoc: (name: _, loc: _)? =  self.generateConsumingPlainIdentifierAttrOption(args: &args) {
         (ctx.allocateCopy(string: $0.rawText.bridged), self.generateSourceLoc($0))
       }

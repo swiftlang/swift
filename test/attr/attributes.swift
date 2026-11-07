@@ -121,7 +121,7 @@ class transparentOnClassVar2 {
   }
 };
 
-@thin  // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'thin'}}
+@thin  // expected-error {{attribute can only be applied to types, not declarations}}
 func testThinDecl() -> () {}
 
 protocol Class : class {}

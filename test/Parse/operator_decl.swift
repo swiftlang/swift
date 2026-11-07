@@ -111,8 +111,8 @@ infix operator **<< : UndeclaredPrecedenceGroup
 
 protocol Proto {}
 infix operator *<*< : F, Proto
-// expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
-// expected-cparser-error@-2 {{expected expression}}
+// expected-error @-1 {{consecutive statements on a line must be separated by ';'}}
+// expected-error @-2 {{expected expression}}
 
 // https://github.com/apple/swift/issues/60932
 

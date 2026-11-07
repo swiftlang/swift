@@ -470,9 +470,9 @@ enum SE0036_Generic<T> {
 enum switch {} // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{6-12=`switch`}}
 
 enum SE0155 {
-  case emptyArgs() // expected-cparser-warning {{enum element with associated values must have at least one associated value}}
-  // expected-cparser-note@-1 {{did you mean to remove the empty associated value list?}} {{17-19=}}
-  // expected-cparser-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
+  case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
+  // expected-note @-1 {{did you mean to remove the empty associated value list?}} {{17-19=}}
+  // expected-note @-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
 }
 
 // https://github.com/apple/swift/issues/53662

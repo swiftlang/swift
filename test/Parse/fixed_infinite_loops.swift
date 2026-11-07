@@ -5,6 +5,6 @@ func test1() {
   return // expected-cparser-error {{expected declaration}}
 }
 func test2() {
-  @unknown // expected-cparser-error {{unknown attribute 'unknown'}} expected-astgen-error {{expected declaration after attribute}}
+  @unknown // expected-error {{unknown attribute 'unknown'}} expected-astgen-error {{expected declaration after attribute}}
   return // expected-cparser-error {{expected declaration}}
 }

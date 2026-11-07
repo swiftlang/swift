@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-@noescape var fn : () -> Int = { 4 }  // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'noescape'}}
+@noescape var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
 
 func conflictingAttrs(_ fn: @noescape @escaping () -> Int) {} // expected-error {{unknown attribute 'noescape'}}
 
@@ -340,16 +340,16 @@ enum r19997577Type {
 }
 
 // type attribute and decl attribute
-func noescapeD(@noescape f: @escaping () -> Bool) {} // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'noescape'}}
+func noescapeD(@noescape f: @escaping () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
 func noescapeT(f: @noescape () -> Bool) {} // expected-error{{unknown attribute 'noescape'}}
-func noescapeG<T>(@noescape f: () -> T) {} // expected-cparser-error{{attribute can only be applied to types, not declarations}} expected-astgen-error{{unknown attribute 'noescape'}}
+func noescapeG<T>(@noescape f: () -> T) {} // expected-error{{attribute can only be applied to types, not declarations}}
 
-func autoclosureD(@autoclosure f: () -> Bool) {} // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'autoclosure'}}
+func autoclosureD(@autoclosure f: () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
 func autoclosureT(f: @autoclosure () -> Bool) {}  // ok
-func autoclosureG<T>(@autoclosure f: () -> T) {} // expected-cparser-error{{attribute can only be applied to types, not declarations}} expected-astgen-error{{unknown attribute 'autoclosure'}}
+func autoclosureG<T>(@autoclosure f: () -> T) {} // expected-error{{attribute can only be applied to types, not declarations}}
 
-func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'noescape'}}
+func noescapeD_noescapeT(@noescape f: @noescape () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
  // expected-error@-1{{unknown attribute 'noescape'}}
 
-func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'autoclosure'}}
+func autoclosureD_noescapeT(@autoclosure f: @noescape () -> Bool) {} // expected-error {{attribute can only be applied to types, not declarations}}
  // expected-error@-1{{unknown attribute 'noescape'}}

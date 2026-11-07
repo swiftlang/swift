@@ -365,6 +365,17 @@ extension ASTGenVisitor {
   }
 
   func generate(closureExpr node: ClosureExprSyntax) -> BridgedExpr {
+    // An editor placeholder where a closure is expected is parsed as a closure
+    // with missing braces around the placeholder; the C++ parser takes the
+    // placeholder itself as the expression.
+    if node.leftBrace.presence == .missing, node.signature == nil,
+      node.statements.count == 1,
+      let only = node.statements.first?.item.as(DeclReferenceExprSyntax.self),
+      only.baseName.isEditorPlaceholder
+    {
+      return self.generate(declReferenceExpr: only)
+    }
+
     let signature: GeneratedClosureSignature
     if let node = node.signature {
       signature = self.generate(closureSignature: node)
@@ -563,6 +574,42 @@ extension ASTGenVisitor {
     )
   }
 
+  /// Warn about a trailing closure that is separated from its callee by more
+  /// than one line, as `Parser::parseTrailingClosures` does.
+  private func diagnoseTrailingClosureAfterNewlines(_ node: FunctionCallExprSyntax) {
+    guard node.leftParen == nil, let closure = node.trailingClosure,
+      closure.leftBrace.presence == .present,
+      let calleeLast = node.calledExpression.lastToken(viewMode: .sourceAccurate)
+    else {
+      return
+    }
+    let start = calleeLast.positionAfterSkippingLeadingTrivia.utf8Offset
+    let end = closure.leftBrace.positionAfterSkippingLeadingTrivia.utf8Offset
+    guard start < end, end <= self.base.count else {
+      return
+    }
+    let newlines = self.base[start..<end].lazy.filter { $0 == UInt8(ascii: "\n") }.count
+    guard newlines > 1 else {
+      return
+    }
+    self.diagnose(.trailing_closure_after_newlines, at: closure.leftBrace)
+    self.diagnose(.trailing_closure_callee_here, at: node.calledExpression)
+
+    // A closure that uses only anonymous parameters would more likely be a
+    // `do` statement.
+    if closure.signature == nil, closure.tokens(viewMode: .sourceAccurate).contains(where: {
+      $0.rawTokenKind == .dollarIdentifier
+    }) {
+      self.diagnose(
+        .brace_stmt_suggest_do,
+        at: closure.leftBrace,
+        fixIts: [
+          .init(replace: CharSourceRange(start: self.generateSourceLoc(closure.leftBrace), byteLength: 0), with: "do ")
+        ]
+      )
+    }
+  }
+
   func generate(functionCallExpr node: FunctionCallExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedCallExpr {
     if !node.arguments.isEmpty || node.trailingClosure == nil {
       if node.leftParen == nil {
@@ -572,6 +619,8 @@ extension ASTGenVisitor {
         self.diagnose(.missingChildToken(parent: node, kindOfTokenMissing: .rightParen))
       }
     }
+
+    self.diagnoseTrailingClosureAfterNewlines(node)
 
     let callee = self.generate(expr: node.calledExpression, postfixIfConfigBaseExpr: postfixIfConfigBaseExpr)
     let arguments = generateArgumentList(

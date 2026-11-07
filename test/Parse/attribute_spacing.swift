@@ -2,7 +2,7 @@
 
 @ MainActor  // expected-cparser-warning {{extraneous whitespace between '@' and attribute name; this is an error in the Swift 6 language mode}} expected-astgen-warning {{extraneous whitespace after '@' is not permitted; this is an error in Swift 6}}
 class Foo {
-  func funcWithEscapingClosure(_ x: @ escaping () -> Int) {} // expected-cparser-warning {{extraneous whitespace between '@' and attribute name; this is an error in the Swift 6 language mode}}
+  func funcWithEscapingClosure(_ x: @ escaping () -> Int) {} // expected-cparser-warning {{extraneous whitespace between '@' and attribute name; this is an error in the Swift 6 language mode}} expected-astgen-warning {{extraneous whitespace after '@' is not permitted; this is an error in Swift 6}}
 }
 
 @available (*, deprecated) // expected-cparser-warning {{extraneous whitespace between attribute name and '('; this is an error in the Swift 6 language mode}} expected-astgen-warning {{extraneous whitespace before '(' is not permitted; this is an error in Swift 6}}

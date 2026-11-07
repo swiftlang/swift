@@ -29,7 +29,7 @@ protocol Collection {
 @_typeEraser // expected-error {{expected '(' in '_typeEraser' attribute}}
 protocol A1 {}
 
-@_typeEraser() // expected-cparser-error {{expected a type name in '@_typeEraser()'}}
+@_typeEraser() // expected-error {{expected a type name in '@_typeEraser()'}}
 protocol A2 {}
 
 @_typeEraser(AnyP // expected-note {{to match this opening '('}} expected-astgen-error {{type eraser 'AnyP' must conform to protocol 'A3'}} expected-astgen-error {{expected ')' to end attribute}}

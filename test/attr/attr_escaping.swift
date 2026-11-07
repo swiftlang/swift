@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-@escaping var fn : () -> Int = { 4 }  // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'escaping'}}
-func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'escaping'}}
+@escaping var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
+func paramDeclEscaping(@escaping fn: (Int) -> Void) {} // expected-error {{attribute can only be applied to types, not declarations}}
 
 func wrongParamType(a: @escaping Int) {} // expected-error {{'@escaping' only applies to function types}}
 

@@ -84,8 +84,8 @@ func $declareWithDollar() { // expected-error{{cannot declare entity named '$dec
   $label: if true { // expected-error{{cannot declare entity named '$label'}}
     break $label
   }
-  switch 0 { // expected-astgen-error {{switch must be exhaustive}}
-  @$dollar case _: // expected-cparser-error {{unknown attribute '$dollar'}} expected-astgen-note {{remove '@unknown' to handle remaining values}}
+  switch 0 { //
+  @$dollar case _: // expected-error {{unknown attribute '$dollar'}}
     break
   }
   if #available($Dummy 9999, *) {} // expected-warning {{cannot find availability domain '$Dummy'}}
@@ -113,7 +113,7 @@ struct Wrapper {
   var projectedValue: String { String(wrappedValue) }
 }
 
-struct S { // expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}}
+struct S { // // expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}}
   @Wrapper var café = 42
 }
 

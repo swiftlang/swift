@@ -750,7 +750,19 @@ extension ASTGenVisitor {
   }
 
   func generate(switchCase node: SwitchCaseSyntax) -> BridgedCaseStmt {
-    let unknownAttrLoc = self.generateSourceLoc(node.attribute?.atSign)
+    // The only attribute a case can have is `@unknown`.
+    var unknownAttrLoc: SourceLoc = nil
+    if let attribute = node.attribute {
+      let name = attribute.attributeName.trimmedDescription
+      if name == "unknown" {
+        unknownAttrLoc = self.generateSourceLoc(attribute.atSign)
+        if let leftParen = attribute.leftParen {
+          self.diagnose(.unexpected_lparen_in_attribute("unknown"), at: leftParen)
+        }
+      } else {
+        self.diagnose(.unknown_attr_name(name), at: attribute.attributeName)
+      }
+    }
     let introducerLoc: SourceLoc
     let terminatorLoc: SourceLoc
     let items: BridgedArrayRef

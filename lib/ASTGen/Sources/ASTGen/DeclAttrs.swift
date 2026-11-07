@@ -421,6 +421,9 @@ extension ASTGenVisitor {
 
       // Renamed attributes. These keep working, with a diagnostic whose
       // severity matches the C++ parser's.
+      case nil where attrName == "availability":
+        self.diagnoseRenamedAttribute(node, to: "available")
+        return self.generateAvailableAttr(attribute: node, attrName: attrName).forEach { handle($0.asDeclAttribute) }
       case nil where attrName == "_functionBuilder":
         self.diagnoseRenamedAttribute(node, to: "resultBuilder", warning: true)
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .ResultBuilder))
@@ -638,6 +641,19 @@ extension ASTGenVisitor {
         // '@_accessorBlock' is a parser only disambiguation marker, ignore.
         if attrName == "_accessorBlock" {
           return
+        }
+
+        // The C++ parser diagnoses a type attribute and `@unknown` on a
+        // declaration, and drops the attribute.
+        if node.attributeName.as(IdentifierTypeSyntax.self)?.moduleSelector == nil {
+          if BridgedOptionalTypeAttrKind(from: attrName.bridged).hasValue {
+            self.diagnose(.type_attribute_applied_to_decl, at: node.attributeName)
+            return
+          }
+          if attrName == "unknown" {
+            self.diagnose(.unknown_attr_name("unknown"), at: node.attributeName)
+            return
+          }
         }
 
         // Fall back to CustomAttr.
@@ -1319,7 +1335,19 @@ extension ASTGenVisitor {
       differentiability = .normal
     }
     if differentiability == .normal {
-      // TODO: Diagnose "'@differentiable' has been renamed to '@differentiable(reverse)"
+      // Omitting the kind is deprecated: it means 'reverse'.
+      if let first = node.leftParen?.nextToken(viewMode: .sourceAccurate) {
+        let insertion = first.tokenKind == .rightParen ? "reverse" : "reverse, "
+        self.diagnose(
+          .attr_differentiable_expected_reverse,
+          at: first,
+          fixIts: [
+            .init(
+              replace: CharSourceRange(start: self.generateSourceLoc(first), byteLength: 0),
+              with: insertion)
+          ]
+        )
+      }
       differentiability = .reverse
     }
     guard differentiability == .reverse || differentiability == .linear else {
@@ -1911,7 +1939,7 @@ extension ASTGenVisitor {
       )
     }
 
-    if let index = descriptorExpr.as(IntegerLiteralExprSyntax.self)?.representedLiteralValue {
+    if allowIndices, let index = descriptorExpr.as(IntegerLiteralExprSyntax.self)?.representedLiteralValue {
       return .forOrdered(
         index,
         dependenceKind: lifetimeDependenceKind,
@@ -2346,7 +2374,9 @@ extension ASTGenVisitor {
       !selectorPieces.isEmpty
     else {
       // '@objc()' - invalid. Recover as '@objc'
-      // TODO: Diagnose "error: expected name within parentheses of @objc attribute"
+      if let leftParen = node.leftParen, !arguments.hasError {
+        self.diagnose(.attr_objc_empty_name, at: leftParen)
+      }
       return .createParsedUnnamed(
         self.ctx,
         atLoc: self.generateSourceLoc(node.atSign),
@@ -3275,6 +3305,16 @@ extension ASTGenVisitor {
   func generateTypeEraserAttr(attribute node: AttributeSyntax) -> BridgedTypeEraserAttr? {
     // FIXME: Should be normal LabeledExprListSyntax arguments.
     // FIXME: Error handling
+    if let args = node.arguments?.as(LabeledExprListSyntax.self), let rightParen = node.rightParen {
+      if args.isEmpty {
+        self.diagnose(.attr_type_eraser_expected_type_name, at: rightParen)
+        return nil
+      }
+      if args.count > 1, let comma = args.first?.trailingComma {
+        self.diagnose(.attr_type_eraser_expected_rparen, at: comma)
+        return nil
+      }
+    }
     let type: BridgedTypeRepr? = self.generateSingleAttrOption(attribute: node, { token in
       // FIXME: Module selector?
       let nameRef = self.generateDeclNameRef(moduleSelector: nil, baseName: token)

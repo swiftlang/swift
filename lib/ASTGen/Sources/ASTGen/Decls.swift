@@ -103,6 +103,12 @@ extension ASTGenVisitor {
       return nil
     }
 
+    // A where clause inside the angle brackets of a typealias's generic
+    // parameter list is rejected, with a message that is about associated types.
+    if let whereClause = node.genericParameterClause?.genericWhereClause {
+      self.diagnose(.associated_type_generic_parameter_list, at: whereClause.whereKeyword)
+    }
+
     let decl = BridgedTypeAliasDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -387,6 +393,33 @@ extension ASTGenVisitor {
         self.diagnose(.nonliteral_enum_case_raw_value, at: rawValueNode)
         rawValue = nil
       }
+    }
+
+    // Per SE-0155, enum elements may not have empty parameter lists.
+    if let clause = node.parameterClause, clause.parameters.isEmpty,
+      clause.leftParen.presence == .present, clause.rightParen.presence == .present
+    {
+      if ctx.langOpts.isLanguageModeAtLeast(major: 5, minor: 0) {
+        self.diagnose(.enum_element_empty_arglist, at: clause.leftParen, highlight: Syntax(clause))
+      } else {
+        self.diagnose(.enum_element_empty_arglist_swift4, at: clause.leftParen, highlight: Syntax(clause))
+      }
+      self.diagnose(
+        .enum_element_empty_arglist_delete,
+        at: clause.leftParen,
+        fixIts: [.init(replace: self.generateCharSourceRange(clause), with: "")]
+      )
+      self.diagnose(
+        .enum_element_empty_arglist_add_void,
+        at: clause.leftParen,
+        fixIts: [
+          .init(
+            replace: CharSourceRange(
+              start: SourceLoc(at: clause.leftParen.endPositionBeforeTrailingTrivia, in: self.base),
+              byteLength: 0),
+            with: "Void")
+        ]
+      )
     }
 
     return .createParsed(
@@ -1569,6 +1602,11 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
+    // The C++ parser reads `deinit async` as a deinitializer with a name.
+    if let async = node.effectSpecifiers?.asyncSpecifier {
+      self.diagnose(.destructor_has_name, at: async)
+    }
+
     // A 'deinit' is only allowed in a struct, enum, or class, or in an
     // '@_objcImplementation' extension. The C++ parser reports a bad placement
     // and marks the decl invalid so the type checker leaves it alone; without
@@ -1703,6 +1741,13 @@ extension ASTGenVisitor {
     // A postfix operator cannot start like the built-in unwrapping operators.
     if fixity == .postfix, node.name.rawText.first == UInt8(ascii: "?") || node.name.rawText.first == UInt8(ascii: "!") {
       self.diagnose(.postfix_operator_name_cannot_start_with_unwrap, at: node.name)
+    }
+
+    // Designated types, `infix operator +++ : Group, Type`, are no longer
+    // accepted: the C++ parser stops at the comma.
+    if let comma = node.operatorPrecedenceAndTypes?.designatedTypes.first?.leadingComma {
+      self.diagnose(.statement_same_line_without_semi, at: comma)
+      self.diagnose(.expected_expr, at: comma)
     }
 
     // Only an infix operator may declare a precedence group. A prefix or postfix

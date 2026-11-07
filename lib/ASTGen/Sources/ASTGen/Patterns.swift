@@ -121,7 +121,13 @@ extension ASTGenVisitor {
 
   func generate(valueBindingPattern node: ValueBindingPatternSyntax) -> BridgedBindingPattern {
     let introducer: BridgedVarDeclIntroducer
-    switch node.bindingSpecifier.text {
+    // A misspelled `let case` is parsed as `case let` with a missing specifier,
+    // whose text is empty but whose kind is still `let` or `var`.
+    let specifierText =
+      node.bindingSpecifier.presence == .missing
+      ? (node.bindingSpecifier.tokenKind == .keyword(.var) ? "var" : "let")
+      : node.bindingSpecifier.text
+    switch specifierText {
     case "let": introducer = .let
     case "inout":
       introducer = .inOut

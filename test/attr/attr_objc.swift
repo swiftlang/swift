@@ -1999,7 +1999,7 @@ class Class_ObjC2 {
   // CHECK-LABEL: @objc(isFoo) func foo() -> Bool {
 }
 
-@objc() // expected-cparser-error {{expected name within parentheses of '@objc'}}
+@objc() // expected-error {{expected name within parentheses of '@objc'}}
 class Class_ObjC3 { 
 }
 

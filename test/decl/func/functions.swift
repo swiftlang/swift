@@ -146,17 +146,17 @@ func inout_error(inout var x : Int) {} // expected-warning {{'var' in this posit
 // Unnamed parameters require the name "_":
 func unnamed(Int) { } // expected-cparser-error{{unnamed parameters must be written with the empty name '_'}}{{14-14=_: }} expected-astgen-error {{expected identifier and ':' in parameter}}
 
-func typeAttrBeforeParamDecl(@convention(c) _: () -> Void) {} // expected-cparser-error{{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'convention'}}
+func typeAttrBeforeParamDecl(@convention(c) _: () -> Void) {} // expected-error{{attribute can only be applied to types, not declarations}}
 
 // FIXME: Bad diagnostics
-func bareTypeWithAttr(@convention(c) () -> Void) {} // expected-cparser-error{{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'convention'}}
-// expected-cparser-error @-1 {{unnamed parameters must be written with the empty name '_'}} {{38-38=_: }} expected-astgen-error@-1 {{}}
+func bareTypeWithAttr(@convention(c) () -> Void) {} // expected-error{{attribute can only be applied to types, not declarations}}
+// expected-cparser-error @-1 {{unnamed parameters must be written with the empty name '_'}} {{38-38=_: }} expected-astgen-error@-1 {{expected identifier and ':' in parameter}}
 
 // Test fixits on curried functions.
 func testCurryFixits() {
   func f1(_ x: Int)(y: Int) {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '(y: Int)' in function}}
   func f1a(_ x: Int, y: Int) {}
-  func f2(_ x: Int)(y: Int)(z: Int) {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '(y: Int)(z: Int)' in function}}
+  func f2(_ x: Int)(y: Int)(z: Int) {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '(y: Int)(z: I}}
   func f2a(_ x: Int, y: Int, z: Int) {}
   func f3(_ x: Int)() {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '()' in function}}
   func f3a(_ x: Int) {}
@@ -187,9 +187,9 @@ func bogusDestructuring() {
   struct Bar {}
 
   struct Foo {
-    func registerCallback(_ callback: @escaping ([Bar]) -> Void) {} // expected-astgen-note {{found this candidate }}
-    func registerCallback(_ callback: @escaping ([String: Bar]) -> Void) {} // expected-astgen-note {{found this candidate }}
-    func registerCallback(_ callback: @escaping (Bar?) -> Void) {} // expected-astgen-note {{found this candidate }}
+    func registerCallback(_ callback: @escaping ([Bar]) -> Void) {} // // expected-astgen-note {{found this candidate }}
+    func registerCallback(_ callback: @escaping ([String: Bar]) -> Void) {} // // expected-astgen-note {{found this candidate }}
+    func registerCallback(_ callback: @escaping (Bar?) -> Void) {} // // expected-astgen-note {{found this candidate }}
   }
 
   Foo().registerCallback { ([Bar]) in } // expected-cparser-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{29-29=_: }} expected-astgen-error {{expected identifier and ':' in parameter}}

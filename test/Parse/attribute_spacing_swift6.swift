@@ -2,7 +2,7 @@
 
 @ MainActor  // expected-cparser-error {{extraneous whitespace between '@' and attribute name}} expected-astgen-error {{extraneous whitespace after '@' is not permitted}}
 class Foo {
-  func funcWithEscapingClosure(_ x: @ escaping () -> Int) {} // expected-cparser-error {{extraneous whitespace between '@' and attribute name}}
+  func funcWithEscapingClosure(_ x: @ escaping () -> Int) {} // expected-cparser-error {{extraneous whitespace between '@' and attribute name}} expected-astgen-error {{extraneous whitespace after '@' is not permitted}}
 }
 
 @available (*, deprecated) // expected-cparser-error {{extraneous whitespace between attribute name and '('}} expected-astgen-error {{extraneous whitespace before '(' is not permitted}}

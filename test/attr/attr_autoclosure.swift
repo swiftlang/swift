@@ -3,7 +3,7 @@
 // Simple case.
 var fn : @autoclosure () -> Int = 4  // expected-error {{'@autoclosure' may only be used on parameters}}
 
-@autoclosure func func1() {}  // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'autoclosure'}}
+@autoclosure func func1() {}  // expected-error {{attribute can only be applied to types, not declarations}}
 
 func func1a(_ v1 : @autoclosure Int) {} // expected-error {{'@autoclosure' only applies to function types}}
 
@@ -26,14 +26,14 @@ let migrate4 : (@autoclosure() -> ()) -> ()
 
 
 struct SomeStruct {
-  @autoclosure let property : () -> Int  // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'autoclosure'}}
+  @autoclosure let property : () -> Int  // expected-error {{attribute can only be applied to types, not declarations}}
 
   init() {
   }
 }
 
 class BaseClass {
-  @autoclosure var property : () -> Int // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'autoclosure'}}
+  @autoclosure var property : () -> Int // expected-error {{attribute can only be applied to types, not declarations}}
   init() {}
 }
 
@@ -65,15 +65,15 @@ struct S : P2 {
 
 
 struct AutoclosureEscapeTest {
-  @autoclosure let delayed: () -> Int  // expected-cparser-error {{attribute can only be applied to types, not declarations}} expected-astgen-error {{unknown attribute 'autoclosure'}}
+  @autoclosure let delayed: () -> Int  // expected-error {{attribute can only be applied to types, not declarations}}
 }
 
 // @autoclosure(escaping) is no longer a thing; just make sure we don't crash
-// expected-cparser-error @+1 {{attribute can only be applied to types, not declarations}} expected-astgen-error@+1 {{unknown attribute 'autoclosure'}}
+// expected-error @+1 {{attribute can only be applied to types, not declarations}}
 func func10(@autoclosure(escaping _: () -> ()) { } // expected-cparser-error{{expected parameter name followed by ':'}} expected-astgen-error {{expected ')' to end attribute}} expected-astgen-note {{to match this opening '('}}
 
 func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{cannot find type 'escaping' in scope}}
-// expected-cparser-error @-1 {{attribute can only be applied to types, not declarations}} expected-astgen-error@-1 {{unknown attribute 'noescape'}}
+// expected-error @-1 {{attribute can only be applied to types, not declarations}}
 // expected-cparser-error @-2 {{expected ',' separator}} expected-astgen-error@-2 {{expected identifier and ':' in parameter}}
 // expected-cparser-error @-3 {{expected parameter name followed by ':'}} expected-astgen-error@-3 {{expected ',' in parameter}}
 
@@ -118,10 +118,10 @@ let _ : (@autoclosure () -> ()) -> ()
 let _ : (@autoclosure(escaping) -> ()) -> ()  // expected-error {{cannot find type 'escaping' in scope}}
 
 // Migration
-// expected-cparser-error @+1 {{attribute can only be applied to types, not declarations}} expected-astgen-error@+1 {{unknown attribute 'autoclosure'}}
+// expected-error @+1 {{attribute can only be applied to types, not declarations}}
 func migrateAC(@autoclosure _: () -> ()) { }
 
-// expected-cparser-error @+1 {{attribute can only be applied to types, not declarations}} expected-astgen-error@+1 {{unknown attribute 'autoclosure'}}
+// expected-error @+1 {{attribute can only be applied to types, not declarations}}
 func migrateACE(@autoclosure(escaping) _: () -> ()) { }
 
 func takesAutoclosure(_ fn: @autoclosure () -> Int) {}

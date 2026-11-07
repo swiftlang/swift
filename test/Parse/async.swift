@@ -30,7 +30,7 @@ func asyncGlobal8() async throws async -> async Int async {} // expected-astgen-
 class X {
   init() async { }
 
-  deinit async { } // expected-cparser-error{{deinitializers cannot have a name}}
+  deinit async { } // expected-error {{deinitializers cannot have a name}}
 
   func f() async { }
 

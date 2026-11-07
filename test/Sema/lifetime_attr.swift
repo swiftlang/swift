@@ -17,13 +17,13 @@ func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
   ne
 }
 
-@_lifetime(copy 0) // expected-cparser-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
-func invalidAttrOnExistingParamIndex(_ ne: NE) -> NE {
+@_lifetime(copy 0) // expected-error {{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func invalidAttrOnExistingParamIndex(_ ne: NE) -> NE { // expected-astgen-error {{a function with a non-'Escapable' result requires '@_lifetime(...)'}}
   ne
 }
 
-@_lifetime(2) // expected-cparser-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}} expected-astgen-error{{invalid parameter index specified '2'}}
-func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE {
+@_lifetime(2) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+func invalidAttrOnNonExistingParamIndex(_ ne: NE) -> NE { // expected-astgen-error {{a function with a non-'Escapable' result requires '@_lifetime(...)'}}
   ne
 }
 

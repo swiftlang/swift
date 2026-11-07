@@ -486,25 +486,25 @@ case .Thing:
 #endif
 }
 
-switch x { // expected-astgen-error {{switch must be exhaustive}}
+switch x { //
 case 0:
   break
-@garbage case _: // expected-cparser-error {{unknown attribute 'garbage'}} expected-astgen-note {{remove '@unknown' to handle remaining values}}
+@garbage case _: // expected-error {{unknown attribute 'garbage'}}
   break
 }
 
-switch x { // expected-astgen-error {{switch must be exhaustive}}
+switch x { //
 case 0:
   break
-@garbage @moreGarbage default: // expected-cparser-error {{unknown attribute 'garbage'}} expected-cparser-error {{unknown attribute 'moreGarbage'}} expected-astgen-error {{unexpected code '@moreGarbage' in switch case}} expected-astgen-note {{remove '@unknown' to handle remaining values}}
+@garbage @moreGarbage default: // expected-error {{unknown attribute 'garbage'}} expected-cparser-error {{unknown attribute 'moreGarbage'}} expected-astgen-error {{unexpected code '@moreGarbage' in switch case}}
   break
 }
 
-@unknown let _ = 1 // expected-cparser-error {{unknown attribute 'unknown'}}
+@unknown let _ = 1 // expected-error {{unknown attribute 'unknown'}}
 
 switch x {
 case _:
-  @unknown let _ = 1 // expected-cparser-error {{unknown attribute 'unknown'}}
+  @unknown let _ = 1 // expected-error {{unknown attribute 'unknown'}}
 }
 
 switch Whatever.Thing {

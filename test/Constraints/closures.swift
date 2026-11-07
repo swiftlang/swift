@@ -119,29 +119,29 @@ do {
   { consume($0) }(42)
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { print(42) }  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-cparser-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
+  { print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-cparser-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { print($0) }  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { print($0) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-astgen-note {{did you mean to use a 'do' statement?}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { [n] in print(42) }  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { [n] in print(42) }  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { consume($0) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-astgen-note {{did you mean to use a 'do' statement?}}
   ;
 
-  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
+  ({ $0(42) } { consume($0) }) // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { (x: Int) in consume(x) }(42)  // expected-cparser-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { (x: Int) in consume(x) }(42)  // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
   // This is technically a valid call, so nothing goes wrong until (42)
@@ -161,15 +161,15 @@ do {
 
   // Equivalent but more obviously unintended.
 
-  { $0(3) }  // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
+  { $0(3) }  // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)
-  // expected-cparser-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { consume($0) }(42) // expected-astgen-note {{did you mean to use a 'do' statement?}}
+  // expected-warning @-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
 
-  ({ $0(3) })  // expected-error {{cannot call value of non-function type '()'}} expected-cparser-note {{callee is here}}
+  ({ $0(3) })  // expected-error {{cannot call value of non-function type '()'}} expected-note {{callee is here}}
 
-  { consume($0) }(42)
-  // expected-cparser-warning@-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
+  { consume($0) }(42) // expected-astgen-note {{did you mean to use a 'do' statement?}}
+  // expected-warning @-1 {{braces here form a trailing closure separated from its callee by multiple newlines}}
   ;
 
   // Also a valid call (!!)

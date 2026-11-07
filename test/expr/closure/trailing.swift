@@ -77,15 +77,15 @@ var c = C().map
   $0 + 1
 }
 
-var c2 = C().map // expected-cparser-note{{callee is here}}
+var c2 = C().map // expected-note {{callee is here}}
 
-{ // expected-cparser-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
+{ // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-astgen-note {{did you mean to use a 'do' statement?}}
   $0 + 1
 }
 
-var c3 = C().map // expected-cparser-note{{callee is here}}
+var c3 = C().map // expected-note {{callee is here}}
 // blah blah blah
-{ // expected-cparser-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
+{ // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-astgen-note {{did you mean to use a 'do' statement?}}
   $0 + 1
 }
 
@@ -134,14 +134,14 @@ let intArray = [someInt]
 limitXY(someInt, toGamut: intArray) {}  // expected-error{{extra trailing closure passed in call}}
 
 // <rdar://problem/23036383> QoI: Invalid trailing closures in stmt-conditions produce lousy diagnostics
-func retBool(x: () -> Int) -> Bool {} // expected-astgen-note {{'retBool(x:)' declared here}} expected-astgen-note {{'retBool(x:)' declared here}}
+func retBool(x: () -> Int) -> Bool {} // // expected-astgen-note {{'retBool(x:)' declared here}} expected-astgen-note {{'retBool(x:)' declared here}}
 func maybeInt(_: () -> Int) -> Int? {}
-func twoClosureArgs(_:()->Void, _:()->Void) -> Bool {} // expected-astgen-note {{'twoClosureArgs' declared here}}
+func twoClosureArgs(_:()->Void, _:()->Void) -> Bool {} // // expected-astgen-note {{'twoClosureArgs' declared here}}
 class Foo23036383 {
   init() {}
-  func map(_: (Int) -> Int) -> Int? {} // expected-astgen-note {{'map' declared here}}
-  func meth1(x: Int, _: () -> Int) -> Bool {} // expected-astgen-note {{'meth1(x:_:)' declared here}}
-  func meth2(_: Int, y: () -> Int) -> Bool {} // expected-astgen-note {{'meth2(_:y:)' declared here}}
+  func map(_: (Int) -> Int) -> Int? {} // // expected-astgen-note {{'map' declared here}}
+  func meth1(x: Int, _: () -> Int) -> Bool {} // // expected-astgen-note {{'meth1(x:_:)' declared here}}
+  func meth2(_: Int, y: () -> Int) -> Bool {} // // expected-astgen-note {{'meth2(_:y:)' declared here}}
   func filter(by: (Int) -> Bool) -> [Int] {}
 }
 enum MyErr : Error {
