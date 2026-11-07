@@ -834,7 +834,7 @@ extension ASTGenVisitor {
       // `\e`: the C++ parser reads the name as an expression that is the whole
       // root of a key path with no components, which the type checker diagnoses.
       if let root = node.root?.as(IdentifierTypeSyntax.self),
-        root.genericArgumentClause == nil, root.name.presence == .present
+        root.genericArgumentClause == nil, root.name.presence == .present, root.name.rawTokenKind == .identifier
       {
         let nameAndLoc = self.generateDeclNameRef(moduleSelector: root.moduleSelector, baseName: root.name)
         let rootExpr: BridgedExpr? = BridgedUnresolvedDeclRefExpr.createParsed(
