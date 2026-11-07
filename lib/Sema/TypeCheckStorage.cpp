@@ -3519,6 +3519,7 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
 }
 
 static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
+                                                   Type storageType,
                                                    Expr *&initializer,
                                                    bool contextualize) {
   auto *dc = wrappedVar->getInnermostDeclContext();
@@ -3529,7 +3530,7 @@ static void typeCheckSynthesizedWrapperInitializer(VarDecl *wrappedVar,
   // Type-check the initialization.
   using namespace constraints;
   auto target = SyntacticElementTarget::forPropertyWrapperInitializer(
-      wrappedVar, initContext, initializer);
+      wrappedVar, initContext, initializer, storageType);
   auto result = TypeChecker::typeCheckExpression(target);
   if (!result)
     return;
@@ -3817,7 +3818,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         && !wrapperInfo.defaultInit) {
       auto ty = parentPBD->getPattern(patternNumber)->getType();
       if (auto defaultInit = TypeChecker::buildDefaultInitializer(ty)) {
-        typeCheckSynthesizedWrapperInitializer(var, defaultInit,
+        typeCheckSynthesizedWrapperInitializer(var, storageType, defaultInit,
                                                /*contextualize=*/false);
         parentPBD->setInit(0, defaultInit);
         parentPBD->setInitializerChecked(0);
@@ -3838,7 +3839,8 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
         Expr *defaultInit = nullptr;
         // Only contextualize local wrapped property, the rest of wrapped
         // property will be contextualized in visitPatternBindingDecl.
-        typeCheckSynthesizedWrapperInitializer(var, defaultInit, dc->isLocalContext());
+        typeCheckSynthesizedWrapperInitializer(var, storageType, defaultInit,
+                                               dc->isLocalContext());
         pbd->setInit(0, defaultInit);
         pbd->setInitializerChecked(0);
 
@@ -3908,7 +3910,7 @@ PropertyWrapperInitializerInfoRequest::evaluate(Evaluator &evaluator,
              !var->getName().hasDollarPrefix()) {
     wrappedValueInit = PropertyWrapperValuePlaceholderExpr::create(
         ctx, var->getSourceRange(), var->getTypeInContext(), /*wrappedValue=*/nullptr);
-    typeCheckSynthesizedWrapperInitializer(var, wrappedValueInit,
+    typeCheckSynthesizedWrapperInitializer(var, storageType, wrappedValueInit,
                                            /*contextualize=*/true);
   }
 
