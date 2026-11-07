@@ -202,3 +202,16 @@ class DerivedUseSelfAfterConsume: Base {
     observe(self) // expected-error {{cannot use 'self' after partial consume}}
   }
 }
+
+// FIXME: this should be diagnosed. After `super.init`, `self` can't be deallocated without running the
+// deinit of its superclass, yet its deinit would destroy the stored property that was consumed.
+class DerivedThrowAfterConsume: Base {
+  var t: Tree?
+  init(fail: Bool) throws {
+    t = Tree()
+    super.init()
+    _ = consume t
+    if fail { throw E() }
+    t = Tree()
+  }
+}

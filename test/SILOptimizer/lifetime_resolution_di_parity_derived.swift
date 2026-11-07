@@ -244,6 +244,30 @@ class DerivedFromDynamic: Dynamic {
   }
 }
 
+// A failure path before `super.init`, which deallocates `self`, doesn't affect the diagnostics.
+
+func mayThrow() throws {}
+
+class MethodBeforeSuperThenThrow: B {
+  var x: Int
+  init(q: Int) throws {
+    x = 0
+    m() // expected-error {{'self' used in method call 'm' before 'super.init' call}}
+    try mayThrow()
+    super.init()
+  }
+}
+
+class NotInitAtSuperAfterThrow: B {
+  var x: A
+  var y: A
+  init(q: Int) throws {
+    x = A()
+    try mayThrow()
+    super.init() // expected-error {{property 'self.y' not initialized at super.init call}}
+  }
+}
+
 // No errors.
 
 class FineAfterSuper: B {

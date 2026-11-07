@@ -277,6 +277,8 @@ private struct AddressUseClassifier: AddressDefUseWalker, ClassInstanceUseWalker
         uses.kill(store, address.accessPath)
       case .destroy(let destroy):
         uses.kill(destroy, address.accessPath)
+      case .deallocate(let load):
+        uses.kill(load, address.accessPath)
       case .initialStore, .ignored, .unknown:
         break
       }

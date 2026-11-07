@@ -881,16 +881,17 @@ private struct Resolver {
           }
 
         case let .end(op) where root.mode == .derivedClassSelf:
-          // Only whether the memory holds the reference decides how to end its lifetime.
-          let reference = space.range(of: .reference)!
-          switch current[reference.lowerBound] {
-          case .yes:
-            break
-          case .no:
+          let holdsReference = current[space.range(of: .reference)!.lowerBound]
+          let superInitialized = current[space.range(of: .superclass)!.lowerBound]
+          if holdsReference == .no {
+            // A failed `super.init` already released the instance.
             context.erase(instruction: op.instruction)
             didDelete = true
-          default:
-            partialDestroys.append((op.instruction, current, reference))
+          } else if holdsReference == .yes && superInitialized == .yes {
+            // FIXME: a stored property consumed after `super.init` and not reinitialized must be diagnosed.
+            break
+          } else {
+            partialDestroys.append((op.instruction, current, range))
             didDelete = true
           }
 
@@ -951,6 +952,10 @@ private struct Resolver {
     for (destroy, avail, range) in partialDestroys {
       if root.isInstanceReference {
         endInstanceLifetime(at: destroy, avail, root, space, controlVar)
+        continue
+      }
+      if root.mode == .derivedClassSelf {
+        endDerivedSelfLifetime(at: destroy, avail, root, space, controlVar)
         continue
       }
       destroyAvailableElements(avail, range, before: destroy, root, space, controlVar)
@@ -1032,23 +1037,11 @@ private struct Resolver {
     if !partialLeaves.isEmpty && space.fieldRange.allSatisfy({ avail[$0] != .no }) {
       guard let controlVar else { fatalError("missing control variable for conditional destroy") }
 
-      //   start:        cond_br (test bits), keepBlock, deallocBlock
-      //   keepBlock:    destroy_value instance; br cont
-      //   deallocBlock: <destroy fields>; dealloc_partial_ref instance; br cont
-      //   cont:         <destroy> ...
-      let isFullyInitialized = controlVar.testAll(partialLeaves, before: destroy)
-      let start = destroy.parentBlock
-      let cont = context.splitBlock(before: destroy)
-      let keepBlock = context.createBlock(after: start)
-      let deallocBlock = context.createBlock(after: keepBlock)
-
-      let keepBuilder = Builder(atEndOf: keepBlock, location: destroy.location, context)
-      keepBuilder.createDestroyValue(operand: instance)
-      keepBuilder.createBranch(to: cont)
-
-      deallocPoint = Builder(atEndOf: deallocBlock, location: destroy.location, context).createBranch(to: cont)
-      Builder(atEndOf: start, location: destroy.location, context)
-        .createCondBranch(condition: isFullyInitialized, trueBlock: keepBlock, falseBlock: deallocBlock)
+      //   keep:    destroy_value instance
+      //   dealloc: <destroy fields>; dealloc_partial_ref instance
+      let (keep, dealloc) = splitIntoDiamond(before: destroy, on: controlVar.testAll(partialLeaves, before: destroy))
+      Builder(before: keep, location: destroy.location, context).createDestroyValue(operand: instance)
+      deallocPoint = dealloc
 
       // A sole conditionally initialized property is known to be uninitialized when deallocating.
       if partialLeaves.count == 1 {
@@ -1083,28 +1076,73 @@ private struct Resolver {
       assert(current[leaf] == .partial)
       guard let controlVar else { fatalError("missing control variable for conditional destroy") }
 
-      // Split the block into a diamond around the destroy of this field:
-      //
-      //   start:  cond_br (test bit), trueBlock, falseBlock
-      //   trueBlock:  destroy_addr field; br cont
-      //   falseBlock: br cont
-      //   cont:  <inst> ...
-      let condition = controlVar.test(leaf, before: inst)
-      let start = inst.parentBlock
-      let cont = context.splitBlock(before: inst)
-      let trueBlock = context.createBlock(after: start)
-      let falseBlock = context.createBlock(after: trueBlock)
-
-      let trueBuilder = Builder(atEndOf: trueBlock, location: inst.location, context)
-      space.withElementAddress(forIndex: leaf, from: root.address, trueBuilder) {
-        trueBuilder.createDestroyAddr(address: $0)
-      }
-      trueBuilder.createBranch(to: cont)
-
-      Builder(atEndOf: falseBlock, location: inst.location, context).createBranch(to: cont)
-      Builder(atEndOf: start, location: inst.location, context)
-        .createCondBranch(condition: condition, trueBlock: trueBlock, falseBlock: falseBlock)
+      let (initialized, _) = splitIntoDiamond(before: inst, on: controlVar.test(leaf, before: inst))
+      let builder = Builder(before: initialized, location: inst.location, context)
+      space.withElementAddress(forIndex: leaf, from: root.address, builder) { builder.createDestroyAddr(address: $0) }
     }
+  }
+
+  // Splits the block before `inst` into a diamond that branches on `condition`:
+  //
+  //   start:      cond_br condition, trueBlock, falseBlock
+  //   trueBlock:  br cont
+  //   falseBlock: br cont
+  //   cont:       <inst> ...
+  //
+  // Returns the branch ending each side, before which that side's code is inserted.
+  func splitIntoDiamond(before inst: Instruction, on condition: Value) -> (ifTrue: BranchInst, ifFalse: BranchInst) {
+    let start = inst.parentBlock
+    let cont = context.splitBlock(before: inst)
+    let trueBlock = context.createBlock(after: start)
+    let falseBlock = context.createBlock(after: trueBlock)
+    let ifTrue = Builder(atEndOf: trueBlock, location: inst.location, context).createBranch(to: cont)
+    let ifFalse = Builder(atEndOf: falseBlock, location: inst.location, context).createBranch(to: cont)
+    Builder(atEndOf: start, location: inst.location, context)
+      .createCondBranch(condition: condition, trueBlock: trueBlock, falseBlock: falseBlock)
+    return (ifTrue, ifFalse)
+  }
+
+  // Ends the lifetime of derived class `self` at a `destroy_addr` of its memory, which may no longer hold the
+  // instance, or hold one whose superclass part isn't initialized. A failed `super.init` already released the
+  // instance. Otherwise, before `super.init`, the initialized stored properties are destroyed and the instance is
+  // deallocated without running its deinit, as `super.init` initializes the parts the deinit needs.
+  func endDerivedSelfLifetime(at destroy: Instruction, _ avail: [Availability], _ root: ResolvableRoot,
+                              _ space: StateIndexSpace, _ controlVar: ControlVariable?) {
+    let reference = space.range(of: .reference)!.lowerBound
+    let superclass = space.range(of: .superclass)!.lowerBound
+    var deallocPoint = destroy
+
+    // The `super.init` bit is set before the call, so whether it failed is only known from the reference.
+    //   holds:  <the rest>
+    //   empty:  nothing
+    if avail[reference] == .partial {
+      guard let controlVar else { fatalError("missing control variable for conditional destroy") }
+      (deallocPoint, _) = splitIntoDiamond(before: destroy, on: controlVar.test(reference, before: destroy))
+    }
+
+    //   keep:     destroy_addr self
+    //   dealloc:  <destroy fields>; dealloc_partial_ref self
+    switch avail[superclass] {
+    case .yes:
+      Builder(before: deallocPoint, location: destroy.location, context).createDestroyAddr(address: root.address)
+      context.erase(instruction: destroy)
+      return
+    case .partial:
+      guard let controlVar else { fatalError("missing control variable for conditional destroy") }
+      let superInitialized = controlVar.test(superclass, before: deallocPoint)
+      let (keep, dealloc) = splitIntoDiamond(before: deallocPoint, on: superInitialized)
+      Builder(before: keep, location: destroy.location, context).createDestroyAddr(address: root.address)
+      deallocPoint = dealloc
+    default:
+      break
+    }
+
+    destroyAvailableElements(avail, space.fieldRange, before: deallocPoint, root, space, controlVar)
+    let builder = Builder(before: deallocPoint, location: destroy.location, context)
+    let instance = builder.createLoad(fromAddress: root.address, ownership: .take)
+    let metatype = builder.createMetatype(ofInstanceType: space.instanceType.canonicalType, representation: .thick)
+    builder.createDeallocPartialRef(instance, metatype: metatype)
+    context.erase(instruction: destroy)
   }
 
   // Classifies every use of the root's address, following projections and access scopes, into the events of each block.
@@ -1215,7 +1253,7 @@ private struct Resolver {
           }
           addUse(.superInit(use), superclass)
           addUse(.take(use, .own), reference)
-        case .destroy:
+        case .destroy, .deallocate:
           addUse(.end(use), space.wholeRange)
         case .ignored:
           break

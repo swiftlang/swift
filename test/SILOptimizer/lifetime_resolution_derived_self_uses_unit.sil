@@ -120,3 +120,22 @@ bb0(%0 : @owned $D):
   dealloc_stack %1
   return %16
 }
+
+// LifetimeResolution deallocates `self` that fails before `super.init`.
+// CHECK-LABEL: begin running test {{.*}} on deallocate_before_super_init: lifetime_resolution_derived_self_uses
+// CHECK-NEXT:  initialStore: store %0 to [init] [[SLOT:%.*]] :
+// CHECK-NEXT:  deallocate: {{%.*}} = load [take] [[SLOT]]
+// CHECK-NEXT:  end running test {{.*}} on deallocate_before_super_init: lifetime_resolution_derived_self_uses
+sil [ossa] @deallocate_before_super_init : $@convention(method) (@owned D) -> () {
+bb0(%0 : @owned $D):
+  %1 = alloc_stack [lexical] [var_decl] $D, let, name "self"
+  %2 = mark_uninitialized [derivedself] %1
+  specify_test "lifetime_resolution_derived_self_uses %2"
+  store %0 to [init] %2
+  %5 = load [take] %2
+  %6 = metatype $@thick D.Type
+  dealloc_partial_ref %5, %6
+  dealloc_stack %1
+  %t = tuple ()
+  return %t
+}

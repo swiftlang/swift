@@ -191,6 +191,10 @@ enum DerivedSelfUse {
 
   case destroy(DestroyAddrInst)
 
+  /// Takes `self` to deallocate it without running its deinit, which LifetimeResolution emits for a failure before
+  /// `super.init`.
+  case deallocate(LoadInst)
+
   /// Has no effect on `self`, like a `dealloc_stack`, `debug_value` or `diagnose`.
   case ignored
 
@@ -211,6 +215,9 @@ enum DerivedSelfUse {
         self = .superInit(load, apply)
       } else if load.loadOwnership == .copy {
         self = .copy(load)
+      } else if load.loadOwnership == .take,
+                load.uses.ignoreDebugUses.singleUse?.instruction is DeallocPartialRefInst {
+        self = .deallocate(load)
       } else {
         self = .unknown
       }
@@ -283,6 +290,7 @@ let lifetimeResolutionDerivedSelfUsesTest = FunctionTest("lifetime_resolution_de
     case .superInit(let load, let apply): print("superInit: \(load)\n  call: \(apply)")
     case .storeBack(let store): print("storeBack: \(store)")
     case .destroy(let destroy): print("destroy: \(destroy)")
+    case .deallocate(let load): print("deallocate: \(load)")
     case .ignored: print("ignored: \(use.instruction)")
     case .unknown: print("unknown: \(use.instruction)")
     }
