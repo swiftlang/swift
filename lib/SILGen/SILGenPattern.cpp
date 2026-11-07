@@ -4046,7 +4046,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     ManagedValue value = subject.getFinalManagedValue();
 
     if (auto *singleEnumDecl = canSubjectTy->getEnumDecl()) {
-      if (singleEnumDecl->isObjC()) {
+      if (singleEnumDecl->isCCompatibleEnum()) {
         auto metatype = ManagedValue::forObjectRValueWithoutOwnership(
             B.createMetatype(loc, loweredMetatypeType));
 

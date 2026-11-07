@@ -9154,7 +9154,7 @@ ERROR(noncopyable_enums_do_not_support_indirect,none,
 ERROR(noncopyable_cast,none,
       "non-'Copyable' types cannot be conditionally cast", ())
 ERROR(noncopyable_objc_enum, none,
-      "non-'Copyable' enums cannot be marked '@objc'", ())
+      "non-'Copyable' enums cannot be marked %0", (DeclAttribute))
 ERROR(moveOnly_not_allowed_here,none,
       "'@_moveOnly' attribute is only valid on structs or enums", ())
 ERROR(moveOnly_deprecated,none,
