@@ -94,18 +94,64 @@ static bool isStdSpanType(clang::QualType clangType) {
   return decl && decl->isInStdNamespace() && decl->getName() == "span";
 }
 
+/// Returns the index of the Swift parameter that the clang parameter at
+/// \p clangIndex was imported as, or std::nullopt if it was imported as `self`.
+static std::optional<size_t>
+getSwiftParamIndex(const AbstractFunctionDecl *MappedDecl, size_t clangIndex) {
+  if (!MappedDecl->isImportAsInstanceMember())
+    return clangIndex;
+  size_t selfIndex = MappedDecl->getSelfIndex();
+  if (clangIndex == selfIndex)
+    return std::nullopt;
+  return clangIndex < selfIndex ? clangIndex : clangIndex - 1;
+}
+
+/// Returns the Swift type that \p clangParam was imported as, or a null type if
+/// it was imported as `self`.
+static Type getImportedParamType(const AbstractFunctionDecl *MappedDecl,
+                                 const clang::ParmVarDecl *clangParam) {
+  std::optional<size_t> index =
+      getSwiftParamIndex(MappedDecl, clangParam->getFunctionScopeIndex());
+  const auto *params = MappedDecl->getParameters();
+  if (!index || *index >= params->size())
+    return Type();
+  return params->get(*index)->getInterfaceType();
+}
+
 // Walks a clang `Expr` tree that appears as a `__counted_by` /
 // `__sized_by` count expression and emits an equivalent Swift expression.
-// `Visit(expr)` returns true on success and the result can be retrieved via
-// `str()`.
 struct SwiftCountExprEmitter
     : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
+  ClangImporter::Implementation &CI;
   const clang::ASTContext &ctx;
+  /// The imported function whose count expression is being emitted.
+  const AbstractFunctionDecl *MappedDecl;
+  /// Whether the count expression is just a reference to a declaration, such as
+  /// a parameter name, ignoring casts that don't change the type (see
+  /// stripValuePreservingCasts).
+  bool isSimpleDeclRef = false;
   llvm::SmallString<128> result;
   llvm::raw_svector_ostream out;
 
-  explicit SwiftCountExprEmitter(const clang::ASTContext &ctx)
-      : ctx(ctx), out(result) {}
+  SwiftCountExprEmitter(ClangImporter::Implementation &Impl,
+                        const clang::ASTContext &ctx,
+                        const AbstractFunctionDecl *MappedDecl)
+      : CI(Impl), ctx(ctx), MappedDecl(MappedDecl), out(result) {}
+
+  /// Computes Swift representation of \p countExpr as a string.
+  /// Use `str()` to get access to the computed string.
+  /// \return true iff a string was successfully computed
+  bool computeSwiftCountExpr(const clang::Expr *countExpr) {
+    // Detect if the count expression is just a use of a DeclRefExpr.
+    // This is used later in VisitDeclRefExpr.
+    isSimpleDeclRef =
+        isa<clang::DeclRefExpr>(stripValuePreservingCasts(countExpr));
+    bool success = Visit(countExpr);
+    // If we failed make the string empty to leave it in a well defined state.
+    if (!success)
+      result.clear();
+    return success;
+  }
 
   StringRef str() const { return result; }
 
@@ -116,6 +162,33 @@ struct SwiftCountExprEmitter
       DLOG("Unsupported decl name in count expr\n");
       return false;
     }
+    // Literals and casts are emitted using the Swift name of their canonical
+    // C type, but parameters and global variables are referenced by name and
+    // so have the type they were imported as. When those differ (e.g. `size_t`
+    // is imported as `Int`, but `size_t`'s canonical type `unsigned long` is
+    // imported into Swift as `CUnsignedLong`), convert the used declaration so
+    // that it can be combined with the rest of the expression without type
+    // errors. Like other implicit conversions (see visitCastImpl) this uses a
+    // plain `T(x)`, which traps if the value doesn't fit, e.g. a negative
+    // `Int`.
+    //
+    // We avoid adding the explicit cast if the count expression is a simple
+    // decl ref because adding the cast would break how _SwiftifyImport handles
+    // this case. In this case _SwiftifyImport removes the count parameter from
+    // the function entirely because the count can come directly from the Span
+    // or UnsafeMutableBufferPointer. _SwiftifyImport currently relies on seeing
+    // just a simple decl to make this decision.
+    //
+    // FIXME: This also skips the conversion for counts on return values, where
+    // the parameter is never removed.
+    // (https://github.com/swiftlang/swift/issues/94221)
+    if (!isSimpleDeclRef)
+      if (std::optional<StringRef> swiftTypeNameForCanonicalCType =
+              getCanonicalTypeNameIfImportedDifferently(e)) {
+        out << *swiftTypeNameForCanonicalCType << '(' << e->getDecl()->getName()
+            << ')';
+        return true;
+      }
     out << e->getDecl()->getName();
     return true;
   }
@@ -212,6 +285,76 @@ struct SwiftCountExprEmitter
   }
 
 private:
+  // Clients must use computeSwiftCountExpr(), which sets up state for the whole
+  // count expression. Visit() is only for subexpressions.
+  using clang::ConstStmtVisitor<SwiftCountExprEmitter, bool>::Visit;
+
+  /// Strips casts that don't change the type, apart from typedefs and
+  /// qualifiers, such as an implicit lvalue-to-rvalue conversion, or
+  /// `(size_t)n` when `n` is already a `size_t`.
+  static const clang::Expr *stripValuePreservingCasts(const clang::Expr *e) {
+    while (const auto *c = dyn_cast<clang::CastExpr>(e)) {
+      if (c->getCastKind() != clang::CK_LValueToRValue &&
+          c->getCastKind() != clang::CK_NoOp)
+        break;
+      e = c->getSubExpr();
+    }
+    return e;
+  }
+
+  /// Returns the Swift type of \p decl, if it is a parameter of the function
+  /// being swiftified or a global variable, or a null type otherwise.
+  Type getImportedType(const clang::ValueDecl *decl) {
+    if (const auto *param = dyn_cast<clang::ParmVarDecl>(decl))
+      return getImportedParamType(MappedDecl, param);
+    // Get the type of a global without importing it. We're in the middle of
+    // importing the function, and importing the global here can import it
+    // twice: for a static data member, importing it first imports its class,
+    // which imports the member too.
+    if (const auto *var = dyn_cast<clang::VarDecl>(decl))
+      if (ClangModuleUnit *module = CI.getClangModuleForDecl(var))
+        return CI.SwiftContext.getClangModuleLoader()->importVarDeclType(
+            var, /*swiftDecl=*/nullptr, module);
+    return Type();
+  }
+
+  /// If \p e refers to a parameter or global variable whose imported Swift type
+  /// differs from the Swift type of its canonical C type, returns the name of
+  /// the latter.
+  std::optional<StringRef>
+  getCanonicalTypeNameIfImportedDifferently(const clang::DeclRefExpr *e) {
+    const clang::ValueDecl *decl = e->getDecl();
+    Type swiftTypeForDecl = getImportedType(decl);
+    // Only support integer types for now.
+    if (!swiftTypeForDecl || !swiftTypeForDecl->isStdlibInteger())
+      return std::nullopt;
+    // Use the type of `e`, the reference in the count expression, rather than
+    // `decl->getType()`. They differ for C++ references: for a parameter
+    // `const size_t &n`, `decl->getType()` is `const size_t &`, which isn't a
+    // builtin type, but `n` in the count has type `const size_t`. That's also
+    // the type the parameter is imported as, since the importer imports a
+    // reference parameter as the type it refers to.
+    std::optional<StringRef> swiftTypeNameForCanonicalCType =
+        getBuiltinTypeSwiftName(e->getType());
+    if (!swiftTypeNameForCanonicalCType)
+      return std::nullopt;
+    const auto *swiftTypeDeclForCanonicalCType =
+        dyn_cast_or_null<TypeDecl>(getKnownSingleDecl(
+            MappedDecl->getASTContext(), *swiftTypeNameForCanonicalCType));
+    if (!swiftTypeDeclForCanonicalCType)
+      return std::nullopt;
+    Type swiftTypeForCanonicalCType =
+        swiftTypeDeclForCanonicalCType->getDeclaredInterfaceType();
+    if (!swiftTypeForCanonicalCType->isStdlibInteger() ||
+        swiftTypeForDecl->isEqual(swiftTypeForCanonicalCType))
+      return std::nullopt;
+    DLOG("Converting reference to '"
+         << decl->getName() << "' imported as '"
+         << swiftTypeForDecl->getString() << "' to '"
+         << *swiftTypeNameForCanonicalCType << "'\n");
+    return swiftTypeNameForCanonicalCType;
+  }
+
   bool visitCastImpl(const clang::CastExpr *c) {
     ASSERT(isa<clang::CStyleCastExpr>(c) || isa<clang::ImplicitCastExpr>(c));
     using CK = clang::CastKind;
@@ -377,14 +520,20 @@ protected:
 };
 
 struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
+  ClangImporter::Implementation &Impl;
+  const AbstractFunctionDecl *MappedDecl;
+
   SwiftifyInfoFunctionPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
                               llvm::raw_svector_ostream &out,
                               MacroDecl &SwiftifyImportDecl,
                               llvm::StringMap<std::string> &typeMapping,
-                              bool &DiagnosedMissingNullableAsEmptySpanParam)
+                              bool &DiagnosedMissingNullableAsEmptySpanParam,
+                              ClangImporter::Implementation &Impl,
+                              const AbstractFunctionDecl *MappedDecl)
       : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl,
                             typeMapping,
-                            DiagnosedMissingNullableAsEmptySpanParam) {}
+                            DiagnosedMissingNullableAsEmptySpanParam),
+        Impl(Impl), MappedDecl(MappedDecl) {}
 
   bool printCountedBy(const clang::CountAttributedType *CAT, Type swiftType,
                       ssize_t pointerIndex, bool isImplicitlyUnwrapped) {
@@ -393,8 +542,8 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     if (isSizedBy ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
                   : ConcretePointeeType(swiftType).isNull())
       return false;
-    SwiftCountExprEmitter emitter(ctx);
-    if (!emitter.Visit(CAT->getCountExpr()))
+    SwiftCountExprEmitter emitter(Impl, ctx, MappedDecl);
+    if (!emitter.computeSwiftCountExpr(CAT->getCountExpr()))
       return false;
 
     // Step 2: print - any early exit must occur before this point
@@ -856,16 +1005,13 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       return false;
     }
 
-    size_t selfParamIndex = MappedDecl->isImportAsInstanceMember()
-                                ? MappedDecl->getSelfIndex()
-                                : ClangDecl->param_size();
     for (auto [index, clangParam] : llvm::enumerate(ClangDecl->parameters())) {
       clang::QualType clangParamTy = clangParam->getType();
       DLOG_SCOPE("Checking parameter '" << *clangParam << "' with type '"
                                         << clangParamTy << "'\n");
-      int mappedIndex = index < selfParamIndex ? index :
-        index > selfParamIndex ? index - 1 :
-        SwiftifyInfoPrinter::SELF_PARAM_INDEX;
+      std::optional<size_t> swiftIndex = getSwiftParamIndex(MappedDecl, index);
+      int mappedIndex = swiftIndex ? static_cast<int>(*swiftIndex)
+                                   : SwiftifyInfoPrinter::SELF_PARAM_INDEX;
       const ParamDecl *swiftParam = nullptr;
       if (mappedIndex == SwiftifyInfoPrinter::SELF_PARAM_INDEX) {
         swiftParam = MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/true);
@@ -1078,7 +1224,8 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     llvm::StringMap<std::string> typeMapping;
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
-        typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
+        typeMapping, DiagnosedMissingNullableAsEmptySpanParam, *this,
+        MappedDecl);
     if (!swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl)) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;

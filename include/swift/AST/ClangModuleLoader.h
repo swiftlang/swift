@@ -420,6 +420,23 @@ public:
   importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                            DeclContext *dc) = 0;
 
+  /// Imports the Swift type of the Clang `VarDecl` \p clangDecl.
+  ///
+  /// \p clangDecl - The Clang `VarDecl` used for import.
+  ///
+  /// \p swiftDecl - The corresponding Swift `VarDecl` to \p clangDecl. If this
+  /// is non-null, this method may mutate the Swift `VarDecl` based on the
+  /// computed type and may adjust the computed type based on attributes on the
+  /// Swift `VarDecl`. If this is null, then the type is computed without
+  /// modifying an existing Swift `VarDecl` and as if there were no attributes
+  /// on the corresponding Swift `VarDecl`.
+  ///
+  /// \p dc - The `DeclContext` that \p swiftDecl is declared in or, if
+  /// \p swiftDecl is null, the `ClangModuleUnit` for the Clang module that
+  /// \p clangDecl belongs to. This cannot be null. \p dc's module
+  /// scope context must be a `ClangModuleUnit`.
+  ///
+  /// \returns The imported Swift type, or an `ErrorType` on failure.
   virtual Type importVarDeclType(const clang::VarDecl *clangDecl,
                                  VarDecl *swiftDecl,
                                  DeclContext *dc) = 0;
