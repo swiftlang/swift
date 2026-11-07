@@ -187,7 +187,10 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         original->getASTContext());
     auto declRef =
         SILDeclRef(original).asForeign(requiresForeignEntryPoint(original));
-    addFunction(declRef.asAutoDiffDerivativeFunction(assocFnId));
+    auto derivative = declRef.asAutoDiffDerivativeFunction(assocFnId);
+    addFunction(derivative);
+    if (original->hasAsync())
+      addAsyncFunctionPointer(derivative);
   }
 
   void addDifferentiabilityWitness(

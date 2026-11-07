@@ -449,6 +449,49 @@ SILValue swift::isPartialApplyOfReabstractionThunk(PartialApplyInst *PAI) {
   return Arg;
 }
 
+SILValue swift::findAsyncLetPartialApplyFromStart(
+    SILValue value, function_ref<bool(SILValue)> acceptSource) {
+  while (true) {
+    if (!value->getType().is<SILFunctionType>() ||
+        (acceptSource && !acceptSource(value)))
+      return {};
+    while (isa<ConvertEscapeToNoEscapeInst, ConvertFunctionInst>(value))
+      value = cast<SingleValueInstruction>(value)->getOperand(0);
+    if (isa<ThinToThickFunctionInst>(value))
+      return value;
+    auto *pai = dyn_cast<PartialApplyInst>(value);
+    if (!pai)
+      return {};
+    auto *callee = pai->getCalleeFunction();
+    if (!callee || callee->isThunk() != IsReabstractionThunk)
+      return pai;
+    if (!pai->getNumArguments())
+      return {};
+    value = pai->getArgument(0);
+  }
+}
+
+SILValue swift::lookThroughAsyncLetClosureUsers(SILValue result) {
+  while (true) {
+    SILValue iter = result;
+    if (auto *use = iter->getSingleUse()) {
+      if (auto *maybeThunk = dyn_cast<PartialApplyInst>(use->getUser())) {
+        if (auto *fas = maybeThunk->getCalleeFunction()) {
+          if (fas->isThunk())
+            iter = maybeThunk;
+        }
+      }
+    }
+    if (auto *cfi = iter->getSingleUserOfType<ConvertFunctionInst>())
+      iter = cfi;
+    if (auto *cvt = iter->getSingleUserOfType<ConvertEscapeToNoEscapeInst>())
+      iter = cvt;
+    if (iter == result)
+      return result;
+    result = iter;
+  }
+}
+
 bool swift::onlyUsedByAssignOrInit(PartialApplyInst *PAI) {
   bool usedByAssignOrInit = false;
   for (Operand *Op : PAI->getUses()) {

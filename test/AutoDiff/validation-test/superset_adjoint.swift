@@ -75,4 +75,42 @@ SupersetVJPTests.testWithLeakChecking("IndirectResults") {
   expectEqual(2, gradient(at: 2) { x in x_T(x, Tracked<Float>(3)) })
 }
 
+@differentiable(reverse)
+func multiply(_ a: Float, _ b: Float) -> Float {
+  a * b
+}
+
+@differentiable(reverse, wrt: x)
+func callSecond(_ x: Float,
+                _ body: @differentiable(reverse) (Float, Float) -> Float)
+    -> Float {
+  body(2, x)
+}
+
+@differentiable(reverse)
+func throwingMultiply(_ a: Float, _ b: Float) throws -> Float {
+  a * b
+}
+
+@differentiable(reverse, wrt: x)
+func callThrowingSecond(
+  _ x: Float,
+  _ body: @differentiable(reverse) (Float, Float) throws -> Float
+) throws -> Float {
+  try body(2, x)
+}
+
+// The extracted VJP returns both gradients; only the second input is active.
+SupersetVJPTests.test("ExtractedVJPInactiveFirstParameter") {
+  expectEqual(Float(2), gradient(at: Float(3)) { x in
+    callSecond(x, multiply)
+  })
+}
+
+SupersetVJPTests.test("ThrowingExtractedVJPInactiveFirstParameter") {
+  expectEqual(Float(2), gradient(at: Float(3)) { x in
+    try! callThrowingSecond(x, throwingMultiply)
+  })
+}
+
 runAllTests()
