@@ -470,7 +470,7 @@ public:
     // call site.
     auto index = 0;
     for (auto *param : *PL) {
-      if (param->isDefaultArgument())
+      if (param->hasDefaultArgumentGenerator())
         addFunction(SILDeclRef::getDefaultArgGenerator(VD, index));
       ++index;
     }
