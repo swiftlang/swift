@@ -6,7 +6,7 @@ protocol P1 {
   associatedtype each A // expected-error {{associated types cannot be variadic}}{{18-23=}}
   associatedtype each B<U>
   // expected-error@-1 {{associated types cannot be variadic}}{{18-23=}}
-  // expected-cparser-error@-2 {{associated types must not have a generic parameter list}}{{24-27=}} expected-astgen-error@-2 {{associated types must not have a generic parameter list}}
+  // expected-error@-2 {{associated types must not have a generic parameter list}} {{24-27=}}
   associatedtype C... // expected-cparser-error {{associated types cannot be variadic}}{{19-22=}} expected-astgen-error {{associated types cannot be variadic}}
   associatedtype D<U>...
   // expected-cparser-error@-1 {{associated types cannot be variadic}}{{22-25=}} expected-astgen-error@-1 {{unexpected code '...' in protocol}}

@@ -42,6 +42,6 @@ if #_hasSymbol(struct) {} // expected-cparser-error {{expected expression in #_h
 if #_hasSymbol(foo bar) {}
 
 // expected-cparser-error@+2 {{expected ')' in #_hasSymbol condition}} expected-astgen-error@+2 {{extra trailing closure passed in call}} expected-astgen-error@+2 {{expected ')' to end macro expansion}} expected-astgen-error@+2 {{expected body in 'if' statement}} expected-astgen-error@+2 {{expected '}' to end 'if' statement}}
-// expected-cparser-note@+1 {{to match this opening '('}} expected-astgen-note@+1 {{to match this opening '('}}
+// expected-note@+1 {{to match this opening '('}}
 if #_hasSymbol(foo {}
 

@@ -8,7 +8,7 @@ func test1(inout var x : Int) {}  // expected-warning {{'var' in this position i
 // expected-cparser-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }} expected-astgen-error@-1 {{'inout' before a parameter name is not allowed}}
 func test2(inout let x : Int) {}  // expected-warning {{'let' in this position is interpreted as an argument label}} {{18-21=`let`}}
 // expected-cparser-error @-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{12-17=}} {{26-26=inout }} expected-astgen-error@-1 {{'inout' before a parameter name is not allowed}}
-func test3(f : (inout _ x : Int) -> Void) {} // expected-cparser-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} expected-astgen-error {{'inout' before a parameter name is not allowed}}
+func test3(f : (inout _ x : Int) -> Void) {} // expected-error {{'inout' before a parameter name is not allowed}}
 
 func test3() {
   undeclared_func( // expected-error {{cannot find 'undeclared_func' in scope}} expected-astgen-error {{expected value and ')' to end function call}}

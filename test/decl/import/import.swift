@@ -25,7 +25,7 @@ func indirectBuiltin() {
 }
 
 func f0() {
-  import Swift // expected-cparser-error{{declaration is only valid at file scope}} expected-astgen-error {{declaration is only valid at file scope}}
+  import Swift // expected-error {{declaration is only valid at file scope}}
 }
 
 import func Swift.print

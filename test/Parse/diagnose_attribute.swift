@@ -16,7 +16,7 @@ func qux() {}
 @diagnose(ExistentialAny, as: ignored, reason: "for a lit test")
 func quux() {}
 
-@diagnose(ExistentialAny, as: ignored, reason: BadReason) // expected-cparser-error {{expected string literal in 'diagnose' attribute}} expected-astgen-error {{expected string literal}}
+@diagnose(ExistentialAny, as: ignored, reason: BadReason) // expected-error {{expected string literal}}
 func corge() {}
 
 // Backward compatibility: @warn is an alias for @diagnose
@@ -26,5 +26,5 @@ func warnAlias() {}
 @warn(ExistentialAny, as: ignored, reason: "backward compat test") // expected-warning {{'@warn' has been renamed to '@diagnose'}}
 func warnAliasWithReason() {}
 
-@warn(ExistentialAny, as: ignored, reason: BadReason) // expected-warning {{'@warn' has been renamed to '@diagnose'}} expected-cparser-error {{expected string literal in 'warn' attribute}} expected-astgen-error {{expected string literal}}
+@warn(ExistentialAny, as: ignored, reason: BadReason) // expected-warning {{'@warn' has been renamed to '@diagnose'}} expected-error {{expected string literal}}
 func warnAliasCorge() {}

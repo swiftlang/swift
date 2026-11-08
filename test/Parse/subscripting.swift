@@ -200,7 +200,7 @@ class A7b {
 }
 
 struct A8 {
-  subscript(i : Int) -> Int // expected-cparser-error{{expected '{' in subscript to specify getter and setter implementation}} expected-astgen-error {{expected '{' in subscript}}
+  subscript(i : Int) -> Int // expected-error {{expected '{' in subscript}}
     get {
       return stored // expected-astgen-error {{cannot find 'stored' in scope}}
     }

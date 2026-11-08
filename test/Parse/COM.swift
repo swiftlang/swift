@@ -45,7 +45,7 @@ protocol P2 { }
 
 @com(interface: 42) // expected-astgen-error {{expected string literal in 'com' attribute}}
 protocol P3 { }
-// expected-cparser-error@-2 {{expected string literal in 'com' attribute}} expected-astgen-error@-2 {{expected string literal}}
+// expected-error@-2 {{expected string literal}}
 
 @com(label: "label")
 protocol P4 { }
@@ -53,7 +53,7 @@ protocol P4 { }
 
 @com(implementation: 42) // expected-astgen-error {{expected string literal in 'com' attribute}}
 protocol P5 { }
-// expected-cparser-error@-2 {{expected string literal in 'com' attribute}} expected-astgen-error@-2 {{expected string literal}}
+// expected-error@-2 {{expected string literal}}
 
 @com(implementation: "00000000-0000-0000-0000-000000000009", threading: apartment)
 protocol P6 { }

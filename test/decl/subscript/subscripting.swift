@@ -473,6 +473,6 @@ struct InOutSubscripts {
   subscript(x4: (inout Int, inout Int) -> ()) -> Int { return 0 } // ok
 
   subscript(inout x5: Int) -> Int { return 0 }
-  // expected-cparser-error@-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} expected-astgen-error@-1 {{'inout' before a parameter name is not allowed}}
+  // expected-error@-1 {{'inout' before a parameter name is not allowed}}
   // expected-error@-2 {{'inout' may only be used on function or initializer parameters}}
 }
