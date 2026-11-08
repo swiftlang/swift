@@ -261,6 +261,24 @@ tests.test("Decimal Floats") {
   expectParse("0.00000000000001", 0.0)
 }
 
+// Digits beyond the maximum needed to resolve a midpoint are summarized by a
+// single digit, which must only be non-zero if one of those digits is non-zero.
+tests.test("Summarized digits") {
+  func zeros(_ count: Int) -> String { String(repeating: "0", count: count) }
+  let midpoint = "1.00048828125"
+  let below: Float16 = 1.0
+  let above: Float16 = 1.0009765625
+
+  expectParse(midpoint + zeros(10), below)
+  expectParse(midpoint + zeros(11), below)
+  expectParse(midpoint + zeros(40), below)
+  expectParse(midpoint + zeros(40) + "1", above)
+
+  // The decimal point can fall within the summarized digits.
+  expectParse("100048828125" + zeros(20) + ".0000e-31", below)
+  expectParse("100048828125" + zeros(20) + ".0001e-31", above)
+}
+
 tests.test("Exhaustive Float16") {
   for i in 0..<0xffff {
     let f = Float16(bitPattern: UInt16(i))
