@@ -634,7 +634,11 @@ extension Span where Element: ~Copyable {
   public func extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
-    let newSpan = unsafe Span(_unchecked: newStart, count: bounds.count)
+    // bounds.count uses checked subtraction, but we use unchecked arithmetic
+    // here because this function assumes 0 <= lowerBound < upperBound. This
+    // is enforced by the precondition in extracting(_:).
+    let newCount = bounds.upperBound &- bounds.lowerBound
+    let newSpan = unsafe Span(_unchecked: newStart, count: newCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
     return unsafe _overrideLifetime(newSpan, copying: self)
