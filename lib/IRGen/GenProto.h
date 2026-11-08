@@ -34,7 +34,10 @@ namespace swift {
   class CanType;
   class FuncDecl;
   enum class MetadataState : size_t;
+  class ModuleDecl;
+  class NormalProtocolConformance;
   class ProtocolConformanceRef;
+  class RootProtocolConformance;
   struct SILDeclRef;
   class SILType;
   class SILFunction;
@@ -53,6 +56,27 @@ namespace irgen {
   class PolymorphicSignatureExpandedTypeSource;
   class ProtocolInfo;
   class TypeInfo;
+
+  /// Return true if the witness table requires runtime instantiation to
+  /// handle resiliently-added requirements with default implementations.
+  ///
+  /// If disableOptimizations is true, skip optimizations that treat
+  /// formally-resilient conformances as non-resilient.
+  bool isResilientConformance(const NormalProtocolConformance *conformance,
+                              ModuleDecl *currentModule,
+                              bool useFragileResilientProtocolWitnesses,
+                              bool disableOptimizations = false);
+  bool isResilientConformance(const RootProtocolConformance *root,
+                              ModuleDecl *currentModule,
+                              bool useFragileResilientProtocolWitnesses,
+                              bool disableOptimizations = false);
+
+  /// Is there anything about the given conformance that requires witness
+  /// tables to be dependently-generated?
+  bool isDependentConformance(const RootProtocolConformance *conformance,
+                              ModuleDecl *currentModule,
+                              bool useFragileResilientProtocolWitnesses,
+                              bool lazyInitializeProtocolConformances);
 
   /// Set an LLVM value name for the given type metadata.
   void setTypeMetadataName(IRGenModule &IGM, llvm::Value *value, CanType type);

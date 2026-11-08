@@ -42,6 +42,9 @@ struct SILSymbolVisitorOptions {
 
   /// Whether resilient protocols should be emitted fragile.
   bool FragileResilientProtocols = false;
+
+  /// Whether protocol witness tables use relative references.
+  bool RelativeProtocolWitnessTables = false;
 };
 
 /// Context for `SILSymbolVisitor` symbol enumeration.

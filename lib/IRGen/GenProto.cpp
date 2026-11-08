@@ -972,28 +972,21 @@ namespace {
   };
 } // end anonymous namespace
 
-/// Return true if the witness table requires runtime instantiation to
-/// handle resiliently-added requirements with default implementations.
-///
-/// If disableOptimizations is true, skip optimizations that treat
-/// formally-resilient conformances as non-resilient.
-bool IRGenModule::isResilientConformance(
-    const NormalProtocolConformance *conformance,
-    bool disableOptimizations
-) {
+bool irgen::isResilientConformance(const NormalProtocolConformance *conformance,
+                                   ModuleDecl *currentModule,
+                                   bool useFragileResilientProtocolWitnesses,
+                                   bool disableOptimizations) {
   // If the protocol is not resilient, the conformance is not resilient
   // either.
-  bool shouldTreatProtocolNonResilient =
-    IRGen.Opts.UseFragileResilientProtocolWitnesses;
   if (!conformance->getProtocol()->isResilient() ||
-      shouldTreatProtocolNonResilient)
+      useFragileResilientProtocolWitnesses)
     return false;
 
   auto *conformanceModule = conformance->getDeclContext()->getParentModule();
 
   // If the protocol and the conformance are both in the current module,
   // they're not resilient.
-  if (conformanceModule == getSwiftModule() &&
+  if (conformanceModule == currentModule &&
       conformanceModule == conformance->getProtocol()->getParentModule())
     return false;
 
@@ -1001,15 +994,15 @@ bool IRGenModule::isResilientConformance(
   // consider the conformance non-resilient, because we used to consider it
   // non-resilient before the symbol moved. This is to ensure ABI stability
   // across module boundaries.
-  if (conformanceModule == getSwiftModule() &&
+  if (conformanceModule == currentModule &&
       conformanceModule->getName().str() ==
-      conformance->getProtocol()->getAlternateModuleName())
+          conformance->getProtocol()->getAlternateModuleName())
     return false;
 
   // A copy of a conformance declared alongside a back-deployed type from
   // another module doesn't get the optimizations below, which assume the
   // conformance is emitted by its own module.
-  if (conformanceModule != getSwiftModule()) {
+  if (conformanceModule != currentModule) {
     if (auto *nominal =
             conformance->getDeclContext()->getSelfNominalTypeDecl()) {
       if (nominal->emitsConformanceIntoClient(conformance->getDeclContext()))
@@ -1035,12 +1028,30 @@ bool IRGenModule::isResilientConformance(
   return true;
 }
 
-bool IRGenModule::isResilientConformance(const RootProtocolConformance *root,
-                                         bool disableOptimizations) {
+bool irgen::isResilientConformance(const RootProtocolConformance *root,
+                                   ModuleDecl *currentModule,
+                                   bool useFragileResilientProtocolWitnesses,
+                                   bool disableOptimizations) {
   if (auto normal = dyn_cast<NormalProtocolConformance>(root))
-    return isResilientConformance(normal, disableOptimizations);
+    return isResilientConformance(normal, currentModule,
+                                  useFragileResilientProtocolWitnesses,
+                                  disableOptimizations);
   // Self-conformances never require this.
   return false;
+}
+
+bool IRGenModule::isResilientConformance(
+    const NormalProtocolConformance *conformance, bool disableOptimizations) {
+  return irgen::isResilientConformance(
+      conformance, getSwiftModule(),
+      IRGen.Opts.UseFragileResilientProtocolWitnesses, disableOptimizations);
+}
+
+bool IRGenModule::isResilientConformance(const RootProtocolConformance *root,
+                                         bool disableOptimizations) {
+  return irgen::isResilientConformance(
+      root, getSwiftModule(), IRGen.Opts.UseFragileResilientProtocolWitnesses,
+      disableOptimizations);
 }
 
 /// Whether this protocol conformance has a dependent type witness.
@@ -1117,18 +1128,18 @@ static bool protocolCanHaveDependentConformance(
 }
 
 static bool isDependentConformance(
-              IRGenModule &IGM,
-              const RootProtocolConformance *rootConformance,
-              bool isResilient,
-              llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited){
+    const RootProtocolConformance *rootConformance, ModuleDecl *currentModule,
+    bool useFragileResilientProtocolWitnesses,
+    bool lazyInitializeProtocolConformances, bool isResilient,
+    llvm::SmallPtrSet<const NormalProtocolConformance *, 4> &visited) {
   // Self-conformances are never dependent.
   auto conformance = dyn_cast<NormalProtocolConformance>(rootConformance);
   if (!conformance)
     return false;
 
-  if (IGM.getOptions().LazyInitializeProtocolConformances) {
+  if (lazyInitializeProtocolConformances) {
     const auto *MD = rootConformance->getDeclContext()->getParentModule();
-    if (!(MD == IGM.getSwiftModule() || MD->isStaticLibrary()))
+    if (!(MD == currentModule || MD->isStaticLibrary()))
       return true;
   }
 
@@ -1138,9 +1149,10 @@ static bool isDependentConformance(
     return false;
 
   // If the conformance is resilient or synthesized, this is always true.
-  if (IGM.isResilientConformance(conformance)
-      || isSynthesizedNonUnique(conformance)
-      || isBackDeployedIntoClient(conformance))
+  if (isResilientConformance(conformance, currentModule,
+                             useFragileResilientProtocolWitnesses) ||
+      isSynthesizedNonUnique(conformance) ||
+      isBackDeployedIntoClient(conformance))
     return true;
 
   // Check whether any of the conformances are dependent.
@@ -1166,8 +1178,11 @@ static bool isDependentConformance(
 
     auto *assocRoot = assocConformance.getConcrete()->getRootConformance();
     if (isDependentConformance(
-            IGM, assocRoot,
-            IGM.isResilientConformance(assocRoot, /*disableOptimizations=*/true),
+            assocRoot, currentModule, useFragileResilientProtocolWitnesses,
+            lazyInitializeProtocolConformances,
+            isResilientConformance(assocRoot, currentModule,
+                                   useFragileResilientProtocolWitnesses,
+                                   /*disableOptimizations=*/true),
             visited))
       return true;
   }
@@ -1233,20 +1248,33 @@ static bool hasConditionalConformances(IRGenModule &IGM,
 }
 /// Is there anything about the given conformance that requires witness
 /// tables to be dependently-generated?
-bool IRGenModule::isDependentConformance(
-    const RootProtocolConformance *conformance) {
+bool irgen::isDependentConformance(const RootProtocolConformance *conformance,
+                                   ModuleDecl *currentModule,
+                                   bool useFragileResilientProtocolWitnesses,
+                                   bool lazyInitializeProtocolConformances) {
   // A dependent conformance requires its witness table to be instantiated at runtime.
   // This is not possible in Embedded Swift, which has no such runtime. It's also not
   // needed: the mandatory pipeline specializes all witness tables, so that every
   // conformance which is used at runtime is fully concrete.
-  if (Context.LangOpts.hasFeature(Feature::Embedded))
+  if (currentModule->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
   llvm::SmallPtrSet<const NormalProtocolConformance *, 4> visited;
   return ::isDependentConformance(
-      *this, conformance,
-      isResilientConformance(conformance, /*disableOptimizations=*/true),
+      conformance, currentModule, useFragileResilientProtocolWitnesses,
+      lazyInitializeProtocolConformances,
+      isResilientConformance(conformance, currentModule,
+                             useFragileResilientProtocolWitnesses,
+                             /*disableOptimizations=*/true),
       visited);
+}
+
+bool IRGenModule::isDependentConformance(
+    const RootProtocolConformance *conformance) {
+  return irgen::isDependentConformance(
+      conformance, getSwiftModule(),
+      IRGen.Opts.UseFragileResilientProtocolWitnesses,
+      getOptions().LazyInitializeProtocolConformances);
 }
 
 static llvm::Value *
