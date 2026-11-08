@@ -7072,7 +7072,23 @@ emitEnumElementPayloads(SILGenFunction &SGF, SILLocation loc,
       std::move(eltPayload).forwardInto(SGF, origEltType, eltInit,
                                         SGF.getTypeLowering(eltTy));
     } else {
-      auto elt = std::move(eltPayload).getAsSingleValue(SGF, origEltType, eltTy);
+      // A no-implicit-copy parameter (e.g. 'borrowing') is emitted as a move
+      // only wrapped value. The enum payload is consumed, so copy and unwrap it
+      // before reabstraction. The move checker then diagnoses the copy as a
+      // consume.
+      auto substEltType = eltPayload.getSubstRValueType();
+      auto conversion = Conversion::getSubstToOrig(
+          origEltType, substEltType, SGF.getLoweredType(substEltType), eltTy);
+      auto elt = SGF.emitConvertedRValue(
+          eltPayload.getLocation(), conversion, SGFContext(),
+          [&](SILGenFunction &SGF, SILLocation loc, SGFContext C) {
+            auto value = std::move(eltPayload).getAsSingleValue(SGF, C);
+            if (!value.isInContext() && value.getType().isObject() &&
+                value.getType().isMoveOnlyWrapped())
+              value = SGF.B.createOwnedMoveOnlyWrapperToCopyableValue(
+                  loc, value.ensurePlusOne(SGF, loc));
+            return value;
+          });
       elts.push_back(elt);
     }
   }

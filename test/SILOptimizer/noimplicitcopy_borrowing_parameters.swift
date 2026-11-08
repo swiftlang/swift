@@ -570,3 +570,65 @@ struct TrivialSelfTest {
 }
 
 func consumeTrivialSelfTest(_ x: consuming TrivialSelfTest) {}
+
+////////////////////////////////////////////////////
+// MARK: Enum payloads (https://github.com/swiftlang/swift/issues/87438) //
+////////////////////////////////////////////////////
+
+enum BorrowingEnumPayloadTest {
+    case string(String)
+    case int(Int)
+    case klass(Klass)
+    case pair(String, Int)
+    case labeled(s: String)
+    case any(Any)
+}
+
+enum BorrowingGenericEnumPayloadTest<T> {
+    case value(T)
+}
+
+func testBorrowingEnumPayloadString(_ x: borrowing String) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    _ = BorrowingEnumPayloadTest.string(x) // expected-note {{consumed here}}
+}
+
+func testBorrowingEnumPayloadTrivial(_ x: borrowing Int) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    _ = BorrowingEnumPayloadTest.int(x) // expected-note {{consumed here}}
+}
+
+func testBorrowingEnumPayloadClass(_ x: borrowing Klass) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    _ = BorrowingEnumPayloadTest.klass(x) // expected-note {{consumed here}}
+}
+
+func testBorrowingEnumPayloadTuple(_ x: borrowing String) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    _ = BorrowingEnumPayloadTest.pair(x, 1) // expected-note {{consumed here}}
+}
+
+func testBorrowingEnumPayloadLabeled(_ x: borrowing String) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    _ = BorrowingEnumPayloadTest.labeled(s: x) // expected-note {{consumed here}}
+}
+
+func testBorrowingEnumPayloadAny(_ x: borrowing String) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    _ = BorrowingEnumPayloadTest.any(x) // expected-note {{consumed here}}
+}
+
+func testBorrowingGenericEnumPayload(_ x: borrowing String) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    _ = BorrowingGenericEnumPayloadTest.value(x) // expected-note {{consumed here}}
+}
+
+func testBorrowingOptionalSome(_ x: borrowing Klass) {
+    // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
+    _ = Optional.some(x) // expected-note {{consumed here}}
+}
+
+func testBorrowingEnumPayloadExplicitCopy(_ x: borrowing String) {
+    _ = BorrowingEnumPayloadTest.string(copy x)
+    _ = Optional.some(copy x)
+}
