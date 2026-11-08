@@ -33,6 +33,9 @@ private protocol Private {
     var privateVarGetSet: Int { get set }
 }
 
+public protocol PublicNoRequirements {}
+public protocol PublicRefinesNoRequirements: PublicNoRequirements {}
+
 @_marker public protocol PublicMarker {}
 @_marker internal protocol InternalMarker {}
 @_marker private protocol PrivateMarker {}

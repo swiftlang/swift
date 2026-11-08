@@ -890,6 +890,7 @@ public:
         ProtocolDecl *PD;
         bool Resilient;
         bool WitnessMethodElimination;
+        bool HasWitnesses = false;
 
       public:
         WitnessVisitor(SILSymbolVisitorImpl &V, ProtocolDecl *PD)
@@ -900,6 +901,7 @@ public:
                   V.Ctx.getOpts().WitnessMethodElimination} {}
 
         void addMethod(SILDeclRef declRef) {
+          HasWitnesses = true;
           if (Resilient || WitnessMethodElimination) {
             Visitor.addDispatchThunk(declRef);
             Visitor.addMethodDescriptor(declRef);
@@ -920,25 +922,34 @@ public:
         }
 
         void addAssociatedType(AssociatedTypeDecl *assocType) {
+          HasWitnesses = true;
           Visitor.addAssociatedTypeDescriptor(assocType);
         }
 
-        void addProtocolConformanceDescriptor() {
-          Visitor.addProtocolRequirementsBaseDescriptor(PD);
-        }
+        void addProtocolConformanceDescriptor() {}
 
         void addOutOfLineBaseProtocol(ProtocolDecl *proto) {
+          HasWitnesses = true;
           Visitor.addBaseConformanceDescriptor(BaseConformance(PD, proto));
         }
 
         void addAssociatedConformance(AssociatedConformance associatedConf) {
+          HasWitnesses = true;
           Visitor.addAssociatedConformanceDescriptor(associatedConf);
         }
 
-        void addPlaceholder(MissingMemberDecl *decl) {}
+        void addPlaceholder(MissingMemberDecl *decl) {
+          if (decl->getNumberOfVTableEntries() > 0)
+            HasWitnesses = true;
+        }
 
         void doIt() {
           visitProtocolDecl(PD);
+
+          // IRGen only defines the requirements base descriptor for a protocol
+          // that has witnesses.
+          if (HasWitnesses)
+            Visitor.addProtocolRequirementsBaseDescriptor(PD);
         }
       };
 
