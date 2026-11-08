@@ -2435,10 +2435,15 @@ namespace {
         // This type is contextually dependent in cases like `.a` where
         // `patternType` represents an implicit base type of `.a` and so
         // should be allowed to bind to a hole just like regular leading-dot
-        // syntax.
+        // syntax. If the parent type is spelled explicitly, the pattern type
+        // is derived from it, so any holes should originate there instead.
+        unsigned patternTypeOptions = TVO_CanBindToNoEscape;
+        if (!enumPattern->getParentType() && !enumPattern->getParentTypeRepr())
+          patternTypeOptions |= TVO_CanBindToHole;
+
         Type patternType =
             CS.createTypeVariable(CS.getConstraintLocator(locator),
-                                  TVO_CanBindToNoEscape | TVO_CanBindToHole);
+                                  patternTypeOptions);
 
         // Form the member constraint for a reference to a member of this
         // type.
