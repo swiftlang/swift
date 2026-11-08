@@ -1,5 +1,4 @@
-// FIXME: crashes under opaque values
-// RUN: not --crash %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -import-objc-header %S/Inputs/objc_bridging_sendable.h %s
+// RUN: %target-swift-emit-silgen-ossa(mock-sdk: %clang-importer-sdk) -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -import-objc-header %S/Inputs/objc_bridging_sendable.h %s
 
 // RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -import-objc-header %S/Inputs/objc_bridging_sendable.h %s | %FileCheck %s
 
@@ -27,7 +26,15 @@ public func useSendableProperty(_ ns: NSBlah) {
 // CHECK-NEXT: [[OPT_RESULT_VALUE:%.*]] = unchecked_ref_cast [[SUCCESS]] : $AnyObject to $Optional<AnyObject>
 // CHECK-NEXT: // function_ref _bridgeAnyObjectToAny(_:)
 // CHECK-NEXT: [[BRIDGE_INTRINSIC_REF:%.*]] = function_ref @$ss018_bridgeAnyObjectToB0yypyXlSgF : $@convention(thin) (@guaranteed Optional<AnyObject>) -> @out Any
-// CHECK-NEXT:  apply [[BRIDGE_INTRINSIC_REF]](%0, [[OPT_RESULT_VALUE]]) : $@convention(thin) (@guaranteed Optional<AnyObject>) -> @out Any
+// CHECK-NEXT: [[BRIDGED:%.*]] = alloc_stack $Any
+// CHECK-NEXT: apply [[BRIDGE_INTRINSIC_REF]]([[BRIDGED]], [[OPT_RESULT_VALUE]]) : $@convention(thin) (@guaranteed Optional<AnyObject>) -> @out Any
+// CHECK-NEXT: [[OPENED_ANY:%.*]] = open_existential_addr immutable_access [[BRIDGED]] : $*Any to $*@opened({{.*}}, Any) Self
+// CHECK-NEXT: [[SENDABLE_RESULT:%.*]] = alloc_stack $any Sendable
+// CHECK-NEXT: [[SENDABLE_ADDR:%.*]] = init_existential_addr [[SENDABLE_RESULT]] : $*any Sendable, $@opened({{.*}}, Any) Self
+// CHECK-NEXT: copy_addr [[OPENED_ANY]] to [init] [[SENDABLE_ADDR]]
+// CHECK-NEXT: [[OPENED_SENDABLE:%.*]] = open_existential_addr immutable_access [[SENDABLE_RESULT]] : $*any Sendable to $*@opened({{.*}}, any Sendable) Self
+// CHECK-NEXT: [[ANY_ADDR:%.*]] = init_existential_addr %0 : $*Any, $@opened({{.*}}, any Sendable) Self
+// CHECK-NEXT: copy_addr [[OPENED_SENDABLE]] to [init] [[ANY_ADDR]]
 func test_use_of_buffer_init() throws {
   func test<T: Sendable>(_: (NSBlah) throws -> T) rethrows -> T {
     fatalError()
