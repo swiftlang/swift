@@ -29,6 +29,7 @@ namespace llvm {
 namespace clang {
   class CXXMethodDecl;
   class CXXRecordDecl;
+  class FunctionType;
   class ObjCMethodDecl;
   class Type;
   class ValueDecl;
@@ -1173,6 +1174,12 @@ public:
     assert(hasStoredClangType());
     return ClangType;
   }
+
+  /// Strip the indirection layers of a Clang type that was imported as a
+  /// Swift function type. The type has the shape
+  /// [reference] [pointer | block pointer] function.
+  static const clang::FunctionType *
+  getClangFunctionType(const clang::Type *clangType);
 
   /// Return whether this abstraction pattern represents an
   /// Objective-C method.  If so, it is legal to call getObjCMethod().
