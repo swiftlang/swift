@@ -128,6 +128,8 @@ in between:
   builds the SDKs with.
 - Toolchain: the rest of the build, which uses the Windows SDKs that
   build-sdk.ps1 built instead of building them.
+- Test: only the tests selected with -Test, against a completed build. Several
+  instances can run different tests at the same time.
 Default: All
 
 .PARAMETER Package
@@ -237,7 +239,7 @@ param
 
   # Build Phases
   [switch] $Toolchain = $true,
-  [ValidateSet("All", "Bootstrap", "Toolchain")]
+  [ValidateSet("All", "Bootstrap", "Toolchain", "Test")]
   [string] $Phase = "All",
   [switch] $Package = $false,
 
@@ -6055,7 +6057,7 @@ if ($DependenciesOnly) {
   exit 0;
 }
 
-if ($Clean -and $Phase -ne "Toolchain") {
+if ($Clean -and $Phase -in "All", "Bootstrap") {
   # Fail instead of leaving a partially-cleaned tree behind.
   function Clean-Path([string] $Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return }
@@ -6084,7 +6086,7 @@ if ($Clean -and $Phase -ne "Toolchain") {
   }
 }
 
-if ($Toolchain -and $Phase -ne "Toolchain") {
+if ($Toolchain -and $Phase -in "All", "Bootstrap") {
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
   if ($HostPlatform.OS -eq [OS]::Windows) {
     (@($HostPlatform) + @($WindowsSDKBuilds)) | ForEach-Object {
@@ -6139,7 +6141,7 @@ if ($Toolchain -and $Phase -ne "Toolchain") {
   }
 }
 
-if ($Toolchain) {
+if ($Toolchain -and $Phase -in "All", "Toolchain") {
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
@@ -6310,11 +6312,11 @@ if ($Toolchain) {
   }
 }
 
-if ($IncludeDS2) {
+if ($IncludeDS2 -and $Phase -ne "Test") {
   Invoke-BuildStep Build-RegsGen2 $BuildPlatform
 }
 
-if ($Windows) {
+if ($Windows -and $Phase -ne "Test") {
   $SDKROOT = Get-SwiftSDK -OS Windows
 
   # In the Toolchain phase, build-sdk.ps1 has built the SDKs.
@@ -6394,7 +6396,7 @@ if ($Windows) {
   }
 }
 
-if ($Android) {
+if ($Android -and $Phase -ne "Test") {
   Build-SDKDependencies $AndroidSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Android
@@ -6459,13 +6461,13 @@ if ($Android) {
   }
 }
 
-if ($Package) {
+if ($Package -and $Phase -ne "Test") {
   Invoke-BuildStep Build-mimalloc $HostPlatform
   Invoke-BuildStep Patch-mimalloc $HostPlatform
   Invoke-BuildStep Build-Installer $HostPlatform
 }
 
-if ($Stage) {
+if ($Stage -and $Phase -ne "Test") {
   Copy-BuildArtifactsToStage $HostPlatform
 }
 
@@ -6517,7 +6519,7 @@ if (-not $IsCrossCompiling) {
   }
 }
 
-if ($IncludeSBoM) {
+if ($IncludeSBoM -and $Phase -ne "Test") {
   Invoke-IsolatingEnvVars {
     $env:SYFT_FILE_METADATA_SELECTION = "all"
     $env:SYFT_FILE_CONTENT_GLOBS = "**\*.h"
@@ -6573,7 +6575,11 @@ if ($IncludeSBoM) {
   if ($Trace) {
     # Stage the trace with the other CI artifacts so that it can be downloaded.
     $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
-    $TimingTraceName = if ($Phase -eq "Bootstrap") { "build-timings-bootstrap.json" } else { "build-timings.json" }
+    $TimingTraceName = switch ($Phase) {
+      "Bootstrap" { "build-timings-bootstrap.json" }
+      "Test"      { "build-timings-test-$(($Test | Where-Object { $_ }) -join "-").json" }
+      default     { "build-timings.json" }
+    }
     Write-TimingTrace "$TimingTraceDir\$TimingTraceName"
   }
 }
