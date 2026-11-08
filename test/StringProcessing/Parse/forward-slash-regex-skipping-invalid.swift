@@ -81,7 +81,7 @@ func p() {
 } // expected-cparser-error {{extraneous '}' at top level}} expected-astgen-error {{unexpected brace in source file}}
 
 func err1() { _ = / 0xG}/ }
-// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}
 func err2() { _ = / 0oG}/ }
 // expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}
 func err3() { _ = / {"/ }

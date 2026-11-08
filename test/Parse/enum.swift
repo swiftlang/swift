@@ -108,7 +108,7 @@ enum Recovery3 {
   case UE2(Void): // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{unexpected code ':' in enum}}
 }
 enum Recovery4 { // expected-cparser-note {{in declaration of 'Recovery4'}}
-  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-cparser-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-cparser-error {{expected declaration}} expected-astgen-error {{}}
+  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-cparser-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-cparser-error {{expected declaration}} expected-astgen-error {{unexpected 'Self' keyword in enum}}
 }
 enum Recovery5 {
   case .UE3 // expected-cparser-error {{extraneous '.' in enum 'case' declaration}} {{8-9=}} expected-astgen-error {{unexpected code '.' in enum case}}
