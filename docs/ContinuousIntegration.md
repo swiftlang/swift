@@ -261,7 +261,7 @@ Windows      | @swift-ci Please test Windows platform | Swift Test Windows Platf
 
 FIXME: FILL ME IN!
 
-<!-- We are making this numbered list with <ol> and <li> HTML tags intead of a regular Markdown numbered list because GitHub doesn't seem capable of rendering multi-line numbered lists in footnotes, even if we put 2 spaces at the end of each line as per the documentation: https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#footnotes -->
+<!-- We are making this numbered list with <ol> and <li> HTML tags instead of a regular Markdown numbered list because GitHub doesn't seem capable of rendering multi-line numbered lists in footnotes, even if we put 2 spaces at the end of each line as per the documentation: https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#footnotes -->
 [^1]: Even though it should go without saying, the reason why having a green build is important is that:<ol><li>A full build break can prevent other developers from testing their work.</li><li>A test break can make it difficult for developers to know whether or not their specific commit has broken a test, requiring them to perform an initial clean build, wasting time.</li><li>@swift-ci pull request testing becomes less effective since one can not perform a test and one must reason about the source of a given failure.</li></ol>
 
 [^2]: This is due to unrelated issues relating to running lldb tests on macOS.
