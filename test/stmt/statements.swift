@@ -219,9 +219,9 @@ func IfStmt2() {
 }
 func IfStmt3() {
   if 1 > 0 {
-  } else 1 < 0 { // expected-cparser-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}} expected-astgen-error {{unexpected code '1 < 0' in 'if' statement}}
+  } else 1 < 0 { // expected-cparser-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}} expected-astgen-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}}{{5-9=else if}}
     _ = 42
-  } else { // // expected-astgen-error {{unexpected code in function}}
+  } else { // expected-astgen-error {{unexpected code in function}}
   }
 }
 
@@ -244,7 +244,7 @@ func DoWhileStmt1() { //
   // expected-cparser-note@+2 {{did you mean 'repeat-while' statement?}} {{3-5=repeat}}
   // expected-cparser-note@+1 {{did you mean separate 'do' and 'while' statements?}} {{+1:5-5=\n}}
   do { // expected-cparser-error {{'do-while' statement is not allowed}}
-  } while true // // expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{expected code block in 'while' statement}}
+  } while true // expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{expected code block in 'while' statement}}
 }
 
 func DoWhileStmt2() {
@@ -445,13 +445,13 @@ func r23684220(_ b: Any) {
 
 // <rdar://problem/21080671> QoI: try/catch (instead of do/catch) creates silly diagnostics
 func f21080671() {
-  try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{function is unused}} expected-astgen-warning {{no calls to throwing functions occur within 'try' expression}}
-  } catch { } // // expected-astgen-error {{unexpected code 'catch { }' in function}}
+  try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{the 'do' keyword is used to specify a 'catch' region}}
+  } catch { } // expected-astgen-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
   
   
-  try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{function is unused}} expected-astgen-warning {{no calls to throwing functions occur within 'try' expression}}
+  try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{the 'do' keyword is used to specify a 'catch' region}}
     f21080671()
-  } catch let x as Int { // // expected-astgen-error {{unexpected 'catch' keyword in function}} expected-astgen-error {{type annotation missing in pattern}} expected-astgen-error {{unexpected code in function}}
+  } catch let x as Int { // expected-astgen-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}} expected-astgen-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} expected-astgen-warning {{cast from 'any Error' to unrelated type 'Int' always fails}}
   } catch {
   }
 }
@@ -460,11 +460,11 @@ func f21080671() {
 // https://twitter.com/radexp/status/694561060230184960
 func f(_ x : Int, y : Int) {
   if x == y && #available(iOS 52, *) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}} expected-astgen-error {{availability condition cannot be used in an expression, only as a condition of 'if' or 'guard'}} expected-astgen-error {{cannot convert value of type '_' to expected argument type 'Bool'}}
-  if #available(iOS 52, *) && x == y {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{27-30=,}} expected-astgen-error {{expected ',' joining parts of a multi-clause condition}}{{27-28=}}{{31-31=, }}{{28-31=}}
+  if #available(iOS 52, *) && x == y {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{27-30=,}} expected-astgen-error {{expected ',' joining parts of a multi-clause condition}}{{27-28=}}{{28-31=}}{{31-31=, }}
 
   // https://twitter.com/radexp/status/694790631881883648
-  if x == y && let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{extra trailing closure passed in call}}
-  if x == y&&let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-14=,}} expected-astgen-error {{expected expression after operator}} expected-astgen-error {{expected '{' in 'if' statement}} expected-astgen-error {{extra trailing closure passed in call}} expected-astgen-error {{expected '}' to end 'if' statement}} expected-astgen-error {{expected '}' to end 'if' statement}}
+  if x == y && let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-15=,}} expected-astgen-error {{expected ',' joining parts of a multi-clause condition}}{{12-13=}}{{13-16=}}{{16-16=, }}
+  if x == y&&let _ = Optional(y) {}  // expected-cparser-error {{expected ',' joining parts of a multi-clause condition}} {{12-14=,}} expected-astgen-error {{expected ',' joining parts of a multi-clause condition}}{{12-14=}}{{14-14=, }}
 }
 
 
@@ -630,7 +630,7 @@ outerLoop1: repeat { // expected-note {{did you mean 'outerLoop1'?}} {{+2:14-23=
 } while true
 
 // Errors in case syntax
-class // // expected-astgen-error {{expected identifier and member block in class}}
+class // expected-astgen-error {{expected identifier and member block in class}}
 case, // expected-cparser-error {{expected identifier in enum 'case' declaration}} expected-cparser-error {{expected identifier after comma in enum 'case' declaration}} expected-cparser-error {{enum 'case' is not allowed outside of an enum}} expected-astgen-error {{'case' can only appear inside a 'switch' statement or 'enum' declaration}}
 case  // expected-cparser-error {{expected identifier in enum 'case' declaration}} expected-cparser-error {{enum 'case' is not allowed outside of an enum}}
 // NOTE: EOF is important here to properly test a code path that used to crash the parser

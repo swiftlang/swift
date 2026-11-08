@@ -83,27 +83,32 @@ fileprivate func emitDiagnosticParts(
     if trimEdits, start >= 0, end <= sourceFileBuffer.count, start <= end {
       let original = Array(sourceFileBuffer[start..<end])
       func isContinuation(_ byte: UInt8) -> Bool { byte & 0xC0 == 0x80 }
-      var prefix = 0
-      while prefix < original.count, prefix < replacement.count, original[prefix] == replacement[prefix] {
-        prefix += 1
-      }
-      // Do not stop in the middle of a character.
-      while prefix > 0, (prefix < original.count && isContinuation(original[prefix]))
-        || (prefix < replacement.count && isContinuation(replacement[prefix]))
-      {
-        prefix -= 1
-      }
+      // Trim what is common at the end first, so that an insertion lands right
+      // after the text it follows, as in `else` + ` if`.
       var suffix = 0
-      while suffix < original.count - prefix, suffix < replacement.count - prefix,
+      while suffix < original.count, suffix < replacement.count,
         original[original.count - 1 - suffix] == replacement[replacement.count - 1 - suffix]
       {
         suffix += 1
       }
+      // Do not stop in the middle of a character.
       while suffix > 0,
         (suffix < original.count && isContinuation(original[original.count - suffix]))
           || (suffix < replacement.count && isContinuation(replacement[replacement.count - suffix]))
       {
         suffix -= 1
+      }
+      var prefix = 0
+      while prefix < original.count - suffix, prefix < replacement.count - suffix,
+        original[prefix] == replacement[prefix]
+      {
+        prefix += 1
+      }
+      while prefix > 0,
+        (prefix < original.count && isContinuation(original[prefix]))
+          || (prefix < replacement.count && isContinuation(replacement[prefix]))
+      {
+        prefix -= 1
       }
       lower = lower.advanced(by: prefix)
       upper = upper.advanced(by: -suffix)
@@ -177,7 +182,7 @@ public func emitDiagnostic(
     offset: sourceFileBufferOffset,
     highlights: diagnostic.highlights,
     edits: attachFixIt ? (diagnostic.fixIts.first(where: { !isNoteFixIt($0) })?.edits ?? []) : [],
-    trimEdits: diagnostic.fixIts.first?.message.message == "replace non-breaking space with ' '"
+    trimEdits: ["replace non-breaking space with ' '", "insert 'if'"].contains(diagnostic.fixIts.first?.message.message ?? "")
   )
 
   for fixIt in diagnostic.fixIts where !attachFixIt || isNoteFixIt(fixIt) {

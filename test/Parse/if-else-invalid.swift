@@ -24,14 +24,14 @@ do {
 
   do {
     if something() {
-    // expected-cparser-error@+1:7 {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}}{{11-11= if}} expected-astgen-error@+1:12 {{unexpected code 'something()' in 'if' statement}}
+    // expected-error@+1:7 {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}}{{11-11= if}}
     } else something() { // Fix-it because all on one line.
     }
   }
 
   do {
     if something() {
-    // expected-cparser-error@+1:12 {{expected '{' or 'if' after 'else'}}{{none}} expected-astgen-error@+1:12 {{unexpected code 'something()' in 'if' statement}}
+    // expected-error@+1:12 {{expected '{' or 'if' after 'else'}}{{none}}
     } else something()
     {
     }

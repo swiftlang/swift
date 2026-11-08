@@ -154,15 +154,15 @@ func bareTypeWithAttr(@convention(c) () -> Void) {} // expected-error{{attribute
 
 // Test fixits on curried functions.
 func testCurryFixits() {
-  func f1(_ x: Int)(y: Int) {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '(y: Int)' in function}}
+  func f1(_ x: Int)(y: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f1a(_ x: Int, y: Int) {}
-  func f2(_ x: Int)(y: Int)(z: Int) {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '(y: Int)(z: I}}
+  func f2(_ x: Int)(y: Int)(z: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f2a(_ x: Int, y: Int, z: Int) {}
-  func f3(_ x: Int)() {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '()' in function}}
+  func f3(_ x: Int)() {} // expected-error{{cannot have more than one parameter list}}
   func f3a(_ x: Int) {}
-  func f4()(x: Int) {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '(x: Int)' in function}}
+  func f4()(x: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f4a(_ x: Int) {}
-  func f5(_ x: Int)()(y: Int) {} // expected-cparser-error{{cannot have more than one parameter list}} expected-astgen-error {{unexpected code '()(y: Int)' in function}}
+  func f5(_ x: Int)()(y: Int) {} // expected-error{{cannot have more than one parameter list}}
   func f5a(_ x: Int, y: Int) {}
 }
 
@@ -187,9 +187,9 @@ func bogusDestructuring() {
   struct Bar {}
 
   struct Foo {
-    func registerCallback(_ callback: @escaping ([Bar]) -> Void) {} // // expected-astgen-note {{found this candidate }}
-    func registerCallback(_ callback: @escaping ([String: Bar]) -> Void) {} // // expected-astgen-note {{found this candidate }}
-    func registerCallback(_ callback: @escaping (Bar?) -> Void) {} // // expected-astgen-note {{found this candidate }}
+    func registerCallback(_ callback: @escaping ([Bar]) -> Void) {} // expected-astgen-note {{found this candidate }}
+    func registerCallback(_ callback: @escaping ([String: Bar]) -> Void) {} // expected-astgen-note {{found this candidate }}
+    func registerCallback(_ callback: @escaping (Bar?) -> Void) {} // expected-astgen-note {{found this candidate }}
   }
 
   Foo().registerCallback { ([Bar]) in } // expected-cparser-warning {{unnamed parameters must be written with the empty name '_'; this is an error in the Swift 6 language mode}} {{29-29=_: }} expected-astgen-error {{expected identifier and ':' in parameter}}
