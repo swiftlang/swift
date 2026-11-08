@@ -191,7 +191,7 @@ func missingControllingExprInForEach() {
 
   // expected-cparser-error @+2 {{expected pattern}} expected-astgen-error@+2 {{expected 'in' and expression in 'for' statement}}
   // expected-cparser-error @+1 {{expected Sequence expression for for-each loop}} expected-astgen-error@+1 {{keyword 'in' cannot be used as an identifier here}}
-  for in {
+  for in { // expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
   }
 
   // expected-error @+1 {{expected pattern}}
@@ -201,7 +201,7 @@ func missingControllingExprInForEach() {
   // expected-cparser-error @+3 {{expected pattern}}
   // expected-error @+2 {{expected Sequence expression for for-each loop}}
   // expected-cparser-error @+1 {{expected '{' to start the body of for-each loop}} expected-astgen-error@+1 {{keyword 'for' cannot be used as an identifier here}}
-  for for in {
+  for for in { // expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
   }
 
   for i in { // expected-error {{expected Sequence expression for for-each loop}}
@@ -260,16 +260,16 @@ extension NoBracesStruct2 // expected-cparser-error {{expected '{' in extension}
 
 protocol Multi ident {}
 // expected-cparser-error @-1 {{found an unexpected second identifier in protocol declaration; is there an accidental break?}} expected-astgen-error@-1 {{found an unexpected second identifier in protocol; is there an accidental break?}}
-// expected-cparser-note @-2 {{join the identifiers together}} {{10-21=Multiident}}
-// expected-cparser-note @-3 {{join the identifiers together with camel-case}} {{10-21=MultiIdent}}
+// expected-note @-2 {{join the identifiers together}} {{10-21=Multiident}}
+// expected-note @-3 {{join the identifiers together with camel-case}} {{10-21=MultiIdent}}
 
 class CCC CCC<T> {}
 // expected-cparser-error @-1 {{found an unexpected second identifier in class declaration; is there an accidental break?}} expected-astgen-error@-1 {{found an unexpected second identifier in class; is there an accidental break?}}
-// expected-cparser-note @-2 {{join the identifiers together}} {{7-14=CCCCCC}}
+// expected-note @-2 {{join the identifiers together}} {{7-14=CCCCCC}}
 
 enum EE EE<T> where T : Multi {
 // expected-cparser-error @-1 {{found an unexpected second identifier in enum declaration; is there an accidental break?}} expected-astgen-error@-1 {{found an unexpected second identifier in enum; is there an accidental break?}} 
-// expected-cparser-note @-2 {{join the identifiers together}} {{6-11=EEEE}}
+// expected-note @-2 {{join the identifiers together}} {{6-11=EEEE}}
   
   case a a
   // expected-cparser-error @-1 {{found an unexpected second identifier in enum 'case' declaration; is there an accidental break?}} expected-astgen-error@-1 {{unexpected code 'a' in enum}} 
@@ -281,12 +281,12 @@ enum EE EE<T> where T : Multi {
 
 struct SS SS : Multi {
 // expected-cparser-error @-1 {{found an unexpected second identifier in struct declaration; is there an accidental break?}} expected-astgen-error@-1 {{found an unexpected second identifier in struct; is there an accidental break?}}
-// expected-cparser-note @-2 {{join the identifiers together}} {{8-13=SSSS}}
+// expected-note @-2 {{join the identifiers together}} {{8-13=SSSS}}
   
   private var a b : Int = ""
   // expected-cparser-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}} expected-astgen-error@-1 {{found an unexpected second identifier in pattern; is there an accidental break?}}
-  // expected-cparser-note @-2 {{join the identifiers together}} {{15-18=ab}}
-  // expected-cparser-note @-3 {{join the identifiers together with camel-case}} {{15-18=aB}}
+  // expected-note @-2 {{join the identifiers together}} {{15-18=ab}}
+  // expected-note @-3 {{join the identifiers together with camel-case}} {{15-18=aB}}
   // expected-error @-4 {{cannot convert value of type 'String' to specified type 'Int'}}
   
   func f() {

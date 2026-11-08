@@ -79,32 +79,32 @@ do {
 // https://github.com/apple/swift/issues/43591
 // Two inout crash compiler
 
-func f1_43591(a : inout inout Int) {}  // expected-cparser-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{19-25=}} expected-astgen-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}}{{19-24=}}
+func f1_43591(a : inout inout Int) {}  // expected-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{19-25=}}
 func f2_43591(inout inout b: Int) {} // expected-cparser-error {{inout' before a parameter name is not allowed, place it before the parameter type instead}} {{15-20=}} {{30-30=inout }} expected-astgen-error {{'inout inout' before a parameter name is not allowed}}
-// expected-cparser-error@-1 {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{21-27=}} expected-astgen-error@-1 {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}}{{30-30=}}
+// expected-cparser-error@-1 {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{21-27=}} expected-astgen-error@-1 {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}}
 func f3_43591(let let a: Int) {} // expected-warning {{'let' in this position is interpreted as an argument label}} {{15-18=`let`}}
 // expected-cparser-error @-1 {{expected ',' separator}} {{22-22=,}}
 // expected-cparser-error @-2 {{expected ':' following argument label and parameter name}} expected-astgen-error@-2 {{unexpected code 'a' in parameter}}
 // expected-warning @-3 {{extraneous duplicate parameter name; 'let' already has an argument label}} {{15-19=}}
 func f4_43591(inout x: inout String) {} // expected-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} expected-astgen-error {{'inout' before a parameter name is not allowed}}
-func f5_43591(inout i: inout Int) {} // expected-cparser-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{15-20=}} expected-astgen-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}}{{24-29=}} expected-astgen-error {{'inout' before a parameter name is not allowed}}
+func f5_43591(inout i: inout Int) {} // expected-cparser-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}} {{15-20=}} expected-astgen-error {{parameter may have at most one of the 'inout', 'borrowing', or 'consuming' specifiers}}{{24-30=}} expected-astgen-error {{'inout' before a parameter name is not allowed}}
 
 func repeat() {}
 // expected-error @-1 {{keyword 'repeat' cannot be used as an identifier here}}
-// expected-cparser-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{6-12=`repeat`}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{6-12=`repeat`}}
 
 let for = 2
 // expected-error @-1 {{keyword 'for' cannot be used as an identifier here}}
-// expected-cparser-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{5-8=`for`}}
+// expected-note @-2 {{if this name is unavoidable, use backticks to escape it}} {{5-8=`for`}}
 
 func dog cow() {} // expected-cparser-error {{found an unexpected second identifier in function declaration; is there an accidental break?}} expected-astgen-error {{}}
-// expected-cparser-note@-1 {{join the identifiers together}} {{6-13=dogcow}}
-// expected-cparser-note@-2 {{join the identifiers together with camel-case}} {{6-13=dogCow}}
+// expected-note @-1 {{join the identifiers together}} {{6-13=dogcow}}
+// expected-note @-2 {{join the identifiers together with camel-case}} {{6-13=dogCow}}
 func cat Mouse() {} // expected-cparser-error {{found an unexpected second identifier in function declaration; is there an accidental break?}} expected-astgen-error {{found an unexpected second identifier in function; is there an accidental break?}}
-// expected-cparser-note@-1 {{join the identifiers together}} {{6-15=catMouse}}
+// expected-note @-1 {{join the identifiers together}} {{6-15=catMouse}}
 func friend ship<T>(x: T) {} // expected-cparser-error {{found an unexpected second identifier in function declaration; is there an accidental break?}} expected-astgen-error {{found an unexpected second identifier in function; is there an accidental break?}} expected-astgen-error {{cannot find type 'T' in scope}}
-// expected-cparser-note@-1 {{join the identifiers together}} {{6-17=friendship}}
-// expected-cparser-note@-2 {{join the identifiers together with camel-case}} {{6-17=friendShip}}
+// expected-note @-1 {{join the identifiers together}} {{6-17=friendship}}
+// expected-note @-2 {{join the identifiers together with camel-case}} {{6-17=friendShip}}
 func were // expected-astgen-error {{expected '(' to start parameter clause}}
 wolf() {} // expected-cparser-error {{found an unexpected second identifier in function declaration; is there an accidental break?}} expected-astgen-error {{expected ':' in parameter}} expected-astgen-error {{expected ')' to end parameter clause}}
 // expected-cparser-note@-1 {{join the identifiers together}} {{-1:6-+0:5=werewolf}}

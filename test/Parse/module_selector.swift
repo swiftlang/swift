@@ -393,11 +393,11 @@ var d: _::Int
 
 var e: Self::Int
 // expected-error@-1 {{keyword 'Self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}}
 
 var f: self::Int
 // expected-error@-1 {{keyword 'self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{8-12=`self`}}
 
 var g: inout::Int
 // expected-new-error@-1 {{expected type in type annotation}}
@@ -411,7 +411,7 @@ var g: inout::Int
 
 var h: Any::Int
 // expected-error@-1 {{keyword 'Any' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{8-11=`Any`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{8-11=`Any`}}
 
 var aArray: [::Int]
 // expected-error@-1 {{expected module name in module selector}}
@@ -437,11 +437,11 @@ var dArray: [_::Int]
 
 var eArray: [Self::Int]
 // expected-error@-1 {{keyword 'Self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{14-18=`Self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{14-18=`Self`}}
 
 var fArray: [self::Int]
 // expected-error@-1 {{keyword 'self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{14-18=`self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{14-18=`self`}}
 
 var gArray: [inout::Int]
 // expected-new-error@-1 {{expected type and ']' to end array type}}
@@ -456,7 +456,7 @@ var gArray: [inout::Int]
 
 var hArray: [Any::Int]
 // expected-error@-1 {{keyword 'Any' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{14-17=`Any`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{14-17=`Any`}}
 
 var aIndex: String.::Index
 // expected-error@-1 {{expected module name in module selector}}
@@ -474,11 +474,11 @@ var dIndex: String._::Index
 
 var eIndex: String.Self::Index
 // expected-error@-1 {{keyword 'Self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{20-24=`Self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{20-24=`Self`}}
 
 var fIndex: String.self::Index
 // expected-error@-1 {{keyword 'self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{20-24=`self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{20-24=`self`}}
 
 var gIndex: String.inout::Index
 // expected-legacy-error@-1 {{expected identifier in dotted type}} expected-new-error@-1 {{expected '=' in variable}}
@@ -489,7 +489,7 @@ var gIndex: String.inout::Index
 
 var hIndex: String.Any::Index
 // expected-error@-1 {{keyword 'Any' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{20-23=`Any`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{20-23=`Any`}}
 
 func inExpr() {
   ::print()
@@ -517,13 +517,13 @@ func inExpr() {
 func inExpr() {
   Self::print()
 // expected-error@-1 {{keyword 'Self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{3-7=`Self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{3-7=`Self`}}
 }
 
 func inExpr() {
   self::print()
 // expected-error@-1 {{keyword 'self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{3-7=`self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{3-7=`self`}}
 }
 
 func inExpr() {
@@ -539,7 +539,7 @@ func inExpr() {
 func inExpr() {
   Any::print()
 // expected-error@-1 {{keyword 'Any' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{3-6=`Any`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{3-6=`Any`}}
 }
 
 func inExpr() {
@@ -573,13 +573,13 @@ func inExpr() {
 func inExpr() {
   _ = 1.Self::magnitude
 // expected-error@-1 {{keyword 'Self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{9-13=`Self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{9-13=`Self`}}
 }
 
 func inExpr() {
   _ = 1.self::magnitude
 // expected-error@-1 {{keyword 'self' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{9-13=`self`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{9-13=`self`}}
 }
 
 func inExpr() {
@@ -594,7 +594,7 @@ func inExpr() {
 func inExpr() {
   _ = 1.Any::magnitude
 // expected-error@-1 {{keyword 'Any' cannot be used as an identifier here}}
-// expected-legacy-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{9-12=`Any`}}
+// expected-note@-2 {{if this name is unavoidable, use backticks to escape it}} {{9-12=`Any`}}
 }
 
 

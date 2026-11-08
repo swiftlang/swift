@@ -163,7 +163,7 @@ extension ASTGenVisitor {
           self.diagnose(
             .parameter_specifier_repeated,
             at: name,
-            fixIts: [.init(remove: self.generateCharSourceRange(name))]
+            fixIts: [self.tidyRemovalFixIt(name)]
           )
           continue
         }

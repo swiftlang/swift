@@ -1,13 +1,13 @@
 // RUN: %target-swift-frontend -parse %s -verify
 
 @freestanding(expression)
-macro self() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
+macro self() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro") // expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
 // expected-cparser-error@-1 {{expected declaration}} expected-astgen-error@-1 {{keyword 'self' cannot be used as an identifier here}}
 
 func sync() {}
 
 @freestanding(expression)
-macro Self() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
+macro Self() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro") // expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
 // expected-cparser-error@-1 {{expected declaration}} expected-astgen-error@-1 {{keyword 'Self' cannot be used as an identifier here}}
 
 func testSelfAsFreestandingMacro() {

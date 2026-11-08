@@ -12,20 +12,20 @@ class MyActorSubclass1: MyActor { }
 actor MyActorSubclass2: MyActor { } // expected-error{{actor types do not support inheritance}}
 
 // expected-error@+1{{keyword 'class' cannot be used as an identifier here}}
-actor class MyActorClass { } // expected-astgen-error {{unexpected code 'MyActorClass' in actor}}
+actor class MyActorClass { } // expected-astgen-error {{unexpected code 'MyActorClass' in actor}} expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
 
 class NonActor { }
 
 actor NonActorSubclass : NonActor { } // expected-error{{actor types do not support inheritance}}
 
 // expected-error@+1{{keyword 'class' cannot be used as an identifier here}}
-public actor class BobHope {} // expected-astgen-error {{unexpected code 'BobHope' in actor}}
+public actor class BobHope {} // expected-astgen-error {{unexpected code 'BobHope' in actor}} expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
 // expected-error@+1{{keyword 'public' cannot be used as an identifier here}}
-actor public class BarbraStreisand {} // expected-astgen-error {{expected member block in actor}}
+actor public class BarbraStreisand {} // expected-astgen-error {{expected member block in actor}} expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
 // expected-error@+1{{keyword 'struct' cannot be used as an identifier here}}
-public actor struct JulieAndrews {} // expected-astgen-error {{unexpected code 'JulieAndrews' in actor}}
+public actor struct JulieAndrews {} // expected-astgen-error {{unexpected code 'JulieAndrews' in actor}} expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
 // expected-error@+1{{keyword 'public' cannot be used as an identifier here}}
-actor public enum TomHanks {} // expected-astgen-error {{expected member block in actor}}
+actor public enum TomHanks {} // expected-astgen-error {{expected member block in actor}} expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
 
 open actor A1 { } // expected-error {{only classes and overridable class members can be declared 'open'; use 'public'}}
 

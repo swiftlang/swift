@@ -52,5 +52,5 @@ public # someFunc // expected-cparser-error {{extraneous whitespace between '#' 
 struct S {
   # someFunc // expected-cparser-error {{extraneous whitespace between '#' and macro name is not permitted}} {{4-5=}} expected-astgen-error {{extraneous whitespace after '#' is not permitted}}
   #class
-  # struct Inner {} // expected-cparser-error {{expected a macro identifier for a pound literal declaration}} expected-astgen-error {{found an unexpected second identifier in macro expansion; is there an accidental break?}} expected-cparser-error {{consecutive declarations on a line}} expected-astgen-error {{extraneous whitespace after '#' is not permitted}}
+  # struct Inner {} // expected-cparser-error {{expected a macro identifier for a pound literal declaration}} expected-astgen-error {{found an unexpected second identifier in macro expansion; is there an accidental break?}} expected-cparser-error {{consecutive declarations on a line}} expected-astgen-error {{extraneous whitespace after '#' is not permitted}} expected-astgen-note {{join the identifiers together}}
 }

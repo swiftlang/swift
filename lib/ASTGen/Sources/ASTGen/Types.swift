@@ -454,7 +454,7 @@ extension ASTGenVisitor {
             self.diagnose(
               .parameter_specifier_repeated,
               at: token,
-              fixIts: [.init(remove: self.generateCharSourceRange(token))]
+              fixIts: [self.tidyRemovalFixIt(token)]
             )
           }
           isolatedLoc = loc
@@ -488,7 +488,8 @@ extension ASTGenVisitor {
           self.diagnose(
             .parameter_specifier_repeated,
             at: token,
-            fixIts: [.init(remove: self.generateCharSourceRange(ownershipSpecifier!))]
+            // A specifier synthesized by recovery has no text to remove.
+            fixIts: ownershipSpecifier!.presence == .present ? [self.tidyRemovalFixIt(ownershipSpecifier!)] : []
           )
         } else {
           (ownership, ownershipLoc, ownershipSpecifier) = (newOwnership, loc, token)

@@ -15,6 +15,27 @@ import BasicBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
+// The accessor-kind helpers are written out here, not with `SWIFT_NAME` member
+// names in the bridging header: a qualified `swift.AccessorKind` name there is
+// not found by the importer on every platform.
+extension swift.AccessorKind {
+  /// The name as it should appear in a diagnostic, e.g. "'yielding borrow'".
+  var nameForDiagnostic: BridgedStringRef { AccessorKind_nameForDiagnostic(self) }
+
+  func diagnosticName(article: Bool, underscored: Bool) -> BridgedStringRef {
+    AccessorKind_nameForDiagnosticStyled(self, article, underscored)
+  }
+
+  /// Whether the kind is only available with the CoroutineAccessors feature.
+  var requiresCoroutineAccessorsFeature: Bool { AccessorKind_requiresCoroutineAccessorsFeature(self) }
+
+  /// The bare source spelling, e.g. "set".
+  var name: BridgedStringRef { AccessorKind_name(self) }
+
+  /// Whether the kind may carry `async`/`throws` effects specifiers.
+  var allowsEffectsSpecifiers: Bool { AccessorKind_allowsEffectsSpecifiers(self) }
+}
+
 // MARK: - TypeDecl
 
 extension ASTGenVisitor {

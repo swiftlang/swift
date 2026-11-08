@@ -31,4 +31,4 @@ typealias Recovery5 : Int, Float // expected-cparser-error {{expected '=' in typ
 
 typealias Recovery6 = = // expected-cparser-error {{expected type in type alias declaration}} expected-astgen-error {{expected type in typealias declaration}} expected-astgen-error {{unexpected code '=' in source file}}
 
-typealias switch = Int // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{11-17=`switch`}}
+typealias switch = Int // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{11-17=`switch`}}

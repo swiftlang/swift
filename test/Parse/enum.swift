@@ -108,7 +108,7 @@ enum Recovery3 {
   case UE2(Void): // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{unexpected code ':' in enum}}
 }
 enum Recovery4 { // expected-cparser-note {{in declaration of 'Recovery4'}}
-  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-cparser-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-cparser-error {{expected declaration}} expected-astgen-error {{}}
+  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-cparser-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-cparser-error {{expected declaration}} expected-astgen-error {{}}
 }
 enum Recovery5 {
   case .UE3 // expected-cparser-error {{extraneous '.' in enum 'case' declaration}} {{8-9=}} expected-astgen-error {{unexpected code '.' in enum case}}
@@ -467,7 +467,7 @@ enum SE0036_Generic<T> {
   }
 }
 
-enum switch {} // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{6-12=`switch`}}
+enum switch {} // expected-error {{keyword 'switch' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{6-12=`switch`}}
 
 enum SE0155 {
   case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
@@ -479,13 +479,13 @@ enum SE0155 {
 
 enum E_53662 {
   case identifier
-  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{8-16=`operator`}}
+  case operator // expected-error {{keyword 'operator' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-16=`operator`}}
   case identifier2
 }
 
 enum E_53662_var {
   case identifier
-  case var // expected-error {{keyword 'var' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{8-11=`var`}}
+  case var // expected-error {{keyword 'var' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-11=`var`}}
   case identifier2
 }
 
@@ -496,7 +496,7 @@ enum E_53662_underscore {
 }
 
 enum E_53662_Comma {
-  case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
+  case a, b, c, func, d // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{17-21=`func`}}
 }
 
 enum E_53662_Newline {
@@ -512,7 +512,7 @@ enum E_53662_Newline2 {
 }
 
 enum E_53662_PatternMatching {
-  case let .foo(x, y): // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{keyword 'let' cannot be used as an identifier here}} expected-astgen-error {{unexpected code '.' in enum}} expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected ':' and type in parameter}} expected-astgen-error {{expected ':' and type in parameter}} expected-astgen-error {{unexpected code ':' in enum}}
+  case let .foo(x, y): // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{keyword 'let' cannot be used as an identifier here}} expected-astgen-error {{unexpected code '.' in enum}} expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected ':' and type in parameter}} expected-astgen-error {{expected ':' and type in parameter}} expected-astgen-error {{unexpected code ':' in enum}} expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
 }
 
 enum CasesWithMissingElement: Int {

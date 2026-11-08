@@ -115,7 +115,7 @@ func testHasMoreAssoc(_ x: Any) {
 }
 
 struct Outer {
-  typealias Any = Int // expected-error {{keyword 'Any' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{13-16=`Any`}}
+  typealias Any = Int // expected-error {{keyword 'Any' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{13-16=`Any`}}
   typealias `Any` = Int
   static func aa(a: `Any`) -> Int { return a }
 }

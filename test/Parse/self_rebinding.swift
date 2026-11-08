@@ -44,7 +44,7 @@ struct T {
     var mutable: Int = 0
     func f() {
         // expected-error @+2 {{keyword 'self' cannot be used as an identifier here}}
-        // expected-cparser-note @+1 {{if this name is unavoidable, use backticks to escape it}}
+        // expected-note @+1 {{if this name is unavoidable, use backticks to escape it}}
         let self = self
     }
 }
