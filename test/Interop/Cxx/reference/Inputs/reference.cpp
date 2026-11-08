@@ -19,6 +19,7 @@ auto getFuncRvalueRef() -> int (&&)() { return getStaticInt; }
 int callFuncRef(int (&f)()) { return f(); }
 int callFuncRvalueRef(int (&&f)()) { return f(); }
 int callFuncPtrRvalueRef(int (*&&f)()) { return f(); }
+int callFuncPtrPtrRvalueRef(int (**&&f)()) { return (*f)(); }
 
 void takeConstRef(const int &value) {
   staticInt = value;
