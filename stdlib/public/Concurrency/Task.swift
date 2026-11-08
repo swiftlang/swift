@@ -166,8 +166,8 @@ extension Task {
   /// Tasks that respond to cancellation by throwing `CancellationError`
   /// have that error propagated here upon cancellation.
   ///
-  /// Cancelling the task that awaits this property doesn't cancel this task
-  /// and doesn't end the wait: the awaiting task stays suspended
+  /// Cancelling a task that awaits this property doesn't cancel this task
+  /// and doesn't end the wait; the awaiting task stays suspended
   /// until this task completes.
   /// To forward the caller's cancellation,
   /// cancel this task from a cancellation handler:
@@ -179,7 +179,7 @@ extension Task {
   ///     }
   ///
   /// If other tasks also await this task,
-  /// cancelling it this way affects them too.
+  /// this task cancellation handler affects them too.
   ///
   /// - Returns: The task's result.
   public var value: Success {
@@ -299,8 +299,8 @@ extension Task where Failure == Never {
   /// but they need to use an approach like returning `nil`
   /// instead of throwing an error.
   ///
-  /// Cancelling the task that awaits this property doesn't cancel this task
-  /// and doesn't end the wait: the awaiting task stays suspended
+  /// Cancelling a task that awaits this property doesn't cancel this task
+  /// and doesn't end the wait; the awaiting task stays suspended
   /// until this task completes.
   /// To forward the caller's cancellation,
   /// cancel this task from a cancellation handler:
@@ -312,7 +312,7 @@ extension Task where Failure == Never {
   ///     }
   ///
   /// If other tasks also await this task,
-  /// cancelling it this way affects them too.
+  /// this task cancellation handler affects them too.
   public var value: Success {
     get async {
       return await _taskFutureGet(_task)
