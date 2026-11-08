@@ -444,7 +444,7 @@ Definition [SCC ancestry].
   A is an ancestor of B if there is a path from some block in A to some block
   in B. A is a proper ancestor of B if A is an ancestor of B and A != B.
   A is a descendent of B if B is an ancestor of A. A is a proper descendent
-  of B if B is a propert ancestor of A.
+  of B if B is a proper ancestor of A.
 
   A cannot be both a proper ancestor of B and a descendent of B.
   A cannot be both an ancestor of B and a proper descendent of B.
@@ -1469,7 +1469,7 @@ Lemma [operation-sequence-concatenation-path]. (tree-independent)
 Pf.
   By induction on PYZ.
 
-  For the base case, PYZ is an empty path. By the definiton of OS_PATH
+  For the base case, PYZ is an empty path. By the definition of OS_PATH
     OS_PATH(SY, PYZ, T) = [ SY ]
   Then consider
     (OS_PATH(SX, PXY, T)..., OS_PATH(SY, PYZ, T)...)
@@ -2790,7 +2790,7 @@ Pf.
 
   If SX' = SX and PSS(R) = { SX' }:
     Then PSS(R) is singleton, so we must also have SY' = SY and
-    PSS(R) = { SY' }. Therefore SX' = SY', and by subsitution, SX = SY.
+    PSS(R) = { SY' }. Therefore SX' = SY', and by substitution, SX = SY.
 
   If SX = CONSERVATIVE_MERGE(PSS(R)) and PSS(R) is not singleton:
     Then we must also have SY = CONSERVATIVE_MERGE(PSS(R)), and by
@@ -2899,7 +2899,7 @@ Pf.
       Then define
         P' = (PB..., K, PFF...)
       P' is an initial path to X, and because its PB subpath passes through
-      A and a deallocation of A, P' must as well. So P' satisifes the
+      A and a deallocation of A, P' must as well. So P' satisfies the
       requirements of the lemma.
 
   By induction, the lemma holds for all points.
@@ -3630,7 +3630,7 @@ Pf.
     AH(A, P2) = AH(A, (X2 -> Y2, P_Y2Y1...))
   By [history-concatenation]:
               = (AH(A, (X2 -> Y2))..., AH(A, P_Y2Y1)...)
-  Applying the definiton of AH to the first component gives:
+  Applying the definition of AH to the first component gives:
     AH(A, (X2 -> Y2)) = ()
   Applying [no-scc-self-path-history] to the second component gives:
     AH(A, P_Y2Y1) = ()
@@ -3781,7 +3781,7 @@ Pf.
   [present-implies-visit]. P is therefore non-empty, so by
   [entry-path-ancestry], the points at all indexes of P except the final
   index are in proper ancestor SCCs of C. Since P passes through A, the point
-  <A must be in a non-final index of P, and therefore it is a propery
+  <A must be in a non-final index of P, and therefore it is a proper
   ancestor SCC of C, and therefore A is in a proper ancestor SCC of C.
 Qed.
 
