@@ -2872,6 +2872,23 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
   llvm_unreachable("bad decl kind!");
 }
 
+void IRGenModule::overrideLinkageForWeakLinkedClangDecl(
+    llvm::GlobalValue *global, const ModuleDecl *declModule,
+    llvm::GlobalValue::LinkageTypes linkage) {
+  // FIXME: We should be able to set the linkage unconditionally here but
+  //        some fixes are needed for Cxx interop.
+  if (!getSwiftModule()->isImportedAsWeakLinked(declModule))
+    return;
+
+  global->setLinkage(linkage);
+
+  // Clang may have assumed that the declaration is DSO-local based on the
+  // linkage it computed, but a weak reference may resolve to null, which is
+  // outside of the current DSO.
+  if (global->hasExternalWeakLinkage())
+    global->setDSOLocal(false);
+}
+
 Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
                                                 const TypeInfo &ti,
                                                 ForDefinition_t forDefinition) {
@@ -2882,16 +2899,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
     auto addr = getAddrOfClangGlobalDecl(cast<clang::VarDecl>(clangDecl),
                                          forDefinition);
 
-    // Override the linkage computed by Clang if the decl is from another
-    // module that imported @_weakLinked.
-    //
-    // FIXME: We should be able to set the linkage unconditionally here but
-    //        some fixes are needed for Cxx interop.
-    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr)) {
-      auto varModule = var->getDecl()->getModuleContext();
-      if (getSwiftModule()->isImportedAsWeakLinked(varModule))
-        globalVar->setLinkage(link.getLinkage());
-    }
+    if (auto globalVar = dyn_cast<llvm::GlobalVariable>(addr))
+      overrideLinkageForWeakLinkedClangDecl(
+          globalVar, var->getDecl()->getModuleContext(), link.getLinkage());
 
     // If we're not emitting this to define it, make sure we cast it to the
     // right type.
@@ -3832,14 +3842,9 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
     if (fn) {
       if (!forDefinition) {
-        // Override the linkage computed by Clang if the decl is from another
-        // module that imported @_weakLinked.
-        //
-        // FIXME: We should be able to set the linkage unconditionally here but
-        //        some fixes are needed for Cxx interop.
         if (auto *parentModule = f->getParentModule())
-          if (getSwiftModule()->isImportedAsWeakLinked(parentModule))
-            fn->setLinkage(link.getLinkage());
+          overrideLinkageForWeakLinkedClangDecl(fn, parentModule,
+                                                link.getLinkage());
       }
 
       // If we have a function, move it to the appropriate position.
