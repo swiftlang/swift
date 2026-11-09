@@ -348,3 +348,24 @@ bb0(%0 : $Int, %1 : @guaranteed $Klass):
   %5 = tuple ()
   return %5 : $()
 }
+
+// A write-only alloc_stack with debug info is removed. Its copy_addr is salvaged.
+
+// CHECK-LABEL: sil @test_take_into_dead_alloc_stack
+// CHECK:       bb0([[SRC:%[0-9]+]] : $*Int):
+// CHECK-NEXT:    debug_value [[SRC]] : $*Int, var, name "y", expr op_deref
+// CHECK-NEXT:    debug_value [[SRC]] : $*Int, let, name "z", expr op_deref
+// CHECK-NEXT:    destroy_addr [[SRC]]
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function 'test_take_into_dead_alloc_stack'
+sil @test_take_into_dead_alloc_stack : $@convention(thin) (@in Int) -> () {
+bb0(%0 : $*Int):
+  %1 = alloc_stack $Int, var, name "y"
+  debug_value %1, let, name "z", expr op_deref
+  copy_addr [take] %0 to [init] %1
+  destroy_addr %1
+  dealloc_stack %1
+  %2 = tuple ()
+  return %2 : $()
+}

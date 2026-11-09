@@ -2248,7 +2248,10 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   if (srcDVI)
     newDVI->cloneReconstructionBlockFrom(srcDVI);
 
-  newDVI->stripDeref(0);
+  // For a store or store_borrow, the load must be removed.
+  // A copy_addr has an address on both sides, so no rewrite is necessary.
+  if (!isa<CopyAddrInst>(SI))
+    newDVI->stripDeref(0);
 }
 
 void swift::salvageStoreDebugInfo(SILInstruction *SI,
