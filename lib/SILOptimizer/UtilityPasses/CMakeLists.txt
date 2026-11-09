@@ -28,5 +28,6 @@ target_sources(swiftSILOptimizer PRIVATE
   SILSkippingChecker.cpp
   TestRunner.cpp
   OwnershipDumper.cpp
-  OwnershipVerifierTextualErrorDumper.cpp)
+  OwnershipVerifierTextualErrorDumper.cpp
+  VerifyOwnership.cpp)
   

@@ -450,6 +450,8 @@ LEGACY_PASS(OwnershipDumper, "ownership-dumper",
      "Print Ownership information for Testing")
 LEGACY_PASS(OwnershipVerifierTextualErrorDumper, "ownership-verifier-textual-error-dumper",
      "Run ownership verification on all functions, emitting FileCheck-able textual errors instead of asserting")
+LEGACY_PASS(VerifyOwnership, "verify-ownership",
+     "Run ownership verification on all functions, even without assertions")
 LEGACY_PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 LEGACY_PASS(SerializeSILPass, "serialize-sil",
