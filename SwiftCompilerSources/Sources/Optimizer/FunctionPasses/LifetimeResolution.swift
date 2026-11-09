@@ -693,7 +693,7 @@ private struct Resolver {
           adjustAccessForTake(load.address)
         }
 
-        return load.operand
+        return load.addressOperand
 
       // load [old] --> load_borrow
       case .loadBorrow:
@@ -732,7 +732,7 @@ private struct Resolver {
           use.set(to: loadBorrow, context)
         }
         context.erase(instruction: load)
-        return loadBorrow.operand
+        return loadBorrow.addressOperand
       }
     default:
       fatalError("unexpected inst to transform: \(op.instruction)")

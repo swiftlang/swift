@@ -10,6 +10,18 @@ import SwiftShims
 
 class X {}
 
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @load_borrow_with_value_hint : $@convention(thin) (@inout X, @owned X) -> ()
+// CHECK:   %3 = load_borrow %0 : $*X, value_hint %1 : $X
+// CHECK: } // end sil function 'load_borrow_with_value_hint'
+sil [serialized] [ossa] @load_borrow_with_value_hint : $@convention(thin) (@inout X, @owned X) -> () {
+bb0(%0 : $*X, %1 : @owned $X):
+  destroy_value %1 : $X
+  %3 = load_borrow %0 : $*X, value_hint %1 : $X
+  end_borrow %3 : $X
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @test_unchecked_ref_cast
 sil [serialized] [ossa] @test_unchecked_ref_cast : $@convention(thin) (@guaranteed AnyObject) -> @owned X {
 bb0(%0 : @guaranteed $AnyObject):

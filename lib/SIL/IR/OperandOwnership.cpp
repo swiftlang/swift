@@ -182,7 +182,6 @@ OPERAND_OWNERSHIP(TrivialUse, InitExistentialMetatype)
 OPERAND_OWNERSHIP(TrivialUse, InjectEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, IsUnique)
 OPERAND_OWNERSHIP(TrivialUse, Load)
-OPERAND_OWNERSHIP(TrivialUse, LoadBorrow)
 OPERAND_OWNERSHIP(TrivialUse, MarkFunctionEscape)
 OPERAND_OWNERSHIP(TrivialUse, ObjCExistentialMetatypeToObject)
 OPERAND_OWNERSHIP(TrivialUse, ObjCMetatypeToObject)
@@ -779,6 +778,14 @@ visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
     return OperandOwnership::TrivialUse;
   }
   return OperandOwnership::PointerEscape;
+}
+
+OperandOwnership OperandOwnershipClassifier::
+visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  if (getOperandIndex() == 0) {
+    return OperandOwnership::TrivialUse;
+  }
+  return OperandOwnership::NonUse;
 }
 
 OperandOwnership

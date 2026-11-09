@@ -873,6 +873,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt LoadInst_getLoadOwnership() const ;
   BRIDGED_INLINE bool LoadBorrowInst_isUnchecked() const ;
   BRIDGED_INLINE void LoadBorrowInst_setUnchecked(bool unchecked) const;
+  BRIDGED_INLINE void LoadBorrow_setValueHint(BridgedValue v) const;
   BRIDGED_INLINE BuiltinValueKind BuiltinInst_getID() const;
   BRIDGED_INLINE IntrinsicID BuiltinInst_getIntrinsicID() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef BuiltinInst_getName() const;

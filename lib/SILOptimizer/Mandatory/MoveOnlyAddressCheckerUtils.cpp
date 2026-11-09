@@ -1432,7 +1432,7 @@ void UseState::initializeLiveness(
   for (auto livenessInstAndValue : nonconsumingUses) {
     if (auto *lbi = dyn_cast<LoadBorrowInst>(livenessInstAndValue.first)) {
       auto accessPathWithBase =
-          AccessPathWithBase::computeInScope(lbi->getOperand());
+          AccessPathWithBase::computeInScope(lbi->getAddress());
       if (auto *beginAccess =
               dyn_cast_or_null<BeginAccessInst>(accessPathWithBase.base)) {
         updateForLivenessAccess(beginAccess, livenessInstAndValue.second);
@@ -1753,7 +1753,7 @@ struct CopiedLoadBorrowEliminationState {
       auto *lbi = targets.pop_back_val();
       SILBuilderWithScope builder(lbi);
       SILValue li = builder.emitLoadValueOperation(
-          lbi->getLoc(), lbi->getOperand(), LoadOwnershipQualifier::Copy);
+          lbi->getLoc(), lbi->getAddress(), LoadOwnershipQualifier::Copy);
       SILValue borrow = builder.createBeginBorrow(lbi->getLoc(), li);
 
       for (auto *ebi : lbi->getEndBorrows()) {

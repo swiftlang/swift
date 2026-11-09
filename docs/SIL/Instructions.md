@@ -861,9 +861,10 @@ In OSSA the ownership kind specifies how to handle ownership:
 ### load_borrow
 
 ```
-sil-instruction ::= 'load_borrow' sil-value
+sil-instruction ::= 'load_borrow' sil-value (',' 'value_hint' sil-operand)?
 
 %1 = load_borrow %0 : $*T
+%3 = load_borrow %0 : $*T, value_hint %2 : $T
 // $T must be a loadable type
 ```
 
@@ -875,6 +876,30 @@ instruction. All [load_borrow](#load_borrow) instructions must be paired
 with exactly one [end_borrow](#end_borrow) instruction along any path
 through the program. Until [end_borrow](#end_borrow), it is illegal to
 invalidate or store to `%0`.
+
+The optional `value_hint` operand states that the loaded value is exactly
+the value of the `value_hint` operand (`%2`), i.e. memory location `%0`
+contains `%2` at the point of the `load_borrow`. Its type must match the
+result type of the `load_borrow`.
+
+This is useful if the `load_borrow` cannot be replaced by the `value_hint`
+in OSSA, because that would violate ownership rules. For example, if the
+`value_hint` is consumed (e.g. by a `store`) before the `load_borrow`:
+
+```
+store %2 to [init] %0 : $*T      // consumes %2
+...
+%3 = load_borrow %0 : $*T, value_hint %2 : $T
+```
+
+The `value_hint` operand is not an ownership use: it does not require
+`%2` to be alive at the `load_borrow` and does not extend its lifetime.
+However, `%2` must dominate the `load_borrow`.
+
+Once OSSA is lowered, the `load_borrow` is replaced by the `value_hint`
+instead of being lowered to a `load`.
+
+The `value_hint` is purely an optimization hint and can always be dropped.
 
 ### store_borrow
 

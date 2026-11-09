@@ -4242,11 +4242,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
     }
 
-    if (parseTypedValueRef(Val, AddrLoc, B) ||
-        parseSILDebugLocation(InstLoc, B))
+    if (parseTypedValueRef(Val, AddrLoc, B))
       return true;
 
-    auto LB = B.createLoadBorrow(InstLoc, Val);
+    SILValue valueHint;
+    if (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
+      P.consumeToken(tok::comma);
+      if (parseVerbatim("value_hint") ||
+          parseTypedValueRef(valueHint, AddrLoc, B)) {
+        return true;
+      }
+    }
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    auto LB = B.createLoadBorrow(InstLoc, Val, valueHint);
     LB->setUnchecked(IsUnchecked);
     ResultVal = LB;
     break;

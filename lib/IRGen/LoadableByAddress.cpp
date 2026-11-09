@@ -2190,7 +2190,7 @@ static SILValue getMakeAddrBorrowOperand(SILBuilder &builder,
     return load->getOperand();
   }
   if (auto lb = dyn_cast<LoadBorrowInst>(operand)) {
-    return lb->getOperand();
+    return lb->getAddress();
   }
 
   // Otherwise, this value is local, and can be spilled to a local stack

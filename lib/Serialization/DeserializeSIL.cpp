@@ -3076,11 +3076,19 @@ llvm::Error SILDeserializer::readSILInstruction(
 #undef REFCOUNTING_INSTRUCTION
 
   case SILInstructionKind::LoadBorrowInst: {
-    assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
-    auto LB = Builder.createLoadBorrow(
-        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
-                           getSILType(MF->getType(TyID),
-                                      (SILValueCategory)TyCategory, Fn)));
+    assert((RecordKind == SIL_ONE_OPERAND ||
+            RecordKind == SIL_TWO_OPERANDS_EXTRA_ATTR) &&
+           "Layout should be OneOperand or TwoOperandsExtraAttr.");
+    SILValue address = getLocalValue(
+        Builder.maybeGetFunction(), ValID,
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    SILValue valueHint;
+    if (RecordKind == SIL_TWO_OPERANDS_EXTRA_ATTR) {
+      valueHint = getLocalValue(
+          Builder.maybeGetFunction(), ValID2,
+          getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn));
+    }
+    auto LB = Builder.createLoadBorrow(Loc, address, valueHint);
     LB->setUnchecked(Attr != 0);
     ResultInst = LB;
     break;

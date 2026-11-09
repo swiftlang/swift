@@ -4543,8 +4543,8 @@ TranslationSemantics PartitionOpTranslator::visitLoadInst(LoadInst *li) {
 /// require the base.
 TranslationSemantics
 PartitionOpTranslator::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  if (SILIsolationInfo::isSendable(lbi->getOperand())) {
-    translateSILRequire(lbi->getOperand());
+  if (SILIsolationInfo::isSendable(lbi->getAddress())) {
+    translateSILRequire(lbi->getAddress());
   }
 
   return TranslationSemantics::Special;

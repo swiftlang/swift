@@ -2795,7 +2795,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
                                  /*lookThroughNestedBorrows=*/true, roots);
     for (auto root : roots) {
       if (auto *lbi = dyn_cast<LoadBorrowInst>(root)) {
-        visitor(&lbi->getOperandRef());
+        visitor(&lbi->getOperandRef(0));
         return;
       }
       if (auto *sbi = dyn_cast<StoreBorrowInst>(root)) {

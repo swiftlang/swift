@@ -2047,7 +2047,10 @@ public:
     if (LBI->isUnchecked()) {
       *this << "[unchecked] ";
     }
-    *this << getIDAndType(LBI->getOperand());
+    *this << getIDAndType(LBI->getAddress());
+    if (LBI->hasValueHint()) {
+      *this << ", value_hint " << getIDAndType(LBI->getValueHint());
+    }
   }
 
   void visitBeginBorrowInst(BeginBorrowInst *BBI) {
