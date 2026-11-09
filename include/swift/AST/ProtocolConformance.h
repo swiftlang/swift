@@ -845,6 +845,12 @@ public:
   CodeGenerationModel
   getEffectiveCodeGenerationModel() const;
 
+  /// Whether this conformance is declared in a generic context with at least
+  /// one generic parameter that is not fixed to a concrete type. A
+  /// conformance such as 'extension Array: P where Element == UInt8' is in a
+  /// generic context but is not effectively generic.
+  bool isEffectivelyGeneric() const;
+
   /// Whether this conformance represents the conformance of one protocol's
   /// conforming types to another protocol.
   ///

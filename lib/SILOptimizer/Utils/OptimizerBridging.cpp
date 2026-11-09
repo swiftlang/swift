@@ -261,7 +261,7 @@ void BridgedPassContext::visitConformancesWithEagerlyEmittedWitnessTables(
         normal->getEffectiveCodeGenerationModel() !=
             CodeGenerationModel::Interface ||
         normal->getDeclContext()->getParentModule() != mod->getSwiftModule() ||
-        normal->getDeclContext()->isGenericContext())
+        normal->isEffectivelyGeneric())
       continue;
     conformances.push_back(normal);
   }

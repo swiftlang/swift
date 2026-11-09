@@ -439,10 +439,8 @@ NormalProtocolConformance::getRequiredCodeGenerationModel() const {
 
   // A conformance in a generic context must be @export(implementation) in
   // Embedded Swift.
-  if (auto sig = dc->getGenericSignatureOfContext()) {
-    if (!sig->areAllParamsConcrete() && isEmbedded)
-      return CodeGenerationModel::Implementation;
-  }
+  if (isEmbedded && isEffectivelyGeneric())
+    return CodeGenerationModel::Implementation;
 
   // Synthesized conformances are always @export(implementation).
   if (isSynthesized())
@@ -467,6 +465,11 @@ NormalProtocolConformance::getEffectiveCodeGenerationModel() const {
 
   // Otherwise, apply the module-level default.
   return getDeclContext()->getParentModule()->codeGenerationModel();
+}
+
+bool NormalProtocolConformance::isEffectivelyGeneric() const {
+  auto sig = getDeclContext()->getGenericSignatureOfContext();
+  return sig && !sig->areAllParamsConcrete();
 }
 
 bool NormalProtocolConformance::isConformanceOfProtocol() const {
