@@ -101,6 +101,38 @@ struct SWIFT_NONESCAPABLE CapturingCtor {
   const int *p;
 };
 
+// Swift drops a dependency whose target is Escapable, so capturing into one is
+// not enforced.
+struct SWIFT_ESCAPABLE EscapableSink {
+  const int *p;
+  // expected-note@+1 {{this lifetime annotation is ignored: parameter 'o' is captured by 'self', which is Escapable, so Swift drops the dependency}}
+  void add(const Owner &o [[clang::lifetime_capture_by_this]]);
+  // expected-note@+1 {{this lifetime annotation is ignored: parameter 'v' is captured by 'self', which is Escapable, so Swift drops the dependency}}
+  void addView(View v [[clang::lifetime_capture_by_this]]);
+};
+
+struct SWIFT_NONESCAPABLE ViewSource {
+  const int *p;
+  // expected-note@+1 {{this lifetime annotation is ignored: 'self' is captured by parameter 'out', which is Escapable, so Swift drops the dependency}}
+  void handOut(EscapableSink &out) const [[clang::lifetime_capture_by(out)]];
+};
+
+// expected-note@+1 {{this lifetime annotation is ignored: parameter 'o' is captured by parameter 'out', which is Escapable, so Swift drops the dependency}}
+void captureIntoEscapable(EscapableSink &out, const Owner &o [[clang::lifetime_capture_by(out)]]);
+// expected-note@+1 {{this lifetime annotation is ignored: parameter 'v' is captured by parameter 'out', which is Escapable, so Swift drops the dependency}}
+void captureViewIntoEscapable(EscapableSink &out, View v [[clang::lifetime_capture_by(out)]]);
+
+// Constructing an Escapable value drops its dependencies too.
+struct SWIFT_ESCAPABLE EscapableBox {
+  const int *p;
+  // expected-warning@+2 {{the returned type 'EscapableBox' is annotated as escapable; it cannot have lifetime dependencies}}
+  // expected-note@+1 {{this lifetime annotation is ignored: the result is Escapable, so Swift drops the dependency}}
+  EscapableBox(const Owner &o [[clang::lifetime_capture_by_this]]);
+  // expected-warning@+2 {{the returned type 'EscapableBox' is annotated as escapable; it cannot have lifetime dependencies}}
+  // expected-note@+1 {{this lifetime annotation is ignored: the result is Escapable, so Swift drops the dependency}}
+  EscapableBox(const View &v [[clang::lifetimebound]]);
+};
+
 //--- test.swift
 import Life
 
@@ -159,5 +191,26 @@ func capturedIntoConstructed(_ v: consuming View, _ s: Shared) {
   _ = CapturingCtor(consuming: v) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
   // expected-note@-1 {{reference to unsafe initializer 'init(consuming:)'}}
   _ = CapturingCtor(s) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe initializer 'init(_:)'}}
+}
+
+func capturedIntoEscapable(_ o: Owner, _ v: View, _ s: EscapableSink, _ src: ViewSource) {
+  var sink = s
+  sink.add(o) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'add'}}
+  sink.addView(v) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'addView'}}
+  src.handOut(&sink) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe instance method 'handOut'}}
+  captureIntoEscapable(&sink, o) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe global function 'captureIntoEscapable'}}
+  captureViewIntoEscapable(&sink, v) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe global function 'captureViewIntoEscapable'}}
+}
+
+func constructedEscapable(_ o: Owner, _ v: View) {
+  _ = EscapableBox(o) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1 {{reference to unsafe initializer 'init(_:)'}}
+  _ = EscapableBox(v) // expected-warning {{expression uses unsafe constructs but is not marked with 'unsafe'}}
   // expected-note@-1 {{reference to unsafe initializer 'init(_:)'}}
 }
