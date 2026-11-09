@@ -1655,6 +1655,11 @@ public:
   /// Add "Unavailable" annotation to the swift declaration.
   void markUnavailable(ValueDecl *decl, StringRef unavailabilityMsg);
 
+  /// Add an implicit \c @unsafe attribute to \p decl.
+  /// An existing \c @unsafe attribute is upgraded to \c @unsafe(always) when
+  /// needed.
+  void markUnsafe(ValueDecl *decl, bool always);
+
   /// Create a decl with error type and an "unavailable" attribute on it
   /// with the specified message.
   ValueDecl *createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
@@ -2841,6 +2846,11 @@ bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
 /// they can be looked up during IRGen.
 void checkRetainReleaseFunctions(ClassDecl *classDecl,
                                  ClangImporter::Implementation &Impl);
+
+/// Returns true if \p method overrides a virtual member retain or release operation.
+bool isOverrideOfRetainReleaseMethod(const clang::CXXMethodDecl *method,
+                                     StringRef swiftBaseName,
+                                     Evaluator &evaluator);
 
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.
