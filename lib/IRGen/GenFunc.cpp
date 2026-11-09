@@ -2115,9 +2115,9 @@ static llvm::Value *emitPartialApplicationForwarder(
   Explosion polyArgs;
 
   // Emit the polymorphic arguments.
-  assert((subs.hasAnySubstitutableParams()
+  assert((subs.isEffectivelyGeneric()
             == hasPolymorphicParameters(origType) ||
-         (!subs.hasAnySubstitutableParams() && origType->getRepresentation() ==
+         (!subs.isEffectivelyGeneric() && origType->getRepresentation() ==
              SILFunctionTypeRepresentation::WitnessMethod))
          && "should have substitutions iff original function is generic");
   WitnessMetadata witnessMetadata;

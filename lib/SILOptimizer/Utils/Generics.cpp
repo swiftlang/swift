@@ -372,7 +372,7 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
   }
 
 
-  if (Subs.hasAnySubstitutableParams() &&
+  if (Subs.isEffectivelyGeneric() &&
       Callee->hasSemanticsAttr(semantics::OPTIMIZE_SIL_SPECIALIZE_GENERIC_PARTIAL_NEVER))
     return true;
 
@@ -481,7 +481,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
                                         SubstitutionMap ParamSubs,
                                         bool isMandatory,
                                         OptRemark::Emitter *ORE) {
-  assert(ParamSubs.hasAnySubstitutableParams());
+  assert(ParamSubs.isEffectivelyGeneric());
 
   if (shouldNotSpecialize(Callee, Apply ? Apply.getFunction() : nullptr))
     return false;
@@ -2378,7 +2378,7 @@ static SILFunction *specializeAccessorThunk(SILFunction *thunk,
 
 bool swift::specializeKeyPathInst(KeyPathInst *kpi, SILTransform *transform) {
   SubstitutionMap subs = kpi->getSubstitutions();
-  if (!subs.hasAnySubstitutableParams())
+  if (!subs.isEffectivelyGeneric())
     return false;
   // Partial specialization would leave generic thunks behind, which is exactly
   // what we're trying to avoid.

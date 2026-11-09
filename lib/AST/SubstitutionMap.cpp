@@ -89,7 +89,7 @@ bool SubstitutionMap::empty() const {
   return getGenericSignature().isNull();
 }
 
-bool SubstitutionMap::hasAnySubstitutableParams() const {
+bool SubstitutionMap::isEffectivelyGeneric() const {
   auto genericSig = getGenericSignature();
   if (!genericSig) return false;
 

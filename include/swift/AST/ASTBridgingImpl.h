@@ -1120,8 +1120,8 @@ bool BridgedSubstitutionMap::isEqualTo(BridgedSubstitutionMap rhs) const {
   return unbridged() == rhs.unbridged();
 }
 
-bool BridgedSubstitutionMap::hasAnySubstitutableParams() const {
-  return unbridged().hasAnySubstitutableParams();
+bool BridgedSubstitutionMap::isEffectivelyGeneric() const {
+  return unbridged().isEffectivelyGeneric();
 }
 
 BridgedSubstitutionMap

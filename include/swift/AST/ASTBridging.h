@@ -3406,7 +3406,7 @@ struct BridgedSubstitutionMap {
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isEmpty() const;
   BRIDGED_INLINE bool isEqualTo(BridgedSubstitutionMap rhs) const;
-  BRIDGED_INLINE bool hasAnySubstitutableParams() const;
+  BRIDGED_INLINE bool isEffectivelyGeneric() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedSubstitutionMap subst(BridgedSubstitutionMap subMap) const;
   BRIDGED_INLINE SwiftInt getNumConformances() const;

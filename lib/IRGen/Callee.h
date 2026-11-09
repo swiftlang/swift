@@ -590,7 +590,7 @@ namespace irgen {
     }
 
     bool hasSubstitutions() const {
-      return Info.Substitutions.hasAnySubstitutableParams();
+      return Info.Substitutions.isEffectivelyGeneric();
     }
     
     SubstitutionMap getSubstitutions() const { return Info.Substitutions; }

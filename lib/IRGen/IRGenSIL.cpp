@@ -4252,7 +4252,7 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     if (IGM.getOptions().UseProfilingMarkerThunks &&
         isa<FunctionRefInst>(site.getCallee()) &&
         !site.getOrigCalleeType()->isAsync() &&
-        subMap.hasAnySubstitutableParams() &&
+        subMap.isEffectivelyGeneric() &&
         !subMap.getRecursiveProperties().hasPrimaryArchetype()) {
       emission->useProfilingThunk();
     }
