@@ -174,7 +174,10 @@ private struct CollectedEffects {
       addEffects(.read, to: copy.source)
       addEffects(.write, to: copy.destination)
 
-      if !copy.isTakeOfSource {
+      if copy.isTakeOfSource {
+        // Conceptually, a take is also a write, because the stored value is not available anymore after the take.
+        addEffects(.write, to: copy.source)
+      } else {
         addEffects(.copy, to: copy.source)
       }
       if !copy.isInitializationOfDestination {
@@ -193,7 +196,14 @@ private struct CollectedEffects {
     case let store as StoreUnownedInst:
       addEffects(.write, to: store.destination)
 
-    case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
+    case let load as LoadInst:
+      addEffects(.read, to: load.address)
+      if load.loadOwnership == .take {
+        // Conceptually, a take is also a write, because the stored value is not available anymore after the take.
+        addEffects(.write, to: load.address)
+      }
+
+    case is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       let addr = inst.operands[0].value
       addEffects(.read, to: addr)
 

@@ -1,4 +1,5 @@
 // RUN: %target-sil-opt -copy-to-borrow-optimization %s | %FileCheck %s
+// RUN: %target-sil-opt -compute-side-effects -copy-to-borrow-optimization %s | %FileCheck %s --check-prefix=EFFECTS
 
 sil_stage canonical
 
@@ -2930,4 +2931,60 @@ bb0(%0 : $*MultiPayload, %1 : $MyInt):
   store %3 to [assign] %0 : $*MultiPayload
   %5 = unchecked_enum_data %2 : $MultiPayload, #MultiPayload.b!enumelt
   return %5 : $MyInt
+}
+
+// Check that a callee which takes its @in argument (with copy_addr [take] or load [take])
+// is considered to write to the argument's memory. Otherwise a `load [copy]` from the argument
+// is wrongly converted to a `load_borrow` with a lifetime overlapping the call.
+
+sil [ossa] @consume_pair_with_copy_addr_take : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = alloc_stack $NativeObjectPair
+  copy_addr [take] %0 to [init] %1
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @consume_pair_with_load_take : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = load [take] %0
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// EFFECTS-LABEL: sil [ossa] @load_copy_before_copy_addr_take_in_callee :
+// EFFECTS:         load [copy]
+// EFFECTS-NOT:     load_borrow
+// EFFECTS:       } // end sil function 'load_copy_before_copy_addr_take_in_callee'
+sil [ossa] @load_copy_before_copy_addr_take_in_callee : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = struct_element_addr %0, #NativeObjectPair.obj2
+  %2 = load [copy] %1
+  %3 = function_ref @consume_pair_with_copy_addr_take : $@convention(thin) (@in NativeObjectPair) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in NativeObjectPair) -> ()
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2
+  %r = tuple ()
+  return %r
+}
+
+// EFFECTS-LABEL: sil [ossa] @load_copy_before_load_take_in_callee :
+// EFFECTS:         load [copy]
+// EFFECTS-NOT:     load_borrow
+// EFFECTS:       } // end sil function 'load_copy_before_load_take_in_callee'
+sil [ossa] @load_copy_before_load_take_in_callee : $@convention(thin) (@in NativeObjectPair) -> () {
+bb0(%0 : $*NativeObjectPair):
+  %1 = struct_element_addr %0, #NativeObjectPair.obj2
+  %2 = load [copy] %1
+  %3 = function_ref @consume_pair_with_load_take : $@convention(thin) (@in NativeObjectPair) -> ()
+  %4 = apply %3(%0) : $@convention(thin) (@in NativeObjectPair) -> ()
+  %5 = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  %6 = apply %5(%2) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
+  destroy_value %2
+  %r = tuple ()
+  return %r
 }
