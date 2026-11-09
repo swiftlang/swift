@@ -151,20 +151,11 @@ func doThrowsWithoutCatch() {
   // expected-error@-2 {{a 'do' statement with a 'throws' clause must have at least one 'catch'}}
 }
 
-// An 'if' whose body braces the parser had to synthesize. swift-syntax cannot
-// form the pattern here where the C++ parser can, so the recovered ASTs differ;
-// what matters is that the body's range stays inside the statement's own scopes.
+// An 'if' with 'let case' (a misspelling of 'case let'): the recovered body must
+// stay inside the statement's own scopes.
 func synthesizedIfBody(a: Int?) {
   if let case x = a {}
-  // expected-astgen-error@-1 {{expected pattern in optional binding}}
-  //
-  // expected-astgen-error@-3 {{expected '{' in 'if' statement}}
-  //
-  // expected-astgen-error@-5 {{'case' can only appear inside a 'switch' statement or 'enum' declaration}}
-  // expected-astgen-error@-6 {{unwrap condition requires a valid identifier}}
-  // expected-astgen-error@-7 {{expected '}' to end 'if' statement}}
-  //
-  // expected-cxx-error@-9 {{pattern matching binding is spelled with 'case let', not 'let case'}}
-  // expected-cxx-warning@-10 {{'if' condition is always true}}
-  // expected-cxx-warning@-11 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+  // expected-error@-1 {{pattern matching binding is spelled with 'case let', not 'let case'}}
+  // expected-warning@-2 {{'if' condition is always true}}
+  // expected-warning@-3 {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
 }
