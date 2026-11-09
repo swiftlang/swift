@@ -52,6 +52,9 @@ namespace swift {
   /// Perform diagnostics on the top level code declaration.
   void performTopLevelDeclDiagnostics(TopLevelCodeDecl *TLCD);
 
+  /// Diagnose a declaration whose type exposes an unusable foreign type.
+  void diagnoseUnusableForeignTypesInDecl(const Decl *D);
+
   /// Emit a fix-it to set the access of \p VD to \p desiredAccess.
   ///
   /// This actually updates \p VD as well if \p updateAttr is true.

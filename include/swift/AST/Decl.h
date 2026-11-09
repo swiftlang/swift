@@ -659,7 +659,7 @@ protected:
     IsDebuggerAlias : 1
   );
 
-  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(NominalTypeDecl, GenericTypeDecl, 1+1+1+1+1+1,
     /// Whether we have already added implicitly-defined initializers
     /// to this declaration.
     AddedImplicitInitializers : 1,
@@ -674,7 +674,10 @@ protected:
     HasDestructorComputed : 1,
 
     /// Whether we have a user-defined deinit.
-    HasDestructor : 1
+    HasDestructor : 1,
+
+    /// Whether this type exposes a foreign type that Swift code must not use.
+    NoExposedUnusableForeignTypes : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
@@ -4720,6 +4723,7 @@ protected:
     Bits.NominalTypeDecl.IsComputingSemanticMembers = false;
     Bits.NominalTypeDecl.HasDestructorComputed = false;
     Bits.NominalTypeDecl.HasDestructor = false;
+    Bits.NominalTypeDecl.NoExposedUnusableForeignTypes = false;
     ExtensionGeneration = 0;
   }
 
@@ -4809,6 +4813,15 @@ public:
   /// Note that we have attempted to add implicit initializers.
   void setAddedImplicitInitializers() {
     Bits.NominalTypeDecl.AddedImplicitInitializers = true;
+  }
+
+  /// Whether this type is known not to expose an unusable foreign type.
+  bool hasNoExposedUnusableForeignTypes() const {
+    return Bits.NominalTypeDecl.NoExposedUnusableForeignTypes;
+  }
+
+  void setNoExposedUnusableForeignTypes() {
+    Bits.NominalTypeDecl.NoExposedUnusableForeignTypes = true;
   }
 
   /// getDeclaredType - Retrieve the type declared by this entity, without

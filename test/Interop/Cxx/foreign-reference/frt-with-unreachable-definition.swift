@@ -149,11 +149,12 @@ FRTOps *makeFRTOps();
 import CxxModule
 
 let _ = makeFRTBasic()
-let _ = makeFRTDerived()
+let _ = makeFRTDerived() // expected-error {{contains foreign reference type 'FRTDerived', whose definition is not reachable}}
 let _ = makeFRTOps()
 let _ = makeFRTAnnotated()
 
 let _: FRTDerived? = nil // expected-error {{foreign reference type 'FRTDerived' has unreachable definition}}
+                         // expected-error@-1 {{contains foreign reference type 'FRTDerived', whose definition is not reachable}}
 
 //--- compile.swift
 import CxxModule
