@@ -1965,25 +1965,8 @@ void SILGenModule::emitMoveOnlyDestructor(NominalTypeDecl *cd,
 
 void SILGenModule::emitDefaultArgGenerator(SILDeclRef constant,
                                            ParamDecl *param) {
-  switch (param->getDefaultArgumentKind()) {
-  case DefaultArgumentKind::None:
-    llvm_unreachable("No default argument here?");
-
-  case DefaultArgumentKind::Normal:
-  case DefaultArgumentKind::StoredProperty:
+  if (param->hasDefaultArgumentGenerator())
     emitOrDelayFunction(constant);
-    break;
-
-  case DefaultArgumentKind::Inherited:
-#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
-  case DefaultArgumentKind::NAME:
-#include "swift/AST/MagicIdentifierKinds.def"
-  case DefaultArgumentKind::NilLiteral:
-  case DefaultArgumentKind::EmptyArray:
-  case DefaultArgumentKind::EmptyDictionary:
-  case DefaultArgumentKind::ExpressionMacro:
-    break;
-  }
 }
 
 void SILGenModule::

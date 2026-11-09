@@ -3748,6 +3748,9 @@ static bool ParseTBDGenArgs(TBDGenOptions &Opts, ArgList &Args,
   Opts.WitnessMethodElimination = Args.hasArg(OPT_enable_llvm_wme);
   Opts.FragileResilientProtocols =
     Args.hasArg(OPT_enable_fragile_resilient_protocol_witnesses);
+  Opts.RelativeProtocolWitnessTables =
+      Args.hasFlag(OPT_enable_relative_protocol_witness_tables,
+                   OPT_disable_relative_protocol_witness_tables, false);
 
   if (const Arg *A = Args.getLastArg(OPT_tbd_compatibility_version)) {
     Opts.CompatibilityVersion = A->getValue();

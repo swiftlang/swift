@@ -7637,6 +7637,10 @@ public:
   /// such as the magic literal \c #function.
   bool hasCallerSideDefaultExpr() const;
 
+  /// Whether this parameter's default argument is evaluated by a generator
+  /// function, rather than at the call site or by an overridden declaration.
+  bool hasDefaultArgumentGenerator() const;
+
   /// Retrieve the fully type-checked default argument expression for this
   /// parameter, or \c nullptr if there is no default expression.
   ///

@@ -10429,6 +10429,25 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   llvm_unreachable("invalid default argument kind");
 }
 
+bool ParamDecl::hasDefaultArgumentGenerator() const {
+  switch (getDefaultArgumentKind()) {
+  case DefaultArgumentKind::Normal:
+  case DefaultArgumentKind::StoredProperty:
+    return true;
+  case DefaultArgumentKind::None:
+  case DefaultArgumentKind::Inherited:
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+  case DefaultArgumentKind::NAME:
+#include "swift/AST/MagicIdentifierKinds.def"
+  case DefaultArgumentKind::NilLiteral:
+  case DefaultArgumentKind::EmptyArray:
+  case DefaultArgumentKind::EmptyDictionary:
+  case DefaultArgumentKind::ExpressionMacro:
+    return false;
+  }
+  llvm_unreachable("invalid default argument kind");
+}
+
 Expr *ParamDecl::getTypeCheckedDefaultExpr() const {
   // Don't kick off a request if we know there's no default expr. The only
   // exception is for inherited default args which we need to perform a couple
