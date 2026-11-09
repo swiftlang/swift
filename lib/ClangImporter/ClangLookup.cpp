@@ -993,7 +993,7 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
 
   llvm::SmallVector<SubscriptDecl *, 1> subscripts;
   for (auto &[_, pair] : CXXSubscripts) {
-    auto [CXXGetter, CXXSetter] = pair;
+    auto CXXGetter = pair.first, CXXSetter = pair.second;
     ASSERT((CXXGetter || CXXSetter) &&
            "subscript should have at least getter or setter");
 
