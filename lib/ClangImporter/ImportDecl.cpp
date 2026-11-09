@@ -4579,7 +4579,7 @@ namespace {
         Impl.markUnavailable(
             result, "LIBKERN_CONSUMES_THIS annotation is not supported");
 
-      recordObjCOverride(result);
+      recordFuncOverride(result);
       Impl.swiftify(result);
     }
 
@@ -5756,7 +5756,7 @@ namespace {
       addObjCAttribute(result, selector);
 
       // If this method overrides another method, mark it as such.
-      recordObjCOverride(result);
+      recordFuncOverride(result);
 
       // Make a note that we've imported this method into this context.
       recordMemberInContext(dc, result);
@@ -5822,7 +5822,7 @@ namespace {
 
   public:
     /// Record the function or initializer overridden by the given Swift method.
-    void recordObjCOverride(AbstractFunctionDecl *decl) const;
+    void recordFuncOverride(AbstractFunctionDecl *decl) const;
 
     /// Given an imported method, try to import it as a constructor.
     ///
@@ -5872,7 +5872,7 @@ namespace {
                                        bool variadic,
                                        ConstructorDecl *&existing);
 
-    static void recordObjCOverride(SubscriptDecl *subscript);
+    static void recordSubscriptOverride(SubscriptDecl *subscript);
 
     /// Given either the getter or setter for a subscript operation,
     /// create the Swift subscript declaration.
@@ -8070,7 +8070,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   Impl.ConstructorsForNominal[ownerNominal].push_back(result);
 
   // If this constructor overrides another constructor, mark it as such.
-  recordObjCOverride(result);
+  recordFuncOverride(result);
 
   // If we ignored a custom Swift name because it wasn't suitable for an init,
   // diagnose that now.
@@ -8083,7 +8083,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   return result;
 }
 
-void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) const {
+void SwiftDeclConverter::recordFuncOverride(AbstractFunctionDecl *decl) const {
   // Make sure that we always set the overridden declarations.
   SWIFT_DEFER {
     if (!decl->overriddenDeclsComputed())
@@ -8097,7 +8097,7 @@ void SwiftDeclConverter::recordObjCOverride(AbstractFunctionDecl *decl) const {
   auto superDecl = classDecl->getSuperclassDecl();
   if (!superDecl)
     return;
-  // Dig out the Objective-C superclass.
+  // Look up the overridden member from the ObjC or C++ superclass
   SmallVector<ValueDecl *, 4> results;
   superDecl->lookupQualified(
       superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
@@ -8158,7 +8158,7 @@ static bool areParameterTypesEqual(const ParameterList &params1,
   return true;
 }
 
-void SwiftDeclConverter::recordObjCOverride(SubscriptDecl *subscript) {
+void SwiftDeclConverter::recordSubscriptOverride(SubscriptDecl *subscript) {
   // Figure out the class in which this subscript occurs.
   auto classTy = subscript->getDeclContext()->getSelfClassDecl();
   if (!classTy)
@@ -8495,7 +8495,7 @@ SwiftDeclConverter::importSubscript(Decl *decl,
   makeSetterUnavailable();
 
   // Wire up overrides.
-  recordObjCOverride(subscript);
+  recordSubscriptOverride(subscript);
 
   return subscript;
 }
