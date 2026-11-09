@@ -71,6 +71,10 @@ function(_add_swift_caching_compile_options name)
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-scanner-prefix-map-sdk /^sdk>"
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-scanner-prefix-map-toolchain /^toolchain>"
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-scanner-prefix-map ${SWIFT_CACHING_BUILD_SOURCE_ROOT}=/^src>")
+    if(SWIFT_CACHING_BUILD_DEVELOPER_DIR)
+      target_compile_options(${name} PRIVATE
+        "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-scanner-prefix-map ${SWIFT_CACHING_BUILD_DEVELOPER_DIR}=/^xcode>")
+    endif()
   endif()
   if(SWIFT_CACHING_BUILD_ENABLE_MCCAS)
     target_compile_options(${name} PRIVATE

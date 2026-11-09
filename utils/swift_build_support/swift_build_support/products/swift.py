@@ -364,6 +364,10 @@ updated without updating swift.py?")
             result.append(
                 ('SWIFT_CACHING_BUILD_SOURCE_ROOT:PATH',
                  SWIFT_SOURCE_ROOT))
+            developer_dir = getattr(self.args, 'caching_developer_dir', None)
+            if developer_dir:
+                result.append(
+                    ('SWIFT_CACHING_BUILD_DEVELOPER_DIR:PATH', developer_dir))
         if getattr(self.args, 'caching_enable_mccas', False):
             result.append(('SWIFT_CACHING_BUILD_ENABLE_MCCAS:BOOL', True))
         return result

@@ -1073,6 +1073,9 @@ class BuildScriptInvocation(object):
                 prefix_map["/^sdk"] = sdk_path
             if toolchain_path:
                 prefix_map["/^toolchain"] = toolchain_path
+            developer_dir = getattr(self.args, 'caching_developer_dir', None)
+            if developer_dir:
+                prefix_map["/^xcode"] = developer_dir
             prefix_map["/^src"] = SWIFT_SOURCE_ROOT
 
             with open(os.path.join(build_dir,
