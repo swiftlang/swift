@@ -1,4 +1,4 @@
-// REQUIRES: objc_interop
+// REQUIRES: objc_interop, OS=macosx
 // REQUIRES: swift_feature_ObjCDirect
 
 // The link step is itself a check: Swift and Clang must agree on the symbol.
@@ -15,6 +15,11 @@
 // msgSend to a selector that is no longer in the class metadata.
 // RUN: %FileCheck %s -check-prefix=HEADER < %t/Mod-Swift.h
 
+// The header still parses where Clang lacks objc_direct and the macros expand
+// to nothing.
+// RUN: %target-clang -fobjc-arc -fsyntax-only -DSWIFT_OBJC_DIRECT= \
+// RUN:   -DSWIFT_OBJC_DIRECT_PROPERTY= -I %t %t/use.m
+
 // The public direct symbol is exported from the library.
 // RUN: %llvm-nm -gU %t/libMod.dylib | %FileCheck %s -check-prefix=DYLIB
 
@@ -24,8 +29,9 @@
 // RUN: strings %t/libMod.dylib | %FileCheck %s -check-prefix=SELECTORS
 
 // Compile the ObjC client to assembly and check how the call is dispatched.
-// RUN: %target-clang -fobjc-arc -fobjc-direct-precondition-thunk -I %t \
-// RUN:   -S -o - %t/use.m | %FileCheck %s -check-prefix=ASM
+// RUN: %target-clang -target arm64-apple-macosx13.0 -fobjc-arc \
+// RUN:   -fobjc-direct-precondition-thunk -I %t -S -o - %t/use.m \
+// RUN:   | %FileCheck %s -check-prefix=ASM
 
 // Compile and link the client. Undefined-symbol agreement is checked by ld.
 // RUN: %target-clang -fobjc-arc -fobjc-direct-precondition-thunk -I %t \
@@ -37,6 +43,7 @@
 
 // HEADER: - (NSInteger)returnOne SWIFT_WARN_UNUSED_RESULT SWIFT_OBJC_DIRECT;
 // HEADER: - (void)normalMethod;
+// HEADER: SWIFT_CLASS_PROPERTY(@property (nonatomic, class, SWIFT_OBJC_DIRECT_PROPERTY) NSInteger shared;)
 
 // DYLIB: T {{_?}}-[Direct returnOne]D
 
@@ -60,6 +67,7 @@ import Foundation
 public class Direct: NSObject {
   @objcDirect public final func returnOne() -> Int { return 1 }
   @objc public func normalMethod() {}
+  @objcDirect public static var shared: Int = 0
 }
 
 //--- use.m

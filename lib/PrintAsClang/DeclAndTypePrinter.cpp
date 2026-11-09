@@ -2260,6 +2260,11 @@ private:
       }
     }
 
+    // Last, so that where the macro expands to nothing, the trailing comma it
+    // leaves still parses: '(nonatomic, class, )'.
+    if (VD->isObjCDirect())
+      os << ", SWIFT_OBJC_DIRECT_PROPERTY";
+
     os << ") ";
     if (VD->getAttrs().hasAttribute<IBInspectableAttr>()) {
       os << "IBInspectable ";

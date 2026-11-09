@@ -15,7 +15,7 @@
 
 import ObjectiveC
 
-// The macro is guarded on __has_attribute so the header stays usable with a
+// The macros are guarded on __has_attribute so the header stays usable with a
 // compiler that lacks objc_direct.
 // CHECK: # if __has_attribute(objc_direct)
 // CHECK-NEXT: #  define SWIFT_OBJC_DIRECT __attribute__((objc_direct))
@@ -23,13 +23,31 @@ import ObjectiveC
 // CHECK-NEXT: #  define SWIFT_OBJC_DIRECT
 // CHECK-NEXT: # endif
 
+// A property's attribute is spelled 'direct', so it needs a macro of its own.
+// CHECK: # if __has_attribute(objc_direct)
+// CHECK-NEXT: #  define SWIFT_OBJC_DIRECT_PROPERTY direct{{$}}
+// CHECK-NEXT: # else
+// CHECK-NEXT: #  define SWIFT_OBJC_DIRECT_PROPERTY
+// CHECK-NEXT: # endif
+
 // CHECK-LABEL: @interface DirectMethodClass
 // CHECK: - (NSInteger)directMethod SWIFT_WARN_UNUSED_RESULT SWIFT_OBJC_DIRECT;
-// Only the direct method is annotated; the plain @objc one is not.
 // CHECK-NOT: SWIFT_OBJC_DIRECT
 // CHECK: - (void)normalMethod;
 // CHECK: @end
 public class DirectMethodClass: NSObject {
   @objcDirect public final func directMethod() -> Int { return 42 }
   @objc public func normalMethod() {}
+}
+
+// CHECK-LABEL: @interface DirectStorageClass
+// CHECK-DAG: @property (nonatomic, SWIFT_OBJC_DIRECT_PROPERTY){{.*}}directProperty;
+// A subscript needs no new spelling: its accessors are printed as methods.
+// CHECK-DAG: - (NSInteger)objectAtIndexedSubscript:{{.*}}SWIFT_OBJC_DIRECT;
+// CHECK-DAG: @property (nonatomic){{.*}}normalProperty;
+// CHECK: @end
+public class DirectStorageClass: NSObject {
+  @objcDirect public var directProperty: Int = 0
+  @objcDirect public subscript(i: Int) -> Int { i }
+  @objc public var normalProperty: Int = 0
 }

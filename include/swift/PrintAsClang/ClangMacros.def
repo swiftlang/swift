@@ -118,6 +118,12 @@ CLANG_MACRO_CONDITIONAL("SWIFT_OBJC_DIRECT", , \
                         "__has_attribute(objc_direct)", \
                         "__attribute__((objc_direct))")
 
+// A property attribute can't be spelled with __attribute__. The printer puts
+// it last in the @property list, where an empty expansion still parses.
+CLANG_MACRO_CONDITIONAL("SWIFT_OBJC_DIRECT_PROPERTY", , \
+                        "__has_attribute(objc_direct)", \
+                        "direct")
+
 CLANG_MACRO_CONDITIONAL("SWIFT_RELEASES_ARGUMENT", , \
                         "__has_attribute(ns_consumed)", \
                         "__attribute__((ns_consumed))")
