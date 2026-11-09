@@ -1617,6 +1617,47 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Obtain the 'await thunk' of the passed-in '@oneway' 'distributed'
+/// function, the regular 'async' thunk that a call which is not a 'send'
+/// calls, see \c AbstractFunctionDecl::getDistributedAwaitThunk()
+class GetDistributedAwaitThunkRequest
+    : public SimpleRequest<GetDistributedAwaitThunkRequest,
+                           FuncDecl *(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
+/// Obtain the 'oneway witness adapter' thunk for the passed-in function: the
+/// synchronous thunk with which a non-'@oneway' 'distributed' function
+/// witnesses the requirement thunk of a '@oneway' 'distributed' requirement
+/// Null if the function cannot witness such a requirement
+class GetDistributedOnewayWitnessAdapterRequest
+    : public SimpleRequest<GetDistributedOnewayWitnessAdapterRequest,
+                           FuncDecl *(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  FuncDecl *evaluate(Evaluator &evaluator, AbstractFunctionDecl *func) const;
+
+public:
+  // Caching
+  bool isCached() const { return true; }
+};
+
 /// Obtain the 'resolvable proxy adapter' thunk for the passed-in function.
 ///
 /// This thunk is invoked on the recipient side of a remote call: it

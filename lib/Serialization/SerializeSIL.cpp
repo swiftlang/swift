@@ -871,13 +871,20 @@ static void handleSILDeclRef(Serializer &S, const SILDeclRef &Ref,
   ValueDecl *decl = Ref.getDecl();
   // A distributed thunk cannot be found by cross-reference lookup, so
   // serialize the decl it was synthesized for; the reader re-derives it.
+  // Bit 1 of the foreign field records that the reference is to the await
+  // thunk of a '@oneway' function rather than its distributed thunk
+  bool isDistributedAwaitThunk = false;
   if (auto *thunk = Ref.getDistributedThunk())
     if (thunk->isDistributedThunk())
-      if (auto *original = getDistributedThunkOriginalDecl(thunk))
+      if (auto *original = getDistributedThunkOriginalDecl(thunk)) {
+        isDistributedAwaitThunk =
+            original->getDistributedAwaitThunk() == thunk;
         decl = original;
+      }
   ListOfValues.push_back(S.addDeclRef(decl));
   ListOfValues.push_back((unsigned)Ref.kind);
-  ListOfValues.push_back(Ref.isForeign);
+  ListOfValues.push_back(unsigned(Ref.isForeign) |
+                         (unsigned(isDistributedAwaitThunk) << 1));
 }
 
 /// Get an identifier ref for a SILFunction and add it to the list of referenced

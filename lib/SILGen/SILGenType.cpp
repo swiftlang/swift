@@ -680,7 +680,12 @@ public:
     // Emit the witness thunk and add it to the table.
     auto witnessLinkage = witnessRef.getLinkage(ForDefinition);
     auto witnessSerializedKind = SerializedKind;
-    if (witnessSerializedKind != IsNotSerialized &&
+    // The witness thunk of a oneway witness adapter, which is not part of the
+    // API of its module, is never public
+    bool isWitnessAdapter = false;
+    if (auto *witnessFunc = dyn_cast_or_null<FuncDecl>(witnessRef.getDecl()))
+      isWitnessAdapter = witnessFunc->isDistributedOnewayWitnessAdapter();
+    if (witnessSerializedKind != IsNotSerialized && !isWitnessAdapter &&
         // If package optimization is enabled, this is false;
         // witness thunk should get a `shared` linkage in the
         // else block below.
@@ -793,8 +798,15 @@ SILFunction *SILGenModule::emitProtocolWitness(
        witnessRef.getFuncDecl()->isDistributed());
   if (shouldUseDistributedThunkWitness) {
     // we may not have a thunk if we're in a protocol?
-    if (witnessRef.getFuncDecl()->getDistributedThunk())
+    if (witnessRef.getFuncDecl()->getDistributedThunk()) {
       witnessRef = witnessRef.getDistributedThunkDeclRef();
+
+      // A non-'@oneway' witness of a '@oneway' requirement is its oneway
+      // witness adapter, which is emitted when it is first used
+      if (auto *thunk = witnessRef.getDistributedThunk())
+        if (thunk->isDistributedOnewayWitnessAdapter())
+          emitDistributedWitnessAdapter(thunk);
+    }
   }
 
   // Work out the lowered function type of the SIL witness thunk.

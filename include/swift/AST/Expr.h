@@ -268,7 +268,7 @@ protected:
     Kind : 2
   );
 
-  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ClosureExpr, AbstractClosureExpr, 1+1+1+1+1+1+1+1+1+1+1,
     /// True if closure parameters were synthesized from anonymous closure
     /// variables.
     HasAnonymousClosureVars : 1,
@@ -311,7 +311,11 @@ protected:
     /// parameter of a `nonisolated(nonsending)` call and doesn't leave isolation of
     /// the parent context. It's easier to work with statically known isolation than
     /// make closure dynamically isolated via assuming `nonisolated(nonsending)`.
-    BehavesLikeNonisolatedNonsending: 1
+    BehavesLikeNonisolatedNonsending: 1,
+
+    /// True if this is the operation closure which pre-checking synthesizes
+    /// for the operand of a 'send'
+    IsOnewaySendOperation : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(BindOptionalExpr, Expr, 16,
@@ -354,12 +358,13 @@ protected:
     NumCaptures : 32
   );
 
-  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1,
+  SWIFT_INLINE_BITFIELD(ApplyExpr, Expr, 1+1+1+1+1+1,
     ThrowsIsSet : 1,
     ImplicitlyAsync : 1,
     ImplicitlyThrows : 1,
     NoAsync : 1,
-    ShouldApplyDistributedThunk : 1
+    ShouldApplyDistributedThunk : 1,
+    IsOnewaySendOperand : 1
   );
 
   SWIFT_INLINE_BITFIELD_EMPTY(CallExpr, ApplyExpr);
@@ -2225,6 +2230,43 @@ public:
 
   static bool classof(const Expr *e) {
     return e->getKind() == ExprKind::Await;
+  }
+};
+
+/// SendExpr - A 'send' surrounding a Void-returning, non-throwing call,
+/// marking that the call should be dispatched fire-and-forget rather than
+/// awaited
+///
+/// Pre-checking wraps the call in an implicit '{ try await <call> }' operation
+/// closure of type '() async throws -> Void', which SILGen runs in a new
+/// discarding task. CSApply replaces the closure with a synchronous
+/// expression for a '@oneway' distributed callee (see
+/// 'FuncDecl::hasSynchronousDistributedThunk()'), which calls its
+/// synchronous distributed thunk, and for a synchronous callee which is
+/// isolated to an actor, which enqueues the call
+class SendExpr final : public Expr {
+  Expr *SubExpr;
+  SourceLoc SendLoc;
+
+public:
+  SendExpr(SourceLoc sendLoc, Expr *sub, bool implicit = false)
+      : Expr(ExprKind::Send, implicit), SubExpr(sub), SendLoc(sendLoc) {}
+
+  /// Create an implicit 'send', which is always of type 'Void'
+  static SendExpr *createImplicit(ASTContext &ctx, SourceLoc sendLoc,
+                                  Expr *sub);
+
+  SourceLoc getLoc() const { return SendLoc; }
+  SourceLoc getSendLoc() const { return SendLoc; }
+
+  Expr *getSubExpr() const { return SubExpr; }
+  void setSubExpr(Expr *E) { SubExpr = E; }
+
+  SourceLoc getStartLoc() const { return SendLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Send;
   }
 };
 
@@ -4368,6 +4410,7 @@ public:
     Bits.ClosureExpr.RequiresDynamicIsolationChecking = false;
     Bits.ClosureExpr.IsMacroArgument = false;
     Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = false;
+    Bits.ClosureExpr.IsOnewaySendOperation = false;
   }
 
   SourceRange getSourceRange() const;
@@ -4491,6 +4534,14 @@ public:
 
   void setBehavesLikeNonisolatedNonsending(bool value = true) {
     Bits.ClosureExpr.BehavesLikeNonisolatedNonsending = value;
+  }
+
+  /// Whether this is the operation closure which pre-checking synthesizes for
+  /// the operand of a 'send', whose body is the user's call
+  bool isOnewaySendOperation() const { return Bits.ClosureExpr.IsOnewaySendOperation; }
+
+  void setIsOnewaySendOperation(bool value = true) {
+    Bits.ClosureExpr.IsOnewaySendOperation = value;
   }
 
   /// Determine whether this closure expression has an
@@ -5033,6 +5084,7 @@ protected:
     Bits.ApplyExpr.ImplicitlyThrows = false;
     Bits.ApplyExpr.NoAsync = false;
     Bits.ApplyExpr.ShouldApplyDistributedThunk = false;
+    Bits.ApplyExpr.IsOnewaySendOperand = false;
   }
 
 public:
@@ -5148,6 +5200,14 @@ public:
   }
   void setShouldApplyDistributedThunk(bool flag) {
     Bits.ApplyExpr.ShouldApplyDistributedThunk = flag;
+  }
+
+  /// Whether this call is the operand of a 'send', e.g. the 'x.f()' in
+  /// 'send x.f()'. Overload resolution prefers a '@oneway' callee for such a
+  /// call, and a non-'@oneway' callee for any other call
+  bool isOnewaySendOperand() const { return Bits.ApplyExpr.IsOnewaySendOperand; }
+  void setIsOnewaySendOperand(bool flag = true) {
+    Bits.ApplyExpr.IsOnewaySendOperand = flag;
   }
 
   ValueDecl *getCalledValue(bool skipFunctionConversions = false) const;

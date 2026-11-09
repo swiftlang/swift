@@ -1671,6 +1671,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::DistributedActor:
   case KnownProtocolKind::DistributedActorStub:
   case KnownProtocolKind::DistributedActorSystem:
+  case KnownProtocolKind::DistributedOnewayActorSystem:
   case KnownProtocolKind::DistributedTargetInvocationEncoder:
   case KnownProtocolKind::DistributedTargetInvocationDecoder:
   case KnownProtocolKind::DistributedTargetInvocationResultHandler:

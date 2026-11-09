@@ -10,7 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 import Swift
-import _Concurrency
+// For the '_enqueueOneway' functions, see '_enqueueOnewayDistributed(on:_:)'
+@_spi(OnewaySend) import _Concurrency
 
 /// A distributed actor system underpins and implements all functionality of distributed actors.
 ///
@@ -514,6 +515,7 @@ public protocol DistributedActorSystem<SerializationRequirement>: Sendable {
             Err: Error
 #endif
 
+
 #if !$Embedded
   // Implementation notes:
   // The `metatype` must be the type of `Value`, and it must conform to
@@ -540,6 +542,138 @@ extension DistributedActorSystem {
   public func resignRemoteID(_ id: ActorID) {}
 }
 #endif // !$Embedded
+
+// ==== ----------------------------------------------------------------------------------------------------------------
+// MARK: Distributed Oneway Actor System
+
+/// A distributed actor system which supports `@oneway` distributed functions
+///
+/// A `@oneway` distributed function, such as `@oneway distributed func stop()`,
+/// is called fire-and-forget using `send`, e.g. `try send worker.stop()`, and
+/// its distributed thunk is synchronous: it does not wait for the call to be
+/// executed, neither on a local actor nor on a remote one. A remote call is
+/// handed to ``remoteCallOneway(on:target:invocation:)`` of the actor system
+///
+/// A `@oneway` distributed function can only be declared in a distributed actor
+/// whose ``DistributedActor/ActorSystem`` is known to conform to this
+/// protocol: either a concrete actor system type which conforms to it, or a
+/// generic actor system which is constrained to conform to it, for example
+/// in a protocol:
+///
+/// ```swift
+/// @Resolvable
+/// protocol Worker: DistributedActor
+///   where ActorSystem: _DistributedOnewayActorSystem<any Codable> {
+///   @oneway distributed func stop()
+/// }
+/// ```
+///
+/// SPI: this protocol and the `oneway` members of ``RemoteCallTarget`` are
+/// SPI in the `OnewaySend` group, and need an
+/// `@_spi(OnewaySend) import Distributed`, both to implement an
+/// actor system which supports `@oneway` functions and to name the protocol
+/// in a constraint. Declaring and calling a `@oneway` function, or making a
+/// `send` call, does not need the SPI import. A conformance to this protocol
+/// must be declared `@_spi(OnewaySend)` too if the conforming type
+/// is public
+@_spi(OnewaySend)
+@available(SwiftStdlib 6.5, *)
+public protocol _DistributedOnewayActorSystem<SerializationRequirement>: DistributedActorSystem {
+  /// Invoked by the Swift runtime when making a fire-and-forget remote call
+  /// to a `@oneway` distributed function, e.g. `try send worker.stop()`
+  ///
+  /// The `invocation` was previously created by `makeInvocationEncoder()` and
+  /// has been populated with all arguments, and the `target` has
+  /// ``RemoteCallTarget/isOnewayRemoteCall`` set
+  ///
+  /// Unlike ``DistributedActorSystem/remoteCallVoid(on:target:invocation:throwing:)``
+  /// this method is synchronous. The distributed thunk calls it without
+  /// `await`, so neither the thunk nor its callers need any suspension
+  /// point. An implementation must return as soon as the invocation was handed to the
+  /// transport, and must never wait for a reply from the remote peer: there is
+  /// none for a `@oneway` call
+  ///
+  /// ## Errors
+  /// This method may throw if handing the call to the transport fails, for
+  /// example because of a serialization error, and the error is rethrown to
+  /// the caller of the `@oneway` function. There is no `throwing:` parameter:
+  /// a `@oneway` function cannot throw, so there is no remote error to report
+  ///
+  /// ### Embedded Swift
+  /// In Embedded Swift the function signature is slightly different, as the
+  /// passed in target actor's actor system must be exactly the same as the
+  /// system the method is defined on, rather only be ID compatible, as it is
+  /// in non-Embedded Swift, like for
+  /// ``DistributedActorSystem/remoteCallVoid(on:target:invocation:throwing:)``
+#if $Embedded
+  func remoteCallOneway<Act>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder
+  ) throws
+      where Act: DistributedActor,
+            Act.ActorSystem == Self
+#else
+  func remoteCallOneway<Act>(
+      on actor: Act,
+      target: RemoteCallTarget,
+      invocation: inout InvocationEncoder
+  ) throws
+      where Act: DistributedActor,
+            Act.ID == ActorID
+#endif
+}
+
+#if $Embedded
+/// Run the synchronous `body` on the local distributed actor `actor` from a
+/// new discarding task, without waiting for it.
+///
+/// The task copies the task locals of the caller and starts on the actor's
+/// executor, so calls enqueued on the same actor run in the order they were
+/// enqueued.
+///
+/// SPI: used by the compiler in the distributed thunk and the Embedded
+/// receive dispatcher of synchronous `@oneway` distributed functions. Do not
+/// use
+///
+/// It is SPI because its body, which is emitted into the client, calls the
+/// SPI '_enqueueOnewayUnchecked(on:_:_:)'. The compiler finds it by a direct
+/// lookup in this module, so a distributed thunk does not need the SPI import.
+/// It is not '@unsafe' (unlike '_enqueueOnewayUnchecked'), so that synthesized
+/// thunks do not need an 'unsafe' marker under strict memory safety
+@_spi(OnewaySend)
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func _enqueueOnewayDistributed<DA: DistributedActor>(
+  on actor: DA,
+  _ body: @escaping (isolated DA) -> Void
+) {
+  // The body only ever runs on the actor's executor, so it is safe to drop
+  // the 'isolated' from its parameter. See '_enqueueOneway(on:_:)'
+  let unisolatedBody: (DA) -> Void = Builtin.reinterpretCast(body)
+  unsafe _enqueueOnewayUnchecked(
+    on: actor.unownedExecutor, actor, unisolatedBody)
+}
+
+/// Returns `value`, which the caller asserts is not referenced by anything
+/// else, as a disconnected value.
+///
+/// SPI: used by the compiler in the Embedded receive dispatcher of synchronous
+/// `@oneway` distributed functions, whose decoded arguments are captured by the
+/// call enqueued on the actor. Do not use
+///
+/// The compiler finds it by a direct lookup in this module, so the dispatcher
+/// does not need the SPI import
+@_spi(OnewaySend)
+@available(SwiftStdlib 6.5, *)
+@export(implementation)
+public func _onewayDecodedArgument<Value>(
+  _ value: consuming Value
+) -> sending Value {
+  nonisolated(unsafe) let decoded = value
+  return decoded
+}
+#endif // $Embedded
 
 // ==== ----------------------------------------------------------------------------------------------------------------
 // MARK: Execute Distributed Methods
@@ -1008,13 +1142,147 @@ internal func _validateMatchingResultHandler<
 public struct RemoteCallTarget: CustomStringConvertible, Hashable {
   private let _identifier: String
 
+  // Backing storage for 'isOnewayRemoteCall'
+  private var _isOnewayRemoteCall: Bool
+
+  // Backing storage for 'isOnewayTarget'
+  private var _isOnewayTarget: Bool
+
+  // Backing storage for 'isIdempotentTarget'
+  private var _isIdempotentTarget: Bool
+
   public init(_ identifier: String) {
     self._identifier = identifier
+    self._isOnewayRemoteCall = false
+    self._isOnewayTarget = false
+    self._isIdempotentTarget = false
   }
 
   /// The underlying identifier of the target, returned as-is.
   public var identifier: String {
     return _identifier
+  }
+
+  /// Whether this remote call was made using `send`, and expects no reply
+  ///
+  /// This describes the individual call, not the target function: see
+  /// ``isOnewayTarget`` for whether the target function is `@oneway`.
+  /// A `send` call, such as `try send worker.stop()`, is made by the
+  /// synchronous distributed thunk, which sets this and hands the call to
+  /// ``_DistributedOnewayActorSystem/remoteCallOneway(on:target:invocation:)``
+  /// of the actor system. The call is fire-and-forget: no peer reply is
+  /// expected, and the actor system must not wait for, or depend on, one.
+  /// An `await` call of a `@oneway` function makes a regular request-reply
+  /// call through ``DistributedActorSystem/remoteCallVoid(on:target:invocation:throwing:)``
+  /// and does not set this
+  ///
+  /// Both kinds of call use the same ``identifier``, the one the function
+  /// would have if it was not `@oneway`, and the recipient runs both through
+  /// the same distributed target accessor, so this flag is the only difference
+  /// between them. A recipient's actor system should set this on the target it
+  /// passes to `executeDistributedTarget` if the call was made using `send`,
+  /// which it must carry to the recipient as part of its message format, and
+  /// must not send a reply for such a call
+  @_spi(OnewaySend)
+  @available(SwiftStdlib 6.5, *)
+  public var isOnewayRemoteCall: Bool {
+    get { _isOnewayRemoteCall }
+    set { _isOnewayRemoteCall = newValue }
+  }
+
+  /// Marks this target as the target of a remote call made using `send`
+  ///
+  /// Called by the synchronous distributed thunk, which only a `send` call
+  /// invokes, so it is known to be a `send` call without passing a flag to
+  /// the thunk. Synthesized code is not availability checked, and this is emitted into
+  /// the client, so it only sets ``isOnewayRemoteCall`` when running on a
+  /// runtime which has it. The flag is only a hint to the actor system, so
+  /// this is a no-op on older runtimes
+  ///
+  /// A `@oneway` distributed function itself requires Swift 6.5 availability
+  /// outside of Embedded Swift, so the check is normally redundant, but it is
+  /// kept since it is harmless and the thunk is not availability checked
+  @_spi(OnewaySend)
+  @available(SwiftStdlib 5.7, *)
+  @export(implementation)
+  public mutating func _markOnewayRemoteCall() {
+    // This is SwiftStdlib 6.5, but an availability macro can't be used in an
+    // @export(implementation) function
+    if #available(anyAppleOS 9999, *) {
+      self.isOnewayRemoteCall = true
+    }
+  }
+
+  /// Marks this target as the target of a `@oneway` distributed function
+  ///
+  /// Called by the synthesized distributed thunks of a `@oneway` function.
+  /// Like ``_markOnewayRemoteCall()`` it is emitted into the client, and a
+  /// no-op on a runtime which does not have ``isOnewayTarget``. Synthesized
+  /// code cannot assign the SPI property ``isOnewayTarget`` itself, because
+  /// the setter of an SPI property is inaccessible without the SPI import
+  @_spi(OnewaySend)
+  @available(SwiftStdlib 5.7, *)
+  @export(implementation)
+  public mutating func _markOnewayTarget() {
+    // This is SwiftStdlib 6.5, but an availability macro can't be used in an
+    // @export(implementation) function
+    if #available(anyAppleOS 9999, *) {
+      self.isOnewayTarget = true
+    }
+  }
+
+  /// Whether the target is a `@oneway` distributed function, regardless of
+  /// whether the call was made using `send` or `await`
+  ///
+  /// Unlike ``isOnewayRemoteCall`` this describes the target function, not
+  /// the call: both synthesized distributed thunks of a `@oneway` function
+  /// set it, the synchronous one used by a `send` call and the one used by an
+  /// `await` call, which makes a regular request-reply remote call. A call by
+  /// `send` of a function which is not `@oneway`, e.g. through a `@oneway`
+  /// protocol requirement it witnesses, does not set it
+  ///
+  /// On the recipient side an actor system may set it on the target it passes
+  /// to `executeDistributedTarget`
+  @_spi(OnewaySend)
+  @available(SwiftStdlib 6.5, *)
+  public var isOnewayTarget: Bool {
+    get { _isOnewayTarget }
+    set { _isOnewayTarget = newValue }
+  }
+
+  /// Marks this target as the target of an `@_remoteCallIdempotent`
+  /// distributed function
+  ///
+  /// Called by the synthesized distributed thunks of such a function. Like
+  /// ``_markOnewayTarget()`` it is emitted into the client, and a no-op on a
+  /// runtime which does not have ``isIdempotentTarget``
+  @_spi(DistributedIdempotent)
+  @available(SwiftStdlib 5.7, *)
+  @export(implementation)
+  public mutating func _markIdempotentTarget() {
+    // This is SwiftStdlib 6.5, but an availability macro can't be used in an
+    // @export(implementation) function
+    if #available(anyAppleOS 9999, *) {
+      self.isIdempotentTarget = true
+    }
+  }
+
+  /// Whether the target is an `@_remoteCallIdempotent` distributed function,
+  /// which is safe to call more than once with the same arguments
+  ///
+  /// This describes the target function, not the call: every synthesized
+  /// distributed thunk of such a function sets it. An actor system may use it
+  /// to make the call more than once, e.g. to retry it after a transport
+  /// failure without knowing whether the recipient already ran it, or to send
+  /// it over more than one connection
+  ///
+  /// On the recipient side an actor system may set it on the target it passes
+  /// to `executeDistributedTarget`
+  @_spi(DistributedIdempotent)
+  @available(SwiftStdlib 6.5, *)
+  public var isIdempotentTarget: Bool {
+    get { _isIdempotentTarget }
+    set { _isIdempotentTarget = newValue }
   }
 
   /// Attempts to pretty format the underlying target identifier.
@@ -1025,6 +1293,16 @@ public struct RemoteCallTarget: CustomStringConvertible, Hashable {
     } else {
       return "\(_identifier)"
     }
+  }
+
+  // A target's identity is its identifier, the 'oneway' and idempotency flags
+  // do not participate in equality and hashing
+  public static func ==(lhs: RemoteCallTarget, rhs: RemoteCallTarget) -> Bool {
+    lhs._identifier == rhs._identifier
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(_identifier)
   }
 }
 #else
@@ -1050,6 +1328,88 @@ private let _immortalStaticStorage: Int = 0
 @available(SwiftStdlib 6.5, *)
 public struct RemoteCallTarget: ~Escapable {
   @usableFromInline internal let _identifier: RawSpan
+
+  // Backing storage for 'isOnewayRemoteCall'
+  @usableFromInline internal var _isOnewayRemoteCall: Bool = false
+
+  // Backing storage for 'isOnewayTarget'
+  @usableFromInline internal var _isOnewayTarget: Bool = false
+
+  // Backing storage for 'isIdempotentTarget'
+  @usableFromInline internal var _isIdempotentTarget: Bool = false
+
+  /// Whether this remote call was made using `send`, and expects no reply
+  ///
+  /// This describes the individual call, not the target function: see
+  /// ``isOnewayTarget`` for whether the target function is `@oneway`.
+  /// The synchronous distributed thunk, which only a `send` call invokes,
+  /// sets this and hands the call to
+  /// ``_DistributedOnewayActorSystem/remoteCallOneway(on:target:invocation:)``
+  /// of the actor system. The actor system must not wait for, or depend on, a
+  /// reply from the peer for such a call. An `await` call of a `@oneway`
+  /// function does not set this
+  @_spi(OnewaySend)
+  public var isOnewayRemoteCall: Bool {
+    get { _isOnewayRemoteCall }
+    set { _isOnewayRemoteCall = newValue }
+  }
+
+  /// Marks this target as the target of a remote call made using `send`
+  ///
+  /// Called by the synchronous distributed thunk, which only a `send` call
+  /// invokes
+  @_spi(OnewaySend)
+  @export(implementation)
+  public mutating func _markOnewayRemoteCall() {
+    _isOnewayRemoteCall = true
+  }
+
+  /// Marks this target as the target of a `@oneway` distributed function
+  ///
+  /// Called by the synthesized distributed thunks of a `@oneway` function.
+  /// Synthesized code cannot assign the SPI property ``isOnewayTarget``
+  /// itself, because the setter of an SPI property is inaccessible without the
+  /// SPI import
+  @_spi(OnewaySend)
+  @export(implementation)
+  public mutating func _markOnewayTarget() {
+    _isOnewayTarget = true
+  }
+
+  /// Whether the target is a `@oneway` distributed function, regardless of
+  /// whether the call was made using `send` or `await`
+  ///
+  /// Both synthesized distributed thunks of a `@oneway` function set this,
+  /// the synchronous one used by a `send` call and the one used by an `await`
+  /// call. A call by `send` of a function which is not `@oneway`, e.g.
+  /// through a `@oneway` protocol requirement it witnesses, does not set it
+  @_spi(OnewaySend)
+  public var isOnewayTarget: Bool {
+    get { _isOnewayTarget }
+    set { _isOnewayTarget = newValue }
+  }
+
+  /// Marks this target as the target of an `@_remoteCallIdempotent`
+  /// distributed function
+  ///
+  /// Called by the synthesized distributed thunks of such a function
+  @_spi(DistributedIdempotent)
+  @export(implementation)
+  public mutating func _markIdempotentTarget() {
+    _isIdempotentTarget = true
+  }
+
+  /// Whether the target is an `@_remoteCallIdempotent` distributed function,
+  /// which is safe to call more than once with the same arguments
+  ///
+  /// Every synthesized distributed thunk of such a function sets this. An
+  /// actor system may use it to make the call more than once, e.g. to retry
+  /// it after a transport failure
+  @_spi(DistributedIdempotent)
+  public var isIdempotentTarget: Bool {
+    get { _isIdempotentTarget }
+    set { _isIdempotentTarget = newValue }
+  }
 
   /// Create a target from a compile-time constant mangled name.
   ///

@@ -1465,6 +1465,11 @@ namespace {
       return CS.getType(expr->getSubExpr());
     }
 
+    Type visitSendExpr(SendExpr *expr) {
+      // 'send <call>' always produces Void
+      return CS.getASTContext().TheEmptyTupleType;
+    }
+
     Type visitForceTryExpr(AnyTryExpr *expr) {
       auto valueTy = CS.createTypeVariable(CS.getConstraintLocator(expr),
                                            TVO_PrefersSubtypeBinding |

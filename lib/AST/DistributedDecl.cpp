@@ -1523,6 +1523,18 @@ bool swift::isDistributedActorSystemRemoteCallWitnessNonisolatedNonsending(
   return getActorIsolation(witness).isNonisolatedNonsending();
 }
 
+bool swift::isSynthesizedEmbeddedDistributedDispatcher(const Decl *decl) {
+  auto *func = dyn_cast_or_null<FuncDecl>(decl);
+  if (!func || !func->isSynthesized())
+    return false;
+  auto &C = func->getASTContext();
+  if (!C.LangOpts.hasFeature(Feature::Embedded) ||
+      func->getBaseIdentifier() != C.Id_executeDistributedTarget)
+    return false;
+  auto *nominal = func->getDeclContext()->getSelfNominalTypeDecl();
+  return nominal && nominal->isDistributedActor();
+}
+
 /******************************************************************************/
 /********************** Distributed Actor Properties **************************/
 /******************************************************************************/
@@ -1575,11 +1587,35 @@ AbstractFunctionDecl *swift::getDistributedThunkOriginalDecl(FuncDecl *thunk) {
     for (auto *member : nominal->lookupDirect(thunk->getName())) {
       auto *afd = dyn_cast<AbstractFunctionDecl>(member);
       if (afd && afd->isDistributed() && !afd->isDistributedThunk() &&
-          afd->getDistributedThunk() == thunk)
+          (afd->getDistributedThunk() == thunk ||
+           afd->getDistributedAwaitThunk() == thunk))
         return afd;
     }
   }
   return nullptr;
+}
+
+FuncDecl *AbstractFunctionDecl::getDistributedOnewayWitnessAdapter() const {
+  if (isDistributedThunk() || isa<AccessorDecl>(this) || !isDistributed())
+    return nullptr;
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetDistributedOnewayWitnessAdapterRequest{mutableThis},
+                           nullptr);
+}
+
+FuncDecl *AbstractFunctionDecl::getDistributedAwaitThunk() const {
+  if (isDistributedThunk() || isa<AccessorDecl>(this) || !isDistributed())
+    return nullptr;
+  auto *func = dyn_cast<FuncDecl>(this);
+  if (!func || !func->hasSynchronousDistributedThunk())
+    return nullptr;
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           GetDistributedAwaitThunkRequest{mutableThis},
+                           nullptr);
 }
 
 FuncDecl *

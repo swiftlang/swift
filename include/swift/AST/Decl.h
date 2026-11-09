@@ -8479,6 +8479,30 @@ public:
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
 
+  /// For a '@oneway' 'distributed' function, whose distributed thunk
+  /// (see \c getDistributedThunk()) is the synchronous thunk that a 'send'
+  /// calls, get the 'await thunk': the regular 'async' thunk that any other
+  /// call, e.g. an 'await', calls. It waits for the call, and makes a remote
+  /// call as a regular request-reply call through 'remoteCallVoid'. It is the
+  /// thunk that the function would have if it was not '@oneway', and the
+  /// remote calls of both thunks use its identifier
+  ///
+  /// \return the await thunk, or null if the function is not a
+  ///         '@oneway' 'distributed' function
+  FuncDecl *getDistributedAwaitThunk() const;
+
+  /// For a non-'@oneway' 'distributed' function that returns 'Void' and does
+  /// not throw, get the synchronous 'oneway witness adapter' thunk, with
+  /// which it witnesses the requirement thunk of a '@oneway' 'distributed'
+  /// requirement. The adapter makes remote calls with the identifier of the
+  /// function's own thunk, so the receiving side runs the function itself, and
+  /// makes local calls by 'send'. It is only emitted when it witnesses
+  /// such a requirement
+  ///
+  /// \return the adapter, or null if the function cannot witness a '@oneway'
+  ///         requirement
+  FuncDecl *getDistributedOnewayWitnessAdapter() const;
+
   /// Get the 'resolvable proxy adapter' thunk used on the recipient side
   /// of a remote call to bridge between the wire-level `@Resolvable`
   /// proxy types (`$P`) and the user-facing `any P` / `some P` types.
@@ -9052,6 +9076,43 @@ public:
                                   DeclContext *Parent, ClangNode ClangN);
 
   bool isStatic() const;
+
+  /// Whether this function is declared '@oneway': it is meant to be called
+  /// with 'send'. This does not affect the function type, so a function
+  /// which differs from another one only in being '@oneway' redeclares it
+  bool isOneway() const;
+
+  /// Whether this function is declared '@oneway(never)', or overrides a
+  /// method which is: a 'send' of a call to it from outside of its isolation
+  /// domain is diagnosed, since it should be called with 'await'
+  bool isOnewayNever() const;
+
+  /// Whether a call of this synchronous '@oneway' 'distributed' function on
+  /// a local actor is enqueued on the actor without any async code by its
+  /// synchronous distributed thunk (see 'hasSynchronousDistributedThunk()')
+  /// and by the receive dispatcher.
+  ///
+  /// This is the case in Embedded Swift with the 'SendCalls' feature.
+  /// Otherwise the thunk sends the call, which runs it in a new task
+  bool isSynchronouslyEnqueuedOneway() const;
+
+  /// Whether this is a '@oneway' 'distributed' function, whose distributed
+  /// thunk is synchronous: 'throws', but neither 'async' nor isolated
+  ///
+  /// This is the case in every mode and also for an 'async' '@oneway'
+  /// function. A 'send' call of such a function is a direct call of the thunk, which
+  /// hands a remote call to the synchronous 'remoteCallOneway' of the actor
+  /// system, a '_DistributedOnewayActorSystem', and runs a local call on the
+  /// actor without waiting for it
+  bool hasSynchronousDistributedThunk() const;
+
+  /// Whether this is a 'oneway witness adapter' thunk, see
+  /// \c AbstractFunctionDecl::getDistributedOnewayWitnessAdapter()
+  bool isDistributedOnewayWitnessAdapter() const;
+
+  /// Whether this is the 'await thunk' of a '@oneway' 'distributed'
+  /// function, see \c AbstractFunctionDecl::getDistributedAwaitThunk()
+  bool isDistributedAwaitThunk() const;
 
   /// \returns the way 'static'/'class' was spelled in the source.
   StaticSpellingKind getStaticSpelling() const {

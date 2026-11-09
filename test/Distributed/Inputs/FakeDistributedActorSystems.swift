@@ -12,7 +12,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-import Distributed
+@_spi(OnewaySend) import Distributed
 
 // ==== Example Distributed Actors ----------------------------------------------
 
@@ -150,6 +150,20 @@ public struct FakeActorSystem: DistributedActorSystem, CustomStringConvertible {
 
   public nonisolated var description: Swift.String {
     "\(Self.self)()"
+  }
+}
+
+@_spi(OnewaySend)
+@available(SwiftStdlib 6.5, *)
+extension FakeActorSystem: _DistributedOnewayActorSystem {
+  public func remoteCallOneway<Act>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation invocationEncoder: inout InvocationEncoder
+  ) throws
+    where Act: DistributedActor,
+          Act.ID == ActorID {
+    throw ExecuteDistributedTargetError(message: "\(#function) not implemented.")
   }
 }
 
@@ -303,6 +317,14 @@ public struct FakeNotLoadableAddressActorSystem: DistributedActorSystem, CustomS
 // ==== Fake Roundtrip Transport -----------------------------------------------
 
 @available(SwiftStdlib 5.7, *)
+/// The reply of one remote call of a roundtrip actor system, so that
+/// concurrent calls, like the '@oneway' calls made with 'send', do not
+/// overwrite each other's replies
+final class FakeRoundtripReply: @unchecked Sendable {
+  var result: Any? = nil
+  var error: (any Error)? = nil
+}
+
 public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked Sendable {
   public typealias ActorID = ActorAddress
   public typealias InvocationEncoder = FakeInvocationEncoder
@@ -312,6 +334,9 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
 
   var activeActors: [ActorID: any DistributedActor] = [:]
   var forcedNextRemoteCallReply: Any? = nil
+
+  // Delivers the '@oneway' calls, see 'remoteCallOneway'
+  let onewayTransport = FakeOnewayTransport()
 
   public init() {}
 
@@ -347,8 +372,6 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
     .init()
   }
 
-  private var remoteCallResult: Any? = nil
-  private var remoteCallError: Error? = nil
 
   public func forceNextRemoteCallReply(_ reply: Any) {
     self.forcedNextRemoteCallReply = reply
@@ -381,27 +404,31 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
       }
 
+      let reply = FakeRoundtripReply()
       let resultHandler = FakeRoundtripResultHandler { value in
-        self.remoteCallResult = value
-        self.remoteCallError = nil
+        reply.result = value
+        reply.error = nil
       } onError: { error in
-        self.remoteCallResult = nil
-        self.remoteCallError = error
+        reply.result = nil
+        reply.error = error
       }
 
+      // The envelope which is sent to the recipient
+      let envelope = FakeTargetEnvelope(target)
       var decoder = invocation.makeDecoder()
 
+      let recipientTarget = fakeRecipientTarget(envelope)
       try await executeDistributedTarget(
         on: active,
-        target: target,
+        target: recipientTarget,
         invocationDecoder: &decoder,
         handler: resultHandler
       )
 
-      switch (remoteCallResult, remoteCallError) {
+      switch (reply.result, reply.error) {
       case (.some(let value), nil):
         print("  << remoteCall return: \(value)")
-        return remoteCallResult! as! Res
+        return reply.result! as! Res
       case (nil, .some(let error)):
         print("  << remoteCall throw: \(error)")
         throw error
@@ -422,6 +449,9 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
           Act.ID == ActorID,
           Err: Error {
     print("  >> remoteCallVoid: on:\(actor), target:\(target), invocation:\(invocation), throwing:\(String(reflecting: errorType))")
+    if #available(SwiftStdlib 6.5, *), target.isOnewayRemoteCall {
+      print("  >> remoteCallVoid: is oneway call")
+    }
     guard let targetActor = activeActors[actor.id] else {
       fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor")
     }
@@ -431,25 +461,29 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
         fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
       }
 
+      let reply = FakeRoundtripReply()
       let resultHandler = FakeRoundtripResultHandler { value in
-        self.remoteCallResult = value
-        self.remoteCallError = nil
+        reply.result = value
+        reply.error = nil
       } onError: { error in
-        self.remoteCallResult = nil
-        self.remoteCallError = error
+        reply.result = nil
+        reply.error = error
       }
 
+      // The envelope which is sent to the recipient
+      let envelope = FakeTargetEnvelope(target)
       var decoder = invocation.makeDecoder()
 
       print(" > execute distributed target: \(target)")
+      let recipientTarget = fakeRecipientTarget(envelope)
       try await executeDistributedTarget(
         on: active,
-        target: target,
+        target: recipientTarget,
         invocationDecoder: &decoder,
         handler: resultHandler
       )
 
-      switch (remoteCallResult, remoteCallError) {
+      switch (reply.result, reply.error) {
       case (.some, nil):
         return
       case (nil, .some(let error)):
@@ -462,6 +496,136 @@ public final class FakeRoundtripActorSystem: DistributedActorSystem, @unchecked 
     try await _openExistential(targetActor, do: doIt)
   }
 
+}
+
+@_spi(OnewaySend)
+@available(SwiftStdlib 6.5, *)
+extension FakeRoundtripActorSystem: _DistributedOnewayActorSystem {
+  /// Hands the call to the fake transport and returns right away, the
+  /// transport executes the calls on the "remote" actor in the order they
+  /// were sent, see 'FakeOnewayTransport'
+  public func remoteCallOneway<Act>(
+    on actor: Act,
+    target: RemoteCallTarget,
+    invocation: inout InvocationEncoder
+  ) throws
+    where Act: DistributedActor,
+          Act.ID == ActorID {
+    print("  >> remoteCallOneway: on:\(actor), target:\(target), invocation:\(invocation), oneway: \(target.isOnewayRemoteCall), onewayTarget: \(target.isOnewayTarget)")
+    guard let targetActor = activeActors[actor.id] else {
+      fatalError("Attempted to call mock 'roundtrip' on: \(actor.id) without active actor")
+    }
+
+    let message = FakeOnewayMessage(
+      system: self, actor: targetActor, target: FakeTargetEnvelope(target),
+      decoder: invocation.makeDecoder())
+    // Runs synchronously up to the hop to the transport, so the calls reach
+    // the transport in the order they were sent
+    let transport = self.onewayTransport
+    Task.immediate {
+      await transport.send(message)
+    }
+  }
+}
+
+/// A '@oneway' call on its way to the "remote" actor
+@available(SwiftStdlib 5.7, *)
+struct FakeOnewayMessage: @unchecked Sendable {
+  let system: FakeRoundtripActorSystem
+  let actor: any DistributedActor
+  let target: FakeTargetEnvelope
+  let decoder: FakeInvocationDecoder
+}
+
+/// The transport of the '@oneway' calls of 'FakeRoundtripActorSystem'. It
+/// executes the calls one after the other, in the order they were sent, and
+/// nobody waits for them
+@available(SwiftStdlib 5.7, *)
+actor FakeOnewayTransport {
+  var outbox: [FakeOnewayMessage] = []
+  var isDelivering = false
+
+  func send(_ message: FakeOnewayMessage) {
+    outbox.append(message)
+    if !isDelivering {
+      isDelivering = true
+      Task { await self.deliverAll() }
+    }
+  }
+
+  func deliverAll() async {
+    while !outbox.isEmpty {
+      let message = outbox.removeFirst()
+      await Self.deliver(message)
+    }
+    isDelivering = false
+  }
+
+  nonisolated static func deliver(_ message: FakeOnewayMessage) async {
+    func doIt<A: DistributedActor>(active: A) async {
+      let resultHandler = FakeRoundtripResultHandler { _ in
+      } onError: { error in
+        print("  << remoteCallOneway error: \(error)")
+      }
+      var decoder = message.decoder
+      print(" > execute oneway distributed target: \(message.target.identifier)")
+      let recipientTarget = fakeRecipientTarget(message.target)
+      do {
+        try await message.system.executeDistributedTarget(
+          on: active,
+          target: recipientTarget,
+          invocationDecoder: &decoder,
+          handler: resultHandler
+        )
+      } catch {
+        print("  << remoteCallOneway execute error: \(error)")
+      }
+    }
+    await _openExistential(message.actor, do: doIt)
+  }
+}
+
+// ==== -----------------------------------------------------------------------
+// MARK: Carrying the oneway flags of a RemoteCallTarget over the "wire"
+
+/// What the sender puts into the envelope next to the invocation: the target
+/// identifier and the oneway flags of the 'RemoteCallTarget'
+@available(SwiftStdlib 5.7, *)
+struct FakeTargetEnvelope: Sendable {
+  let identifier: String
+  var isOnewayRemoteCall: Bool = false
+  var isOnewayTarget: Bool = false
+
+  init(_ target: RemoteCallTarget) {
+    self.identifier = target.identifier
+    if #available(SwiftStdlib 6.5, *) {
+      self.isOnewayRemoteCall = target.isOnewayRemoteCall
+      self.isOnewayTarget = target.isOnewayTarget
+    }
+  }
+}
+
+/// Tests which check the oneway flags the recipient sees turn this on. It is
+/// off by default so that the many tests which share these systems, and
+/// match their output line by line, don't see the extra line
+@available(SwiftStdlib 5.7, *)
+public enum FakeRecipientTargetPrinting {
+  nonisolated(unsafe) public static var isEnabled = false
+}
+
+/// The recipient builds a fresh target from the identifier, and restores the
+/// oneway flags which were sent along with the invocation
+@available(SwiftStdlib 5.7, *)
+func fakeRecipientTarget(_ envelope: FakeTargetEnvelope) -> RemoteCallTarget {
+  var target = RemoteCallTarget(envelope.identifier)
+  if #available(SwiftStdlib 6.5, *) {
+    target.isOnewayTarget = envelope.isOnewayTarget
+    if envelope.isOnewayRemoteCall { target._markOnewayRemoteCall() }
+    if FakeRecipientTargetPrinting.isEnabled {
+      print("  >> executeDistributedTarget: \(target.identifier) oneway: \(target.isOnewayRemoteCall) target: \(target.isOnewayTarget)")
+    }
+  }
+  return target
 }
 
 @available(SwiftStdlib 5.7, *)
@@ -673,8 +837,6 @@ public final class FakeCustomSerializationRoundtripActorSystem: DistributedActor
     .init()
   }
 
-  private var remoteCallResult: Any? = nil
-  private var remoteCallError: Error? = nil
 
   public func forceNextRemoteCallReply(_ reply: Any) {
     self.forcedNextRemoteCallReply = reply
@@ -707,27 +869,31 @@ public final class FakeCustomSerializationRoundtripActorSystem: DistributedActor
         fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
       }
 
+      let reply = FakeRoundtripReply()
       let resultHandler = FakeCustomSerializationRoundtripResultHandler { value in
-        self.remoteCallResult = value
-        self.remoteCallError = nil
+        reply.result = value
+        reply.error = nil
       } onError: { error in
-        self.remoteCallResult = nil
-        self.remoteCallError = error
+        reply.result = nil
+        reply.error = error
       }
 
+      // The envelope which is sent to the recipient
+      let envelope = FakeTargetEnvelope(target)
       var decoder = invocation.makeDecoder()
 
+      let recipientTarget = fakeRecipientTarget(envelope)
       try await executeDistributedTarget(
         on: active,
-        target: target,
+        target: recipientTarget,
         invocationDecoder: &decoder,
         handler: resultHandler
       )
 
-      switch (remoteCallResult, remoteCallError) {
+      switch (reply.result, reply.error) {
       case (.some(let value), nil):
         print("  << remoteCall return: \(value)")
-        return remoteCallResult! as! Res
+        return reply.result! as! Res
       case (nil, .some(let error)):
         print("  << remoteCall throw: \(error)")
         throw error
@@ -757,25 +923,29 @@ public final class FakeCustomSerializationRoundtripActorSystem: DistributedActor
         fatalError("Attempted to call mock 'roundtrip' on unknown actor: \(actor.id), known: \(active.id)")
       }
 
+      let reply = FakeRoundtripReply()
       let resultHandler = FakeCustomSerializationRoundtripResultHandler { value in
-        self.remoteCallResult = value
-        self.remoteCallError = nil
+        reply.result = value
+        reply.error = nil
       } onError: { error in
-        self.remoteCallResult = nil
-        self.remoteCallError = error
+        reply.result = nil
+        reply.error = error
       }
 
+      // The envelope which is sent to the recipient
+      let envelope = FakeTargetEnvelope(target)
       var decoder = invocation.makeDecoder()
 
       print(" > execute distributed target: \(target)")
+      let recipientTarget = fakeRecipientTarget(envelope)
       try await executeDistributedTarget(
         on: active,
-        target: target,
+        target: recipientTarget,
         invocationDecoder: &decoder,
         handler: resultHandler
       )
 
-      switch (remoteCallResult, remoteCallError) {
+      switch (reply.result, reply.error) {
       case (.some, nil):
         return
       case (nil, .some(let error)):

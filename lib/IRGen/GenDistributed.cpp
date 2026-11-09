@@ -496,6 +496,24 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   if (Context.LangOpts.hasFeature(Feature::Embedded))
     return;
 
+  // The synchronous thunk of a '@oneway' function or requirement, and a
+  // distributed oneway witness adapter, are never looked up by name at
+  // runtime: every remote call of a function, sent or awaited, uses the
+  // identifier of its regular 'async' thunk, which for a '@oneway' function is
+  // its await thunk, so the receiving side runs it through the accessor and
+  // the accessible function record of that thunk, like any other function
+  auto isSynchronousOnewayThunk = [](AbstractFunctionDecl *decl) {
+    auto *func = dyn_cast_or_null<FuncDecl>(decl);
+    return func && func->isDistributedThunk() && func->isOneway() &&
+           !func->hasAsync();
+  };
+  if (auto *thunk = target.dyn_cast<SILFunction *>()) {
+    if (isSynchronousOnewayThunk(thunk->getDeclRef().getDistributedThunk()))
+      return;
+  } else if (isSynchronousOnewayThunk(cast<AbstractFunctionDecl *>(target))) {
+    return;
+  }
+
   LinkEntity accessorRef = getAccessorLinking(target);
 
   // Pick the SIL function to dispatch through. Default = the linked thunk;

@@ -12388,6 +12388,50 @@ OperatorDecl *FuncDecl::getOperatorDecl() const {
                            nullptr);
 }
 
+bool FuncDecl::isOnewayNever() const {
+  for (auto *func = this; func;
+       func = dyn_cast_or_null<FuncDecl>(func->getOverriddenDecl())) {
+    if (func->getAttrs().hasAttribute<OnewayNeverAttr>())
+      return true;
+  }
+  return false;
+}
+
+bool FuncDecl::isOneway() const {
+  return getAttrs().hasAttribute<OnewayAttr>();
+}
+
+bool FuncDecl::isSynchronouslyEnqueuedOneway() const {
+  if (!isOneway() || hasAsync())
+    return false;
+
+  auto &langOpts = getASTContext().LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+         langOpts.hasFeature(Feature::SendCalls);
+}
+
+bool FuncDecl::hasSynchronousDistributedThunk() const {
+  // Deliberately independent of the language mode and the features of the
+  // module using the function: the thunk's signature is part of its mangled
+  // name, which every module must agree on, and '@oneway' can only be
+  // declared with the 'SendCalls' feature anyway
+  return isOneway() && isDistributed() && !isa<AccessorDecl>(this);
+}
+
+bool FuncDecl::isDistributedOnewayWitnessAdapter() const {
+  return isDistributedThunk() && !isa<AccessorDecl>(this) &&
+         getBaseIdentifier().str().starts_with("$onewayWitness$");
+}
+
+bool FuncDecl::isDistributedAwaitThunk() const {
+  // The synchronous thunk of a '@oneway' function and its oneway
+  // witness adapter are not 'async', the await thunk is the only
+  // '@oneway' thunk which is
+  return isDistributedThunk() && !isa<AccessorDecl>(this) &&
+         !isDistributedOnewayWitnessAdapter() && isOneway() &&
+         hasAsync();
+}
+
 bool FuncDecl::isStatic() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,

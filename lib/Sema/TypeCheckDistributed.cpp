@@ -26,6 +26,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/ASTPrinter.h"
 
 using namespace swift;
@@ -964,6 +965,71 @@ static bool checkEmbeddedDistributedFunction(AbstractFunctionDecl *func) {
   return anyMissing;
 }
 
+static bool isResolvableMacroStub(FuncDecl *func);
+
+/// The actor system of the distributed actor (or 'DistributedActor'
+/// constrained protocol) which \p func is a member of, in the generic
+/// environment of \p func: a concrete actor system, or an archetype which is
+/// constrained by the generic signature
+Type swift::getDistributedActorSystemTypeOfMember(AbstractFunctionDecl *func) {
+  auto &C = func->getASTContext();
+  auto *DC = func->getDeclContext();
+  auto *nominal = DC->getSelfNominalTypeDecl();
+  if (!nominal)
+    return Type();
+
+  Type systemTy;
+  if (isa<ProtocolDecl>(nominal)) {
+    auto *actorProto = C.getDistributedActorDecl();
+    auto *systemAssocType =
+        actorProto ? actorProto->getAssociatedType(C.Id_ActorSystem) : nullptr;
+    if (!systemAssocType)
+      return Type();
+    systemTy =
+        DependentMemberType::get(DC->getSelfInterfaceType(), systemAssocType);
+  } else if (nominal->isDistributedActor()) {
+    systemTy = getDistributedActorSystemType(nominal);
+  }
+  if (!systemTy || systemTy->hasError())
+    return Type();
+  return func->mapTypeIntoEnvironment(systemTy);
+}
+
+/// The synchronous distributed thunk of a 'oneway' function hands a remote
+/// call to the 'remoteCallOneway' of the actor system, which is declared by
+/// '_DistributedOnewayActorSystem'. Require the actor system to be known to
+/// conform to it: a concrete actor system which conforms, or a generic one
+/// which is constrained to conform
+///
+/// \returns true if the actor system is not known to conform, which was
+/// diagnosed
+static bool checkDistributedOnewayActorSystem(AbstractFunctionDecl *func) {
+  auto *funcDecl = dyn_cast<FuncDecl>(func);
+  if (!funcDecl || !funcDecl->hasSynchronousDistributedThunk())
+    return false;
+
+  // The '@Resolvable' macro copies the requirement, which is diagnosed
+  if (isResolvableMacroStub(funcDecl))
+    return false;
+
+  // Without an actor system other diagnostics apply
+  Type systemTy = getDistributedActorSystemTypeOfMember(func);
+  if (!systemTy)
+    return false;
+
+  auto &C = func->getASTContext();
+  auto *onewayProto =
+      C.getProtocol(KnownProtocolKind::DistributedOnewayActorSystem);
+  if (onewayProto && !lookupConformance(systemTy, onewayProto).isInvalid())
+    return false;
+
+  func->diagnose(diag::oneway_distributed_requires_oneway_actor_system, func);
+  if (auto *nominal = func->getDeclContext()->getSelfNominalTypeDecl())
+    nominal->diagnose(diag::oneway_distributed_actor_system_not_oneway,
+                      systemTy->mapTypeOutOfEnvironment(), nominal);
+  return true;
+}
+
 bool CheckDistributedFunctionRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
@@ -988,6 +1054,10 @@ bool CheckDistributedFunctionRequest::evaluate(
   // single targeted diagnostic rather than also tripping the generic
   // "does not conform to serialization requirement" diagnostic.
   if (checkEmbeddedDistributedFunction(func))
+    return true;
+
+  // A 'oneway' function requires a '_DistributedOnewayActorSystem'
+  if (checkDistributedOnewayActorSystem(func))
     return true;
 
   Type serializationReqType =
@@ -1270,12 +1340,65 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
       if (auto thunk = func->getDistributedThunk()) {
         SF->addDelayedFunction(thunk);
       }
+      if (auto awaitThunk = func->getDistributedAwaitThunk()) {
+        SF->addDelayedFunction(awaitThunk);
+      }
     }
   }
 }
 
 bool TypeChecker::checkDistributedFunc(FuncDecl *func) {
   return swift::checkDistributedFunction(func);
+}
+
+/// Whether 'func' is a stub the '@Resolvable' macro synthesized for a protocol
+/// requirement, in 'extension P where Self: _DistributedActorStub'. The stub
+/// copies the requirement's attributes, and the requirement itself is
+/// diagnosed, so diagnosing the stub again would only duplicate the error
+static bool isResolvableMacroStub(FuncDecl *func) {
+  auto *ext = dyn_cast<ExtensionDecl>(func->getDeclContext());
+  if (!ext || !isa_and_nonnull<ProtocolDecl>(ext->getExtendedNominal()))
+    return false;
+
+  auto *SF = ext->getParentSourceFile();
+  if (!SF || SF->getFulfilledMacroRole() != MacroRole::Extension)
+    return false;
+
+  auto *stubProto = func->getASTContext().get_DistributedActorStubDecl();
+  if (!stubProto)
+    return false;
+
+  for (auto req : ext->getGenericSignature().getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        req.getProtocolDecl() == stubProto)
+      return true;
+  }
+  return false;
+}
+
+void TypeChecker::checkDistributedOnewayAvailability(FuncDecl *func) {
+  if (!func->isDistributed() || !func->isOneway() || func->isImplicit())
+    return;
+
+  // Embedded Swift has no OS availability, the runtime ships with the binary
+  auto &C = func->getASTContext();
+  if (C.LangOpts.hasFeature(Feature::Embedded))
+    return;
+
+  if (isResolvableMacroStub(func))
+    return;
+
+  // The synchronous distributed thunk calls 'remoteCallOneway' of the
+  // '_DistributedOnewayActorSystem', which is only available in the runtime
+  // which supports '@oneway' distributed functions, and enqueues a local call
+  // without waiting for it, which is covered by the same availability
+  TypeChecker::checkAvailability(
+      func->getLoc(), C.getDistributedOnewayFunctionAvailability(), func,
+      [&](AvailabilityDomain domain, AvailabilityRange range) {
+        return C.Diags.diagnose(func->getLoc(),
+                                diag::oneway_distributed_only_version_newer,
+                                func, domain, range);
+      });
 }
 
 ConstructorDecl*

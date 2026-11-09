@@ -2372,6 +2372,12 @@ namespace {
     SmallVector<llvm::PointerUnion<ApplyExpr *, LookupExpr *>, 4> applyStack;
     SmallVector<std::pair<OpaqueValueExpr *, Expr *>, 4> opaqueValues;
     SmallVector<const PatternBindingDecl *, 2> patternBindingStack;
+    /// The explicit 'send' expressions that are being walked, innermost last
+    SmallVector<SendExpr *, 1> sendStack;
+    /// The explicit 'await' expressions that are being walked, innermost
+    /// last. A closure or local function starts a new context, which a
+    /// null entry separates from the 'await's around it
+    SmallVector<AwaitExpr *, 2> awaitStack;
     llvm::function_ref<Type(Expr *)> getType;
     llvm::function_ref<ActorIsolation(AbstractClosureExpr *)>
         getClosureActorIsolation;
@@ -3214,6 +3220,7 @@ namespace {
       // an isolation requirement unsatisfied by the calling context, so
       // set the unsatisfiedIsolationJump fields of the ApplyExpr appropriately
       apply->setIsolationCrossing(getContextIsolation(), *unsatisfiedIsolation);
+      diagnoseAwaitedOnewayCall(apply);
     }
 
     PreWalkResult<Pattern *> walkToPatternPre(Pattern *pattern) override {
@@ -3253,6 +3260,7 @@ namespace {
         }
 
         contextStack.push_back(func);
+        awaitStack.push_back(nullptr);
       }
 
       if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
@@ -3266,6 +3274,8 @@ namespace {
       if (auto func = dyn_cast<AbstractFunctionDecl>(decl)) {
         assert(contextStack.back() == func);
         contextStack.pop_back();
+        assert(!awaitStack.empty() && awaitStack.back() == nullptr);
+        awaitStack.pop_back();
       }
 
       if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
@@ -3300,6 +3310,13 @@ namespace {
             openExistential->getExistentialValue()});
         return Action::Continue(expr);
       }
+
+      if (auto *send = dyn_cast<SendExpr>(expr))
+        sendStack.push_back(send);
+
+      if (auto *await = dyn_cast<AwaitExpr>(expr))
+        if (!await->isImplicit())
+          awaitStack.push_back(await);
 
       auto determineClosureIsolationInContext =
           [&](AbstractClosureExpr *closure, Expr *context) {
@@ -3357,6 +3374,7 @@ namespace {
 
         checkLocalCaptures(closure);
         contextStack.push_back(closure);
+        awaitStack.push_back(nullptr);
         return Action::Continue(expr);
       }
 
@@ -3509,9 +3527,23 @@ namespace {
         return Action::Continue(expr);
       }
 
+      if (auto *send = dyn_cast<SendExpr>(expr)) {
+        assert(sendStack.back() == send);
+        sendStack.pop_back();
+      }
+
       if (auto *closure = dyn_cast<AbstractClosureExpr>(expr)) {
         assert(contextStack.back() == closure);
         contextStack.pop_back();
+        assert(!awaitStack.empty() && awaitStack.back() == nullptr);
+        awaitStack.pop_back();
+      }
+
+      if (auto *await = dyn_cast<AwaitExpr>(expr)) {
+        if (!await->isImplicit()) {
+          assert(awaitStack.back() == await);
+          awaitStack.pop_back();
+        }
       }
 
       if (auto *apply = dyn_cast<ApplyExpr>(expr)) {
@@ -3943,6 +3975,80 @@ namespace {
       NotDistributed, // fail: non-distributed declaration in distributed actor
     };
 
+    /// A 'send' of a call which goes through a distributed thunk, i.e. on a
+    /// distributed actor which may be remote, requires the function to be
+    /// '@oneway': only its synchronous distributed thunk can hand the
+    /// call to the actor system as a oneway call, in the order of the 'send's
+    /// that made them. A call on a known-local actor, such as an isolated
+    /// 'self', does not go through a thunk and is sent like any actor call.
+    ///
+    /// \returns true if an error was diagnosed
+    bool diagnoseSendOfNonOnewayDistributedFunction(ApplyExpr *apply,
+                                                          ValueDecl *decl) {
+      if (!apply->isOnewaySendOperand())
+        return false;
+      // The 'send' of a call in an optional chain ('send a?.f()') wraps an
+      // implicit 'send' of the call, look through it to the explicit one. The
+      // 'send' in a distributed thunk is implicit and has no explicit one
+      auto found = llvm::find_if(llvm::reverse(sendStack), [](SendExpr *send) {
+        return !send->isImplicit();
+      });
+      if (found == sendStack.rend())
+        return false;
+      SendExpr *send = *found;
+
+      auto *func = dyn_cast_or_null<FuncDecl>(decl);
+      if (!func || !func->isDistributed() || func->isOneway())
+        return false;
+
+      ctx.Diags.diagnose(send->getSendLoc(),
+                         diag::send_distributed_requires_oneway, func);
+
+      // The function can be made '@oneway' if it is declared in
+      // source of this module, rather than e.g. by a macro expansion. The
+      // stub of a '@Resolvable' protocol is declared by the macro, the
+      // protocol's requirement which it witnesses is the one to mark
+      auto isEditable = [&](ValueDecl *vd) {
+        auto *sf = vd->getDeclContext()->getParentSourceFile();
+        return vd->getModuleContext() == getDeclContext()->getParentModule() &&
+               vd->getLoc().isValid() && sf &&
+               sf->Kind != SourceFileKind::MacroExpansion;
+      };
+      ValueDecl *toMark = isEditable(func) ? func : nullptr;
+      if (!toMark) {
+        if (auto *proto = func->getDeclContext()->getExtendedProtocolDecl()) {
+          for (auto *req : proto->lookupDirect(func->getName())) {
+            if (req->isProtocolRequirement() && isEditable(req)) {
+              toMark = req;
+              break;
+            }
+          }
+        }
+      }
+      if (toMark) {
+        toMark->diagnose(diag::send_distributed_add_oneway, toMark)
+            .fixItInsert(toMark->getAttributeInsertionLoc(false),
+                         "@oneway ");
+      }
+
+      // In an async context the call can wait for its reply instead. The
+      // operand of 'send' is checked in an implicit closure, so look at the
+      // context around it
+      const DeclContext *callerDC = getDeclContext();
+      while (auto *closure = dyn_cast<AbstractClosureExpr>(callerDC)) {
+        if (!closure->isImplicit())
+          break;
+        callerDC = closure->getParent();
+      }
+      if (callerDC->isAsyncContext()) {
+        ctx.Diags
+            .diagnose(send->getSendLoc(),
+                      diag::send_distributed_use_try_await, func)
+            .fixItReplace(send->getSendLoc(), "try await");
+      }
+      return true;
+    }
+
     /// Determine whether we can access the given declaration that is
     /// isolated to a distributed actor from a location that is potentially not
     /// local to this process.
@@ -4073,6 +4179,35 @@ namespace {
     }
 
     /// Check actor isolation for a particular application.
+    /// A '@oneway' function is intended to be called with 'send',
+    /// without waiting for it. Warn about an explicit 'await' of a call of
+    /// it which crosses into another isolation domain, which waits for it. A
+    /// call from within the function's own isolation domain is an ordinary
+    /// call, and a 'send' call is only implicitly awaited, in the operation
+    /// closure of the 'send'
+    void diagnoseAwaitedOnewayCall(ApplyExpr *apply) {
+      if (!ctx.LangOpts.hasFeature(Feature::SendCalls) ||
+          isa<SelfApplyExpr>(apply) || apply->isImplicit() ||
+          apply->isOnewaySendOperand())
+        return;
+      if (awaitStack.empty() || !awaitStack.back())
+        return;
+
+      auto *callee = dyn_cast_or_null<FuncDecl>(
+          apply->getCalledValue(/*skipFunctionConversions=*/true));
+      Type fnTy = getType(apply->getFn());
+      auto *anyFnTy = fnTy ? fnTy->getAs<AnyFunctionType>() : nullptr;
+      if (!callee || !callee->isOneway())
+        return;
+
+      AwaitExpr *await = awaitStack.back();
+      auto diag = ctx.Diags.diagnose(apply->getLoc(),
+                                     diag::await_on_oneway_function,
+                                     callee != nullptr, callee);
+      if (anyFnTy && anyFnTy->getResult()->isVoid())
+        diag.fixItReplace(await->getAwaitLoc(), "send");
+    }
+
     bool checkApply(ApplyExpr *apply) {
       auto fnExprType = getType(apply->getFn());
       if (!fnExprType)
@@ -4268,9 +4403,27 @@ namespace {
       // an isolation requirement unsatisfied by the calling context, so
       // set the unsatisfiedIsolationJump fields of the ApplyExpr appropriately
       apply->setIsolationCrossing(getContextIsolation(), *unsatisfiedIsolation);
+      diagnoseAwaitedOnewayCall(apply);
 
       bool requiresAsync =
           callOptions.contains(ActorReferenceResult::Flags::AsyncPromotion);
+
+      // A 'send' call of a 'oneway' distributed function is a direct call of
+      // the function's synchronous distributed thunk (marked as such when the
+      // 'send' was lowered), which runs local calls on the actor and hands
+      // remote calls to the actor system without awaiting either. Such a
+      // call throws, like any distributed call, but it is not implicitly
+      // async, so it can be made from a synchronous context
+      bool isSyncOnewayDistributedCall = false;
+      if (unsatisfiedIsolation->isDistributedActor()) {
+        if (auto *calleeFunc = dyn_cast_or_null<FuncDecl>(calleeDecl)) {
+          if (calleeFunc->hasSynchronousDistributedThunk() &&
+              apply->shouldApplyDistributedThunk()) {
+            isSyncOnewayDistributedCall = true;
+            requiresAsync = false;
+          }
+        }
+      }
 
       // If we need to mark the call as implicitly asynchronous, make sure
       // we're in an asynchronous context.
@@ -4330,12 +4483,25 @@ namespace {
           return true;
 
         std::tie(setThrows, usesDistributedThunk) = *distributedAccess;
+
+        if (usesDistributedThunk &&
+            diagnoseSendOfNonOnewayDistributedFunction(apply,
+                                                             calleeDecl))
+          return true;
+
+        // Even a call on a known-local actor goes through the synchronous
+        // thunk, so that it is enqueued rather than run inline
+        if (isSyncOnewayDistributedCall) {
+          setThrows = true;
+          usesDistributedThunk = true;
+        }
       }
 
       // Mark as implicitly async/throws/distributed thunk as needed.
       if (requiresAsync || setThrows || usesDistributedThunk) {
         markNearestCallAsImplicitly(
-            unsatisfiedIsolation, setThrows, usesDistributedThunk);
+            isSyncOnewayDistributedCall ? std::nullopt : unsatisfiedIsolation,
+            setThrows, usesDistributedThunk);
       }
 
       // Sendable checking for arguments and results are deferred to region
