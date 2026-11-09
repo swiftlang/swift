@@ -9693,6 +9693,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyTransitivelyConformsTo(
 
   auto *protocol = protocolTy->castTo<ProtocolType>()->getDecl();
 
+  // Whether a function type conforms can depend on a type that's
+  // not resolved yet.
+  if (auto *fnTy = resolvedTy->getAs<FunctionType>();
+      fnTy && fnTy->hasTypeDependencyFor(protocol)) {
+    resolvedTy = simplifyType(fnTy);
+    if (resolvedTy->castTo<FunctionType>()->hasTypeDependencyFor(protocol))
+      return formUnsolved();
+  }
+
   // First, let's check whether the type itself conforms,
   // if it does - we are done.
   if (lookupConformance(resolvedTy, protocol))
