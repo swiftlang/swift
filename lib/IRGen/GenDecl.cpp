@@ -3633,12 +3633,15 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
   llvm::FunctionType *ctorFnType =
       cast<llvm::FunctionType>(clangFunc->getValueType());
 
+  // Mirror C++ value-initialization, which zero-initializes the object first
+  // only if its default constructor is not user-provided.
+  bool zeroInitialize = ctor->isDefaultConstructor() && !ctor->isUserProvided();
+
   // Only need a thunk if either:
   // 1. The calling conventions do not match, and we need to pass arguments
   //    differently.
-  // 2. This is a default constructor, and we need to zero the backing memory of
-  //    the struct.
-  if (assumedFnType == ctorFnType && !ctor->isDefaultConstructor()) {
+  // 2. We need to zero the backing memory of the struct.
+  if (assumedFnType == ctorFnType && !zeroInitialize) {
     return ctorAddress;
   }
 
@@ -3684,7 +3687,7 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
     }
   }
 
-  if (ctor->isDefaultConstructor()) {
+  if (zeroInitialize) {
     assert(Args.size() > 0 && "expected at least 1 argument (result address) "
                               "for default constructor");
 
