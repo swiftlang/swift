@@ -42,7 +42,9 @@ ActiveTaskStatus::getStatusRecordParent(TaskStatusRecord *ptr) {
 /// If the client of withStatusRecordLock has already loaded the status of the
 /// task, they may pass it into this function to avoid a double-load.
 ///
-/// The input `fn` is invoked once while holding the status record lock.
+/// The input `fn` is invoked once while holding the status record lock. It may
+/// change the status with its own compare and swap, and releasing the lock
+/// preserves that change.
 ///
 /// The optional `statusUpdate` is invoked while releasing the StatusRecordLock
 /// from the ActiveTaskStatus so that callers may make additional modifications
@@ -1659,24 +1661,37 @@ static void performEscalationAction(AsyncTask *task, TaskStatusRecord *record,
   // FIXME: allow dynamic extension/correction?
 }
 
-SWIFT_CC(swift)
-JobPriority
-static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
-  SWIFT_TASK_DEBUG_LOG("Escalating %p to %#zx priority", task, newPriority);
-  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
-  auto oldPriority = oldStatus.getStoredPriority();
-  auto newStatus = oldStatus;
+namespace {
+enum class EscalateStatusResult {
+  Escalated,
+  NothingToDo,
+  HasRecords,
+};
+} // end anonymous namespace
 
+/// Raise the priority stored in the task's status to `newPriority`. On return,
+/// `oldStatus` is the status that was replaced (or that made escalation
+/// unnecessary) and `newStatus` is the status now stored.
+///
+/// With `lockFreeOnly`, give up when the task has status records, because
+/// the caller must hold the status record lock to escalate it.
+static EscalateStatusResult escalateStatus(AsyncTask *task,
+                                           ActiveTaskStatus &oldStatus,
+                                           ActiveTaskStatus &newStatus,
+                                           JobPriority newPriority,
+                                           bool lockFreeOnly) {
   while (true) {
-    // Ensure oldPriority is up to date if we retry the compare_exchange.
-    oldPriority = oldStatus.getStoredPriority();
+    auto oldPriority = oldStatus.getStoredPriority();
 
     // Fast path: check that the stored priority is already at least
     // as high as the desired priority.
     if (oldPriority >= newPriority) {
       SWIFT_TASK_DEBUG_LOG("Task is already at %#zx priority", oldPriority);
-      return oldPriority;
+      return EscalateStatusResult::NothingToDo;
     }
+
+    if (lockFreeOnly && oldStatus.getInnermostRecord() != nullptr)
+      return EscalateStatusResult::HasRecords;
 
     if (oldStatus.isRunning()) {
       // Regardless of whether status record is locked or not, update the
@@ -1685,7 +1700,7 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     } else if (oldStatus.isComplete()) {
       // We raced with concurrent completion, nothing to escalate
       SWIFT_TASK_DEBUG_LOG("Escalated a task %p which had completed, do nothing", task);
-      return oldStatus.getStoredPriority();
+      return EscalateStatusResult::NothingToDo;
     } else {
       // Task is suspended or enqueued.
       newStatus = oldStatus.withNewPriority(newPriority);
@@ -1696,10 +1711,14 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
             /* success */ SWIFT_MEMORY_ORDER_CONSUME,
             /* failure */ std::memory_order_relaxed)) {
       _swift_tsan_consume(task);
-      break;
+      return EscalateStatusResult::Escalated;
     }
   }
+}
 
+static void overrideRunningTask(AsyncTask *task, ActiveTaskStatus newStatus,
+                                JobPriority oldPriority,
+                                JobPriority newPriority) {
   if (newStatus.isRunning()) {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     // The task is running, escalate the thread that is running it.
@@ -1720,30 +1739,62 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     //
     // When tasks are enqueued on any executor, they will have an
     // EnqueuedOnExecutor TaskDependencyStatusRecord which will have
-    // performEscalationAction called on it below. This will call
+    // performEscalationAction called on it. This will call
     // swift_executor_escalate which will enqueue a stealer if needed.
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which isn't running", task);
   }
+}
 
-  if (newStatus.getInnermostRecord() == NULL) {
+SWIFT_CC(swift)
+JobPriority
+static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
+  SWIFT_TASK_DEBUG_LOG("Escalating %p to %#zx priority", task, newPriority);
+  auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
+  auto newStatus = oldStatus;
+
+  switch (escalateStatus(task, oldStatus, newStatus, newPriority,
+                         /*lockFreeOnly=*/true)) {
+  case EscalateStatusResult::NothingToDo:
+    return oldStatus.getStoredPriority();
+  case EscalateStatusResult::Escalated:
+    overrideRunningTask(task, newStatus, oldStatus.getStoredPriority(),
+                        newPriority);
     return newStatus.getStoredPriority();
+  case EscalateStatusResult::HasRecords:
+    break;
   }
 
-  SWIFT_TASK_DEBUG_LOG(
-      "[Override] Escalating %p which has status records from %#x to %#x", task,
-      oldPriority, newPriority);
-  // We must have at least one record - the task dependency one.
-  assert(newStatus.getInnermostRecord() != NULL);
+  // The task has status records. Raise the priority while holding the status
+  // record lock, so the records notified are exactly the ones present when the
+  // priority changed. Otherwise the task can see the new priority and add a
+  // record that is then notified of an escalation that predates it, or remove
+  // one before it hears about an escalation within its scope.
+  JobPriority result;
+  withStatusRecordLock(task, oldStatus, [&](ActiveTaskStatus status) {
+    oldStatus = status;
+    if (escalateStatus(task, oldStatus, newStatus, newPriority,
+                       /*lockFreeOnly=*/false) !=
+        EscalateStatusResult::Escalated) {
+      result = oldStatus.getStoredPriority();
+      return;
+    }
 
-  withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
+    auto oldPriority = oldStatus.getStoredPriority();
+    overrideRunningTask(task, newStatus, oldPriority, newPriority);
+
+    SWIFT_TASK_DEBUG_LOG(
+        "[Override] Escalating %p which has status records from %#x to %#x",
+        task, oldPriority, newPriority);
+
     // We know that none of the escalation actions will recursively
     // modify the task status record list by adding or removing task records
-    for (auto cur: status.records()) {
+    for (auto cur: newStatus.records()) {
       performEscalationAction(task, cur, oldPriority, newPriority);
     }
+    result = newStatus.getStoredPriority();
   });
 
-  return newStatus.getStoredPriority();
+  return result;
 }
 
 void TaskDependencyStatusRecord::performEscalationAction(
