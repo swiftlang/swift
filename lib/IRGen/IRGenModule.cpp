@@ -1795,8 +1795,13 @@ void IRGenModule::constructInitialFnAttributes(
   // When the Clang configuration disables builtins Clang stamps
   // its functions with the "no-builtins" attribute. Mirror that on
   // the Swift side (otherwise the mismatch prevents function inlining.)
-  if (getClangASTContext().getLangOpts().NoBuiltin) {
+  const auto &clangLangOpts = getClangASTContext().getLangOpts();
+  if (clangLangOpts.NoBuiltin) {
     Attrs.addAttribute("no-builtins");
+  } else {
+    // Likewise for the builtins disabled one by one with -fno-builtin-<name>.
+    for (const auto &name : clangLangOpts.NoBuiltinFuncs)
+      Attrs.addAttribute("no-builtin-" + name);
   }
 
   // Mark as 'nounwind' to avoid referencing exception personality symbols, this
