@@ -94,6 +94,12 @@ ReferenceTestSuite.test("func-ptr-ptr-rvalue-reference") {
   expectEqual(68, callFuncPtrPtrRvalueRef(consuming: &f))
 }
 
+ReferenceTestSuite.test("func-ptr-array-rvalue-reference") {
+  setStaticInt(69)
+  let fs: ((@convention(c) () -> CInt)?, (@convention(c) () -> CInt)?, (@convention(c) () -> CInt)?) = (nil, nil, getStaticInt)
+  expectEqual(69, callFuncPtrArrayRvalueRef(consuming: fs))
+}
+
 ReferenceTestSuite.test("pod-struct-const-lvalue-reference") {
   expectNotEqual(getStaticInt(), 78)
   takeConstRef(78)

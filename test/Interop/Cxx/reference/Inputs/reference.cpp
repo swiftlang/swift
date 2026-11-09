@@ -20,6 +20,7 @@ int callFuncRef(int (&f)()) { return f(); }
 int callFuncRvalueRef(int (&&f)()) { return f(); }
 int callFuncPtrRvalueRef(int (*&&f)()) { return f(); }
 int callFuncPtrPtrRvalueRef(int (**&&f)()) { return (*f)(); }
+int callFuncPtrArrayRvalueRef(int (*(&&a)[3])()) { return a[2](); }
 
 void takeConstRef(const int &value) {
   staticInt = value;

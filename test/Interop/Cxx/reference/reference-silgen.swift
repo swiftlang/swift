@@ -101,3 +101,9 @@ func passFuncPtrPtrRvalueRef(_ f: UnsafeMutablePointer<(@convention(c) () -> CIn
 }
 
 // CHECK: sil {{.*}}[clang callFuncPtrPtrRvalueRef] @{{.*}} : $@convention(c) (@in_cxx Optional<UnsafeMutablePointer<Optional<@convention(c) () -> Int32>>>) -> Int32
+
+func passFuncPtrArrayRvalueRef(_ fs: ((@convention(c) () -> CInt)?, (@convention(c) () -> CInt)?, (@convention(c) () -> CInt)?)) -> CInt {
+  return callFuncPtrArrayRvalueRef(consuming: fs)
+}
+
+// CHECK: sil {{.*}}[clang callFuncPtrArrayRvalueRef] @{{.*}} : $@convention(c) (@in_cxx (Optional<@convention(c) () -> Int32>, Optional<@convention(c) () -> Int32>, Optional<@convention(c) () -> Int32>)) -> Int32
