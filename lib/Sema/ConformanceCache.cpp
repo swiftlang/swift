@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/Subtyping.h"
+#include "TypeChecker.h"
 
 #define DEBUG_TYPE "Subtyping"
 #include "llvm/Support/Debug.h"
@@ -100,6 +101,7 @@ bool ConformanceCache::isConformanceTransitiveForSupertype(
   case ConversionBehavior::AnyHashable:
   case ConversionBehavior::Tuple:
   case ConversionBehavior::Function:
+  case ConversionBehavior::Existential:
     break;
 
   case ConversionBehavior::String:
@@ -142,11 +144,6 @@ bool ConformanceCache::isConformanceTransitiveForSupertype(
     addMutablePointers();
     break;
 
-  case ConversionBehavior::Existential:
-    // FIXME: Implement this.
-    result = false;
-    break;
-
   case ConversionBehavior::Unknown:
     // Can't say anything in this case.
     result = false;
@@ -183,9 +180,11 @@ bool ConformanceCache::checkTransitiveSupertypeConformance(
     type = lvalueType->getObjectType();
   auto behavior = getConversionBehavior(type);
   if (isConformanceTransitiveForSupertype(behavior, proto)) {
-    // Unwrap InOut and LValue type.
-    return !lookupConformance(type->getWithoutSpecifierType(), proto)
-        .isInvalid();
+    if (type->is<InOutType>())
+      return false;
+
+    auto result = TypeChecker::containsProtocol(type, proto);
+    return result.first || !result.second.isInvalid();
   }
   return true;
 }
