@@ -5801,7 +5801,8 @@ static ManagedValue drillIntoComponent(SILGenFunction &SGF,
   ManagedValue addr = std::move(component).project(SGF, loc, base);
 
   if ((SGF.getModule().getOptions().Sanitizers & SanitizerKind::Thread) &&
-      tsanKind == TSanKind::InoutAccess && !isRValue) {
+      tsanKind == TSanKind::InoutAccess && !isRValue &&
+      addr.getType().isAddress()) {
     emitTsanInoutAccess(SGF, loc, addr);
   }
 
