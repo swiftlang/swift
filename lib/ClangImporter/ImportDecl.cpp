@@ -5351,14 +5351,7 @@ namespace {
         return;
 
       // Keeping the original name means every use has to be acknowledged.
-      auto *unsafeAttr = swiftDecl->getAttrs().getAttribute<UnsafeAttr>();
-      if (!unsafeAttr || !unsafeAttr->isAlways()) {
-        bool implicit = !unsafeAttr || unsafeAttr->isImplicit();
-        if (unsafeAttr)
-          swiftDecl->getAttrs().removeAttribute(unsafeAttr);
-        swiftDecl->addAttribute(new (Impl.SwiftContext) UnsafeAttr(
-            SourceLoc(), SourceRange(), /*always=*/true, implicit));
-      }
+      Impl.markUnsafe(swiftDecl, /*always=*/true);
 
       // Keeping the original name collides with the same-named safe wrapper
       // that callers are encouraged to hand-write around the '__<name>Unsafe'
@@ -5509,6 +5502,12 @@ namespace {
               if (auto unavailable = funcDecl->getUnavailableAttr())
                 result->addAttribute(unavailable->getParsedAttr()->clone(
                     Impl.SwiftContext, /*implicit=*/true));
+
+              if (!result->getBaseName().isSpecial() &&
+                  importer::isOverrideOfRetainReleaseMethod(
+                      decl, result->getBaseName().getIdentifier().str(),
+                      Impl.SwiftContext.evaluator))
+                Impl.markUnsafe(result, /*always=*/true);
 
               // swiftify is called on import, but the virtualThunkToOriginal
               // mapping is not yet ready at that time, so call it again.
@@ -11864,6 +11863,18 @@ markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
   auto ua = AvailableAttr::createUniversallyUnavailable(SwiftContext,
                                                         unavailabilityMsgRef);
   decl->addAttribute(ua);
+}
+
+void ClangImporter::Implementation::markUnsafe(ValueDecl *decl, bool always) {
+  auto *existingUnsafeAttr = decl->getAttrs().getAttribute<UnsafeAttr>();
+  if (existingUnsafeAttr && (existingUnsafeAttr->isAlways() || !always))
+    return;
+
+  bool implicit = !existingUnsafeAttr || existingUnsafeAttr->isImplicit();
+  if (existingUnsafeAttr)
+    decl->getAttrs().removeAttribute(existingUnsafeAttr);
+  decl->addAttribute(new (SwiftContext) UnsafeAttr(SourceLoc(), SourceRange(),
+                                                   always, implicit));
 }
 
 /// Create a decl with error type and an "unavailable" attribute on it
