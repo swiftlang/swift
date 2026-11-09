@@ -1185,6 +1185,12 @@ FuncDecl *getForEachIteratorNextFunction(
 VarDecl *getSelfForInitDelegationInConstructor(DeclContext *DC,
                                                UnresolvedDotExpr *UDE);
 
+/// If an initializer of a C++ foreign reference type called with `super.init`
+/// from a Swift subclass cannot construct the base subobject of the subclass,
+/// diagnose it.
+bool diagnoseForeignReferenceSuperInit(ConstructorDecl *ctor, SourceLoc loc,
+                                       bool implicitlyGenerated);
+
 /// Diagnose assigning variable to itself.
 bool diagnoseSelfAssignment(const Expr *E);
 

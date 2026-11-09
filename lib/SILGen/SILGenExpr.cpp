@@ -5689,7 +5689,7 @@ bool SILGenFunction::isInitDelegationBorrowingSelf() const {
   auto otherCtor = rebind->getCalledConstructor(isChaining)->getDecl();
   return isChaining && SILDeclRef(otherCtor, SILDeclRef::Kind::Initializer)
                            .asForeign(requiresForeignEntryPoint(otherCtor))
-                           .isForeignReferenceInitializer();
+                           .isCXXForeignReferenceInitializer();
 }
 
 /// Emit the builtin that points the C++ v-table pointers of \p self, a Swift

@@ -5686,6 +5686,23 @@ void ClangImporter::getMangledName(raw_ostream &os,
   return Implementation::getMangledName(Impl.Mangler.get(), clangDecl, os);
 }
 
+void ClangImporter::getMangledBaseObjectConstructorName(
+    raw_ostream &os, const clang::CXXConstructorDecl *ctor) const {
+  if (!Impl.Mangler)
+    Impl.Mangler.reset(getClangASTContext().createMangleContext());
+
+  Impl.Mangler->mangleCXXName(getBaseObjectConstructor(ctor), os);
+}
+
+clang::GlobalDecl ClangImporter::getBaseObjectConstructor(
+    const clang::CXXConstructorDecl *ctor) const {
+  bool hasConstructorVariants =
+      getClangASTContext().getTargetInfo().getCXXABI().hasConstructorVariants();
+  return clang::GlobalDecl(ctor, hasConstructorVariants
+                                     ? clang::Ctor_Base
+                                     : clang::Ctor_Complete);
+}
+
 void ClangImporter::Implementation::getMangledName(
     clang::MangleContext *mangler, const clang::NamedDecl *clangDecl,
     raw_ostream &os) {

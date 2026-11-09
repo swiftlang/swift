@@ -1324,11 +1324,11 @@ bool SILDeclRef::isForeignToNativeThunk() const {
   return false;
 }
 
-bool SILDeclRef::isForeignReferenceInitializer() const {
-  if (!isForeign || kind != Kind::Initializer || !hasDecl())
+bool SILDeclRef::isCXXForeignReferenceInitializer() const {
+  if (!isForeign || kind != Kind::Initializer)
     return false;
-  auto ctor = dyn_cast<ConstructorDecl>(getDecl());
-  if (!ctor || !ctor->hasClangNode())
+  auto ctor = cast<ConstructorDecl>(getDecl());
+  if (!ctor->hasClangNode())
     return false;
   auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
   if (!classDecl || !classDecl->isForeignReferenceType())
@@ -1605,10 +1605,20 @@ std::optional<std::string> SILDeclRef::getAsmName() const {
   if (isAutoDiffDerivativeFunction())
     return std::nullopt;
 
-  // The Clang decl of a C++ foreign reference type's initializer is the static
-  // factory it was imported from, which is not the initializing entry point.
-  if (isForeignReferenceInitializer())
-    return std::nullopt;
+  // The initializing entry point of a constructor of a C++ foreign reference
+  // type is the base-object variant of the C++ constructor. Mangle that rather
+  // than the Clang decl of the Swift initializer, which is the static factory
+  // that the initializer was imported from.
+  if (isCXXForeignReferenceInitializer()) {
+    auto &ctx = getASTContext();
+    auto importer = static_cast<ClangImporter *>(ctx.getClangModuleLoader());
+    auto cxxCtorDecl = importer->getOriginalForeignReferenceConstructor(
+        cast<ConstructorDecl>(getDecl()));
+    std::string storage;
+    llvm::raw_string_ostream SS(storage);
+    importer->getMangledBaseObjectConstructorName(SS, cxxCtorDecl);
+    return storage;
+  }
 
   if (hasDecl() && !isDefaultArgGenerator() &&
       (getDecl()->getClangDecl() || getDecl()->getImplementedObjCDecl())) {
