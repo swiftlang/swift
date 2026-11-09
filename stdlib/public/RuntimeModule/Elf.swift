@@ -724,6 +724,15 @@ protocol Elf_Phdr : ByteSwappable {
   var p_align: Size { get set }
 }
 
+extension Array where Element: Elf_Phdr {
+  /// The lowest virtual address of the loadable segments.  An image is
+  /// mapped so that its first byte is at this address.
+  var lowestLoadAddress: ImageSource.Address {
+    return lazy.filter { $0.p_type == .PT_LOAD }
+      .map { ImageSource.Address($0.p_vaddr) }.min() ?? 0
+  }
+}
+
 extension Elf32_Phdr : Elf_Phdr {
 }
 
@@ -1213,7 +1222,6 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
 
     var phdrs: [Traits.Phdr] = []
     var phAddr = ImageSource.Address(header.e_phoff)
-    var minAddr: Traits.Address? = nil
     for _ in 0..<header.e_phnum {
       let phdr = maybeSwap(try source.fetch(from: phAddr, as: Traits.Phdr.self))
       phdrs.append(phdr)
@@ -1223,16 +1231,8 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
         throw ElfImageError.badProgramHeaderSize
       }
       phAddr = nextAddr
-
-      if phdr.p_type == .PT_LOAD {
-        if let oldMinAddr = minAddr {
-          minAddr = min(oldMinAddr, phdr.p_vaddr)
-        } else {
-          minAddr = phdr.p_vaddr
-        }
-      }
     }
-    imageBase = ImageSource.Address(exactly: minAddr ?? 0)!
+    imageBase = phdrs.lowestLoadAddress
     programHeaders = phdrs
 
     if source.isMappedImage {
@@ -1853,22 +1853,43 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
     return overflow ? nil : result
   }
 
-  // Find the last loadable executable segment, and scan for PT_NOTE
-  // segments that contain the UUID
   let (firstPhAddr, phOverflow)
     = address.addingReportingOverflow(ImageSource.Size(header.e_phoff))
   if phOverflow {
     return nil
   }
+  var phdrs: [Traits.Phdr] = []
   var phAddr = firstPhAddr
   for _ in 0..<header.e_phnum {
     let phdr = maybeSwap(try reader.fetch(from: phAddr, as: Traits.Phdr.self))
+    phdrs.append(phdr)
 
-    // Ignore segments whose extent can't be represented
+    let (nextPhAddr, nextOverflow)
+      = phAddr.addingReportingOverflow(ImageSource.Address(header.e_phentsize))
+    if nextOverflow {
+      break
+    }
+    phAddr = nextPhAddr
+  }
+
+  // The image is mapped at `address`, which corresponds to the lowest
+  // virtual address of its loadable segments; that isn't always zero.
+  let imageBase = phdrs.lowestLoadAddress
+
+  // Find the last loadable executable segment, and scan for PT_NOTE
+  // segments that contain the UUID
+  for phdr in phdrs {
+    // Ignore segments that start below the image, and segments whose extent
+    // can't be represented
+    let vaddr = ImageSource.Address(phdr.p_vaddr)
+    let size = ImageSource.Size(phdr.p_memsz)
+    guard vaddr >= imageBase,
+          !vaddr.addingReportingOverflow(size).overflow else {
+      continue
+    }
     let (segStart, startOverflow)
-      = address.addingReportingOverflow(ImageSource.Address(phdr.p_vaddr))
-    let (segEnd, endOverflow)
-      = segStart.addingReportingOverflow(ImageSource.Size(phdr.p_memsz))
+      = address.addingReportingOverflow(vaddr - imageBase)
+    let (segEnd, endOverflow) = segStart.addingReportingOverflow(size)
 
     if !startOverflow && !endOverflow {
       if phdr.p_type == .PT_LOAD && (phdr.p_flags & PF_X) != 0 {
@@ -1932,13 +1953,6 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
         }
       }
     }
-
-    let (nextPhAddr, nextOverflow)
-      = phAddr.addingReportingOverflow(ImageSource.Address(header.e_phentsize))
-    if nextOverflow {
-      break
-    }
-    phAddr = nextPhAddr
   }
 
   return (endOfText: endOfText, uuid: uuid)
