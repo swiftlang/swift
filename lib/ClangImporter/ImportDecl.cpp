@@ -8087,7 +8087,7 @@ void SwiftDeclConverter::recordFuncOverride(AbstractFunctionDecl *decl) const {
   // Make sure that we always set the overridden declarations.
   SWIFT_DEFER {
     if (!decl->overriddenDeclsComputed())
-      decl->setOverriddenDecls({ });
+      decl->setOverriddenDecls({});
   };
 
   // Figure out the class in which this method occurs.
@@ -8097,59 +8097,72 @@ void SwiftDeclConverter::recordFuncOverride(AbstractFunctionDecl *decl) const {
   auto superDecl = classDecl->getSuperclassDecl();
   if (!superDecl)
     return;
-  // Look up the overridden member from the ObjC or C++ superclass
-  SmallVector<ValueDecl *, 4> results;
-  if (isa_and_nonnull<clang::CXXRecordDecl>(classDecl->getClangDecl())) {
-    for (auto *cls = superDecl; cls; cls = cls->getSuperclassDecl()) {
-      // A C++ member cannot override anything declared in an extension, so no
-      // need to use lookupQualified()
-      for (auto *member :
-           importer::lookupDirectWithoutExtensions(cls, decl->getName()))
-        if (member->isAccessibleFrom(superDecl))
-          results.push_back(member);
-      // C++ classes do not inherit constructors.
-      if (isa<ConstructorDecl>(decl))
-        break;
-    }
-  } else {
-    superDecl->lookupQualified(
-        superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
-        {NLFlags::QualifiedDefault, NLFlags::IgnoreMissingImports}, results);
-  }
-  for (auto member : results) {
-    if (member->getKind() != decl->getKind() ||
-        member->isInstanceMember() != decl->isInstanceMember() ||
-        member->isObjC() != decl->isObjC())
-      continue;
-    // Set function override.
-    if (auto func = dyn_cast<FuncDecl>(decl)) {
-      auto foundFunc = cast<FuncDecl>(member);
-      // Require a selector match.
-      if (foundFunc->isObjC() &&
-          func->getObjCSelector() != foundFunc->getObjCSelector())
-        continue;
-      func->setOverriddenDecl(foundFunc);
-      func->addAttribute(new (func->getASTContext()) OverrideAttr(true));
-      return;
-    }
-    // Set constructor override.
-    auto ctor = cast<ConstructorDecl>(decl);
-    auto memberCtor = cast<ConstructorDecl>(member);
-    // Require a selector match.
-    if (ctor->isObjC() &&
-        ctor->getObjCSelector() != memberCtor->getObjCSelector())
-      continue;
-    ctor->setOverriddenDecl(memberCtor);
-    ctor->addAttribute(new (ctor->getASTContext()) OverrideAttr(true));
+
+  // Whether decl could override superMember.
+  auto isCandidate = [&](ValueDecl *superMember) {
+    return superMember->getKind() == decl->getKind() &&
+           superMember->isInstanceMember() == decl->isInstanceMember() &&
+           superMember->isObjC() == decl->isObjC();
+  };
+
+  auto tryRecordFuncOverride = [&](FuncDecl *func, FuncDecl *superFunc) {
+    if (superFunc->isObjC() &&
+        func->getObjCSelector() != superFunc->getObjCSelector())
+      return false /* did not record*/;
+    func->setOverriddenDecl(superFunc);
+    func->addAttribute(new (Impl.SwiftContext)
+                           OverrideAttr(/*IsImplicit=*/true));
+    return true /* recorded override */;
+  };
+
+  auto tryRecordInitOverride = [&](ConstructorDecl *ctor,
+                                   ConstructorDecl *superCtor) {
+    if (superCtor->isObjC() &&
+        ctor->getObjCSelector() != superCtor->getObjCSelector())
+      return false /* did not record */;
+    ctor->setOverriddenDecl(superCtor);
+    ctor->addAttribute(new (Impl.SwiftContext)
+                           OverrideAttr(/*IsImplicit=*/true));
 
     // Propagate 'required' to subclass initializers.
-    if (memberCtor->isRequired() &&
-        !ctor->getAttrs().hasAttribute<RequiredAttr>()) {
+    if (superCtor->isRequired() &&
+        !ctor->getAttrs().hasAttribute<RequiredAttr>())
       ctor->addAttribute(new (Impl.SwiftContext)
                              RequiredAttr(/*IsImplicit=*/true));
+    return true /* recorded override */;
+  };
+
+  auto tryRecordOverride = [&](ValueDecl *superMember) {
+    if (!isCandidate(superMember))
+      return false /* did not record override */;
+    if (auto *func = dyn_cast<FuncDecl>(decl))
+      return tryRecordFuncOverride(func, cast<FuncDecl>(superMember));
+    if (auto *ctor = dyn_cast<ConstructorDecl>(decl))
+      return tryRecordInitOverride(ctor, cast<ConstructorDecl>(superMember));
+    llvm_unreachable("only functions and initializers can override");
+  };
+
+  if (isa_and_nonnull<clang::CXXRecordDecl>(classDecl->getClangDecl())) {
+    // C++ members cannot override anything declared in an extension, so look up
+    // superclass members without loading extensions (unlike lookupQualified()).
+    using importer::lookupDirectWithoutExtensions;
+    for (auto *cls = superDecl; cls; cls = cls->getSuperclassDecl()) {
+      for (auto *member : lookupDirectWithoutExtensions(cls, decl->getName()))
+        if (member->isAccessibleFrom(superDecl) && tryRecordOverride(member))
+          return; // Override recorded
+      if (isa<ConstructorDecl>(decl))
+        return; // C++ classes do not inherit constructors.
     }
     return;
   }
+
+  SmallVector<ValueDecl *, 4> results;
+  superDecl->lookupQualified(
+      superDecl, DeclNameRef(decl->getName()), decl->getLoc(),
+      {NLFlags::QualifiedDefault, NLFlags::IgnoreMissingImports}, results);
+  for (auto *member : results)
+    if (tryRecordOverride(member))
+      return; // Override recorded
 }
 
 // Note: This function ignores labels.
