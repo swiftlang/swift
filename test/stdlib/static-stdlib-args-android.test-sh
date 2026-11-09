@@ -1,0 +1,14 @@
+// Ensure that -static-stdlib links Dispatch on Android.
+//
+// The concurrency runtime uses Dispatch, so the static stdlib link arguments
+// must include it and the blocks runtime. Without them, an executable that
+// uses concurrency fails to link, and a shared library fails to load.
+
+// REQUIRES: OS=linux-android || OS=linux-androideabi
+// REQUIRES: static_stdlib
+// REQUIRES: concurrency
+
+// RUN: %FileCheck %s < %target-static-stdlib-path/static-stdlib-args.lnk
+
+// CHECK: -lswiftCore
+// CHECK-NEXT: -ldispatch -lBlocksRuntime
