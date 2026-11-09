@@ -588,7 +588,7 @@ bb0(%0 : $*X):
 }
 
 // CHECK-LABEL: sil [ossa] @load_take_and_destroy
-// CHECK-NEXT:  [%0: read v**, copy v**, destroy v**]
+// CHECK-NEXT:  [%0: read v**, write v**, copy v**, destroy v**]
 // CHECK-NEXT:  [global: write,copy,destroy]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @load_take_and_destroy : $@convention(thin) (@in X) -> () {
@@ -612,7 +612,7 @@ bb0(%0 : $*X):
 }
 
 // CHECK-LABEL: sil [ossa] @copy_addr_take_and_destroy
-// CHECK-NEXT:  [%0: read v**, copy v**, destroy v**]
+// CHECK-NEXT:  [%0: read v**, write v**, copy v**, destroy v**]
 // CHECK-NEXT:  [global: write,copy,destroy]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @copy_addr_take_and_destroy : $@convention(thin) (@in X) -> () {
@@ -627,7 +627,7 @@ bb0(%0 : $*X):
 
 // CHECK-LABEL: sil [ossa] @copy_addr_take_and_init
 // CHECK-NEXT:  [%0: write v**]
-// CHECK-NEXT:  [%1: read v**]
+// CHECK-NEXT:  [%1: read v**, write v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @copy_addr_take_and_init : $@convention(thin) (@in X) -> @out X {
@@ -665,7 +665,7 @@ bb0(%0 : $*TwoSPs):
 }
 
 // CHECK-LABEL: sil [ossa] @copy_addr_and_consume_by_unknown_func
-// CHECK-NEXT:  [%0: read v**, copy v**, destroy v**]
+// CHECK-NEXT:  [%0: read v**, write v**, copy v**, destroy v**]
 // CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @copy_addr_and_consume_by_unknown_func : $@convention(thin) (@in X) -> () {
