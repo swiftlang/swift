@@ -8148,6 +8148,7 @@ void SwiftDeclConverter::recordFuncOverride(AbstractFunctionDecl *decl) const {
       ctor->addAttribute(new (Impl.SwiftContext)
                              RequiredAttr(/*IsImplicit=*/true));
     }
+    return;
   }
 }
 
