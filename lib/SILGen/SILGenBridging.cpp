@@ -1973,7 +1973,7 @@ void SILGenFunction::emitNativeToForeignThunk(SILDeclRef thunk) {
   // If the function we're calling isn't actually polymorphic, drop the
   // substitutions.  This should only happen in concrete specializations.
   if (subs && !nativeFn->getType().castTo<SILFunctionType>()->isPolymorphic()) {
-    assert(subs.getGenericSignature()->areAllParamsConcrete());
+    assert(!subs.isEffectivelyGeneric());
     subs = SubstitutionMap();
   }
     

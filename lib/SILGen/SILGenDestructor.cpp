@@ -182,7 +182,7 @@ void SILGenFunction::emitDestroyingDestructor(DestructorDecl *dd) {
 
     // We completely drop the generic signature if all generic parameters were
     // concrete.
-    if (subMap && subMap.getGenericSignature()->areAllParamsConcrete())
+    if (subMap && !subMap.isEffectivelyGeneric())
       subMap = SubstitutionMap();
 
     std::tie(dtorValue, dtorTy)

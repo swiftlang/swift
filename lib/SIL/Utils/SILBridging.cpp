@@ -253,7 +253,7 @@ BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstituti
   swift::SILFunction *f = getFunction();
   swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
 
-  if (!genericSig || genericSig->areAllParamsConcrete())
+  if (!genericSig.isEffectivelyGeneric())
     return swift::SubstitutionMap();
 
   SubstitutionMap contextSubs = contextSubstitutions.unbridged();

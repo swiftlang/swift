@@ -1232,7 +1232,7 @@ Accessor methods:
 \item \texttt{empty()} answers if this is the empty substitution map; this is the logical negation of the \texttt{bool} implicit conversion.
 \item \texttt{getGenericSignature()} returns the substitution map's \IndexSource{input generic signature}input generic signature.
 \item \texttt{getReplacementTypes()} returns an array of \texttt{Type}.
-\item \texttt{isEffectivelyGeneric()} answers if this substitution map's input generic signature contains at least one generic parameter that is not fixed to a concrete type (see the \texttt{GenericSignatureImpl::areAllParamsConcrete()} method from \SecRef{src:generic signatures}).
+\item \texttt{isEffectivelyGeneric()} answers if this substitution map's input generic signature contains at least one generic parameter that is not fixed to a concrete type (see the \texttt{GenericSignature::isEffectivelyGeneric()} method from \SecRef{src:generic signatures}).
 \end{itemize}
 
 Recursive properties of replacement types:

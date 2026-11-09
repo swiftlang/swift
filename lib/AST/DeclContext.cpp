@@ -489,7 +489,7 @@ bool DeclContext::isGenericContext() const {
 
 bool DeclContext::isEffectivelyGenericContext() const {
   return isGenericContext() &&
-         !getGenericSignatureOfContext()->areAllParamsConcrete();
+         getGenericSignatureOfContext()->isEffectivelyGeneric();
 }
 
 ResilienceExpansion DeclContext::getResilienceExpansion() const {

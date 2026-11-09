@@ -836,7 +836,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // Generic signatures where all parameters are concrete are lowered away
   // at the SILFunctionType level.
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }

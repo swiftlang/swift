@@ -5930,7 +5930,7 @@ SILFunctionType::SILFunctionType(
   }
 
   if (genericSig) {
-    assert(!genericSig->areAllParamsConcrete() &&
+    assert(genericSig->isEffectivelyGeneric() &&
            "If all generic parameters are concrete, SILFunctionType should "
            "not have a generic signature at all");
 
@@ -7553,7 +7553,7 @@ SILLayout *SILLayout::get(ASTContext &C,
                           bool CapturesGenericEnvironment) {
   // The "captures generic environment" flag is meaningless if there are
   // no generic arguments to capture.
-  if (!Generics || Generics->areAllParamsConcrete()) {
+  if (!Generics.isEffectivelyGeneric()) {
     CapturesGenericEnvironment = false;
   }
 

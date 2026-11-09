@@ -261,8 +261,7 @@ public:
   }
 
   bool isGeneric() const {
-    auto sig = Type->getInvocationGenericSignature();
-    return sig && !sig->areAllParamsConcrete();
+    return Type->getInvocationGenericSignature().isEffectivelyGeneric();
   }
 
   Callee getCallee(llvm::Value *actorSelf);

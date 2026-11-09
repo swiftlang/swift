@@ -1077,7 +1077,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
   if (!pft->isPolymorphic()) {
     subs = SubstitutionMap();
   } else {
-    assert(!subs.getGenericSignature()->areAllParamsConcrete());
+    assert(subs.isEffectivelyGeneric());
 
     auto specialized =
         pft->substGenericArgs(F.getModule(), subs, getTypeExpansionContext());

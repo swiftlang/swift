@@ -5227,8 +5227,7 @@ IRGenModule::getAddrOfGenericTypeMetadataAccessFunction(
                                            ArrayRef<llvm::Type *> genericArgs,
                                            ForDefinition_t forDefinition) {
   assert(nominal->isGenericContext());
-  assert(!genericArgs.empty() ||
-         nominal->getGenericSignature()->areAllParamsConcrete());
+  assert(!genericArgs.empty() || !nominal->isEffectivelyGenericContext());
   IRGen.noteUseOfTypeMetadata(nominal);
 
   auto type = nominal->getDeclaredType()->getCanonicalType();

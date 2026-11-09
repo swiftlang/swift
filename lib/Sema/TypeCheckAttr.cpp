@@ -3751,7 +3751,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
   if (!attr->isFullSpecialization())
     return;
 
-  if (specializedSig->areAllParamsConcrete())
+  if (!specializedSig->isEffectivelyGeneric())
     return;
 
   SmallVector<GenericTypeParamType *, 2> unspecializedParams;

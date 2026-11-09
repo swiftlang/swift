@@ -701,7 +701,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
   GenericArguments genericArgs;
   genericArgs.collect(IGF, theType);
   assert((!genericArgs.Values.empty() ||
-          theDecl->getGenericSignature()->areAllParamsConcrete()) &&
+          !theDecl->isEffectivelyGenericContext()) &&
          "no generic args?!");
 
   MetadataResponse response;
@@ -3152,9 +3152,8 @@ static bool shouldAccessByMangledName(IRGenModule &IGM, CanType type) {
   // A nongeneric nominal type with nontrivial metadata has an accessor
   // already we can just call.
   if (auto nom = dyn_cast<NominalType>(type)) {
-    if (!isa<ProtocolDecl>(nom->getDecl())
-        && (!nom->getDecl()->isGenericContext()
-            || nom->getDecl()->getGenericSignature()->areAllParamsConcrete())) {
+    if (!isa<ProtocolDecl>(nom->getDecl()) &&
+        !nom->getDecl()->isEffectivelyGenericContext()) {
       return false;
     }
   }

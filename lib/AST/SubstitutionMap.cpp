@@ -90,10 +90,7 @@ bool SubstitutionMap::empty() const {
 }
 
 bool SubstitutionMap::isEffectivelyGeneric() const {
-  auto genericSig = getGenericSignature();
-  if (!genericSig) return false;
-
-  return !genericSig->areAllParamsConcrete();
+  return getGenericSignature().isEffectivelyGeneric();
 }
 
 RecursiveTypeProperties SubstitutionMap::getRecursiveProperties() const {

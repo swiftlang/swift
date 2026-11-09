@@ -1162,8 +1162,8 @@ BridgedGenericSignature::getCanonicalSignature() const {
   return BridgedCanGenericSignature{impl};
 }
 
-bool BridgedGenericSignature::areAllParamsConcrete() const {
-  return unbridged()->areAllParamsConcrete();
+bool BridgedGenericSignature::isEffectivelyGeneric() const {
+  return unbridged().isEffectivelyGeneric();
 }
 
 bool BridgedGenericSignature::canBeEmittedInEmbeddedSwift() const {

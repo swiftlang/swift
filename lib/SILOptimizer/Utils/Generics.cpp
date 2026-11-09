@@ -891,8 +891,7 @@ CanSILFunctionType
 ReabstractionInfo::createSubstitutedType(SILFunction *OrigF,
                                          SubstitutionMap SubstMap,
                                          bool HasUnboundGenericParams) {
-  if ((SpecializedGenericSig &&
-       SpecializedGenericSig->areAllParamsConcrete()) ||
+  if (!SpecializedGenericSig.isEffectivelyGeneric() ||
       !HasUnboundGenericParams) {
     SpecializedGenericSig = nullptr;
     SpecializedGenericEnv = nullptr;
@@ -1953,8 +1952,7 @@ void ReabstractionInfo::finishPartialSpecializationPreparation(
     CalleeParamSubMap = CallerParamSubMap;
   }
 
-  HasUnboundGenericParams =
-      SpecializedGenericSig && !SpecializedGenericSig->areAllParamsConcrete();
+  HasUnboundGenericParams = SpecializedGenericSig.isEffectivelyGeneric();
 
   createSubstitutedAndSpecializedTypes();
 
