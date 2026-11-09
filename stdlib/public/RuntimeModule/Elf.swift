@@ -975,6 +975,8 @@ enum ElfImageError: Error {
   case wrongClass
   case badNoteName
   case badStringTableSectionIndex
+  case badProgramHeaderSize
+  case badSectionHeaderSize
 }
 
 protocol ElfSymbolProtocol: Equatable {
@@ -1195,13 +1197,32 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       return x
     }
 
+    // Entries smaller than the structures we read would overlap one another
+    let phentsize = Int(header.e_phentsize)
+    let shentsize = Int(header.e_shentsize)
+    if header.e_phnum > 0 {
+      if phentsize < MemoryLayout<Traits.Phdr>.size {
+        throw ElfImageError.badProgramHeaderSize
+      }
+    }
+    if header.e_shnum > 0 {
+      if !source.isMappedImage && shentsize < MemoryLayout<Traits.Shdr>.size {
+        throw ElfImageError.badSectionHeaderSize
+      }
+    }
+
     var phdrs: [Traits.Phdr] = []
     var phAddr = ImageSource.Address(header.e_phoff)
     var minAddr: Traits.Address? = nil
     for _ in 0..<header.e_phnum {
       let phdr = maybeSwap(try source.fetch(from: phAddr, as: Traits.Phdr.self))
       phdrs.append(phdr)
-      phAddr += ImageSource.Address(header.e_phentsize)
+      let (nextAddr, overflow)
+        = phAddr.addingReportingOverflow(ImageSource.Address(header.e_phentsize))
+      if overflow {
+        throw ElfImageError.badProgramHeaderSize
+      }
+      phAddr = nextAddr
 
       if phdr.p_type == .PT_LOAD {
         if let oldMinAddr = minAddr {
@@ -1222,7 +1243,12 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       for _ in 0..<header.e_shnum {
         let shdr = maybeSwap(try source.fetch(from: shAddr, as: Traits.Shdr.self))
         shdrs.append(shdr)
-        shAddr += ImageSource.Address(header.e_shentsize)
+        let (nextAddr, overflow)
+          = shAddr.addingReportingOverflow(ImageSource.Address(header.e_shentsize))
+        if overflow {
+          throw ElfImageError.badSectionHeaderSize
+        }
+        shAddr = nextAddr
       }
       sectionHeaders = shdrs
     }
@@ -1328,7 +1354,7 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
               noteAddr += 4 - (noteAddr & 3)
             }
 
-            if noteEnd - noteAddr < nhdr.n_descsz {
+            if noteAddr > noteEnd || noteEnd - noteAddr < nhdr.n_descsz {
               // The segment is probably corrupted
               noteAddr = noteEnd
               continue
@@ -1362,19 +1388,21 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
   }
 
   private var _uuid: [UInt8]?
+  private var _uuidSearched = false
   public var uuid: [UInt8]? {
-    if let uuid = _uuid {
-      return uuid
+    if _uuidSearched {
+      return _uuid
     }
 
     for note in notes {
       if note.name == "GNU" && note.type == NT_GNU_BUILD_ID {
         _uuid = note.desc
-        return _uuid
+        break
       }
     }
 
-    return nil
+    _uuidSearched = true
+    return _uuid
   }
 
   private var _debugLinkCRC: UInt32?
@@ -1396,6 +1424,21 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
   struct EHFrameInfo {
     var ehFrameSection: Range?
     var ehFrameHdrSection: Range?
+  }
+
+  /// Get the file extent of a section.
+  ///
+  /// - Parameter shdr: The section header.
+  ///
+  /// - Returns: The start and end offsets of the section's contents, or `nil`
+  ///   if the header describes a range that overflows.
+  private func extent(
+    of shdr: Traits.Shdr
+  ) -> (base: ImageSource.Address, end: ImageSource.Address)? {
+    let base = ImageSource.Address(shdr.sh_offset)
+    let (end, overflow)
+      = base.addingReportingOverflow(ImageSource.Size(shdr.sh_size))
+    return overflow ? nil : (base, end)
   }
 
   private var _ehFrameInfo: EHFrameInfo?
@@ -1453,9 +1496,8 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
 
     if let sectionHeaders = sectionHeaders {
       let stringShdr = sectionHeaders[Int(header.e_shstrndx)]
-      let base = ImageSource.Address(stringShdr.sh_offset)
-      let end = base + ImageSource.Size(stringShdr.sh_size)
-      if let stringSource = try? source[base..<end] {
+      if let (base, end) = extent(of: stringShdr),
+         let stringSource = try? source[base..<end] {
         let stringSect = ElfStringSection(source: stringSource)
 
         for shdr in sectionHeaders {
@@ -1510,9 +1552,10 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       let zname = ".z" + name.dropFirst()
       let stringShdr = sectionHeaders[Int(header.e_shstrndx)]
       do {
-        let base = ImageSource.Address(stringShdr.sh_offset)
-        let end = base + ImageSource.Size(stringShdr.sh_size)
-        let stringSource = try source[base..<end]
+        guard let (stringBase, stringEnd) = extent(of: stringShdr) else {
+          return nil
+        }
+        let stringSource = try source[stringBase..<stringEnd]
         let stringSect = ElfStringSection(source: stringSource)
 
         for shdr in sectionHeaders {
@@ -1527,8 +1570,9 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
           }
 
           if name == sname {
-            let base = ImageSource.Address(shdr.sh_offset)
-            let end = base + ImageSource.Size(shdr.sh_size)
+            guard let (base, end) = extent(of: shdr) else {
+              continue
+            }
             let subSource = try source[base..<end]
 
             if (shdr.sh_flags & Traits.Shdr.Flags(SHF_COMPRESSED)) != 0 {
@@ -1540,8 +1584,9 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
           }
 
           if zname == sname {
-            let base = ImageSource.Address(shdr.sh_offset)
-            let end = base + ImageSource.Size(shdr.sh_size)
+            guard let (base, end) = extent(of: shdr) else {
+              continue
+            }
             let subSource = try source[base..<end]
 
             return try ImageSource(gnuCompressedImageSource: subSource)
@@ -1643,12 +1688,9 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       return table
     }
 
-    guard let localTable = SymbolTable(image: self) else {
-      return SymbolTable()
-    }
-
-    _symbolTable = localTable
-    return localTable
+    let table = SymbolTable(image: self) ?? SymbolTable()
+    _symbolTable = table
+    return table
   }
 
   static var pathSeparator: String { "/" }
@@ -1797,71 +1839,106 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
   var endOfText = address
   var uuid: [UInt8]? = nil
 
+  // The program header entries must be big enough to hold a header, otherwise
+  // they overlap one another and the header's fields are meaningless
+  if header.e_phnum > 0
+       && Int(header.e_phentsize) < MemoryLayout<Traits.Phdr>.size {
+    return nil
+  }
+
+  // Align a note offset to a multiple of four bytes; returns nil on overflow
+  func align4(_ addr: ImageSource.Address) -> ImageSource.Address? {
+    let pad = (4 - (addr & 3)) & 3
+    let (result, overflow) = addr.addingReportingOverflow(pad)
+    return overflow ? nil : result
+  }
+
   // Find the last loadable executable segment, and scan for PT_NOTE
   // segments that contain the UUID
-  var phAddr = ImageSource.Address(address) + ImageSource.Size(header.e_phoff)
+  let (firstPhAddr, phOverflow)
+    = address.addingReportingOverflow(ImageSource.Size(header.e_phoff))
+  if phOverflow {
+    return nil
+  }
+  var phAddr = firstPhAddr
   for _ in 0..<header.e_phnum {
     let phdr = maybeSwap(try reader.fetch(from: phAddr, as: Traits.Phdr.self))
-    if phdr.p_type == .PT_LOAD && (phdr.p_flags & PF_X) != 0 {
-      endOfText = max(endOfText, address + ImageSource.Address(phdr.p_vaddr)
-                                   + ImageSource.Size(phdr.p_memsz))
-    }
-    if phdr.p_type == .PT_NOTE {
-      var noteAddr = address + ImageSource.Address(phdr.p_vaddr)
-      let noteEnd = noteAddr + ImageSource.Size(phdr.p_memsz)
 
-      while noteAddr < noteEnd {
-        let nhdr = maybeSwap(try reader.fetch(
-                               from: noteAddr, as: Traits.Nhdr.self))
+    // Ignore segments whose extent can't be represented
+    let (segStart, startOverflow)
+      = address.addingReportingOverflow(ImageSource.Address(phdr.p_vaddr))
+    let (segEnd, endOverflow)
+      = segStart.addingReportingOverflow(ImageSource.Size(phdr.p_memsz))
 
-        noteAddr += ImageSource.Size(MemoryLayout<Traits.Nhdr>.size)
+    if !startOverflow && !endOverflow {
+      if phdr.p_type == .PT_LOAD && (phdr.p_flags & PF_X) != 0 {
+        endOfText = max(endOfText, segEnd)
+      }
+      if phdr.p_type == .PT_NOTE {
+        var noteAddr = segStart
+        let noteEnd = segEnd
 
-        if noteEnd - noteAddr < nhdr.n_namesz {
-          // This segment is probably corrupted, so skip it
-          noteAddr = noteEnd
-          continue
-        }
-
-        var isBuildId = false
-        let nameLen = nhdr.n_namesz > 0 ? nhdr.n_namesz - 1 : 0
-
-        // Test if this is a "GNU" NT_GNU_BUILD_ID note
-        if nameLen == 3 {
-          let byte0 = try reader.fetch(from: noteAddr, as: UInt8.self)
-          let byte1 = try reader.fetch(from: noteAddr + 1, as: UInt8.self)
-          let byte2 = try reader.fetch(from: noteAddr + 2, as: UInt8.self)
-
-          if byte0 == 0x47 && byte1 == 0x4e && byte2 == 0x55 &&
-               UInt32(nhdr.n_type) == NT_GNU_BUILD_ID {
-            isBuildId = true
+        while noteAddr < noteEnd {
+          if noteEnd - noteAddr < MemoryLayout<Traits.Nhdr>.size {
+            // This segment is corrupted, so skip it
+            break
           }
-        }
 
-        noteAddr += ImageSource.Size(nhdr.n_namesz)
-        if (noteAddr & 3) != 0 {
-          noteAddr += 4 - (noteAddr & 3)
-        }
+          let nhdr = maybeSwap(try reader.fetch(
+                                 from: noteAddr, as: Traits.Nhdr.self))
 
-        if noteEnd - noteAddr < nhdr.n_descsz {
-          // Corrupted segment, skip
-          noteAddr = noteEnd
-          continue
-        }
+          noteAddr += ImageSource.Size(MemoryLayout<Traits.Nhdr>.size)
 
-        if isBuildId {
-          uuid = try reader.fetch(from: noteAddr,
-                                  count: Int(nhdr.n_descsz),
-                                  as: UInt8.self)
-        }
+          if noteEnd - noteAddr < nhdr.n_namesz {
+            // This segment is probably corrupted, so skip it
+            break
+          }
 
-        noteAddr += ImageSource.Size(nhdr.n_descsz)
-        if (noteAddr & 3) != 0 {
-          noteAddr += 4 - (noteAddr & 3)
+          var isBuildId = false
+          let nameLen = nhdr.n_namesz > 0 ? nhdr.n_namesz - 1 : 0
+
+          // Test if this is a "GNU" NT_GNU_BUILD_ID note
+          if nameLen == 3 {
+            let byte0 = try reader.fetch(from: noteAddr, as: UInt8.self)
+            let byte1 = try reader.fetch(from: noteAddr + 1, as: UInt8.self)
+            let byte2 = try reader.fetch(from: noteAddr + 2, as: UInt8.self)
+
+            if byte0 == 0x47 && byte1 == 0x4e && byte2 == 0x55 &&
+                 UInt32(nhdr.n_type) == NT_GNU_BUILD_ID {
+              isBuildId = true
+            }
+          }
+
+          noteAddr += ImageSource.Size(nhdr.n_namesz)
+          guard let descAddr = align4(noteAddr),
+                descAddr <= noteEnd,
+                noteEnd - descAddr >= nhdr.n_descsz else {
+            // Corrupted segment, skip
+            break
+          }
+          noteAddr = descAddr
+
+          if isBuildId {
+            uuid = try reader.fetch(from: noteAddr,
+                                    count: Int(nhdr.n_descsz),
+                                    as: UInt8.self)
+          }
+
+          noteAddr += ImageSource.Size(nhdr.n_descsz)
+          guard let nextAddr = align4(noteAddr) else {
+            break
+          }
+          noteAddr = nextAddr
         }
       }
     }
 
-    phAddr += ImageSource.Address(header.e_phentsize)
+    let (nextPhAddr, nextOverflow)
+      = phAddr.addingReportingOverflow(ImageSource.Address(header.e_phentsize))
+    if nextOverflow {
+      break
+    }
+    phAddr = nextPhAddr
   }
 
   return (endOfText: endOfText, uuid: uuid)
@@ -2007,5 +2084,41 @@ public func testElfImageAt(path: String) -> Bool {
   } else {
     print("\(path) is not an ELF image")
     return false
+  }
+}
+
+/// Run the ELF parsing code over an in-memory image and describe the result.
+///
+/// - Parameter bytes: The contents of a 64-bit ELF file.
+///
+/// - Returns: A one-line summary of what the parser made of the image.
+@_spi(ElfTest)
+@available(BacktracingDT 6.2, *)
+public func testElfImage(bytes: [UInt8]) -> String {
+  return bytes.withUnsafeBytes { buf in
+    var result: [String] = []
+
+    let source = ImageSource(unowned: buf, isMappedImage: false)
+    if let image = try? Elf64Image(source: source) {
+      result.append("image: loaded")
+
+      let uuid = image.uuid
+      _ = image.uuid
+      _ = image.ehFrameInfo
+      _ = image.getSection(".debug_info")
+      _ = image.lookupSymbol(address: 0)
+      result.append("uuid: \(uuid.map { hex($0) } ?? "none")")
+    } else {
+      result.append("image: rejected")
+    }
+
+    let base = UInt64(UInt(bitPattern: buf.baseAddress))
+    if let info = getElfImageInfo(at: base, using: UnsafeLocalMemoryReader()) {
+      result.append("info: endOfText=base+\(info.endOfText - base)")
+    } else {
+      result.append("info: none")
+    }
+
+    return result.joined(separator: ", ")
   }
 }
