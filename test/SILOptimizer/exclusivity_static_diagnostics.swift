@@ -411,6 +411,24 @@ func inoutSameStoredProperty() {
   // expected-note@-2{{conflicting access is here}}
 }
 
+// rdar://170348611 - a copyable 'consuming' value is stored as $@moveOnly; the
+// moveonlywrapper_to_copyable_addr cast must not hide the field projections.
+func inoutSeparateStoredPropertiesOfConsumingParam(_ s: consuming StructWithTwoStoredProp) {
+  takesTwoInouts(&s.f1, &s.f2) // no-error
+}
+
+extension StructWithTwoStoredProp {
+  consuming func inoutSeparateStoredPropertiesOfConsumingSelf() {
+    takesTwoInouts(&self.f1, &self.f2) // no-error
+  }
+}
+
+func inoutSameStoredPropertyOfConsumingParam(_ s: consuming StructWithTwoStoredProp) {
+  takesTwoInouts(&s.f1, &s.f1)
+  // expected-error@-1{{overlapping accesses to 's.f1', but modification requires exclusive access}}
+  // expected-note@-2{{conflicting access is here}}
+}
+
 func inoutSeparateTupleElements() {
   var t = (1, 4)
   takesTwoInouts(&t.0, &t.1) // no-error
