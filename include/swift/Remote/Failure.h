@@ -272,7 +272,7 @@ public:
 
       switch (ArgKinds[argIndex]) {
       case ArgStorageKind::None:
-        LLVM_BUILTIN_UNREACHABLE;
+        LLVM_BUILTIN_TRAP;
 
       // Stringize a string argument by just appending it.
       case ArgStorageKind::String:
@@ -296,7 +296,7 @@ public:
         continue;
       }
       }
-      LLVM_BUILTIN_UNREACHABLE;
+      LLVM_BUILTIN_TRAP;
     }
 
     // Append the rest of the string.
