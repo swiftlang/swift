@@ -165,7 +165,7 @@ func tuple_assign() {
 func missing_semicolons() {
   var w = 321
   func g() {}
-  g() w += 1             // expected-cparser-error{{consecutive statements}} {{6-6=;}} expected-astgen-error {{consecutive statements}}{{6-7= \n  }}
+  g() w += 1             // expected-cparser-error{{consecutive statements}} {{6-6=;}} expected-astgen-error {{consecutive statements}}{{6-6= \n }}
   var z = w"hello"    // expected-cparser-error{{consecutive statements}} {{12-12=;}} expected-astgen-error {{consecutive statements}}{{12-12=\n  }} expected-warning {{string literal is unused}}
   // expected-warning@-1 {{initialization of variable 'z' was never used; consider replacing with assignment to '_' or removing it}}
   class  C {}class  C2 {} // expected-cparser-error{{consecutive statements}} {{14-14=;}} expected-astgen-error {{consecutive statements}}{{14-14=\n  }}

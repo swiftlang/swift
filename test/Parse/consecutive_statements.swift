@@ -24,26 +24,26 @@ func test(i: inout Int, j: inout Int) {
   if i != j { i = j }
 
   // Errors
-  i = j j = i // expected-cparser-error{{consecutive statements}} {{8-8=;}} expected-astgen-error {{consecutive statements}}{{8-9= \n  }}
+  i = j j = i // expected-cparser-error{{consecutive statements}} {{8-8=;}} expected-astgen-error {{consecutive statements}}{{8-8= \n }}
   let r : Int i = j // expected-cparser-error{{consecutive statements}} {{14-14=;}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{cannot convert value of type '()' to specified type 'Int'}}
-  let s : Int let t : Int // expected-cparser-error{{consecutive statements}} {{14-14=;}} expected-astgen-error {{consecutive statements}}{{14-15= \n  }}
+  let s : Int let t : Int // expected-cparser-error{{consecutive statements}} {{14-14=;}} expected-astgen-error {{consecutive statements}}{{14-14= \n }}
   _ = r; _ = s; _ = t
 }
 
 struct X {
   // In a sequence of declarations.
-  var a, b : Int func d() -> Int {} // expected-cparser-error{{consecutive declarations}} {{17-17=;}} expected-astgen-error {{consecutive declarations}}{{17-18= \n  }}
+  var a, b : Int func d() -> Int {} // expected-cparser-error{{consecutive declarations}} {{17-17=;}} expected-astgen-error {{consecutive declarations}}{{17-17= \n }}
 
   var prop : Int { return 4
-  } var other : Float // expected-cparser-error{{consecutive declarations}} {{4-4=;}} expected-astgen-error {{consecutive declarations}}{{4-5= \n  }}
+  } var other : Float // expected-cparser-error{{consecutive declarations}} {{4-4=;}} expected-astgen-error {{consecutive declarations}}{{4-4= \n }}
 
   // Within property accessors
   subscript(i: Int) -> Float {
     get {
-      var x = i x = i + x return Float(x) // expected-cparser-error{{consecutive statements}} {{16-16=;}} expected-astgen-error {{consecutive statements}}{{16-17= \n      }} expected-cparser-error{{consecutive statements}} {{26-26=;}} expected-astgen-error {{consecutive statements}}{{26-27= \n      }}
+      var x = i x = i + x return Float(x) // expected-cparser-error{{consecutive statements}} {{16-16=;}} expected-astgen-error {{consecutive statements}}{{16-16= \n     }} expected-cparser-error{{consecutive statements}} {{26-26=;}} expected-astgen-error {{consecutive statements}}{{26-26= \n     }}
     }
     set {
-      var x = i x = i + 1 // expected-cparser-error{{consecutive statements}} {{16-16=;}} expected-astgen-error {{consecutive statements}}{{16-17= \n      }}
+      var x = i x = i + 1 // expected-cparser-error{{consecutive statements}} {{16-16=;}} expected-astgen-error {{consecutive statements}}{{16-16= \n     }}
       _ = x
     }
   }
@@ -51,7 +51,7 @@ struct X {
 
 class C {
   // In a sequence of declarations.
-  var a, b : Int func d() -> Int {} // expected-cparser-error{{consecutive declarations}} {{17-17=;}} expected-astgen-error {{consecutive declarations}}{{17-18= \n  }}
+  var a, b : Int func d() -> Int {} // expected-cparser-error{{consecutive declarations}} {{17-17=;}} expected-astgen-error {{consecutive declarations}}{{17-17= \n }}
   init() {
     a = 0
     b = 0
@@ -59,12 +59,12 @@ class C {
 }
 
 protocol P {
-  func a() func b() // expected-cparser-error{{consecutive declarations}} {{11-11=;}} expected-astgen-error {{consecutive declarations}}{{11-12= \n  }}
+  func a() func b() // expected-cparser-error{{consecutive declarations}} {{11-11=;}} expected-astgen-error {{consecutive declarations}}{{11-11= \n }}
 }
 
 enum Color {
-  case Red case Blue // expected-cparser-error{{consecutive declarations}} {{11-11=;}} expected-astgen-error {{consecutive declarations}}{{11-12= \n  }}
-  func a() {} func b() {} // expected-cparser-error{{consecutive declarations}} {{14-14=;}} expected-astgen-error {{consecutive declarations}}{{14-15= \n  }}
+  case Red case Blue // expected-cparser-error{{consecutive declarations}} {{11-11=;}} expected-astgen-error {{consecutive declarations}}{{11-11= \n }}
+  func a() {} func b() {} // expected-cparser-error{{consecutive declarations}} {{14-14=;}} expected-astgen-error {{consecutive declarations}}{{14-14= \n }}
 }
 
 // At the top level

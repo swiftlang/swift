@@ -30,7 +30,8 @@ fileprivate func emitDiagnosticParts(
   highlights: [Syntax] = [],
   edits: [SourceEdit] = [],
   canonicalizeEdits: Bool = false,
-  trimEdits: Bool = false
+  trimEdits: Bool = true,
+  trimEverything: Bool = false
 ) {
   // Map severity
   let bridgedSeverity = severity.bridged
@@ -80,7 +81,7 @@ fileprivate func emitDiagnosticParts(
     // front of the indentation whose spaces it changes.
     let start = offset + lower.utf8Offset
     let end = offset + upper.utf8Offset
-    if trimEdits, start >= 0, end <= sourceFileBuffer.count, start <= end {
+    if trimEdits, !canonicalizeEdits, start >= 0, end <= sourceFileBuffer.count, start <= end {
       let original = Array(sourceFileBuffer[start..<end])
       func isContinuation(_ byte: UInt8) -> Bool { byte & 0xC0 == 0x80 }
       // Trim what is common at the end first, so that an insertion lands right
@@ -109,6 +110,34 @@ fileprivate func emitDiagnosticParts(
           || (prefix < replacement.count && isContinuation(replacement[prefix]))
       {
         prefix -= 1
+      }
+      if !trimEverything {
+        // Only drop trivia that the edit repeats: leading whitespace, and
+        // trailing whitespace and comments. A fix-it that replaces a node
+        // together with the comment after it should not edit that comment.
+        func isSpace(_ byte: UInt8) -> Bool {
+          byte == UInt8(ascii: " ") || byte == UInt8(ascii: "\t") || byte == UInt8(ascii: "\n")
+            || byte == UInt8(ascii: "\r")
+        }
+        var leadingSpaces = 0
+        while leadingSpaces < prefix, isSpace(original[leadingSpaces]) { leadingSpaces += 1 }
+        prefix = leadingSpaces
+        let suffixStart = original.count - suffix
+        var keep = suffix
+        var i = suffixStart
+        keep = 0
+        while i < original.count {
+          var j = i
+          while j < original.count, isSpace(original[j]) { j += 1 }
+          let isComment = j + 1 < original.count && original[j] == UInt8(ascii: "/")
+            && (original[j + 1] == UInt8(ascii: "/") || original[j + 1] == UInt8(ascii: "*"))
+          if j == original.count || isComment {
+            keep = original.count - i
+            break
+          }
+          i += 1
+        }
+        suffix = keep
       }
       lower = lower.advanced(by: prefix)
       upper = upper.advanced(by: -suffix)
@@ -182,7 +211,7 @@ public func emitDiagnostic(
     offset: sourceFileBufferOffset,
     highlights: diagnostic.highlights,
     edits: attachFixIt ? (diagnostic.fixIts.first(where: { !isNoteFixIt($0) })?.edits ?? []) : [],
-    trimEdits: ["replace non-breaking space with ' '", "insert 'if'"].contains(diagnostic.fixIts.first?.message.message ?? "")
+    trimEverything: ["replace non-breaking space with ' '", "insert 'if'"].contains(diagnostic.fixIts.first?.message.message ?? "")
   )
 
   for fixIt in diagnostic.fixIts where !attachFixIt || isNoteFixIt(fixIt) {

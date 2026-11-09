@@ -78,7 +78,7 @@ func test3(_ a: ZeroOneTwoThree) {
      ZeroOneTwoThree.Zero // expected-error {{cannot convert value of type 'ZeroOneTwoThree' to specified type 'Int'}}
 
   // expected-warning @+1 {{unused}}
-  test3 ZeroOneTwoThree.Zero // expected-error {{function is unused}} expected-cparser-error{{consecutive statements}} {{8-8=;}} expected-astgen-error {{consecutive statements}}{{8-9= \n  }}
+  test3 ZeroOneTwoThree.Zero // expected-error {{function is unused}} expected-cparser-error{{consecutive statements}} {{8-8=;}} expected-astgen-error {{consecutive statements}}{{8-8= \n }}
   test3 (ZeroOneTwoThree.Zero)
   test3(ZeroOneTwoThree.Zero)
   test3 // expected-error {{function is unused}}
