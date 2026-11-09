@@ -593,6 +593,27 @@ bool MoveOnlyObjectCheckerPImpl::eraseMarkWithCopiedOperand(
     return true;
   }
 
+  // Handle the borrowed subject of a `switch consume`, whose `where` clause
+  // borrows the pattern variables while it is evaluated.
+  //
+  //   %1 = begin_borrow [fixed] %0
+  //   %2 = copy_value %1
+  //   %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(orig); bbi && bbi->isFixed()) {
+    // The destroys go away with the copy. Any other consuming use needs an
+    // owned operand, which the borrow can't provide.
+    if (!llvm::all_of(markedInst->getConsumingUses(), [](Operand *use) {
+          return isa<DestroyValueInst>(use->getUser());
+        }))
+      return false;
+    for (auto *use : llvm::make_early_inc_range(markedInst->getConsumingUses()))
+      use->getUser()->eraseFromParent();
+    markedInst->replaceAllUsesWith(replacement);
+    markedInst->eraseFromParent();
+    cvi->eraseFromParent();
+    return true;
+  }
+
   // Handle:
   //   (%yield, ..., %handle) = begin_apply
   //   %copy = copy_value %yield
