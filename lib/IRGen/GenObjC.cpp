@@ -1772,7 +1772,13 @@ void IRGenFunction::emitBlockRelease(llvm::Value *value) {
 void IRGenFunction::emitForeignReferenceTypeLifetimeOperation(
     const clang::FunctionDecl *clangFn, llvm::Value *value,
     bool needsNullCheck) {
-  assert(clangFn);
+  if (!clangFn) {
+    // A shared foreign reference type might have no retain/release operations
+    // if the importer could not resolve them.
+    IGM.error(SourceLoc(), "foreign reference type has no retain/release "
+                           "operation; please file a bug");
+    return;
+  }
 
   auto llvmFn = cast<llvm::Function>(
       IGM.getAddrOfClangGlobalDecl(clangFn, ForDefinition));
