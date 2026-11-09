@@ -726,6 +726,10 @@ EXPERIMENTAL_FEATURE(ModernImportedCArrays, true)
 /// into a future language version.
 EXPERIMENTAL_FEATURE(ModernImportedCArraysOnly, true)
 
+/// Allow value pack expansions as elements of array literals, e.g.
+/// `[repeat each x]`.
+EXPERIMENTAL_FEATURE(PackExpansionInArrayLiterals, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

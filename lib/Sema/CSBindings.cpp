@@ -3252,6 +3252,76 @@ static bool isInterestingElementType(ConstraintKind forKind, Type type,
   return proto->isSpecificProtocol(kind);
 }
 
+/// The element type of an array literal can't refer to the element archetypes
+/// opened by one of its own value pack expansion elements: in
+/// `[repeat each x]`, the array exists outside of the expansion, so its element
+/// type can't be `each T`.
+///
+/// Returns true if \p type is such a binding for \p typeVar, inferred from
+/// (some part of) the conversion of the pattern of a pack expansion element to
+/// the element type of the array literal, and \p typeVar is outside of the
+/// expansion.
+static bool isArrayLiteralPackExpansionElementBinding(ConstraintSystem &CS,
+                                                      TypeVariableType *typeVar,
+                                                      Constraint *constraint,
+                                                      Type type) {
+  if (!type->hasElementArchetype())
+    return false;
+
+  // Look for the conversion of a pack expansion element to the array element
+  // type (`ArrayExpr -> tuple element #N`), or of some component of it.
+  auto *locator = constraint->getLocator();
+  if (!locator || locator->getPath().empty())
+    return false;
+
+  auto *arrayExpr = getAsExpr<ArrayExpr>(locator->getAnchor());
+  if (!arrayExpr)
+    return false;
+
+  auto elt = locator->getPath().front().getAs<LocatorPathElt::TupleElement>();
+  if (!elt || elt->getIndex() >= arrayExpr->getNumElements())
+    return false;
+
+  auto *expansion =
+      dyn_cast<PackExpansionExpr>(arrayExpr->getElement(elt->getIndex()));
+  if (!expansion)
+    return false;
+
+  // Type variables introduced while matching the conversion itself, e.g. the
+  // intermediate type of an `AnyHashable` erasure, belong to the expansion and
+  // can bind to its element archetypes. Their locators are rooted at the
+  // same element. Type variables for the array element type are instead
+  // introduced by the literal's default type, the contextual type (possibly
+  // with placeholders), or an enclosing expression.
+  if (auto *typeVarLoc = typeVar->getImpl().getLocator()) {
+    if (typeVarLoc->getAnchor() == locator->getAnchor()) {
+      auto typeVarPath = typeVarLoc->getPath();
+      if (!typeVarPath.empty()) {
+        if (auto typeVarElt =
+                typeVarPath.front().getAs<LocatorPathElt::TupleElement>()) {
+          if (typeVarElt->getIndex() == elt->getIndex())
+            return false;
+        }
+      }
+    } else {
+      // A type variable anchored within the expansion, e.g. for a
+      // subexpression of its pattern, is inside of it as well.
+      auto &SM = CS.getASTContext().SourceMgr;
+      auto anchorRange = typeVarLoc->getAnchor().getSourceRange();
+      if (anchorRange.isValid() &&
+          SM.rangeContains(expansion->getSourceRange(), anchorRange))
+        return false;
+    }
+  }
+
+  auto *env = CS.getPackExpansionEnvironment(expansion);
+  return type.findIf([&](Type t) {
+    if (auto *archetype = t->getAs<ElementArchetypeType>())
+      return !env || archetype->getGenericEnvironment() == env;
+    return false;
+  });
+}
+
 std::optional<PotentialBinding>
 PotentialBindings::inferFromRelational(Constraint *constraint) {
   ASSERT(TypeVar);
@@ -3494,6 +3564,12 @@ PotentialBindings::inferFromRelational(Constraint *constraint) {
       recordDelayedBy(constraint);
 
     DEBUG_BAILOUT("Dependent member");
+    return std::nullopt;
+  }
+
+  if (kind == AllowedBindingKind::Supertypes &&
+      isArrayLiteralPackExpansionElementBinding(CS, TypeVar, constraint, type)) {
+    DEBUG_BAILOUT("Pack element type escaping array literal");
     return std::nullopt;
   }
 

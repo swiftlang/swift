@@ -7035,7 +7035,13 @@ ERROR(expansion_not_allowed,none,
       "tuple element, or generic argument of a variadic type", (Type))
 ERROR(expansion_expr_not_allowed,none,
       "value pack expansion can only appear inside a function argument list, "
-      "tuple element, array literal, or as the expression of a for-in loop", ())
+      "tuple element, or as the expression of a for-in loop", ())
+ERROR(expansion_in_inline_array_literal_unsupported,none,
+      "value pack expansion in an 'InlineArray' literal is not yet supported",
+      ())
+ERROR(expansion_array_literal_element_type_unsupported,none,
+      "array literal element type %0 that depends on pack element type %1 "
+      "is not yet supported", (Type, Type))
 ERROR(invalid_expansion_argument,none,
       "cannot pass value pack expansion to non-pack parameter of type %0",
       (Type))

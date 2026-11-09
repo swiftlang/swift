@@ -65,15 +65,20 @@ public:
   }
 };
 
-/// Begin a varargs emission sequence.
+/// Begin a varargs emission sequence, allocating an array of
+/// \p numEltsVal elements.
 VarargsInfo emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                              CanType baseTy, CanType arrayTy,
                              SILValue numEltsVal);
 
 /// Successfully end a varargs emission sequence.
+///
+/// \param numStaticElements The number of elements known statically.
+/// \param numElements The total number of elements, if it's only known
+///   dynamically (e.g. because of pack expansions), or null otherwise.
 ManagedValue emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
-                            VarargsInfo &&varargs,
-                             unsigned numElements); 
+                            VarargsInfo &&varargs, unsigned numStaticElements,
+                            SILValue numElements);
 
 } // end namespace Lowering
 } // end namespace swift

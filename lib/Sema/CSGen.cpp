@@ -1599,6 +1599,8 @@ namespace {
       auto contextualPurpose = CS.getContextualTypePurpose(expr);
 
       auto joinElementTypes = [&](std::optional<Type> elementType) {
+        bool allowPackExpansions =
+            ctx.LangOpts.hasFeature(Feature::PackExpansionInArrayLiterals);
         const auto elements = expr->getElements();
         unsigned index = 0;
 
@@ -1606,17 +1608,17 @@ namespace {
         addJoinConstraint<Iterator>(
             CS, locator, elements.begin(), elements.end(), elementType,
             [&](const auto it) {
-              if (auto packExpr = dyn_cast<PackExpansionExpr>(*it)) {
-                auto *locator = CS.getConstraintLocator(
-                    packExpr, LocatorPathElt::TupleElement(index++));
-                auto *eltLocator = CS.getConstraintLocator(packExpr);
-                Type elementType = CS.getType(packExpr->getPatternExpr());
-                return std::make_pair(elementType, locator);
-              } else {
-                auto *locator = CS.getConstraintLocator(
-                    expr, LocatorPathElt::TupleElement(index++));
-                return std::make_pair(CS.getType(*it), locator);
+              auto *locator = CS.getConstraintLocator(
+                  expr, LocatorPathElt::TupleElement(index++));
+              // Each element of a value pack expansion, e.g.
+              // `[repeat each x]`, must convert to the array element type,
+              // so join the pattern type instead of the expansion type.
+              if (auto *expansion = dyn_cast<PackExpansionExpr>(*it)) {
+                if (allowPackExpansions)
+                  return std::make_pair(CS.getType(expansion->getPatternExpr()),
+                                        locator);
               }
+              return std::make_pair(CS.getType(*it), locator);
             });
       };
 
