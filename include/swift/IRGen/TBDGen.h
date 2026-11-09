@@ -48,6 +48,9 @@ struct TBDGenOptions {
   /// Whether resilient protocols should be emitted fragile.
   bool FragileResilientProtocols = false;
 
+  /// Whether protocol witness tables use relative references.
+  bool RelativeProtocolWitnessTables = false;
+
   /// The install_name to use in the TBD file.
   std::string InstallName;
 
@@ -80,6 +83,8 @@ struct TBDGenOptions {
            lhs.VirtualFunctionElimination == rhs.VirtualFunctionElimination &&
            lhs.WitnessMethodElimination == rhs.WitnessMethodElimination &&
            lhs.FragileResilientProtocols == rhs.FragileResilientProtocols &&
+           lhs.RelativeProtocolWitnessTables ==
+               rhs.RelativeProtocolWitnessTables &&
            lhs.InstallName == rhs.InstallName &&
            lhs.ModuleLinkName == rhs.ModuleLinkName &&
            lhs.CurrentVersion == rhs.CurrentVersion &&
@@ -98,8 +103,8 @@ struct TBDGenOptions {
         opts.HasMultipleIGMs, opts.IsInstallAPI, opts.LinkerDirectivesOnly,
         opts.PublicOrPackageSymbolsOnly, opts.VirtualFunctionElimination,
         opts.WitnessMethodElimination, opts.FragileResilientProtocols,
-        opts.InstallName, opts.ModuleLinkName,
-        opts.CurrentVersion, opts.CompatibilityVersion,
+        opts.RelativeProtocolWitnessTables, opts.InstallName,
+        opts.ModuleLinkName, opts.CurrentVersion, opts.CompatibilityVersion,
         opts.ModuleInstallNameMapPath,
         hash_combine_range(opts.embedSymbolsFromModules.begin(),
                            opts.embedSymbolsFromModules.end()));
