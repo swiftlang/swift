@@ -1073,9 +1073,10 @@ void importer::checkRetainReleaseFunctions(
   // (A directly-annotated FRT may be forward-declared.)
   if (baseCxxRecordDecl &&
       (!isReachable(cxxRecordDecl) || !isReachable(baseCxxRecordDecl))) {
-    Impl.diagnose(HeaderLoc(recordDecl->getLocation()),
-                  diag::foreign_reference_type_unreachable,
-                  classDecl->getNameStr());
+    Impl.markUnavailable(classDecl,
+                         "foreign reference type '" +
+                             classDecl->getNameStr().str() +
+                             "' has unreachable definition");
     return;
   }
 
