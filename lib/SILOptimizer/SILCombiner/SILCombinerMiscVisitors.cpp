@@ -331,7 +331,8 @@ SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
       for (auto *Op : OEAI->getUses()) {
         assert(isa<DestroyAddrInst>(Op->getUser()) ||
                Op->getUser()->isDebugInstruction() && "Unexpected instruction");
-        ToDelete.insert(Op->getUser());
+        if (!Op->getUser()->isDebugInstruction())
+          ToDelete.insert(Op->getUser());
       }
     }
 
@@ -341,7 +342,8 @@ SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
            isa<DeallocStackInst>(Op->getUser()) ||
            isa<DeinitExistentialAddrInst>(Op->getUser()) ||
            Op->getUser()->isDebugInstruction() && "Unexpected instruction");
-    ToDelete.insert(Op->getUser());
+    if (!Op->getUser()->isDebugInstruction())
+      ToDelete.insert(Op->getUser());
   }
 
   // Check if a retain is moved after the copy_addr. If the retained object
@@ -354,6 +356,13 @@ SILInstruction *SILCombiner::legacyVisitAllocStackInst(AllocStackInst *AS) {
   }
 
   for (CopyAddrInst *copy : takingCopies) {
+    // Move the debug info from the now dead alloc_stack, to describe where the
+    // value was taken from.
+    // This is safe as the old alloc_stack is removed with its variable, and
+    // all writes receives its debug info from the source, which we know still
+    // has the correct content until it is destroyed on the very next
+    // instruction. A breakpoint on the destroy would show the variable value.
+    swift::salvageStoreDebugInfo(copy, copy->getSrc(), AS);
     SILBuilderWithScope destroyBuilder(copy, Builder.getBuilderContext());
     destroyBuilder.createDestroyAddr(copy->getLoc(), copy->getSrc());
   }
