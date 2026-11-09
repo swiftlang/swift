@@ -13,12 +13,13 @@
 #ifndef SWIFT_AST_SOURCEFILEEXTRAS_H
 #define SWIFT_AST_SOURCEFILEEXTRAS_H
 
-#include "llvm/ADT/DenseMap.h"
-#include <vector>
+#include "llvm/ADT/DenseSet.h"
 
 namespace swift {
 
+class ConstructorDecl;
 class Decl;
+class NominalTypeDecl;
 
 /// Extra information associated with a source file that is lazily created and
 /// stored in a separately-allocated side structure.
@@ -26,8 +27,12 @@ struct SourceFileExtras {
   /// Set of compatibility memberwise initializers that we have emitted a
   /// warning for.
   llvm::DenseSet<const ConstructorDecl *> DiagnosedCompatMemberwiseInits;
+
+  /// (outermost enclosing declaration, unusable imported type) pairs that we
+  /// have emitted an error for, so that each declaration gets at most one.
+  llvm::DenseSet<std::pair<const Decl *, const NominalTypeDecl *>>
+      DiagnosedUnusableImportedTypes;
 };
-  
 }
 
 #endif // SWIFT_AST_SOURCEFILEEXTRAS_H

@@ -15,8 +15,11 @@
 
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/AST/TypeAlignments.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/TaggedUnion.h"
 #include "clang/AST/DeclTemplate.h"
+#include "llvm/ADT/PointerIntPair.h"
 
 namespace clang {
 class ASTContext;
@@ -57,6 +60,34 @@ enum class ClangTypeKind {
   /// Structs, enums, and unions.
   Tag,
   ObjCProtocol,
+};
+
+/// An imported type that Swift code must not use and why.
+class UnusableImportedType {
+public:
+  /// Why ClangImporter considers a type unusable from Swift.
+  enum class Reason : uint8_t {
+    /// A shared foreign reference type whose definition (or base's definition)
+    /// is not reachable, so its retain/release operations cannot be resolved.
+    UnreachableForeignReferenceType,
+  };
+
+private:
+  llvm::PointerIntPair<NominalTypeDecl *, 3, Reason> declAndReason;
+
+public:
+  /// No unusable type.
+  explicit UnusableImportedType() : declAndReason(nullptr, Reason()) {}
+
+  UnusableImportedType(NominalTypeDecl *decl, Reason reason)
+      : declAndReason(decl, reason) {
+    ASSERT(decl && "use the default constructor for no type");
+  }
+
+  NominalTypeDecl *getDecl() const { return declAndReason.getPointer(); }
+  Reason getReason() const { return declAndReason.getInt(); }
+
+  explicit operator bool() const { return getDecl(); }
 };
 
 /// A path for serializing a declaration.
@@ -270,6 +301,24 @@ public:
   /// (i.e. it is immortal or not a valid foreign reference type).
   virtual std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
   getForeignReferenceTypeOperations(const clang::RecordDecl *decl) = 0;
+
+  /// If values of \p type expose an imported type that Swift code must not
+  /// use, returns that type and the reason. Otherwise, returns an empty result.
+  ///
+  /// A type T exposes an unusable type U if:
+  ///   - T is U; or
+  ///   - T is formed from a type that exposes U: a generic argument (e.g. `U?`
+  ///     or `[U]`), a tuple element, a function parameter or result, or the
+  ///     instance type of a metatype; or
+  ///   - T is a struct or enum that Swift copies and destroys field by field,
+  ///     and one of its stored properties or enum payloads exposes U.
+  ///
+  /// The last rule does not apply to:
+  ///   - classes, since copying a reference doesn't copy the object;
+  ///   - resilient types, since their storage is hidden; and
+  ///   - C++ records that C++ copies and destroys, i.e., records with a usable
+  ///     copy constructor and a non-trivial destructor.
+  virtual UnusableImportedType findExposedUnusableImportedType(Type type) = 0;
 
   /// Returns true if we synthesize this member for every type so no need to
   /// clone it for the derived classes.

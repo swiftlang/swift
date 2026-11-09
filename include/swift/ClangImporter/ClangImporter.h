@@ -834,6 +834,8 @@ public:
   std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
   getForeignReferenceTypeOperations(const clang::RecordDecl *decl) override;
 
+  UnusableImportedType findExposedUnusableImportedType(Type type) override;
+
   /// Classify \p decl against libkern's OSObject hierarchy.
   LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
 

@@ -988,6 +988,24 @@ public:
     return it->second;
   }
 
+  /// Imported types that Swift code must not use, and why. Marked while the
+  /// type is imported, before Swift code using it is type-checked.
+  llvm::DenseMap<const NominalTypeDecl *, UnusableImportedType::Reason>
+      UnusableImportedTypes;
+
+  /// Cache for \c findUnusableImportedTypeInStorage. An empty entry is also a
+  /// placeholder while the storage of a recursive type is being walked.
+  llvm::DenseMap<const NominalTypeDecl *, UnusableImportedType>
+      StorageExposingUnusableImportedType;
+
+  /// See \c ClangModuleLoader::findExposedUnusableImportedType.
+  UnusableImportedType findExposedUnusableImportedType(Type type);
+
+  /// Returns the unusable type exposed by the storage of the struct or enum
+  /// \p nominal, or an empty result.
+  UnusableImportedType
+  findUnusableImportedTypeInStorage(const NominalTypeDecl *nominal);
+
   /// Cache for getLibkernSubclass(), which classifies a CXXRecordDecl against
   /// libkern's OSObject hierarchy.
   llvm::DenseMap<const clang::CXXRecordDecl *, LibkernSubclass>
