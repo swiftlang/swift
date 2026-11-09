@@ -894,6 +894,38 @@ extension MutableSpan {
       index &+= elements.count
     }
   }
+
+  /// Overwrites elements of this span, starting at an index, by copying
+  /// every element of the source.
+  ///
+  /// `source` must not have more elements than fit between `index` and
+  /// the end of this span. If it has fewer, the remaining elements of
+  /// this span are unchanged.
+  ///
+  /// If reading from `source` throws an error, the elements copied before
+  /// the error occurred remain in this span, and `index` is updated to
+  /// the index after the last element updated before the error.
+  ///
+  /// - Parameters:
+  ///   - index: The index at which to start copying. It must be a valid
+  ///      index of this span, or equal to its `count`. On return, it is
+  ///      updated to the index after the last element updated.
+  ///   - source: The elements to copy into this span.
+  /// - Throws: Any error thrown while reading from `source`.
+  @export(implementation)
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func updateElements<
+    I: Iterable & ~Escapable & ~Copyable
+  >(
+    startingAt index: inout Index, copyingAll source: borrowing I
+  ) throws(I.Failure) where I.Element == Element {
+    var iterator = try updateElements(startingAt: &index, copying: source)
+    let next = try iterator.nextSpan()
+    _precondition(
+      next.isEmpty, "Source has more elements than the destination can contain."
+    )
+  }
 #endif // !SPAN_COMPATIBILITY_STUB
 }
 

@@ -783,6 +783,46 @@ suite.test("updateElements(startingAt:copying:), source throws")
   }
 }
 
+suite.test("updateElements(startingAt:copyingAll:), source longer than destination")
+.require(.minimumStdlib(.stdlib_6_5))
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let source: [8 of Int] = [0, 1, 2, 3, 4, 5, 6, 7]
+  var a = ContiguousArray(repeating: -1, count: 6)
+  var span = a.mutableSpan
+  var index = 2
+  expectCrashLater(
+    withDebugMessage: "Source has more elements than the destination can contain"
+  )
+  span.updateElements(startingAt: &index, copyingAll: source)
+}
+
+suite.test("updateElements(startingAt:copyingAll:), source throws when checking for more elements")
+.require(.minimumStdlib(.stdlib_6_5))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let values = ContiguousArray(0..<10)
+  // provides 0..<5 as spans of 2, 2 and 1 elements, then throws
+  let source = ThrowingIterable(values.span, limit: 5, chunkSize: 2)
+
+  // the destination is filled by the elements provided before the error,
+  // so the error comes from checking that the source has no more elements
+  var a = ContiguousArray(repeating: -1, count: 7)
+  var span = a.mutableSpan
+  var index = 2
+  do throws(SourceError) {
+    try span.updateElements(startingAt: &index, copyingAll: source)
+    expectUnreachable()
+  } catch {
+    expectEqual(error, SourceError())
+  }
+  expectEqual(index, 7)
+  expectEqual(a, [-1, -1, 0, 1, 2, 3, 4])
+}
+
 suite.test("span property")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
