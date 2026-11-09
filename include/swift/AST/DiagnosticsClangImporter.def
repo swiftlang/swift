@@ -375,6 +375,10 @@ ERROR(foreign_reference_types_retain_release_not_a_function_decl, none,
 ERROR(foreign_reference_types_retain_release_not_an_instance_function, none,
       "specified %select{retain|release}0 function '%1' is a static function; expected an instance function",
       (bool, StringRef))
+ERROR(unusable_imported_type_use, none,
+      "type %0 cannot be used because it contains "
+      "%select{foreign reference type %1, whose definition is not reachable}2",
+      (Type, const ValueDecl *, unsigned))
 
 ERROR(nonescapable_foreign_reference_type, none,
       "%0 cannot be both a foreign reference type and non-'Escapable'; foreign "

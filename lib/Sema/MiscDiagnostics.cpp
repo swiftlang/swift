@@ -27,10 +27,12 @@
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/Pattern.h"
@@ -38,6 +40,7 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SILOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -6937,6 +6940,137 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
   }
 }
 
+/// Returns the outermost function, property, or top-level code enclosing \p DC,
+/// or null if \p DC is a type, an extension, or a file.
+static const Decl *getOutermostEnclosingDecl(const DeclContext *DC) {
+  const Decl *result = nullptr;
+  for (; !DC->isModuleScopeContext() && !DC->isTypeContext();
+       DC = DC->getParent()) {
+    if (auto *D = DC->getAsDecl())
+      result = D;
+    else if (auto *init = dyn_cast<PatternBindingInitializer>(DC))
+      result = init->getBinding();
+  }
+  return result;
+}
+
+/// Diagnoses a use of \p type at \p loc if it exposes an imported type that
+/// Swift code must not use, at most once per unusable type in \p enclosing.
+/// Returns true if \p type exposes such a type.
+static bool diagnoseUnusableImportedType(Type type, SourceLoc loc,
+                                         const Decl *enclosing,
+                                         SourceFile *SF) {
+  if (!type || type->hasError() || loc.isInvalid())
+    return false;
+  auto &ctx = type->getASTContext();
+  type = type->getWithoutSpecifierType();
+  auto unusable =
+      ctx.getClangModuleLoader()->findExposedUnusableImportedType(type);
+  if (!unusable)
+    return false;
+  auto *decl = unusable.getDecl();
+  if (SF && enclosing &&
+      !SF->getExtras().DiagnosedUnusableImportedTypes.insert({enclosing, decl})
+           .second)
+    return true;
+  ctx.Diags.diagnose(loc, diag::unusable_imported_type_use, type, decl,
+                     static_cast<unsigned>(unusable.getReason()));
+  return true;
+}
+
+static void diagnoseUnusableImportedTypesInExpr(const Expr *E,
+                                                const DeclContext *DC) {
+  if (!DC->getASTContext().LangOpts.EnableCXXInterop)
+    return;
+
+  class DiagnoseWalker : public BaseDiagnosticWalker {
+    const Decl *Enclosing;
+    SourceFile *SF;
+
+  public:
+    DiagnoseWalker(const Decl *enclosing, SourceFile *SF)
+        : Enclosing(enclosing), SF(SF) {}
+
+    // Post-order, so that the error is on the innermost offending expression.
+    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+      if (diagnoseUnusableImportedType(E->getType(), E->getLoc(), Enclosing,
+                                       SF))
+        return Action::Stop();
+      return Action::Continue(E);
+    }
+  };
+
+  DiagnoseWalker walker(getOutermostEnclosingDecl(DC),
+                        DC->getParentSourceFile());
+  const_cast<Expr *>(E)->walk(walker);
+}
+
+void swift::diagnoseUnusableImportedTypesInDecl(const Decl *D) {
+  if (D->isImplicit() || D->isInvalid() ||
+      !D->getASTContext().LangOpts.EnableCXXInterop)
+    return;
+
+  // A local declaration shares its errors with the declaration enclosing it.
+  const Decl *enclosing = getOutermostEnclosingDecl(D->getDeclContext());
+  if (!enclosing)
+    enclosing = D;
+  auto *SF = D->getDeclContext()->getParentSourceFile();
+
+  auto check = [&](Type type, SourceLoc loc) {
+    diagnoseUnusableImportedType(type, loc.isValid() ? loc : D->getLoc(),
+                                 enclosing, SF);
+  };
+  auto checkParams = [&](const ParameterList *params) {
+    if (params)
+      for (auto *param : *params)
+        check(param->getInterfaceType(), param->getStartLoc());
+  };
+
+  if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
+    for (auto i : range(PBD->getNumPatternEntries())) {
+      // The initializer expression is diagnosed instead.
+      if (PBD->isExplicitlyInitialized(i))
+        continue;
+      PBD->getPattern(i)->forEachVariable(
+          [&](VarDecl *var) { check(var->getInterfaceType(), var->getLoc()); });
+    }
+    return;
+  }
+
+  // Accessors are covered by their storage declaration.
+  if (isa<AccessorDecl>(D))
+    return;
+
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
+    // 'self' is covered by the extension or type declaration.
+    checkParams(AFD->getParameters());
+    if (auto *FD = dyn_cast<FuncDecl>(AFD))
+      check(FD->getResultInterfaceType(), FD->getLoc());
+    return;
+  }
+
+  if (auto *SD = dyn_cast<SubscriptDecl>(D)) {
+    checkParams(SD->getIndices());
+    check(SD->getElementInterfaceType(), SD->getLoc());
+    return;
+  }
+
+  if (auto *EED = dyn_cast<EnumElementDecl>(D)) {
+    checkParams(EED->getParameterList());
+    return;
+  }
+
+  if (auto *ED = dyn_cast<ExtensionDecl>(D)) {
+    check(ED->getExtendedType(), ED->getLoc());
+    return;
+  }
+
+  if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
+    check(TAD->getUnderlyingType(), TAD->getLoc());
+    return;
+  }
+}
+
 /// Diagnose each implicit force unwrap, which occurs when referencing an
 /// implicitly unwrapped optional or the result of a dynamic lookup in a
 /// context that requires a non-optional value.
@@ -7163,6 +7297,7 @@ void swift::performSyntacticExprDiagnostics(const Expr *E,
   diagnoseDictionaryLiteralDuplicateKeyEntries(E, DC);
   diagnoseMissingMemberImports(E, DC);
   diagnoseCxxFunctionCalls(E, DC);
+  diagnoseUnusableImportedTypesInExpr(E, DC);
   diagnoseInvalidSendingCaptureDeclarations(E, DC);
   diagnoseNondeinitableCaptureListEntries(E, DC);
   diagnoseImplicitForceUnwrap(E, DC);

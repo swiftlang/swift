@@ -1077,6 +1077,8 @@ void importer::checkRetainReleaseFunctions(
                          "foreign reference type '" +
                              classDecl->getNameStr().str() +
                              "' has unreachable definition");
+    Impl.UnusableImportedTypes[classDecl] =
+        UnusableImportedType::Reason::UnreachableForeignReferenceType;
     return;
   }
 
@@ -1137,6 +1139,102 @@ void importer::checkRetainReleaseFunctions(
     }
   }
   Impl.setForeignReferenceTypeOperations(recordDecl, retainFn, releaseFn);
+}
+
+//===----------------------------------------------------------------------===//
+// Unusable imported types
+//===----------------------------------------------------------------------===//
+
+/// Whether Swift copies and destroys the imported C++ record \p structDecl
+/// only through its C++ copy constructor and destructor, or does so field-wise.
+/// This mirrors \c AddressOnlyCXXClangRecordTypeInfo in IRGen.
+static bool isCopiedAndDestroyedByCxx(const StructDecl *structDecl) {
+  auto *cxxRecord =
+      dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+  if (!cxxRecord || !structDecl->isCxxNonTrivial())
+    return false;
+
+  auto *destructor = cxxRecord->getDestructor();
+  if (!destructor || destructor->isTrivial())
+    return false;
+
+  auto *copyConstructor = importer::findCopyConstructor(cxxRecord);
+  return copyConstructor && copyConstructor->getAccess() == clang::AS_public;
+}
+
+UnusableImportedType
+ClangImporter::Implementation::findUnusableImportedTypeInStorage(
+    const NominalTypeDecl *nominal) {
+  if (!isa<StructDecl, EnumDecl>(nominal))
+    return UnusableImportedType();
+
+  // Insert a placeholder so that recursive types terminate.
+  auto [it, inserted] =
+      StorageExposingUnusableImportedType.try_emplace(nominal);
+  if (!inserted)
+    return it->second;
+
+  UnusableImportedType found;
+  auto check = [&](Type type) {
+    if (!found)
+      found = findExposedUnusableImportedType(type);
+  };
+
+  if (nominal->isResilient()) {
+    // The storage is not visible to clients.
+  } else if (auto *structDecl = dyn_cast<StructDecl>(nominal)) {
+    if (!isCopiedAndDestroyedByCxx(structDecl)) {
+      for (auto *field : structDecl->getStoredProperties())
+        check(field->getInterfaceType());
+
+      // Fields of C++ base classes count as fields of the derived record.
+      auto *cxxRecord =
+          dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+      if (cxxRecord && cxxRecord->hasDefinition()) {
+        for (auto &base : cxxRecord->bases()) {
+          auto *baseRecord = base.getType()->getAsCXXRecordDecl();
+          if (!baseRecord)
+            continue;
+          if (auto *baseDecl = dyn_cast_or_null<NominalTypeDecl>(
+                  importDecl(baseRecord, CurrentVersion)))
+            check(baseDecl->getDeclaredInterfaceType());
+        }
+      }
+    }
+  } else {
+    for (auto *element : cast<EnumDecl>(nominal)->getAllElements())
+      if (element->hasAssociatedValues())
+        check(element->getPayloadInterfaceType());
+  }
+
+  // Look up the entry again: the walk may have grown the map.
+  StorageExposingUnusableImportedType[nominal] = found;
+  return found;
+}
+
+UnusableImportedType
+ClangImporter::Implementation::findExposedUnusableImportedType(Type type) {
+  if (UnusableImportedTypes.empty() || !type || type->hasError())
+    return UnusableImportedType();
+
+  UnusableImportedType found;
+  type->getCanonicalType().findIf([&](Type component) {
+    auto *nominal = component->getAnyNominal();
+    if (!nominal)
+      return false;
+
+    auto unusable = UnusableImportedTypes.find(nominal);
+    if (unusable != UnusableImportedTypes.end())
+      found = UnusableImportedType(nominal, unusable->second);
+    else
+      found = findUnusableImportedTypeInStorage(nominal);
+    return bool(found);
+  });
+  return found;
+}
+
+UnusableImportedType ClangImporter::findExposedUnusableImportedType(Type type) {
+  return Impl.findExposedUnusableImportedType(type);
 }
 
 //===----------------------------------------------------------------------===//
