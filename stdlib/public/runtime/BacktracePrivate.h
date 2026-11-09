@@ -149,6 +149,7 @@ struct BacktraceSettings {
   const char      *swiftBacktracePath;
   const char      *outputPath;
   bool             closeFds;
+  bool             hookFailFast;
 };
 
 SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings;
