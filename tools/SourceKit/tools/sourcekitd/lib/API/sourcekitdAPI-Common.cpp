@@ -258,6 +258,7 @@ bool sourcekitd::initializeClient() {
 
   static std::once_flag flag;
   std::call_once(flag, []() {
+    llvm::remove_fatal_error_handler();
     llvm::install_fatal_error_handler(fatal_error_handler, 0);
     sourcekitd::enableLogging("sourcekit");
   });
