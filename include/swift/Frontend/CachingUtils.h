@@ -30,14 +30,16 @@
 namespace swift {
 
 /// Create a swift caching output backend that stores the output from
-/// compiler into a CAS.
+/// compiler into a CAS. If \p DiskBackend is provided, the outputs are also
+/// written to disk, exporting them from the CAS when possible.
 llvm::IntrusiveRefCntPtr<cas::SwiftCASOutputBackend>
 createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
     const FrontendOptions &Opts, FrontendOptions::ActionType Action,
-    bool WriteOutputHashXAttr);
+    bool WriteOutputHashXAttr,
+    llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> DiskBackend = nullptr);
 
 /// Replay the output of the compilation from cache.
 /// Return true if outputs are replayed, false otherwise.
@@ -52,6 +54,9 @@ bool replayCachedCompilerOutputs(llvm::cas::ObjectStore &CAS,
 
 /// Replay the output of the compilation from cache for one input file.
 /// Return true if outputs are replayed, false otherwise.
+///
+/// Outputs that are stored verbatim in the CAS are exported directly to the
+/// file system when possible, the rest are written through \p OutBackend.
 bool replayCachedCompilerOutputsForInput(llvm::cas::ObjectStore &CAS,
                                          llvm::cas::ObjectRef OutputRef,
                                          const InputFile &Input,

@@ -22,6 +22,7 @@
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/CASUtil/Utils.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/IOSandbox.h"
 #include "llvm/Support/Mutex.h"
 #include <optional>
 
@@ -52,6 +53,42 @@ private:
 } // namespace
 
 namespace swift::cas {
+
+Error exportCASObjectToFile(const ObjectProxy &Object, StringRef Path,
+                            OutputConfig Config,
+                            OutputBackend &FallbackBackend) {
+  // `exportDataToFile` always replaces the file with the exact object data.
+  if (Path == "-" || Config.getAppend() || Config.getText()) {
+    auto File = FallbackBackend.createFile(Path, Config);
+    if (!File)
+      return File.takeError();
+    *File << Object.getData();
+    return File->keep();
+  }
+
+  auto BypassSandbox = sys::sandbox::scopedDisable();
+
+  if (Config.getOnlyIfDifferent()) {
+    // Skip writing if the existing file already has the same content.
+    uint64_t Size;
+    if (!sys::fs::file_size(Path, Size) && Size == Object.getData().size()) {
+      auto Existing = MemoryBuffer::getFile(Path, /*IsText=*/false,
+                                            /*RequiresNullTerminator=*/false);
+      if (Existing && (*Existing)->getBuffer() == Object.getData())
+        return Error::success();
+    }
+  }
+
+  if (Config.getImplyCreateDirectories()) {
+    StringRef ParentPath = sys::path::parent_path(Path);
+    if (!ParentPath.empty())
+      if (std::error_code EC = sys::fs::create_directories(ParentPath))
+        return createFileError(ParentPath, EC);
+  }
+
+  return Object.exportDataToFile(Path);
+}
+
 void SwiftCASOutputBackend::anchor() {}
 
 class SwiftCASOutputBackend::Implementation {
@@ -59,31 +96,37 @@ public:
   Implementation(ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
                  const FrontendInputsAndOutputs &InputsAndOutputs,
                  const FrontendOptions &Opts,
-                 FrontendOptions::ActionType Action, bool WriteOutputHashXAttr)
+                 FrontendOptions::ActionType Action, bool WriteOutputHashXAttr,
+                 IntrusiveRefCntPtr<OutputBackend> DiskBackend)
       : CAS(CAS), Cache(Cache), BaseKey(BaseKey),
         InputsAndOutputs(InputsAndOutputs), Opts(Opts), Action(Action),
-        WriteOutputHashXAttr(WriteOutputHashXAttr) {
+        WriteOutputHashXAttr(WriteOutputHashXAttr),
+        DiskBackend(std::move(DiskBackend)) {
     initBackend(InputsAndOutputs);
   }
 
   llvm::Expected<std::unique_ptr<llvm::vfs::OutputFileImpl>>
   createFileImpl(llvm::StringRef ResolvedPath,
                  std::optional<llvm::vfs::OutputConfig> Config) {
+    OutputConfig ResolvedConfig = Config.value_or(OutputConfig());
     auto ProducingInput = OutputToInputMap.find(ResolvedPath);
     if (ProducingInput == OutputToInputMap.end() &&
         ResolvedPath.starts_with(Opts.SymbolGraphOutputDir)) {
       return std::make_unique<SwiftCASOutputFile>(
-          ResolvedPath, [this](StringRef Path, StringRef Bytes) -> Error {
+          ResolvedPath,
+          [this, ResolvedConfig](StringRef Path, StringRef Bytes) -> Error {
+            std::optional<ObjectRef> BytesRef;
+            if (Error E =
+                    CAS.storeFromString(/*Refs*/ {}, Bytes).moveInto(BytesRef))
+              return E;
+            if (Error E = exportToDisk(Path, *BytesRef, ResolvedConfig))
+              return E;
             bool Shortened = Path.consume_front(Opts.SymbolGraphOutputDir);
             assert(Shortened && "symbol graph path outside output dir");
             (void)Shortened;
             std::optional<ObjectRef> PathRef;
             if (Error E =
                     CAS.storeFromString(/*Refs*/ {}, Path).moveInto(PathRef))
-              return E;
-            std::optional<ObjectRef> BytesRef;
-            if (Error E =
-                    CAS.storeFromString(/*Refs*/ {}, Bytes).moveInto(BytesRef))
               return E;
             auto Ref = CAS.store({*PathRef, *BytesRef}, {});
             if (!Ref)
@@ -98,21 +141,34 @@ public:
     auto OutputType = ProducingInput->second.second;
 
     // Uncached output kind.
-    if (!isStoredDirectly(OutputType))
-      return std::make_unique<llvm::vfs::NullOutputFileImpl>();
+    if (!isStoredDirectly(OutputType)) {
+      if (!DiskBackend)
+        return std::make_unique<llvm::vfs::NullOutputFileImpl>();
+      OutputFile File;
+      if (Error E =
+              DiskBackend->createFile(ResolvedPath, Config).moveInto(File))
+        return std::move(E);
+      return File.takeImpl();
+    }
 
     return std::make_unique<SwiftCASOutputFile>(
         ResolvedPath,
-        [this, InputIndex, OutputType](StringRef Path,
-                                       StringRef Bytes) -> Error {
-          return storeImpl(Path, Bytes, InputIndex, OutputType);
+        [this, InputIndex, OutputType,
+         ResolvedConfig](StringRef Path, StringRef Bytes) -> Error {
+          return storeImpl(Path, Bytes, InputIndex, OutputType, ResolvedConfig);
         });
   }
 
   void initBackend(const FrontendInputsAndOutputs &InputsAndOutputs);
 
+  /// Store the output into the CAS. If \p DiskConfig is provided, also export
+  /// the output to disk using that config.
   Error storeImpl(StringRef Path, StringRef Bytes, unsigned InputIndex,
-                  file_types::ID OutputKind);
+                  file_types::ID OutputKind,
+                  std::optional<OutputConfig> DiskConfig = std::nullopt);
+
+  /// Export the CAS object \p Ref to \p Path, if writing to disk is enabled.
+  Error exportToDisk(StringRef Path, ObjectRef Ref, OutputConfig Config);
 
   // Return true if all the outputs are produced for the given index.
   bool addProducedOutput(unsigned InputIndex, file_types::ID OutputKind,
@@ -128,6 +184,7 @@ private:
   const FrontendOptions &Opts;
   FrontendOptions::ActionType Action;
   bool WriteOutputHashXAttr;
+  IntrusiveRefCntPtr<OutputBackend> DiskBackend;
 
   // Lock for updating output file status.
   llvm::sys::SmartMutex<true> OutputLock;
@@ -145,10 +202,10 @@ SwiftCASOutputBackend::SwiftCASOutputBackend(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
     const FrontendOptions &Opts, FrontendOptions::ActionType Action,
-    bool WriteOutputHashXAttr)
+    bool WriteOutputHashXAttr, IntrusiveRefCntPtr<OutputBackend> DiskBackend)
     : Impl(*new SwiftCASOutputBackend::Implementation(
           CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action,
-          WriteOutputHashXAttr)) {}
+          WriteOutputHashXAttr, std::move(DiskBackend))) {}
 
 SwiftCASOutputBackend::~SwiftCASOutputBackend() { delete &Impl; }
 
@@ -161,7 +218,8 @@ bool SwiftCASOutputBackend::isStoredDirectly(file_types::ID Kind) {
 IntrusiveRefCntPtr<OutputBackend> SwiftCASOutputBackend::cloneImpl() const {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
       Impl.CAS, Impl.Cache, Impl.BaseKey, Impl.InputsAndOutputs, Impl.Opts,
-      Impl.Action, Impl.WriteOutputHashXAttr);
+      Impl.Action, Impl.WriteOutputHashXAttr,
+      Impl.DiskBackend ? Impl.DiskBackend->clone() : nullptr);
 }
 
 Expected<std::unique_ptr<OutputFileImpl>>
@@ -255,9 +313,20 @@ void SwiftCASOutputBackend::Implementation::initBackend(
   OutputRefs.resize(InputsAndOutputs.getAllInputs().size());
 }
 
+Error SwiftCASOutputBackend::Implementation::exportToDisk(StringRef Path,
+                                                          ObjectRef Ref,
+                                                          OutputConfig Config) {
+  if (!DiskBackend)
+    return Error::success();
+  auto Proxy = CAS.getProxy(Ref);
+  if (!Proxy)
+    return Proxy.takeError();
+  return exportCASObjectToFile(*Proxy, Path, Config, *DiskBackend);
+}
+
 Error SwiftCASOutputBackend::Implementation::storeImpl(
     StringRef Path, StringRef Bytes, unsigned InputIndex,
-    file_types::ID OutputKind) {
+    file_types::ID OutputKind, std::optional<OutputConfig> DiskConfig) {
   std::optional<ObjectRef> BytesRef;
   if (Error E = CAS.storeFromString(/*Refs*/ {}, Bytes).moveInto(BytesRef))
     return E;
@@ -267,9 +336,13 @@ Error SwiftCASOutputBackend::Implementation::storeImpl(
                           << "\' for input \'" << InputIndex << "\': \'"
                           << CAS.getID(*BytesRef).toString() << "\'\n";);
 
-  // FIXME: this creates an implicit requirement that the output backend is
-  // layered so that SwiftCASOutputBackend is written after the on-disk backend.
-  // The output backend interface currently doesn't let us pass this directly.
+  if (DiskConfig)
+    if (Error E = exportToDisk(Path, *BytesRef, *DiskConfig))
+      return E;
+
+  // FIXME: without a disk backend, this creates an implicit requirement that
+  // the output backend is layered so that SwiftCASOutputBackend is written
+  // after the on-disk backend.
   if (WriteOutputHashXAttr && OutputKind == file_types::TY_Object) {
     if (auto E = llvm::cas::writeCASHashXAttr(CAS.getID(*BytesRef), Path))
       return E;

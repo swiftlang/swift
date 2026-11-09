@@ -543,17 +543,18 @@ void CompilerInstance::setupOutputBackend() {
   if (OutputBackend)
     return;
 
-  OutputBackend =
+  llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> DiskBackend =
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
+  OutputBackend = DiskBackend;
 
-  // Mirror the output into CAS.
+  // Store the output into CAS first, then export it from the CAS to disk.
   if (supportCaching()) {
     auto &InAndOuts = Invocation.getFrontendOptions().InputsAndOutputs;
     CASOutputBackend = createSwiftCachingOutputBackend(
         *CAS, *ResultCache, *CompileJobBaseKey, InAndOuts,
         Invocation.getFrontendOptions(),
         Invocation.getFrontendOptions().RequestedAction,
-        Invocation.getCASOptions().WriteOutputHashXAttr);
+        Invocation.getCASOptions().WriteOutputHashXAttr, DiskBackend);
 
     if (Invocation.getIRGenOptions().UseCASBackend) {
       auto OutputFiles = InAndOuts.copyOutputFilenames();
@@ -561,22 +562,29 @@ void CompilerInstance::setupOutputBackend() {
           std::make_move_iterator(OutputFiles.begin()),
           std::make_move_iterator(OutputFiles.end()));
       // Filter the object file output if MCCAS is enabled, we do not want to
-      // store the object file itself, but store the MCCAS CASID instead.
-      auto FilterBackend = llvm::vfs::makeFilteringOutputBackend(
-          CASOutputBackend,
+      // store the object file itself, but store the MCCAS CASID instead. The
+      // object file is written directly to disk.
+      auto IsMCCASObjectFile =
           [&, OutputFileSet](StringRef Path,
                              std::optional<llvm::vfs::OutputConfig> Config) {
             if (InAndOuts.getPrincipalOutputType() != file_types::ID::TY_Object)
-              return true;
-            return !(OutputFileSet.find(Path.str()) != OutputFileSet.end());
-          });
-      OutputBackend =
-          llvm::vfs::makeMirroringOutputBackend(OutputBackend, FilterBackend);
+              return false;
+            return OutputFileSet.find(Path.str()) != OutputFileSet.end();
+          };
+      OutputBackend = llvm::vfs::makeMirroringOutputBackend(
+          llvm::vfs::makeFilteringOutputBackend(
+              CASOutputBackend,
+              [IsMCCASObjectFile](
+                  StringRef Path,
+                  std::optional<llvm::vfs::OutputConfig> Config) {
+                return !IsMCCASObjectFile(Path, Config);
+              }),
+          llvm::vfs::makeFilteringOutputBackend(DiskBackend,
+                                                IsMCCASObjectFile));
       return;
     }
 
-    OutputBackend =
-        llvm::vfs::makeMirroringOutputBackend(OutputBackend, CASOutputBackend);
+    OutputBackend = CASOutputBackend;
   }
 
   // Setup verification backend.

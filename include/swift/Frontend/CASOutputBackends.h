@@ -22,6 +22,24 @@
 
 namespace swift::cas {
 
+/// Write the data of the CAS object \p Object to the file at \p Path,
+/// honoring \p Config.
+///
+/// When possible, this uses \c ObjectStore::exportDataToFile, which can avoid
+/// copying the data (e.g. by cloning the file from the CAS storage). For
+/// configurations that it doesn't support (e.g. writing to stdout or appending)
+/// the data is written through \p FallbackBackend instead.
+llvm::Error exportCASObjectToFile(const llvm::cas::ObjectProxy &Object,
+                                  llvm::StringRef Path,
+                                  llvm::vfs::OutputConfig Config,
+                                  llvm::vfs::OutputBackend &FallbackBackend);
+
+/// An output backend that stores the compiler outputs into the CAS and
+/// associates them with the compile job cache key.
+///
+/// If a \c DiskBackend is provided, the outputs are also written to disk: the
+/// outputs that are stored directly into the CAS are exported from the CAS,
+/// and the rest of the outputs are written through \c DiskBackend.
 class SwiftCASOutputBackend : public llvm::vfs::OutputBackend {
   void anchor() override;
 
@@ -42,13 +60,13 @@ private:
   static bool isStoredDirectly(file_types::ID Kind);
 
 public:
-  SwiftCASOutputBackend(llvm::cas::ObjectStore &CAS,
-                        llvm::cas::ActionCache &Cache,
-                        llvm::cas::ObjectRef BaseKey,
-                        const FrontendInputsAndOutputs &InputsAndOutputs,
-                        const FrontendOptions &Opts,
-                        FrontendOptions::ActionType Action,
-                        bool WriteOutputHashXAttr);
+  SwiftCASOutputBackend(
+      llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
+      llvm::cas::ObjectRef BaseKey,
+      const FrontendInputsAndOutputs &InputsAndOutputs,
+      const FrontendOptions &Opts, FrontendOptions::ActionType Action,
+      bool WriteOutputHashXAttr,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::OutputBackend> DiskBackend = nullptr);
   ~SwiftCASOutputBackend();
 
   llvm::Error storeCachedDiagnostics(unsigned InputIndex,
