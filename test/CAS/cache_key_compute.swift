@@ -80,8 +80,8 @@
 // RUN: %cache-tool print-base-key -cas-path %t/cas-plugin -cas-plugin-path %plugin(CASPluginTest) -cas-plugin-option first-prefix=myfirst- -- \
 // RUN:   %target-swift-frontend-plain -cache-compile-job %t/a.swift -c @%t/MyApp-plugin.cmd -cas-path %t/cas-plugin -cas-plugin-path %plugin(CASPluginTest) > %t8.casid
 // RUN: cp %plugin(CASPluginTest) %t/libCASPluginTest%llvm_plugin_ext
-// RUN: %cache-tool print-base-key -cas-path %t/cas-plugin -cas-plugin-path %t/libCASPluginTest%llvm_plugin_ext -cas-plugin-option first-prefix=myfirst- -- \
-// RUN:   %target-swift-frontend-plain -cache-compile-job %t/a.swift -c @%t/MyApp-plugin.cmd -cas-path %t/cas-plugin -cas-plugin-path %t/libCASPluginTest%llvm_plugin_ext > %t9.casid
+// RUN: %cache-tool print-base-key -cas-path %t/cas-plugin -cas-plugin-path %plugin(CASPluginTest) -cas-plugin-option first-prefix=myfirst- -- \
+// RUN:   %target-swift-frontend-plain -cache-compile-job %t/a.swift -c @%t/MyApp-plugin.cmd -cas-path %t/cas-plugin -cas-plugin-path %plugin(CASPluginTest) > %t9.casid
 // RUN: diff %t8.casid %t9.casid
 
 
