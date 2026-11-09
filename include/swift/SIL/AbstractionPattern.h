@@ -1176,8 +1176,15 @@ public:
   }
 
   /// Strip the indirection layers of a Clang type that was imported as a
-  /// Swift function type. The type has the shape
-  /// [reference] [pointer | block pointer] function.
+  /// Swift function type. The Clang type has one of the shapes:
+  ///   1. [& | &&]                           function
+  ///   2. [&&]     [pointer | block pointer] function
+  ///
+  /// 1. A function is not an object, so the importer does not mark the
+  /// reference @_addressable and it reaches this helper unchanged.
+  ///
+  /// 2. Lvalue references to pointers are @_addressable, which lowers them
+  /// with an opaque pattern, so this helper sees the pointer only.
   static const clang::FunctionType *
   getClangFunctionType(const clang::Type *clangType);
 
