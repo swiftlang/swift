@@ -2789,11 +2789,8 @@ Decl::getRequiredCodeGenerationModel() const {
   }
 
   // A generic declaration must be @export(implementation) in Embedded Swift.
-  auto dc = getInnermostDeclContext();
-  if (auto sig = dc->getGenericSignatureOfContext()) {
-    if (!sig->areAllParamsConcrete() && isEmbedded)
-      return CodeGenerationModel::Implementation;
-  }
+  if (isEmbedded && getInnermostDeclContext()->isEffectivelyGenericContext())
+    return CodeGenerationModel::Implementation;
 
   // Foreign types are always @export(implementation).
   if (auto nominal = dyn_cast<NominalTypeDecl>(this)) {

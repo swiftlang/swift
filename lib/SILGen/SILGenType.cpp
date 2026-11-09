@@ -383,11 +383,8 @@ public:
 
 static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
                                          VarDecl *var) {
-  if (var->getDeclContext()->isGenericContext()) {
-    assert(var->getDeclContext()->getGenericSignatureOfContext()
-              ->areAllParamsConcrete()
-           && "generic static vars are not implemented yet");
-  }
+  assert(!var->getDeclContext()->isEffectivelyGenericContext() &&
+         "generic static vars are not implemented yet");
 
   if (var->getDeclContext()->getSelfClassDecl()) {
     assert(var->isFinal() && "only 'static' ('class final') stored properties are implemented in classes");

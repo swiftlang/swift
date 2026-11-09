@@ -2850,8 +2850,7 @@ public:
         // occur once per instantiation, which we don't yet handle.
         if (DC->getExtendedProtocolDecl()) {
           unimplementedStatic(ProtocolExtensions);
-        } else if (DC->isGenericContext()
-               && !DC->getGenericSignatureOfContext()->areAllParamsConcrete()) {
+        } else if (DC->isEffectivelyGenericContext()) {
           unimplementedStatic(GenericTypes);
         } else if (DC->getSelfClassDecl()) {
           auto StaticSpelling = PBD->getStaticSpelling();

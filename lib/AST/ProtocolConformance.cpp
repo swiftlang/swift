@@ -468,8 +468,7 @@ NormalProtocolConformance::getEffectiveCodeGenerationModel() const {
 }
 
 bool NormalProtocolConformance::isEffectivelyGeneric() const {
-  auto sig = getDeclContext()->getGenericSignatureOfContext();
-  return sig && !sig->areAllParamsConcrete();
+  return getDeclContext()->isEffectivelyGenericContext();
 }
 
 bool NormalProtocolConformance::isConformanceOfProtocol() const {

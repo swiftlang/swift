@@ -487,6 +487,11 @@ bool DeclContext::isGenericContext() const {
   return false;
 }
 
+bool DeclContext::isEffectivelyGenericContext() const {
+  return isGenericContext() &&
+         !getGenericSignatureOfContext()->areAllParamsConcrete();
+}
+
 ResilienceExpansion DeclContext::getResilienceExpansion() const {
   auto fragileKind = getFragileFunctionKind();
   switch (fragileKind.kind) {
