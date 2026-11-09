@@ -1429,6 +1429,14 @@ NominalTypeDecl::getAllProtocols(bool sorted) const {
          "For inherited protocols, use ProtocolDecl::inheritsFrom() or "
          "ProtocolDecl::getInheritedProtocols()");
 
+  // Expand conformances added by extension macros so that the
+  // conformance table includes macro-generated extensions and their
+  // implied (transitive) conformances.
+  auto &ctx = getASTContext();
+  (void)evaluateOrDefault(
+      ctx.evaluator, ExpandExtensionMacros{const_cast<NominalTypeDecl *>(this)},
+      {});
+
   prepareConformanceTable();
   SmallVector<ProtocolDecl *, 2> result;
   ConformanceTable->getAllProtocols(const_cast<NominalTypeDecl *>(this), result,
@@ -1439,6 +1447,13 @@ NominalTypeDecl::getAllProtocols(bool sorted) const {
 SmallVector<ProtocolConformance *, 2> NominalTypeDecl::getAllConformances(
                                         bool sorted) const
 {
+  // Expand conformances added by extension macros so that the
+  // conformance table includes macro-generated extensions.
+  auto &ctx = getASTContext();
+  (void)evaluateOrDefault(
+      ctx.evaluator, ExpandExtensionMacros{const_cast<NominalTypeDecl *>(this)},
+      {});
+
   prepareConformanceTable();
   SmallVector<ProtocolConformance *, 2> result;
   ConformanceTable->getAllConformances(const_cast<NominalTypeDecl *>(this),
