@@ -2264,6 +2264,7 @@ struct XWrapper {
 
 sil @borrow_x : $@convention(method) (@guaranteed XWrapper) -> @guaranteed X
 sil @borrow_x_from_address : $@convention(method) (@in_guaranteed XWrapper) -> @guaranteed X
+sil @borrow_x_without_self : $@convention(thin) () -> @guaranteed X
 
 // An `end_borrow` of a borrow accessor result with a @guaranteed self protects the interior
 // pointers of the result, like an `end_borrow` of a `begin_borrow`.
@@ -2355,6 +2356,56 @@ bb0(%0 : $*XWrapper, %1 : $*Int32):
   specify_test "memory_effects"
   %2 = function_ref @borrow_x_from_address : $@convention(method) (@in_guaranteed XWrapper) -> @guaranteed X
   %3 = apply %2(%0) : $@convention(method) (@in_guaranteed XWrapper) -> @guaranteed X
+  br bb1(%3)
+
+bb1(%5 : @reborrow $X):
+  %6 = borrowed %5 from ()
+  end_borrow %6 : $X
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// A borrow accessor result without self may be a borrow of immortal memory, like a global, so its `end_borrow`
+// has the worst effects.
+// CHECK-LABEL: @test_end_borrow_of_borrow_accessor_result_without_self
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:   %0 = argument of bb0 : $*XWrapper
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #4.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #5.
+// CHECK-NEXT:     end_borrow %3 : $X
+// CHECK-NEXT:   %4 = ref_element_addr %3 : $X, #X.a
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_end_borrow_of_borrow_accessor_result_without_self : $@convention(thin) (@inout XWrapper, @inout Int32) -> () {
+bb0(%0 : $*XWrapper, %1 : $*Int32):
+  specify_test "memory_effects"
+  %2 = function_ref @borrow_x_without_self : $@convention(thin) () -> @guaranteed X
+  %3 = apply %2() : $@convention(thin) () -> @guaranteed X
+  %4 = ref_element_addr %3 : $X, #X.a
+  end_borrow %3 : $X
+  %6 = tuple ()
+  return %6 : $()
+}
+
+// An `end_borrow` of a reborrowed borrow accessor result without self also has the worst effects.
+// CHECK-LABEL: @test_end_borrow_of_reborrowed_borrow_accessor_result_without_self
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     end_borrow %6 : $X
+// CHECK-NEXT:   %0 = argument of bb0 : $*XWrapper
+// CHECK-NEXT:   r=1,w=1
+// CHECK:      PAIR #3.
+// CHECK-NEXT:     end_borrow %6 : $X
+// CHECK-NEXT:   %1 = argument of bb0 : $*Int32
+// CHECK-NEXT:   r=1,w=1
+sil [ossa] @test_end_borrow_of_reborrowed_borrow_accessor_result_without_self : $@convention(thin) (@inout XWrapper, @inout Int32) -> () {
+bb0(%0 : $*XWrapper, %1 : $*Int32):
+  specify_test "memory_effects"
+  %2 = function_ref @borrow_x_without_self : $@convention(thin) () -> @guaranteed X
+  %3 = apply %2() : $@convention(thin) () -> @guaranteed X
   br bb1(%3)
 
 bb1(%5 : @reborrow $X):

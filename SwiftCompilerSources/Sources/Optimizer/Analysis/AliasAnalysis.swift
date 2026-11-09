@@ -350,6 +350,9 @@ struct AliasAnalysis {
            memLoc.mayAlias(with: selfAddress, self) {
           return .worstEffects
         }
+        if apply.selfArgument == nil {
+          return .worstEffects
+        }
         return borrowEffects
       case let borrowedFrom as BorrowedFromInst where borrowedFrom.borrowedPhi.isReborrow:
         // A reborrow continues the borrow scope of the incoming borrow(s). If one of those is a
@@ -418,7 +421,7 @@ struct AliasAnalysis {
   }
 
   /// Returns true if the reborrow of `borrowedFrom` (transitively) reborrows a `load_borrow`, or a borrow accessor
-  /// result with an address self.
+  /// result with an address self or without self.
   private func isEndOfReborrowedLoadBorrow(_ borrowedFrom: BorrowedFromInst,
                                            aliasingWith memLoc: MemoryLocation) -> Bool {
     var worklist = ValueWorklist(context)
@@ -434,6 +437,9 @@ struct AliasAnalysis {
       case let apply as ApplyInst:
         if let selfAddress = apply.selfAddressOfGuaranteedBorrowAccessorResult,
            memLoc.mayAlias(with: selfAddress, self) {
+          return true
+        }
+        if apply.selfArgument == nil {
           return true
         }
       case let bf as BorrowedFromInst:
