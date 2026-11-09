@@ -481,7 +481,7 @@ struct ErrorInFunctionSignatureResultArrayType2 {
 }
 
 struct ErrorInFunctionSignatureResultArrayType3 {
-  func foo() -> Int[0] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{unexpected code '[0]' in function}} expected-astgen-error {{array types are now written with the brackets around the element type}}
+  func foo() -> Int[0] { // expected-cparser-error {{array types are now written with the brackets around the element type}} {{17-17=[}} {{20-21=}} expected-astgen-error {{unexpected code '[0]' in function}}
     return [0] // expected-astgen-error {{cannot convert return expression of type '[Int]' to return type 'Int'}}
   }
 }

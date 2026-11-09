@@ -219,7 +219,7 @@ func IfStmt2() {
 }
 func IfStmt3() {
   if 1 > 0 {
-  } else 1 < 0 { // expected-cparser-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}} expected-astgen-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}}{{5-9=else if}}
+  } else 1 < 0 { // expected-error {{expected '{' or 'if' after 'else'; did you mean to write 'if'?}} {{9-9= if}}
     _ = 42
   } else { // expected-astgen-error {{unexpected code in function}}
   }
