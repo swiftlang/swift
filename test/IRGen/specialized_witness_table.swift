@@ -38,23 +38,23 @@ extension Cond: P where T: P {
 
 // The specialized table has a non-unique definition. Its header is the descriptor of
 // the generic conformance and it contains the specialized witness.
-// CHECK-DAG: @"$s4test3BoxVySiGAA1PAAWP" = linkonce_odr hidden {{(unnamed_addr )?}}constant {{.*}}@"$s4test3BoxVyxGAA1PAAMc"{{.*}}Si_TG5
+// CHECK-DAG: @"$s4test3BoxVySiGAA1PAAWP" = linkonce_odr hidden {{(unnamed_addr )?}}constant {{.*}}@"$s4test3BoxVyxGAA1PAAMc{{(\.ptrauth(\.[0-9]+)?)?}}"{{.*}}Si_TG5
 
 // Base protocol and associated conformance entries directly point to specialized tables.
-// CHECK-DAG: @"$s4test7WrapperVySbGAA1QAAWP" = linkonce_odr hidden {{.*}}@"$s4test7WrapperVyxGAA1QAAMc"{{.*}}@"$s4test7WrapperVySbGAA1PAAWP"{{.*}}@"$s4test3BoxVySbGAA1PAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
+// CHECK-DAG: @"$s4test7WrapperVySbGAA1QAAWP" = linkonce_odr hidden {{.*}}@"$s4test7WrapperVyxGAA1QAAMc{{(\.ptrauth(\.[0-9]+)?)?}}"{{.*}}@"$s4test7WrapperVySbGAA1PAAWP"{{.*}}@"$s4test3BoxVySbGAA1PAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
 // CHECK-DAG: @"$s4test7WrapperVySbGAA1PAAWP" = linkonce_odr hidden
 // CHECK-DAG: @"$s4test3BoxVySbGAA1PAAWP" = linkonce_odr hidden
 
-// CHECK-DAG: @"$s4test4CondVyAA3BoxVySdGGAA1PAAWP" = linkonce_odr hidden {{.*}}@"$s4test4CondVyxGAA1PA2aERzlMc"
+// CHECK-DAG: @"$s4test4CondVyAA3BoxVySdGGAA1PAAWP" = linkonce_odr hidden {{.*}}@"$s4test4CondVyxGAA1PA2aERzlMc{{(\.ptrauth(\.[0-9]+)?)?}}"
 
 // An associated conformance which is the conformance itself.
-// CHECK-DAG: @"$s4test4LoopVySiGAA7SelfRefAAWP" = linkonce_odr hidden {{.*}}@"$s4test4LoopVyxGAA7SelfRefAAMc"{{.*}}@"$s4test4LoopVySiGAA7SelfRefAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
+// CHECK-DAG: @"$s4test4LoopVySiGAA7SelfRefAAWP" = linkonce_odr hidden {{.*}}@"$s4test4LoopVyxGAA7SelfRefAAMc{{(\.ptrauth(\.[0-9]+)?)?}}"{{.*}}@"$s4test4LoopVySiGAA7SelfRefAAWP{{(\.ptrauth(\.[0-9]+)?)?}}"
 
 // The generic witness of a conditional conformance needs a runtime-instantiated witness table.
 // NOSTATIC-NOT: @"$s4test4CondVyAA3BoxVySiGGAA16HasGenericMethodAAWP" =
 
 // A witness which cannot be specialized is the generic witness in the static table.
-// CHECK-DAG: @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP" = linkonce_odr hidden {{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodAAMc"{{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW{{(\.ptrauth(\.[0-9]+)?)?}}"
+// CHECK-DAG: @"$s4test4GBoxVySiGAA16HasGenericMethodAAWP" = linkonce_odr hidden {{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodAAMc{{(\.ptrauth(\.[0-9]+)?)?}}"{{.*}}@"$s4test4GBoxVyxGAA16HasGenericMethodA2aEP1gySiqd__lFTW{{(\.ptrauth(\.[0-9]+)?)?}}"
 
 // No additional conformance descriptor is emitted for a specialized witness table.
 // DESC:     @"$s4test7WrapperVyxGAA1QAAMc" =
@@ -189,4 +189,31 @@ extension Named {
 // CHECK:       }
 public func makeFinalBox() -> any Named {
   return FinalBox(t: 1)
+}
+
+// Non-optimized functions don't create specialized witness tables. But if a specialized
+// witness table is created for an existential in an optimized function, it's used for all
+// existentials of the conformance in the module, including the ones in non-optimized functions.
+// CHECK-LABEL: define {{.*}} @"$s4test16makeBoxOptimizedAA1P_pyF"
+// CHECK:         store ptr @"$s4test3BoxVys6UInt16VGAA1PAAWP"
+// CHECK:       }
+public func makeBoxOptimized() -> any P {
+  return Box(t: UInt16(1))
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4test19makeBoxNotOptimizedAA1P_pyF"
+// CHECK:         store ptr @"$s4test3BoxVys6UInt16VGAA1PAAWP"
+// CHECK:       }
+@_optimize(none)
+public func makeBoxNotOptimized() -> any P {
+  return Box(t: UInt16(1))
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4test24makeOtherBoxNotOptimizedAA1P_pyF"
+// CHECK-NOT:     @"$s4test3BoxVys6UInt32VGAA1PAAWP"
+// CHECK:       }
+// NOSTATIC-NOT: @"$s4test3BoxVys6UInt32VGAA1PAAWP" =
+@_optimize(none)
+public func makeOtherBoxNotOptimized() -> any P {
+  return Box(t: UInt32(1))
 }
