@@ -38,9 +38,6 @@ bb0(%0 : $*ClassProtocol):
 
 // Check that a specialization of test_indirect_class_protocol is created.
 // CHECK-LABEL: sil shared {{.*}}@$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5 : $@convention(thin) (@owned C) -> ()
-// CHECK:      bb0(%0 : $C):
-// CHECK-NEXT: strong_release %0
-// CHECK-NEXT: return undef
 // CHECK-LABEL: end sil function '$s28test_indirect_class_protocolTf4e_n4main1CC_Tg5'
 
 sil @invoke_indirect_class_protocol : $@convention(thin) (@guaranteed C) -> () {

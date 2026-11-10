@@ -145,6 +145,11 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeResults() {
     auto RV = findReturnValue(F);
     if (!RV)
       return false;
+    if (RV->getType().isMoveOnly()) {
+      // We must not do this transformation for non-copyable types, because
+      // it's not possible to insert a compensating retain_value in the thunk.
+      return false;
+    }
     auto &RI = ResultDescList[0];
     // We have an @owned return value, find the epilogue retains now.
     auto Retains = EA->get(F)->computeEpilogueARCInstructions(
