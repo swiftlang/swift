@@ -970,11 +970,23 @@ ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
 /// as permissive as the input C++ access.
 AccessLevel convertClangAccess(clang::AccessSpecifier access);
 
-/// Lookup and return the copy constructor of \a decl
+/// Returns the copy constructor of \p decl, or nullptr if it doesn't have a
+/// valid one, or if it is less accessible than \p maxAccess (e.g.,
+/// \c clang::AS_protected allows a public or protected copy constructor).
 ///
-/// Returns nullptr if \a decl doesn't have a valid copy constructor
-const clang::CXXConstructorDecl *
-findCopyConstructor(const clang::CXXRecordDecl *decl);
+/// Swift copies an address-only value of \p decl with its public copy
+/// constructor if there is one, and field by field otherwise.
+clang::CXXConstructorDecl *
+findCopyConstructor(const clang::CXXRecordDecl *decl,
+                    clang::AccessSpecifier maxAccess = clang::AS_public);
+
+/// Returns the destructor of \p decl, or nullptr if it has none or it is
+/// trivial.
+///
+/// Swift destroys an address-only value of \p decl with this destructor if
+/// there is one, and field by field otherwise.
+clang::CXXDestructorDecl *
+findNonTrivialDestructor(const clang::CXXRecordDecl *decl);
 
 /// Whether \p decl is a non-trivial C++ record.
 inline bool isNonTrivialCxxRecord(const clang::CXXRecordDecl *decl) {

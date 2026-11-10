@@ -1145,21 +1145,15 @@ void importer::checkRetainReleaseFunctions(
 // Unusable imported types
 //===----------------------------------------------------------------------===//
 
-/// Whether Swift copies and destroys the imported C++ record \p structDecl
-/// only through its C++ copy constructor and destructor, or does so field-wise.
-/// This mirrors \c AddressOnlyCXXClangRecordTypeInfo in IRGen.
+/// Whether Swift copies and destroys the imported C++ record \p structDecl only
+/// through its C++ copy constructor and destructor, rather than field-wise.
+/// Uses the same rules as \c AddressOnlyCXXClangRecordTypeInfo in IRGen.
 static bool isCopiedAndDestroyedByCxx(const StructDecl *structDecl) {
   auto *cxxRecord =
       dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
-  if (!cxxRecord || !structDecl->isCxxNonTrivial())
-    return false;
-
-  auto *destructor = cxxRecord->getDestructor();
-  if (!destructor || destructor->isTrivial())
-    return false;
-
-  auto *copyConstructor = importer::findCopyConstructor(cxxRecord);
-  return copyConstructor && copyConstructor->getAccess() == clang::AS_public;
+  return cxxRecord && structDecl->isCxxNonTrivial() &&
+         importer::findCopyConstructor(cxxRecord) &&
+         importer::findNonTrivialDestructor(cxxRecord);
 }
 
 UnusableImportedType

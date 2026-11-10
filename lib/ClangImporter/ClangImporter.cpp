@@ -9049,17 +9049,24 @@ bool importer::isViewType(const clang::CXXRecordDecl *decl) {
   return !hasOwnedValueAttr(decl) && hasPointerInSubobjects(decl);
 }
 
-const clang::CXXConstructorDecl *
-importer::findCopyConstructor(const clang::CXXRecordDecl *decl) {
+clang::CXXConstructorDecl *
+importer::findCopyConstructor(const clang::CXXRecordDecl *decl,
+                              clang::AccessSpecifier maxAccess) {
   for (auto ctor : decl->ctors()) {
     if (ctor->isCopyConstructor() && !ctor->isDeleted() &&
         !ctor->isIneligibleOrNotSelected() &&
         // FIXME: Support default arguments
         // (https://github.com/swiftlang/swift/issues/86260)
         ctor->getNumParams() == 1)
-      return ctor;
+      return ctor->getAccess() <= maxAccess ? ctor : nullptr;
   }
   return nullptr;
+}
+
+clang::CXXDestructorDecl *
+importer::findNonTrivialDestructor(const clang::CXXRecordDecl *decl) {
+  auto *dtor = decl->getDestructor();
+  return dtor && !dtor->isTrivial() ? dtor : nullptr;
 }
 
 static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl,
@@ -9250,15 +9257,13 @@ CxxValueSemantics::evaluate(Evaluator &evaluator,
     } else {
       bool hasDefaultedOrImplicitCopyCtor; // i.e., requires member-wise copy
 
-      if (auto *copyCtor = findCopyConstructor(cxxRecordDecl)) {
-        // Found a copy constructor, but only consider it viable if it can be
-        // accessed publicly. If cxxRecordDecl is a base class, it suffices to
-        // be protected, and does not need to be public.
-        isCopyable =
-            copyCtor->getAccess() == clang::AS_public ||
-            (isBase && copyCtor->getAccess() == clang::AS_protected);
-
-        hasDefaultedOrImplicitCopyCtor = isCopyable && copyCtor->isDefaulted();
+      // The copy constructor must be public, but for a base class, it suffices
+      // to be protected.
+      if (auto *copyCtor = importer::findCopyConstructor(
+              cxxRecordDecl,
+              /*maxAccess=*/isBase ? clang::AS_protected : clang::AS_public)) {
+        isCopyable = true;
+        hasDefaultedOrImplicitCopyCtor = copyCtor->isDefaulted();
       } else {
         // Even if the copy constructor cannot be found, it might be implicit
         isCopyable = hasDefaultedOrImplicitCopyCtor =
