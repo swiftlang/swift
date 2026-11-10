@@ -2988,3 +2988,29 @@ bb0(%0 : $*NativeObjectPair):
   %r = tuple ()
   return %r
 }
+
+struct AccessorNT {
+  var c: C
+}
+
+sil @nonmutatingMutateAccessorNT : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+
+// The store through the nonmutating mutate accessor result writes the alloc_stack.
+//
+// CHECK-LABEL: sil [ossa] @nonmutating_mutate_accessor_result_written :
+// CHECK:         load [copy] %0
+// CHECK-NOT:     store_borrow
+// CHECK-LABEL: } // end sil function 'nonmutating_mutate_accessor_result_written'
+sil [ossa] @nonmutating_mutate_accessor_result_written : $@convention(thin) (@in_guaranteed AccessorNT, @owned C) -> () {
+bb0(%0 : $*AccessorNT, %1 : @owned $C):
+  %2 = load [copy] %0
+  %3 = alloc_stack $AccessorNT
+  store %2 to [init] %3
+  %5 = function_ref @nonmutatingMutateAccessorNT : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed AccessorNT) -> @inout C
+  store %1 to [assign] %6
+  destroy_addr %3
+  dealloc_stack %3
+  %10 = tuple ()
+  return %10
+}

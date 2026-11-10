@@ -404,6 +404,10 @@ extension ApplySite {
   public var hasGuaranteedAddressResult: Bool {
     functionConvention.hasGuaranteedAddressResult
   }
+
+  public var hasInoutResult: Bool {
+    functionConvention.hasInoutResult
+  }
 }
 
 extension ApplySite {

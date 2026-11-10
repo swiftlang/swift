@@ -2098,3 +2098,101 @@ bb0(%0 : @owned $Span<Int>):
   dealloc_stack %stk
   return %val
 }
+
+struct AccessorS {
+  var i: Int
+  var j: Int
+}
+
+class AccessorK {
+  var s: AccessorS
+}
+
+sil @borrowAccessorAddr : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+sil [readonly] @readonlyBorrowAccessorAddr : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+sil @nonmutatingMutateAccessor : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int
+
+// The load through the borrow accessor result reads the temporary after the source is written.
+//
+// CHECK-LABEL: sil [ossa] @borrow_accessor_result_used_after_source_write :
+// CHECK:         alloc_stack $AccessorS
+// CHECK:         copy_addr %0 to [init]
+// CHECK-LABEL: } // end sil function 'borrow_accessor_result_used_after_source_write'
+sil [ossa] @borrow_accessor_result_used_after_source_write : $@convention(thin) (@inout AccessorS, Int) -> Int {
+bb0(%0 : $*AccessorS, %1 : $Int):
+  %2 = alloc_stack $AccessorS
+  copy_addr %0 to [init] %2
+  %4 = function_ref @borrowAccessorAddr : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  %5 = apply %4(%2) : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  %6 = struct_element_addr %0, #AccessorS.i
+  store %1 to [trivial] %6
+  %8 = load [trivial] %5
+  destroy_addr %2
+  dealloc_stack %2
+  return %8
+}
+
+// The temporary is written through the result of a nonmutating mutate accessor.
+//
+// CHECK-LABEL: sil [ossa] @nonmutating_mutate_accessor_result_written :
+// CHECK:         alloc_stack $AccessorS
+// CHECK:         copy_addr %0 to [init]
+// CHECK-LABEL: } // end sil function 'nonmutating_mutate_accessor_result_written'
+sil [ossa] @nonmutating_mutate_accessor_result_written : $@convention(thin) (@inout AccessorS, Int) -> Int {
+bb0(%0 : $*AccessorS, %1 : $Int):
+  %2 = alloc_stack $AccessorS
+  copy_addr %0 to [init] %2
+  %4 = function_ref @nonmutatingMutateAccessor : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int
+  %5 = apply %4(%2) : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int
+  store %1 to [trivial] %5
+  destroy_addr %2
+  dealloc_stack %2
+  %9 = struct_element_addr %0, #AccessorS.i
+  %10 = load [trivial] %9
+  return %10
+}
+
+// The load through the borrow accessor result is outside the borrow scope of the source's base.
+//
+// CHECK-LABEL: sil [ossa] @borrow_accessor_result_used_outside_source_borrow :
+// CHECK:         alloc_stack $AccessorS
+// CHECK:         copy_addr {{%[0-9]+}} to [init]
+// CHECK-LABEL: } // end sil function 'borrow_accessor_result_used_outside_source_borrow'
+sil [ossa] @borrow_accessor_result_used_outside_source_borrow : $@convention(thin) (@owned AccessorK) -> Int {
+bb0(%0 : @owned $AccessorK):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #AccessorK.s
+  %3 = alloc_stack $AccessorS
+  copy_addr %2 to [init] %3
+  %5 = function_ref @readonlyBorrowAccessorAddr : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  end_borrow %1
+  destroy_value %0
+  %9 = load [trivial] %6
+  destroy_addr %3
+  dealloc_stack %3
+  return %9
+}
+
+// The temporary is passed to a borrow accessor, so it is kept, even though the projection of the result after the
+// source's borrow scope is dead.
+//
+// CHECK-LABEL: sil [ossa] @borrow_accessor_result_dead_projection :
+// CHECK:         alloc_stack $AccessorS
+// CHECK:         copy_addr {{%[0-9]+}} to [init]
+// CHECK-LABEL: } // end sil function 'borrow_accessor_result_dead_projection'
+sil [ossa] @borrow_accessor_result_dead_projection : $@convention(thin) (@guaranteed AccessorK) -> Int {
+bb0(%0 : @guaranteed $AccessorK):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #AccessorK.s
+  %3 = alloc_stack $AccessorS
+  copy_addr %2 to [init] %3
+  %5 = function_ref @readonlyBorrowAccessorAddr : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  %6 = apply %5(%3) : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  %7 = load [trivial] %6
+  end_borrow %1
+  %9 = struct_element_addr %6, #Int._value
+  destroy_addr %3
+  dealloc_stack %3
+  return %7
+}

@@ -1459,7 +1459,7 @@ bb0(%0 : $*WrapperSE):
 }
 
 // CHECK-LABEL: sil [ossa] @call_mutate_accessor_se
-// CHECK-NEXT:  [%0: read v**, write v**.v**, destroy v**.v**]
+// CHECK-NEXT:  [%0: read v**, write v**, copy v**, destroy v**.v**]
 // CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
 // CHECK-NEXT:  [global: write,copy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
@@ -1470,6 +1470,36 @@ bb0(%0 : $*WrapperSE, %1 : @owned $X):
   store %1 to [assign] %addr
   %r = tuple ()
   return %r
+}
+
+struct WrapperWithIntSE {
+  @_hasStorage var x: X
+  @_hasStorage var i: Int
+}
+
+sil [ossa] @mutate_accessor_int_se : $@convention(method) (@inout WrapperWithIntSE) -> @inout Int {
+bb0(%0 : $*WrapperWithIntSE):
+  %1 = struct_element_addr %0, #WrapperWithIntSE.i
+  return %1
+}
+
+sil @write_through_pointer_se : $@convention(thin) (Builtin.RawPointer) -> ()
+
+// The address result of the mutate accessor escapes to an unknown function.
+//
+// CHECK-LABEL: sil [ossa] @escape_mutate_accessor_result_se
+// CHECK-NEXT:  [%0: read v**, write v**, copy v**, destroy v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @escape_mutate_accessor_result_se : $@convention(thin) (@inout WrapperWithIntSE) -> () {
+bb0(%0 : $*WrapperWithIntSE):
+  %1 = function_ref @mutate_accessor_int_se : $@convention(method) (@inout WrapperWithIntSE) -> @inout Int
+  %2 = apply %1(%0) : $@convention(method) (@inout WrapperWithIntSE) -> @inout Int
+  %3 = address_to_pointer %2 : $*Int to $Builtin.RawPointer
+  %4 = function_ref @write_through_pointer_se : $@convention(thin) (Builtin.RawPointer) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (Builtin.RawPointer) -> ()
+  %6 = tuple ()
+  return %6
 }
 
 // rdar://188850214

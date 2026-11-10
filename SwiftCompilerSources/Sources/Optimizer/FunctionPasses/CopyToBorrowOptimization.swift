@@ -406,6 +406,9 @@ private struct AllocStackUsesWalker : AddressDefUseWalker {
         if let pa = apply as? PartialApplyInst, !pa.isOnStack {
           return .abortWalk
         }
+        if let applyInst = apply as? ApplyInst, applyInst.functionConvention.hasAddressResult {
+          return .abortWalk
+        }
         return .continueWalk
       default:
         return .abortWalk

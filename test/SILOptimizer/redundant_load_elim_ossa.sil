@@ -1841,3 +1841,44 @@ bb0(%0 : $Builtin.RawPointer):
   %r = tuple ()
   return %r
 }
+
+struct AccessorInner {
+  @_hasStorage var p: Int
+  @_hasStorage var q: Int
+}
+
+struct AccessorOuter {
+  @_hasStorage var t: AccessorInner
+  @_hasStorage var b: Int
+}
+
+sil [ossa] @mutate_accessor_outer_t : $@convention(method) (@inout AccessorOuter) -> @inout AccessorInner {
+[%0: read s0.v**]
+[global: ]
+bb0(%0 : $*AccessorOuter):
+  %1 = struct_element_addr %0, #AccessorOuter.t
+  return %1
+}
+
+// The store through the mutate accessor result writes self.t.q, so the reload of self.t.q can't reuse the first load.
+// CHECK-LABEL: sil [ossa] @dont_forward_across_store_through_mutate_accessor_result :
+// CHECK:         [[L1:%.*]] = load [trivial]
+// CHECK:         store %1 to [trivial]
+// CHECK:         [[L2:%.*]] = load [trivial]
+// CHECK:         tuple ([[L1]] : $Int, [[L2]] : $Int)
+// CHECK-LABEL: } // end sil function 'dont_forward_across_store_through_mutate_accessor_result'
+sil [ossa] @dont_forward_across_store_through_mutate_accessor_result : $@convention(thin) (@inout AccessorOuter, Int) -> (Int, Int) {
+bb0(%0 : $*AccessorOuter, %1 : $Int):
+  %2 = struct_element_addr %0, #AccessorOuter.t
+  %3 = struct_element_addr %2, #AccessorInner.q
+  %4 = load [trivial] %3
+  %5 = function_ref @mutate_accessor_outer_t : $@convention(method) (@inout AccessorOuter) -> @inout AccessorInner
+  %6 = apply %5(%0) : $@convention(method) (@inout AccessorOuter) -> @inout AccessorInner
+  %7 = struct_element_addr %6, #AccessorInner.q
+  store %1 to [trivial] %7
+  %9 = struct_element_addr %0, #AccessorOuter.t
+  %10 = struct_element_addr %9, #AccessorInner.q
+  %11 = load [trivial] %10
+  %12 = tuple (%4, %11)
+  return %12
+}

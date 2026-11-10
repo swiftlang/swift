@@ -211,3 +211,41 @@ bb3:
   %9999 = tuple()
   return %9999 : $()
 }
+
+struct AccessorS {
+  var i: Int
+  var k: K
+}
+
+sil @nonmutating_mutate_accessor : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int
+sil @use_accessor_s : $@convention(thin) (@guaranteed AccessorS) -> ()
+
+// A nonmutating mutate accessor doesn't mutate its 'self'.
+sil [ossa] @write_through_nonmutating_mutate_accessor_result : $@convention(thin) (@in_guaranteed AccessorS, Int) -> () {
+bb0(%0 : $*AccessorS, %1 : $Int):
+  %2 = load_borrow %0 : $*AccessorS
+  %3 = function_ref @nonmutating_mutate_accessor : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int
+  %4 = apply %3(%0) : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int
+  store %1 to [trivial] %4 : $*Int
+  %6 = function_ref @use_accessor_s : $@convention(thin) (@guaranteed AccessorS) -> ()
+  %7 = apply %6(%2) : $@convention(thin) (@guaranteed AccessorS) -> ()
+  end_borrow %2 : $AccessorS
+  %9 = tuple ()
+  return %9 : $()
+}
+
+sil @mutate_accessor_with_inout_argument : $@convention(method) (@inout AccessorS, @inout AccessorS) -> @inout Int
+
+// The result of a mutate accessor is derived from its 'self', not from its other inout arguments.
+sil [ossa] @write_through_mutate_accessor_result_with_inout_argument : $@convention(thin) (@inout AccessorS, @inout AccessorS, Int) -> () {
+bb0(%0 : $*AccessorS, %1 : $*AccessorS, %2 : $Int):
+  %3 = function_ref @mutate_accessor_with_inout_argument : $@convention(method) (@inout AccessorS, @inout AccessorS) -> @inout Int
+  %4 = apply %3(%0, %1) : $@convention(method) (@inout AccessorS, @inout AccessorS) -> @inout Int
+  %5 = load_borrow %0 : $*AccessorS
+  store %2 to [trivial] %4 : $*Int
+  %7 = function_ref @use_accessor_s : $@convention(thin) (@guaranteed AccessorS) -> ()
+  %8 = apply %7(%5) : $@convention(thin) (@guaranteed AccessorS) -> ()
+  end_borrow %5 : $AccessorS
+  %10 = tuple ()
+  return %10 : $()
+}

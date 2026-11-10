@@ -607,8 +607,13 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
       return .continueWalk
 
     // Warning: all instruction listed here, must also be handled in `CollectedEffects.addInstructionEffects`
-    case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is ApplySite, is DestroyAddrInst,
-         is DebugValueInst:
+    case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is DestroyAddrInst, is DebugValueInst:
+      return .continueWalk
+
+    case let apply as ApplySite:
+      if let apply = apply as? ApplyInst, apply.functionConvention.hasAddressResult {
+        return .abortWalk
+      }
       return .continueWalk
 
     case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
