@@ -81,26 +81,26 @@ func repeatedAttribute(a: Int, b: @_scoped(a) @_scoped(a) S) {}
 // expected-error@-1:15{{expected '(' in '_scopeParams' attribute}}
 
 @_scopeParams() func emptyScopeParams() {}
-// expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{expected '(' in '_scopeParams' attribute}}
+// expected-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams(a func scopeParamsMissingRParen() {} // expected-astgen-note {{to match this opening '('}}
 // expected-cparser-error@-1:17{{expected ',' separator}}{{16-16=,}}
 // expected-cparser-error@-2:17{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-2 {{expected ')' to end attribute}}
 
 @_scopeParams(self) func selfScopeParam() {}
-// expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
+// expected-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams(Self) func capitalSelfScopeParam() {}
-// expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
+// expected-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams(&a) func accessScopeParam() {}
-// expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
+// expected-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams(0) func integerScopeParam() {}
-// expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
+// expected-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams($0) func dollarScopeParam() {}
-// expected-cparser-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
+// expected-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams(a, immortal) func immortalScopeParam() {}
 // expected-cparser-error@-1:18{{'immortal' cannot be used as a scope parameter name}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
@@ -138,7 +138,7 @@ func scopeParamsOnNonFunctionType(x: @_scopeParams(a) S) {}
 // expected-error@-1:38{{'@_scopeParams' only applies to function types}}
 
 func malformedScopeParamsOnFunctionType(body: @_scopeParams(0) @Sendable () -> Void) {}
-// expected-cparser-error@-1:61{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
+// expected-cparser-error@-1:61{{expected scope parameter name in '_scopeParams' attribute}}
 
 func repeatedScopeParamsOnFunctionType(body: @_scopeParams(a) @_scopeParams(b) () -> Void) {}
 // expected-error@-1:63{{duplicate attribute}}

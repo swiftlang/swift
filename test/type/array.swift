@@ -40,7 +40,7 @@ func constructArray(_ n: Int) {
 
 // Fix-Its from the old syntax to the new.
 
-typealias FixIt0 = Int[] // expected-cparser-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{empty collection literal requires an explicit type}} expected-astgen-warning {{expression of type '[Any]' is unused}}
+typealias FixIt0 = Int[] // expected-error{{array types are now written with the brackets around the element type}}{{20-20=[}}{{23-24=}}
 
 // Make sure preCheckTarget() properly folds member types.
 

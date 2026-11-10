@@ -156,6 +156,17 @@ extension ASTGenVisitor {
         return nil
 
       case nil:
+        // A declaration attribute written in a type: the attribute belongs on the
+        // declaration, which the C++ parser says, rather than reporting an
+        // unknown type attribute or a missing custom attribute.
+        if BridgedOptionalDeclAttrKind(from: attrName.bridged).hasValue {
+          self.diagnose(
+            .decl_attribute_applied_to_type,
+            at: node.attributeName,
+            fixIts: [self.tidyRemovalFixIt(node)]
+          )
+          return nil
+        }
         // Not a builtin type attribute. Fall back to CustomAttr
         break;
       }
@@ -536,7 +547,12 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
-      self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
+      if let rightParen = node.rightParen, node.leftParen != nil, rightParen.presence == .present {
+        // `@_scopeParams()`: the parentheses are there, the names are not.
+        self.diagnose(.expected_scope_param, at: rightParen)
+      } else {
+        self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
+      }
       return nil
     }
     if let trailingComma = args.last?.trailingComma {
@@ -554,7 +570,11 @@ extension ASTGenVisitor {
         case .identifier(let text) = declRefExpr.baseName.tokenKind,
         text != "immortal"
       else {
-        self.diagnose(.invalidArgumentInAttribute(node, arg))
+        if arg.expression.as(DeclReferenceExprSyntax.self)?.baseName.text == "immortal" {
+          self.diagnose(.immortal_scope_param, at: arg.expression)
+        } else {
+          self.diagnose(.expected_scope_param, at: arg)
+        }
         return nil
       }
       params.append(self.generateLocatedIdentifier(declRefExpr.baseName))

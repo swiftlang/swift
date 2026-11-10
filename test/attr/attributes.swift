@@ -60,7 +60,7 @@ func zim() {}
 func zung<T>(_: T) {}
 @_transparent // expected-error{{'@_transparent' attribute cannot be applied to stored properties}} {{1-15=}}
 var zippity : Int
-func zoom(x: @_transparent () -> ()) { } // expected-cparser-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}} expected-astgen-error {{unknown attribute '_transparent'}}
+func zoom(x: @_transparent () -> ()) { } // expected-cparser-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}} expected-astgen-error {{attribute can only be applied to declarations, not types}}{{14-28=}}
 protocol ProtoWithTransparent {
   @_transparent// expected-error{{'@_transparent' attribute is not supported on declarations within protocols}} {{3-16=}}
   func transInProto()
@@ -350,10 +350,10 @@ extension P {
 }
 
 enum E1 {
-  case str(@_nonEphemeral _: String) // expected-cparser-error {{expected parameter name followed by ':'}} expected-astgen-error {{unexpected code ': String' in parameter clause}} expected-astgen-error {{unknown attribute '_nonEphemeral'}} expected-astgen-error {{type placeholder not allowed here}}
-  case ptr(@_nonEphemeral _: UnsafeMutableRawPointer) // expected-cparser-error {{expected parameter name followed by ':'}} expected-astgen-error {{unexpected code ': UnsafeMutableRawPointer' in parameter clause}} expected-astgen-error {{unknown attribute '_nonEphemeral'}} expected-astgen-error {{type placeholder not allowed here}}
+  case str(@_nonEphemeral _: String) // expected-cparser-error {{expected parameter name followed by ':'}} expected-astgen-error {{unexpected code ': String' in parameter clause}} expected-astgen-error {{attribute can only be applied to declarations, not types}} expected-astgen-error {{type placeholder not allowed here}}
+  case ptr(@_nonEphemeral _: UnsafeMutableRawPointer) // expected-cparser-error {{expected parameter name followed by ':'}} expected-astgen-error {{unexpected code ': UnsafeMutableRawPointer' in parameter clause}} expected-astgen-error {{attribute can only be applied to declarations, not types}} expected-astgen-error {{type placeholder not allowed here}}
 
-  func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-cparser-error {{attribute can only be applied to declarations, not types}} expected-astgen-error {{unknown attribute '_nonEphemeral'}}
+  func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-error {{attribute can only be applied to declarations, not types}}
 }
 
 @_custom func testCustomAttribute() {} // expected-error {{unknown attribute '_custom'}}
@@ -361,17 +361,17 @@ enum E1 {
 // https://github.com/apple/swift/issues/65705
 struct GI65705<A> {}
 struct I65705 {
-  let m1: @discardableResult () -> Int // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{11-30=}} {{none}} expected-astgen-error {{unknown attribute 'discardableResult'}}
-  var m2: @discardableResult () -> Int // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{11-30=}} {{none}} expected-astgen-error {{unknown attribute 'discardableResult'}}
-  let m3: GI65705<@discardableResult () -> Int> // expected-cparser-error{{attribute can only be applied to declarations, not types}} {{19-37=}} {{none}} expected-astgen-error {{unknown attribute 'discardableResult'}}
+  let m1: @discardableResult () -> Int // expected-error {{attribute can only be applied to declarations, not types}} {{11-30=}} {{none}}
+  var m2: @discardableResult () -> Int // expected-error {{attribute can only be applied to declarations, not types}} {{11-30=}} {{none}}
+  let m3: GI65705<@discardableResult () -> Int> // expected-error{{attribute can only be applied to declarations, not types}} {{19-37=}} {{none}}
 
-  func f1(_: inout @discardableResult Int) {} // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{20-39=}} {{3-3=@discardableResult }} {{none}} expected-astgen-error {{unknown attribute 'discardableResult'}}
-  func f2(_: @discardableResult Int) {} // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{14-33=}} {{3-3=@discardableResult }} {{none}} expected-astgen-error {{unknown attribute 'discardableResult'}}
+  func f1(_: inout @discardableResult Int) {} // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{20-39=}} {{3-3=@discardableResult }} {{none}} expected-astgen-error {{attribute can only be applied to declarations, not types}}{{20-39=}}
+  func f2(_: @discardableResult Int) {} // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{14-33=}} {{3-3=@discardableResult }} {{none}} expected-astgen-error {{attribute can only be applied to declarations, not types}}{{14-33=}}
 
   func stmt(_ a: Int?) {
-    if let _: @discardableResult Int = a { // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{15-34=}} expected-astgen-error {{unknown attribute 'discardableResult'}}
+    if let _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}}
     }
-    if var _: @discardableResult Int = a { // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{15-34=}} expected-astgen-error {{unknown attribute 'discardableResult'}}
+    if var _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}}
     }
   }
 }

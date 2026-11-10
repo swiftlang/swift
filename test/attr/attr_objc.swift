@@ -180,7 +180,7 @@ func subject_genericFunc<T>(t: T) { // A top-level @objc function cannot be gene
   func subject_instanceFunc() {}
 }
 
-func subject_funcParam(a: @objc Int) { // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}} expected-astgen-error {{unknown attribute 'objc'}}
+func subject_funcParam(a: @objc Int) { // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{1-1=@objc }} {{27-33=}} expected-astgen-error {{attribute can only be applied to declarations, not types}}{{27-33=}}
 }
 
 @objc // bad-access-note-move{{subject_struct}} expected-error {{'@objc' attribute cannot be applied to this declaration}} {{1-7=}}
