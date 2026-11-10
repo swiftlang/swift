@@ -4232,7 +4232,12 @@ private:
                 loc, result);
           }
         }
-        result = result.materialize(SGF, loc);
+        // A borrowed value may itself be a formal-evaluation borrow, such as
+        // a borrowed subscript index, so the borrow of the temporary has to
+        // end with the formal access rather than with the enclosing scope.
+        result = SGF.isInFormalEvaluationScope()
+                     ? result.formallyMaterialize(SGF, loc)
+                     : result.materialize(SGF, loc);
       }
 
     // Otherwise, simultaneously emit and reabstract.
