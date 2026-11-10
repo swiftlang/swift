@@ -448,11 +448,11 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
            hasMacroParameter("refAvailability");
   }
 
-  // Cell and ConstCell share their availability, and are newer than both Ref
-  // and Span, so Cell's availability covers the whole wrapper.
+  // Ref is newer than Cell, ConstCell and Span, so Ref's availability covers
+  // the whole wrapper.
   void printRefAvailability() {
     if (needsRefAvailability)
-      printAvailability("Cell", "refAvailability");
+      printAvailability("Ref", "refAvailability");
   }
 
   bool registerStdSpanTypeMapping(Type swiftType, const clang::QualType clangType) {

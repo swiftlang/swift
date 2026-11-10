@@ -8,8 +8,7 @@
 // XFAIL: swift_test_mode_optimize_none_with_opaque_values
 
 // RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells \
-// RUN:   -Xfrontend -disable-availability-checking)
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells)
 
 //--- Inputs/module.modulemap
 module RefReturn {
@@ -39,6 +38,7 @@ var suite = TestSuite("ReferenceReturn")
 // A Ref returned for an inout dependence keeps exclusive access to its source
 // while it is alive, so each Ref lives in its own scope.
 suite.test("free function") {
+  guard #available(SwiftStdlib 6.2, *) else { return }
   var a: CInt = 1
   var b: CInt = 2
   do {
@@ -54,6 +54,7 @@ suite.test("free function") {
 }
 
 suite.test("method") {
+  guard #available(SwiftStdlib 6.2, *) else { return }
   var counter = Counter()
   do {
     let r: Ref<Cell<CInt>> = counter.get()
