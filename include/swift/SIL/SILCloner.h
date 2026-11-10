@@ -2538,7 +2538,8 @@ void SILCloner<ImplClass>::visitUncheckedOwnershipInst(
 
   recordClonedInstruction(
       uoi, getBuilder().createUncheckedOwnership(
-               getOpLocation(uoi->getLoc()), getOpValue(uoi->getOperand())));
+               getOpLocation(uoi->getLoc()), getOpValue(uoi->getOperand()),
+               uoi->getForwardingOwnershipKind()));
 }
 
 template <typename ImplClass>

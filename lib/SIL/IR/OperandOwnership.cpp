@@ -260,6 +260,8 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedRetainValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedReleaseValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedAutoreleaseValue)
 
+OPERAND_OWNERSHIP(NonUse, UncheckedOwnership)
+
 // These act as a form of conversion that does not imply ownership. Thus from an
 // operand perspective we treat them as a pointer escape and from a value
 // perspective, they return a value with OwnershipKind::Unowned.
@@ -456,7 +458,6 @@ AGGREGATE_OWNERSHIP(DestructureTuple)
 AGGREGATE_OWNERSHIP(Enum)
 AGGREGATE_OWNERSHIP(UncheckedEnumData)
 AGGREGATE_OWNERSHIP(SwitchEnum)
-AGGREGATE_OWNERSHIP(UncheckedOwnership)
 #undef AGGREGATE_OWNERSHIP
 
 // A begin_borrow is conditionally nested.

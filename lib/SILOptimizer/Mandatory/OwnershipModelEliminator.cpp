@@ -213,6 +213,11 @@ struct OwnershipModelEliminatorVisitor
     return true;
   }
 
+  bool visitUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
+    eraseInstructionAndRAUW(uoi, uoi->getOperand());
+    return true;
+  }
+
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *urvi);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *urvi);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *uavi);

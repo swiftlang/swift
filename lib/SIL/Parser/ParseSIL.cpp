@@ -4198,9 +4198,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::UncheckedOwnershipInst: {
     if (parseTypedValueRef(Val, B))
       return true;
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
+    if (parseForwardingOwnershipKind(forwardingOwnership))
+      return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createUncheckedOwnership(InstLoc, Val);
+    ResultVal = B.createUncheckedOwnership(InstLoc, Val, forwardingOwnership);
     break;
   }
 

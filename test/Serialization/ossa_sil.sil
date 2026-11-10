@@ -35,6 +35,20 @@ struct Wrapper {
   var _k: X
 }
 
+// CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @unchecked_ownership :
+// CHECK:         %2 = unchecked_ownership %1 : $Wrapper, forwarding: @none
+// CHECK-LABEL: } // end sil function 'unchecked_ownership'
+sil [serialized] [ossa] @unchecked_ownership : $@convention(thin) (@inout X, @owned Wrapper) -> () {
+bb0(%0 : $*X, %1 : @owned $Wrapper):
+  %2 = unchecked_ownership %1, forwarding: @none
+  %3 = struct_extract %2, #Wrapper._k
+  destroy_value %1
+  %5 = load_borrow %0, value_hint %3
+  end_borrow %5
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: sil [serialized] [canonical] [stage=canonical] [ossa] @return_borrow_test : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed X {
 // CHECK: bb0(%0 : $*Wrapper):
 // CHECK:   %1 = struct_element_addr %0 : $*Wrapper, #Wrapper._k

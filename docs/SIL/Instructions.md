@@ -1215,13 +1215,55 @@ This is only valid in Raw SIL.
 ### unchecked_ownership
 
 ```
-sil-instruction ::= 'unchecked_ownership' sil-operand
+sil-instruction ::= 'unchecked_ownership' sil-operand (',' 'forwarding' ':' sil-value-ownership-kind)?
 
-unchecked_ownership %1 : $T
+%1 = unchecked_ownership %0 : $T
+%2 = unchecked_ownership %0 : $T, forwarding: @none
 ```
 
-unchecked_ownership disables the ownership verification of it's operand. This used in cases 
-we cannot resolve ownership until a mandatory pass runs. This is only valid in Raw SIL. 
+Produces a value `%1` which is the same value as the operand `%0` but
+"breaks" the ownership chain between the two. The operand is not an ownership
+use (it is a non-use, like a type-dependent operand), so the ownership verifier
+and OSSA utilities, like liveness computations, don't connect uses of the
+result with the operand. In particular, uses of the result are not required to
+be within the lifetime or borrow scope of the operand.
+
+The ownership of the result is the forwarding ownership kind of the
+instruction. By default it's the ownership kind of the operand. It can be set
+explicitly with the `forwarding:` attribute, e.g. `@none` to make the result
+a value without ownership, even if its type is not trivial.
+
+The instruction is only valid in OSSA.
+
+It's the responsibility of the code which creates `unchecked_ownership` to
+ensure that the program is still correct after the ownership model eliminator
+replaced the result with the operand. In particular, the result must only be
+used at places where the value is known to be alive at runtime, even if it is
+not alive in terms of OSSA (e.g. because it's still stored in memory).
+
+How `unchecked_ownership` can be used depends on the forwarding ownership:
+
+* With `@none` forwarding, the result is a value without ownership, which has
+  no lifetime or scope which OSSA utilities and optimizations have to respect.
+  Therefore it can be used throughout the OSSA pipeline. For example, it can be
+  used to create the `value_hint` of a `load_borrow` from a value which is not
+  alive anymore in terms of OSSA at the `load_borrow` (see
+  [load_borrow](#load_borrow)):
+  ```
+  store %1 to [init] %0 : $*T      // consumes %1
+  ...
+  %2 = unchecked_ownership %1 : $T, forwarding: @none
+  %3 = load_borrow %0 : $*T, value_hint %2 : $T
+  ```
+
+* With `@guaranteed` or `@owned` forwarding, the result has a lifetime or
+  borrow scope which is not connected with the operand. OSSA optimizations
+  cannot handle this correctly. Therefore, it's only used in raw SIL, in cases
+  where the ownership cannot be resolved until a mandatory pass runs. For
+  example, SILGen produces the result of a borrow accessor inside a local borrow
+  scope and uses `unchecked_ownership` to return it outside that scope. A
+  mandatory pass then removes the `unchecked_ownership` and introduces a
+  `return_borrow`.
 
 ### copy_addr
 
