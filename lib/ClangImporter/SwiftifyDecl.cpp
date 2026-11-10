@@ -113,14 +113,17 @@ getSwiftParamIndex(const AbstractFunctionDecl *MappedDecl, size_t clangIndex) {
   return clangIndex < selfIndex ? clangIndex : clangIndex - 1;
 }
 
-/// Returns the Swift type that \p clangParam was imported as, or a null type if
-/// it was imported as `self`.
+/// Returns the Swift type that \p clangParam was imported as, which is the type
+/// of `self` if it was imported as `self`.
 static Type getImportedParamType(const AbstractFunctionDecl *MappedDecl,
                                  const clang::ParmVarDecl *clangParam) {
   std::optional<size_t> index =
       getSwiftParamIndex(MappedDecl, clangParam->getFunctionScopeIndex());
+  if (!index)
+    return MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true)
+        ->getInterfaceType();
   const auto *params = MappedDecl->getParameters();
-  if (!index || *index >= params->size())
+  if (*index >= params->size())
     return Type();
   return params->get(*index)->getInterfaceType();
 }
@@ -137,6 +140,9 @@ struct SwiftCountExprEmitter
   /// a parameter name, ignoring parentheses and casts that don't change the
   /// type (see stripValuePreservingCasts).
   bool isSimpleDeclRef = false;
+  /// Whether the count expression refers to a value whose type is a
+  /// `swift_newtype` typedef, which isn't supported yet.
+  bool usesSwiftNewtype = false;
   llvm::SmallString<128> result;
   llvm::raw_svector_ostream out;
 
@@ -169,6 +175,15 @@ struct SwiftCountExprEmitter
       DLOG("Unsupported decl name in count expr\n");
       return false;
     }
+    Type swiftTypeForDecl = getImportedType(e->getDecl());
+    // FIXME: A `swift_newtype` typedef is imported as a struct that wraps the
+    // underlying value, which count expressions don't support yet.
+    // (https://github.com/swiftlang/swift/issues/94222)
+    if (isSwiftNewtype(swiftTypeForDecl)) {
+      DLOG("Unsupported swift_newtype value in count expr\n");
+      usesSwiftNewtype = true;
+      return false;
+    }
     // Literals and casts are emitted using the Swift name of their canonical
     // C type, but parameters and global variables are referenced by name and
     // so have the type they were imported as. When those differ (e.g. `size_t`
@@ -191,7 +206,7 @@ struct SwiftCountExprEmitter
     // (https://github.com/swiftlang/swift/issues/94221)
     if (!isSimpleDeclRef)
       if (std::optional<StringRef> swiftTypeNameForCanonicalCType =
-              getCanonicalTypeNameIfImportedDifferently(e)) {
+              getCanonicalTypeNameIfImportedDifferently(e, swiftTypeForDecl)) {
         out << *swiftTypeNameForCanonicalCType << '(' << e->getDecl()->getName()
             << ')';
         return true;
@@ -330,13 +345,43 @@ private:
     return Type();
   }
 
-  /// If \p e refers to a parameter or global variable whose imported Swift type
-  /// differs from the Swift type of its canonical C type, returns the name of
-  /// the latter.
+  /// Returns true if \p type is the struct that a `swift_newtype` typedef was
+  /// imported as. For example, this C typedef:
+  ///
+  /// \code
+  /// typedef size_t MySize __attribute__((swift_newtype(struct)));
+  /// \endcode
+  ///
+  /// is imported into Swift as:
+  ///
+  /// \code
+  /// struct MySize : Hashable, Equatable, _SwiftNewtypeWrapper,
+  ///                 RawRepresentable, @unchecked Sendable {
+  ///   init(_ rawValue: Int)
+  ///   init(rawValue: Int)
+  ///   let rawValue: Int
+  ///   typealias RawValue = Int
+  /// }
+  /// \endcode
+  bool isSwiftNewtype(Type type) {
+    if (!type)
+      return false;
+    const auto *structDecl =
+        dyn_cast_or_null<StructDecl>(type->getAnyNominal());
+    if (!structDecl)
+      return false;
+    const auto *typedefDecl =
+        dyn_cast_or_null<clang::TypedefNameDecl>(structDecl->getClangDecl());
+    return typedefDecl && getSwiftNewtypeAttr(typedefDecl, CI.CurrentVersion);
+  }
+
+  /// If \p e refers to a parameter or global variable whose imported Swift
+  /// type, \p swiftTypeForDecl (see getImportedType), differs from the Swift
+  /// type of its canonical C type, returns the name of the latter.
   std::optional<StringRef>
-  getCanonicalTypeNameIfImportedDifferently(const clang::DeclRefExpr *e) {
+  getCanonicalTypeNameIfImportedDifferently(const clang::DeclRefExpr *e,
+                                            Type swiftTypeForDecl) {
     const clang::ValueDecl *decl = e->getDecl();
-    Type swiftTypeForDecl = getImportedType(decl);
     // Only support integer types for now.
     if (!swiftTypeForDecl || !swiftTypeForDecl->isStdlibInteger())
       return std::nullopt;
@@ -533,6 +578,9 @@ protected:
 struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   ClangImporter::Implementation &Impl;
   const AbstractFunctionDecl *MappedDecl;
+  /// Whether a count expression refers to a value whose type is a
+  /// `swift_newtype` typedef, which isn't supported yet.
+  bool hasSwiftNewtypeCount = false;
 
   SwiftifyInfoFunctionPrinter(clang::ASTContext &ctx, ASTContext &SwiftContext,
                               llvm::raw_svector_ostream &out,
@@ -546,26 +594,33 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
                             DiagnosedMissingNullableAsEmptySpanParam),
         Impl(Impl), MappedDecl(MappedDecl) {}
 
+  // Whether printCountedBy supports the type of this attribute's pointer.
+  bool isSupportedCountedByPointer(const clang::CountAttributedType *CAT,
+                                   Type swiftType) {
+    return CAT->isCountInBytes()
+               ? SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
+               : !ConcretePointeeType(swiftType).isNull();
+  }
+
   // Whether printCountedBy supports this attribute.
   bool canPrintCountedBy(const clang::CountAttributedType *CAT,
                          Type swiftType) {
-    if (CAT->isCountInBytes()
-            ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
-            : ConcretePointeeType(swiftType).isNull())
-      return false;
-    return SwiftCountExprEmitter(Impl, ctx, MappedDecl)
-        .computeSwiftCountExpr(CAT->getCountExpr());
+    return isSupportedCountedByPointer(CAT, swiftType) &&
+           SwiftCountExprEmitter(Impl, ctx, MappedDecl)
+               .computeSwiftCountExpr(CAT->getCountExpr());
   }
 
   bool printCountedBy(const clang::CountAttributedType *CAT, Type swiftType,
                       ssize_t pointerIndex, bool isImplicitlyUnwrapped) {
     // Step 1: check if we support this attribute
-    if (!canPrintCountedBy(CAT, swiftType))
+    if (!isSupportedCountedByPointer(CAT, swiftType))
       return false;
     bool isSizedBy = CAT->isCountInBytes();
     SwiftCountExprEmitter emitter(Impl, ctx, MappedDecl);
-    bool emitted = emitter.computeSwiftCountExpr(CAT->getCountExpr());
-    ASSERT(emitted);
+    if (!emitter.computeSwiftCountExpr(CAT->getCountExpr())) {
+      hasSwiftNewtypeCount |= emitter.usesSwiftNewtype;
+      return false;
+    }
 
     // Step 2: print - any early exit must occur before this point
     printSeparator();
@@ -1185,6 +1240,14 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                                  << "' on return value\n");
       attachMacro = true;
     }
+  }
+  // Don't generate a wrapper at all if a count expression refers to a
+  // `swift_newtype` value. A wrapper without that count would expose the
+  // pointer unsafely, and adding the count once `swift_newtype` is supported
+  // would change the wrapper's signature, which would be source breaking.
+  if (printer.hasSwiftNewtypeCount) {
+    DLOG("Count expression refers to a swift_newtype value\n");
+    return false;
   }
   return attachMacro;
 }
