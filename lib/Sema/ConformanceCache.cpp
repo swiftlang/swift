@@ -23,6 +23,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/Subtyping.h"
+#include "TypeChecker.h"
 
 #define DEBUG_TYPE "Subtyping"
 #include "llvm/Support/Debug.h"
@@ -44,8 +45,12 @@ ConformanceCache::lookupConformance(Type type, ProtocolDecl *protocol) {
   return conformance;
 }
 
+/// If we have:
+///
 /// T conv $T0
 /// $T0 conforms P
+///
+/// Can we conclude that T itself conforms to P?
 bool ConformanceCache::isConformanceTransitiveForSupertype(
     ConversionBehavior behavior, ProtocolDecl *proto) {
   // Sendable conformance is too loose to conclude anything.
@@ -95,6 +100,8 @@ bool ConformanceCache::isConformanceTransitiveForSupertype(
   case ConversionBehavior::Optional:
   case ConversionBehavior::AnyHashable:
   case ConversionBehavior::Tuple:
+  case ConversionBehavior::Function:
+  case ConversionBehavior::Existential:
     break;
 
   case ConversionBehavior::String:
@@ -122,10 +129,9 @@ bool ConformanceCache::isConformanceTransitiveForSupertype(
       declsToCheck.push_back(cgFloatDecl);
     break;
 
-  case ConversionBehavior::Function:
   case ConversionBehavior::Metatype:
   case ConversionBehavior::ExistentialMetatype:
-    // FIXME: Metatypes and functions.
+    // FIXME: COM interp introduces "metatype conformances", revisit this
     result = false;
     break;
 
@@ -136,11 +142,6 @@ bool ConformanceCache::isConformanceTransitiveForSupertype(
   case ConversionBehavior::InOut:
     // InOut types convert to mutable pointers.
     addMutablePointers();
-    break;
-
-  case ConversionBehavior::Existential:
-    // FIXME: Implement this.
-    result = false;
     break;
 
   case ConversionBehavior::Unknown:
@@ -179,15 +180,21 @@ bool ConformanceCache::checkTransitiveSupertypeConformance(
     type = lvalueType->getObjectType();
   auto behavior = getConversionBehavior(type);
   if (isConformanceTransitiveForSupertype(behavior, proto)) {
-    // Unwrap InOut and LValue type.
-    return !lookupConformance(type->getWithoutSpecifierType(), proto)
-        .isInvalid();
+    if (type->is<InOutType>())
+      return false;
+
+    auto result = TypeChecker::containsProtocol(type, proto);
+    return result.first || !result.second.isInvalid();
   }
   return true;
 }
 
+/// If we have:
+///
 /// $T0 conv T
 /// $T0 conforms P
+///
+/// Can we conclude that T itself conforms to P?
 bool ConformanceCache::isConformanceTransitiveForSubtype(
     ConversionBehavior behavior, ProtocolDecl *proto) {
   // Sendable conformance is too loose to conclude anything.
