@@ -14,6 +14,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBasicBlock.h"
 #define DEBUG_TYPE "silgen-cleanup"
 
@@ -294,7 +295,9 @@ void SILGenCleanup::run() {
   breakInfiniteLoops(getPassManager(), function);
   completeAllLifetimes(getPassManager(), function,
                        /*includeTrivialVars=*/true);
-  function->verifyOwnership(/*deadEndBlocks=*/nullptr);
+  // Release compilers verify ownership once, in OwnershipModelEliminator.
+  if (CONDITIONAL_ASSERT_enabled())
+    function->verifyOwnership(/*deadEndBlocks=*/nullptr);
 
   DeadEndBlocks deadEndBlocks(function);
   SILGenCanonicalize sgCanonicalize(deadEndBlocks);
