@@ -417,7 +417,6 @@ void addSimplifyCFGSILCombinePasses(SILPassPipelinePlan &P) {
 /// Perform semantic annotation/loop base optimizations.
 void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // Perform classic SSA optimizations for cleanup.
-  P.addLowerAggregateInstrs();
   P.addSILCombine();
   P.addEarlySROA();
   P.addDeadObjectElimination();
@@ -501,6 +500,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Split up opaque operations (copy_addr, retain_value, etc.).
   P.addLowerAggregateInstrs();
+
+  P.addLowerAddressInstructions();
 
   // Split up operations on stack-allocated aggregates (struct, tuple).
   if (OpLevel == OptimizationLevelKind::HighLevel) {
