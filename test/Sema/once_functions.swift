@@ -569,6 +569,28 @@ func overloadRanking(
   let _: String = overloaded { @once in }
 }
 
+// Execution semantics are ignored when they're all that keep either overload
+// from being more specialized than the other, so a synchronous overload with
+// an exactly-once closure parameter is still more specialized than an `async`
+// one with a plain closure parameter.
+func syncOrAsync(_ body: @once () -> Void) -> Int { 0 }
+func syncOrAsync(_ body: () async -> Void) async -> String { "" }
+
+func optionalSyncOrAsync(_ body: consuming (@callable(once) () -> Void)?) -> Int { 0 }
+func optionalSyncOrAsync(_ body: (() async -> Void)?) async -> String { "" }
+
+func packSyncOrAsync<each T>(_ v: repeat each T, operation: @once () -> Void) -> Int { 0 }
+func packSyncOrAsync<each T>(_ v: repeat each T, operation: () async -> Void) async -> String { "" }
+
+func callSyncOrAsync() async {
+  let syncOrAsyncClosure = syncOrAsync { }
+  let _: Int = syncOrAsyncClosure
+  let optionalSyncOrAsyncClosure = optionalSyncOrAsync { }
+  let _: Int = optionalSyncOrAsyncClosure
+  let packSyncOrAsyncClosure = packSyncOrAsync(1, 2) { }
+  let _: Int = packSyncOrAsyncClosure
+}
+
 // MARK: - Existential conversions
 
 protocol ExistentialProto {}

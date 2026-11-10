@@ -2974,6 +2974,9 @@ ConstraintSystem::SolutionKind
 ConstraintSystem::matchFunctionExecutionSemantics(
     FunctionType *func1, FunctionType *func2, ConstraintKind kind,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
+  if (Options.contains(ConstraintSystemFlags::IgnoreExecutionSemanticsMismatch))
+    return SolutionKind::Solved;
+
   auto formUnsolved = [&]() {
     // If we're supposed to generate constraints, do so.
     if (flags.contains(TMF_GenerateConstraints)) {
