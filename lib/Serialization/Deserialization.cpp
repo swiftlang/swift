@@ -6984,6 +6984,16 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::Allocator_DECL_ATTR: {
+        bool isImplicit;
+        TypeID allocatorTypeID;
+        serialization::decls_block::AllocatorDeclAttrLayout::readRecord(
+            scratch, isImplicit, allocatorTypeID);
+
+        Attr = AllocatorAttr::create(ctx, &MF, allocatorTypeID, isImplicit);
+        break;
+      }
+
       case decls_block::Custom_DECL_ATTR: {
         // Deserialize the custom attributes after the attached decl,
         // skip for now.
@@ -9785,6 +9795,11 @@ ValueDecl *ModuleFile::loadTargetFunctionDecl(
 
 Type ModuleFile::loadTypeEraserType(const TypeEraserAttr *TRA,
                                     uint64_t contextData) {
+  return getType(contextData);
+}
+
+Type ModuleFile::loadClassAllocatorType(const AllocatorAttr *attr,
+                                        uint64_t contextData) {
   return getType(contextData);
 }
 

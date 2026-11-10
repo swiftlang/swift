@@ -212,6 +212,8 @@ extension ASTGenVisitor {
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .TypeEraser:
         return handle(self.generateTypeEraserAttr(attribute: node)?.asDeclAttribute)
+      case .Allocator:
+        return handle(self.generateAllocatorAttr(attribute: node)?.asDeclAttribute)
       case .UnavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
       case .Unsafe:
@@ -2446,6 +2448,27 @@ extension ASTGenVisitor {
       originalNameLoc: originalDecl.declNameLoc,
       params: parameters
     )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @allocator(NodePool)
+  ///   ```
+  func generateAllocatorAttr(attribute node: AttributeSyntax) -> BridgedAllocatorAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      let type = self.generateConsumingAttrOption(args: &args, label: nil) {
+        self.generateTypeRepr(expr: $0)
+      }
+      guard let type else {
+        return nil
+      }
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        typeExpr: .createParsed(self.ctx, type: type)
+      )
+    }
   }
 
   /// E.g.:

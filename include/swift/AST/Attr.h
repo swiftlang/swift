@@ -1482,6 +1482,60 @@ public:
   bool isEquivalent(const TypeEraserAttr *other, Decl *attachedTo) const;
 };
 
+/// The \c @allocator(AllocatorType) attribute on a class declaration.
+///
+/// Instances of the class (and of its subclasses, unless they declare their
+/// own allocator) are allocated and freed through \c AllocatorType, which
+/// must conform to \c Swift.ClassAllocator.
+class AllocatorAttr final : public DeclAttribute {
+  TypeExpr *AllocatorExpr;
+  LazyMemberLoader *Resolver;
+  uint64_t ResolverContextData;
+
+  friend class ResolveClassAllocatorTypeRequest;
+
+  AllocatorAttr(SourceLoc atLoc, SourceRange range, TypeExpr *allocatorExpr,
+                LazyMemberLoader *Resolver, uint64_t Data, bool implicit)
+      : DeclAttribute(DeclAttrKind::Allocator, atLoc, range, implicit),
+        AllocatorExpr(allocatorExpr), Resolver(Resolver),
+        ResolverContextData(Data) {}
+
+public:
+  static AllocatorAttr *create(ASTContext &ctx, SourceLoc atLoc,
+                               SourceRange range, TypeExpr *allocatorExpr);
+
+  /// Create an attribute whose allocator type is loaded lazily, e.g. from a
+  /// serialized module.
+  static AllocatorAttr *create(ASTContext &ctx, LazyMemberLoader *Resolver,
+                               uint64_t Data, bool implicit);
+
+  /// Retrieve the parsed type repr for this attribute, if it was parsed.
+  /// Else returns \c nullptr.
+  TypeRepr *getParsedAllocatorTypeRepr() const;
+
+  /// Retrieve the parsed location of the allocator type, if it was parsed.
+  SourceLoc getLoc() const;
+
+  /// Retrieve the allocator type if it has already been resolved by a call to
+  /// \c getResolvedType(), otherwise a null type.
+  ///
+  /// This entrypoint is only suitable for syntactic clients like the AST
+  /// printer. Semantic clients should use \c getResolvedType() instead.
+  Type getTypeWithoutResolving() const;
+
+  /// Resolves the allocator type of this attribute, attached to \p CD.
+  /// Returns an ErrorType if it cannot be resolved.
+  Type getResolvedType(const ClassDecl *CD) const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Allocator;
+  }
+
+  UNIMPLEMENTED_CLONE(AllocatorAttr)
+
+  bool isEquivalent(const AllocatorAttr *other, Decl *attachedTo) const;
+};
+
 /// Represents any sort of access control modifier.
 class AbstractAccessControlAttr : public DeclAttribute {
 protected:

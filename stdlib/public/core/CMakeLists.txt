@@ -57,6 +57,7 @@ split_embedded_sources(
   EMBEDDED CTypes.swift
   EMBEDDED Character.swift
   EMBEDDED CharacterProperties.swift
+    NORMAL ClassAllocator.swift
   EMBEDDED ClosedRange.swift
     NORMAL CocoaArray.swift
     NORMAL Codable.swift

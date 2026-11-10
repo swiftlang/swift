@@ -233,6 +233,13 @@ public:
                                             bool isOptional);
 #include "swift/AST/ReferenceStorage.def"
 
+  /// The type info of `unowned` references to instances of \p referent, a
+  /// class whose last unowned release frees its instances through its
+  /// allocator (see isClassAllocatedOnUnownedRelease).
+  const TypeInfo *createClassAllocatedUnownedStorageType(llvm::Type *valueType,
+                                                         bool isOptional,
+                                                         ClassDecl *referent);
+
   llvm::Type *getExistentialType(unsigned numWitnessTables);
 
   /// Retrieve the generic signature for the current generic context, or null if no

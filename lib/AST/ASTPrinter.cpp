@@ -1647,6 +1647,23 @@ void PrintAST::printAttributes(const Decl *D) {
         Printer.printAttrName("@_hasMissingDesignatedInitializers");
         Printer << " ";
       }
+
+      // A package interface prints the allocator that a package class gets
+      // from -default-class-allocator, which interfaces don't record, so that
+      // a module built from it has the allocator too.
+      if (Options.IsForSwiftInterface && Options.printPackageInterface() &&
+          !attrs.hasAttribute<AllocatorAttr>(/*AllowInvalid=*/true) &&
+          !Options.excludeAttrKind(DeclAttrKind::Allocator)) {
+        if (Type allocatorType =
+                CD->getPackageInterfaceDefaultAllocatorType()) {
+          Printer.printAttrName("@allocator");
+          Printer << "(";
+          Printer.callPrintNamePre(PrintNameContext::Attribute);
+          allocatorType->print(Printer, Options);
+          Printer.printNamePost(PrintNameContext::Attribute);
+          Printer << ") ";
+        }
+      }
     }
   }
 

@@ -921,6 +921,15 @@ BUILTIN_MISC_OPERATION(AssumeAlignment, "assumeAlignment", "n", Special)
 /// (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(Dereferenceable, "dereferenceable", "n", Special)
 
+/// classInstanceSize<C>() and classInstanceAlignMask<C>() return the byte size
+/// and alignment mask that `alloc_ref $C` (without tail elements) passes to
+/// swift_allocObject: constants for fixed-layout classes, otherwise read from
+/// C's metadata. C must be a (possibly generic) class type. Emitted by the
+/// DirectClassAlloc pass for classes with an `@allocator`.
+BUILTIN_MISC_OPERATION(ClassInstanceSize, "classInstanceSize", "n", Special)
+BUILTIN_MISC_OPERATION(ClassInstanceAlignMask, "classInstanceAlignMask", "n",
+                       Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //

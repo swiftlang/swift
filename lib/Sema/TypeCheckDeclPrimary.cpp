@@ -3560,6 +3560,7 @@ public:
     (void) CD->getDestructor();
 
     TypeChecker::checkDeclAttributes(CD);
+    TypeChecker::checkClassAllocator(CD);
 
     if (CD->isActor())
       TypeChecker::checkConcurrencyAvailability(CD->getLoc(), CD);

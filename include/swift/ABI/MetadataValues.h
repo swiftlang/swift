@@ -374,6 +374,15 @@ enum class ClassFlags : uint32_t {
   /// which was created during compilation and made to be canonical by
   /// modifying the metadata accessor.
   IsCanonicalStaticSpecialization = 0x10,
+
+  /// Instances of this class are allocated and freed by a custom instance
+  /// allocator, declared with `@allocator` on this class or a superclass, or
+  /// applied with `-default-class-allocator`. The class's value witness table
+  /// then has the class allocator witness `deallocate` (see
+  /// TargetClassAllocatorValueWitnessTable), which frees the instances that
+  /// the runtime frees. This flag is the only marker of that table: only
+  /// classes with this flag have one.
+  HasClassAllocator = 0x20,
 };
 inline bool operator&(ClassFlags a, ClassFlags b) {
   return (uint32_t(a) & uint32_t(b)) != 0;
@@ -1783,6 +1792,10 @@ namespace SpecialPointerAuthDiscriminators {
   const uint16_t DestructiveInjectEnumTag = 0xb2e4;
   const uint16_t GetEnumTagSinglePayload = 0x60f0;
   const uint16_t StoreEnumTagSinglePayload = 0xa0d1;
+
+  /// The `deallocate` class allocator value witness (see
+  /// TargetClassAllocatorValueWitnessTable).
+  const uint16_t ClassAllocatorDeallocate = 0x864a; // = 34378
 
   /// KeyPath metadata functions.
   const uint16_t KeyPathDestroy = _SwiftKeyPath_ptrauth_ArgumentDestroy;

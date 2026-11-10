@@ -31,6 +31,7 @@
 #include "Explosion.h"
 #include "GenCall.h"
 #include "GenCast.h"
+#include "GenClass.h"
 #include "GenConcurrency.h"
 #include "GenDistributed.h"
 #include "GenEnum.h"
@@ -238,6 +239,19 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     out.add(IGF.Builder.CreateAdd(
                            valueTy.second.getAlignmentMask(IGF, valueTy.first),
                            IGF.IGM.getSize(Size(1))));
+    return;
+  }
+
+  case BuiltinValueKind::ClassInstanceSize:
+  case BuiltinValueKind::ClassInstanceAlignMask: {
+    (void)args.claimAll();
+    CanType classTy =
+        substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto sizeAndAlignMask = emitClassInstanceSizeAndAlignMask(
+        IGF, SILType::getPrimitiveObjectType(classTy));
+    out.add(Builtin.ID == BuiltinValueKind::ClassInstanceSize
+                ? sizeAndAlignMask.first
+                : sizeAndAlignMask.second);
     return;
   }
 

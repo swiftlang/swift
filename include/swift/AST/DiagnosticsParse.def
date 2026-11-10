@@ -1745,6 +1745,11 @@ ERROR(attr_type_eraser_expected_type_name,none,
 ERROR(attr_type_eraser_expected_rparen,none,
       "expected ')' after type name for '@_typeEraser'", ())
 
+ERROR(attr_allocator_expected_type,none,
+      "expected a type name in '@allocator()'", ())
+ERROR(attr_allocator_expected_rparen,none,
+      "expected ')' after type name for '@allocator'", ())
+
 ERROR(expected_thrown_error_type,none,
       "expected thrown error type after 'throws('", ())
 ERROR(expected_rparen_after_thrown_error_type,none,

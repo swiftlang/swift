@@ -89,6 +89,7 @@ class DeadFunctionAndGlobalElimination {
 
   bool keepExternalWitnessTablesAlive;
   bool keepStringSwitchIntrinsicAlive;
+  bool keepClassAllocatorDestroyersAlive;
 
   /// Checks is a function is alive, e.g. because it is visible externally.
   bool isAnchorFunction(SILFunction *F) {
@@ -144,6 +145,17 @@ class DeadFunctionAndGlobalElimination {
     if (keepStringSwitchIntrinsicAlive &&
         F->hasSemanticsAttr("findStringSwitchCaseWithCache"))
       return true;
+
+    // The ReleaseDevirtualizer calls the destroying destructor of a class with
+    // a class allocator, instead of its deallocating destructor, to destroy a
+    // stack-promoted instance. Late DFE removes it if it's unused.
+    if (keepClassAllocatorDestroyersAlive) {
+      SILDeclRef declRef = F->getDeclRef();
+      if (declRef && declRef.kind == SILDeclRef::Kind::Destroyer)
+        if (auto *cls = declRef.getDecl()->getDeclContext()->getSelfClassDecl())
+          if (cls->getAllocatorType())
+            return true;
+    }
 
     return false;
   }
@@ -754,10 +766,12 @@ class DeadFunctionAndGlobalElimination {
 public:
   DeadFunctionAndGlobalElimination(SILModule *module,
                                    bool keepExternalWitnessTablesAlive,
-                                   bool keepStringSwitchIntrinsicAlive) :
+                                   bool keepStringSwitchIntrinsicAlive,
+                                   bool keepClassAllocatorDestroyersAlive) :
     Module(module),
     keepExternalWitnessTablesAlive(keepExternalWitnessTablesAlive),
-    keepStringSwitchIntrinsicAlive(keepStringSwitchIntrinsicAlive) {}
+    keepStringSwitchIntrinsicAlive(keepStringSwitchIntrinsicAlive),
+    keepClassAllocatorDestroyersAlive(keepClassAllocatorDestroyersAlive) {}
 
   /// Replaces references to dead globals within debug reconstruction blocks
   /// with undef.
@@ -863,7 +877,8 @@ public:
     DeadFunctionAndGlobalElimination deadFunctionElimination(
         getModule(),
         /*keepExternalWitnessTablesAlive*/ !isLateDFE,
-        /*keepStringSwitchIntrinsicAlive*/ !isLateDFE);
+        /*keepStringSwitchIntrinsicAlive*/ !isLateDFE,
+        /*keepClassAllocatorDestroyersAlive*/ !isLateDFE);
     deadFunctionElimination.eliminateFunctionsAndGlobals(this);
   }
 };

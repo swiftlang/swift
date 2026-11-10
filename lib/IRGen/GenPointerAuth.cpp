@@ -401,6 +401,8 @@ PointerAuthEntity::getDeclDiscriminator(IRGenModule &IGM) const {
         return SpecialPointerAuthDiscriminators::CoroFrameAllocationFunction;
       case Special::CoroFrameDeallocationFunction:
         return SpecialPointerAuthDiscriminators::CoroFrameDeallocationFunction;
+      case Special::ClassAllocatorDeallocate:
+        return SpecialPointerAuthDiscriminators::ClassAllocatorDeallocate;
       }
       llvm_unreachable("bad kind");
     };

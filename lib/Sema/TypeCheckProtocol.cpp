@@ -2958,6 +2958,10 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
     }
   }
 
+  // A conformance to ClassAllocator must be @unsafe under strict memory
+  // safety.
+  TypeChecker::checkClassAllocatorConformanceSafety(conformance);
+
   diagnoseConformanceIsolationErrors(conformance);
 }
 

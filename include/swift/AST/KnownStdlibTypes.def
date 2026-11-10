@@ -110,4 +110,8 @@ KNOWN_STDLIB_TYPE_DECL(MutableSpan, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(Ref, NominalTypeDecl, 1)
 KNOWN_STDLIB_TYPE_DECL(MutableRef, NominalTypeDecl, 1)
 
+KNOWN_STDLIB_TYPE_DECL(ManagedBuffer, ClassDecl, 2)
+KNOWN_STDLIB_TYPE_DECL(ManagedBufferPointer, NominalTypeDecl, 2)
+KNOWN_STDLIB_TYPE_DECL(SystemClassAllocator, NominalTypeDecl, 0)
+
 #undef KNOWN_STDLIB_TYPE_DECL

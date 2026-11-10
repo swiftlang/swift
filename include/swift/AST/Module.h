@@ -838,6 +838,11 @@ public:
     return Bits.ModuleDecl.IsMainModule;
   }
 
+  /// The class allocator named by `-default-class-allocator`, which classes
+  /// of this module use unless they or a superclass declare one with
+  /// `@allocator`, or a null type. Only the main module has one.
+  Type getDefaultClassAllocator() const;
+
   /// Whether this module has been compiled with comprehensive checking for
   /// concurrency, e.g., Sendable checking.
   bool isConcurrencyChecked() const {

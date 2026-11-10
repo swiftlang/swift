@@ -7670,6 +7670,80 @@ ERROR(dynamic_replacement_replaced_constructor_is_not_convenience, none,
       "replaced initializer %0 is not marked as convenience", (DeclNameRef))
 
 //------------------------------------------------------------------------------
+// MARK: @allocator()
+//------------------------------------------------------------------------------
+
+ERROR(allocator_not_allowed,none,
+      "%select{'@allocator'|inherited allocator %1|"
+      "default class allocator %1}0 cannot be applied to %kind2 because "
+      "%select{it inherits from an Objective-C class|"
+      "it is a subclass of 'ManagedBuffer'|"
+      "it is %select{'public'|declared 'open'|'@usableFromInline'}4 in a "
+      "module built with library evolution, so %select{clients outside its "
+      "package can see it|subclasses in other modules could inherit the "
+      "allocator|clients outside its package can see it}4|"
+      "the runtime allocates its remote proxies}3",
+      (unsigned, Type, const ValueDecl *, unsigned, unsigned))
+NOTE(allocator_opt_out,none,
+     "add '@allocator(SystemClassAllocator)' to use the system allocator",
+     ())
+ERROR(allocator_attr_in_embedded,none,
+      "'@allocator' is not supported in Embedded Swift", ())
+ERROR(allocator_attr_missing_protocol,none,
+      "'@allocator' requires the standard library protocol 'ClassAllocator'",
+      ())
+ERROR(allocator_attr_unavailable,none,
+      "'@allocator' is only available in %0 %1 or newer",
+      (AvailabilityDomain, AvailabilityRange))
+ERROR(allocator_type_does_not_conform,none,
+      "allocator type %0 does not conform to protocol 'ClassAllocator'",
+      (Type))
+ERROR(allocator_type_depends_on_generic_parameter,none,
+      "allocator type %0 cannot depend on the generic parameters of %1",
+      (Type, const ValueDecl *))
+ERROR(allocator_type_not_exported,none,
+      "%select{allocator type|default class allocator}0 %1 of "
+      "%select{private|fileprivate|internal|package|public|open}2 class %3 "
+      "must be %select{'@usableFromInline' or public|"
+      "'@usableFromInline', package or public}6 because %4 is "
+      "%select{private|fileprivate|internal|package|public|open}5",
+      (unsigned, Type, AccessLevel, const ValueDecl *, const ValueDecl *,
+       AccessLevel, bool))
+GROUPED_WARNING(class_allocator_conformance_not_unsafe,StrictMemorySafety,none,
+     "conformance of %0 to %kind1 must be marked '@unsafe' because the "
+     "compiler trusts a class allocator to manage memory correctly",
+     (Type, const ValueDecl *))
+ERROR(managed_buffer_pointer_class_with_allocator,none,
+      "'ManagedBufferPointer' cannot allocate an instance of %0, which has a "
+      "class allocator",
+      (Type))
+ERROR(default_class_allocator_requires_feature,none,
+      "'-default-class-allocator' requires "
+      "'-enable-experimental-feature ClassAllocators'",
+      ())
+ERROR(default_class_allocator_in_embedded,none,
+      "'-default-class-allocator' is not supported in Embedded Swift", ())
+ERROR(default_class_allocator_invalid_name,none,
+      "'%0' passed to '-default-class-allocator' is not a fully qualified "
+      "type name of the form 'Module.Type'",
+      (StringRef))
+ERROR(default_class_allocator_module_not_found,none,
+      "cannot find module %0 for '-default-class-allocator %1'",
+      (Identifier, StringRef))
+ERROR(default_class_allocator_type_not_found,none,
+      "cannot find type '%0' for '-default-class-allocator'", (StringRef))
+ERROR(default_class_allocator_type_generic,none,
+      "type %0 for '-default-class-allocator' must not be generic", (Type))
+ERROR(default_class_allocator_does_not_conform,none,
+      "type %0 for '-default-class-allocator' does not conform to protocol "
+      "'ClassAllocator'",
+      (Type))
+ERROR(default_class_allocator_unavailable,none,
+      "'-default-class-allocator' requires a deployment target of %0 %1 or "
+      "newer",
+      (AvailabilityDomain, AvailabilityRange))
+
+//------------------------------------------------------------------------------
 // MARK: @_typeEraser()
 //------------------------------------------------------------------------------
 

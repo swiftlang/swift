@@ -147,17 +147,24 @@ Metadata *TargetSingletonMetadataInitialization<InProcess>::allocate(
 
     // Begin by initializing the value witness table; everything else is
     // initialized by swift_initClassMetadata().
-#if SWIFT_OBJC_INTEROP
     auto *classMetadata = static_cast<ClassMetadata*>(metadata);
+#if SWIFT_OBJC_INTEROP
     classMetadata->setAsTypeMetadata();
-
-    fullMetadata->ValueWitnesses =
-      (classMetadata->Flags & ClassFlags::UsesSwiftRefcounting)
-         ? &VALUE_WITNESS_SYM(Bo)
-         : &VALUE_WITNESS_SYM(BO);
-#else
-    fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
 #endif
+
+    // The compiler emits the value witness table of a class with a class
+    // allocator, which has the class allocator witness, in its template; keep
+    // it.
+    if (!(classMetadata->Flags & ClassFlags::HasClassAllocator)) {
+#if SWIFT_OBJC_INTEROP
+      fullMetadata->ValueWitnesses =
+          (classMetadata->Flags & ClassFlags::UsesSwiftRefcounting)
+              ? &VALUE_WITNESS_SYM(Bo)
+              : &VALUE_WITNESS_SYM(BO);
+#else
+      fullMetadata->ValueWitnesses = &VALUE_WITNESS_SYM(Bo);
+#endif
+    }
   }
 
   return metadata;

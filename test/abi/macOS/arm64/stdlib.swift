@@ -1393,3 +1393,22 @@ Added: _$ss9ConstCellVMn
 
 // Removed: _createOffsetBasedKeyPath
 Removed: _$ss25_createOffsetBasedKeyPath4root5value6offsets03AnydE0CypXp_ypXpSitF
+
+// ClassAllocator, SystemClassAllocator, and runtime support for classes with
+// class allocators
+Added: _$ss14ClassAllocatorMp
+Added: _$ss14ClassAllocatorP10deallocate_9byteCount9alignment3forySv_S2iyXlXptFZTj
+Added: _$ss14ClassAllocatorP10deallocate_9byteCount9alignment3forySv_S2iyXlXptFZTq
+Added: _$ss14ClassAllocatorP8allocate9byteCount9alignment3forSvSi_SiyXlXptFZTj
+Added: _$ss14ClassAllocatorP8allocate9byteCount9alignment3forSvSi_SiyXlXptFZTq
+Added: _$ss14ClassAllocatorTL
+Added: _$ss20SystemClassAllocatorO10deallocate_9byteCount9alignment3forySv_S2iyXlXptFZ
+Added: _$ss20SystemClassAllocatorO8allocate9byteCount9alignment3forSvSi_SiyXlXptFZ
+Added: _$ss20SystemClassAllocatorOMa
+Added: _$ss20SystemClassAllocatorOMn
+Added: _$ss20SystemClassAllocatorON
+Added: _$ss20SystemClassAllocatorOs0bC0sMc
+Added: _$ss20SystemClassAllocatorOs0bC0sWP
+Added: _swift_deallocClassInstanceBegin
+Added: _swift_initHeapObject
+Added: _swift_unownedReleaseBegin

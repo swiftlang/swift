@@ -491,6 +491,15 @@ static bool usesFeatureCompileTimeValues(Decl *decl) {
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
+static bool usesFeatureClassAllocators(Decl *decl) {
+  if (decl->getAttrs().hasAttribute<AllocatorAttr>())
+    return true;
+  // The package interface prints the allocator from -default-class-allocator.
+  if (auto *cls = dyn_cast<ClassDecl>(decl))
+    return bool(cls->getPackageInterfaceDefaultAllocatorType());
+  return false;
+}
+
 UNINTERESTING_FEATURE(ClosureBodyMacro)
 UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
 UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)

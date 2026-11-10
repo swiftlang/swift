@@ -41,6 +41,9 @@
 #include "swift/Runtime/Atomic.h"
 #include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
+#if !SWIFT_CONCURRENCY_EMBEDDED
+#include "swift/Runtime/ClassAllocator.h"
+#endif
 #include "swift/Runtime/DispatchShims.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Exception.h"
@@ -2114,9 +2117,20 @@ void DefaultActorImpl::deallocateUnconditional() {
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(this->metadata);
-  size_t deallocSize = isDistributedRemote() ?
-      getDistributedRemoteActorAllocSize(metadata)
-      : metadata->getInstanceSize();
+  // A default actor whose class has a class allocator. (Distributed actors,
+  // whose remote proxies the runtime allocates, can't have one.)
+  if (SWIFT_UNLIKELY(metadata->getFlags() & ClassFlags::HasClassAllocator)) {
+    // Return the memory to the class's allocator unless unowned references
+    // remain, in which case the last unowned release does.
+    if (void *allocation = swift_deallocClassInstanceBegin(this))
+      class_allocator::callDeallocateWitness(metadata, allocation,
+                                             metadata->getInstanceSize(),
+                                             metadata->getInstanceAlignMask());
+    return;
+  }
+  size_t deallocSize = isDistributedRemote()
+                           ? getDistributedRemoteActorAllocSize(metadata)
+                           : metadata->getInstanceSize();
   swift_deallocClassInstance(this, deallocSize,
                              metadata->getInstanceAlignMask());
 #else
@@ -2486,11 +2500,22 @@ void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
   if (isDefaultActorClass(metadata))
     return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
 
-  size_t deallocSize = swift_distributed_actor_is_remote(actor) ?
-        getDistributedRemoteActorAllocSize(metadata)
-        : metadata->getInstanceSize();
-  swift_deallocObject(actor, deallocSize,
-                      metadata->getInstanceAlignMask());
+  // An actor with a custom executor whose class has a class allocator.
+  // (Distributed actors can't have one.)
+  if (SWIFT_UNLIKELY(metadata->getFlags() & ClassFlags::HasClassAllocator)) {
+    // Return the memory to the class's allocator unless unowned references
+    // remain, in which case the last unowned release does.
+    if (void *allocation = swift_deallocClassInstanceBegin(actor))
+      class_allocator::callDeallocateWitness(metadata, allocation,
+                                             metadata->getInstanceSize(),
+                                             metadata->getInstanceAlignMask());
+    return;
+  }
+
+  size_t deallocSize = swift_distributed_actor_is_remote(actor)
+                           ? getDistributedRemoteActorAllocSize(metadata)
+                           : metadata->getInstanceSize();
+  swift_deallocObject(actor, deallocSize, metadata->getInstanceAlignMask());
 #else
   // TODO(distributed): Embedded should be able to handle remote actor references here
   return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));

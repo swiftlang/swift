@@ -2003,6 +2003,11 @@ public:
     llvm_unreachable("unimplemented for ClangImporter");
   }
 
+  Type loadClassAllocatorType(const AllocatorAttr *attr,
+                              uint64_t contextData) override {
+    llvm_unreachable("unimplemented for ClangImporter");
+  }
+
   ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,
                                     uint64_t contextData) override {
     llvm_unreachable("unimplemented for ClangImporter");

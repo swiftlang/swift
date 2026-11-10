@@ -39,6 +39,7 @@ set(swift_runtime_sources
     Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
+    ClassAllocator.cpp
     Demangle.cpp
     DynamicCast.cpp
     Enum.cpp

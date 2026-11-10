@@ -3976,6 +3976,48 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Resolve the allocator type of an \c @allocator attribute.
+class ResolveClassAllocatorTypeRequest
+    : public SimpleRequest<ResolveClassAllocatorTypeRequest,
+                           Type (ClassDecl *, AllocatorAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, ClassDecl *CD,
+                AllocatorAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
+/// Resolve and check the class allocator named by `-default-class-allocator`
+/// for a module, diagnosing errors. Returns a null type if there is none or it
+/// is invalid.
+class DefaultClassAllocatorRequest
+    : public SimpleRequest<DefaultClassAllocatorRequest, Type(ModuleDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  Type evaluate(Evaluator &evaluator, ModuleDecl *module) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
 class ResolveTypeEraserTypeRequest
     : public SimpleRequest<ResolveTypeEraserTypeRequest,
                            Type (ProtocolDecl *, TypeEraserAttr *),

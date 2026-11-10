@@ -381,6 +381,7 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj Class_getSuperclassDecl() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj Class_getDestructor() const;
   BRIDGED_INLINE bool Class_isForeign() const;
+  BRIDGED_INLINE bool Class_hasClassAllocator() const;
   BRIDGED_INLINE bool ProtocolDecl_requiresClass() const;
   BRIDGED_INLINE bool ProtocolDecl_isMarkerProtocol() const;
   BRIDGED_INLINE bool ProtocolDecl_isEligibleForFastCasting() const;
@@ -1446,6 +1447,11 @@ BridgedTransposeAttr BridgedTransposeAttr_createParsed(
     swift::SourceRange range, BridgedNullableTypeRepr cBaseType,
     BridgedDeclNameRef cOriginalName, BridgedDeclNameLoc cOriginalNameLoc,
     BridgedArrayRef cParams);
+
+SWIFT_NAME("BridgedAllocatorAttr.createParsed(_:atLoc:range:typeExpr:)")
+BridgedAllocatorAttr BridgedAllocatorAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, BridgedTypeExpr cTypeExpr);
 
 SWIFT_NAME("BridgedTypeEraserAttr.createParsed(_:atLoc:range:typeExpr:)")
 BridgedTypeEraserAttr BridgedTypeEraserAttr_createParsed(

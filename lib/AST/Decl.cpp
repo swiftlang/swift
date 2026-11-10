@@ -13085,6 +13085,85 @@ const VarDecl *ClassDecl::getUnownedExecutorProperty() const {
   return nullptr;
 }
 
+bool ClassAllocatorSource::isSystemClassAllocator() const {
+  if (!AllocatorType)
+    return false;
+  auto *nominal = AllocatorType->getAnyNominal();
+  return nominal &&
+         nominal == nominal->getASTContext().getSystemClassAllocatorDecl();
+}
+
+ClassAllocatorSource ClassDecl::getAllocatorSource() const {
+  // The nearest declaration wins: the class's own `@allocator`, else the
+  // nearest superclass's, else the module default. An invalid attribute
+  // still counts, with an error type.
+  for (auto *cls = const_cast<ClassDecl *>(this); cls;
+       cls = cls->getSuperclassDecl()) {
+    if (auto *attr = cls->getAttrs().getAttribute<AllocatorAttr>(
+            /*AllowInvalid=*/true)) {
+      ClassAllocatorSource source;
+      source.SourceKind = cls == this ? ClassAllocatorSource::Kind::Declared
+                                      : ClassAllocatorSource::Kind::Inherited;
+      source.AllocatorType = attr->isInvalid() ? ErrorType::get(getASTContext())
+                                               : attr->getResolvedType(cls);
+      source.DeclaringClass = cls;
+      return source;
+    }
+  }
+
+  // `-default-class-allocator` applies to the classes of the module being
+  // compiled. The module records it as an implicit `@allocator` attribute on
+  // each class it applies to.
+  if (auto defaultAllocator = getModuleContext()->getDefaultClassAllocator()) {
+    ClassAllocatorSource source;
+    source.SourceKind = ClassAllocatorSource::Kind::ModuleDefault;
+    source.AllocatorType = defaultAllocator;
+    return source;
+  }
+  return ClassAllocatorSource();
+}
+
+Type ClassDecl::getAllocatorType() const {
+  // Only native Swift classes have class allocators: Objective-C classes are
+  // allocated and freed by the Objective-C runtime, and the remote proxies of
+  // distributed actors by the distributed actor runtime. Sema diagnoses
+  // allocators on them.
+  if (isForeign() || checkAncestry(AncestryFlags::ObjC) || isDistributedActor())
+    return Type();
+  auto source = getAllocatorSource();
+  Type allocatorType = source.AllocatorType;
+  if (!allocatorType || allocatorType->hasError() ||
+      allocatorType->hasTypeParameter() || allocatorType->hasArchetype() ||
+      source.isSystemClassAllocator())
+    return Type();
+  auto *proto = getASTContext().getProtocol(KnownProtocolKind::ClassAllocator);
+  if (!proto || checkConformance(allocatorType, proto).isInvalid())
+    return Type();
+  return allocatorType;
+}
+
+Type ClassDecl::getPackageInterfaceDefaultAllocatorType() const {
+  if (getAllocatorSource().SourceKind !=
+      ClassAllocatorSource::Kind::ModuleDefault)
+    return Type();
+  if (!getFormalAccessScope(/*useDC=*/nullptr,
+                            /*treatUsableFromInlineAsPublic=*/true)
+           .isPackage())
+    return Type();
+  return getAllocatorType();
+}
+
+Type ClassDecl::getDirectlyCallableAllocatorType(ModuleDecl *module) const {
+  Type allocatorType = getAllocatorType();
+  if (!allocatorType)
+    return Type();
+  auto *classModule = getModuleContext();
+  if (classModule == module || !classModule->isResilient() ||
+      bypassResilienceInPackage(module))
+    return allocatorType;
+  return Type();
+}
+
 bool ClassDecl::isRootDefaultActor() const {
   return isRootDefaultActor(getModuleContext(), ResilienceExpansion::Maximal);
 }

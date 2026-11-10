@@ -34,6 +34,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/SIL/ClassAllocatorWitnesses.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
@@ -449,6 +450,59 @@ void IRGenModule::addVTableTypeMetadata(
   auto relptrSize = DataLayout.getTypeAllocSize(Int32Ty).getKnownMinValue();
   setVCallVisibility(var, vis,
                      std::make_pair(minOffset, maxOffset + relptrSize));
+}
+
+/// Store \p table into the value witness table field of \p metadata, class
+/// metadata that the runtime has allocated but not yet published.
+static void emitStoreOfClassValueWitnessTable(IRGenFunction &IGF,
+                                              llvm::Value *metadata,
+                                              llvm::Constant *table) {
+  auto &IGM = IGF.IGM;
+  llvm::Value *slot = IGF.Builder.CreateInBoundsGEP(
+      IGM.WitnessTablePtrTy, metadata,
+      llvm::ConstantInt::getSigned(IGM.Int32Ty, -1));
+  llvm::Value *value = table;
+  if (auto schema = IGM.getOptions().PointerAuth.ValueWitnessTable) {
+    auto authInfo =
+        PointerAuthInfo::emit(IGF, schema, slot, PointerAuthEntity());
+    value = emitPointerAuthSign(IGF, value, authInfo);
+  }
+  IGF.Builder.CreateStore(
+      value, Address(slot, IGM.WitnessTablePtrTy, IGM.getPointerAlignment()));
+}
+
+/// The relocation function of the resilient metadata pattern of \p cls, a
+/// class with resilient ancestry and a class allocator: it calls the
+/// default relocation, swift_relocateClassMetadata, and then installs
+/// \p table, the class's value witness table.
+static llvm::Function *
+getClassMetadataRelocationFunction(IRGenModule &IGM, ClassDecl *cls,
+                                   llvm::Constant *table) {
+  std::string name = "__swift_relocate_class_metadata_";
+  name += LinkEntity::forNominalTypeDescriptor(cls).mangleAsString(IGM.Context);
+  auto *fn = IGM.getOrCreateHelperFunction(
+      name, IGM.TypeMetadataPtrTy,
+      {IGM.TypeContextDescriptorPtrTy, IGM.Int8PtrTy},
+      [&](IRGenFunction &IGF) {
+        auto params = IGF.collectParameters();
+        llvm::Value *descriptor = params.claimNext();
+        llvm::Value *pattern = params.claimNext();
+        // swift_relocateClassMetadata authenticates the descriptor.
+        if (auto schema =
+                IGF.IGM.getOptions().PointerAuth.TypeDescriptorsAsArguments) {
+          auto authInfo = PointerAuthInfo::emit(
+              IGF, schema, nullptr,
+              PointerAuthEntity::Special::TypeDescriptorAsArgument);
+          descriptor = emitPointerAuthSign(IGF, descriptor, authInfo);
+        }
+        llvm::Value *metadata = IGF.Builder.CreateCall(
+            IGF.IGM.getRelocateClassMetadataFunctionPointer(),
+            {descriptor, pattern});
+        emitStoreOfClassValueWitnessTable(IGF, metadata, table);
+        IGF.Builder.CreateRet(metadata);
+      },
+      /*setIsNoInline=*/true);
+  return cast<llvm::Function>(fn);
 }
 
 static void addPaddingAfterGenericParamDescriptors(IRGenModule &IGM,
@@ -4345,6 +4399,15 @@ static ClassFlags getClassFlags(ClassDecl *classDecl) {
   if (attrs.hasAttribute<ObjCRuntimeNameAttr>())
     flags |= ClassFlags::HasCustomObjCName;
 
+  // Classes with an instance allocator, their own or inherited. The flag tells
+  // the runtime that the class's value witness table has the class allocator
+  // witness (see getClassAllocatorValueWitnessTable).
+  if (getClassAllocatorWitnessType(classDecl)) {
+    assert((flags & ClassFlags::UsesSwiftRefcounting) &&
+           "class allocators require Swift reference counting");
+    flags |= ClassFlags::HasClassAllocator;
+  }
+
   return flags;
 }
 
@@ -4417,6 +4480,11 @@ namespace {
       assert(
           !relativeReference &&
           "Cannot get a relative reference to a class' value witness table.");
+      // A class with a class allocator has its own table, with the class
+      // allocator witness, which the runtime keeps when it initializes
+      // singleton metadata.
+      if (auto *table = getClassAllocatorValueWitnessTable(IGM, Target))
+        return ConstantReference(table, ConstantReference::Direct);
       switch (IGM.getClassMetadataStrategy(Target)) {
       case ClassMetadataStrategy::Resilient:
       case ClassMetadataStrategy::Singleton:
@@ -4995,9 +5063,16 @@ namespace {
     }
 
     void addRelocationFunction() {
-      // We don't use this yet, but it's available as a future customization
-      // point.
-      B.addRelativeAddressOrNull(nullptr);
+      // The default relocation installs Builtin.NativeObject's value witness
+      // table. A class with a class allocator has a relocation function that
+      // installs its own.
+      auto *table = getClassAllocatorValueWitnessTable(IGM, Target);
+      if (!table) {
+        B.addRelativeAddressOrNull(nullptr);
+        return;
+      }
+      B.addCompactFunctionReference(
+          getClassMetadataRelocationFunction(IGM, Target, table));
     }
 
     void addLayoutStringPointer() {
@@ -5245,6 +5320,12 @@ namespace {
             IGM.getAllocateGenericClassMetadataFunctionPointer(),
           {descriptor, arguments, templatePointer});
 
+      // The runtime installs Builtin.NativeObject's value witness table. A
+      // class with a class allocator has its own; install it before the
+      // metadata is published.
+      if (auto *table = getClassAllocatorValueWitnessTable(IGM, Target))
+        emitStoreOfClassValueWitnessTable(IGF, metadata, table);
+
       return metadata;
     }
 
@@ -5476,6 +5557,12 @@ namespace {
       flags |= ClassFlags::IsCanonicalStaticSpecialization;
 
       return flags;
+    }
+
+    ConstantReference getValueWitnessTable(bool relativeReference) {
+      if (auto *table = getClassAllocatorValueWitnessTable(IGM, Target))
+        return ConstantReference(table, ConstantReference::Direct);
+      return super::getValueWitnessTable(relativeReference);
     }
 
     bool hasFixedLayout() { return true; }
@@ -7703,6 +7790,7 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::TaskExecutor:
   case KnownProtocolKind::Clock:
   case KnownProtocolKind::ExecutorFactory:
+  case KnownProtocolKind::ClassAllocator:
   case KnownProtocolKind::Sendable:
   case KnownProtocolKind::UnsafeSendable:
   case KnownProtocolKind::RangeReplaceableCollection:

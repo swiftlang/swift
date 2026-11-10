@@ -282,6 +282,40 @@ TargetValueWitnessTable<Runtime>::_asEVWT() const {
   return static_cast<const TargetEnumValueWitnessTable<Runtime> *>(this);
 }
 
+/// The value witness table of a class with a custom instance allocator. It
+/// extends the base table with one class allocator witness, `deallocate`, at
+/// the offset where enum witnesses would be. A class has such a table if and
+/// only if its class flags have ClassFlags::HasClassAllocator; no value
+/// witness flag marks it.
+///
+/// The base table is the same as Builtin.NativeObject's. `deallocate` is never
+/// null and calls the class's ClassAllocator. Its signature is the lowering of
+/// a `ClassAllocator` struct or enum's
+/// `static func deallocate(_:byteCount:alignment:for:)`, whose thin `self` has
+/// no representation, so it may be that method itself.
+template <class Runtime>
+struct TargetClassAllocatorValueWitnessTable
+    : TargetValueWitnessTable<Runtime> {
+  using StoredSize = typename Runtime::StoredSize;
+
+  /// Frees \p allocation, the memory of an instance of class \p type, which
+  /// was obtained from the class's instance allocator with size \p size and
+  /// alignment \p alignment (not the alignment mask).
+  using DeallocateUnsigned = SWIFT_CC(swift) void(
+      TargetPointer<Runtime, void> allocation, StoredSize size,
+      StoredSize alignment,
+      ConstTargetPointer<Runtime, TargetMetadata<Runtime>> type);
+
+  TargetSignedPointer<
+      Runtime,
+      DeallocateUnsigned *
+          __ptrauth_swift_value_witness_function_pointer(
+              SpecialPointerAuthDiscriminators::ClassAllocatorDeallocate)>
+      deallocate;
+};
+using ClassAllocatorValueWitnessTable =
+    TargetClassAllocatorValueWitnessTable<InProcess>;
+
 /// A type layout record. This is the subset of the value witness table that is
 /// necessary to perform dependent layout of generic value types. It excludes
 /// the value witness functions and includes only the size, alignment,

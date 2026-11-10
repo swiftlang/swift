@@ -77,6 +77,16 @@ SWIFT_RUNTIME_EXPORT
 HeapObject *swift_initStackObject(HeapMetadata const *metadata,
                                   HeapObject *object);
 
+/// Initialize an instance of a class with a class allocator in
+/// \p allocation, which compiled code obtained from the class's allocator
+/// with the given size and alignment mask. Copies the class's instance prefix,
+/// if any, and returns the object at the instance address point, in the same
+/// state as an object returned by swift_allocObject.
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+HeapObject *swift_initHeapObject(HeapMetadata const *metadata,
+                                 void *allocation, size_t size,
+                                 size_t alignMask);
+
 /// Initializes the object header of a static object which is statically
 /// allocated in the data section.
 ///
@@ -334,6 +344,16 @@ void swift_deallocClassInstance(HeapObject *object,
                                  size_t allocatedSize,
                                  size_t allocatedAlignMask);
 
+/// Everything swift_deallocClassInstance does for \p object, an instance of a
+/// class with a class allocator, except freeing its memory. Returns the
+/// allocation of the object if the caller must now return it to the class's
+/// allocator, or null if unowned references remain, in which case the last
+/// unowned release frees it. Compiled code calls this from the deallocating
+/// deinit of such classes, and the concurrency runtime calls it to free actors
+/// whose deinit leaves the free to it.
+SWIFT_CC(swift) SWIFT_RUNTIME_EXPORT
+void *swift_deallocClassInstanceBegin(HeapObject *object);
+
 /// Deallocate the given memory after destroying instance variables.
 ///
 /// Destroys instance variables in classes more derived than the given metatype.
@@ -476,6 +496,13 @@ HeapObject *swift_unownedRetain(HeapObject *value);
 /// Decrement the unowned retain count.
 SWIFT_RUNTIME_EXPORT
 void swift_unownedRelease(HeapObject *value);
+
+/// Decrement the unowned retain count of \p value, an instance of a class
+/// with a class allocator, or null. Returns the allocation of the object if
+/// that was its last unowned reference and the caller must now return the
+/// memory to the class's allocator, and null otherwise.
+SWIFT_RUNTIME_EXPORT
+void *swift_unownedReleaseBegin(HeapObject *value);
 
 /// Increment the unowned retain count.
 SWIFT_RUNTIME_EXPORT

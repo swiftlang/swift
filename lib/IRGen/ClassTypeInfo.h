@@ -18,6 +18,9 @@
 #define SWIFT_IRGEN_CLASSTYPEINFO_H
 
 #include "ClassLayout.h"
+#include "Explosion.h"
+#include "GenClass.h"
+#include "GenType.h"
 #include "HeapTypeInfo.h"
 
 #include "swift/AST/ASTContext.h"
@@ -103,6 +106,28 @@ public:
     }
 
     HeapTypeInfo::emitScalarRelease(IGF, value, atomicity);
+  }
+
+  /// The last release of an `unowned` reference to an instance of a class
+  /// whose possible classes all have the same class allocator (see
+  /// isClassAllocatedOnUnownedRelease) frees the instance through the
+  /// allocator.
+  const TypeInfo *createUnownedStorageType(TypeConverter &TC,
+                                           bool isOptional) const override {
+    if (getReferenceCounting() == ReferenceCounting::Native &&
+        isClassAllocatedOnUnownedRelease(TC.IGM, getClass()))
+      return TC.createClassAllocatedUnownedStorageType(getStorageType(),
+                                                       isOptional, getClass());
+    return HeapTypeInfo::createUnownedStorageType(TC, isOptional);
+  }
+
+  void unownedRelease(IRGenFunction &IGF, Explosion &e,
+                      Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Native &&
+        isClassAllocatedOnUnownedRelease(IGF.IGM, getClass()))
+      return emitClassAllocatedUnownedRelease(IGF, e.claimNext(), getClass(),
+                                              atomicity);
+    HeapTypeInfo::unownedRelease(IGF, e, atomicity);
   }
 
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,

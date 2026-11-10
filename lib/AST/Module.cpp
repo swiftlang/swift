@@ -961,6 +961,14 @@ ModuleDecl *ModuleDecl::getTopLevelModule(bool overlay) {
   return this;
 }
 
+Type ModuleDecl::getDefaultClassAllocator() const {
+  if (!isMainModule() || getASTContext().LangOpts.DefaultClassAllocator.empty())
+    return Type();
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      DefaultClassAllocatorRequest{const_cast<ModuleDecl *>(this)}, Type());
+}
+
 bool ModuleDecl::isSubmoduleOf(const ModuleDecl *M) const {
   // Swift modules don't currently support submodules.
   if (!isNonSwiftModule())

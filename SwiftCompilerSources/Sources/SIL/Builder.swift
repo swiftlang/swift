@@ -292,6 +292,12 @@ public struct Builder {
     return notifyNew(dr.getAs(DeallocStackRefInst.self))
   }
 
+  @discardableResult
+  public func createDeallocRef(_ operand: Value) -> DeallocRefInst {
+    let dr = bridged.createDeallocRef(operand.bridged)
+    return notifyNew(dr.getAs(DeallocRefInst.self))
+  }
+
   public func createAddressToPointer(address: Value, pointerType: Type,
                                      needStackProtection: Bool) -> AddressToPointerInst {
     let dr = bridged.createAddressToPointer(address.bridged, pointerType.bridged, needStackProtection)

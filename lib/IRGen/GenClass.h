@@ -48,7 +48,8 @@ namespace irgen {
   class Size;
   class StructLayout;
   class TypeInfo;
-  
+
+  enum class Atomicity : bool;
   enum class ClassDeallocationKind : unsigned char;
   enum class FieldAccess : uint8_t;
 
@@ -204,6 +205,25 @@ namespace irgen {
   emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                              ClassDecl *theClass,
                                              llvm::Value *metadata);
+
+  /// The size and alignment mask of instances of \p selfType (without tail
+  /// elements): the values that `alloc_ref` passes to swift_allocObject.
+  /// Backs Builtin.classInstanceSize and Builtin.classInstanceAlignMask.
+  std::pair<llvm::Value *, llvm::Value *>
+  emitClassInstanceSizeAndAlignMask(IRGenFunction &IGF, SILType selfType);
+
+  /// Whether the last release of an `unowned` reference to an instance of
+  /// \p cls frees the instance in compiled code, through the class's
+  /// allocator: \p cls has an instance allocator, and is final or, in a
+  /// whole-module compilation, is a class of this module that can't be
+  /// subclassed outside it and whose subclasses all have the same allocator.
+  bool isClassAllocatedOnUnownedRelease(IRGenModule &IGM, ClassDecl *cls);
+
+  /// Release an `unowned` reference to \p object, an instance of \p cls or
+  /// of a subclass, for which isClassAllocatedOnUnownedRelease is true; if it
+  /// was the last one, free the object through the class's allocator.
+  void emitClassAllocatedUnownedRelease(IRGenFunction &IGF, llvm::Value *object,
+                                        ClassDecl *cls, Atomicity atomicity);
 
   /// For VFE, returns a type identifier for the given base method on a class.
   llvm::MDString *typeIdForMethod(IRGenModule &IGM, SILDeclRef method);

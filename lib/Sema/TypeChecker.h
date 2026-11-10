@@ -524,6 +524,38 @@ void checkCircularOpaqueReturnTypeDecl(OpaqueTypeDecl *opaqueDecl);
 void addImplicitDynamicAttribute(Decl *D);
 void checkDeclAttributes(Decl *D);
 void checkDeclABIAttribute(Decl *apiDecl, ABIAttr *abiAttr);
+
+/// If \p cls can't have a class allocator, the reason, as an index into the
+/// reason %select of diag::allocator_not_allowed.
+std::optional<unsigned> getClassAllocatorIneligibility(const ClassDecl *cls);
+
+/// How \p cls is visible to clients, as an index into the access %select of
+/// diag::allocator_not_allowed.
+unsigned getClassAllocatorVisibilityKind(const ClassDecl *cls);
+
+/// Whether \p cls is visible to other modules of its package, but not
+/// outside it: its effective visibility, counting `@usableFromInline` as
+/// public, is `package`.
+bool isClassVisibleOnlyInPackage(const ClassDecl *cls);
+
+/// If clients of \p cls, a public or package class, can't see
+/// \p allocatorType, its allocator, the type declaration they can't see.
+/// Otherwise null.
+const NominalTypeDecl *getUnexportedClassAllocatorType(const ClassDecl *cls,
+                                                       Type allocatorType);
+
+/// Diagnose an allocator that \p cls inherits or gets from
+/// `-default-class-allocator` but can't have. (An `@allocator` attribute is
+/// checked with the class's other attributes.)
+void checkClassAllocator(ClassDecl *cls);
+
+/// Diagnose `-default-class-allocator` for \p module.
+void checkDefaultClassAllocatorFlag(ModuleDecl *module);
+
+/// Under strict memory safety, diagnose a conformance to `ClassAllocator`
+/// that isn't written `@unsafe`.
+void checkClassAllocatorConformanceSafety(
+    NormalProtocolConformance *conformance);
 void checkClosureAttributes(ClosureExpr *closure);
 void checkParameterList(ParameterList *params, DeclContext *owner);
 void checkYieldList(YieldList *yields, AbstractFunctionDecl *AFD);

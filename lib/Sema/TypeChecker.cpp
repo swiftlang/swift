@@ -294,6 +294,10 @@ TypeCheckPrimaryFileRequest::evaluate(Evaluator &eval, SourceFile *SF) const {
     // checking.
     (void)AvailabilityScope::getOrBuildForSourceFile(*SF);
 
+    // Diagnose the module's -default-class-allocator, before any code is
+    // generated for its classes.
+    TypeChecker::checkDefaultClassAllocatorFlag(SF->getParentModule());
+
     // Type check the top-level elements of the source file. The DeclChecker
     // handles auxiliary decls.
     for (auto D : SF->getTopLevelDecls()) {

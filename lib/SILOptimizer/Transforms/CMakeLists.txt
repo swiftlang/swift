@@ -11,6 +11,8 @@ target_sources(swiftSILOptimizer PRIVATE
   DeadCodeElimination.cpp
   DeadObjectElimination.cpp
   Devirtualizer.cpp
+  ClassAllocatorWitnesses.cpp
+  DirectClassAlloc.cpp
   DifferentiabilityWitnessDevirtualizer.cpp
   EagerSpecializer.cpp
   GenericSpecializer.cpp

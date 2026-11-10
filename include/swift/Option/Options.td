@@ -1101,6 +1101,13 @@ def default_isolation_EQ :  Joined<["-"], "default-isolation=">,
   Flags<[FrontendOption]>,
   Alias<default_isolation>;
 
+def default_class_allocator : Separate<["-"], "default-class-allocator">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Allocate the instances of the module's classes with the given "
+           "class allocator, unless a class or a superclass declares one "
+           "with '@allocator'">,
+  MetaVarName<"<Module.Type>">;
+
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,

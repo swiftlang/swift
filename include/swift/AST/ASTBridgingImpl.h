@@ -287,6 +287,10 @@ bool BridgedDeclObj::Class_isForeign() const {
   return getAs<swift::ClassDecl>()->isForeign();
 }
 
+bool BridgedDeclObj::Class_hasClassAllocator() const {
+  return bool(getAs<swift::ClassDecl>()->getAllocatorType());
+}
+
 bool BridgedDeclObj::ProtocolDecl_requiresClass() const {
   return getAs<swift::ProtocolDecl>()->requiresClass();
 }

@@ -27,6 +27,7 @@ namespace llvm {
 
 namespace swift {
   class CanType;
+  class ClassDecl;
 
 namespace irgen {
   class ConstantStructBuilder;
@@ -49,6 +50,15 @@ namespace irgen {
 
   SILType getLoweredTypeInPrimaryContext(IRGenModule &IGM,
                                          NominalTypeDecl *type);
+
+  /// The value witness table, with the class allocator witness (see
+  /// TargetClassAllocatorValueWitnessTable), of \p cls, a class with a class
+  /// allocator whose metadata this module emits; or null if \p cls has no
+  /// class allocator, and its value witness table is Builtin.NativeObject's
+  /// or Builtin.UnknownObject's. Classes with the same allocator share a
+  /// table, which each image has one copy of.
+  llvm::Constant *getClassAllocatorValueWitnessTable(IRGenModule &IGM,
+                                                     ClassDecl *cls);
 
   bool layoutStringsEnabled(IRGenModule &IGM, bool diagnose = false);
 }

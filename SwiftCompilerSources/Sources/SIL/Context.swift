@@ -50,6 +50,12 @@ extension Context {
     _bridged.lookUpNominalDeinitFunction(ofNominal.bridged).function
   }
 
+  /// Looks up the destroying destructor that `deallocator`, the deallocating
+  /// destructor of a class, calls.
+  public func lookupDestroyingDestructor(of deallocator: Function) -> Function? {
+    _bridged.lookUpDestroyingDestructor(deallocator.bridged).function
+  }
+
   /// Looks up the specialized deinit for a concrete type, if one was created.
   public func lookupSpecializedDeinit(ofType type: Type) -> Function? {
     _bridged.lookUpSpecializedDeinitFunction(type.bridged).function

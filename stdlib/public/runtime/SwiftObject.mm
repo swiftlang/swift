@@ -30,6 +30,7 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/ClassAllocator.h"
 #include "swift/Runtime/CustomRRABI.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
@@ -200,9 +201,14 @@ static SwiftObject *_allocHelper(Class cls) {
 #else
   const size_t mask = 16 - 1;
 #endif
-  return reinterpret_cast<SwiftObject *>(swift::swift_allocObject(
-    reinterpret_cast<HeapMetadata const *>(cls),
-    class_getInstanceSize(cls), mask));
+  auto metadata = reinterpret_cast<HeapMetadata const *>(cls);
+  // Instances of classes with a class allocator are only allocated by
+  // compiled code, through the class's allocator.
+  if (SWIFT_UNLIKELY(class_allocator::hasInstanceAllocator(metadata)))
+    class_allocator::fatalAllocationWithoutClassAllocator(metadata,
+                                                          "+allocWithZone:");
+  return reinterpret_cast<SwiftObject *>(
+      swift::swift_allocObject(metadata, class_getInstanceSize(cls), mask));
 }
 
 SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API

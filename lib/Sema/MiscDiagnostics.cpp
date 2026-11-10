@@ -162,6 +162,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
 
+        checkManagedBufferPointerBufferClass(Call);
+
         // Check the callee, looking through implicit conversions.
         auto base = Call->getFn();
         unsigned uncurryLevel = 0;
@@ -639,6 +641,45 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     /// We have a collection literal with a defaulted type, e.g. of [Any].  Emit
     /// an error if it was inferred to this type in an invalid context, which is
     /// one in which the parent expression is not itself a collection literal.
+    /// Diagnose `ManagedBufferPointer(bufferClass: C.self, ...)` where `C`
+    /// has a class allocator, which would free a buffer that the system
+    /// allocator allocated. (The runtime traps if the class isn't statically
+    /// known.)
+    void checkManagedBufferPointerBufferClass(ApplyExpr *call) {
+      auto *init = dyn_cast_or_null<ConstructorDecl>(
+          call->getCalledValue(/*skipFunctionConversions=*/true));
+      if (!init)
+        return;
+      auto *managedBufferPointer = Ctx.getManagedBufferPointerDecl();
+      if (!managedBufferPointer ||
+          init->getDeclContext()->getSelfNominalTypeDecl() !=
+              managedBufferPointer)
+        return;
+      auto *args = call->getArgs();
+      if (!args)
+        return;
+      for (auto arg : *args) {
+        if (arg.getLabel() != Ctx.getIdentifier("bufferClass"))
+          continue;
+        Expr *bufferClass = arg.getExpr()->getSemanticsProvidingExpr();
+        while (auto *conversion = dyn_cast<ImplicitConversionExpr>(bufferClass))
+          bufferClass = conversion->getSubExpr()->getSemanticsProvidingExpr();
+        // Only a statically known class, such as `C.self`.
+        if (!isa<DotSelfExpr>(bufferClass) && !isa<TypeExpr>(bufferClass))
+          return;
+        auto metatype = bufferClass->getType()->getAs<MetatypeType>();
+        if (!metatype)
+          return;
+        Type instanceType = metatype->getInstanceType();
+        auto *cls = dyn_cast_or_null<ClassDecl>(instanceType->getAnyNominal());
+        if (cls && cls->getAllocatorType())
+          Ctx.Diags.diagnose(bufferClass->getLoc(),
+                             diag::managed_buffer_pointer_class_with_allocator,
+                             instanceType);
+        return;
+      }
+    }
+
     void checkTypeDefaultedCollectionExpr(CollectionExpr *c) {
       // If the parent is a non-expression, or is not itself a literal, then
       // produce an error with a fixit to add the type as an explicit

@@ -22,12 +22,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/ClassAllocatorWitnesses.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SIL/TypeLowering.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -1584,6 +1588,58 @@ ConstantReference irgen::emitValueWitnessTable(IRGenModule &IGM,
 
   return {llvm::ConstantExpr::getBitCast(global, IGM.WitnessTablePtrTy),
           ConstantReference::Direct};
+}
+
+llvm::Constant *irgen::getClassAllocatorValueWitnessTable(IRGenModule &IGM,
+                                                          ClassDecl *cls) {
+  CanType allocatorType = getClassAllocatorWitnessType(cls);
+  if (!allocatorType)
+    return nullptr;
+
+  std::string name = "__swift_class_allocator_value_witnesses_";
+  name +=
+      Mangle::ASTMangler(IGM.Context).mangleTypeWithoutPrefix(allocatorType);
+  if (auto *existing = IGM.Module.getNamedGlobal(name))
+    return existing;
+
+  // The witness is the allocator's own `deallocate` method, if its lowering
+  // is the witness's, and otherwise a function that the
+  // ClassAllocatorWitnesses SIL pass creates; the pass makes sure that this
+  // module has either. The class's metadata has ClassFlags::HasClassAllocator,
+  // which tells the runtime that its value witness table has the witness, so
+  // the table can't be omitted.
+  auto *deallocateFn =
+      lookUpClassAllocatorDeallocateEntry(IGM.getSILModule(), allocatorType);
+  if (!deallocateFn)
+    ABORT([&](auto &out) {
+      out << "missing class allocator witness for class " << cls->getName()
+          << " with allocator " << allocatorType;
+    });
+  llvm::Constant *deallocate =
+      IGM.getAddrOfSILFunction(deallocateFn, NotForDefinition);
+
+  ConstantInitBuilder builder(IGM);
+  auto witnesses = builder.beginStruct();
+
+  // The table begins like Builtin.NativeObject's.
+  CanType nativeObjectType = IGM.Context.TheNativeObjectType;
+  SILType loweredType = IGM.getLoweredType(nativeObjectType);
+  auto &ti = IGM.getTypeInfo(loweredType);
+  FixedPacking packing = ti.getFixedPacking(IGM);
+  for (unsigned i = 0; i != NumRequiredValueWitnesses; ++i)
+    addValueWitness(IGM, witnesses, ValueWitness(i), packing, nativeObjectType,
+                    loweredType, ti);
+
+  // Then comes the class allocator witness.
+  witnesses.addSignedPointer(
+      deallocate, IGM.getOptions().PointerAuth.ValueWitnesses,
+      PointerAuthEntity::Special::ClassAllocatorDeallocate);
+
+  auto *global = witnesses.finishAndCreateGlobal(
+      name, IGM.getPointerAlignment(), /*constant=*/true,
+      llvm::GlobalValue::LinkOnceODRLinkage);
+  ApplyIRLinkage(IRLinkage::InternalLinkOnceODR).to(global);
+  return global;
 }
 
 llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,

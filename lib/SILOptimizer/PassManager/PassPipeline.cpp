@@ -257,6 +257,10 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
     P.addEmbeddedExportedPrespecializations();
   }
 
+  // Create the class allocator witnesses that IRGen-emitted value witness
+  // tables reference, before they are optimized with the rest of the module.
+  P.addClassAllocatorWitnesses();
+
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
   P.addInitializeStaticGlobals();
@@ -814,6 +818,11 @@ static void addClosureSpecializePassPipeline(SILPassPipelinePlan &P) {
   P.addComputeEscapeEffects();
   P.addComputeSideEffects();
 
+  // Create the class allocator witnesses that IRGen calls for stack-promoted
+  // instances of classes with class allocators that it can't put on the
+  // stack, so that the low-level pipeline optimizes them.
+  P.addClassAllocatorWitnesses();
+
   // We do this late since it is a pass like the inline caches that we only want
   // to run once very late. Make sure to run at least one round of the ARC
   // optimizer after this.
@@ -836,6 +845,12 @@ static void addLowLevelPassPipeline(SILPassPipelinePlan &P) {
   P.addDeadStoreElimination();
 
   P.startPipeline("LowLevel,Function", true /*isFunctionPassPipeline*/);
+
+  // Call the allocators of classes with class allocators directly. After
+  // dead object elimination, so that allocations of objects that don't escape
+  // may be removed, and after ownership elimination; this pipeline then
+  // specializes and inlines the stdlib helpers it calls.
+  P.addDirectClassAlloc();
 
   // Should be after FunctionSignatureOpts and before the last inliner.
   P.addClassDestroyDevirtualizer(); // currently a no-op in non-OSSA
@@ -956,7 +971,13 @@ SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   P.addThunkLowering();
   P.addLowerHopToActor(); // FIXME: earlier for more opportunities?
   P.addKillInvalidDebugValues();
+  // For SIL that didn't go through the mandatory pipeline, and for
+  // stack-promoted allocations.
+  P.addClassAllocatorWitnesses();
   P.addOwnershipModelEliminator();
+  // Classes with class allocators are allocated and freed by calling their
+  // allocators directly, at every optimization level.
+  P.addDirectClassAlloc();
   P.addAlwaysEmitConformanceMetadataPreservation();
   P.addIRGenPrepare();
 

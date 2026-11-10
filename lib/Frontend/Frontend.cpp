@@ -1471,6 +1471,15 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
                                            : ImportOptions());
   }
 
+  // -default-class-allocator names `Module.Type`, resolved as if `Module`
+  // were imported into every file.
+  auto [allocatorModule, allocatorTypeName] =
+      StringRef(Invocation.getLangOptions().DefaultClassAllocator).split('.');
+  if (!allocatorTypeName.empty() && Lexer::isIdentifier(allocatorModule) &&
+      allocatorModule != Invocation.getModuleName() &&
+      allocatorModule != STDLIB_NAME)
+    pushImport(allocatorModule);
+
   if (Invocation.shouldImportSwiftONoneSupport()) {
     pushImport(SWIFT_ONONE_SUPPORT);
   }

@@ -2947,6 +2947,10 @@ BridgedInstruction BridgedBuilder::createDeallocStackRef(BridgedValue operand) c
       unbridged().createDeallocStackRef(regularLoc(), operand.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createDeallocRef(BridgedValue operand) const {
+  return {unbridged().createDeallocRef(regularLoc(), operand.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createDeallocPack(BridgedValue operand) const {
   return {unbridged().createDeallocPack(regularLoc(), operand.getSILValue())};
 }

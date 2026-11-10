@@ -948,6 +948,20 @@ OptionalBridgedFunction BridgedContext::lookUpNominalDeinitFunction(BridgedDeclO
   return {context->getModule()->lookUpMoveOnlyDeinitFunction(nominal.getAs<swift::NominalTypeDecl>())};
 }
 
+OptionalBridgedFunction
+BridgedContext::lookUpDestroyingDestructor(BridgedFunction deallocator) const {
+  swift::SILDeclRef declRef = deallocator.getFunction()->getDeclRef();
+  if (!declRef || declRef.kind != swift::SILDeclRef::Kind::Deallocator)
+    return {nullptr};
+  swift::SILDeclRef destroyer(declRef.getDecl(),
+                              swift::SILDeclRef::Kind::Destroyer);
+  swift::SILModule *module = context->getModule();
+  if (swift::SILFunction *fn = module->lookUpFunction(destroyer))
+    return {fn};
+  return {module->loadFunction(destroyer.mangle(),
+                               swift::SILModule::LinkingMode::LinkNormal)};
+}
+
 OptionalBridgedFunction BridgedContext::
 lookUpSpecializedDeinitFunction(BridgedType nominalType) const {
   auto *deinit =

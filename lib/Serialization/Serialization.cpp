@@ -3526,6 +3526,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::Allocator: {
+      auto attr = cast<AllocatorAttr>(DA);
+      auto allocatorType = attr->getResolvedType(cast<ClassDecl>(D));
+      assert(allocatorType && "Failed to resolve allocator type!");
+      writeClassAllocator(allocatorType, attr->isImplicit());
+      return;
+    }
+
     case DeclAttrKind::Custom: {
       auto abbrCode = S.DeclTypeAbbrCodes[CustomDeclAttrLayout::Code];
       auto theAttr = cast<CustomAttr>(DA);
@@ -4433,6 +4441,14 @@ public:
     for (auto Attr : D->getSemanticAttrs())
       writeDeclAttribute(D, Attr);
 
+    // Record the allocator that a class gets from `-default-class-allocator`
+    // as an implicit attribute: client subclasses inherit it and call it.
+    if (auto *cls = dyn_cast<ClassDecl>(D)) {
+      auto source = cls->getAllocatorSource();
+      if (source.SourceKind == ClassAllocatorSource::Kind::ModuleDefault)
+        writeClassAllocator(source.AllocatorType, /*isImplicit=*/true);
+    }
+
     if (auto *value = dyn_cast<ValueDecl>(D))
       writeDiscriminatorsIfNeeded(value);
 
@@ -4441,6 +4457,14 @@ public:
     }
 
     DeclVisitor<DeclSerializer>::visit(const_cast<Decl *>(D));
+  }
+
+  void writeClassAllocator(Type allocatorType, bool isImplicit) {
+    using namespace decls_block;
+    auto abbrCode = S.DeclTypeAbbrCodes[AllocatorDeclAttrLayout::Code];
+    AllocatorDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                        isImplicit,
+                                        S.addTypeRef(allocatorType));
   }
 
   void writeDeclErrorFlag() {

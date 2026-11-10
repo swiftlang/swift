@@ -152,23 +152,29 @@ namespace {
     : public SingleScalarTypeInfo<Nativeness##Name##ReferenceTypeInfo, \
                                   LoadableTypeInfo> { \
     llvm::PointerIntPair<llvm::Type*, 1, bool> ValueTypeAndIsOptional; \
+    /* For references to instances of a class whose last unowned release */ \
+    /* frees them through the class's allocator, the class. */ \
+    ClassDecl *ClassAllocatedReferent; \
   public: \
     Nativeness##Name##ReferenceTypeInfo(llvm::Type *valueType, \
                                               llvm::Type *type, \
                                               Size size, Alignment alignment, \
                                               SpareBitVector &&spareBits, \
-                                              bool isOptional) \
+                                              bool isOptional, \
+                                              ClassDecl *classAllocatedReferent \
+                                                = nullptr) \
       : SingleScalarTypeInfo(type, size, std::move(spareBits), \
                              alignment, IsNotTriviallyDestroyable, \
                              IsCopyable, \
                              IsFixedSize, IsABIAccessible), \
-        ValueTypeAndIsOptional(valueType, isOptional) {} \
+        ValueTypeAndIsOptional(valueType, isOptional), \
+        ClassAllocatedReferent(classAllocatedReferent) {} \
     enum { IsScalarTriviallyDestroyable = false }; \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
                           SILType T, \
                           bool useStructLayouts) const override { \
-      if (!useStructLayouts) { \
+      if (!useStructLayouts || ClassAllocatedReferent) { \
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T); \
       } \
       return IGM.typeLayoutCache.getOrCreateScalarEntry( \
@@ -186,6 +192,10 @@ namespace {
     } \
     void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value, \
                            Atomicity atomicity) const { \
+      if (ClassAllocatedReferent) \
+        return emitClassAllocatedUnownedRelease(IGF, value, \
+                                                ClassAllocatedReferent, \
+                                                atomicity); \
       IGF.emit##Nativeness##Name##Release(value, atomicity); \
     } \
     void emitScalarFixLifetime(IRGenFunction &IGF, llvm::Value *value) const { \
@@ -1109,6 +1119,15 @@ void IRGenFunction::storeReferenceStorageExtraInhabitant(llvm::Value *index,
   SOMETIMES_UNKNOWN(Unowned)
 #undef SOMETIMES_UNKNOWN
 #undef ALWAYS_NATIVE
+
+const TypeInfo *TypeConverter::createClassAllocatedUnownedStorageType(
+    llvm::Type *valueType, bool isOptional, ClassDecl *referent) {
+  auto &&spareBits = IGM.getReferenceStorageSpareBits(
+      ReferenceOwnership::Unowned, ReferenceCounting::Native);
+  return new NativeUnownedReferenceTypeInfo(
+      valueType, IGM.UnownedReferenceStructTy, IGM.getPointerSize(),
+      IGM.getPointerAlignment(), std::move(spareBits), isOptional, referent);
+}
 
 #define CHECKED_REF_STORAGE(Name, ...) \
   static_assert(&TypeConverter::create##Name##StorageType != nullptr, \

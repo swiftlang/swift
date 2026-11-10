@@ -719,6 +719,11 @@ namespace swift {
     /// Defines the default actor isolation.
     DefaultIsolation DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
 
+    /// The fully qualified name (`Module.Type`) of the class allocator that
+    /// classes of the module use unless they or a superclass declare one with
+    /// `@allocator` (`-default-class-allocator`), or empty.
+    std::string DefaultClassAllocator;
+
     /// Whether to enable generation of safe wrappers and parsing of bounds
     /// attributes (default enabled) or not.
     bool DisableSafeInteropWrappers = false;

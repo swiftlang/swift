@@ -703,6 +703,35 @@ FUNCTION(ErrorStrongRelease, Swift, swift_errorRelease,
   LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, Native, ) \
   LOADABLE_CHECKED_REF_STORAGE_HELPER(Name, name, NonAtomicNative, nonatomic_)
 #include "swift/AST/ReferenceStorage.def"
+
+// void *swift_unownedReleaseBegin(void *ptr);
+FUNCTION(NativeUnownedReleaseBegin, Swift, swift_unownedReleaseBegin,
+         C_CC, ClassAllocatorsAvailability,
+         RETURNS(Int8PtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
+// HeapObject *swift_initHeapObject(HeapMetadata const *metadata,
+//                                  void *allocation, size_t size,
+//                                  size_t alignMask);
+FUNCTION(InitHeapObject, Swift, swift_initHeapObject,
+         SwiftCC, ClassAllocatorsAvailability,
+         RETURNS(RefCountedPtrTy),
+         ARGS(TypeMetadataPtrTy, Int8PtrTy, SizeTy, SizeTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::NoEffect),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_deallocClassInstanceBegin(HeapObject *object);
+FUNCTION(DeallocClassInstanceBegin, Swift, swift_deallocClassInstanceBegin,
+         SwiftCC, ClassAllocatorsAvailability,
+         RETURNS(Int8PtrTy),
+         ARGS(RefCountedPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RuntimeEffect::Deallocating),
+         UNKNOWN_MEMEFFECTS)
 #undef NEVER_LOADABLE_CHECKED_REF_STORAGE_HELPER
 #undef LOADABLE_CHECKED_REF_STORAGE_HELPER
 

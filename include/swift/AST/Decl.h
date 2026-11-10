@@ -5431,6 +5431,33 @@ enum class AncestryFlags : uint8_t {
 /// kinds of superclasses that a class may have.
 using AncestryOptions = OptionSet<AncestryFlags>;
 
+/// Where a class gets its allocator; see ClassDecl::getAllocatorSource().
+struct ClassAllocatorSource {
+  enum class Kind : uint8_t {
+    /// No `@allocator` in the class's superclass chain, and no
+    /// `-default-class-allocator`: the class uses the system allocator.
+    None,
+    /// The class's own `@allocator` attribute.
+    Declared,
+    /// The `@allocator` attribute of a superclass.
+    Inherited,
+    /// `-default-class-allocator`.
+    ModuleDefault,
+  };
+
+  Kind SourceKind = Kind::None;
+
+  /// The allocator type, or null for Kind::None. It may be an ErrorType.
+  Type AllocatorType;
+
+  /// The class with the `@allocator` attribute, for Kind::Declared and
+  /// Kind::Inherited.
+  ClassDecl *DeclaringClass = nullptr;
+
+  /// Whether the allocator is `SystemClassAllocator`.
+  bool isSystemClassAllocator() const;
+};
+
 /// ClassDecl - This is the declaration of a class, for example:
 ///
 ///    class Complex { var R : Double, I : Double }
@@ -5588,6 +5615,43 @@ public:
     return getForeignClassKind() != ForeignKind::Normal ||
       const_cast<ClassDecl *>(this)->isForeignReferenceType();
   }
+
+  /// Where the allocator of instances of this class comes from: the nearest
+  /// `@allocator` attribute in its superclass chain, starting with the class
+  /// itself, or else `-default-class-allocator` if the class is in the module
+  /// being compiled. The allocator type may be `SystemClassAllocator`, which
+  /// means "no class allocator", and isn't checked.
+  ClassAllocatorSource getAllocatorSource() const;
+
+  /// The custom instance allocator, a `ClassAllocator` type, that allocates
+  /// and frees instances of this class (see getAllocatorSource()), or a null
+  /// type if instances use the system allocator. That's the case if the
+  /// nearest declaration is `@allocator(SystemClassAllocator)`, if there is
+  /// none, if the allocator type is invalid, and for classes that can't have
+  /// a class allocator: foreign classes, classes with Objective-C ancestry and
+  /// distributed actors.
+  Type getAllocatorType() const;
+
+  /// The allocator of this class (getAllocatorType()) if code compiled in
+  /// \p module may call it directly for instances whose class is statically
+  /// known to be this class, or else a null type. That's the case if the
+  /// class is in \p module, or in a module built without library evolution,
+  /// or in one of the same package that \p module accesses without
+  /// resilience (bypassResilienceInPackage), because those are built
+  /// together. Otherwise, the class's module may change its allocator without
+  /// \p module being recompiled, so \p module leaves the free to the runtime,
+  /// which finds the allocator in the instance's metadata. (It can't allocate
+  /// such a class's instances: only the class's module can.)
+  Type getDirectlyCallableAllocatorType(ModuleDecl *module) const;
+
+  /// The allocator that a package interface prints as `@allocator` on this
+  /// class although the class doesn't declare one, or a null type: the
+  /// allocator from `-default-class-allocator` of a class visible only in its
+  /// package. Module interfaces don't record the flag, so a module built from
+  /// the package interface would otherwise lose it. (An inherited allocator
+  /// is printed on the superclass that declares it, or comes from the same
+  /// imported module.)
+  Type getPackageInterfaceDefaultAllocatorType() const;
 
   /// Whether the class is (known to be) a default actor.
   bool isDefaultActor() const;

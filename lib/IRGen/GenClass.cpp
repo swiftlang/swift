@@ -32,9 +32,11 @@
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/ClassAllocatorWitnesses.h"
 #include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
+#include "swift/SIL/SILVTable.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
@@ -881,6 +883,229 @@ irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
   return {size, alignMask};
 }
 
+std::pair<llvm::Value *, llvm::Value *>
+irgen::emitClassInstanceSizeAndAlignMask(IRGenFunction &IGF, SILType selfType) {
+  auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
+  auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
+                                             /*forBackwardDeployment=*/false);
+  if (classLayout.isFixedSize())
+    return {IGF.IGM.getSize(classLayout.getSize()),
+            IGF.IGM.getSize(classLayout.getAlignMask())};
+  llvm::Value *metadata = emitClassHeapMetadataRef(
+      IGF, selfType.getASTType(), MetadataValueType::TypeMetadata,
+      MetadataState::Complete);
+  return emitClassResilientInstanceSizeAndAlignMask(
+      IGF, selfType.getClassDecl(), metadata);
+}
+
+/// Whether \p a and \p b are the same class allocator type, or both no
+/// class allocator.
+static bool isSameClassAllocator(Type a, Type b) {
+  if (!a || !b)
+    return !a && !b;
+  return a->getCanonicalType() == b->getCanonicalType();
+}
+
+/// Whether every possible class of an instance of \p cls, a non-final class
+/// with a class allocator, is known to use the same allocator as \p cls: in a
+/// whole-module compilation, \p cls is a class of this module that can't be
+/// subclassed outside it, and each of its subclasses in the module has the
+/// same allocator.
+static bool hasUniformClassAllocator(IRGenModule &IGM, ClassDecl *cls) {
+  SILModule &silModule = IGM.getSILModule();
+  if (!silModule.isWholeModule())
+    return false;
+  ModuleDecl *module = silModule.getSwiftModule();
+  if (cls->getModuleContext() != module)
+    return false;
+
+  // Only classes whose effective access is `open` can be subclassed outside
+  // the module. That includes internal and public classes with
+  // -enable-testing and every class with -enable-private-imports, because
+  // importers can subclass them. So can an `open` class nested in a package
+  // type, whose effective access is only `package`, by the other modules of
+  // the package. (Devirtualization, isKnownFinalClass, doesn't account for
+  // that case. With library evolution, such a class can't have an allocator.)
+  if (cls->getEffectiveAccess() == AccessLevel::Open ||
+      cls->getFormalAccess() == AccessLevel::Open)
+    return false;
+
+  // As in ClassHierarchyAnalysis, the classes of the module are those with a
+  // SIL vtable; SILGen emits one for every native class, including generic,
+  // nested, local and private ones.
+  auto &mixed = IGM.IRGen.ClassesWithDifferentlyAllocatedSubclasses;
+  if (!mixed) {
+    mixed.emplace();
+    for (SILVTable *vtable : silModule.getVTables()) {
+      ClassDecl *subclass = vtable->getClass();
+      if (subclass->getModuleContext() != module)
+        continue;
+      Type allocator = subclass->getAllocatorType();
+      for (ClassDecl *ancestor = subclass->getSuperclassDecl(); ancestor;
+           ancestor = ancestor->getSuperclassDecl()) {
+        if (ancestor->getModuleContext() != module)
+          continue;
+        if (Type ancestorAllocator = ancestor->getAllocatorType())
+          if (!isSameClassAllocator(allocator, ancestorAllocator))
+            mixed->insert(ancestor);
+      }
+    }
+  }
+  return !mixed->count(cls);
+}
+
+bool irgen::isClassAllocatedOnUnownedRelease(IRGenModule &IGM,
+                                             ClassDecl *cls) {
+  // A class of a module built with library evolution that this module
+  // accesses resiliently may have another allocator at run time: the runtime
+  // frees its instances.
+  if (!cls || !cls->getDirectlyCallableAllocatorType(IGM.getSwiftModule()))
+    return false;
+  // The class of the instance must be statically known to use the
+  // allocator: the class is final, or every class that can be the
+  // instance's uses the same allocator.
+  return cls->isSemanticallyFinal() || hasUniformClassAllocator(IGM, cls);
+}
+
+/// Return \p allocation, the memory of an instance of \p cls or of a subclass
+/// with the same allocator, whose class has metadata \p metadata, to the
+/// class's allocator: call its deallocate witness directly if this module has
+/// it (the allocator's own method or the function that the
+/// ClassAllocatorWitnesses pass created), and otherwise through the class's
+/// value witness table. The witness takes the alignment, not \p alignMask.
+static void emitClassAllocatorDeallocateCall(IRGenFunction &IGF, ClassDecl *cls,
+                                             llvm::Value *metadata,
+                                             llvm::Value *allocation,
+                                             llvm::Value *size,
+                                             llvm::Value *alignMask) {
+  auto &IGM = IGF.IGM;
+  llvm::Value *alignment =
+      IGF.Builder.CreateAdd(alignMask, llvm::ConstantInt::get(IGM.SizeTy, 1));
+  llvm::Value *args[] = {allocation, size, alignment, metadata};
+  auto *fnType = llvm::FunctionType::get(
+      IGM.VoidTy,
+      {IGM.Int8PtrTy, IGM.SizeTy, IGM.SizeTy, IGM.TypeMetadataPtrTy},
+      /*isVarArg=*/false);
+  Signature signature(fnType, llvm::AttributeList(), IGM.SwiftCC);
+
+  CanType allocatorType = cls->getAllocatorType()->getCanonicalType();
+  if (auto *witnessFunction = lookUpClassAllocatorDeallocateEntry(
+          IGM.getSILModule(), allocatorType)) {
+    auto *fn = IGM.getAddrOfSILFunction(witnessFunction, NotForDefinition);
+    IGF.Builder.CreateCall(
+        FunctionPointer::forDirect(FunctionPointer::Kind::Function, fn, nullptr,
+                                   signature),
+        args);
+    return;
+  }
+
+  llvm::Value *table = IGF.emitValueWitnessTableRefForMetadata(metadata);
+  // The class allocator witness follows the base value witness table.
+  unsigned index =
+      IGM.DataLayout.getTypeAllocSize(IGM.getValueWitnessTableTy()) /
+      IGM.getPointerSize().getValue();
+  llvm::Value *slot =
+      IGF.Builder.CreateConstInBoundsGEP1_32(IGM.PtrTy, table, index);
+  llvm::Value *witness = IGF.Builder.CreateLoad(
+      Address(slot, IGM.PtrTy, IGM.getPointerAlignment()),
+      "class-allocator.deallocate");
+  auto authInfo = PointerAuthInfo::emit(
+      IGF, IGF.getOptions().PointerAuth.ValueWitnesses, slot,
+      PointerAuthEntity::Special::ClassAllocatorDeallocate);
+  IGF.Builder.CreateCall(
+      FunctionPointer::createSigned(FunctionPointer::Kind::Function, witness,
+                                    authInfo, signature),
+      args);
+}
+
+/// Allocate an instance of \p cls, a class with an instance allocator, whose
+/// metadata is \p metadata, with the class's allocator, and initialize its
+/// header: the heap allocation of a stack-promoted object that IRGen can't put
+/// on the stack. The ClassAllocatorWitnesses SIL pass creates the allocate
+/// witness for every allocator of a class whose instances a function of the
+/// module may stack-promote.
+static llvm::Value *emitClassAllocatorAllocation(IRGenFunction &IGF,
+                                                 ClassDecl *cls,
+                                                 llvm::Value *metadata,
+                                                 llvm::Value *size,
+                                                 llvm::Value *alignMask) {
+  auto &IGM = IGF.IGM;
+  CanType allocatorType = cls->getAllocatorType()->getCanonicalType();
+  auto *witnessFunction =
+      IGM.getSILModule().lookUpFunction(getClassAllocatorWitnessName(
+          allocatorType, ClassAllocatorWitnessKind::Allocate));
+  if (!witnessFunction)
+    llvm::report_fatal_error("missing class allocator witness for a "
+                             "stack-promoted allocation");
+  auto *fnType = llvm::FunctionType::get(
+      IGM.Int8PtrTy, {IGM.TypeMetadataPtrTy, IGM.SizeTy, IGM.SizeTy},
+      /*isVarArg=*/false);
+  Signature signature(fnType, llvm::AttributeList(), IGM.SwiftCC);
+  auto *fn = IGM.getAddrOfSILFunction(witnessFunction, NotForDefinition);
+  llvm::Value *allocation = IGF.Builder.CreateCall(
+      FunctionPointer::forDirect(FunctionPointer::Kind::Function, fn, nullptr,
+                                 signature),
+      {metadata, size, alignMask});
+  return IGF.Builder.CreateCall(IGM.getInitHeapObjectFunctionPointer(),
+                                {metadata, allocation, size, alignMask},
+                                "reference.new");
+}
+
+void irgen::emitClassAllocatedUnownedRelease(IRGenFunction &IGF,
+                                             llvm::Value *object,
+                                             ClassDecl *cls,
+                                             Atomicity atomicity) {
+  auto &IGM = IGF.IGM;
+  // The non-atomic release leaves the free to the runtime, which finds the
+  // allocator in the class's value witness table.
+  if (atomicity == Atomicity::NonAtomic) {
+    IGF.emitNativeUnownedRelease(object, atomicity);
+    return;
+  }
+
+  object = IGF.Builder.CreateBitCast(object, IGM.RefCountedPtrTy);
+  llvm::Value *allocation = IGF.Builder.CreateCall(
+      IGM.getNativeUnownedReleaseBeginFunctionPointer(), {object});
+  auto *freeBB = IGF.createBasicBlock("unowned.free");
+  auto *contBB = IGF.createBasicBlock("unowned.released");
+  llvm::Value *isLastReference = IGF.Builder.CreateICmpNE(
+      allocation, llvm::ConstantPointerNull::get(
+                      cast<llvm::PointerType>(allocation->getType())));
+  IGF.Builder.CreateCondBr(isLastReference, freeBB, contBB);
+
+  // That was the last reference: free the instance. Its header is intact.
+  // Its class is `cls` or a subclass with the same allocator, so the metadata
+  // passed to the allocator is the instance's own, loaded from the instance.
+  IGF.Builder.emitBlock(freeBB);
+  CanType classType = cls->getDeclaredInterfaceType()->getCanonicalType();
+  llvm::Value *metadata =
+      emitHeapMetadataRefForHeapObject(IGF, object, classType);
+  // If the class is final, the instance is a `cls`, and if its layout is
+  // fixed and known here, its size and alignment are constants, as in its
+  // deallocating deinit. Otherwise the instance may be a subclass's, or the
+  // layout is known only at run time: load them from the metadata. That
+  // includes a class with a resilient superclass, whose layout lacks the
+  // superclass's fields but counts as fixed (isFixedSize() is false).
+  llvm::Value *size = nullptr, *alignMask = nullptr;
+  if (cls->isSemanticallyFinal()) {
+    SILType selfType = getSelfType(cls);
+    auto &classTI = IGM.getTypeInfo(selfType).as<ClassTypeInfo>();
+    auto &layout = classTI.getClassLayout(IGM, selfType,
+                                          /*forBackwardDeployment=*/false);
+    if (layout.isFixedLayout() && layout.isFixedSize()) {
+      size = IGM.getSize(layout.getSize());
+      alignMask = IGM.getSize(layout.getAlignMask());
+    }
+  }
+  if (!size)
+    std::tie(size, alignMask) =
+        emitClassResilientInstanceSizeAndAlignMask(IGF, cls, metadata);
+  emitClassAllocatorDeallocateCall(IGF, cls, metadata, allocation, size,
+                                   alignMask);
+  IGF.Builder.CreateBr(contBB);
+
+  IGF.Builder.emitBlock(contBB);
+}
 
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
@@ -941,8 +1166,17 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     auto maybeDescriptor =
         classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
 
-    val = IGF.emitAllocObjectCall(metadata, size, alignMask, maybeDescriptor,
-                                  "reference.new");
+    // The DirectClassAlloc SIL pass rewrites the heap allocations of classes
+    // with class allocators into calls of the allocators. A stack-promoted
+    // allocation that can't be put on the stack is allocated with the
+    // allocator too.
+    ClassDecl *cls = selfType.getClassDecl();
+    if (TailArrays.empty() &&
+        cls->getDirectlyCallableAllocatorType(IGF.IGM.getSwiftModule()))
+      val = emitClassAllocatorAllocation(IGF, cls, metadata, size, alignMask);
+    else
+      val = IGF.emitAllocObjectCall(metadata, size, alignMask, maybeDescriptor,
+                                    "reference.new");
     StackAllocSize = -1;
   }
   return IGF.Builder.CreateBitCast(val, IGF.IGM.PtrTy);
@@ -1061,6 +1295,33 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
   llvm::Value *size, *alignMask;
   getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
+
+  // The DirectClassAlloc SIL pass rewrites the deallocations of classes with
+  // class allocators into calls of the allocators, except for those of
+  // actors that the concurrency runtime frees through the allocators (above),
+  // and those of stack-promoted objects, which IRGen frees here if it
+  // couldn't put them on the stack: like the deallocating deinit, let the
+  // runtime do its bookkeeping and, unless unowned references remain, return
+  // the memory to the allocator.
+  if (theClass->getDirectlyCallableAllocatorType(IGF.IGM.getSwiftModule())) {
+    selfValue = emitCastToHeapObject(IGF, selfValue);
+    llvm::Value *allocation = IGF.Builder.CreateCall(
+        IGF.IGM.getDeallocClassInstanceBeginFunctionPointer(), {selfValue});
+    auto *freeBB = IGF.createBasicBlock("dealloc.free");
+    auto *contBB = IGF.createBasicBlock("dealloc.done");
+    llvm::Value *mustFree = IGF.Builder.CreateICmpNE(
+        allocation, llvm::ConstantPointerNull::get(
+                        cast<llvm::PointerType>(allocation->getType())));
+    IGF.Builder.CreateCondBr(mustFree, freeBB, contBB);
+    IGF.Builder.emitBlock(freeBB);
+    llvm::Value *metadata =
+        emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType);
+    emitClassAllocatorDeallocateCall(IGF, theClass, metadata, allocation, size,
+                                     alignMask);
+    IGF.Builder.CreateBr(contBB);
+    IGF.Builder.emitBlock(contBB);
+    return;
+  }
 
   selfValue = emitCastToHeapObject(IGF, selfValue);
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();

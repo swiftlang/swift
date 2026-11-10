@@ -71,6 +71,7 @@ public:
     CoroDeallocationFunction,
     CoroFrameAllocationFunction,
     CoroFrameDeallocationFunction,
+    ClassAllocatorDeallocate,
   };
 
 private:

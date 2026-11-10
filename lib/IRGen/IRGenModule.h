@@ -324,6 +324,12 @@ public:
   /// symbol ultimately, because the two extensions may have the same
   /// generic signature, etc.
   llvm::DenseSet<ExtensionDecl*> AllConformanceOfProtocolExtensionDescriptors;
+
+  /// In a whole-module compilation, the classes of this module that have a
+  /// class allocator and a subclass whose allocator differs. Computed on first
+  /// use (see isClassAllocatedOnUnownedRelease).
+  std::optional<llvm::DenseSet<ClassDecl *>>
+      ClassesWithDifferentlyAllocatedSubclasses;
 private:
 
   /// The queue of lazy field metadata records to emit.

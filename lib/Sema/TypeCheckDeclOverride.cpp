@@ -1679,6 +1679,7 @@ namespace  {
     UNINTERESTING_ATTR(EmitAssemblyVisionRemarks)
     UNINTERESTING_ATTR(SetterAccess)
     UNINTERESTING_ATTR(TypeEraser)
+    UNINTERESTING_ATTR(Allocator)
     UNINTERESTING_ATTR(SPIAccessControl)
     UNINTERESTING_ATTR(HasStorage)
     UNINTERESTING_ATTR(UIApplicationMain)

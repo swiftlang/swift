@@ -78,10 +78,6 @@ private func tryDevirtualizeRelease(of dealloc: DeallocStackRefInst, _ context: 
   // in deallocating state, which means set the RC_DEALLOCATING_FLAG flag.
   let beginDealloc = builder.createBeginDeallocRef(reference: object, allocation: allocRef)
 
-  // Create the call to the destructor with the allocated object as self
-  // argument.
-  let functionRef = builder.createFunctionRef(dealloc)
-
   let substitutionMap: SubstitutionMap
   if dealloc.isGeneric {
     substitutionMap = context.getContextSubstitutionMap(for: type)
@@ -89,6 +85,25 @@ private func tryDevirtualizeRelease(of dealloc: DeallocStackRefInst, _ context: 
     // In embedded Swift, dealloc might be a specialized deinit, so the substitution map on the old apply isn't valid for the new apply
     substitutionMap = SubstitutionMap()
   }
+
+  // The deallocator of a class with a class allocator frees the object by
+  // calling the allocator unless the runtime reports that the object is on the
+  // stack. Instead, do what the deallocator does with a `dealloc_ref`, which
+  // IRGen drops for an object on the stack, so that the object costs the same
+  // as an instance of a class without an allocator: call the destroying
+  // destructor, then deallocate the object.
+  if let classDecl = type.nominal as? ClassDecl, classDecl.hasClassAllocator,
+     let destroyer = context.lookupDestroyingDestructor(of: dealloc) {
+    let functionRef = builder.createFunctionRef(destroyer)
+    builder.createApply(function: functionRef, substitutionMap, arguments: [beginDealloc])
+    builder.createDeallocRef(beginDealloc)
+    context.erase(instruction: lastRelease)
+    return
+  }
+
+  // Create the call to the destructor with the allocated object as self
+  // argument.
+  let functionRef = builder.createFunctionRef(dealloc)
 
   builder.createApply(function: functionRef, substitutionMap, arguments: [beginDealloc])
   context.erase(instruction: lastRelease)

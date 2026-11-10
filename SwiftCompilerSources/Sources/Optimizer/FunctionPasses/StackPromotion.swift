@@ -75,6 +75,16 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
     return false
   }
 
+  // A stack-promoted instance of a class with a class allocator never reaches
+  // the allocator. If IRGen can't put it on the stack, it allocates it with
+  // the allocator, except for an `alloc_ref_dynamic` or an object with tail
+  // elements, which it would allocate with the system allocator.
+  if let classDecl = allocRef.type.nominal as? ClassDecl,
+     classDecl.hasClassAllocator,
+     allocRef is AllocRefDynamicInst || !allocRef.tailAllocatedCounts.isEmpty {
+    return false
+  }
+
   if let dtor = (allocRef.type.nominal as? ClassDecl)?.destructor {
     if dtor.isIsolated {
       // Classes (including actors) with isolated deinit can escape implicitly.

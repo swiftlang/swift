@@ -234,6 +234,18 @@ classes.
 - The **class flags** are a 32-bit field at **offset 5** on platforms which 
   support Objective-C interoperability; on other platforms, the field is at 
   **offset 2**.
+
+  If the **has class allocator** flag (``0x20``) is set, instances of the
+  class are allocated and freed by an instance allocator, a type that
+  conforms to ``ClassAllocator``: the one declared with ``@allocator`` by the
+  class or its nearest superclass that declares one, or the one named by
+  ``-default-class-allocator``. Compiled code allocates every instance, and
+  frees it in its deallocating deinit, by calling the allocator directly. The
+  class's value witness table then has a class allocator witness (see `Class
+  Allocator Value Witnesses`_), ``deallocate``, which frees the instances that
+  the runtime frees: after the last ``unowned`` release, and when an
+  initializer fails.
+
 - The **instance address point** is a 32-bit field following the class flags.
   A pointer to an instance of this class points this number of bytes after the
   beginning of the instance.
@@ -296,6 +308,41 @@ classes.
   This is currently only used for metadata which is built at compile time,
   but not for metadata which is built at runtime, e.g. for generic classes.
 
+
+Class Allocator Value Witnesses
+```````````````````````````````
+
+The value witness table of a class with the **has class allocator** class
+flag (``0x20``) extends ``Builtin.NativeObject``'s table with one more
+witness, which follows the base table at the offset where enum witnesses
+would be:
+
+- ``deallocate(allocation, size, alignment, metadata)`` frees the memory of an
+  instance of the class, through the class's instance allocator. ``size`` and
+  ``alignment`` (not the alignment mask) are those the memory was allocated
+  with, and ``metadata`` is the instance's class.
+
+The witness uses the Swift calling convention, returns nothing, and is never
+null. Its signature is that of a non-generic struct or enum's
+``static func deallocate(_:byteCount:alignment:for:)``, whose thin ``self`` has
+no representation. If the allocator is such a type and its witness for the
+requirement is its own method with exactly that lowering, the class allocator
+witness is the method itself; otherwise it's a function, one per allocator
+type in each image, that calls the allocator's witness. No value
+witness flag marks the extended table: a class has one if and only if its
+class flags have ``0x20``. Tables derived from it, such as those of
+single-payload enums, don't have the witness. Classes with the same instance
+allocator share a table, and each image has one copy of it.
+
+The weak reference side tables of the instances of a class with an instance
+allocator are allocated and freed by the runtime, as for any other class.
+
+A class's value witness table is installed by its static metadata, by the
+instantiation function of a generic class, by the relocation function of the
+metadata pattern of a class with resilient ancestry, and by canonical
+prespecialized metadata. When the runtime initializes singleton class
+metadata from a template, it keeps the template's value witness table if the
+class flags have ``0x20``.
 
 Objective C class wrapper metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

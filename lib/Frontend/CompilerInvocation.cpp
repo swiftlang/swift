@@ -2061,6 +2061,11 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::NoExplicitNonIsolated);
   }
 
+  // -default-class-allocator is checked during type checking, which resolves
+  // the type it names.
+  if (const Arg *A = Args.getLastArg(OPT_default_class_allocator))
+    Opts.DefaultClassAllocator = A->getValue();
+
   if (FrontendOpts.ImportHeaderAsInternal)
     Opts.enableFeature(Feature::CheckImplementationOnly);
 
