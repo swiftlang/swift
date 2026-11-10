@@ -210,3 +210,23 @@ func consumingIndex(c: Consuming, nc: consuming NC) -> Int {
 func consumingIndexRMW(c: inout Consuming, nc: consuming NC) {
   c[nc] += 1
 }
+
+// A borrowed lvalue index such as `nc.self` is a formal-evaluation borrow.
+// When a generic coroutine takes it indirectly, the borrow of the temporary
+// has to end before the borrow of the index does.
+struct GenericRead {
+  subscript<T: ~Copyable>(t: borrowing T) -> Bool { _read { yield true } }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s26subscript_ownership_params18genericReadDotSelf1g2ncSbAA07GenericE0V_AA2NCVtF
+// CHECK:         [[BORROW:%[0-9]+]] = begin_borrow
+// CHECK:         [[TEMP:%[0-9]+]] = alloc_stack $NC
+// CHECK:         [[SB:%[0-9]+]] = store_borrow [[BORROW]] to [[TEMP]]
+// CHECK:         begin_apply {{%[0-9]+}}<NC>([[SB]], {{%[0-9]+}})
+// CHECK:         end_apply
+// CHECK-NEXT:    end_borrow [[SB]]
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK:       } // end sil function
+func genericReadDotSelf(g: GenericRead, nc: borrowing NC) -> Bool {
+  return g[nc.self]
+}
