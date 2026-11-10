@@ -27,7 +27,7 @@ class Container<T> {
 
 func useContainer() -> () {
   var a : Container<not a type [skip this greater: >] >, b : Int // expected-cparser-error{{expected '>' to complete generic argument list}} expected-astgen-error {{expected '>' to end generic argument clause}} expected-note{{to match this opening '<'}} expected-astgen-note {{'a' declared here}} expected-astgen-note {{did you mean 'a'?}} expected-astgen-error {{cannot find type 'not' in scope}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{use of local variable 'a' before its declaration}} expected-astgen-error {{unexpected code 'this greater: >' in subscript}} expected-astgen-error {{expected expression after operator}}
-  b = 5 // no-warning // // expected-astgen-error {{cannot find 'b' in scope}}
+  b = 5 // no-warning // expected-astgen-error {{cannot find 'b' in scope}}
   a.exists()
 }
 
@@ -131,7 +131,7 @@ func missingControllingExprInRepeatWhile() {
   repeat {
   } while // expected-error {{missing condition in 'while' statement}}
   { // expected-cparser-error{{closure expression is unused}} expected-astgen-error {{function produces expected type 'Bool'; did you mean to call it with '()'?}} expected-cparser-note {{did you mean to use a 'do' statement?}} {{3-3=do }}
-    missingControllingExprInRepeatWhile(); // // expected-astgen-error {{cannot convert value of type '()' to closure result type 'Bool'}}
+    missingControllingExprInRepeatWhile(); // expected-astgen-error {{cannot convert value of type '()' to closure result type 'Bool'}}
   }
 
   repeat {
@@ -290,7 +290,7 @@ struct SS SS : Multi {
   // expected-error @-4 {{cannot convert value of type 'String' to specified type 'Int'}}
   
   func f() {
-    var c d = 5 // // expected-astgen-error {{cannot find type 'd' in scope}}
+    var c d = 5 // expected-astgen-error {{cannot find type 'd' in scope}}
     // expected-cparser-error @-1 {{found an unexpected second identifier in variable declaration; is there an accidental break?}} expected-astgen-error@-1 {{expected ':' in type annotation}}
     // expected-cparser-note @-2 {{join the identifiers together}} {{9-12=cd}}
     // expected-cparser-note @-3 {{join the identifiers together with camel-case}} {{9-12=cD}}
@@ -326,7 +326,7 @@ struct ErrorTypeInVarDecl3 {
 
 struct ErrorTypeInVarDecl4 {
   var v1 : Int<, // expected-cparser-error {{expected type}} {{16-16= <#type#>}} expected-astgen-error {{expected '>' to end generic argument clause}} expected-astgen-error {{cannot specialize non-generic type 'Int'}} expected-astgen-note {{to match this opening '<'}}
-  var v2 : Int // // expected-astgen-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
+  var v2 : Int // expected-astgen-error {{'var' cannot appear nested inside another 'var' or 'let' pattern}}
 }
 
 struct ErrorTypeInVarDecl5 {
@@ -433,7 +433,7 @@ struct ErrorTypeInVarDeclArrayType2 {
 }
 
 struct ErrorTypeInVarDeclArrayType3 {
-  var v1 : Int[ // expected-cparser-error {{expected ']' in array type}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{cannot convert value of type '[Any]' }} expected-astgen-error {{expected ']' to end array}}
+  var v1 : Int[ // expected-cparser-error {{expected ']' in array type}} expected-astgen-error {{expected '=' in variable}} expected-astgen-error {{cannot convert value of type '[Any]' to specified type 'Int'}} expected-astgen-error {{expected ']' to end array}}
                 // expected-note@-1 {{to match this opening '['}}
   ;  // expected-cparser-error {{expected expression}}
   var v2 : Int
@@ -732,7 +732,7 @@ let myString = @"foo" // expected-error {{string literals in Swift are not prece
 let curlyQuotes1 = “hello world!” // expected-cparser-error {{unicode curly quote found, replace with '"'}} {{20-23="}} expected-astgen-error {{cannot find '“hello world!”' in scope}}
 
 // expected-cparser-error @+1 {{unicode curly quote found, replace with '"'}} {{20-23="}} expected-astgen-error @+1 {{unicode curly quote found; use '"' instead}}
-let curlyQuotes2 = “hello world!" // // expected-astgen-error {{cannot find '“hello world!"' in scope}}
+let curlyQuotes2 = “hello world!" // expected-astgen-error {{cannot find '“hello world!"' in scope}}
 
 
 // <rdar://problem/21196171> compiler should recover better from "unicode Specials" characters
@@ -799,7 +799,7 @@ func test23719432() {
 
 // <rdar://problem/19911096> QoI: terrible recovery when using '·' for an operator
 infix operator · {  // expected-error {{'·' is considered an identifier and must not appear within an operator name}} expected-astgen-error {{operator should not be declared with body}}
-  associativity none precedence 150 // // expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-warning {{integer literal is unused}} expected-astgen-error {{cannot find 'precedence' in scope}}
+  associativity none precedence 150 // expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-warning {{integer literal is unused}} expected-astgen-error {{cannot find 'precedence' in scope}}
 } // expected-astgen-error {{unexpected brace in source file}}
 
 infix operator -@-class Recover1 {} // expected-cparser-error {{'@' is not allowed in operator names}} expected-astgen-error {{'@-class' is not allowed in operator names}} expected-astgen-error {{cannot find 'Recover1' in scope; did you mean 'Decoder'?}}
@@ -840,13 +840,13 @@ extension Collection where Element == Int && Index == Int {} //
 func testSkipUnbalancedParen() {
   ?( // expected-cparser-error {{expected expression}} expected-astgen-error {{unexpected code '?(' in function}}
 }
-func testSkipToFindOpenBrace1() { // // expected-astgen-note {{to match this opening '{'}}
+func testSkipToFindOpenBrace1() { // expected-astgen-note {{to match this opening '{'}}
   // expected-error@+3 {{expected pattern}}
   // expected-cparser-error@+2 {{variable binding in a condition requires an initializer}}
   // expected-cparser-error@+1 {{expected '{' after 'if' condition}} expected-astgen-error@+1 {{expected '{' in 'if' statement}}
   do { if case }
 }
-func testSkipToFindOpenBrace2() { // // expected-astgen-note {{to match this opening '{'}}
+func testSkipToFindOpenBrace2() { // expected-astgen-note {{to match this opening '{'}}
   do { if true {} else false } // expected-error {{expected '{' or 'if' after 'else'}} expected-astgen-warning {{boolean literal is unused}}
 }
 
@@ -854,5 +854,5 @@ struct Outer {
   struct Inner<T> {}
 }
 extension Outer.Inner<Never> { // expected-cparser-note {{in extension of 'Outer.Inner<Never>'}} expected-astgen-error {{declaration is only valid at file scope}}
-  @someAttr // // expected-astgen-error {{expected declaration after attribute}}
+  @someAttr // expected-astgen-error {{expected declaration after attribute}}
 } // expected-cparser-error {{expected declaration}} expected-astgen-error {{expected '}' to end function}} expected-astgen-error {{expected '}' to end function}}

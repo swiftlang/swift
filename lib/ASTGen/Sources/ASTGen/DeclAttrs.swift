@@ -1208,16 +1208,16 @@ extension ASTGenVisitor {
             case let label where label == "interface":
               guard let value =
                   generateConsumingSimpleStringLiteralAttrOption(args: &arguments,
-                                                                 label: label) else {
-                    self.diagnose(.attr_expected_string_literal("com"), at: node.attributeName)
+                                                                 label: label,
+                                                                 attributeName: "com") else {
                     return nil
                   }
               interface = value
             case let label where label == "implementation":
               guard let value =
                   generateConsumingSimpleStringLiteralAttrOption(args: &arguments,
-                                                                 label: label) else {
-                    self.diagnose(.attr_expected_string_literal("com"), at: node.attributeName)
+                                                                 label: label,
+                                                                 attributeName: "com") else {
                     return nil
                   }
               implementation = value
@@ -3266,7 +3266,7 @@ extension ASTGenVisitor {
 
       let reason: BridgedStringRef
       if let userSpecifiedReason = self.generateConsumingSimpleStringLiteralAttrOption(
-        args: &args, label: "reason")
+        args: &args, label: "reason", attributeName: node.attributeName.trimmedDescription)
       {
         reason = userSpecifiedReason
       } else {
@@ -3581,7 +3581,10 @@ extension ASTGenVisitor {
     ).bridged
   }
 
-  func generateStringLiteralTextIfNotInterpolated(expr node: some ExprSyntaxProtocol) -> BridgedStringRef? {
+  func generateStringLiteralTextIfNotInterpolated(
+    expr node: some ExprSyntaxProtocol,
+    attributeName: String? = nil
+  ) -> BridgedStringRef? {
     if let literal = node.as(SimpleStringLiteralExprSyntax.self) {
       return rawStringLiteralContent(open: literal.openingQuote, close: literal.closingQuote)
     } else if let literal = node.as(StringLiteralExprSyntax.self) {
@@ -3591,7 +3594,11 @@ extension ASTGenVisitor {
       }
       return rawStringLiteralContent(open: literal.openingQuote, close: literal.closingQuote)
     }
-    self.diagnose(.expectedStringLiteralArgument(node))
+    if let attributeName {
+      self.diagnose(.attr_expected_string_literal(attributeName), at: node)
+    } else {
+      self.diagnose(.expectedStringLiteralArgument(node))
+    }
     return nil
   }
 
@@ -3655,10 +3662,11 @@ extension ASTGenVisitor {
 
   func generateConsumingSimpleStringLiteralAttrOption(
     args: inout Slice<LabeledExprListSyntax>,
-    label: SyntaxText? = nil
+    label: SyntaxText? = nil,
+    attributeName: String? = nil
   ) -> BridgedStringRef? {
     return self.generateConsumingAttrOption(args: &args, label: label) {
-      self.generateStringLiteralTextIfNotInterpolated(expr: $0)
+      self.generateStringLiteralTextIfNotInterpolated(expr: $0, attributeName: attributeName)
     }
   }
 

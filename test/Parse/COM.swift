@@ -43,17 +43,17 @@ protocol P1 { }
 protocol P2 { }
 // expected-cparser-error@-2 {{expected ':' after label 'interface'}} expected-astgen-error@-2 {{unexpected code '""' in attribute}}
 
-@com(interface: 42) // expected-astgen-error {{expected string literal in 'com' attribute}}
+@com(interface: 42)
 protocol P3 { }
-// expected-error@-2 {{expected string literal}}
+// expected-error@-2 {{expected string literal in 'com' attribute}}
 
 @com(label: "label")
 protocol P4 { }
 // expected-error@-2 {{unknown label 'label' in '@com' attribute; expected 'interface:', 'implementation:', or 'threading:'}}
 
-@com(implementation: 42) // expected-astgen-error {{expected string literal in 'com' attribute}}
+@com(implementation: 42)
 protocol P5 { }
-// expected-error@-2 {{expected string literal}}
+// expected-error@-2 {{expected string literal in 'com' attribute}}
 
 @com(implementation: "00000000-0000-0000-0000-000000000009", threading: apartment)
 protocol P6 { }

@@ -113,7 +113,7 @@ struct Wrapper {
   var projectedValue: String { String(wrappedValue) }
 }
 
-struct S { // // expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}}
+struct S { // expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}} expected-astgen-note {{'S' declared here}}
   @Wrapper var café = 42
 }
 

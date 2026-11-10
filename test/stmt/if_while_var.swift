@@ -122,7 +122,7 @@ if let x = opt, let y = opt, x != y,
 }
 
 // Leading boolean conditional.
-if 1 != 2, let x = opt, // // expected-astgen-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
+if 1 != 2, let x = opt, // expected-astgen-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}}
    y = opt,  // expected-cparser-error {{expected 'let' in conditional}} {{4-4=let }} expected-astgen-error {{unexpected code before optional binding}}
    x != y,
    let a = opt, var b = opt { // expected-warning {{immutable value 'a' was never used; consider replacing with '_' or removing it}} expected-warning {{variable 'b' was never used; consider replacing with '_' or removing it}}

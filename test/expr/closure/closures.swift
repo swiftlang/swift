@@ -42,7 +42,7 @@ func funcdecl5(_ a: Int, _ y: Int) {
   
   func6({$0 + $1})       // Closure with two named anonymous arguments
   func6({($0) + $1})    // Closure with sequence expr inferred type
-  func6({($0) + $0})    // // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
+  func6({($0) + $0})    // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
 
 
   var testfunc : ((), Int) -> Int  // expected-note 2 {{'testfunc' declared here}}

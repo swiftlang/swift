@@ -280,7 +280,7 @@ var globalCheckedVar = 1
 @exclusivity(unchecked) // ok
 var globalUncheckedVar = 1
 
-@exclusivity(abc) // // expected-error {{unknown option 'abc' for attribute 'exclusivity'}}
+@exclusivity(abc) // expected-error {{unknown option 'abc' for attribute 'exclusivity'}}
 var globalUnknownVar = 1
 
 struct ExclusivityAttrStruct {

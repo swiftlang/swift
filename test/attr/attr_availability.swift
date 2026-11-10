@@ -264,7 +264,7 @@ func functionWithShortFormIOSVersionNoPointAvailable() {}
 @available(iOS 8.0, OSX 10.10.3, *)
 func functionWithShortFormIOSOSXAvailable() {}
 
-@available(iOS 8.0 // // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{must handle potential future platforms with}} expected-astgen-error {{expected ')' to end attribute}}
+@available(iOS 8.0 // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{must handle potential future platforms with '*'}} expected-astgen-error {{expected ')' to end attribute}}
 func shortFormMissingParen() { // expected-cparser-error {{expected ')' in 'available' attribute}}
 }
 
@@ -305,7 +305,7 @@ func iosIsClosestThanMacOS() {}
 func shortFormWithUnrecognizedPlatformContinueValidating() {
 }
 
-@available(iOS 8.0, * // // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{expected ')' to end attribute}}
+@available(iOS 8.0, * // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{expected ')' to end attribute}}
 func shortFormMissingParenAfterWildcard() { // expected-cparser-error {{expected ')' in 'available' attribute}}
 }
 
