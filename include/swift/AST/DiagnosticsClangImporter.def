@@ -257,7 +257,7 @@ NOTE(cxx_unsafe_unannotated_nonescapable_param, none,
      "non-'Escapable' parameter '%1' has no lifetime annotation}0",
      (bool, StringRef))
 NOTE(cxx_unsafe_skipped_lifetime_escapable_result, none,
-     "this lifetime annotation is not enforced: the result is Escapable, so "
+     "this lifetime annotation is ignored: the result is Escapable, so "
      "Swift drops the dependency", ())
 // The annotation sits either on a parameter or on 'self', which has no
 // declaration to name.
@@ -281,6 +281,11 @@ NOTE(cxx_unsafe_skipped_lifetime_escapable_capture, none,
      "Swift cannot represent the lifetime annotation on "
      "%select{'self'|parameter '%1'}0, which is Escapable and imported by "
      "value", (bool, StringRef))
+NOTE(cxx_unsafe_skipped_lifetime_escapable_target, none,
+     "this lifetime annotation is ignored: "
+     "%select{'self'|parameter '%1'}0 is captured by "
+     "%select{'self'|parameter '%3'}2, which is Escapable, so Swift drops the "
+     "dependency", (bool, StringRef, bool, StringRef))
 NOTE(cxx_unsafe_skipped_lifetime_constructed_self, none,
      "Swift cannot represent a parameter capturing 'self' in an initializer",
      ())
