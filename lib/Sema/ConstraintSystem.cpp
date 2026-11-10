@@ -2672,12 +2672,21 @@ static bool diagnoseAmbiguity(
       auto *primaryFix = aggregateFix.front().second;
       if (primaryFix->diagnoseForAmbiguity(aggregateFix))
         return true;
-
-      if (fixKind == FixKind::AllowArgumentTypeMismatch) {
-        auto &primaryFix = aggregateFix.front();
-        return primaryFix.second->diagnose(*primaryFix.first);
+    }
+  }
+  
+  {
+    bool didDiagnose = false;
+    for (auto &entry : aggregateFix) {
+      const auto &fix = entry.second;
+      if (fix->getKind() == FixKind::AllowArgumentTypeMismatch) {
+        if (fix->diagnoseForAmbiguity(aggregateFix))
+          didDiagnose = true;
       }
     }
+    
+    if (didDiagnose)
+      return true;
   }
 
   auto *decl = *localAmbiguity.begin();

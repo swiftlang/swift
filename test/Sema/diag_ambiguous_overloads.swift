@@ -207,14 +207,15 @@ do {
   // expected-note@-2 {{no candidates found for specified argument '-'}}
   
   func test() -> Int {}
+  // expected-note@-1 {{cannot convert result type 'Int' to expected argument type 'Int32'}}
+  
   func test() -> String {}
+  // expected-note@-1 {{cannot convert result type 'String' to expected argument type 'Int32'}}
   
   func other(_: Int32) {}
   
   other(test())
   // expected-error@-1 {{ambiguous use of 'test'}}
-  // expected-note@-2 {{cannot convert result type 'Int' to expected argument type 'Int32'}}
-  // expected-note@-3 {{cannot convert result type 'String' to expected argument type 'Int32'}}
 }
 
 do {
@@ -222,6 +223,8 @@ do {
   func test(_: String) {}
   
   func compute() -> Double { 0 }
+  // expected-note@-1 {{cannot convert result type 'Double' to expected argument type 'Int'}}
+  // expected-note@-2 {{cannot convert result type 'Double' to expected argument type 'String'}}
   
-  test(compute()) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+  test(compute()) // expected-error {{ambiguous use of 'compute'}}
 }

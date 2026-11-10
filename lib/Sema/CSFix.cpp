@@ -2005,7 +2005,8 @@ bool AllowArgumentMismatch::diagnoseForAmbiguity(
           [&primaryFix](
               const std::pair<const Solution *, const ConstraintFix *> &entry) {
             auto *fix = entry.second->getAs<AllowArgumentMismatch>();
-            return primaryFix->getToType()->isEqual(fix->getToType());
+            return (primaryFix->getToType()->isEqual(fix->getToType()) ||
+                    primaryFix->getFromType()->isEqual(fix->getFromType()));
           })) {
     auto primarySolution = commonFixes.front().first;
     auto &CS = getConstraintSystem();
@@ -2035,13 +2036,13 @@ bool AllowArgumentMismatch::diagnoseForAmbiguity(
 
       if (callExpr) {
         auto fromType = fix->getFromType();
-        if (dyn_cast<FunctionType>(fromType)) {
+        if (dyn_cast<FunctionType>(fromType.getPointer())) {
           isPartialApplication = true;
         }
       }
-
+      
       if (!isPartialApplication) {
-        DE.diagnose(getLoc(getAnchor()),
+        DE.diagnose(getLoc(overload->choice.getDecl()),
                     diag::ambiguous_no_candidates_match_argument_type,
                     fix->getFromType(), fix->getToType());
       }
