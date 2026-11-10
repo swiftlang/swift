@@ -2127,6 +2127,9 @@ static MoveConstraint getMoveConstraint(SILValue addr) {
     auto info = bai->getSubstCalleeConv().getYieldInfoForOperandIndex(index);
     return MoveConstraint::forGuaranteed(!info.isConsumedInCaller());
   }
+  case AccessRepresentation::Kind::BorrowMutateAccessor:
+    // Conservatively reject for now.
+    return MoveConstraint::Illegal;
   case AccessRepresentation::Kind::Nested: {
     auto *bai = cast<BeginAccessInst>(base.getBaseAddress());
     if (bai->getAccessKind() == SILAccessKind::Init ||

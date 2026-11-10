@@ -1013,3 +1013,115 @@ bb0(%0 : $Builtin.Int64):
  return %ret : $()
 }
 
+
+sil @borrowAddressSelf : $@convention(method) (@in_guaranteed MyStruct) -> @guaranteed_address Int64
+sil @borrowObjectSelf : $@convention(method) (@guaranteed MyStruct) -> @guaranteed_address Int64
+sil @nonmutatingMutate : $@convention(method) (@in_guaranteed MyStruct) -> @inout Int64
+
+// The results of borrow and mutate accessors with an @in_guaranteed self are at an unknown offset in self, so their
+// uses only overlap the uses of self. The result of an accessor with an object self is BorrowMutateAccessor storage.
+//
+// CHECK-LABEL: @testBorrowMutateAccessorUses
+// CHECK: ###For MemOp:   %3 = load [trivial] %0 : $*MyStruct
+// CHECK: Storage: Argument %0 = argument of bb0 : $*MyStruct
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:   %3 = load [trivial] %0 : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %5 = apply %4(%0) : $@convention(method) (@in_guaranteed MyStruct) -> @guaranteed_address Int64
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %8 = apply %7(%0) : $@convention(method) (@in_guaranteed MyStruct) -> @inout Int64
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+// CHECK: Overlapping Uses {
+// CHECK-NEXT:   %3 = load [trivial] %0 : $*MyStruct
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %5 = apply %4(%0) : $@convention(method) (@in_guaranteed MyStruct) -> @guaranteed_address Int64
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %6 = load [trivial] %5 : $*Int64
+// CHECK-NEXT:   Path: (@Unknown)
+// CHECK-NEXT:   %8 = apply %7(%0) : $@convention(method) (@in_guaranteed MyStruct) -> @inout Int64
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   store %2 to [trivial] %8 : $*Int64
+// CHECK-NEXT:   Path: (@Unknown)
+// CHECK-NEXT: }
+// CHECK: ###For MemOp:   %6 = load [trivial] %5 : $*Int64
+// CHECK: Storage: Argument %0 = argument of bb0 : $*MyStruct
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   store %2 to [trivial] %8 : $*Int64
+// CHECK: Storage: Argument %0 = argument of bb0 : $*MyStruct
+// CHECK: Path: (@Unknown)
+// CHECK: ###For MemOp:   %12 = load [trivial] %11 : $*Int64
+// CHECK: Storage: BorrowMutateAccessor   %11 = apply %10(%1) : $@convention(method) (@guaranteed MyStruct) -> @guaranteed_address Int64
+// CHECK: Path: ()
+// CHECK: Exact Uses {
+// CHECK-NEXT:   %12 = load [trivial] %11 : $*Int64
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT: }
+sil [ossa] @testBorrowMutateAccessorUses : $@convention(thin) (@in_guaranteed MyStruct, MyStruct, Int64) -> () {
+bb0(%0 : $*MyStruct, %1 : $MyStruct, %2 : $Int64):
+  %3 = load [trivial] %0
+  %4 = function_ref @borrowAddressSelf : $@convention(method) (@in_guaranteed MyStruct) -> @guaranteed_address Int64
+  %5 = apply %4(%0) : $@convention(method) (@in_guaranteed MyStruct) -> @guaranteed_address Int64
+  %6 = load [trivial] %5
+  %7 = function_ref @nonmutatingMutate : $@convention(method) (@in_guaranteed MyStruct) -> @inout Int64
+  %8 = apply %7(%0) : $@convention(method) (@in_guaranteed MyStruct) -> @inout Int64
+  store %2 to [trivial] %8
+  %10 = function_ref @borrowObjectSelf : $@convention(method) (@guaranteed MyStruct) -> @guaranteed_address Int64
+  %11 = apply %10(%1) : $@convention(method) (@guaranteed MyStruct) -> @guaranteed_address Int64
+  %12 = load [trivial] %11
+  %13 = tuple ()
+  return %13
+}
+
+struct AccessorResultInner {
+  @_hasStorage var p: Int64
+  @_hasStorage var q: Int64
+}
+
+struct AccessorResultOuter {
+  @_hasStorage var t: AccessorResultInner
+  @_hasStorage var b: Int64
+}
+
+sil @borrowInner : $@convention(method) (@in_guaranteed AccessorResultOuter) -> @guaranteed_address AccessorResultInner
+
+// The load through the accessor result's field q is at an unknown offset in self, and the store to self's field t.q
+// overlaps it.
+// FIXME: The load's overlapping uses don't include the store, because the result's field index is matched against
+// self's type.
+//
+// CHECK-LABEL: @testBorrowAccessorResultProjectionUses
+// CHECK: ###For MemOp:   %5 = load [trivial] %4 : $*Int64
+// CHECK-NEXT: Argument %0 = argument of bb0 : $*AccessorResultOuter
+// CHECK-NEXT: Base: %0 = argument of bb0 : $*AccessorResultOuter
+// CHECK-NEXT: Storage: Argument %0 = argument of bb0 : $*AccessorResultOuter
+// CHECK-NEXT: Path: (@Unknown,#1)
+// CHECK: Overlapping Uses {
+// CHECK-NEXT:   %3 = apply %2(%0) : $@convention(method) (@in_guaranteed AccessorResultOuter) -> @guaranteed_address AccessorResultInner
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %5 = load [trivial] %4 : $*Int64
+// CHECK-NEXT:   Path: (@Unknown,#1)
+// CHECK-NEXT: }
+// CHECK: ###For MemOp:   store %1 to [trivial] %7 : $*Int64
+// CHECK: Storage: Argument %0 = argument of bb0 : $*AccessorResultOuter
+// CHECK: Path: (#0,#1)
+// CHECK: Overlapping Uses {
+// CHECK-NEXT:   %3 = apply %2(%0) : $@convention(method) (@in_guaranteed AccessorResultOuter) -> @guaranteed_address AccessorResultInner
+// CHECK-NEXT:   Path: ()
+// CHECK-NEXT:   %5 = load [trivial] %4 : $*Int64
+// CHECK-NEXT:   Path: (@Unknown,#1)
+// CHECK-NEXT:   store %1 to [trivial] %7 : $*Int64
+// CHECK-NEXT:   Path: (#0,#1)
+// CHECK-NEXT: }
+sil [ossa] @testBorrowAccessorResultProjectionUses : $@convention(thin) (@inout AccessorResultOuter, Int64) -> Int64 {
+bb0(%0 : $*AccessorResultOuter, %1 : $Int64):
+  %2 = function_ref @borrowInner : $@convention(method) (@in_guaranteed AccessorResultOuter) -> @guaranteed_address AccessorResultInner
+  %3 = apply %2(%0) : $@convention(method) (@in_guaranteed AccessorResultOuter) -> @guaranteed_address AccessorResultInner
+  %4 = struct_element_addr %3, #AccessorResultInner.q
+  %5 = load [trivial] %4
+  %6 = struct_element_addr %0, #AccessorResultOuter.t
+  %7 = struct_element_addr %6, #AccessorResultInner.q
+  store %1 to [trivial] %7
+  return %5
+}
