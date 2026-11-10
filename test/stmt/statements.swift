@@ -446,12 +446,12 @@ func r23684220(_ b: Any) {
 // <rdar://problem/21080671> QoI: try/catch (instead of do/catch) creates silly diagnostics
 func f21080671() {
   try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{the 'do' keyword is used to specify a 'catch' region}}
-  } catch { } // expected-astgen-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  } catch { }
   
   
   try {  // expected-cparser-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}} expected-astgen-error {{the 'do' keyword is used to specify a 'catch' region}}
     f21080671()
-  } catch let x as Int { // expected-astgen-warning {{'catch' block is unreachable because no errors are thrown in 'do' block}} expected-astgen-warning {{immutable value 'x' was never used; consider replacing with '_' or removing it}} expected-astgen-warning {{cast from 'any Error' to unrelated type 'Int' always fails}}
+  } catch let x as Int {
   } catch {
   }
 }

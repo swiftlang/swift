@@ -42,8 +42,8 @@ let c: @differentiable(reverse (Float) -> Float // expected-astgen-note {{to mat
 // expected-cparser-error @+1 {{expected ')' in '@differentiable' attribute}} expected-astgen-error@+1 {{unexpected initializer in pattern; did you mean to use '='?}}
 let c: @differentiable(notValidArg (Float) -> Float // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{expected argument for '@differentiable' attribute}} expected-astgen-error {{expected ')' to end attribute}} expected-astgen-error {{unexpected code '-> Float' in source file}}
 
-// expected-cparser-error @+1 {{unknown differentiability kind 'notValidArg'; only 'reverse' is supported}} expected-astgen-error@+1 {{expected argument for '@differentiable' attribute}}
-let d: @differentiable(notValidArg) (Float) -> Float // expected-astgen-error {{unexpected code 'notValidArg' in attribute}}
+// expected-error @+1 {{unknown differentiability kind 'notValidArg'; only 'reverse' is supported}}
+let d: @differentiable(notValidArg) (Float) -> Float
 
 // Using 'linear' as a type
 struct B {

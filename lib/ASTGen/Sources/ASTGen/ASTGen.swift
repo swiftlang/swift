@@ -68,6 +68,11 @@ struct ASTGenVisitor {
   /// already diagnosed as invalid, so they are marked invalid too.
   @Boxed var accessorsAreInvalid: Bool = false
 
+  /// Set when the declaration attribute being generated was rejected after a
+  /// diagnostic: the C++ parser gives up on the declaration then, so later
+  /// checks must not report on it.
+  @Boxed var rejectedDeclAttribute: Bool = false
+
   let ctx: BridgedASTContext
 
   let configuredRegions: ConfiguredRegions

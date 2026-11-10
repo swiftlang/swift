@@ -12,7 +12,7 @@ func unavailable_func_with_message() {}
 @available(OSX, unavailable)
 func unavailable_multiple_platforms() {}
 
-@available // expected-error {{expected '(' in 'available' attribute}} expected-astgen-error {{expected platform in 'available' attribute}} expected-astgen-error {{expected '()' in attribute}}
+@available // expected-cparser-error {{expected '(' in 'available' attribute}} expected-astgen-error {{expected '()' in attribute}} expected-astgen-error {{expected platform in 'available' attribute}} expected-astgen-error {{expected argument for '@available' attribute}}
 func noArgs() {}
 @available(*) // expected-error {{expected ',' in 'available' attribute}}
 func noKind() {}

@@ -524,7 +524,9 @@ extension ASTGenVisitor {
     doStmtOrExpr node: some DoStmtOrExprSyntax,
     labelInfo: BridgedLabeledStmtInfo = nil
   ) -> BridgedStmt {
-    if node.catchClauses.isEmpty {
+    // `try { ... } catch { ... }` was diagnosed by the parser; like the C++
+    // parser, keep only the body and do not type-check the `catch` clauses.
+    if node.catchClauses.isEmpty || node.doKeyword.presence == .missing {
       // A 'throws' clause is only meaningful with a 'catch' to type. The C++
       // parser reports this and drops the clause, keeping a plain DoStmt.
       if let throwsClause = node.throwsClause {

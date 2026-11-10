@@ -1350,6 +1350,12 @@ extension ASTGenVisitor {
       fatalError("(compiler bug) invalid arguments for @differentiable attribute")
     }
 
+    // `@differentiable(horse)`: the parser has diagnosed the unknown kind; it
+    // is not a bare `@differentiable` that needs to be renamed.
+    if args.kindSpecifier == nil, node.unexpectedBetweenArgumentsAndRightParen != nil {
+      return nil
+    }
+
     var differentiability: BridgedDifferentiabilityKind
     if let kindSpecifier = args.kindSpecifier {
       differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
@@ -1994,6 +2000,7 @@ extension ASTGenVisitor {
 
       var target: BridgedLifetimeDescriptor? = nil
       var sources: [BridgedLifetimeDescriptor] = []
+      var failed = false
       var first = true
       while let arg = args.popFirst() {
         if first {
@@ -2013,7 +2020,14 @@ extension ASTGenVisitor {
           allowIndices: allowIndices
         ) {
           sources.append(src)
+        } else {
+          // The descriptor has been diagnosed; like the C++ parser, give up on
+          // the whole entry.
+          failed = true
         }
+      }
+      if failed {
+        return nil
       }
 
       if let target {
@@ -2045,6 +2059,7 @@ extension ASTGenVisitor {
     // attribute spelling does.
     guard let entry = self.generateLifetimeEntry(attribute: node, allowIndices: false) else {
       // TODO: Diagnose?
+      self.rejectedDeclAttribute = true
       return nil
     }
 

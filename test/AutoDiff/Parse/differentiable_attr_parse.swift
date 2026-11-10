@@ -3,7 +3,7 @@
 /// Good
 
 // expected-cparser-warning @+1 {{'@differentiable' has been renamed to '@differentiable(reverse)'}} {{16-16=(reverse)}} expected-astgen-warning@+1 {{'@differentiable' has been renamed to '@differentiable(reverse)'}}
-@differentiable // // expected-astgen-error {{expected '(' in attribute}} expected-astgen-error {{expected argument for '@differentiable //' attribute}} expected-astgen-error {{expected ')' to end attribute}}
+@differentiable // expected-astgen-error {{expected '(' in attribute}} expected-astgen-error {{expected argument for '@differentiable' attribute}} expected-astgen-error {{expected ')' to end attribute}}
 // expected-warning @+1 {{'@differentiable' has been renamed to '@differentiable(reverse)'}} {{17-17=reverse, }}
 @differentiable(wrt: x)
 func please_use_reverse(_ x: Float, _ y: Float) -> Float { x }
@@ -66,8 +66,8 @@ public func squareRoot() -> Self {
 @differentiable(_linear) // okay
 // expected-cparser-error @+1 {{unsupported differentiability kind '_forward'; only 'reverse' is supported}} {{17-25=reverse}} expected-astgen-error@+1 {{unsupported differentiability kind '_forward'; only 'reverse' is supported}}
 @differentiable(_forward)
-// expected-cparser-error @+1 {{unknown differentiability kind 'horse'; only 'reverse' is supported}} {{17-22=reverse}} expected-astgen-error@+1 {{expected argument for '@differentiable' attribute}}
-@differentiable(horse) // okay // // expected-astgen-error {{unexpected code 'horse' in attribute}} expected-astgen-warning {{'@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}}
+// expected-error @+1 {{unknown differentiability kind 'horse'; only 'reverse' is supported}} {{17-22=reverse}}
+@differentiable(horse) // okay
 func identity(_ x: Float) -> Float {
   return x
 }
@@ -75,8 +75,8 @@ func identity(_ x: Float) -> Float {
 @differentiable(_linear, wrt: x) // okay
 // expected-cparser-error @+1 {{unsupported differentiability kind '_forward'; only 'reverse' is supported}} {{17-25=reverse}} expected-astgen-error@+1 {{unsupported differentiability kind '_forward'; only 'reverse' is supported}}
 @differentiable(_forward, wrt: x)
-// expected-cparser-error @+1 {{unknown differentiability kind 'horse'; only 'reverse' is supported}} {{17-22=reverse}} expected-astgen-error@+1 {{expected argument for '@differentiable' attribute}}
-@differentiable(horse, wrt: x) // okay // // expected-astgen-error {{unexpected code 'horse, wrt: x' in attribute}} expected-astgen-warning {{'@differentiable' has been renamed to '@differentiable(reverse)' and will be removed in the next release}}
+// expected-error @+1 {{unknown differentiability kind 'horse'; only 'reverse' is supported}} {{17-22=reverse}}
+@differentiable(horse, wrt: x) // okay
 func slope2(_ x: Float) -> Float {
   return 2 * x
 }
@@ -132,19 +132,19 @@ func bar(_ x: Float, _: Float) -> Float {
 }
 
 // expected-cparser-error @+1 {{expected 'wrt:' or 'where'}} expected-astgen-error@+1 {{unexpected code 'y' in attribute}}
-@differentiable(reverse, wrt: x, y) // // expected-astgen-error {{unexpected ',' separator}}
+@differentiable(reverse, wrt: x, y) // expected-astgen-error {{unexpected ',' separator}}
 func bar(_ x: Float, _ y: Float) -> Float {
   return 1 + x
 }
 
 // expected-cparser-error @+1 {{expected 'wrt:' or 'where'}} expected-astgen-error@+1 {{unexpected code '1' in attribute}}
-@differentiable(reverse, wrt: 0, 1) // // expected-astgen-error {{unexpected ',' separator}}
+@differentiable(reverse, wrt: 0, 1) // expected-astgen-error {{unexpected ',' separator}}
 func two(x: Float, y: Float) -> Float {
   return x + y
 }
 
 // expected-cparser-error @+1 {{expected 'wrt:' or 'where'}} expected-astgen-error@+1 {{unexpected code 'y' in attribute}}
-@differentiable(reverse, wrt: 0, y) // // expected-astgen-error {{unexpected ',' separator}}
+@differentiable(reverse, wrt: 0, y) // expected-astgen-error {{unexpected ',' separator}}
 func two(x: Float, y: Float) -> Float {
   return x + y
 }
@@ -156,7 +156,7 @@ func two(x: Float, y: Float) -> Float {
 }
 
 // expected-cparser-error @+1 {{expected ')' in 'differentiable' attribute}} expected-astgen-error@+1 {{expected ')' to end attribute}}
-@differentiable(reverse, wrt: (x) // // expected-astgen-note {{to match this opening '('}}
+@differentiable(reverse, wrt: (x) // expected-astgen-note {{to match this opening '('}}
 func bar(_ x: Float, _: Float) -> Float {
   return 1 + x
 }
@@ -186,13 +186,13 @@ func bar<T : Numeric>(_ x: T, _: T) -> T {
 }
 
 // expected-cparser-error @+1 {{expected 'wrt:' or 'where'}} expected-astgen-error@+1 {{unexpected code 'linear' in attribute}}
-@differentiable(reverse, wrt: x, linear) // // expected-astgen-error {{unexpected ',' separator}}
+@differentiable(reverse, wrt: x, linear) // expected-astgen-error {{unexpected ',' separator}}
 func slope4(_ x: Float) -> Float {
   return 4 * x
 }
 
 // expected-cparser-error @+1 {{expected 'wrt:' or 'where'}} expected-astgen-error@+1 {{unexpected code 'linear' in attribute}}
-@differentiable(reverse, wrt: x, linear) // // expected-astgen-error {{unexpected ',' separator}}
+@differentiable(reverse, wrt: x, linear) // expected-astgen-error {{unexpected ',' separator}}
 func slope5(_ x: Float) -> Float {
   return 5 * x
 }

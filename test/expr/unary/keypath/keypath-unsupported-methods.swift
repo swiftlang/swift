@@ -43,8 +43,8 @@ func f_54961(fleep: [Blatz]) {
 
 // https://github.com/apple/swift/issues/56996
 func f_56996() {
-  _ = \Int.byteSwapped.signum() // expected-error {{key path cannot refer to instance method 'signum()'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}}
-  _ = \Int.byteSwapped.init() // expected-cparser-error {{key path cannot refer to initializer 'init()'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}}
+  _ = \Int.byteSwapped.signum() // expected-error {{key path cannot refer to instance method 'signum()'}}
+  _ = \Int.byteSwapped.init() // expected-error {{key path cannot refer to initializer 'init()'}}
 }
 
 postfix operator ^

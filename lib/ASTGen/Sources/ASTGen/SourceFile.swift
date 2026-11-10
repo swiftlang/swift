@@ -110,7 +110,10 @@ extension Parser.LanguageFeatures {
     mapFeature(.TrailingComma, to: .trailingComma)
     mapFeature(.CoroutineAccessors, to: .coroutineAccessors)
     mapFeature(.OldOwnershipOperatorSpellings, to: .oldOwnershipOperatorSpellings)
-    mapFeature(.KeyPathWithMethodMembers, to: .keypathWithMethodMembers)
+    // The C++ parser always reads `\T.method()` as a key path component and
+    // leaves it to the type checker to reject it without the feature. Doing the
+    // same avoids a spurious "consecutive statements" error.
+    insert(.keypathWithMethodMembers)
     mapFeature(.BorrowAndMutateAccessors, to: .borrowAndMutateAccessors)
     mapFeature(.LiteralExpressions, to: .literalExpressions)
     mapFeature(.OnceFunctions, to: .onceFunctions)

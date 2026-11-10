@@ -1492,6 +1492,7 @@ extension ASTGenVisitor {
   } 
   
   func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl? {
+    self.rejectedDeclAttribute = false
     var attrs = self.generateDeclAttributes(node, allowStatic: true)
 
     // A synthesized 'func' keyword means the parser invented this declaration
@@ -1536,6 +1537,10 @@ extension ASTGenVisitor {
     }
     if signature.isRethrows {
       attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+    }
+    if self.rejectedDeclAttribute {
+      decl.asDecl.setInvalid()
+      self.rejectedDeclAttribute = false
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 

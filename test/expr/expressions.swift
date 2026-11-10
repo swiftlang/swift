@@ -937,7 +937,7 @@ let _ = "foo \(42 /* // expected-astgen-note {{to match this opening '('}}
                    */)end"
 // expected-cparser-error @-3 {{cannot find ')' to match opening '(' in string interpolation}} expected-cparser-error @-3 {{unterminated string literal}}
 // expected-cparser-error @-2 {{expected expression}}
-// expected-cparser-error @-3 {{unterminated string literal}} expected-astgen-error@-3 {{expected ')' in string literal}}
+// expected-cparser-error @-3 {{unterminated string literal}} expected-astgen-error@-5 {{expected ')' in string literal}}
 
 // https://github.com/apple/swift/issues/66192
 func I66192(_: Int) {}
