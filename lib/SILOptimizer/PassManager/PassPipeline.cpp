@@ -667,6 +667,8 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
+
+  P.addVerifyOwnership();
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {

@@ -73,7 +73,8 @@ LoweredSILRequest::evaluate(Evaluator &evaluator,
   {
     FrontendStatsTracer tracer(silMod->getASTContext().Stats,
                                "SIL verification, pre-optimization");
-    silMod->verify();
+    // OwnershipModelEliminator verifies ownership before lowering it.
+    silMod->verify(/*isCompleteOSSA=*/true, /*checkLinearLifetime=*/false);
   }
 
   runSILOptimizationPasses(*silMod);

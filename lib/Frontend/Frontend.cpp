@@ -2068,7 +2068,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   {
     FrontendStatsTracer tracer(silModule->getASTContext().Stats,
                                "SIL verification, pre-optimization");
-    silModule->verify();
+    // OwnershipModelEliminator verifies ownership before lowering it.
+    silModule->verify(/*isCompleteOSSA=*/true, /*checkLinearLifetime=*/false);
   }
 
   performSILOptimizations(Invocation, silModule);
