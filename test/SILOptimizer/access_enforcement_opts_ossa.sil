@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-verify-all -access-enforcement-opts -I %S/Inputs/abi %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -2017,4 +2017,60 @@ bb0:
   dealloc_stack %s : $*Outer
   %r = tuple ()
   return %r : $()
+}
+
+final class LoopClock {
+  @_hasStorage var cycles: Int64
+  @_hasStorage var ok: Builtin.Int1
+}
+
+sil @loopClockTick : $@convention(thin) (@guaranteed LoopClock) -> ()
+
+// rdar://190352551
+// Do not merge accesses in a loop when a back edge bypasses the child access:
+// the merged scope would still be active when the parent begin_access is
+// reached again.
+//
+// CHECK-LABEL: sil [ossa] @dontMergeBypassedLoopAccess :
+// CHECK: bb1:
+// CHECK: [[A1:%.*]] = begin_access [modify] [dynamic]
+// CHECK: end_access [[A1]]
+// CHECK: bb2:
+// CHECK: [[A2:%.*]] = begin_access [modify] [dynamic]
+// CHECK: end_access [[A2]]
+// CHECK-LABEL: } // end sil function 'dontMergeBypassedLoopAccess'
+sil [ossa] @dontMergeBypassedLoopAccess : $@convention(thin) (@guaranteed LoopClock) -> () {
+bb0(%0 : @guaranteed $LoopClock):
+  br bb1
+
+bb1:
+  %f = function_ref @loopClockTick : $@convention(thin) (@guaranteed LoopClock) -> ()
+  %a = apply %f(%0) : $@convention(thin) (@guaranteed LoopClock) -> ()
+  %c = ref_element_addr %0 : $LoopClock, #LoopClock.cycles
+  %1 = begin_access [modify] [dynamic] %c : $*Int64
+  %2 = load [trivial] %1 : $*Int64
+  store %2 to [trivial] %1 : $*Int64
+  end_access %1 : $*Int64
+  %o = ref_element_addr %0 : $LoopClock, #LoopClock.ok
+  %3 = begin_access [read] [dynamic] %o : $*Builtin.Int1
+  %4 = load [trivial] %3 : $*Builtin.Int1
+  end_access %3 : $*Builtin.Int1
+  cond_br %4, bb2, bb4
+
+bb2:
+  %5 = begin_access [modify] [dynamic] %c : $*Int64
+  %6 = load [trivial] %5 : $*Int64
+  store %6 to [trivial] %5 : $*Int64
+  end_access %5 : $*Int64
+  cond_br undef, bb3, bb5
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+
+bb5:
+  br bb1
+
+bb4:
+  br bb1
 }

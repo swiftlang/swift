@@ -71,4 +71,29 @@ tests.test("copyable type")
     C2().foo()
   }
 
+// rdar://190352551: AccessEnforcementOpts must not merge accesses in a loop
+// when the `continue` back edge bypasses the second access.
+final class C3 {
+  var n = 0
+  var ok = true
+
+  @inline(never) func pick() { ok.toggle() }
+
+  func run(_ b: Bool) {
+    while true {
+      pick()
+      n += 1
+      guard ok else { continue }
+      n += 1
+      if b { break }
+    }
+  }
+}
+
+tests.test("loop with bypassed access") {
+  let c = C3()
+  c.run(true)
+  expectEqual(3, c.n)
+}
+
 runAllTests()
