@@ -27,6 +27,7 @@
 #include "clang/CAS/IncludeTree.h"
 #include "clang/Frontend/CompileJobCacheResult.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
+#include "llvm/CAS/CASExportingOutputBackend.h"
 #include "llvm/CAS/CASFileSystem.h"
 #include "llvm/CAS/HierarchicalTreeBuilder.h"
 #include "llvm/CAS/ObjectStore.h"
@@ -62,9 +63,10 @@ llvm::IntrusiveRefCntPtr<SwiftCASOutputBackend> createSwiftCachingOutputBackend(
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
     const FrontendOptions &Opts, FrontendOptions::ActionType Action,
-    bool WriteOutputHashXAttr) {
+    bool WriteOutputHashXAttr, bool UseCASBackend) {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
-      CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action, WriteOutputHashXAttr);
+      CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action, WriteOutputHashXAttr,
+      UseCASBackend);
 }
 
 Error cas::CachedResultLoader::replay(CallbackTy Callback) {
@@ -300,40 +302,55 @@ static bool replayCachedCompilerOutputsImpl(
 
   // Replay the result only when everything is resolved.
   for (auto &Output : OutputProxies) {
-    auto File = Backend.createFile(Output.Path, getOutputConfig(Output.Kind));
-    if (!File) {
-      Diag.diagnose(SourceLoc(), diag::error_opening_output, Output.Path,
-                    toString(File.takeError()));
-      continue;
-    }
+    // Export the outputs that are replayed as-is from the CAS, which can clone
+    // the files backing them, except for stdout.
+    bool IsReplayedAsIs =
+        !(UseCASBackend && Output.Kind == file_types::ID::TY_Object) &&
+        Output.Kind != file_types::ID::TY_Dependencies &&
+        Output.Kind != file_types::ID::TY_ConstValues;
+    if (IsReplayedAsIs && Output.Path != "-") {
+      if (auto E = CASExportingOutputBackend::writeObject(
+              Output.Path, Output.Proxy, getOutputConfig(Output.Kind))) {
+        Diag.diagnose(SourceLoc(), diag::error_closing_output, Output.Path,
+                      toString(std::move(E)));
+        continue;
+      }
+    } else {
+      auto File = Backend.createFile(Output.Path, getOutputConfig(Output.Kind));
+      if (!File) {
+        Diag.diagnose(SourceLoc(), diag::error_opening_output, Output.Path,
+                      toString(File.takeError()));
+        continue;
+      }
 
-    if (UseCASBackend && Output.Kind == file_types::ID::TY_Object) {
-      auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
-      if (auto E = Schema->serializeObjectFile(Output.Proxy, *File)) {
-        Diag.diagnose(SourceLoc(), diag::error_mccas, toString(std::move(E)));
-        return false;
-      }
-    } else if (Output.Kind == file_types::ID::TY_Dependencies) {
-      if (emitMakeDependenciesFromSerializedBuffer(
-            Output.Proxy.getData(), *File, Opts, Output.Input, Diag)) {
-        Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
-                      "failed to emit dependency file");
-        return false;
-      }
-    } else if (Output.Kind == file_types::ID::TY_ConstValues) {
-      if (remapConstValuesJSON(Output.Proxy.getData(), *File,
-                               Opts.CacheReplayPrefixMap)) {
-        Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
-                      "failed to remap const values file");
-        return false;
-      }
-    } else
-      *File << Output.Proxy.getData();
+      if (UseCASBackend && Output.Kind == file_types::ID::TY_Object) {
+        auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
+        if (auto E = Schema->serializeObjectFile(Output.Proxy, *File)) {
+          Diag.diagnose(SourceLoc(), diag::error_mccas, toString(std::move(E)));
+          return false;
+        }
+      } else if (Output.Kind == file_types::ID::TY_Dependencies) {
+        if (emitMakeDependenciesFromSerializedBuffer(
+                Output.Proxy.getData(), *File, Opts, Output.Input, Diag)) {
+          Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                        "failed to emit dependency file");
+          return false;
+        }
+      } else if (Output.Kind == file_types::ID::TY_ConstValues) {
+        if (remapConstValuesJSON(Output.Proxy.getData(), *File,
+                                 Opts.CacheReplayPrefixMap)) {
+          Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
+                        "failed to remap const values file");
+          return false;
+        }
+      } else
+        *File << Output.Proxy.getData();
 
-    if (auto E = File->keep()) {
-      Diag.diagnose(SourceLoc(), diag::error_closing_output, Output.Path,
-                    toString(std::move(E)));
-      continue;
+      if (auto E = File->keep()) {
+        Diag.diagnose(SourceLoc(), diag::error_closing_output, Output.Path,
+                      toString(std::move(E)));
+        continue;
+      }
     }
     if (WriteOutputHashXAttr && Output.Kind == file_types::ID::TY_Object) {
       if (auto E = llvm::cas::writeCASHashXAttr(
