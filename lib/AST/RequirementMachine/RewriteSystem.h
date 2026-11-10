@@ -404,9 +404,12 @@ private:
   std::optional<std::pair<unsigned, unsigned>>
   findRuleToDelete(EliminationPredicate isRedundantRuleFn);
 
-  void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
+  void deleteRule(unsigned ruleID, const RewritePath &replacementPath,
+                  std::vector<llvm::SmallVector<unsigned, 1>> &loopsByRule);
 
   void performHomotopyReduction(EliminationPredicate isRedundantRuleFn);
+
+  void verifyRedundantRulesReplaced() const;
 
 public:
   // Utilities for minimal conformances algorithm, defined in
