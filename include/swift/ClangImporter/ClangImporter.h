@@ -432,6 +432,15 @@ public:
   instantiateCXXClassTemplate(clang::ClassTemplateDecl *decl,
                       ArrayRef<clang::TemplateArgument> arguments) override;
 
+  /// Instantiate `__SwiftSubclassShim<Base, Size, Align>` which provides the
+  /// backing storage for a Swift class which subclasses the C++ foreign
+  /// reference type \p base and adds \p swiftFieldsSize bytes of stored
+  /// properties.
+  const clang::CXXRecordDecl *
+  instantiateForeignReferenceSubclassShim(const clang::CXXRecordDecl *base,
+                                          uint64_t swiftFieldsSize,
+                                          uint64_t swiftFieldsAlign);
+
   ConcreteDeclRef getCXXFunctionTemplateSpecialization(
           SubstitutionMap subst, ValueDecl *decl) override;
 

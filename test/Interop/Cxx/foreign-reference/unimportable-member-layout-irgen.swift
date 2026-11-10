@@ -4,8 +4,8 @@ import MemberLayout
 
 // Make sure the "refs" and "values" look *exactly* the same.
 
-// CHECK: %TSo10IntCharRefV = type <{ %Ts5Int32V, %Ts4Int8V }>
-// CHECK: %TSo12IntCharValueV = type <{ %Ts5Int32V, %Ts4Int8V }>
+// CHECK: %TSo10IntCharRefV = type <{ %Ts5Int32V, %Ts4Int8V, [3 x i8] }>
+// CHECK: %TSo12IntCharValueV = type <{ %Ts5Int32V, %Ts4Int8V, [3 x i8] }>
 
 // CHECK: %TSo21UnimportableMemberRefV = type <{ %Ts5Int32V, %Ts5Int32V, [8 x i8], %Ts5Int32V }>
 // CHECK: %TSo23UnimportableMemberValueV = type <{ %Ts5Int32V, %Ts5Int32V, [8 x i8], %Ts5Int32V }>

@@ -8623,6 +8623,70 @@ ClangImporter::instantiateCXXClassTemplate(
       Impl.importDecl(ctsd, Impl.CurrentVersion));
 }
 
+const clang::CXXRecordDecl *
+ClangImporter::instantiateForeignReferenceSubclassShim(
+    const clang::CXXRecordDecl *base, uint64_t swiftFieldsSize,
+    uint64_t swiftFieldsAlign) {
+  auto &ctx = Impl.SwiftContext;
+
+  // Look up `__SwiftSubclassShim` in CxxShim module.
+  auto cxxShimModule = ctx.getLoadedModule(ctx.getIdentifier(CXX_SHIM_NAME));
+  if (!cxxShimModule)
+    return nullptr;
+
+  SmallVector<ValueDecl *, 1> templateResults;
+  ctx.lookupInModule(cxxShimModule, "__SwiftSubclassShim", templateResults);
+  ASSERT(templateResults.size() == 1 && "must have a single shim template");
+  auto shimTemplate =
+      const_cast<clang::ClassTemplateDecl *>(dyn_cast<clang::ClassTemplateDecl>(
+          templateResults.front()->getClangDecl()));
+
+  auto &clangCtx = getClangASTContext();
+  clang::QualType baseType = clangCtx.getCanonicalTagType(base);
+  clang::QualType unsignedLongTy = clangCtx.UnsignedLongTy;
+  unsigned unsignedLongWidth = clangCtx.getIntWidth(unsignedLongTy);
+
+  auto integralArg = [&](uint64_t value) {
+    return clang::TemplateArgument(
+        clangCtx,
+        llvm::APSInt(llvm::APInt(unsignedLongWidth, value),
+                     /*isUnsigned=*/true),
+        unsignedLongTy);
+  };
+
+  // __SwiftSubclassShim<Base, Size, Align>
+  SmallVector<clang::TemplateArgument, 3> shimTemplateArgs = {
+      clang::TemplateArgument(baseType), integralArg(swiftFieldsSize),
+      integralArg(swiftFieldsAlign)};
+
+  // Find or create the clang specialization. Don't import the type into Swift.
+  llvm::FoldingSetInsertToken insertPosition;
+  auto spec =
+      shimTemplate->findSpecialization(shimTemplateArgs, insertPosition);
+  if (!spec) {
+    spec = clang::ClassTemplateSpecializationDecl::Create(
+        clangCtx, shimTemplate->getTemplatedDecl()->getTagKind(),
+        shimTemplate->getDeclContext(),
+        shimTemplate->getTemplatedDecl()->getBeginLoc(),
+        shimTemplate->getLocation(), shimTemplate, shimTemplateArgs,
+        /*StrictPackMatch=*/false, nullptr);
+    shimTemplate->AddSpecialization(spec, insertPosition);
+  }
+
+  // Instantiate the definition so its layout and member functions exist.
+  if (!spec->hasDefinition()) {
+    clang::Sema &clangSema = Impl.getClangSema();
+    clang::Sema::ContextRAII context(clangSema,
+                                     clangCtx.getTranslationUnitDecl());
+    clangSema.InstantiateClassTemplateSpecialization(
+        spec->getLocation(), spec,
+        clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
+        /*Complain=*/false, /*PrimaryStrictPackMatch=*/false);
+  }
+
+  return spec;
+}
+
 // On Windows and 32-bit platforms we need to force "Int" to actually be
 // re-imported as "Int." This is needed because otherwise, we cannot round-trip
 // "Int" and "UInt". For example, on Windows, "Int" will be imported into C++ as

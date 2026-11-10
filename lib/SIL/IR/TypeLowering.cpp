@@ -81,7 +81,9 @@ namespace {
     /// Class metatypes have non-empty representation due to the
     /// possibility of subclassing.
     bool visitClassType(CanClassType type) {
-      if (type->isForeignReferenceType())
+      // The metatype of a C++ foreign reference type is a singleton, and so is
+      // the metatype of a Swift subclass of one, which must be final.
+      if (type->getDecl()->getForeignReferenceSuperclassOrSelf())
         return true;
       return false;
     }
