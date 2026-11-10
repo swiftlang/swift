@@ -20,21 +20,31 @@
 using namespace swift;
 using namespace Lowering;
 
-static FuncDecl *synthesizeExit(ASTContext &ctx, ModuleDecl *moduleDecl) {
+static FuncDecl *synthesizeExit(ASTContext &ctx, ModuleDecl *moduleDecl,
+                                StringRef name) {
   // Synthesize an exit function with this interface.
   // @_extern(c)
-  // func exit(_: Int32) -> Never
+  // func <name>(_: Int32) -> Never
   ParameterList *params =
       ParameterList::createWithoutLoc(ParamDecl::createImplicit(
           ctx, Identifier(), Identifier(), ctx.getInt32Type(), moduleDecl));
   FuncDecl *exitFuncDecl = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None,
-      DeclName(ctx, DeclBaseName(ctx.getIdentifier("exit")), params), {},
+      DeclName(ctx, DeclBaseName(ctx.getIdentifier(name)), params), {},
       /*async*/ false, /*throws*/ false, /*thrownType*/ Type(), {}, params,
       ctx.getNeverType(), moduleDecl);
   exitFuncDecl->addAttribute(new (ctx) ExternAttr(
       std::nullopt, std::nullopt, ExternKind::C, /*implicit*/ true));
   return exitFuncDecl;
+}
+
+static FuncDecl *getExitFunction(SILGenModule &SGM, ModuleDecl *moduleDecl) {
+  ASTContext &ctx = SGM.getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::Embedded))
+    return synthesizeExit(ctx, moduleDecl, "_swift_exit");
+  if (FuncDecl *exitFuncDecl = SGM.getExit())
+    return exitFuncDecl;
+  return synthesizeExit(ctx, moduleDecl, "exit");
 }
 
 void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
@@ -106,11 +116,8 @@ void SILGenModule::emitEntryPoint(SourceFile *SF, SILFunction *TopLevel) {
 
   SILType returnType;
   if (isAsyncTopLevel) {
-    FuncDecl *exitFuncDecl = getExit();
-    if (!exitFuncDecl) {
-      // If it doesn't exist, we can conjure one up instead of crashing
-      exitFuncDecl = synthesizeExit(getASTContext(), TopLevel->getModule().getSwiftModule());
-    }
+    FuncDecl *exitFuncDecl =
+        getExitFunction(*this, TopLevel->getModule().getSwiftModule());
     exitFunc = getFunction(
         SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
         NotForDefinition);
@@ -224,7 +231,7 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
       32, getASTContext());
 
   // Set up the exit block, which will either return the exit value
-  // (for synchronous main()) or call exit() with the return value (for
+  // (for synchronous main()) or pass it to the exit function (for
   // asynchronous main()).
   auto *exitBlock = createBasicBlock();
   SILValue exitCode =
@@ -238,11 +245,7 @@ void SILGenFunction::emitCallToMain(FuncDecl *mainFunc) {
       exitCode = B.createStruct(loc, returnType, exitCode);
     B.createReturn(loc, exitCode);
   } else {
-    FuncDecl *exitFuncDecl = SGM.getExit();
-    if (!exitFuncDecl) {
-      // If it doesn't exist, we can conjure one up instead of crashing
-      exitFuncDecl = synthesizeExit(getASTContext(), mainFunc->getModuleContext());
-    }
+    FuncDecl *exitFuncDecl = getExitFunction(SGM, mainFunc->getModuleContext());
     SILFunction *exitSILFunc = SGM.getFunction(
         SILDeclRef(exitFuncDecl, SILDeclRef::Kind::Func, /*isForeign*/ true),
         NotForDefinition);
