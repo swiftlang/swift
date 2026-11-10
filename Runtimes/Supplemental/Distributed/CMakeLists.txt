@@ -46,6 +46,7 @@ include(EmitSwiftInterface)
 include(InstallSwiftInterface)
 include(PlatformInfo)
 include(ResourceEmbedding)
+include(FramePointers)
 include(CatalystSupport)
 include(SwiftCallingConventions)
 

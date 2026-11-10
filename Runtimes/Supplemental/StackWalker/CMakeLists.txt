@@ -27,6 +27,7 @@ endif()
 
 include(GNUInstallDirs)
 include(ResourceEmbedding)
+include(FramePointers)
 
 # NOTE: we disable availability checking because we need to use code from the
 # RuntimeModule, but we also need to build with an availability version below
