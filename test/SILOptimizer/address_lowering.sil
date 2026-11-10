@@ -4024,3 +4024,66 @@ bb3:
   %8 = tuple ()
   return %8 : $()
 }
+
+// The variable takes the payload into its own storage before the copied enum's
+// source is overwritten.
+// CHECK-LABEL: sil [ossa] @zzcVarBindsPayloadOfCopy : $@convention(thin) <T> (@inout Optional<T>) -> () {
+// CHECK:       bb0(%0 : $*Optional<T>):
+// CHECK-NEXT:    [[COPY:%[^ ]+]] = alloc_stack $Optional<T>
+// CHECK-NEXT:    copy_addr %0 to [init] [[COPY]] : $*Optional<T>
+// CHECK-NEXT:    switch_enum_addr [[COPY]] : $*Optional<T>, case #Optional.some!enumelt: [[SOME:bb[0-9]+]]
+// CHECK:       [[SOME]]:
+// CHECK-NEXT:    [[VAR:%[^ ]+]] = alloc_stack [lexical] $T
+// CHECK:         [[PAYLOAD:%[^ ]+]] = unchecked_inplace_enum_data_addr [[COPY]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK-NEXT:    copy_addr [take] [[PAYLOAD]] to [init] [[VAR]] : $*T
+// CHECK:         copy_addr [take] {{%[^ ]+}} to %0 : $*Optional<T>
+// CHECK:         apply {{%[^ ]+}}<T>([[VAR]])
+// CHECK-LABEL: } // end sil function 'zzcVarBindsPayloadOfCopy'
+sil [ossa] @zzcVarBindsPayloadOfCopy : $@convention(thin) <T> (@inout Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  %1 = load [copy] %0 : $*Optional<T>
+  switch_enum %1 : $Optional<T>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  br bb3
+
+bb2(%4 : @owned $T):
+  %5 = move_value [lexical] [var_decl] %4 : $T
+  %6 = enum $Optional<T>, #Optional.none!enumelt
+  store %6 to [assign] %0 : $*Optional<T>
+  %8 = function_ref @sink : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<T>(%5) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %5 : $T
+  br bb3
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// The variable shares the storage of the throwing call's indirect result.
+// CHECK-LABEL: sil [ossa] @zzdVarBindsElementOfThrowingCall : $@convention(thin) <T> () -> @error any Error {
+// CHECK:         [[VAR:%[^ ]+]] = alloc_stack [lexical] $T
+// CHECK:         try_apply undef<T>([[VAR]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error
+// CHECK:       [[NORMAL]]([[OBJ:%[^ ]+]] : @owned $AnyObject):
+// CHECK-NOT:     copy_addr
+// CHECK:         apply {{%[^ ]+}}<T>([[VAR]])
+// CHECK:         destroy_addr [[VAR]] : $*T
+// CHECK-LABEL: } // end sil function 'zzdVarBindsElementOfThrowingCall'
+sil [ossa] @zzdVarBindsElementOfThrowingCall : $@convention(thin) <T> () -> (@error any Error) {
+bb0:
+  try_apply undef<T>() : $@convention(thin) <τ_0_0> () -> (@out τ_0_0, @owned AnyObject, @error any Error), normal bb1, error bb2
+
+bb1(%1 : @owned $(T, AnyObject)):
+  (%2, %3) = destructure_tuple %1 : $(T, AnyObject)
+  %4 = move_value [lexical] [var_decl] %2 : $T
+  destroy_value %3 : $AnyObject
+  %6 = function_ref @sink : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %7 = apply %6<T>(%4) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %4 : $T
+  %9 = tuple ()
+  return %9 : $()
+
+bb2(%11 : @owned $any Error):
+  throw %11 : $any Error
+}
