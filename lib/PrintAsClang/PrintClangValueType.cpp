@@ -260,11 +260,12 @@ void ClangValueTypePrinter::printValueTypeDecl(
     ClangSyntaxPrinter(Context, os).printSwiftImplQualifier();
     os << function << '(' << reference << ");\n";
   };
-  auto printInlineMove = [&](raw_ostream &os) {
+  auto printInlineMove = [&](raw_ostream &os, unsigned indent = 4) {
+    os << std::string(indent, ' ');
     if (isSingleSwiftReference) {
-      os << "    memcpy(_storage, other._storage, sizeof(void *));\n";
+      os << "memcpy(_storage, other._storage, sizeof(void *));\n";
     } else {
-      os << "    vwTable->initializeWithTake(_storage, "
+      os << "vwTable->initializeWithTake(_storage, "
             "const_cast<char *>(other._getOpaquePointer()), metadata._0);\n";
     }
   };
@@ -386,24 +387,37 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "    if (this == &other) return *this;\n";
       if (!isSingleSwiftReference)
         printVWTable(os);
-      // The destination may itself be moved from, as in 'std::swap'. Destroy
-      // explicitly: 'assignWithTake' does not run a declared 'deinit'.
-      os << "    if (!_isMovedFrom()) {\n";
-      if (isSingleSwiftReference) {
-        os << "      void *reference;\n"
-              "      memcpy(&reference, _storage, sizeof(reference));\n";
-        printReferenceCountCall(os, "swift_release", "reference", 6);
-      } else {
-        os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
-      }
-      os << "    }\n";
-      os << "    if (other._isMovedFrom()) {\n";
-      os << "      _setMovedFrom();\n";
+      // Either side may be moved from: the destination in 'std::swap', the
+      // source when C++ assigns a moved-from object. Without an old value this
+      // is a move construction.
+      os << "    if (_isMovedFrom()) {\n";
+      os << "      if (other._isMovedFrom()) return *this;\n";
+      printInlineMove(os, 6);
+      os << "      other._setMovedFrom();\n";
       os << "      return *this;\n";
       os << "    }\n";
-      printInlineMove(os);
-      os << "    other._setMovedFrom();\n";
-      os << "  return *this;\n";
+      // Destroy the old value last, as Swift assignment does, so a 'deinit'
+      // that runs then finds this object assigned and the source moved from.
+      if (isSingleSwiftReference) {
+        os << "    void *oldReference;\n"
+              "    memcpy(&oldReference, _storage, sizeof(oldReference));\n";
+      } else {
+        os << "    alignas(" << typeSizeAlign->alignment << ") char _oldValue["
+           << typeSizeAlign->size << "];\n";
+        os << "    vwTable->initializeWithTake(_oldValue, _storage, "
+              "metadata._0);\n";
+      }
+      os << "    if (other._isMovedFrom()) {\n";
+      os << "      _setMovedFrom();\n";
+      os << "    } else {\n";
+      printInlineMove(os, 6);
+      os << "      other._setMovedFrom();\n";
+      os << "    }\n";
+      if (isSingleSwiftReference)
+        printReferenceCountCall(os, "swift_release", "oldReference");
+      else
+        os << "    vwTable->destroy(_oldValue, metadata._0);\n";
+      os << "    return *this;\n";
       os << "  }\n";
     }
 

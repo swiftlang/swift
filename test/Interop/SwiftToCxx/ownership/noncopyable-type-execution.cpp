@@ -167,6 +167,14 @@ int main(int argc, char **argv) {
     consumeMoveOnlyWithRef(std::move(t));
   }
 
+  // Move assignment destroys the old value once, and the new one at the end.
+  // CHECK-NEXT: destroy Ref
+  // CHECK-NEXT: destroy Ref
+  {
+    auto s = makeMoveOnlyWithRef();
+    s = makeMoveOnlyWithRef();
+  }
+
   // A value of more than four words is returned and consumed indirectly.
   // CHECK-NEXT: destroy BigMoveOnly(4)
   {

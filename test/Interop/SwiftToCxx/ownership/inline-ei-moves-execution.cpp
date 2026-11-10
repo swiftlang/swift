@@ -48,6 +48,7 @@ using namespace InlineMoves;
 
 static_assert(sizeof(SingleRef) == sizeof(void *), "no added state storage");
 static_assert(sizeof(ReferenceChoice) == sizeof(void *), "no added state storage");
+static_assert(std::is_standard_layout<SingleRef>::value, "");
 static_assert(std::is_nothrow_move_constructible<SingleRef>::value, "");
 static_assert(std::is_nothrow_move_assignable<SingleRef>::value, "");
 static_assert(std::is_trivially_copyable<TrivialBool>::value, "");
@@ -221,6 +222,22 @@ int main(int argc, char **argv) {
     assert(retainCount(ref) == 1);
   }
   assert(destroyedRefs() == 1);
+
+  {
+    // Move assignment destroys the old value last, so its deinit already
+    // finds the new value in the destination.
+    auto second = Ref::init(2);
+    auto single = SingleRef::init(Ref::init(1));
+    watchReference(&single, 0, second);
+    single = SingleRef::init(second);
+    assert(deinitSawNewValue());
+    auto fourth = Ref::init(4);
+    auto padded = PaddedRef::init(Ref::init(3));
+    watchReference(&padded, paddedRefOffset(), fourth);
+    padded = PaddedRef::init(fourth);
+    assert(deinitSawNewValue());
+  }
+  assert(destroyedRefs() == 5);
 
   swift::String cString("string from C++");
   swift::String emptyString(nullptr);

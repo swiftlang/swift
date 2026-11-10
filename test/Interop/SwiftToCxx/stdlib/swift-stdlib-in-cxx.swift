@@ -49,8 +49,9 @@
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK Array &operator =(Array &&other) noexcept {
 // CHECK-NEXT: if (this == &other) return *this;
-// CHECK: vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
-// CHECK-NEXT: other._setMovedFrom();
+// CHECK: alignas({{[0-9]+}}) char _oldValue[{{[0-9]+}}];
+// CHECK-NEXT: vwTable->initializeWithTake(_oldValue, _storage, metadata._0);
+// CHECK: vwTable->destroy(_oldValue, metadata._0);
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK Array(const Array &other) noexcept {
@@ -109,8 +110,9 @@
 // CHECK-NEXT:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(String &&other) noexcept {
 // CHECK-NEXT:  if (this == &other) return *this;
-// CHECK:  vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
-// CHECK-NEXT:  other._setMovedFrom();
+// CHECK:  alignas({{[0-9]+}}) char _oldValue[{{[0-9]+}}];
+// CHECK-NEXT:  vwTable->initializeWithTake(_oldValue, _storage, metadata._0);
+// CHECK:  vwTable->destroy(_oldValue, metadata._0);
 // CHECK-NEXT:  return *this;
 // CHECK-NEXT:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String(const String &other) noexcept {

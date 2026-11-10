@@ -140,12 +140,18 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // CHECK-NEXT:     other._setMovedFrom();
 // CHECK:   SWIFT_INLINE_THUNK MoveOnlyWithRef &operator =(MoveOnlyWithRef &&other) noexcept {
 // CHECK-NEXT:     if (this == &other) return *this;
-// CHECK:     if (!_isMovedFrom())
-// CHECK-NEXT:       vwTable->destroy(_getOpaquePointer(), metadata._0);
-// CHECK:     if (other._isMovedFrom()) {
-// CHECK-NEXT:       _setMovedFrom();
+// CHECK:     if (_isMovedFrom()) {
+// CHECK-NEXT:       if (other._isMovedFrom()) return *this;
+// CHECK-NEXT:       vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:       other._setMovedFrom();
+// CHECK-NEXT:       return *this;
+// CHECK-NEXT:     }
+// CHECK-NEXT:     alignas({{[0-9]+}}) char _oldValue[{{[0-9]+}}];
+// CHECK-NEXT:     vwTable->initializeWithTake(_oldValue, _storage, metadata._0);
 // CHECK:     vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
 // CHECK-NEXT:     other._setMovedFrom();
+// CHECK-NEXT:     }
+// CHECK-NEXT:     vwTable->destroy(_oldValue, metadata._0);
 // CHECK:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { if (_isMovedFrom()) abort(); return _storage; }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { if (_isMovedFrom()) abort(); return _storage; }
 // CHECK:   bool _isMovedFrom() const noexcept {

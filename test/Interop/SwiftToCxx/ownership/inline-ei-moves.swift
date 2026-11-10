@@ -62,10 +62,20 @@
 // CHECK: void _setMovedFrom() noexcept {
 
 private var destroyedReferences = 0
+private var watchedReference: UnsafeRawPointer?
+private var expectedReference: UInt = 0
+private var watchedDeinitSawNewValue = false
 public final class Ref {
   public let id: Int
   public init(_ id: Int) { self.id = id }
-  deinit { destroyedReferences += 1 }
+  deinit {
+    destroyedReferences += 1
+    if let reference = watchedReference {
+      watchedReference = nil
+      watchedDeinitSawNewValue =
+          reference.load(as: UInt.self) == expectedReference
+    }
+  }
 }
 
 // An empty case consumes one reference extra inhabitant. The moved-from state
@@ -94,6 +104,12 @@ public final class Ref {
 // CHECK: ~SingleRef() noexcept {
 // CHECK-NEXT: if (_isMovedFrom()) return;
 // CHECK: SingleRef(SingleRef &&other) noexcept {
+// CHECK: SingleRef &operator =(SingleRef &&other) noexcept {
+// CHECK: void *oldReference;
+// CHECK-NEXT: memcpy(&oldReference, _storage, sizeof(oldReference));
+// CHECK: other._setMovedFrom();
+// CHECK-NEXT: }
+// CHECK-NEXT: swift::_impl::swift_release(oldReference);
 // CHECK: SingleRef(const SingleRef &other) noexcept {
 // CHECK-NEXT: if (other._isMovedFrom()) {
 // CHECK: void _setMovedFrom() noexcept {
@@ -122,3 +138,19 @@ public func consume(_ value: consuming SingleRef) -> Int { value.ref.id }
 public func paddedStride() -> Int { MemoryLayout<PaddedRef>.stride }
 public func boolWeakStride() -> Int { MemoryLayout<BoolWeak>.stride }
 public func destroyedRefs() -> Int { destroyedReferences }
+
+// The next 'Ref' deinit checks that 'value' already holds 'expected' at
+// 'offset'.
+public func watchReference(in value: UnsafeRawPointer, at offset: Int,
+                           expecting expected: Ref) {
+  watchedReference = value + offset
+  expectedReference =
+      UInt(bitPattern: Unmanaged.passUnretained(expected).toOpaque())
+  watchedDeinitSawNewValue = false
+}
+public func deinitSawNewValue() -> Bool {
+  watchedReference == nil && watchedDeinitSawNewValue
+}
+public func paddedRefOffset() -> Int {
+  MemoryLayout<PaddedRef>.offset(of: \.ref)!
+}
