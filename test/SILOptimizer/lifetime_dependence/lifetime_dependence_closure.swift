@@ -364,3 +364,19 @@ func throwWithoutStore(array: [Int]) -> Int {
   } catch {}
   return count
 }
+
+// rdar://190239363 - The autoclosure on the RHS of || or && captures a
+// lifetime-dependent value. ClosureLifetimeFixup must not emit a non-dead-end
+// destroy of the capture on the unreachable error path, after the dependence
+// scope has ended.
+@available(SwiftStdlib 6.2, *)
+func spanInLogicalOr(_ s: String) -> Bool {
+  let span = s.utf8.span
+  return span[0] == UInt8(ascii: "_") || span[0] == UInt8(ascii: "-")
+}
+
+@available(SwiftStdlib 6.2, *)
+func spanInLogicalAnd(_ s: String) -> Bool {
+  let span = s.utf8.span
+  return span[0] == UInt8(ascii: "_") && span[1] == UInt8(ascii: "-")
+}
