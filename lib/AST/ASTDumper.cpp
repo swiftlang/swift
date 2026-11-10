@@ -3485,17 +3485,15 @@ public:
         
         if (auto *CasePattern = LabelItem.getPattern()) {
           switch (CasePattern->getOwnership()) {
-          case ValueOwnership::Default:
-            break;
-          case ValueOwnership::Shared:
+          case LoweredOwnership::Shared:
             printFieldRaw([](llvm::raw_ostream &os) { os << "borrowing"; },
                           Label::always("ownership"));
             break;
-          case ValueOwnership::InOut:
+          case LoweredOwnership::InOut:
             printFieldRaw([](llvm::raw_ostream &os) { os << "mutating"; },
                           Label::always("ownership"));
             break;
-          case ValueOwnership::Owned:
+          case LoweredOwnership::Owned:
             printFieldRaw([](llvm::raw_ostream &os) { os << "consuming"; },
                           Label::always("ownership"));
             break;

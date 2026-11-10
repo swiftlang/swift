@@ -3722,7 +3722,8 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       : ValueOwnership::Owned;
     for (auto caseLabel : S->getCases()) {
       for (auto item : caseLabel->getCaseLabelItems()) {
-        ownership = std::max(ownership, item.getPattern()->getOwnership());
+        ownership = std::max(
+            ownership, asValueOwnership(item.getPattern()->getOwnership()));
       }
       // To help migrate early adopters of the feature, if the case body is
       // obviously trying to return out one of the pattern bindings, which

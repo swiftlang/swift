@@ -579,6 +579,21 @@ SILGenFunction::emitSiblingMethodRef(SILLocation loc,
       ManagedValue::forObjectRValueWithoutOwnership(methodValue), methodTy);
 }
 
+/// Returns true if \p addr is the storage of a capture that the current
+/// function may not consume: an immutable box or a guaranteed address.
+static bool isImmutableCapture(SILValue addr) {
+  if (auto *project = dyn_cast<ProjectBoxInst>(addr)) {
+    auto *box = dyn_cast<SILFunctionArgument>(project->getOperand());
+    return box && box->isClosureCapture() &&
+           !box->getType().castTo<SILBoxType>()->isFieldMutable(
+               project->getFieldIndex());
+  }
+
+  auto *arg = dyn_cast<SILFunctionArgument>(addr);
+  return arg && arg->isClosureCapture() &&
+         arg->getArgumentConvention().isGuaranteedConventionInCallee();
+}
+
 void SILGenFunction::emitCaptures(SILLocation loc,
                                   SILDeclRef closure,
                                   CaptureEmission purpose,
@@ -791,32 +806,14 @@ void SILGenFunction::emitCaptures(SILLocation loc,
       }
     };
 
-    auto &Entry = found->second;
-    auto val = Entry.value;
-
-    switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
-    case CaptureKind::Constant: {
-      assert(!isPack);
-
-      // let declarations.
+    // Captures a copy of the value of the 'let' binding \p val.
+    auto captureCopyOfLet = [&](SILValue val) {
       auto &tl = getTypeLowering(valueType);
       bool eliminateMoveOnlyWrapper =
           val->getType().isMoveOnlyWrapped() &&
           !interfaceType->is<SILMoveOnlyWrappedType>();
 
       if (!val->getType().isAddress()) {
-        // Our 'let' binding can guarantee the lifetime for the callee,
-        // if we don't need to do anything more to it.
-        if (canGuarantee && !vd->getInterfaceType()->is<ReferenceStorageType>()) {
-          auto guaranteed = B.borrowObjectRValue(
-              *this, loc, val, ManagedValue::ScopeKind::Lexical);
-          if (eliminateMoveOnlyWrapper)
-            guaranteed = B.createGuaranteedMoveOnlyWrapperToCopyableValue(
-                loc, guaranteed);
-          capturedArgs.push_back(guaranteed);
-          break;
-        }
-
         // Just copy a by-val let.
         val = B.emitCopyValueOperation(loc, val);
         // If we need to unwrap a moveonlywrapped value, do so now but in an
@@ -849,14 +846,54 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         val = emitConversionFromSemanticValue(loc, val, getLoweredType(type));
 
       capturedArgs.push_back(emitManagedRValueWithCleanup(val));
+    };
+
+    auto &Entry = found->second;
+    auto val = Entry.value;
+
+    switch (SGM.Types.getDeclCaptureKind(capture, expansion)) {
+    case CaptureKind::Constant: {
+      assert(!isPack);
+
+      // let declarations.
+      // Our 'let' binding can guarantee the lifetime for the callee,
+      // if we don't need to do anything more to it.
+      if (!val->getType().isAddress() && canGuarantee &&
+          !vd->getInterfaceType()->is<ReferenceStorageType>()) {
+        auto guaranteed = B.borrowObjectRValue(
+            *this, loc, val, ManagedValue::ScopeKind::Lexical);
+        if (val->getType().isMoveOnlyWrapped() &&
+            !interfaceType->is<SILMoveOnlyWrappedType>())
+          guaranteed =
+              B.createGuaranteedMoveOnlyWrapperToCopyableValue(loc, guaranteed);
+        capturedArgs.push_back(guaranteed);
+        break;
+      }
+
+      captureCopyOfLet(val);
       break;
     }
     case CaptureKind::Consuming: {
       assert(!isPack);
-      assert(val->getType().isAddress() &&
-             "at-most-once values are bound as local boxed storage");
 
       auto &tl = getTypeLowering(valueType);
+
+      // A binding that the function only borrows, such as a binding of a
+      // borrowing `switch`, is marked so that the move checker rejects
+      // consuming it. The closure still takes ownership of its capture, so
+      // capture a copy, which the move checker then diagnoses as consuming the
+      // borrowed binding.
+      auto *mark = dyn_cast<MarkUnresolvedNonCopyableValueInst>(val);
+      if (mark && mark->getCheckKind() == MarkUnresolvedNonCopyableValueInst::
+                                              CheckKind::NoConsumeOrAssign) {
+        captureCopyOfLet(val);
+        break;
+      }
+
+      // Otherwise, the value is in local storage. Sema doesn't let the closure
+      // consume a value that the function only captured immutably.
+      ASSERT(val->getType().isAddress() && !isImmutableCapture(val) &&
+             "consumed captures are taken out of local storage");
 
       // Consuming a capture means taking the original value out of its local
       // storage and moving it into the closure. Any further use of the outer

@@ -474,3 +474,49 @@ func testLocalLetCaptureIsNotConsumed() {
 
   _ = r
 }
+
+// A binding of a borrowing `switch` is borrowed, so the closure captures a copy
+// of it, which the move checker diagnoses.
+// CHECK-LABEL: sil hidden [ossa] @$s37callable_once_attr_consuming_captures40testBorrowedSwitchBindingCaptureIsCopiedyyAA8ResourceVSgF : $@convention(thin) (@guaranteed Optional<Resource>) -> () {
+// CHECK: bb1([[PAYLOAD:%.*]] : @guaranteed $Resource):
+// CHECK:  [[PAYLOAD_COPY:%.*]] = copy_value [[PAYLOAD]] : $Resource
+// CHECK:  [[R:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[PAYLOAD_COPY]] : $Resource
+// CHECK:  [[CLOSURE:%.*]] = function_ref @$s37callable_once_attr_consuming_captures40testBorrowedSwitchBindingCaptureIsCopiedyyAA8ResourceVSgFyyXEfU_
+// CHECK:  [[R_COPY:%.*]] = copy_value [[R]] : $Resource
+// CHECK:  partial_apply [called_at_most_once] [[CLOSURE]]([[R_COPY]]) : $@convention(thin) (@owned Resource) -> ()
+// CHECK: } // end sil function '$s37callable_once_attr_consuming_captures40testBorrowedSwitchBindingCaptureIsCopiedyyAA8ResourceVSgF'
+func testBorrowedSwitchBindingCaptureIsCopied(_ e: borrowing Resource?) {
+  switch e {
+  case .some(let r):
+    calledAtMostOnce {
+      r.use()
+    }
+  case .none:
+    break
+  }
+}
+
+func consumeValue<T: ~Copyable>(_ t: consuming T) {}
+
+// CHECK-LABEL: sil hidden [ossa] @$s37callable_once_attr_consuming_captures51testBorrowedAddressOnlySwitchBindingCaptureIsCopiedyyxSgRi_zlF : $@convention(thin) <T where T : ~Copyable> (@in_guaranteed Optional<T>) -> () {
+// CHECK: bb1:
+// CHECK:  [[PAYLOAD:%.*]] = unchecked_inplace_enum_data_addr {{%.*}} : $*Optional<T>, #Optional.some!enumelt
+// CHECK:  [[ACCESS:%.*]] = begin_access [read] [static] [no_nested_conflict] [[PAYLOAD]] : $*T
+// CHECK:  [[T:%.*]] = mark_unresolved_non_copyable_value [strict] [no_consume_or_assign] [[ACCESS]] : $*T
+// CHECK:  [[CLOSURE:%.*]] = function_ref @$s37callable_once_attr_consuming_captures51testBorrowedAddressOnlySwitchBindingCaptureIsCopiedyyxSgRi_zlFyyXEfU_
+// CHECK:  [[T_COPY:%.*]] = alloc_stack $T
+// CHECK:  copy_addr [[T]] to [init] [[T_COPY]] : $*T
+// CHECK:  partial_apply [called_at_most_once] [[CLOSURE]]<T>([[T_COPY]]) : $@convention(thin) <τ_0_0 where τ_0_0 : ~Copyable> (@in τ_0_0) -> ()
+// CHECK: } // end sil function '$s37callable_once_attr_consuming_captures51testBorrowedAddressOnlySwitchBindingCaptureIsCopiedyyxSgRi_zlF'
+func testBorrowedAddressOnlySwitchBindingCaptureIsCopied<T: ~Copyable>(
+  _ e: borrowing T?
+) {
+  switch e {
+  case .some(let t):
+    calledAtMostOnce {
+      consumeValue(t)
+    }
+  case .none:
+    break
+  }
+}

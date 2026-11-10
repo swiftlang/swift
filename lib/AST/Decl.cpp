@@ -9581,6 +9581,35 @@ ParamDecl::Specifier ParamDecl::getSpecifier() const {
                            ParamDecl::Specifier::Default);
 }
 
+std::optional<LoweredOwnership> VarDecl::getBindingOwnership() const {
+  switch (getIntroducer()) {
+  case Introducer::Let:
+    // `let` defaults to the prevailing ownership of the match.
+    return std::nullopt;
+
+  case Introducer::Var:
+    // If the variable's type is copyable, then we can bind the variable by
+    // copying without requiring more than a borrow of the original.
+    // FIXME: An explicit `consuming` binding kind consumes regardless of
+    // type.
+    if (!hasInterfaceType() || getTypeInContext()->isCopyable())
+      return std::nullopt;
+
+    // Noncopyable `var` consumes the bound value to move it into a new
+    // independent variable.
+    return LoweredOwnership::Owned;
+
+  case Introducer::InOut:
+    // `inout` bindings modify the value in-place.
+    return LoweredOwnership::InOut;
+
+  case Introducer::Borrowing:
+    // `borrow` bindings borrow parts of the value in-place.
+    return LoweredOwnership::Shared;
+  }
+  llvm_unreachable("bad introducer");
+}
+
 LoweredOwnership ParamDecl::getLoweredOwnership() const {
   auto *dc = getDeclContext();
   auto ownership = getValueOwnership();
