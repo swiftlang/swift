@@ -951,8 +951,9 @@ public:
 
   // Returns true if the function has any generic arguments.
   bool isGeneric() const {
-    auto s = getLoweredFunctionType()->getInvocationGenericSignature();
-    return s && !s->areAllParamsConcrete();
+    return getLoweredFunctionType()
+        ->getInvocationGenericSignature()
+        .isEffectivelyGeneric();
   }
 
   /// Returns true if this function ie either a class method, or a

@@ -986,7 +986,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
       getIRName(original), AutoDiffDerivativeFunctionKind::VJP, config);
   auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *vjpGenericEnv = nullptr;
-  if (vjpCanGenSig && !vjpCanGenSig->areAllParamsConcrete())
+  if (vjpCanGenSig.isEffectivelyGeneric())
     vjpGenericEnv = vjpCanGenSig.getGenericEnvironment();
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
@@ -1037,7 +1037,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
       getIRName(original), AutoDiffDerivativeFunctionKind::JVP, config);
   auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
   GenericEnvironment *jvpGenericEnv = nullptr;
-  if (jvpCanGenSig && !jvpCanGenSig->areAllParamsConcrete())
+  if (jvpCanGenSig.isEffectivelyGeneric())
     jvpGenericEnv = jvpCanGenSig.getGenericEnvironment();
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,

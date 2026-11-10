@@ -4417,7 +4417,7 @@ getGenericSignatureWithCapturedEnvironments(AnyFunctionRef fn,
 
 static CanGenericSignature
 getCanonicalSignatureOrNull(GenericSignature sig) {
-  if (!sig || sig->areAllParamsConcrete())
+  if (!sig.isEffectivelyGeneric())
     return nullptr;
   return sig.getCanonicalSignature();
 }

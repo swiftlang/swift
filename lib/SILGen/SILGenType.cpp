@@ -383,11 +383,8 @@ public:
 
 static void emitTypeMemberGlobalVariable(SILGenModule &SGM,
                                          VarDecl *var) {
-  if (var->getDeclContext()->isGenericContext()) {
-    assert(var->getDeclContext()->getGenericSignatureOfContext()
-              ->areAllParamsConcrete()
-           && "generic static vars are not implemented yet");
-  }
+  assert(!var->getDeclContext()->isEffectivelyGenericContext() &&
+         "generic static vars are not implemented yet");
 
   if (var->getDeclContext()->getSelfClassDecl()) {
     assert(var->isFinal() && "only 'static' ('class final') stored properties are implemented in classes");
@@ -839,7 +836,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
 
   // Generic signatures where all parameters are concrete are lowered away
   // at the SILFunctionType level.
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }

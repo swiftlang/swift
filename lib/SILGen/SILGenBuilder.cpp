@@ -74,7 +74,7 @@ PartialApplyInst *SILGenBuilder::createPartialApply(
 
   // We completely drop the generic signature if all generic parameters were
   // concrete. Similar to emitRawApply.
-  if (Subs && Subs.getGenericSignature()->areAllParamsConcrete())
+  if (Subs && !Subs.isEffectivelyGeneric())
     Subs = SubstitutionMap();
 
   return SILBuilder::createPartialApply(

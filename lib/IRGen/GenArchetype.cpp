@@ -551,7 +551,7 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
   llvm::Value *genericArgs;
   Address alloca;
   Size allocaSize(0);
-  if (!generics || generics->areAllParamsConcrete()) {
+  if (!generics.isEffectivelyGeneric()) {
     genericArgs = llvm::UndefValue::get(IGF.IGM.Int8PtrTy);
   } else {
     SmallVector<llvm::Value *, 4> args;

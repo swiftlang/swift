@@ -512,7 +512,7 @@ private func getHash(
     }
     hasher.combine(ObjectIdentifier(BuiltinInst.self))
     hasher.combine(bi.name._bridged.data)
-    hasher.combine(bi.substitutionMap.hasAnySubstitutableParams)
+    hasher.combine(bi.substitutionMap.isEffectivelyGeneric)
     for op in bi.operands {
       hasher.combine(op.value.hashable)
     }
