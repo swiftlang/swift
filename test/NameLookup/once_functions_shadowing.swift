@@ -16,6 +16,10 @@ public func run(_ body: @once () -> Void) {
   body()
 }
 
+public func produce() -> @once () -> Void {
+  return {}
+}
+
 //--- Client.swift
 
 import Library
@@ -40,4 +44,15 @@ func useOverloads(_ exactlyOnce: @once () -> Void) {
   let runResult = run {}
   let _: Int = runResult
   run(exactlyOnce)
+}
+
+// Declarations that only differ in the execution semantics of their result do
+// shadow each other, since they would be redeclarations in the same module.
+func produce() -> () -> Void {
+  return {}
+}
+
+func useShadowingDecl() {
+  let produced = produce()
+  let _: () -> Void = produced
 }
