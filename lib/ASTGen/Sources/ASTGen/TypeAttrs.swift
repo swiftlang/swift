@@ -144,11 +144,29 @@ extension ASTGenVisitor {
         .SILImplicitLeadingParam,
         .CallerIsolated,
         .UnownedInnerPointer:
-        // TODO: Diagnose or fallback to CustomAttr?
-        fatalError("SIL type attributes are not supported")
-        break;
+        // These spellings exist only in SIL, and ASTGen never parses a SIL file
+        // (`shouldParseViaASTGen` refuses `SourceFileKind::SIL`), so reaching one
+        // here means it was written in ordinary Swift. The C++ parser does not
+        // recognize SIL-only type attributes outside SIL either, and reports them
+        // as unknown at the '@'.
+        self.diagnose(
+          .unknown_attr_name(node.attributeName.trimmedDescription),
+          at: node.atSign
+        )
+        return nil
 
       case nil:
+        // A declaration attribute written in a type: the attribute belongs on the
+        // declaration, which the C++ parser says, rather than reporting an
+        // unknown type attribute or a missing custom attribute.
+        if BridgedOptionalDeclAttrKind(from: attrName.bridged).hasValue {
+          self.diagnose(
+            .decl_attribute_applied_to_type,
+            at: node.attributeName,
+            fixIts: [self.tidyRemovalFixIt(node)]
+          )
+          return nil
+        }
         // Not a builtin type attribute. Fall back to CustomAttr
         break;
       }
@@ -176,7 +194,22 @@ extension ASTGenVisitor {
   ///   @convention(c, cType: "int (*)(int)")
   ///   ```
   func generateConventionTypeAttr(attribute node: AttributeSyntax) -> BridgedConventionTypeAttr? {
-    self.generateWithLabeledExprListArguments(attribute: node) { args in
+    // `@convention(c, )` and `@convention(c, cType)` are accepted by the parser
+    // but the C++ parser requires a `cType: "..."` argument after the comma.
+    if let all = node.arguments?.as(LabeledExprListSyntax.self), let rightParen = node.rightParen {
+      if all.count == 1, let comma = all.first?.trailingComma {
+        let next = comma.nextToken(viewMode: .sourceAccurate) ?? rightParen
+        self.diagnose(.convention_attribute_ctype_expected_label, at: next)
+        return nil
+      }
+      if all.count == 2, let second = all.last, second.label == nil,
+        second.expression.as(DeclReferenceExprSyntax.self)?.baseName.text == "cType"
+      {
+        self.diagnose(.convention_attribute_ctype_expected_colon, at: rightParen)
+        return nil
+      }
+    }
+    return self.generateWithLabeledExprListArguments(attribute: node) { args in
       let nameAndLoc: (name: _, loc: _)? =  self.generateConsumingPlainIdentifierAttrOption(args: &args) {
         (ctx.allocateCopy(string: $0.rawText.bridged), self.generateSourceLoc($0))
       }
@@ -215,46 +248,76 @@ extension ASTGenVisitor {
   }
 
   func generateDifferentiableTypeAttr(attribute node: AttributeSyntax) -> BridgedDifferentiableTypeAttr? {
-    let differentiability: BridgedDifferentiabilityKind
-    let differentiabilityLoc: SourceLoc
+    // Mirrors `parseDifferentiableTypeAttributeArgument` and its caller in
+    // ParseDecl.cpp: an unknown or unsupported kind is an error, while omitting
+    // the kind entirely is only a warning and means 'reverse'.
+    var differentiability: BridgedDifferentiabilityKind = .normal
+    var differentiabilityLoc: SourceLoc = nil
+
     if let args = node.arguments {
-      guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self) else {
-        fatalError("(compiler bug) invalid arguments for @differentiable attribute")
+      guard let args = args.as(DifferentiableAttributeArgumentsSyntax.self),
+        let kindSpecifier = args.kindSpecifier
+      else {
+        // Malformed argument clause; the parser has already diagnosed it.
+        return nil
       }
 
-      if let kindSpecifier = args.kindSpecifier {
-        differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
-        differentiabilityLoc = self.generateSourceLoc(kindSpecifier)
-
-        guard differentiability != .nonDifferentiable else {
-          // TODO: Diagnose
-          fatalError("invalid kind for @differentiable type attribute")
-        }
-
-        guard kindSpecifier.nextToken(viewMode: .fixedUp) == node.rightParen else {
-          // TODO: Diagnose
-          fatalError("only expeceted 'reverse' in @differentiable type attribute")
-        }
-      } else {
-        // TODO: Diagnose
-        fatalError("expected @differentiable(reverse)")
+      // The kind is the only argument: a comma, trailing or not, is not
+      // expected.
+      if let comma = args.kindSpecifierComma, !node.hasError {
+        self.diagnose(.attr_expected_rparen(node.attributeName.trimmedDescription, false), at: comma)
+        return nil
       }
-    } else {
-      differentiability = .normal
-      differentiabilityLoc = nil
+
+      differentiability = self.generateDifferentiabilityKind(text: kindSpecifier.rawText)
+      differentiabilityLoc = self.generateSourceLoc(kindSpecifier)
+      let kindText = String(syntaxText: kindSpecifier.rawText)
+      let replaceWithReverse = CompilerDiagnosticFixIt(
+        replace: self.generateCharSourceRange(kindSpecifier),
+        with: "reverse"
+      )
+
+      switch differentiability {
+      case .nonDifferentiable:
+        self.diagnose(
+          .attr_differentiable_unknown_kind(kindText),
+          at: kindSpecifier,
+          fixIts: [replaceWithReverse]
+        )
+        return nil
+      case .forward:
+        // Only 'reverse' is formally supported today. '_linear' works for
+        // testing purposes. '_forward' is rejected.
+        self.diagnose(
+          .attr_differentiable_kind_not_supported(kindText),
+          at: kindSpecifier,
+          fixIts: [replaceWithReverse]
+        )
+        return nil
+      default:
+        break
+      }
+
+      // Anything between the kind and the ')' is extra; the parser records it as
+      // unexpected code and has already diagnosed it. The C++ parser likewise
+      // builds the attribute and lets the surrounding parse report the leftovers.
     }
 
-    // Only 'reverse' is formally supported today. '_linear' works for testing
-    // purposes. '_forward' is rejected.
-    switch differentiability {
-    case .normal, .nonDifferentiable:
-      // TODO: Diagnose
-      fatalError("Only @differentiable(reverse) is supported")
-    case .forward:
-      // TODO: Diagnose
-      fatalError("Only @differentiable(reverse) is supported")
-    case .reverse, .linear:
-      break
+    if differentiability == .normal {
+      // Bare '@differentiable' means 'reverse', with a deprecation warning.
+      let insertReverse = CompilerDiagnosticFixIt(
+        replace: self.generateCharSourceRange(
+          start: node.attributeName.endPositionBeforeTrailingTrivia,
+          length: SourceLength(utf8Length: 0)
+        ),
+        with: "(reverse)"
+      )
+      self.diagnose(
+        .attr_differentiable_expected_reverse,
+        at: node.attributeName,
+        fixIts: [insertReverse]
+      )
+      differentiability = .reverse
     }
 
     return .createParsed(
@@ -268,7 +331,7 @@ extension ASTGenVisitor {
   }
 
   func generateLifetimeTypeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeTypeAttr? {
-    guard let entry = self.generateLifetimeEntry(attribute: node) else {
+    guard let entry = self.generateLifetimeEntry(attribute: node, allowIndices: true) else {
       return nil
     }
 
@@ -289,7 +352,11 @@ extension ASTGenVisitor {
         switch $0.rawText {
         case "any": return .dynamicIsolation
         default:
-          // TODO: Diagnose.
+          self.diagnose(
+            .attr_isolated_expected_kind,
+            at: $0,
+            fixIts: [.init(replace: self.generateCharSourceRange($0), with: "any")]
+          )
           return nil
         }
       }
@@ -337,7 +404,7 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
-      self.diagnose(.expectedArgumentsInAttribute(node))
+      self.diagnoseEmptyScopeList(node)
       return nil
     }
     if let trailingComma = args.last?.trailingComma {
@@ -361,6 +428,15 @@ extension ASTGenVisitor {
       parensRange: self.generateAttrParensRange(attribute: node),
       restrictions: restrictions.lazy.bridgedArray(in: self)
     )
+  }
+
+  /// Diagnose `@_scoped()`: the parentheses are there, the scopes are not.
+  func diagnoseEmptyScopeList(_ node: AttributeSyntax) {
+    if let rightParen = node.rightParen, node.leftParen != nil, rightParen.presence == .present {
+      self.diagnose(.expected_scope(node.attributeName.trimmedDescription), at: rightParen)
+    } else {
+      self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
+    }
   }
 
   func generateScopeRestriction(_ arg: LabeledExprSyntax) -> BridgedScopeRestrictionRepr? {
@@ -429,7 +505,7 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, let arg = args.first else {
-      self.diagnose(.expectedArgumentsInAttribute(node))
+      self.diagnoseEmptyScopeList(node)
       return nil
     }
     guard args.count == 1, arg.label == nil, arg.trailingComma == nil,
@@ -471,7 +547,12 @@ extension ASTGenVisitor {
       return nil
     }
     guard case .argumentList(let args) = node.arguments, !args.isEmpty else {
-      self.diagnose(.expectedArgumentsInAttribute(node))
+      if let rightParen = node.rightParen, node.leftParen != nil, rightParen.presence == .present {
+        // `@_scopeParams()`: the parentheses are there, the names are not.
+        self.diagnose(.expected_scope_param, at: rightParen)
+      } else {
+        self.diagnoseExpectedAttributeArguments(node, atNextToken: true)
+      }
       return nil
     }
     if let trailingComma = args.last?.trailingComma {
@@ -489,7 +570,11 @@ extension ASTGenVisitor {
         case .identifier(let text) = declRefExpr.baseName.tokenKind,
         text != "immortal"
       else {
-        self.diagnose(.invalidArgumentInAttribute(node, arg))
+        if arg.expression.as(DeclReferenceExprSyntax.self)?.baseName.text == "immortal" {
+          self.diagnose(.immortal_scope_param, at: arg.expression)
+        } else {
+          self.diagnose(.expected_scope_param, at: arg)
+        }
         return nil
       }
       params.append(self.generateLocatedIdentifier(declRefExpr.baseName))

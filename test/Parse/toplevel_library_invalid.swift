@@ -9,7 +9,7 @@ x + x; // expected-error {{expressions are not allowed at the top level}} expect
 // expected-warning @-1 {{result of call to closure returning 'Int' is unused}}
 
 
-// expected-error @+3 {{expected 'in' after for-each pattern}}
-// expected-error @+2 {{expected Sequence expression for for-each loop}}
-// expected-error @+1 {{expected '{' to start the body of for-each loop}}
+// expected-cparser-error @+3 {{expected 'in' after for-each pattern}}
+// expected-cparser-error @+2 {{expected Sequence expression for for-each loop}} expected-astgen-error@+2 {{statements are not allowed at the top level}}
+// expected-cparser-error @+1 {{expected '{' to start the body of for-each loop}} expected-astgen-error@+1 {{expected 'in', expression, and body in 'for' statement}}
 for i

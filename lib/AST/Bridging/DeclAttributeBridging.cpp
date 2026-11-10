@@ -17,6 +17,7 @@
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Identifier.h"
+#include "swift/Parse/Lexer.h"
 
 using namespace swift;
 
@@ -95,6 +96,45 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
   auto attrs = cAttrs->unbridged();
   attrs.add(cAdd.unbridged());
   *cAttrs = attrs;
+}
+
+BridgedDuplicateAttributeInfo BridgedDeclAttributes_checkDuplicate(
+    BridgedASTContext cContext, const BridgedDeclAttributes *_Nonnull attrs,
+    BridgedDeclAttribute newAttr) {
+  BridgedDuplicateAttributeInfo info{false,        false,        false,
+                                     SourceLoc(),  SourceLoc(),
+                                     CharSourceRange(), CharSourceRange()};
+  auto &SM = cContext.unbridged().SourceMgr;
+  auto *attr = newAttr.unbridged();
+  auto kind = attr->getKind();
+  // Custom attributes (property wrappers, global actors, macros, ...) are not
+  // parsed by `Parser::parseNewDeclAttribute`, and may repeat.
+  if (kind == DeclAttrKind::Custom ||
+      DeclAttribute::allowMultipleAttributes(kind))
+    return info;
+  auto *previous = attrs->unbridged().getAttribute(kind);
+  if (!previous)
+    return info;
+
+  info.isDuplicate = true;
+  info.isModifier = DeclAttribute::isDeclModifier(kind);
+  info.newLoc = attr->getLocation();
+  // For simple attributes, the range starts at the '@' and ends at the name,
+  // and the diagnostic is on the name.
+  if (attr->AtLoc.isValid() && info.newLoc == attr->AtLoc)
+    info.newLoc = attr->getEndLoc();
+  info.previousLoc = previous->getLocation();
+  info.newRange =
+      Lexer::getCharSourceRangeFromSourceRange(SM, attr->getRangeWithAt());
+  info.previousRange =
+      Lexer::getCharSourceRangeFromSourceRange(SM, previous->getRangeWithAt());
+  if (auto *access = dyn_cast<AccessControlAttr>(attr))
+    info.hasDifferentAccessLevel =
+        access->getAccess() != cast<AccessControlAttr>(previous)->getAccess();
+  else if (auto *access = dyn_cast<SetterAccessAttr>(attr))
+    info.hasDifferentAccessLevel =
+        access->getAccess() != cast<SetterAccessAttr>(previous)->getAccess();
+  return info;
 }
 
 bool BridgedDeclAttributes_hasAttribute(
@@ -192,6 +232,28 @@ BridgedPreInverseGenericsAttr_createParsed(BridgedASTContext cContext,
                                            SourceLoc atLoc,
                                            SourceRange range) {
   return new (cContext.unbridged()) PreInverseGenericsAttr(atLoc, range);
+}
+
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsedWithExcept(BridgedASTContext cContext,
+                                                     SourceLoc atLoc,
+                                                     SourceRange range,
+                                                     BridgedTypeRepr cExceptType) {
+  return new (cContext.unbridged())
+      PreInverseGenericsAttr(atLoc, range, cExceptType.unbridged());
+}
+
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsedExceptCopyable(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range) {
+  // Keep this in sync with the `_preInverseGenericsExceptCopyable` case of
+  // DeclAttrKind::PreInverseGenerics in ParseDecl.cpp: the shorthand's 'except:'
+  // type is injected already resolved, since it is not written in source.
+  auto &ctx = cContext.unbridged();
+  Type resolvedExceptType = ProtocolCompositionType::getInverseOf(
+      ctx, InvertibleProtocolKind::Copyable);
+  return new (ctx) PreInverseGenericsAttr(
+      atLoc, range, /*exceptType=*/nullptr, resolvedExceptType);
 }
 
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
@@ -374,16 +436,36 @@ BridgedExposeAttr BridgedExposeAttr_createParsed(BridgedASTContext cContext,
       ExposeAttr(cName.unbridged(), atLoc, range, kind, /*Implicit=*/false);
 }
 
+static NonexhaustiveMode unbridged(BridgedNonexhaustiveMode mode) {
+  switch (mode) {
+  case BridgedNonexhaustiveModeError:
+    return NonexhaustiveMode::Error;
+  case BridgedNonexhaustiveModeWarning:
+    return NonexhaustiveMode::Warning;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedNonexhaustiveAttr
+BridgedNonexhaustiveAttr_createParsed(BridgedASTContext cContext,
+                                      SourceLoc atLoc, SourceRange range,
+                                      BridgedNonexhaustiveMode cMode) {
+  return new (cContext.unbridged())
+      NonexhaustiveAttr(atLoc, range, unbridged(cMode));
+}
+
 BridgedExternAttr BridgedExternAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     SourceLoc lParenLoc, SourceLoc rParenLoc, swift::ExternKind kind,
     BridgedStringRef cModuleName, BridgedStringRef cName) {
+  // A null string means the argument was not written; an empty one was written
+  // as "".
   std::optional<StringRef> moduleName = cModuleName.unbridged();
-  if (moduleName->empty())
+  if (!moduleName->data())
     moduleName = std::nullopt;
 
   std::optional<StringRef> name = cName.unbridged();
-  if (name->empty())
+  if (!name->data())
     name = std::nullopt;
 
   return new (cContext.unbridged())
@@ -492,6 +574,11 @@ BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str) {
   return role.has_value() ? *role : BridgedMacroRoleNone;
 }
 
+bool BridgedMacroRole_isSupported(BridgedMacroRole role,
+                                  BridgedASTContext cContext) {
+  return isMacroSupported(unbridge(role), cContext.unbridged());
+}
+
 MacroSyntax unbridge(BridgedMacroSyntax cSyntax) {
   switch (cSyntax) {
   case BridgedMacroSyntaxAttached:
@@ -547,6 +634,10 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    Identifier name) {
   return new (cContext.unbridged())
       SwiftNativeObjCRuntimeBaseAttr(name, atLoc, range, /*Implicit=*/false);
+}
+
+bool BridgedDiagnoseAttr_isKnownGroup(Identifier diagGroupName) {
+  return getDiagGroupIDByName(diagGroupName.str()).has_value();
 }
 
 BridgedDiagnoseAttr

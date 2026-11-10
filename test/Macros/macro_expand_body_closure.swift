@@ -10,8 +10,14 @@
 macro Empty() = #externalMacro(module: "MacroDefinition", type: "EmptyBodyMacro")
 
 // Make sure we can handle the lack of 'in' here.
-_ = { @Empty x -> // expected-error {{cannot infer type of closure parameter 'x' without a type annotation}}
-  0 // expected-error {{expected closure result type after '->'}} expected-error {{expected 'in' after the closure signature}}
+// swift-syntax only recognizes the attribute as part of a closure signature when
+// it can see the 'in', so it parses '@Empty x' as the start of the body.
+_ = { @Empty x -> // expected-cparser-error {{cannot infer type of closure parameter 'x' without a type annotation}}
+  // expected-astgen-error@-1 {{expected declaration and ';' after attribute}}
+  // expected-astgen-error@-2 {{cannot find 'x' in scope}}
+  // expected-astgen-error@-3 {{expected type before '->'}}
+  0 // expected-cparser-error {{expected closure result type after '->'}} expected-cparser-error {{expected 'in' after the closure signature}}
+  // expected-astgen-error@-1 {{expected type after '->'}}
 }
 
 _ = { @Empty in }

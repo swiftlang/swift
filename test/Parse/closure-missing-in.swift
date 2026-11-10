@@ -3,7 +3,7 @@
 func test<T>(make: () -> [T], consume: (T) -> Void) { consume(make()[0]) }
 
 func main1() {
-  test(make: { () -> [Int] // expected-error@+1 {{expected 'in' after the closure signature}}
+  test(make: { () -> [Int] // expected-cparser-error@+1 {{expected 'in' after the closure signature}} expected-astgen-error {{expected 'in' in closure signature}}
     return [3]
   }, consume: { _ in })
 }
@@ -12,15 +12,15 @@ func main1() {
 // Resync path: there are tokens before `in` — should diagnose once, then recover.
 func main2() {
   _ = { () -> Int
-    0 // expected-error {{unexpected tokens prior to 'in'}}
+    0 // expected-cparser-error {{unexpected tokens prior to 'in'}} expected-astgen-error {{unexpected code '0' in closure signature}}
     in
     1
   }
 }
 
 func main3() {
-  _ = { x, y -> Int
-    x + y // expected-error {{expected 'in' after the closure signature}}
+  _ = { x, y -> Int // expected-astgen-error {{expected 'in' in closure signature}}
+    x + y // expected-cparser-error {{expected 'in' after the closure signature}}
   }
 }
 

@@ -32,6 +32,13 @@ BridgedDiagnosticArgument::BridgedDiagnosticArgument(SwiftInt i)
 BridgedDiagnosticArgument::BridgedDiagnosticArgument(BridgedStringRef s)
     : BridgedDiagnosticArgument(DiagnosticArgument(s.unbridged())) {}
 
+BridgedDiagnosticArgument::BridgedDiagnosticArgument(Identifier identifier)
+    : BridgedDiagnosticArgument(DiagnosticArgument(identifier)) {}
+
+BridgedDiagnosticArgument BridgedDiagnosticArgument_createUnsigned(unsigned value) {
+  return BridgedDiagnosticArgument(DiagnosticArgument(value));
+}
+
 static_assert(sizeof(BridgedDiagnosticFixIt) >= sizeof(DiagnosticInfo::FixIt),
               "BridgedDiagnosticFixIt has wrong size");
 
@@ -46,11 +53,17 @@ BridgedDiagnosticFixIt::BridgedDiagnosticFixIt(SourceLoc start, uint32_t length,
                                        llvm::ArrayRef<DiagnosticArgument>());
 }
 
+bool BridgedDiagnosticEngine_pointsToFirstBadToken(
+    BridgedDiagnosticEngine bridgedEngine, swift::DiagID diagID) {
+  return bridgedEngine.unbridged()->isDiagnosticPointsToFirstBadToken(diagID);
+}
+
 void BridgedDiagnosticEngine_diagnose(
     BridgedDiagnosticEngine bridgedEngine, SourceLoc loc, DiagID diagID,
     BridgedArrayRef /*BridgedDiagnosticArgument*/ bridgedArguments,
     SourceLoc highlightStart, uint32_t hightlightLength,
-    BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts) {
+    BridgedArrayRef /*BridgedDiagnosticFixIt*/ bridgedFixIts,
+    SwiftInt warnUntilMajor) {
   auto *D = bridgedEngine.unbridged();
 
   SmallVector<DiagnosticArgument, 2> arguments;
@@ -71,6 +84,15 @@ void BridgedDiagnosticEngine_diagnose(
     auto range = unbridge(fixIt).getRange();
     auto text = unbridge(fixIt).getText();
     inflight.fixItReplaceChars(range.getStart(), range.getEnd(), text);
+  }
+
+  if (warnUntilMajor) {
+    for (auto mode : LanguageMode::allSupportedModes()) {
+      if (mode.version() == std::make_pair((unsigned)warnUntilMajor, 0u)) {
+        inflight.warnUntilLanguageMode(mode);
+        break;
+      }
+    }
   }
 }
 

@@ -2,6 +2,6 @@
 
 precedencegroup; // expected-error {{expected identifier}}
 
-precedencegroup A; // expected-error {{expected '{'}}
+precedencegroup A; // expected-cparser-error {{expected '{'}} expected-astgen-error {{expected '{}' in precedencegroup}}
 
-precedencegroup B {; // expected-error {{expected operator attribute identifier}}
+precedencegroup B {; // expected-cparser-error {{expected operator attribute identifier}} expected-astgen-error {{expected '}' to end precedencegroup}} expected-astgen-note {{to match this opening '{'}}

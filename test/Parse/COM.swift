@@ -39,9 +39,9 @@ class C8 { }
 protocol P1 { }
 // expected-error@-2 {{expected 'interface:', 'implementation:', or 'threading:' in '@com' attribute}}
 
-@com(interface "")
+@com(interface "") // expected-astgen-error {{expected 'interface:', 'implementation:', or 'threading:' in '@com' attribute}}
 protocol P2 { }
-// expected-error@-2 {{expected ':' after label 'interface'}}
+// expected-cparser-error@-2 {{expected ':' after label 'interface'}} expected-astgen-error@-2 {{unexpected code '""' in attribute}}
 
 @com(interface: 42)
 protocol P3 { }

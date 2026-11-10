@@ -17,7 +17,7 @@ func invalidAttrOnNonExistingSelf(_ ne: NE) -> NE {
   ne
 }
 
-@_lifetime(copy 0) // expected-error{{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
+@_lifetime(copy 0) // expected-error {{expected 'copy', 'borrow', or '&' followed by an identifier or 'self' in lifetime dependence specifier}}
 func invalidAttrOnExistingParamIndex(_ ne: NE) -> NE {
   ne
 }

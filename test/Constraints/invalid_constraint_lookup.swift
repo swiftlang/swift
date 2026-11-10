@@ -10,7 +10,7 @@ func f<U: P>(_ rhs: U) -> X<U.A> { // expected-error {{cannot find type 'X' in s
 
 struct Zzz<T> {
   subscript (a: Foo) -> Zzz<T> { // expected-error {{cannot find type 'Foo' in scope}}
-  get: // expected-error {{expected '{' to start getter definition}}
+  get: // expected-error {{expected '{' to start getter definition}} expected-astgen-error {{unexpected code in subscript}}
   set:
     for i in value {}
   }

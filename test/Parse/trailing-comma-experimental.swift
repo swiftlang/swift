@@ -39,17 +39,17 @@ func testConditionListTrailingComma() {
 
     if { } // expected-error {{missing condition in 'if' statement}} 
 
-    if , { } // expected-error {{expected expression, var, or let in 'if' condition}}
+    if , { } // expected-cparser-error {{expected expression, var, or let in 'if' condition}} expected-astgen-error {{missing condition in 'if' statement}}
 
-    guard else { return } // expected-error {{missing condition in 'guard' statement}} 
+    guard else { return } // expected-cparser-error {{missing condition in 'guard' statement}} expected-astgen-error {{expected condition in 'guard' statement}} 
 
-    guard , else { return } // expected-error {{expected expression, var, let or case in 'guard' condition}} 
+    guard , else { return } // expected-cparser-error {{expected expression, var, let or case in 'guard' condition}} expected-astgen-error {{expected expression in 'guard' statement}} 
 
     guard true, else { return }
 
-    guard true, , else { return } // expected-error {{expected expression in conditional}}
+    guard true, , else { return } // expected-cparser-error {{expected expression in conditional}} expected-astgen-error {{expected expression in 'guard' statement}}
 
-    guard true, { return } // expected-error {{expected 'else' after 'guard' condition}}
+    guard true, { return } // expected-cparser-error {{expected 'else' after 'guard' condition}} expected-astgen-error {{expected 'else' in 'guard' statement}}
 
     while true, { }
 }
@@ -71,7 +71,7 @@ protocol P2 { }
 struct S1<T1, T2,> where T1: P1, T2: P2, { }
 
 protocol P3 {
-  func f<T1, T2>(a: T1, b: T2) where T1: P1, T2: P2, // expected-error {{expected type}} 
+  func f<T1, T2>(a: T1, b: T2) where T1: P1, T2: P2, // expected-cparser-error {{expected type}} expected-astgen-error {{expected left-hand type, '==', and right-hand type in same type requirement}} 
 }
 
 // Inheritance Clause List

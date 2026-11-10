@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -parse -verify-additional-prefix legacy-
+// RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -parse -verify-additional-prefix legacy- -disable-experimental-feature ParserASTGen
 // RUN: %target-typecheck-verify-swift -sdk %clang-importer-sdk -module-name main -I %S/Inputs -parse -verify-additional-prefix new- -enable-experimental-feature ParserASTGen
 
 // Make sure the lack of the experimental flag disables the feature:
@@ -20,11 +20,11 @@ import struct ModuleSelectorTestingKit::Submodule::A
 
 import struct ModuleSelectorTestingKit.Submodule::A
 // expected-legacy-error@-1 {{module selector cannot specify a submodule}} expected-new-error@-1 {{submodule cannot be imported using module selector}}
-// expected-legacy-note@-2 {{replace '::' with '.'}} {{49-51=.}} expected-new-note@-2 {{replace '::' with '.'}} {{49-51=}} {{49-49=.}}
+// expected-legacy-note@-2 {{replace '::' with '.'}} {{49-51=.}} 
 
 import ctypes::bits
 // expected-legacy-error@-1 {{module selector cannot specify a submodule}} expected-new-error@-1 {{submodule cannot be imported using module selector}}
-// expected-legacy-note@-2 {{replace '::' with '.'}} {{14-16=.}} expected-new-note@-2 {{replace '::' with '.'}} {{14-16=}} {{14-14=.}}
+// expected-legacy-note@-2 {{replace '::' with '.'}} {{14-16=.}} 
 
 
 // ModuleSelectorCorrectCode
@@ -92,7 +92,7 @@ _ = Swift :: print
 _ = Swift::
 print
 // expected-legacy-error@-2 {{expected identifier after module selector}} expected-new-error@-2 {{expected identifier}}
-// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{12-+1:1=}} expected-new-note@-3 {{insert identifier}} {{12-12=<#identifier#>}}
+// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{12-+1:1=}} 
 
 _ = Swift
 ::print
@@ -100,7 +100,7 @@ _ = Swift
 _ = Swift ::
 print
 // expected-legacy-error@-2 {{expected identifier after module selector}} expected-new-error@-2 {{expected identifier}}
-// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{13-+1:1=}} expected-new-note@-3 {{insert identifier}} {{13-13=<#identifier#>}}
+// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{13-+1:1=}} 
 
 _ = Swift
 :: print
@@ -109,7 +109,7 @@ _ = Swift
 ::
 print
 // expected-legacy-error@-2 {{expected identifier after module selector}} expected-new-error@-2 {{expected identifier}}
-// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{3-+1:1=}} expected-new-note@-3 {{insert identifier}} {{3-3=<#identifier#>}}
+// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{3-+1:1=}} 
 
 
 // ModuleSelectorIncorrectFuncSignature
@@ -128,23 +128,23 @@ func decl1(
   main::p1: ::A
 // expected-legacy-error@-2 {{expected parameter name followed by ':'}} {{none}} expected-new-error@-1 {{unexpected code '::p1' in parameter}}
 // expected-new-error@-2 {{expected module name in module selector}}
-// expected-new-note@-3 {{insert module name}} {{13-13=<#identifier#>}}
+//
 ) {}
 
 func decl1(
   main::p1: Swift::
 // expected-legacy-error@-2 {{expected parameter name followed by ':'}} {{none}} expected-new-error@-1 {{unexpected code '::p1' in parameter}}
 // expected-new-error@-2 {{expected identifier in type}}
-// expected-new-note@-3 {{insert identifier}} {{20-20=<#identifier#>}}
+//
 ) {}
 
 func decl1(
   main::label p2: Swift::inout A
 // expected-legacy-error@-2 {{expected parameter name followed by ':'}} {{none}} expected-new-error@-1 {{unexpected code '::label p2' in parameter}}
 // expected-new-error@-2 {{expected ',' in parameter}}
-// expected-new-note@-3 {{insert ','}} {{31-32=}} {{32-32=, }}
+//
 // expected-new-error@-4 {{expected identifier and ':' in parameter}}
-// expected-new-note@-5 {{insert identifier and ':'}} {{32-32=<#identifier#>}}
+//
 ) {}
 
 func decl1(
@@ -158,24 +158,24 @@ func decl1(
 func testModuleSelectorIncorrectBindingDecls() {
   let main::decl1a = "a"
   // expected-new-error@-1 {{expected '=' in variable}}
-  // expected-legacy-error@-2 {{consecutive statements on a line must be separated by ';'}} {{11-11=;}} expected-new-note@-2 {{insert '='}} {{11-11= = }}
+  // expected-legacy-error@-2 {{consecutive statements on a line must be separated by ';'}} {{11-11=;}} 
   // expected-error@-3 {{expected module name in module selector}}
-  // expected-new-note@-4 {{insert module name}} {{11-11=<#identifier#>}}
+  //
 
   // Found by mutation testing:
   let let::decl1a = "a"
   // expected-legacy-error@-1 {{'let' cannot appear nested inside another 'var' or 'let' pattern}} expected-new-error@-1 {{expected pattern in value binding pattern}}
-  // expected-legacy-error@-2 {{expected pattern}} expected-new-note@-2 {{insert pattern}} {{10-10=<#pattern#> }}
+  // expected-legacy-error@-2 {{expected pattern}} 
   // expected-new-error@-3 {{expected '=' in variable}}
-  // expected-new-note@-4 {{insert '='}} {{10-10== }}
+  //
   // expected-new-error@-5 {{expected module name in module selector}}
-  // expected-new-note@-6 {{insert module name}} {{10-10=<#identifier#>}}
+  //
 
   var main::decl1b = "b"
   // expected-new-error@-1 {{expected '=' in variable}}
-  // expected-legacy-error@-2 {{consecutive statements on a line must be separated by ';'}} {{11-11=;}} expected-new-note@-2 {{insert '='}} {{11-11= = }}
+  // expected-legacy-error@-2 {{consecutive statements on a line must be separated by ';'}} {{11-11=;}} 
   // expected-error@-3 {{expected module name in module selector}}
-  // expected-new-note@-4 {{insert module name}} {{11-11=<#identifier#>}}
+  //
 
   let (main::decl1c, Swift::decl1d) = ("c", "d")
   // expected-legacy-error@-1 {{expected ',' separator}} {{12-12=,}} expected-new-error@-1 {{unexpected code '::decl1c, Swift::decl1d' in tuple pattern}}
@@ -278,15 +278,15 @@ protocol decl6_substitute {
 // ModuleSelectorIncorrectGlobalVarDecls
 let main::decl7 = 7
 // expected-legacy-error@-1 {{consecutive statements on a line must be separated by ';'}} {{9-9=;}} expected-new-error@-1 {{expected '=' in variable}}
-// expected-new-note@-2 {{insert '='}} {{9-9= = }}
+//
 // expected-error@-3 {{expected module name in module selector}}
-// expected-new-note@-4 {{insert module name}} {{9-9=<#identifier#>}}
+//
 
 var main::decl8 = 8 {
 // expected-legacy-error@-1 {{consecutive statements on a line must be separated by ';'}} {{9-9=;}} expected-new-error@-1 {{expected '=' in variable}}
-// expected-new-note@-2 {{insert '='}} {{9-9= = }}
+//
 // expected-error@-3 {{expected module name in module selector}}
-// expected-new-note@-4 {{insert module name}} {{9-9=<#identifier#>}}
+//
 // expected-legacy-error@-5 {{consecutive statements on a line must be separated by ';'}} {{20-20=;}}
 // expected-legacy-error@-6 {{top-level statement cannot begin with a closure expression}}
   willSet(Swift::newValue) {}
@@ -359,10 +359,10 @@ class C1 {}
 // ModuleSelectorOperatorDecls
 infix operator <<<<< : Swift::AdditionPrecedence
 // expected-legacy-error@-1 {{consecutive statements on a line must be separated by ';'}} {{29-29=;}} expected-new-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
-// expected-new-note@-2 {{insert newline}} {{29-29=\n}}
-// expected-new-note@-3 {{insert ';'}} {{29-29=;}}
+//
+//
 // expected-error@-4 {{expected module name in module selector}}
-// expected-new-note@-5 {{insert module name}} {{29-29=<#identifier#>}}
+//
 
 precedencegroup main::PG1 {}
 // expected-legacy-error@-1 {{expected '{' after name of precedence group}} expected-new-error@-1 {{unexpected code '::PG1' in precedencegroup}}
@@ -375,15 +375,15 @@ precedencegroup PG1_substitute {
 // ModuleSelectorIllFormedModuleNames
 var a: ::Int
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{8-8=<#identifier#>}}
+//
 
 var b: (::Int)
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{9-9=<#identifier#>}}
+//
 
 var c: *::Int
 // expected-legacy-error@-1 {{expected type}} expected-new-error@-1 {{expected type in type annotation}}
-// expected-new-note@-2 {{insert type}} {{8-8=<#type#>}}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} expected-new-error@-3 {{unexpected code '*::Int' in source file}}
 // expected-legacy-error@-4 {{expected module name in module selector}}
 
@@ -401,13 +401,13 @@ var f: self::Int
 
 var g: inout::Int
 // expected-new-error@-1 {{expected type in type annotation}}
-// expected-new-note@-2 {{insert type}} {{8-8=<#type#>}}
+//
 // expected-new-error@-3 {{expected pattern in variable}}
-// expected-new-note@-4 {{insert pattern}} {{13-13=<#pattern#> }}
+//
 // expected-new-error@-5 {{expected '=' in variable}}
-// expected-new-note@-6 {{insert '='}} {{13-13== }}
+//
 // expected-legacy-error@-7 {{expected module name in module selector}} expected-new-error@-7 {{expected module name in module selector}}
-// expected-new-note@-8 {{insert module name}} {{13-13=<#identifier#>}}
+//
 
 var h: Any::Int
 // expected-error@-1 {{keyword 'Any' cannot be used as an identifier here}}
@@ -415,15 +415,15 @@ var h: Any::Int
 
 var aArray: [::Int]
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{14-14=<#identifier#>}}
+//
 
 var bArray: [(::Int)]
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{15-15=<#identifier#>}}
+//
 
 var cArray: [*::Int]
 // expected-legacy-error@-1 {{expected element type}} expected-new-error@-1 {{expected type in array type}}
-// expected-new-note@-2 {{insert type}} {{14-14=<#type#>}}
+//
 // expected-legacy-error@-3 {{expected ']' in array type}}
 // expected-legacy-note@-4 {{to match this opening '['}}
 // expected-legacy-error@-5 {{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-new-error@-5 {{unexpected code '*::Int' in array type}}
@@ -445,13 +445,13 @@ var fArray: [self::Int]
 
 var gArray: [inout::Int]
 // expected-new-error@-1 {{expected type and ']' to end array type}}
-// expected-new-note@-2 {{insert type and ']'}} {{14-14=<#type#>}} {{14-14=]}}
+//
 // expected-new-error@-3 {{expected pattern in variable}}
-// expected-new-note@-4 {{insert pattern}} {{19-19=<#pattern#> }}
+//
 // expected-new-error@-5 {{expected '=' in variable}}
-// expected-new-note@-6 {{insert '='}} {{19-19== }}
+//
 // expected-error@-7 {{expected module name in module selector}}
-// expected-new-note@-8 {{insert module name}} {{19-19=<#identifier#>}}
+//
 // expected-new-error@-9 {{unexpected code ']' in source file}}
 
 var hArray: [Any::Int]
@@ -460,7 +460,7 @@ var hArray: [Any::Int]
 
 var aIndex: String.::Index
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{20-20=<#identifier#>}}
+//
 
 // FIXME: This gets interpreted as a single `.*` operator; may not be ideal.
 var cIndex: String.*::Index
@@ -482,10 +482,10 @@ var fIndex: String.self::Index
 
 var gIndex: String.inout::Index
 // expected-legacy-error@-1 {{expected identifier in dotted type}} expected-new-error@-1 {{expected '=' in variable}}
-// expected-new-note@-2 {{insert '='}} {{25-25= = }}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{20-20=;}}
 // expected-legacy-error@-4 {{expected expression}} expected-new-error@-4 {{expected module name in module selector}}
-// expected-new-note@-5 {{insert module name}} {{25-25=<#identifier#>}}
+//
 
 var hIndex: String.Any::Index
 // expected-error@-1 {{keyword 'Any' cannot be used as an identifier here}}
@@ -494,13 +494,13 @@ var hIndex: String.Any::Index
 func inExpr() {
   ::print()
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{-1:16-+0:3=}} {{-1:16-16=\n  <#identifier#>}}
+//
 }
 
 func inExpr() {
   (::print())
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{4-4=<#identifier#>}}
+//
 }
 
 func inExpr() {
@@ -529,11 +529,11 @@ func inExpr() {
 func inExpr() {
   inout::print()
 // expected-legacy-error@-1 {{expected expression}} expected-new-error@-1 {{expected pattern in variable}}
-// expected-new-note@-2 {{insert pattern}} {{8-8=<#pattern#> }}
+//
 // expected-new-error@-3 {{expected '=' in variable}}
-// expected-new-note@-4 {{insert '='}} {{8-8== }}
+//
 // expected-new-error@-5 {{expected module name in module selector}}
-// expected-new-note@-6 {{insert module name}} {{8-8=<#identifier#>}}
+//
 }
 
 func inExpr() {
@@ -545,23 +545,23 @@ func inExpr() {
 func inExpr() {
   _ = 1.::magnitude
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{9-9=<#identifier#>}}
+//
 }
 
 func inExpr() {
   _ = (1.::magnitude)
 // expected-error@-1 {{expected module name in module selector}}
-// expected-new-note@-2 {{insert module name}} {{10-10=<#identifier#>}}
+//
 }
 
 // FIXME: This gets interpreted as a single `.*` operator; may not be ideal.
 func inExpr() {
   _ = 1.*::magnitude
 // expected-new-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
-// expected-new-note@-2 {{insert newline}} {{10-10=\n  }}
-// expected-new-note@-3 {{insert ';'}} {{10-10=;}}
+//
+//
 // expected-error@-4 {{expected module name in module selector}}
-// expected-new-note@-5 {{insert module name}} {{10-10=<#identifier#>}}
+//
 }
 
 func inExpr() {
@@ -585,10 +585,10 @@ func inExpr() {
 func inExpr() {
   _ = 1.inout::magnitude
 // expected-legacy-error@-1 {{consecutive statements on a line must be separated by ';'}} {{14-14=;}} expected-new-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
-// expected-new-note@-2 {{insert newline}} {{14-14=\n  }}
-// expected-new-note@-3 {{insert ';'}} {{14-14=;}}
+//
+//
 // expected-error@-4 {{expected module name in module selector}}
-// expected-new-note@-5 {{insert module name}} {{14-14=<#identifier#>}}
+//
 }
 
 func inExpr() {
@@ -600,7 +600,7 @@ func inExpr() {
 
 // ModuleSelectorAttrs
 @_spi(main::Private)
-// expected-legacy-error@-1 {{expected ')' in '_spi' attribute}} {{none}} FIXME: 'main::Private' should be diagnosed in ASTGen
+// expected-legacy-error@-1 {{expected ')' in '_spi' attribute}} {{none}} expected-new-error@-1 {{expected an SPI identifier as subject of the '@_spi' attribute}}
 // expected-legacy-error@-2 {{expected declaration}}
 public struct BadImplementsAttr: CustomStringConvertible {}
 
@@ -616,7 +616,7 @@ public var stringValue: String { fatalError() }
 public func fn<T>() -> T { fatalError() }
 
 func fn(_: @isolated(Swift::any) () -> Void) {} 
-// expected-legacy-error@-1 {{expected 'any' as the isolation kind}} expected-new-error@-1 {{unexpected code '::any' in attribute}}
+// expected-legacy-error@-1 {{expected 'any' as the isolation kind}} expected-new-error@-1 {{unexpected code '::any' in attribute}} expected-new-error@-1 {{expected 'any' as the isolation kind}}
 // expected-legacy-error@-2 {{expected ')' after isolation kind}} {{none}}
 // expected-legacy-note@-3 {{to match this opening '('}}
 // expected-legacy-error@-4 {{expected module name in module selector}}
@@ -639,27 +639,27 @@ let x = Swift::do { 1 }
 let x = Swift::
 do { 1 }
 // expected-legacy-error@-2 {{expected identifier after module selector}} expected-new-error@-2 {{expected identifier in variable}}
-// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{16-+1:1=}} expected-new-note@-3 {{insert identifier}} {{16-16=<#identifier#>}}
+// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{16-+1:1=}} 
 
 let x = Swift::if y { 1 } else { 0 }
 // expected-legacy-error@-1 {{consecutive statements on a line must be separated by ';'}} {{18-18=;}} expected-new-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
-// expected-new-note@-2 {{insert newline}} {{18-19= \n}}
-// expected-new-note@-3 {{insert ';'}} {{18-19=}} {{19-19=; }}
+//
+//
 // expected-legacy-error@-4 {{consecutive statements on a line must be separated by ';'}} {{26-26=;}}
 // expected-legacy-error@-5 {{expected expression}} expected-new-error@-5 {{unexpected code 'else { 0 }' in source file}}
 
 let x = Swift::
 if y { 1 } else { 0 }
 // expected-legacy-error@-2 {{expected identifier after module selector}} expected-new-error@-2 {{expected identifier in variable}}
-// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{16-+1:1=}} expected-new-note@-3 {{insert identifier}} {{16-16=<#identifier#>}}
+// expected-legacy-note@-3 {{remove extraneous whitespace after '::'}} {{16-+1:1=}} 
 
 let x = Swift::switch y {
 // expected-legacy-error@-1 {{consecutive statements on a line must be separated by ';'}} {{22-22=;}} expected-new-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
-// expected-new-note@-2 {{insert newline}} {{22-23= \n}}
-// expected-new-note@-3 {{insert ';'}} {{22-23=}} {{23-23=; }}
+//
+//
 // expected-legacy-error@-4 {{consecutive statements on a line must be separated by ';'}} {{24-24=;}} expected-new-error@-4 {{consecutive statements on a line must be separated by newline or ';'}}
-// expected-new-note@-5 {{insert newline}} {{24-25= \n}}
-// expected-new-note@-6 {{insert ';'}} {{24-25=}} {{25-25=; }}
+//
+//
   // expected-legacy-error@-7 {{top-level statement cannot begin with a closure expression}}
 case true: 1
 // expected-legacy-error@-1 {{'case' label can only appear inside a 'switch' statement}} expected-new-error@-1 {{'case' can only appear inside a 'switch' statement or 'enum' declaration}}
@@ -669,7 +669,7 @@ case false: 0
 
 let x = Swift::
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in variable}}
-// expected-legacy-note@-2 {{remove extraneous whitespace after '::'}} {{16-+3:1=}} expected-new-note@-2 {{insert identifier}} {{16-16=<#identifier#>}}
+// expected-legacy-note@-2 {{remove extraneous whitespace after '::'}} {{16-+3:1=}} 
 switch y {
 case true: 1
 case false: 0
@@ -677,48 +677,48 @@ case false: 0
 
 fn(Swift::&x)
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in function call}}
-// expected-new-note@-2 {{insert identifier}} {{11-11=<#identifier#>}}
+//
 // expected-legacy-error@-3 {{expected ',' separator}} expected-new-error@-3 {{unexpected code '&x' in function call}}
 
 _ = Swift::\main::Foo.BarKit::bar
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{12-12=;}}
 
 _ = \main::Foo.BarKit::bar
 
 _ = Swift::-x
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{12-12=;}}
 
 _ = Swift::1
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{12-12=;}}
 
 _ = Swift::1.0
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{12-12=;}}
 
 func fn() {
   _ = Swift::@"fnord"
   // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-  // expected-new-note@-2 {{insert identifier}} {{14-14=<#identifier#>}}
+  //
   // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{14-14=;}}
   // expected-error@-4 {{string literals in Swift are not preceded by an '@' sign}}
-  // expected-new-note@-5 {{remove '@'}} {{14-15=}}
+  //
 }
 
 _ = Swift::"fnord"
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{12-12=;}}
 
 _ = Swift::/fnord/
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{12-12=;}}
 
 _ = Swift::nil
@@ -735,11 +735,11 @@ func fn() {
 }
 
 @attached(extension, names: Swift::deinit) macro m()
-// expected-legacy-error@-1 {{unknown introduced name kind 'Swift'}} FIXME: 'Swift::' should be diagnosed by ASTGen
+// expected-error@-1 {{unknown introduced name kind 'Swift'}}
 // expected-legacy-error@-2 {{expected '{' for deinitializer}}
 
 @attached(extension, names: Swift::subscript) macro m()
-// expected-legacy-error@-1 {{unknown introduced name kind 'Swift'}} FIXME: 'Swift::' should be diagnosed by ASTGen
+// expected-error@-1 {{unknown introduced name kind 'Swift'}}
 // expected-legacy-error@-2 {{expected '(' for subscript parameters}}
 
 _ = Swift::Self
@@ -749,7 +749,7 @@ _ = Swift::Any
 _ = {
   _ = Swift::$0
   // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-  // expected-new-note@-2 {{insert identifier}} {{14-14=<#identifier#>}}
+  //
   // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}} {{14-14=;}}
 }
 
@@ -758,30 +758,30 @@ _ = Swift::$foo
 //  FIXME: Legacy parser considers `_` a keyword; new parser probably should too
 _ = Swift::_
 // expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 
 Swift::_ = 1
 // expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{8-8=<#identifier#>}}
+//
 
 _ = Swift::#foo
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 // expected-legacy-error@-3 {{consecutive statements on a line must be separated by ';'}}
 
 _ = #Swift::foo
 
 _ = Swift::{ 1 }
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in function call}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#> }}
+//
 
 _ = Swift::.random()
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in member access}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 
 _ = Swift::.main::random()
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in member access}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 
 _ = .main::random()
 
@@ -789,21 +789,21 @@ _ = Swift::super.foo()
 
 _ = Swift::(a, b)
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in function call}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 
 _ = Swift::[a, b]
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in subscript}}
-// expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+//
 
 _ = Swift::
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier}}
-// expected-legacy-note@-2 {{remove extraneous whitespace after '::'}} {{12-+4:1=}} expected-new-note@-2 {{insert identifier}} {{12-12=<#identifier#>}}
+// expected-legacy-note@-2 {{remove extraneous whitespace after '::'}} {{12-+4:1=}} 
 
 _ = x.Swift::y
 
 _ = x.Swift::1
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in member access}}
-// expected-new-note@-2 {{insert identifier}} {{14-14=<#identifier#>}}
+//
 
 _ = x.Swift::self
 
@@ -817,7 +817,7 @@ _ = myArray.reduce(0, Swift::+)
 
 if Swift::#available(macOS 15, *) {}
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in 'if' statement}}
-// expected-new-note@-2 {{insert identifier}} {{11-11=<#identifier#> }}
+//
 // expected-legacy-error@-3 {{expected '{' after 'if' condition}} expected-new-error@-3 {{unexpected code '#available(macOS 15, *)' in 'if' statement}}
 
 func fn(_: Swift::Self) {}
@@ -828,23 +828,23 @@ func fn(_: Swift::Foo) {}
 
 func fn(_: Swift::(Int, String)) {}
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in type}}
-// expected-new-note@-2 {{insert identifier}} {{19-19=<#identifier#>}}
+//
 // expected-new-error@-3 {{unexpected code '(Int, String)' in parameter clause}}
 
 func fn(_: Swift::[Int]) {}
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in type}}
-// expected-new-note@-2 {{insert identifier}} {{19-19=<#identifier#>}}
+//
 // expected-new-error@-3 {{unexpected code '[Int]' in parameter clause}}
 
 //  FIXME: Legacy parser considers `_` a keyword; new parser probably should too
 func fn(_: Swift::_) {}
 // expected-new-error@-1 {{expected identifier in type}}
-// expected-new-note@-2 {{insert identifier}} {{19-19=<#identifier#>}}
+//
 // expected-new-error@-3 {{unexpected code '_' in parameter clause}}
 
 func fn(_: Swift::) {}
 // expected-legacy-error@-1 {{expected identifier after module selector}} expected-new-error@-1 {{expected identifier in type}}
-// expected-new-note@-2 {{insert identifier}} {{19-19=<#identifier#>}}
+//
 
 func fn(_: Foo.Swift::Type) {}
 
@@ -867,4 +867,4 @@ _ = Foundation::NSData::
 Fnord::NSData()
 // expected-legacy-error@-2 {{module selector cannot specify a submodule}} {{17-25=}} expected-new-error@-2 {{unexpected code 'NSData::' in module selector}}
 // expected-legacy-error@-3 {{expected identifier after module selector}} expected-new-error@-3 {{expected identifier}}
-// expected-legacy-note@-4 {{remove extraneous whitespace after '::'}} {{25-+1:1=}} expected-new-note@-4 {{insert identifier}} {{25-25=<#identifier#>}}
+// expected-legacy-note@-4 {{remove extraneous whitespace after '::'}} {{25-+1:1=}} 

@@ -179,7 +179,7 @@ C<CC>().c()
 
 // https://github.com/apple/swift/issues/43128
 protocol P_43128 {
-  typealias Foo // expected-error {{type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement}}
+  typealias Foo // expected-cparser-error {{type alias is missing an assigned type; use 'associatedtype' to define an associated type requirement}} expected-astgen-error {{expected '=' and type in typealias declaration}}
 }
 
 associatedtype Foo = Int // expected-error {{associated types can only be defined in a protocol; define a type or introduce a 'typealias' to satisfy an associated type requirement}}

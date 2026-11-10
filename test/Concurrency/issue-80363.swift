@@ -29,7 +29,7 @@ struct TestMembers {
     }
 
     isolated set {
-      // expected-error@-1 {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}}
+      // expected-cparser-error@-1 {{expected 'get', 'set', 'willSet', or 'didSet' keyword to start an accessor definition}} expected-astgen-error@-1 {{unexpected code in variable}}
     }
   }
 

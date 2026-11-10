@@ -1,4 +1,7 @@
 // {"kind":"typecheck","original":"4b05db17","signature":"swift::constraints::ConstraintSystem::recordResolvedOverload(swift::constraints::ConstraintLocator*, swift::constraints::SelectedOverload)","signatureAssert":"Assertion failed: (inserted), function recordResolvedOverload","signatureNext":"ConstraintSystem::resolveOverload"}
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 enum a {
   case b

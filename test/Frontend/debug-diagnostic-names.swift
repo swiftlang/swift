@@ -2,8 +2,9 @@
 // RUN: not %target-swift-frontend -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK_NONAMES
 
 let x =
-// CHECK_NAMES: error: expected initial value after '=' [expected_init_value]{{$}}
-// CHECK_NONAMES: error: expected initial value after '='{{$}}
+// ASTGen reports this with swift-syntax's wording, as a bridged error.
+// CHECK_NAMES: error: {{expected initial value after '='|expected expression in variable}} [{{expected_init_value|bridged_error}}]{{$}}
+// CHECK_NONAMES: error: {{expected initial value after '='|expected expression in variable}}{{$}}
 
 // CHECK_NAMES: warning: expression following 'return' is treated as an argument of the 'return' [unindented_code_after_return]{{$}}
 // CHECK_NAMES: note: indent the expression to silence this warning [indent_expression_to_silence]{{$}}

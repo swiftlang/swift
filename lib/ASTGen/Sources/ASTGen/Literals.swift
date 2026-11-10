@@ -122,7 +122,7 @@ extension ASTGenVisitor {
         base: interpolationVarRef.asExpr,
         dotLoc: nil,
         name: appendLiteral,
-        nameLoc: BridgedDeclNameLoc()
+        nameLoc: BridgedDeclNameLoc.createParsed(isFirst ? startLoc : literal.loc)
       )
       appendLiteralRef.asExpr.setImplicit()
       let argList = BridgedArgumentList.createImplicitUnlabeled(
@@ -161,7 +161,8 @@ extension ASTGenVisitor {
         // Consume literals before this interpolation.
         consumeCurrentLiteralValue()
 
-        let loc = self.generateSourceLoc(seg)
+        // The C++ parser locates an interpolation segment at its '('.
+        let loc = self.generateSourceLoc(seg.leftParen)
 
         // Construct '$interpolation.appendExpression(<interpolation value>)'
         let interpolationVarRef = BridgedDeclRefExpr.create(
@@ -175,7 +176,7 @@ extension ASTGenVisitor {
           base: interpolationVarRef.asExpr,
           dotLoc: self.generateSourceLoc(seg.backslash),
           name: appendInterpolation,
-          nameLoc: BridgedDeclNameLoc.createParsed(self.generateSourceLoc(seg))
+          nameLoc: BridgedDeclNameLoc.createParsed(loc)
         )
         appendInterpolationRef.asExpr.setImplicit()
         let argList = self.generateArgumentList(
@@ -261,8 +262,8 @@ extension ASTGenVisitor {
   func generate(arrayExpr node: ArrayExprSyntax) -> BridgedArrayExpr {
     let expressions = node.elements.lazy.map({ self.generate(expr: $0.expression) })
 
-    let commaLocations = node.elements.compactMap(in: self) {
-      self.generateSourceLoc($0.trailingComma)
+    let commaLocations = node.elements.compactMap(in: self) { element -> SourceLoc? in
+      element.trailingComma.map { self.generateSourceLoc($0) }
     }
 
     return .createParsed(
@@ -270,7 +271,7 @@ extension ASTGenVisitor {
       lSquareLoc: self.generateSourceLoc(node.leftSquare),
       elements: expressions.bridgedArray(in: self),
       commaLocs: commaLocations,
-      rSquareLoc: self.generateSourceLoc(node.rightSquare)
+      rSquareLoc: self.generateClosingDelimiterLoc(node.rightSquare, of: node)
     )
   }
 
@@ -284,7 +285,7 @@ extension ASTGenVisitor {
 
   public func generate(dictionaryExpr node: DictionaryExprSyntax) -> BridgedDictionaryExpr {
     let lBracketLoc = self.generateSourceLoc(node.leftSquare)
-    let rBracketLoc = self.generateSourceLoc(node.rightSquare)
+    let rBracketLoc = self.generateClosingDelimiterLoc(node.rightSquare, of: node)
     let elements: BridgedArrayRef
     let colonLocs: BridgedArrayRef
 
@@ -296,9 +297,10 @@ extension ASTGenVisitor {
       elements = elementNodes.lazy
         .map({ self.generate(dictionaryElement: $0).asExpr })
         .bridgedArray(in: self)
-      colonLocs = elementNodes.lazy
-        .map({ self.generateSourceLoc($0.colon) })
-        .bridgedArray(in: self)
+      // The locations of the commas between the elements.
+      colonLocs = elementNodes.compactMap(in: self) { element -> SourceLoc? in
+        element.trailingComma.map { self.generateSourceLoc($0) }
+      }
     }
     return .createParsed(
       self.ctx,

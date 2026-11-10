@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 let _ = self // expected-error {{cannot find 'self' in scope; did you mean to use it in a type or extension context?}} 
-let s = self.b // // expected-error {{cannot find 'self' in scope; did you mean to use it in a type or extension context?}} 
+let s = self.b // expected-error {{cannot find 'self' in scope; did you mean to use it in a type or extension context?}} 
 let w = self.method() // expected-error {{cannot find 'self' in scope; did you mean to use it in a type or extension context?}} 
 
 struct aStruct {

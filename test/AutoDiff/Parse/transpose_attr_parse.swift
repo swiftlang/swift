@@ -48,20 +48,20 @@ func transpose(v: Float) -> Float
 
 /// Bad
 
-// expected-error @+2 {{expected an original function name}}
-// expected-error @+1 {{expected declaration}}
+// expected-cparser-error @+2 {{expected an original function name}} expected-astgen-error@+2 {{unexpected code '3' in attribute}}
+// expected-cparser-error @+1 {{expected declaration}} expected-astgen-error@+1 {{expected identifier in attribute arguments}}
 @transpose(of: 3)
 func transpose(v: Float) -> Float
 
-// expected-error @+1 {{expected label 'wrt:' in '@transpose' attribute}}
-@transpose(of: foo, blah)
+// expected-cparser-error @+1 {{expected label 'wrt:' in '@transpose' attribute}} expected-astgen-error@+1 {{expected 'wrt:' in differentiability argument}}
+@transpose(of: foo, blah) // expected-astgen-error {{expected a parameter, which can be a function parameter index or 'self'}}
 func transpose(v: Float) -> Float
 
-// expected-error @+1 {{expected a colon ':' after 'wrt'}}
+// expected-cparser-error @+1 {{expected a colon ':' after 'wrt'}} expected-astgen-error@+1 {{expected ':' and arguments in differentiability argument}}
 @transpose(of: foo, wrt)
 func transpose(v: Float) -> Float
 
-// expected-error @+1 {{unexpected ',' separator}} {{19-20=}}
+// expected-cparser-error @+1 {{unexpected ',' separator}} {{19-20=}} expected-astgen-error@+1 {{expected 'wrt:' and arguments in differentiability argument}}
 @transpose(of: foo,)
 func transpose(v: Float) -> Float
 
@@ -81,22 +81,22 @@ func transpose(v: Float) -> Float
 // NOTE: The "expected ',' separator" diagnostic is not ideal.
 // Ideally, the diagnostic should point out that `Swift.Float.+(_:_)` is
 // not a valid declaration name (missing colon after second argument label).
-// expected-error @+2 {{expected ',' separator}}
-// expected-error @+1 {{expected declaration}}
+// expected-cparser-error @+2 {{expected ',' separator}}
+// expected-cparser-error @+1 {{expected declaration}} expected-astgen-error@+1 {{unexpected code '(_:_)' in attribute}}
 @transpose(of: Swift.Float.+(_:_))
 func transpose(v: Float) -> Float
 
 // NOTE: The "expected ',' separator" diagnostic is not ideal.
 // Ideally, the diagnostic should point out that `Swift.Float.+.a` is
 // not a valid declaration name.
-// expected-error @+2 {{expected ',' separator}}
-// expected-error @+1 {{expected declaration}}
+// expected-cparser-error @+2 {{expected ',' separator}} expected-astgen-error@+2 {{unexpected code 'a' in attribute}}
+// expected-cparser-error @+1 {{expected declaration}} expected-astgen-error@+1 {{expected 'get' in attribute arguments}}
 @transpose(of: Swift.Float.+.a)
 func transpose(v: Float) -> Float
 
 // TF-1168: missing comma before `wrt:`.
-// expected-error @+2 {{expected ',' separator}} {{19-19=,}}
-// expected-error @+1 {{expected declaration}}
+// expected-cparser-error @+2 {{expected ',' separator}} {{19-19=,}}
+// expected-cparser-error @+1 {{expected declaration}} expected-astgen-error@+1 {{unexpected code 'wrt: x' in attribute}}
 @transpose(of: foo wrt: x)
 func transpose(v: Float) -> Float
 

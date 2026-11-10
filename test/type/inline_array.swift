@@ -8,32 +8,32 @@ let _ = [[3 of Int] of Int]() // expected-error {{cannot pass type '[3 of Int]' 
 
 do {
   let _: [3 of
-  // expected-error@-1 {{expected type}}
+  // expected-cparser-error@-1 {{expected type}} expected-astgen-error@-1 {{expected element type and ']' to end inline array type}}
 }
 
 do {
-  let _: [3 of Int // expected-note {{to match this opening '['}}
-} // expected-error {{expected ']' in inline array type}}
+  let _: [3 of Int // expected-note {{to match this opening '['}} expected-astgen-error {{expected ']' to end inline array type}}
+} // expected-cparser-error {{expected ']' in inline array type}}
 
 // We don't currently allow multi-line.
 func testMultiline(_ of: Int) {
   let _ = [ // expected-error {{cannot call value of non-function type '[Int]'}}
-    3 // expected-error {{expected ',' separator}}
-    of
+    3 // expected-cparser-error {{expected ',' separator}}
+    of // expected-astgen-error {{unexpected code in array}}
     Int
   ](repeating: 0)
 
   let _ = [3
-    of
+    of // expected-astgen-error {{unexpected code in array}}
     Int
   ](repeating: 0)
-  // expected-error@-4 {{expected ',' separator}}
+  // expected-cparser-error@-4 {{expected ',' separator}}
   // expected-error@-5 {{cannot call value of non-function type '[Int]'}}
 
   let _ = [3
-           of Int](repeating: 0)
+           of Int](repeating: 0) // expected-astgen-error {{unexpected code 'of Int' in array}}
   // expected-error@-2 {{cannot call value of non-function type '[Int]'}}
-  // expected-error@-3 {{expected ',' separator}}
+  // expected-cparser-error@-3 {{expected ',' separator}}
 
   // This is okay.
   let _ = [3 of
@@ -64,9 +64,9 @@ let _ = S<[Int.Type of 3]>()
 let _ = S<[sending P & Q of 3]>()
 // expected-error@-1 {{element count must precede inline array element type}}
 // expected-error@-2 {{'sending' may only be used on parameters and results}}
-let _ = S<[some P & Q -> Int of 3]>()
+let _ = S<[some P & Q -> Int of 3]>() // expected-astgen-error {{expected ')' in function type}}
 // expected-error@-1 {{element count must precede inline array element type}}
-// expected-error@-2 {{single argument function types require parentheses}}
+// expected-cparser-error@-2 {{single argument function types require parentheses}} expected-astgen-error@-2 {{expected '(' to start function type}}
 // expected-error@-3 {{'some' types are only permitted in properties, subscripts, and functions}}
 let _ = S<[~P of 3]>()
 // expected-error@-1 {{element count must precede inline array element type}}

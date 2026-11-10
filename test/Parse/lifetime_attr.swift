@@ -19,7 +19,7 @@ func derive(_ ne1: NE, _ ne2: NE) -> NE {
   return ne2
 }
 
-@_lifetime // expected-error{{expected '(' after lifetime dependence specifier}}
+@_lifetime // expected-cparser-error{{expected '(' after lifetime dependence specifier}} expected-astgen-error{{expected '(' in '_lifetime' attribute}}
 func testMissingLParenError(_ ne: NE) -> NE {
   ne
 }

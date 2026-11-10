@@ -12,7 +12,7 @@
 
 import ASTBridging
 import BasicBridging
-import SwiftDiagnostics
+@_spi(Compiler) import SwiftDiagnostics
 import SwiftSyntax
 
 fileprivate struct PerFrontendDiagnosticState {
@@ -28,7 +28,10 @@ fileprivate func emitDiagnosticParts(
   position: AbsolutePosition,
   offset: Int,
   highlights: [Syntax] = [],
-  edits: [SourceEdit] = []
+  edits: [SourceEdit] = [],
+  canonicalizeEdits: Bool = false,
+  trimEdits: Bool = true,
+  trimEverything: Bool = false
 ) {
   // Map severity
   let bridgedSeverity = severity.bridged
@@ -56,13 +59,106 @@ fileprivate func emitDiagnosticParts(
     )
   }
 
-  // Emit changes for a Fix-It.
-  for edit in edits {
-    var newText: String = edit.replacement
+  // Emit changes for a Fix-It. When asked to, make the edits one change that
+  // spans them all, as the C++ parser does for the Fix-Its it attaches to notes.
+  var mergedEdits: [SourceEdit] = []
+  for edit in edits.sorted(by: { $0.range.lowerBound < $1.range.lowerBound }) {
+    if canonicalizeEdits, let last = mergedEdits.last {
+      mergedEdits[mergedEdits.count - 1] = SourceEdit(
+        range: last.range.lowerBound..<edit.range.upperBound,
+        replacement: last.replacement + edit.replacement
+      )
+    } else {
+      mergedEdits.append(edit)
+    }
+  }
+  for edit in mergedEdits {
+    var lower = edit.range.lowerBound
+    var upper = edit.range.upperBound
+    var replacement = Array(edit.replacement.utf8)
+
+    // Leave out the text that the edit leaves as it was, e.g., the newline in
+    // front of the indentation whose spaces it changes.
+    let start = offset + lower.utf8Offset
+    let end = offset + upper.utf8Offset
+    if trimEdits, !canonicalizeEdits, start >= 0, end <= sourceFileBuffer.count, start <= end {
+      let original = Array(sourceFileBuffer[start..<end])
+      func isContinuation(_ byte: UInt8) -> Bool { byte & 0xC0 == 0x80 }
+      // Trim what is common at the end first, so that an insertion lands right
+      // after the text it follows, as in `else` + ` if`.
+      var suffix = 0
+      while suffix < original.count, suffix < replacement.count,
+        original[original.count - 1 - suffix] == replacement[replacement.count - 1 - suffix]
+      {
+        suffix += 1
+      }
+      // Do not stop in the middle of a character.
+      while suffix > 0,
+        (suffix < original.count && isContinuation(original[original.count - suffix]))
+          || (suffix < replacement.count && isContinuation(replacement[replacement.count - suffix]))
+      {
+        suffix -= 1
+      }
+      var prefix = 0
+      while prefix < original.count - suffix, prefix < replacement.count - suffix,
+        original[prefix] == replacement[prefix]
+      {
+        prefix += 1
+      }
+      while prefix > 0,
+        (prefix < original.count && isContinuation(original[prefix]))
+          || (prefix < replacement.count && isContinuation(replacement[prefix]))
+      {
+        prefix -= 1
+      }
+      if !trimEverything {
+        // Only drop trivia that the edit repeats: leading whitespace, and
+        // trailing whitespace and comments. A fix-it that replaces a node
+        // together with the comment after it should not edit that comment.
+        func isSpace(_ byte: UInt8) -> Bool {
+          byte == UInt8(ascii: " ") || byte == UInt8(ascii: "\t") || byte == UInt8(ascii: "\n")
+            || byte == UInt8(ascii: "\r")
+        }
+        var leadingSpaces = 0
+        while leadingSpaces < prefix, isSpace(original[leadingSpaces]) { leadingSpaces += 1 }
+        prefix = leadingSpaces
+        let suffixStart = original.count - suffix
+        var keep = suffix
+        var i = suffixStart
+        keep = 0
+        while i < original.count {
+          var j = i
+          while j < original.count, isSpace(original[j]) { j += 1 }
+          let isComment = j + 1 < original.count && original[j] == UInt8(ascii: "/")
+            && (original[j + 1] == UInt8(ascii: "/") || original[j + 1] == UInt8(ascii: "*"))
+          if j == original.count || isComment {
+            keep = original.count - i
+            break
+          }
+          i += 1
+        }
+        suffix = keep
+      }
+      lower = lower.advanced(by: prefix)
+      upper = upper.advanced(by: -suffix)
+      replacement = Array(replacement[prefix..<(replacement.count - suffix)])
+    }
+
+    // A joined name does not swallow the whitespace after it.
+    if canonicalizeEdits, !replacement.isEmpty, let last = replacement.last, last != UInt8(ascii: " ") {
+      let s = offset + lower.utf8Offset
+      var e = offset + upper.utf8Offset
+      while e > s, e <= sourceFileBuffer.count, sourceFileBuffer[e - 1] == UInt8(ascii: " ") {
+        e -= 1
+        upper = upper.advanced(by: -1)
+      }
+    }
+
+    var newText = String(decoding: replacement, as: UTF8.self)
     newText.withBridgedString { bridgedMessage in
       diag.fixItReplace(
-        start: sourceLoc(at: edit.range.lowerBound),
-        end: sourceLoc(at: edit.range.upperBound),
+        start: sourceLoc(at: lower),
+        end: sourceLoc(at: upper),
         replacement: bridgedMessage
       )
     }
@@ -80,7 +176,32 @@ public func emitDiagnostic(
   diagnosticSeverity: DiagnosticSeverity,
   messageSuffix: String? = nil
 ) {
-  // Emit the main diagnostic
+  // SwiftParser diagnostics: attach the Fix-It to the diagnostic itself, as the
+  // C++ parser does, rather than emitting it as a separate note. SwiftParser
+  // can offer several alternative Fix-Its for one diagnostic (e.g. "insert
+  // newline" or "insert ';'"); they cannot all be applied together, so only the
+  // first is attached.
+  //
+  // Other sources, such as SwiftIfConfig, have no C++-parser counterpart that
+  // attaches the Fix-It; the C++ side reports those as notes, so keep that.
+  let domain = diagnostic.diagnosticID.domain
+  let attachFixIt = domain == "SwiftParser" || domain == "SwiftLexer"
+
+  // The C++ parser offers these as notes with a Fix-It, not as a Fix-It on the
+  // diagnostic. Their messages are the same text as the C++ notes.
+  let noteFixItMessages: Set<String> = [
+    "if this name is unavoidable, use backticks to escape it",
+    "join the identifiers together",
+    "join the identifiers together with camel-case",
+  ]
+  // Only for the diagnostics that have such a note in the C++ parser.
+  let diagMessage = diagnostic.diagMessage.message
+  let hasNoteForm =
+    (diagMessage.hasPrefix("keyword '") && diagMessage.hasSuffix("cannot be used as an identifier here"))
+    || diagMessage.hasPrefix("found an unexpected second identifier")
+  func isNoteFixIt(_ fixIt: FixIt) -> Bool {
+    attachFixIt && hasNoteForm && noteFixItMessages.contains(fixIt.message.message)
+  }
   emitDiagnosticParts(
     diagnosticEngine: diagnosticEngine,
     sourceFileBuffer: sourceFileBuffer,
@@ -88,12 +209,13 @@ public func emitDiagnostic(
     severity: diagnosticSeverity,
     position: diagnostic.position,
     offset: sourceFileBufferOffset,
-    highlights: diagnostic.highlights
+    highlights: diagnostic.highlights,
+    edits: attachFixIt ? (diagnostic.fixIts.first(where: { !isNoteFixIt($0) })?.edits ?? []) : [],
+    trimEverything: ["replace non-breaking space with ' '", "insert 'if'"].contains(diagnostic.fixIts.first?.message.message ?? "")
   )
 
-  // Emit Fix-Its.
-  // FIXME: Ths assumes the fixIt is on the same tree/buffer, which is not guaranteed.
-  for fixIt in diagnostic.fixIts {
+  for fixIt in diagnostic.fixIts where !attachFixIt || isNoteFixIt(fixIt) {
+    // FIXME: Ths assumes the fixIt is on the same tree/buffer, which is not guaranteed.
     emitDiagnosticParts(
       diagnosticEngine: diagnosticEngine,
       sourceFileBuffer: sourceFileBuffer,
@@ -101,7 +223,8 @@ public func emitDiagnostic(
       severity: .note,
       position: diagnostic.position,
       offset: sourceFileBufferOffset,
-      edits: fixIt.edits
+      edits: fixIt.edits,
+      canonicalizeEdits: isNoteFixIt(fixIt)
     )
   }
 

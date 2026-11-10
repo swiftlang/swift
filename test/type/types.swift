@@ -162,11 +162,11 @@ class r21949448 {
 }
 
 // SE-0066 - Standardize function type argument syntax to require parentheses
-let _ : Int -> Float // expected-error {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}}
-let _ : inout Int -> Float // expected-error {{'inout' may only be used on parameters}}
-// expected-error@-1 {{single argument function types require parentheses}} {{15-15=(}} {{18-18=)}}
-func testNoParenFunction(x: Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{29-29=(}} {{32-32=)}}
-func testNoParenFunction(x: inout Int -> Float) {} // expected-error {{single argument function types require parentheses}} {{35-35=(}} {{38-38=)}}
+let _ : Int -> Float // expected-cparser-error {{single argument function types require parentheses}} {{9-9=(}} {{12-12=)}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
+let _ : inout Int -> Float // expected-error {{'inout' may only be used on parameters}} expected-astgen-error {{expected ')' in function type}}
+// expected-cparser-error@-1 {{single argument function types require parentheses}} {{15-15=(}} {{18-18=)}} expected-astgen-error@-1 {{expected '(' to start function type}}
+func testNoParenFunction(x: Int -> Float) {} // expected-cparser-error {{single argument function types require parentheses}} {{29-29=(}} {{32-32=)}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
+func testNoParenFunction(x: inout Int -> Float) {} // expected-cparser-error {{single argument function types require parentheses}} {{35-35=(}} {{38-38=)}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
 
 func foo1(a : UnsafePointer<Void>) {} // expected-warning {{UnsafePointer<Void> has been replaced by UnsafeRawPointer}}{{15-34=UnsafeRawPointer}}
 func foo2(a : UnsafeMutablePointer<()>) {} // expected-warning {{UnsafeMutablePointer<Void> has been replaced by UnsafeMutableRawPointer}}{{15-39=UnsafeMutableRawPointer}}
@@ -180,8 +180,8 @@ class C {
 }
 
 let _ : inout @convention(c) (Int) -> Int // expected-error {{'inout' may only be used on parameters}}
-func foo3(inout a: Int -> Void) {} // expected-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{11-16=}} {{20-20=inout }}
-                                   // expected-error @-1 {{single argument function types require parentheses}} {{20-20=(}} {{23-23=)}}
+func foo3(inout a: Int -> Void) {} // expected-cparser-error {{'inout' before a parameter name is not allowed, place it before the parameter type instead}} {{11-16=}} {{20-20=inout }} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
+                                   // expected-cparser-error @-1 {{single argument function types require parentheses}} {{20-20=(}} {{23-23=)}} expected-astgen-error@-1 {{'inout' before a parameter name is not allowed}}
 
 // https://github.com/apple/swift/issues/48077
 do {
@@ -192,7 +192,7 @@ do {
 
 typealias A = (inout Int ..., Int ... = [42, 12]) -> Void // expected-error {{'inout' must not be used on variadic parameters}}
                                                           // expected-error@-1 {{only a single element can be variadic}} {{35-39=}}
-                                                          // expected-error@-2 {{default argument not permitted in a tuple type}} {{39-49=}}
+                                                          // expected-cparser-error@-2 {{default argument not permitted in a tuple type}} {{39-49=}} expected-astgen-error@-2 {{unexpected code '= [42, 12]' in function type}}
 
 // rdar://94888357 - failed to produce a diagnostic when type is used incorrectly
 func rdar94888357() {

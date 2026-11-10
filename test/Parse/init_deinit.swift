@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 struct FooStructConstructorA {
-  init // expected-error {{expected '('}}
+  init // expected-cparser-error {{expected '('}} expected-astgen-error {{expected parameter clause in function signature}}
   // expected-error@-1{{initializer requires a body}}
 }
 
@@ -10,11 +10,11 @@ struct FooStructConstructorB {
 }
 
 struct FooStructConstructorC {
-  init {} // expected-error {{expected '('}}{{7-7=()}}
+  init {} // expected-cparser-error {{expected '('}}{{7-7=()}} expected-astgen-error {{expected parameter clause in function signature}}
   // expected-note@-1{{'init()' previously declared here}}
-  init<T> {} // expected-error {{expected '('}} {{10-10=()}}
+  init<T> {} // expected-cparser-error {{expected '('}} {{10-10=()}} expected-astgen-error {{expected parameter clause in function signature}}
   // expected-error@-1{{generic parameter 'T' is not used in function signature}}
-  init? { self.init() } // expected-error {{expected '('}} {{8-8=()}}
+  init? { self.init() } // expected-cparser-error {{expected '('}} {{8-8=()}} expected-astgen-error {{expected parameter clause in function signature}}
   // expected-error@-1{{invalid redeclaration of 'init()'}}
 }
 
@@ -24,13 +24,13 @@ struct FooStructConstructorD {
 }
 
 struct FooStructDeinitializerA {
-  deinit // expected-error {{expected '{' for deinitializer}}
-  deinit x // expected-error {{deinitializers cannot have a name}} {{10-12=}}  expected-error {{expected '{' for deinitializer}}
-  deinit x() // expected-error {{deinitializers cannot have a name}} {{10-11=}} expected-error {{no parameter clause allowed on deinitializer}} {{11-13=}} expected-error {{expected '{' for deinitializer}}
+  deinit // expected-cparser-error {{expected '{' for deinitializer}} expected-astgen-error {{expected '{' in body of function declaration}} expected-astgen-note {{'deinit' previously declared here}} expected-astgen-note {{'deinit' previously declared here}}
+  deinit x // expected-cparser-error {{deinitializers cannot have a name}} {{10-12=}} expected-astgen-error {{deinitializers cannot have a name}}  expected-cparser-error {{expected '{' for deinitializer}} expected-astgen-error {{invalid redeclaration of 'deinit'}}
+  deinit x() // expected-error {{deinitializers cannot have a name}} {{10-11=}} expected-cparser-error {{no parameter clause allowed on deinitializer}} {{11-13=}} expected-cparser-error {{expected '{' for deinitializer}} expected-astgen-error {{invalid redeclaration of 'deinit'}}
 }
 
-struct FooStructDeinitializerB {
-  deinit // expected-error {{expected '{' for deinitializer}}
+struct FooStructDeinitializerB { // expected-astgen-note {{consider adding '~Copyable' to struct 'FooStructDeinitializerB'}}
+  deinit // expected-cparser-error {{expected '{' for deinitializer}} expected-astgen-error {{deinitializer cannot be declared in struct 'FooStructDeinitializerB' that conforms to 'Copyable'}} expected-astgen-error {{expected '{' in body of function declaration}}
 }
 
 struct FooStructDeinitializerC { // expected-note {{consider adding '~Copyable' to struct 'FooStructDeinitializerC'}}
@@ -38,7 +38,7 @@ struct FooStructDeinitializerC { // expected-note {{consider adding '~Copyable' 
 }
 
 class FooClassDeinitializerA {
-  deinit(a : Int) {} // expected-error{{no parameter clause allowed on deinitializer}}{{9-18=}}
+  deinit(a : Int) {} // expected-cparser-error{{no parameter clause allowed on deinitializer}}{{9-18=}} expected-astgen-error {{deinitializers cannot have parameters}}
 }
 
 class FooClassDeinitializerB {
@@ -46,15 +46,15 @@ class FooClassDeinitializerB {
 }
 
 class FooClassDeinitializerC {
-  deinit x (a : Int) {} // expected-error {{deinitializers cannot have a name}} {{10-12=}} expected-error{{no parameter clause allowed on deinitializer}}{{12-22=}}
+  deinit x (a : Int) {} // expected-error {{deinitializers cannot have a name}} {{10-12=}} expected-cparser-error{{no parameter clause allowed on deinitializer}}{{12-22=}}
 }
 
-init {} // expected-error {{initializers may only be declared within a type}} expected-error {{expected '('}} {{5-5=()}}
+init {} // expected-error {{initializers may only be declared within a type}} expected-cparser-error {{expected '('}} {{5-5=()}} expected-astgen-error {{expected parameter clause in function signature}}
 init() // expected-error {{initializers may only be declared within a type}}
 init() {} // expected-error {{initializers may only be declared within a type}}
 
 deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
-deinit // expected-error {{expected '{' for deinitializer}}
+deinit // expected-cparser-error {{expected '{' for deinitializer}} expected-astgen-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or non-'Copyable' type}}
 
 struct BarStruct {

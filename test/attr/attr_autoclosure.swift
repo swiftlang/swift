@@ -70,12 +70,12 @@ struct AutoclosureEscapeTest {
 
 // @autoclosure(escaping) is no longer a thing; just make sure we don't crash
 // expected-error @+1 {{attribute can only be applied to types, not declarations}}
-func func10(@autoclosure(escaping _: () -> ()) { } // expected-error{{expected parameter name followed by ':'}}
+func func10(@autoclosure(escaping _: () -> ()) { } // expected-cparser-error{{expected parameter name followed by ':'}} expected-astgen-error {{expected ')' to end attribute}} expected-astgen-note {{to match this opening '('}}
 
 func func11(_: @autoclosure(escaping) @noescape () -> ()) { } // expected-error{{cannot find type 'escaping' in scope}}
 // expected-error @-1 {{attribute can only be applied to types, not declarations}}
-// expected-error @-2 {{expected ',' separator}}
-// expected-error @-3 {{expected parameter name followed by ':'}}
+// expected-cparser-error @-2 {{expected ',' separator}} expected-astgen-error@-2 {{expected identifier and ':' in parameter}}
+// expected-cparser-error @-3 {{expected parameter name followed by ':'}} expected-astgen-error@-3 {{expected ',' in parameter}}
 
 func func12_sink(_ x: @escaping () -> Int) { }
 

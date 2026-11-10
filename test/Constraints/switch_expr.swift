@@ -750,7 +750,7 @@ func builderStaticMember() -> (Either<String, Int>, Double) {
 
 @Builder
 func builderNotPostfix() -> (Either<String, Int>, Bool) {
-  switch Bool.random() { case true: "" case false: 1 } !.random() // expected-error {{consecutive statements on a line must be separated by ';'}}
+  switch Bool.random() { case true: "" case false: 1 } !.random() // expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}}
 }
 
 @Builder

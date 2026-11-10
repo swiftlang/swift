@@ -7,8 +7,8 @@ actor SomeActor {}
 distributed actor DA {}
 // expected-error@-1{{distributed actor 'DA' declared without importing module 'Distributed'}}
 
-distributed actor class DAC {}
-// expected-error@-1{{distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}}
+distributed actor class DAC {} // expected-astgen-note {{if this name is unavoidable, use backticks to escape it}}
+// expected-cparser-error@-1{{distributed' can only be applied to 'actor' definitions, and distributed actor-isolated async functions}} expected-astgen-error@-1{{unexpected code 'DAC' in actor}}
 // expected-error@-2{{keyword 'class' cannot be used as an identifier here}}
 
 actor A {

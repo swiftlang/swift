@@ -37,9 +37,49 @@ struct ASTGenVisitor {
 
   @Boxed private(set) var declContext: BridgedDeclContext
 
+  /// Whether a variable declaration should skip its `TopLevelCodeDecl` wrapper;
+  /// see `withTopLevelCodeSuppressed(_:)`.
+  @Boxed private(set) var suppressTopLevelCode: Bool = false
+
+  /// The exposure kinds of the `@_expose` attributes seen so far in the
+  /// attribute list being generated, to diagnose duplicates.
+  @Boxed var seenExposureKinds: [UInt8] = []
+
+  /// The kinds of the `@_extern` attributes seen so far in the attribute list
+  /// being generated, to diagnose duplicates.
+  @Boxed var seenExternKinds: [UInt8] = []
+
+  /// The `#if` blocks already checked for clauses following `#else`.
+  @Boxed var diagnosedIfConfigs: Set<SyntaxIdentifier> = []
+
+  /// Set when an availability specification list was diagnosed and had a
+  /// specification dropped, so the condition is marked invalid.
+  @Boxed var availabilitySpecListIsInvalid: Bool = false
+
+  /// Whether a `#sourceLocation(file:line:)` directive is open, so that a
+  /// parameterless `#sourceLocation()` has something to close.
+  @Boxed var inPoundSourceLocationEnvironment: Bool = false
+
+  /// Set when a pattern binding was diagnosed as malformed while its entries
+  /// were generated, so the declaration is marked invalid.
+  @Boxed var patternBindingIsInvalid: Bool = false
+
+  /// Whether the accessors being generated belong to a declaration that was
+  /// already diagnosed as invalid, so they are marked invalid too.
+  @Boxed var accessorsAreInvalid: Bool = false
+
+  /// Set when the declaration attribute being generated was rejected after a
+  /// diagnostic: the C++ parser gives up on the declaration then, so later
+  /// checks must not report on it.
+  @Boxed var rejectedDeclAttribute: Bool = false
+
   let ctx: BridgedASTContext
 
   let configuredRegions: ConfiguredRegions
+
+  /// Whether the bodies of eligible functions are built on demand rather than
+  /// as part of generating the declaration; see `DelayedBodies.swift`.
+  let delayFunctionBodies: Bool
 
   fileprivate let allocator: SwiftSyntax.BumpPtrAllocator = .init(initialSlabSize: 256)
 
@@ -48,16 +88,25 @@ struct ASTGenVisitor {
     sourceBuffer: UnsafeBufferPointer<UInt8>,
     declContext: BridgedDeclContext,
     astContext: BridgedASTContext,
-    configuredRegions: ConfiguredRegions
+    configuredRegions: ConfiguredRegions,
+    delayFunctionBodies: Bool = false
   ) {
     self.diagnosticEngine = diagnosticEngine
     self.base = sourceBuffer
     self.declContext = declContext
     self.ctx = astContext
     self.configuredRegions = configuredRegions
+    self.delayFunctionBodies = delayFunctionBodies
   }
 
   func generate(sourceFile node: SourceFileSyntax) -> [BridgedASTNode] {
+    // A hashbang line is only allowed in the main file.
+    if let shebang = node.shebang, self.declContext.isModuleScopeContext,
+      !self.declContext.parentSourceFile.isScriptMode
+    {
+      self.diagnose(.lex_hashbang_not_allowed, at: shebang)
+    }
+
     // If not top-level, no need for 'TopLevelCodeDecl' treatment.
     if !self.declContext.isModuleScopeContext {
       return self.generate(codeBlockItemList: node.statements)
@@ -84,9 +133,9 @@ struct ASTGenVisitor {
       if !declContext.parentSourceFile.isScriptMode {
         switch astNode.kind {
         case .stmt:
-          self.diagnose(.illegalTopLevelStmt(node))
+          self.diagnose(.illegal_top_level_stmt, at: node)
         case .expr:
-          self.diagnose(.illegalTopLevelExpr(node))
+          self.diagnose(.illegal_top_level_expr, at: node)
         case .decl:
           fatalError("unreachable")
         }
@@ -122,6 +171,14 @@ struct ASTGenVisitor {
       return self.generate(decl: node).map { .decl($0) }
 
     case .expr(let node):
+      // A top-level statement in a script cannot begin with a closure: that is
+      // ambiguous with a trailing closure.
+      if declContext.parentSourceFile.isScriptMode,
+        let first = node.firstToken(viewMode: .sourceAccurate), first.rawTokenKind == .leftBrace,
+        first.parent?.is(ClosureExprSyntax.self) == true, !node.hasError
+      {
+        self.diagnose(.statement_begins_with_closure, at: first)
+      }
       return maybeTopLevelCodeDecl {
         if let node = node.as(MacroExpansionExprSyntax.self) {
           switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
@@ -150,15 +207,51 @@ struct ASTGenVisitor {
     }
   }
 
-  func generateTopLevel(codeBlockItemList node: CodeBlockItemListSyntax) -> [BridgedASTNode] {
+  func generateTopLevel(
+    codeBlockItemList node: CodeBlockItemListSyntax,
+    skippingLeadingExpressions: Bool = false
+  ) -> [BridgedASTNode] {
     var out = [BridgedASTNode]()
+    var skipping = skippingLeadingExpressions
+
+    /// Whether a top-level 'guard' has been seen. Such a statement introduces
+    /// bindings that the rest of the file can use, so every function after it has
+    /// to be treated as if it were in a local context when SILGen computes
+    /// captures -- otherwise SILGen skips the capture list, and a reference to one
+    /// of those bindings ends up on the global path instead. `Parser::parseBraceItems`
+    /// tracks the same thing as `IsFollowingGuard`.
+    var isFollowingGuard = false
+
     visitIfConfigElements(
       node,
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
+      // After a stray label, the C++ parser skips to the start of the next
+      // statement or declaration, dropping leading expressions.
+      if skipping {
+        if case .expr = element.item {
+          return
+        }
+        skipping = false
+      }
+      // The statements of a 'case' outside of a 'switch' belong after it.
+      defer {
+        if let body = element.strayCaseBody {
+          out.append(contentsOf: self.generateTopLevel(codeBlockItemList: body, skippingLeadingExpressions: true))
+        }
+      }
       guard let item = self.generateTopLevel(codeBlockItem: element) else {
         return
+      }
+      if let semicolon = element.semicolon, semicolon.presence == .present, !element.item.hasError {
+        item.setTrailingSemiLoc(self.generateSourceLoc(semicolon))
+      }
+      if isFollowingGuard, item.kind == .decl {
+        item.castToDecl().setHasTopLevelLocalContextCaptures()
+      }
+      if element.item.isGuardStmt {
+        isFollowingGuard = true
       }
       out.append(item)
 
@@ -173,6 +266,17 @@ struct ASTGenVisitor {
       }
     }
     return out
+  }
+}
+
+extension CodeBlockItemSyntax.Item {
+  /// Whether this item is a 'guard' statement, which at file scope introduces
+  /// bindings visible to everything after it.
+  var isGuardStmt: Bool {
+    if case .stmt(let stmt) = self {
+      return stmt.is(GuardStmtSyntax.self)
+    }
+    return false
   }
 }
 
@@ -208,11 +312,92 @@ extension ASTGenVisitor {
     SourceLoc(at: node.positionAfterSkippingLeadingTrivia, in: self.base)
   }
 
+  /// Obtains the C++ start location of `token`.
+  ///
+  /// A token that ends its parent, which the parser synthesized during recovery, has a zero-width
+  /// position just past the preceding token *and its trailing trivia*, which can
+  /// lie beyond the construct that contains it. The C++ parser gives a token it
+  /// did not find the start of the previous token it consumed
+  /// (`Parser::getErrorOrMissingLoc`), which lets a construct end where its
+  /// contents end, so do the same.
+  @inline(__always)
+  func generateSourceLoc(_ token: TokenSyntax) -> SourceLoc {
+    // This applies to a missing token that ends its parent -- a closing
+    // delimiter, the ':' of a `case` -- and not to one that opens a construct,
+    // such as the `{` of a `switch` whose subject is another `switch`: that
+    // must not move back into what precedes it.
+    if token.presence == .missing,
+      token.rawTokenKind != .leftParen, token.rawTokenKind != .leftBrace,
+      token.rawTokenKind != .leftSquare, token.rawTokenKind != .leftAngle,
+      let parent = token.parent,
+      let lastInParent = parent.lastToken(viewMode: .sourceAccurate),
+      lastInParent.endPosition <= token.position,
+      let previous = token.previousToken(viewMode: .sourceAccurate)
+    {
+      return SourceLoc(at: previous.positionAfterSkippingLeadingTrivia, in: self.base)
+    }
+    return SourceLoc(at: token.positionAfterSkippingLeadingTrivia, in: self.base)
+  }
+
+  @inline(__always)
+  func generateSourceLoc(_ token: TokenSyntax?) -> SourceLoc {
+    token.map { self.generateSourceLoc($0) } ?? nil
+  }
+
   /// Obtains the C++ start location of the node excluding leading trivia in the
   /// source buffer. If the `node` is nil returns an invalid source location.
   @inline(__always)
   func generateSourceLoc(_ node: (some SyntaxProtocol)?) -> SourceLoc {
     node.map(generateSourceLoc(_:)) ?? nil
+  }
+
+  /// The end location for a brace-delimited construct: the '}' if the parser
+  /// saw one, and otherwise the end of the last token that is actually present.
+  ///
+  /// A '}' the parser synthesized during recovery still has a position -- a
+  /// zero-width one just past the preceding token *and its trailing trivia* --
+  /// which for an unterminated construct lands beyond everything it contains,
+  /// and sometimes inside whatever follows. Using it makes the construct's range
+  /// exceed its contents, so its own child scopes fall outside it and ASTScope
+  /// and the availability-scope builder reject the result. The C++ parser ends
+  /// the range at the last token it consumed.
+  func generateRBraceLoc(_ rightBrace: TokenSyntax, of node: some SyntaxProtocol) -> SourceLoc {
+    let loc = self.generateSourceLocIfPresent(rightBrace)
+    if loc != nil {
+      return loc
+    }
+    if let lastPresent = node.lastToken(viewMode: .sourceAccurate) {
+      return self.generateSourceLoc(lastPresent)
+    }
+    // Nothing in the construct is present -- `if c { } else` gives an 'else' body
+    // with neither brace nor contents. Collapse to the construct's own start,
+    // which is where the '{' was synthesized, so that the range stays a valid
+    // zero-width point: a range with one valid and one invalid endpoint is itself
+    // an assertion failure.
+    return self.generateSourceLoc(node)
+  }
+
+  /// The location of a closing parenthesis or bracket, which may have been
+  /// synthesized: see `generateRBraceLoc(_:of:)`.
+  func generateClosingDelimiterLoc(_ token: TokenSyntax, of node: some SyntaxProtocol) -> SourceLoc {
+    self.generateRBraceLoc(token, of: node)
+  }
+
+  /// Obtains the C++ start location of `token`, or an invalid location if the
+  /// parser synthesized it during recovery.
+  ///
+  /// A missing token still has a position -- a zero-width one where the token
+  /// would have gone -- so `generateSourceLoc` returns a valid location for it.
+  /// That position can fall outside the enclosing node's range, which makes any
+  /// AST range built from it inconsistent with its parent's. Use this wherever
+  /// the C++ parser would have left the corresponding `SourceLoc` default
+  /// because it never consumed a token.
+  @inline(__always)
+  func generateSourceLocIfPresent(_ token: TokenSyntax?) -> SourceLoc {
+    guard let token, token.presence == .present else {
+      return nil
+    }
+    return self.generateSourceLoc(token)
   }
 
   /// Obtains a pair of an `ASTContext`-owned identifier and a C++ source
@@ -285,6 +470,9 @@ extension ASTGenVisitor {
       if arguments.arguments.isEmpty {
         bridgedLabels = BridgedArrayRef()
       } else {
+        for argument in arguments.arguments {
+          self.diagnoseUnnecessarilyEscapedLabel(argument.name)
+        }
         let labels = arguments.arguments.lazy.map {
           self.generateIdentifier($0.name)
         }
@@ -402,6 +590,17 @@ extension ASTGenVisitor {
     }
     return body()
   }
+
+  /// Run `body` with top-level-code wrapping of variable declarations
+  /// suppressed, e.g., for declarations in a generated buffer.
+  func withTopLevelCodeSuppressed<T>(_ body: () -> T) -> T {
+    let old = self.suppressTopLevelCode
+    self.suppressTopLevelCode = true
+    defer {
+      self.suppressTopLevelCode = old
+    }
+    return body()
+  }
 }
 
 // Forwarding overloads that take optional syntax nodes. These are defined on demand to achieve a consistent
@@ -424,7 +623,14 @@ extension ASTGenVisitor {
 
   @inline(__always)
   func generate(genericParameterClause node: GenericParameterClauseSyntax?) -> BridgedNullableGenericParamList {
-    node.map(generate(genericParameterClause:)).asNullable
+    // Drop an empty parameter list, e.g. the one recovery produces for
+    // `struct S< {}`. The C++ parser yields no list at all in that case, and
+    // downstream code asserts that a GenericParamList has at least one
+    // parameter ("Parsed an empty generic parameter list?").
+    guard let node, !node.parameters.isEmpty else {
+      return nil
+    }
+    return Optional(self.generate(genericParameterClause: node)).asNullable
   }
 
   @inline(__always)
@@ -443,8 +649,14 @@ extension ASTGenVisitor {
   }
 
   @inline(__always)
-  func generate(inheritedTypeList node: InheritedTypeListSyntax?) -> BridgedArrayRef {
-    node.map(generate(inheritedTypeList:)) ?? .init()
+  func generate(
+    inheritedTypeList node: InheritedTypeListSyntax?,
+    allowClassRequirement: Bool = false,
+    allowAnyObject: Bool = false
+  ) -> BridgedArrayRef {
+    node.map {
+      generate(inheritedTypeList: $0, allowClassRequirement: allowClassRequirement, allowAnyObject: allowAnyObject)
+    } ?? .init()
   }
 
   @inline(__always)
@@ -464,6 +676,7 @@ extension Collection {
     }
 
     let baseAddress = astgen.allocator.allocate(T.self, count: self.count).baseAddress!
+    var initializedCount = 0
     do {
       // A loop instead of `initialize(from: self.lazy.compactMap(transform))` because we aren't
       // doing a great job optimizing the latter.
@@ -475,10 +688,13 @@ extension Collection {
 
         currentAddress.initialize(to: transformed)
         currentAddress += 1
+        initializedCount += 1
       }
     }
 
-    return .init(data: baseAddress, count: self.count)
+    // Elements the transform dropped leave their slots uninitialized, so the
+    // array is only as long as what was initialized.
+    return .init(data: baseAddress, count: initializedCount)
   }
 }
 
@@ -554,6 +770,7 @@ public func buildTopLevelASTNodes(
   dc: BridgedDeclContext,
   attachedDecl: BridgedNullableDecl,
   ctx: BridgedASTContext,
+  delayFunctionBodies: CInt,
   outputContext: UnsafeMutableRawPointer,
   callback: @convention(c) (BridgedASTNode, UnsafeMutableRawPointer) -> Void
 ) {
@@ -563,13 +780,31 @@ public func buildTopLevelASTNodes(
     sourceBuffer: sourceFile.pointee.buffer,
     declContext: dc,
     astContext: ctx,
-    configuredRegions: sourceFile.pointee.configuredRegions(astContext: ctx)
+    configuredRegions: sourceFile.pointee.configuredRegions(astContext: ctx),
+    delayFunctionBodies: delayFunctionBodies != 0
   )
+
+  // A generated buffer is never a script-mode main file, whatever the enclosing
+  // declaration's file is, so a variable declaration in it is not top-level code.
+  // The C++ parser gets this from `allowTopLevelCode()`, i.e. the kind of the
+  // SourceFile it is parsing. Statements *are* still wrapped, matching the C++
+  // parser's `IsTopLevel` handling, which does not consult `allowTopLevelCode()`.
+  let isGeneratedBuffer = sourceFile.pointee.generatedKind != .none
+
+  func generateTopLevelNodes(_ body: () -> Void) {
+    if isGeneratedBuffer {
+      visitor.withTopLevelCodeSuppressed(body)
+    } else {
+      body()
+    }
+  }
 
   switch sourceFile.pointee.syntax.as(SyntaxEnum.self) {
   case .sourceFile(let node):
-    for elem in visitor.generate(sourceFile: node) {
-      callback(elem, outputContext)
+    generateTopLevelNodes {
+      for elem in visitor.generate(sourceFile: node) {
+        callback(elem, outputContext)
+      }
     }
 
   case .memberBlockItemListFile(let node):
@@ -597,6 +832,45 @@ public func buildTopLevelASTNodes(
     fatalError("invalid syntax for a source file")
   }
 
-  // Diagnose any errors from evaluating #ifs.
-  visitor.diagnoseAll(visitor.configuredRegions.diagnostics)
+  // Diagnose any errors from evaluating #ifs. Those inside a body that is built
+  // on demand are held back until the body is.
+  // A `#if` without a condition is reported where the C++ parser does, for
+  // every one of them: the evaluator only sees those that are not nested in a
+  // region it has already given up on.
+  func isMissingCondition(_ diagnostic: Diagnostic) -> Bool {
+    diagnostic.node.is(MissingExprSyntax.self)
+  }
+  if delayFunctionBodies != 0 {
+    visitor.diagnoseAll(
+      sourceFile.pointee.heldBackDiagnostics(astContext: ctx).ifConfigOutside.filter { !isMissingCondition($0) }
+    )
+  } else {
+    visitor.diagnoseAll(visitor.configuredRegions.diagnostics.filter { !isMissingCondition($0) })
+  }
+  visitor.diagnoseIncompleteConditions(in: Syntax(sourceFile.pointee.syntax))
+}
+
+private final class IncompleteConditionFinder: SyntaxVisitor {
+  var directives: [TokenSyntax] = []
+
+  override func visit(_ node: IfConfigClauseSyntax) -> SyntaxVisitorContinueKind {
+    if node.condition?.is(MissingExprSyntax.self) == true, node.poundKeyword.presence == .present {
+      directives.append(node.poundKeyword)
+    }
+    return .visitChildren
+  }
+}
+
+extension ASTGenVisitor {
+  /// Diagnose each `#if` or `#elseif` that has no condition.
+  func diagnoseIncompleteConditions(in root: Syntax) {
+    let finder = IncompleteConditionFinder(viewMode: .sourceAccurate)
+    finder.walk(root)
+    for directive in finder.directives {
+      self.diagnose(
+        .incomplete_conditional_compilation_directive,
+        at: SourceLoc(at: directive.endPositionBeforeTrailingTrivia, in: self.base)
+      )
+    }
+  }
 }

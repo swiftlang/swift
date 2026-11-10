@@ -60,7 +60,7 @@ func zim() {}
 func zung<T>(_: T) {}
 @_transparent // expected-error{{'@_transparent' attribute cannot be applied to stored properties}} {{1-15=}}
 var zippity : Int
-func zoom(x: @_transparent () -> ()) { } // expected-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}}
+func zoom(x: @_transparent () -> ()) { } // expected-cparser-error{{attribute can only be applied to declarations, not types}} {{1-1=@_transparent }} {{14-28=}} expected-astgen-error {{attribute can only be applied to declarations, not types}}{{14-28=}}
 protocol ProtoWithTransparent {
   @_transparent// expected-error{{'@_transparent' attribute is not supported on declarations within protocols}} {{3-16=}}
   func transInProto()
@@ -216,7 +216,7 @@ func func_with_unknown_attr3(x: @unknown(Int) -> Int) {} // expected-error {{unk
 func func_with_unknown_attr4(x: @unknown(Int) throws -> Int) {} // expected-error {{unknown attribute 'unknown'}}
 func func_with_unknown_attr5(x: @unknown (x: Int, y: Int)) {} // expected-error {{unknown attribute 'unknown'}}
 func func_with_unknown_attr6(x: @unknown(x: Int, y: Int)) {} // expected-error {{unknown attribute 'unknown'}}
-func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {{unknown attribute 'unknown'}} expected-warning {{extraneous whitespace between attribute name and '('; this is an error in the Swift 6 language mode}}
+func func_with_unknown_attr7(x: @unknown (Int) () -> Int) {} // expected-error {{unknown attribute 'unknown'}} expected-cparser-warning {{extraneous whitespace between attribute name and '('; this is an error in the Swift 6 language mode}} expected-astgen-warning {{extraneous whitespace before '(' is not permitted; this is an error in Swift 6}}
 
 func func_type_attribute_with_space(x: @convention(c) () -> Int) {} // OK. Known attributes can have space before its paren.
 
@@ -280,7 +280,7 @@ var globalCheckedVar = 1
 @exclusivity(unchecked) // ok
 var globalUncheckedVar = 1
 
-@exclusivity(abc) // // expected-error {{unknown option 'abc' for attribute 'exclusivity'}}
+@exclusivity(abc) // expected-error {{unknown option 'abc' for attribute 'exclusivity'}}
 var globalUnknownVar = 1
 
 struct ExclusivityAttrStruct {
@@ -350,8 +350,8 @@ extension P {
 }
 
 enum E1 {
-  case str(@_nonEphemeral _: String) // expected-error {{expected parameter name followed by ':'}}
-  case ptr(@_nonEphemeral _: UnsafeMutableRawPointer) // expected-error {{expected parameter name followed by ':'}}
+  case str(@_nonEphemeral _: String) // expected-cparser-error {{expected parameter name followed by ':'}} expected-astgen-error {{unexpected code ': String' in parameter clause}} expected-astgen-error {{attribute can only be applied to declarations, not types}} expected-astgen-error {{type placeholder not allowed here}}
+  case ptr(@_nonEphemeral _: UnsafeMutableRawPointer) // expected-cparser-error {{expected parameter name followed by ':'}} expected-astgen-error {{unexpected code ': UnsafeMutableRawPointer' in parameter clause}} expected-astgen-error {{attribute can only be applied to declarations, not types}} expected-astgen-error {{type placeholder not allowed here}}
 
   func foo() -> @_nonEphemeral UnsafeMutableRawPointer? { return nil } // expected-error {{attribute can only be applied to declarations, not types}}
 }
@@ -365,8 +365,8 @@ struct I65705 {
   var m2: @discardableResult () -> Int // expected-error {{attribute can only be applied to declarations, not types}} {{11-30=}} {{none}}
   let m3: GI65705<@discardableResult () -> Int> // expected-error{{attribute can only be applied to declarations, not types}} {{19-37=}} {{none}}
 
-  func f1(_: inout @discardableResult Int) {} // expected-error {{attribute can only be applied to declarations, not types}} {{20-39=}} {{3-3=@discardableResult }} {{none}}
-  func f2(_: @discardableResult Int) {} // expected-error {{attribute can only be applied to declarations, not types}} {{14-33=}} {{3-3=@discardableResult }} {{none}}
+  func f1(_: inout @discardableResult Int) {} // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{20-39=}} {{3-3=@discardableResult }} {{none}} expected-astgen-error {{attribute can only be applied to declarations, not types}}{{20-39=}}
+  func f2(_: @discardableResult Int) {} // expected-cparser-error {{attribute can only be applied to declarations, not types}} {{14-33=}} {{3-3=@discardableResult }} {{none}} expected-astgen-error {{attribute can only be applied to declarations, not types}}{{14-33=}}
 
   func stmt(_ a: Int?) {
     if let _: @discardableResult Int = a { // expected-error {{attribute can only be applied to declarations, not types}} {{15-34=}}

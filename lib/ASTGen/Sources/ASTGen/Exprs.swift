@@ -58,6 +58,11 @@ extension ASTGenVisitor {
     case .functionCallExpr(let node):
       return self.generate(functionCallExpr: node).asExpr
     case .genericSpecializationExpr(let node):
+      // The C++ parser takes an editor placeholder as a complete expression and
+      // does not look for generic arguments after it.
+      if let placeholder = node.expression.as(DeclReferenceExprSyntax.self), placeholder.baseName.isEditorPlaceholder {
+        return self.generate(declReferenceExpr: placeholder)
+      }
       return self.generate(genericSpecializationExpr: node).asExpr
     case .ifExpr(let node):
       return self.generate(ifExpr: node).asExpr
@@ -204,6 +209,20 @@ extension ASTGenVisitor {
   }
 
   func generate(awaitExpr node: AwaitExprSyntax) -> BridgedAwaitExpr {
+    // 'try' must precede 'await'.
+    if let tryExpr = node.expression.as(TryExprSyntax.self) {
+      self.diagnose(
+        .await_before_try,
+        at: node.awaitKeyword,
+        fixIts: [
+          self.tidyRemovalFixIt(node.awaitKeyword),
+          .init(
+            replace: CharSourceRange(
+              start: self.generateSourceLoc(tryExpr.expression), byteLength: 0),
+            with: "await "),
+        ]
+      )
+    }
     return .createParsed(
       self.ctx,
       awaitLoc: self.generateSourceLoc(node.awaitKeyword),
@@ -290,11 +309,21 @@ extension ASTGenVisitor {
       fatalError("invalid ownership")
     }
     let nameAndLoc = self.generateIdentifierAndSourceLoc(node.name)
+    self.diagnoseDollarDeclName(node.name)
     let equalLoc: SourceLoc
     let initExpr: BridgedExpr
     if let initializer = node.initializer {
       equalLoc = self.generateSourceLoc(initializer.equal)
       initExpr = self.generate(expr: initializer.value)
+    } else if node.hasError
+      || (node.parent?.parent?.as(ClosureCaptureClauseSyntax.self).map {
+        $0.unexpectedBetweenItemsAndRightSquare != nil && $0.items.last?.id == node.id
+      } ?? false)
+    {
+      // `[strong self]`: the parser has diagnosed the capture; looking up its
+      // first word as a name would only add "cannot find 'strong'".
+      equalLoc = nil
+      initExpr = BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     } else {
       // Otherwise, create an 'UnresolvedDeclRefExpr' with the name
       equalLoc = nil
@@ -336,6 +365,17 @@ extension ASTGenVisitor {
   }
 
   func generate(closureExpr node: ClosureExprSyntax) -> BridgedExpr {
+    // An editor placeholder where a closure is expected is parsed as a closure
+    // with missing braces around the placeholder; the C++ parser takes the
+    // placeholder itself as the expression.
+    if node.leftBrace.presence == .missing, node.signature == nil,
+      node.statements.count == 1,
+      let only = node.statements.first?.item.as(DeclReferenceExprSyntax.self),
+      only.baseName.isEditorPlaceholder
+    {
+      return self.generate(declReferenceExpr: only)
+    }
+
     let signature: GeneratedClosureSignature
     if let node = node.signature {
       signature = self.generate(closureSignature: node)
@@ -395,7 +435,7 @@ extension ASTGenVisitor {
         self.ctx,
         lBraceLoc: self.generateSourceLoc(node.leftBrace),
         elements: self.generate(codeBlockItemList: node.statements).lazy.bridgedArray(in: self),
-        rBraceLoc: self.generateSourceLoc(node.rightBrace)
+        rBraceLoc: self.generateRBraceLoc(node.rightBrace, of: node)
       )
     }
 
@@ -413,6 +453,14 @@ extension ASTGenVisitor {
   }
 
   func generate(consumeExpr node: ConsumeExprSyntax) -> BridgedConsumeExpr {
+    // The temporary `_move` spelling is accepted with a warning.
+    if node.consumeKeyword.rawText == "_move" {
+      self.diagnose(
+        .move_consume_final_spelling,
+        at: node.expression,
+        fixIts: [.init(replace: self.generateCharSourceRange(node.consumeKeyword), with: "consume")]
+      )
+    }
     return .createParsed(
       self.ctx,
       consumeLoc: self.generateSourceLoc(node.consumeKeyword),
@@ -436,6 +484,36 @@ extension ASTGenVisitor {
     )
   }
 
+  /// Warn about an argument label that was escaped with backticks but did not
+  /// need to be. Only `_` needs escaping, because `foo(_: 3)` is taken to mean
+  /// `foo(3)`.
+  func diagnoseUnnecessarilyEscapedLabel(_ label: TokenSyntax) {
+    let written = label.rawText
+    guard written.count > 2, written.first == UInt8(ascii: "`"), written.last == UInt8(ascii: "`") else {
+      return
+    }
+    let text = String(syntaxText: SyntaxText(rebasing: written[1..<(written.count - 1)]))
+    // 'inout' cannot be an argument label, so escaping it is required, as is
+    // '_'; and anything that is not a plain identifier needs the quotes.
+    guard text != "_", text != "inout",
+      let first = text.unicodeScalars.first, first == "_" || first.properties.isAlphabetic,
+      text.unicodeScalars.allSatisfy({ $0 == "_" || $0.properties.isAlphabetic || ("0"..."9").contains($0) })
+    else {
+      return
+    }
+    let range = self.generateCharSourceRange(label)
+    let openTick = CharSourceRange(start: range.getStart(), byteLength: 1)
+    let closeTick = CharSourceRange(
+      start: SourceLoc(at: label.endPositionBeforeTrailingTrivia.advanced(by: -1), in: self.base),
+      byteLength: 1
+    )
+    self.diagnose(
+      .escaped_parameter_name(text),
+      at: label,
+      fixIts: [.init(remove: openTick), .init(remove: closeTick)]
+    )
+  }
+
   func generateArgumentList(
     leftParen: TokenSyntax?,
     labeledExprList: LabeledExprListSyntax,
@@ -447,6 +525,9 @@ extension ASTGenVisitor {
     let bridgedArgs: BridgedArrayRef = {
       // Arguments before ')'
       let normalArgs = labeledExprList.lazy.map({ elem in
+        if let label = elem.label {
+          self.diagnoseUnnecessarilyEscapedLabel(label)
+        }
         let labelInfo = elem.label.map(self.generateIdentifierAndSourceLoc(_:))
         return BridgedCallArgument(
           labelLoc: labelInfo?.sourceLoc ?? SourceLoc(),
@@ -501,6 +582,42 @@ extension ASTGenVisitor {
     )
   }
 
+  /// Warn about a trailing closure that is separated from its callee by more
+  /// than one line, as `Parser::parseTrailingClosures` does.
+  private func diagnoseTrailingClosureAfterNewlines(_ node: FunctionCallExprSyntax) {
+    guard node.leftParen == nil, let closure = node.trailingClosure,
+      closure.leftBrace.presence == .present,
+      let calleeLast = node.calledExpression.lastToken(viewMode: .sourceAccurate)
+    else {
+      return
+    }
+    let start = calleeLast.positionAfterSkippingLeadingTrivia.utf8Offset
+    let end = closure.leftBrace.positionAfterSkippingLeadingTrivia.utf8Offset
+    guard start < end, end <= self.base.count else {
+      return
+    }
+    let newlines = self.base[start..<end].lazy.filter { $0 == UInt8(ascii: "\n") }.count
+    guard newlines > 1 else {
+      return
+    }
+    self.diagnose(.trailing_closure_after_newlines, at: closure.leftBrace)
+    self.diagnose(.trailing_closure_callee_here, at: node.calledExpression)
+
+    // A closure that uses only anonymous parameters would more likely be a
+    // `do` statement.
+    if closure.signature == nil, closure.tokens(viewMode: .sourceAccurate).contains(where: {
+      $0.rawTokenKind == .dollarIdentifier
+    }) {
+      self.diagnose(
+        .brace_stmt_suggest_do,
+        at: closure.leftBrace,
+        fixIts: [
+          .init(replace: CharSourceRange(start: self.generateSourceLoc(closure.leftBrace), byteLength: 0), with: "do ")
+        ]
+      )
+    }
+  }
+
   func generate(functionCallExpr node: FunctionCallExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedCallExpr {
     if !node.arguments.isEmpty || node.trailingClosure == nil {
       if node.leftParen == nil {
@@ -509,6 +626,26 @@ extension ASTGenVisitor {
       if node.rightParen == nil {
         self.diagnose(.missingChildToken(parent: node, kindOfTokenMissing: .rightParen))
       }
+    }
+
+    self.diagnoseTrailingClosureAfterNewlines(node)
+
+    // A trailing closure that follows an already-parenthesized call, e.g.,
+    // in a statement condition, is parsed as a call of the call. The C++
+    // parser makes it the trailing closure of the parenthesized call.
+    if node.leftParen == nil, node.arguments.isEmpty, node.trailingClosure != nil,
+      let inner = node.calledExpression.as(FunctionCallExprSyntax.self),
+      inner.leftParen != nil, inner.trailingClosure == nil
+    {
+      let callee = self.generate(expr: inner.calledExpression, postfixIfConfigBaseExpr: postfixIfConfigBaseExpr)
+      let arguments = generateArgumentList(
+        leftParen: inner.leftParen,
+        labeledExprList: inner.arguments,
+        rightParen: inner.rightParen,
+        trailingClosure: node.trailingClosure,
+        additionalTrailingClosures: node.additionalTrailingClosures
+      )
+      return .createParsed(self.ctx, fn: callee, args: arguments)
     }
 
     let callee = self.generate(expr: node.calledExpression, postfixIfConfigBaseExpr: postfixIfConfigBaseExpr)
@@ -541,9 +678,25 @@ extension ASTGenVisitor {
     let placeholderTyR: BridgedTypeRepr?
     let expansionTyR: BridgedTypeRepr?
     func parseType(text: SyntaxText) -> BridgedTypeRepr {
-      var parser = Parser(UnsafeBufferPointer(start: text.baseAddress, count: text.count))
+      let buffer = UnsafeBufferPointer(start: text.baseAddress, count: text.count)
+      var parser = Parser(buffer)
       let syntax = TypeSyntax.parse(from: &parser)
-      return self.generate(type: syntax)
+      // `text` points into the token's raw text, not into the source buffer.
+      // Parse it on its own, but generate with a visitor whose buffer is the
+      // corresponding part of the source buffer so that locations are real.
+      let offsetInToken = text.baseAddress! - token.rawText.baseAddress!
+      let sourceText = UnsafeBufferPointer(
+        start: self.base.baseAddress! + token.positionAfterSkippingLeadingTrivia.utf8Offset + offsetInToken,
+        count: text.count
+      )
+      let typeVisitor = ASTGenVisitor(
+        diagnosticEngine: self.diagnosticEngine,
+        sourceBuffer: sourceText,
+        declContext: self.declContext,
+        astContext: self.ctx,
+        configuredRegions: self.configuredRegions
+      )
+      return typeVisitor.generate(type: syntax)
     }
     if let typeText = data.typeText {
       placeholderTyR = parseType(text: typeText)
@@ -573,31 +726,44 @@ extension ASTGenVisitor {
     }
 
     guard let idx = parseDollarIdentifierIndex(text: token.rawText) else {
-      // TODO: Diagnose.
-      fatalError("(compiler bug) malformed dollar identifier token")
+      // The lexer only produces this token kind for '$' followed by digits, so
+      // there is always an index to parse.
+      preconditionFailure("dollar identifier token without a number")
     }
 
     let closure = self.declContext.castToClosureExpr()
     let params = closure.getParameterList()
 
-    if !closure.hasAnonymousClosureVars {
-      // TODO: Diagnose and fix it to the named parameter.
-      // Fall through, bind to the parameter even though the name doesn't match.
+    // Mirror `Parser::parseExprIdentifier`: '$N' resolves to an anonymous
+    // closure variable only when the closure's parameters *are* the anonymous
+    // ones. Otherwise the closure was written with explicit parameters, and '$N'
+    // is either a typo for one of their names or simply not usable.
+    if closure.hasAnonymousClosureVars && idx < params.size {
+      return BridgedDeclRefExpr.create(
+        self.ctx,
+        decl: params.get(idx).asDecl,
+        loc: .createParsed(loc),
+        isImplicit: false
+      ).asExpr
     }
 
-    guard idx < params.size else {
-      // TODO: Diagnose out of range (but should be unreachable)
-      fatalError("(compiler bug) out-of-bound dollar identifier number")
+    if idx < params.size, params.get(idx).hasName {
+      let paramName = String(bridged: params.get(idx).nameStr)
+      self.diagnose(
+        .anon_closure_arg_in_closure_with_args_typo(paramName),
+        at: token,
+        fixIts: [.init(replace: self.generateCharSourceRange(token), with: paramName)]
+      )
+      return BridgedDeclRefExpr.create(
+        self.ctx,
+        decl: params.get(idx).asDecl,
+        loc: .createParsed(loc),
+        isImplicit: false
+      ).asExpr
     }
 
-    let param = params.get(idx)
-
-    return BridgedDeclRefExpr.create(
-      self.ctx,
-      decl: param.asDecl,
-      loc: .createParsed(loc),
-      isImplicit: false
-    ).asExpr
+    self.diagnose(.anon_closure_arg_in_closure_with_args, at: token)
+    return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(token)).asExpr
   }
 
   func generate(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedExpr {
@@ -618,6 +784,17 @@ extension ASTGenVisitor {
         // TODO: Diagnose.
       }
       return generateDollarIdentifierExpr(token: node.baseName)
+    }
+    // A reference with no name -- `Swift::` with the identifier after the module
+    // selector missing -- has nothing to resolve, and the synthesized name token
+    // sits past the end of the line, which would give the reference a range
+    // extending past the enclosing declaration. The C++ parser yields an
+    // ErrorExpr here; the parser has already reported the missing identifier.
+    guard node.baseName.presence == .present else {
+      return BridgedErrorExpr.create(
+        self.ctx,
+        loc: self.generateSourceRange(node)
+      ).asExpr
     }
     let nameAndLoc = generateDeclNameRef(declReferenceExpr: node)
     return BridgedUnresolvedDeclRefExpr.createParsed(
@@ -729,6 +906,55 @@ extension ASTGenVisitor {
 
   func generate(keyPathExpr node: KeyPathExprSyntax) -> BridgedExpr {
     guard !node.components.isEmpty else {
+      // `\e`: the C++ parser reads the name as an expression that is the whole
+      // root of a key path with no components, which the type checker diagnoses.
+      if let root = node.root?.as(IdentifierTypeSyntax.self),
+        root.genericArgumentClause == nil, root.name.presence == .present, root.name.rawTokenKind == .identifier
+      {
+        let nameAndLoc = self.generateDeclNameRef(moduleSelector: root.moduleSelector, baseName: root.name)
+        let rootExpr: BridgedExpr? = BridgedUnresolvedDeclRefExpr.createParsed(
+          self.ctx,
+          name: nameAndLoc.name,
+          kind: .ordinary,
+          loc: nameAndLoc.loc
+        ).asExpr
+        return BridgedKeyPathExpr.createParsed(
+          self.ctx,
+          backslashLoc: self.generateSourceLoc(node.backslash),
+          parsedRoot: rootExpr.asNullable,
+          parsedPath: BridgedExpr?.none.asNullable,
+          hasLeadingDot: false
+        ).asExpr
+      }
+      // `\(x)`: the C++ parser reads the parenthesized expression as the root,
+      // and the type checker says it is an interpolation outside of a string.
+      if let tuple = node.root?.as(TupleTypeSyntax.self), tuple.elements.count == 1,
+        let element = tuple.elements.first, element.firstName == nil,
+        let name = element.type.as(IdentifierTypeSyntax.self),
+        name.genericArgumentClause == nil, name.name.presence == .present, name.name.rawTokenKind == .identifier,
+        tuple.leftParen.presence == .present, tuple.rightParen.presence == .present
+      {
+        let nameAndLoc = self.generateDeclNameRef(moduleSelector: name.moduleSelector, baseName: name.name)
+        let inner: BridgedExpr = BridgedUnresolvedDeclRefExpr.createParsed(
+          self.ctx,
+          name: nameAndLoc.name,
+          kind: .ordinary,
+          loc: nameAndLoc.loc
+        ).asExpr
+        let paren: BridgedExpr? = BridgedParenExpr.createParsed(
+          self.ctx,
+          leftParenLoc: self.generateSourceLoc(tuple.leftParen),
+          expr: inner,
+          rightParenLoc: self.generateSourceLoc(tuple.rightParen)
+        ).asExpr
+        return BridgedKeyPathExpr.createParsed(
+          self.ctx,
+          backslashLoc: self.generateSourceLoc(node.backslash),
+          parsedRoot: paren.asNullable,
+          parsedPath: BridgedExpr?.none.asNullable,
+          hasLeadingDot: false
+        ).asExpr
+      }
       // FIXME: Diagnostics KeyPath expression without any component.
       return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
     }
@@ -842,6 +1068,11 @@ extension ASTGenVisitor {
   }
 
   func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedExpr {
+    // `#` without a macro name has been diagnosed by the parser; there is no
+    // macro to look up.
+    if node.macroName.presence == .missing {
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
+    }
     switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
     case .generated(let astNode):
       guard let astNode else {
@@ -893,6 +1124,16 @@ extension ASTGenVisitor {
     }
 
     let dotLoc = self.generateSourceLoc(node.period)
+
+    // `x.` with no member name: the parser has diagnosed it, and there is no
+    // name to look up.
+    if node.declName.baseName.presence == .missing {
+      return BridgedErrorExpr.create(
+        self.ctx,
+        loc: self.generateSourceRange(start: node.base?.firstToken(viewMode: .sourceAccurate) ?? node.period, end: node.period)
+      ).asExpr
+    }
+
     let nameAndLoc = generateDeclNameRef(declReferenceExpr: node.declName)
 
     if let baseExpr {
@@ -1096,6 +1337,16 @@ extension ASTGenVisitor {
     // SwiftSyntax.SequenceExprSyntax and swift::SequenceExpr has mismatch in the
     // element representations. e.g. 'as' and 'is'.
 
+    // An operator with no operand after it: `Parser::parseExprSequence` fails
+    // the whole sequence when an element is missing, so the enclosing expression
+    // is an ErrorExpr. The parser has already reported the missing operand, and
+    // keeping the operands that were parsed would only produce follow-on
+    // diagnostics, e.g., "cannot find" for an operand that was never meant to be
+    // a complete expression.
+    if let last = node.elements.last, last.is(MissingExprSyntax.self) {
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
+    }
+
     // FIXME: Avoid Swift.Array.
     var elements: [BridgedExpr] = []
     elements.reserveCapacity(node.elements.count)
@@ -1124,6 +1375,18 @@ extension ASTGenVisitor {
         elements.append(oper.asExpr)
         elements.append(oper.asExpr)
       case .unresolvedTernaryExpr(let node):
+        // A ternary without its ':' cannot be represented: with no 'else'
+        // expression, `TernaryExpr`'s range degenerates and is no longer
+        // consistent with its children's, which the AST verifier rejects.
+        // `Parser::parseExprSequence` fails the whole sequence in this case, so
+        // the enclosing expression becomes an ErrorExpr; do the same. The parser
+        // has already reported the missing ':'.
+        guard node.colon.presence == .present else {
+          return BridgedErrorExpr.create(
+            self.ctx,
+            loc: self.generateSourceRange(node.parent ?? Syntax(node))
+          ).asExpr
+        }
         elements.append(self.generate(unresolvedTernaryExpr: node).asExpr)
       default:
         elements.append(self.generate(expr: node))
@@ -1166,8 +1429,45 @@ extension ASTGenVisitor {
   }
 
   func generate(tryExpr node: TryExprSyntax, overridingSubExpr: BridgedExpr? = nil) -> BridgedExpr {
-    let tryLoc = self.generateSourceLoc(node.tryKeyword)
     let subExpr = overridingSubExpr ?? self.generate(expr: node.expression)
+
+    // A synthesized 'try' has a zero-width position just past the preceding
+    // token *and its trailing trivia*, which can land beyond the expression it
+    // would wrap -- giving the Try expression an inverted range. The C++ parser
+    // never builds one of these without consuming a 'try', so neither should we.
+    guard node.tryKeyword.presence == .present else {
+      // `try let x = foo()` and `try return foo()`: the parser moved the
+      // misplaced 'try' onto the value and diagnosed it. As the C++ parser does,
+      // wrap the value in a 'try' that starts where it does, so that the call is
+      // not reported as unmarked.
+      func isTry(_ unexpected: UnexpectedNodesSyntax?) -> Bool {
+        unexpected?.contains(where: { $0.as(TokenSyntax.self)?.tokenKind == .keyword(.try) }) == true
+      }
+      let hasMisplacedTry: Bool
+      if node.parent?.is(InitializerClauseSyntax.self) == true,
+        let variable = sequence(first: Syntax(node).parent, next: { $0?.parent }).lazy.compactMap({ $0?.as(VariableDeclSyntax.self) }).first,
+        variable.bindings.count == 1
+      {
+        hasMisplacedTry = isTry(variable.unexpectedBetweenModifiersAndBindingSpecifier)
+      } else if let stmt = node.parent?.as(ReturnStmtSyntax.self) {
+        hasMisplacedTry = isTry(stmt.unexpectedBeforeReturnKeyword)
+      } else if let stmt = node.parent?.as(ThrowStmtSyntax.self) {
+        hasMisplacedTry = isTry(stmt.unexpectedBeforeThrowKeyword)
+      } else if let stmt = node.parent?.as(ThenStmtSyntax.self) {
+        hasMisplacedTry = isTry(stmt.unexpectedBeforeThenKeyword)
+      } else {
+        hasMisplacedTry = false
+      }
+      if hasMisplacedTry, !node.expression.is(MissingExprSyntax.self) {
+        return BridgedTryExpr.createParsed(
+          self.ctx,
+          tryLoc: self.generateSourceLoc(node.expression),
+          subExpr: subExpr
+        ).asExpr
+      }
+      return subExpr
+    }
+    let tryLoc = self.generateSourceLoc(node.tryKeyword)
 
     switch node.questionOrExclamationMark {
     case nil:
@@ -1198,13 +1498,14 @@ extension ASTGenVisitor {
   func generate(tupleExpr node: TupleExprSyntax) -> BridgedExpr {
     if node.elements.count == 1,
        let first = node.elements.first,
-       first.label == nil,
+       // An explicitly omitted label, `(_: 3)`, leaves a parenthesized expression.
+       first.label == nil || first.label?.rawTokenKind == .wildcard,
        !first.expression.is(PackExpansionExprSyntax.self) {
       return BridgedParenExpr.createParsed(
         self.ctx,
         leftParenLoc: self.generateSourceLoc(node.leftParen),
         expr: self.generate(expr: node.elements.first!.expression),
-        rightParenLoc: self.generateSourceLoc(node.rightParen)
+        rightParenLoc: self.generateClosingDelimiterLoc(node.rightParen, of: node)
       ).asExpr
     }
 
@@ -1228,7 +1529,7 @@ extension ASTGenVisitor {
       exprs: expressions.bridgedArray(in: self),
       labels: labels.bridgedArray(in: self),
       labelLocs: labelLocations.bridgedArray(in: self),
-      rightParenLoc: self.generateSourceLoc(node.rightParen)
+      rightParenLoc: self.generateClosingDelimiterLoc(node.rightParen, of: node)
     ).asExpr
   }
 
@@ -1282,7 +1583,11 @@ extension ASTGenVisitor {
       self.ctx,
       questionLoc: self.generateSourceLoc(node.questionMark),
       thenExpr: self.generate(expr: node.thenExpression),
-      colonLoc: self.generateSourceLoc(node.colon)
+      // A synthesized ':' sits just past the 'then' expression, which can be
+      // outside the enclosing sequence's range; `TernaryExpr::getEndLoc()` falls
+      // back to it when there is no 'else' expression, and the AST verifier then
+      // sees a child reaching past its parent.
+      colonLoc: self.generateSourceLocIfPresent(node.colon)
     )
   }
 
@@ -1437,3 +1742,27 @@ func findMaxAnonymousClosureParamUsage(closureExpr node: ClosureExprSyntax) -> I
 
 }
 
+extension ASTGenVisitor {
+  /// The C++ parser treats `#line 42 "file"` at the start of a line as a
+  /// directive, which was renamed to `#sourceLocation`; SwiftSyntax sees a
+  /// `#line` literal.
+  func diagnoseLegacyLineDirective(_ node: some FreestandingMacroExpansionSyntax) {
+    guard
+      node.macroName.text == "line",
+      node.parent?.is(CodeBlockItemSyntax.self) == true || node.parent?.is(MemberBlockItemSyntax.self) == true,
+      node.pound.leadingTrivia.contains(where: { $0.isNewline }) || node.pound.previousToken(viewMode: .sourceAccurate) == nil,
+      let next = node.pound.nextToken(viewMode: .sourceAccurate).flatMap({ $0.nextToken(viewMode: .sourceAccurate) }),
+      case .integerLiteral = next.tokenKind,
+      !next.leadingTrivia.contains(where: { $0.isNewline })
+    else {
+      return
+    }
+    // The legacy directive opens a '#sourceLocation' environment as well.
+    self.inPoundSourceLocationEnvironment = true
+    self.diagnose(
+      .line_directive_style_deprecated,
+      at: node.pound,
+      fixIts: [.init(replace: self.generateCharSourceRange(node.pound), with: "#sourceLocation")]
+    )
+  }
+}

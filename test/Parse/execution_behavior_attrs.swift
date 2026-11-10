@@ -29,25 +29,35 @@ func test_err3_caller(_: nonisolated(nonsending) (isolated (any Actor)?) async -
 // expected-error@-1 {{cannot use 'nonisolated(nonsending)' together with an isolated parameter}}
 
 func test_err4(_: nonisolated (Int) -> Void) {}
-// expected-error@-1 {{expected 'nonsending' in modifier}}
-// expected-error@-2 {{expected '{' in body of function declaration}}
-// expected-warning@-3 {{extraneous whitespace between attribute name and '('; this is an error in the Swift 6 language mode}}
-// expected-error@-4 {{consecutive statements on a line must be separated by ';'}}
-// expected-error@-5 {{expected expression}}
+// expected-cparser-error@-1 {{expected 'nonsending' in modifier}}
+// expected-cparser-error@-2 {{expected '{' in body of function declaration}}
+// expected-cparser-warning@-3 {{extraneous whitespace between attribute name and '('; this is an error in the Swift 6 language mode}}
+// expected-cparser-error@-4 {{consecutive statements on a line must be separated by ';'}}
+// expected-cparser-error@-5 {{expected expression}}
+// expected-astgen-error@-6 {{expected 'nonsending' in 'nonisolated' specifier}}
+// expected-astgen-error@-7 {{unexpected code 'Int' in 'nonisolated' specifier}}
+// expected-astgen-error@-8 {{expected '(', type, and ')' in function type}}
 
 func test_err5(_: nonisolated( () async -> Void) {}
-// expected-error@-1 {{expected 'nonsending' in modifier}}
+// expected-cparser-error@-1 {{expected 'nonsending' in modifier}}
+// expected-astgen-error@-2 {{expected 'nonsending)' to end 'nonisolated' specifier}}
 
 func test_err6(_: nonisolated(hello) () async -> Void) {}
-// expected-error@-1 {{expected 'nonsending' in modifier}}
-// expected-error@-2 {{cannot have more than one parameter list}}
-// expected-error@-3 {{cannot find type 'hello' in scope}}
-// expected-error@-4 {{onsecutive statements on a line must be separated by ';'}}
-// expected-error@-5 {{expected expression}}
+// expected-cparser-error@-1 {{expected 'nonsending' in modifier}}
+// expected-cparser-error@-2 {{cannot have more than one parameter list}}
+// expected-cparser-error@-3 {{cannot find type 'hello' in scope}}
+// expected-cparser-error@-4 {{consecutive statements on a line must be separated by ';'}}
+// expected-cparser-error@-5 {{expected expression}}
+// expected-astgen-error@-6 {{expected 'nonsending' in 'nonisolated' specifier}}
+// expected-astgen-error@-7 {{unexpected code 'hello' in 'nonisolated' specifier}}
 
 func test_err7(_: nonisolated(hello () async -> Void) {}
-// expected-error@-1 {{expected 'nonsending' in modifier}}
+// expected-cparser-error@-1 {{expected 'nonsending' in modifier}}
 // expected-error@-2 {{cannot find type 'hello' in scope}}
+// expected-astgen-error@-3 {{expected 'nonsending)' to end 'nonisolated' specifier}}
+// expected-astgen-error@-4 {{expected ')' to end parameter clause}}
+// expected-astgen-error@-5 {{unexpected code '() async -> Void)' in function}}
+// expected-astgen-note@-6 {{to match this opening '('}}
 
 func test_err8(_: @concurrent Int) {} // expected-error {{attribute does not apply to type}}
 

@@ -10,7 +10,7 @@
 let double: Double = 0.0
 _ = double == .nan // expected-warning {{comparison with '.nan' using '==' is always false, use 'double.isNaN' to check if 'double' is not a number}}
 _ = double != .nan // expected-warning {{comparison with '.nan' using '!=' is always true, use '!double.isNaN' to check if 'double' is a number}}
-_ = 0.0 == .nan // // expected-warning {{comparison with '.nan' using '==' is always false, use '0.0.isNaN' to check if '0.0' is not a number}}
+_ = 0.0 == .nan // expected-warning {{comparison with '.nan' using '==' is always false, use '0.0.isNaN' to check if '0.0' is not a number}}
 
 // One side is '.nan' and the other isn't. Using '>=', '>', '<', '<=' for comparison:
 // We can't suggest using '.isNaN' here.

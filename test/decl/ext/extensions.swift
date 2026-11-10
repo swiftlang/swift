@@ -369,7 +369,7 @@ extension S_52866 where T == Never { // expected-note {{requirement specified as
 protocol Rdar66943328 {
   associatedtype Assoc
 }
-extension Rdar66943328 where Assoc == Int // expected-error {{expected '{' in extension}}
+extension Rdar66943328 where Assoc == Int // expected-cparser-error {{expected '{' in extension}} expected-astgen-error {{expected member block in extension}}
 #endif
 
 // Reject extension of existential type

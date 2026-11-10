@@ -236,14 +236,14 @@ func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
 
 func testDisembodiedStringInterpolation(x: Int) {
   \(x) // expected-error{{string interpolation can only appear inside a string literal}}
-  \(x, radix: 16) // expected-error{{string interpolation can only appear inside a string literal}}
+  \(x, radix: 16) // expected-cparser-error{{string interpolation can only appear inside a string literal}} expected-astgen-error {{expected type in tuple type}} expected-astgen-error {{unexpected code '16' in tuple type}}
 }
 
 func testNoComponents() {
-  let _: KeyPath<A, A> = \A // expected-error{{must have at least one component}}
-  let _: KeyPath<C, A> = \C // expected-error{{must have at least one component}}
+  let _: KeyPath<A, A> = \A // expected-error {{must have at least one component}}
+  let _: KeyPath<C, A> = \C // expected-error {{must have at least one component}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
-  let _: KeyPath<A, C> = \A // expected-error{{must have at least one component}}
+  let _: KeyPath<A, C> = \A // expected-error {{must have at least one component}}
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   _ = \A // expected-error {{key path must have at least one component}}
 }
@@ -1008,17 +1008,17 @@ func f_53967() {
 // Ban keypaths with contextual root and without a leading dot.
 struct S_54718 {
   let property: [Int] = []
-  let kp1: KeyPath<S_54718, Int> = \property.count // expected-error {{a Swift key path with contextual root must begin with a leading dot}}{{37-37=.}}
+  let kp1: KeyPath<S_54718, Int> = \property.count // expected-cparser-error {{a Swift key path with contextual root must begin with a leading dot}}{{37-37=.}} expected-astgen-error {{cannot find type 'property' in scope}}
   let kp2: KeyPath<S_54718, Int> = \.property.count // Ok
   let kp3: KeyPath<S_54718, Int> = \S_54718.property.count // Ok
 
-  func foo1(_: KeyPath<S_54718, Int> = \property.count) {} // expected-error {{a Swift key path with contextual root must begin with a leading dot}}{{41-41=.}}
+  func foo1(_: KeyPath<S_54718, Int> = \property.count) {} // expected-cparser-error {{a Swift key path with contextual root must begin with a leading dot}}{{41-41=.}} expected-astgen-error {{cannot find type 'property' in scope}}
   func foo2(_: KeyPath<S_54718, Int> = \.property.count) {} // Ok
   func foo3(_: KeyPath<S_54718, Int> = \S_54718.property.count) {} // Ok
 
   func foo4<T>(_: KeyPath<S_54718, T>) {}
   func useFoo4() {
-    foo4(\property.count) // expected-error {{a Swift key path with contextual root must begin with a leading dot}}{{11-11=.}}
+    foo4(\property.count) // expected-cparser-error {{a Swift key path with contextual root must begin with a leading dot}}{{11-11=.}} expected-astgen-error {{cannot find type 'property' in scope}}
     foo4(\.property.count) // Ok
     foo4(\S_54718.property.count) // Ok
   }
@@ -1148,37 +1148,37 @@ func testMemberAccessOnOptionalKeyPathComponent() {
 }
 
 func testSyntaxErrors() {
-  _ = \.  ; // expected-error{{expected member name following '.'}}
-  _ = \.a ;
-  _ = \[a ;
+  _ = \.  ; // expected-cparser-error{{expected member name following '.'}} expected-astgen-error {{expected identifier in key path property component}}
+  _ = \.a ; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+  _ = \[a ; // expected-astgen-note {{to match this opening '['}} expected-astgen-error {{expected ']' to end array type}}
   _ = \[a];
-  _ = \?  ;
-  _ = \!  ;
-  _ = \.  ; // expected-error{{expected member name following '.'}}
-  _ = \.a ;
-  _ = \[a ;
-  _ = \[a,;
-  _ = \[a:;
+  _ = \?  ; // expected-astgen-error {{expected root in key path}}
+  _ = \!  ; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}} expected-astgen-error {{expected root in key path}}
+  _ = \.  ; // expected-cparser-error{{expected member name following '.'}} expected-astgen-error {{expected identifier in key path property component}}
+  _ = \.a ; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+  _ = \[a ; // expected-astgen-note {{to match this opening '['}} expected-astgen-error {{expected ']' to end array type}}
+  _ = \[a,; // expected-astgen-note {{to match this opening '['}} expected-astgen-error {{expected ']' to end array type}} expected-astgen-error {{unexpected code ',' in function}}
+  _ = \[a:; // expected-astgen-error {{expected value type and ']' to end dictionary type}}
   _ = \[a];
-  _ = \.a?;
-  _ = \.a!;
-  _ = \A     ;
-  _ = \A,    ;
-  _ = \A<    ;
-  _ = \A.  ; // expected-error{{expected member name following '.'}}
-  _ = \A.a ;
-  _ = \A[a ;
-  _ = \A[a];
+  _ = \.a?; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+  _ = \.a!; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
+  _ = \A     ; // expected-astgen-error {{key path must have at least one component}}
+  _ = \A,    ; // expected-astgen-error {{key path must have at least one component}} expected-astgen-error {{unexpected code ',' in function}}
+  _ = \A<    ; // expected-astgen-note {{to match this opening '<'}} expected-astgen-error {{expected '>' to end generic argument clause}}
+  _ = \A.  ; // expected-cparser-error{{expected member name following '.'}} expected-astgen-error {{expected identifier in key path property component}}
+  _ = \A.a ; // expected-astgen-error {{value of type 'A' has no member 'a'}}
+  _ = \A[a ; // expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{cannot find 'a' in scope}} expected-astgen-error {{expected ']' to end key path subscript component}}
+  _ = \A[a]; // expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}} expected-astgen-error {{cannot find 'a' in scope}}
   _ = \A?  ;
   _ = \A!  ;
-  _ = \A.  ; // expected-error{{expected member name following '.'}}
-  _ = \A.a ;
-  _ = \A[a ;
-  _ = \A[a,;
-  _ = \A[a:;
-  _ = \A[a];
-  _ = \A.a?;
-  _ = \A.a!;
+  _ = \A.  ; // expected-cparser-error{{expected member name following '.'}} expected-astgen-error {{expected identifier in key path property component}}
+  _ = \A.a ; // expected-astgen-error {{value of type 'A' has no member 'a'}}
+  _ = \A[a ; // expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{cannot find 'a' in scope}} expected-astgen-error {{expected ']' to end key path subscript component}}
+  _ = \A[a,; // expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{cannot find 'a' in scope}} expected-astgen-error {{expected value in key path subscript component}} expected-astgen-error {{expected ']' to end key path subscript component}}
+  _ = \A[a:; // expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}} expected-astgen-note {{to match this opening '['}} expected-astgen-error {{expected value in key path subscript component}} expected-astgen-error {{expected ']' to end key path subscript component}}
+  _ = \A[a]; // expected-astgen-error {{failed to produce diagnostic for expression; please submit a bug report (https://swift.org/contributing/#reporting-bugs)}} expected-astgen-error {{cannot find 'a' in scope}}
+  _ = \A.a?; // expected-astgen-error {{value of type 'A' has no member 'a'}}
+  _ = \A.a!; // expected-astgen-error {{value of type 'A' has no member 'a'}}
 }
 
 // https://github.com/apple/swift/issues/56996
@@ -1186,8 +1186,8 @@ func f_56996() {
   _ = \Int.byteSwapped.signum()
   _ = \Int.byteSwapped.init() // expected-error {{static member 'init()' cannot be used on instance of type 'Int'}}
   _ = \Int // expected-error {{key path must have at least one component}}
-  _ = \Int? // expected-error {{key path must have at least one component}}
-  _ = \Int. // expected-error {{expected member name following '.'}}
+  _ = \Int? // expected-cparser-error {{key path must have at least one component}}
+  _ = \Int. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected identifier in key path property component}}
 }
 
 // https://github.com/apple/swift/issues/55805

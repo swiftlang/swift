@@ -15,6 +15,27 @@ import BasicBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
+// The accessor-kind helpers are written out here, not with `SWIFT_NAME` member
+// names in the bridging header: a qualified `swift.AccessorKind` name there is
+// not found by the importer on every platform.
+extension swift.AccessorKind {
+  /// The name as it should appear in a diagnostic, e.g. "'yielding borrow'".
+  var nameForDiagnostic: BridgedStringRef { AccessorKind_nameForDiagnostic(self) }
+
+  func diagnosticName(article: Bool, underscored: Bool) -> BridgedStringRef {
+    AccessorKind_nameForDiagnosticStyled(self, article, underscored)
+  }
+
+  /// Whether the kind is only available with the CoroutineAccessors feature.
+  var requiresCoroutineAccessorsFeature: Bool { AccessorKind_requiresCoroutineAccessorsFeature(self) }
+
+  /// The bare source spelling, e.g. "set".
+  var name: BridgedStringRef { AccessorKind_name(self) }
+
+  /// Whether the kind may carry `async`/`throws` effects specifiers.
+  var allowsEffectsSpecifiers: Bool { AccessorKind_allowsEffectsSpecifiers(self) }
+}
+
 // MARK: - TypeDecl
 
 extension ASTGenVisitor {
@@ -33,7 +54,14 @@ extension ASTGenVisitor {
     case .editorPlaceholderDecl:
       fatalError("EditorPlaceholderDeclSyntax should not be used")
     case .enumCaseDecl(let node):
-      return self.generate(enumCaseDecl: node).asDecl
+      let decl = self.generate(enumCaseDecl: node)
+      // Only an enum can contain 'case' elements; the C++ parser builds no
+      // declaration for one anywhere else.
+      guard self.isDirectlyInEnumBody(node) else {
+        self.diagnose(.disallowed_enum_element, at: node.caseKeyword)
+        return nil
+      }
+      return decl?.asDecl
     case .enumDecl(let node):
       return self.generate(enumDecl: node)?.asDecl
     case .extensionDecl(let node):
@@ -45,7 +73,7 @@ extension ASTGenVisitor {
     case .ifConfigDecl:
       fatalError("Should have been handled by the caller")
     case .importDecl(let node):
-      return self.generate(importDecl: node).asDecl
+      return self.generate(importDecl: node)?.asDecl
     case .initializerDecl(let node):
       return self.generate(initializerDecl: node).asDecl
     case .macroDecl(let node):
@@ -56,8 +84,9 @@ extension ASTGenVisitor {
       return self.generate(missingDecl: node)?.asDecl
     case .operatorDecl(let node):
       return self.generate(operatorDecl: node)?.asDecl
-    case .poundSourceLocation:
-      // #sourceLocation directives are handled elsewhere, ignore.
+    case .poundSourceLocation(let node):
+      // The line table is built elsewhere; only check the directive here.
+      self.check(poundSourceLocation: node)
       return nil
     case .precedenceGroupDecl(let node):
       return self.generate(precedenceGroupDecl: node)?.asDecl
@@ -85,6 +114,7 @@ extension ASTGenVisitor {
     guard result.identifier != nil else {
       return nil
     }
+    self.diagnoseDollarDeclName(node)
     return result
   }
 
@@ -92,6 +122,12 @@ extension ASTGenVisitor {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
+    }
+
+    // A where clause inside the angle brackets of a typealias's generic
+    // parameter list is rejected, with a message that is about associated types.
+    if let whereClause = node.genericParameterClause?.genericWhereClause {
+      self.diagnose(.associated_type_generic_parameter_list, at: whereClause.whereKeyword)
     }
 
     let decl = BridgedTypeAliasDecl.createParsed(
@@ -124,21 +160,13 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      )
+      braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.asNominalTypeDecl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.asNominalTypeDecl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -158,21 +186,13 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      )
+      braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -192,22 +212,14 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      ),
+      braceRange: self.generateMemberBraceRange(node.memberBlock),
       isActor: false
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -227,22 +239,14 @@ extension ASTGenVisitor {
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      ),
+      braceRange: self.generateMemberBraceRange(node.memberBlock),
       isActor: true
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -252,7 +256,9 @@ extension ASTGenVisitor {
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
-    let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
+    let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.filter {
+      $0.name.presence == .present
+    }.map {
       self.generateLocatedIdentifier($0.name)
     }
 
@@ -263,23 +269,15 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes, allowClassRequirement: true, allowAnyObject: true),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      )
+      braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
 
     return decl
   }
@@ -290,13 +288,30 @@ extension ASTGenVisitor {
       return nil
     }
 
+    // An 'associatedtype' is only meaningful in a protocol, and the AST verifier
+    // enforces that. The C++ parser reports a bad placement and produces no
+    // decl at all, rather than one the verifier will reject.
+    guard self.declContext.isProtocolContext else {
+      self.diagnose(
+        .associatedtype_outside_protocol,
+        at: node.associatedtypeKeyword,
+        fixIts: [
+          .init(
+            replace: self.generateCharSourceRange(node.associatedtypeKeyword),
+            with: "typealias"
+          )
+        ]
+      )
+      return nil
+    }
+
     let decl = BridgedAssociatedTypeDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       associatedtypeKeywordLoc: self.generateSourceLoc(node.associatedtypeKeyword),
       name: name,
       nameLoc: nameLoc,
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes, allowAnyObject: true),
       defaultType: self.generate(type: node.initializer?.value),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
@@ -320,23 +335,62 @@ extension ASTGenVisitor {
       extendedType: self.generate(type: node.extendedType),
       inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      )
+      braceRange: self.generateMemberBraceRange(node.memberBlock)
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+    self.generateMembers(of: node, decl: decl.asDecl, declContext: decl.asDeclContext) {
+      decl.setParsedMembers($0, fingerprint: $1)
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
+
+    // An extension is only valid at file scope. One that ended up elsewhere,
+    // e.g. through parser recovery, is diagnosed and marked invalid so that the
+    // type checker leaves it alone.
+    if !self.declContext.isModuleScopeContext {
+      self.diagnose(.decl_inner_scope, at: node.extensionKeyword)
+      decl.asDecl.setInvalid()
+    }
 
     return decl
+  }
+}
+
+extension ASTGenVisitor {
+  /// The brace range of a nominal type or extension body.
+  ///
+  /// When the parser had to synthesize the braces there is nothing to point at,
+  /// and the synthesized tokens sit past the last real token -- on trailing
+  /// trivia, or at end of file. That is not safe to use as a range end:
+  /// `getCharSourceRangeOfScope` extends a scope's end with
+  /// `Lexer::getLocForEndOfToken`, so an end on trivia lexes forward into the
+  /// next declaration, and the scope then fails ASTScope's containment check.
+  /// Collapse to the last token that *is* present instead, which is what the C++
+  /// parser ends up doing for e.g. `extension Foo` with no body.
+  func generateMemberBraceRange(_ memberBlock: MemberBlockSyntax) -> SourceRange {
+    if memberBlock.leftBrace.presence == .present {
+      // An unterminated body still has a '{' and contents to point at; only the
+      // end needs care, which `generateRBraceLoc` handles.
+      return SourceRange(
+        start: self.generateSourceLoc(memberBlock.leftBrace),
+        end: self.generateRBraceLoc(memberBlock.rightBrace, of: memberBlock)
+      )
+    }
+    // No '{' at all, as in `extension Foo` with no body.
+    //
+    // The body must still contain whatever members it holds: swift-syntax's
+    // recovery can absorb the declarations that follow into a brace-less member
+    // block -- a bare `extension` swallows the extensions after it -- and a range
+    // that excluded them would fail the verifier's containment check. Prefer the
+    // members' own extent, and collapse only when there are none.
+    let contentRange = self.generateSourceRange(memberBlock.members)
+    if contentRange.start.isValid {
+      return contentRange
+    }
+    guard let precedingToken = memberBlock.previousToken(viewMode: .sourceAccurate) else {
+      return self.generateSourceRange(memberBlock)
+    }
+    let loc = self.generateSourceLoc(precedingToken)
+    return SourceRange(start: loc, end: loc)
   }
 }
 
@@ -348,6 +402,49 @@ extension ASTGenVisitor {
       return nil
     }
 
+    var rawValue: BridgedExpr? = nil
+    if let rawValueNode = node.rawValue?.value {
+      rawValue = self.generate(expr: rawValueNode)
+
+      // Without `LiteralExpressions`, a raw value has to be one of a fixed set of
+      // literal forms. The C++ parser checks the same list, reports the same
+      // diagnostic, and then drops the raw value; keeping it would leave an
+      // expression Sema is not prepared for on the EnumElementDecl.
+      if !ctx.langOpts.hasFeature(.LiteralExpressions),
+        !rawValueNode.isValidEnumRawValueLiteral
+      {
+        self.diagnose(.nonliteral_enum_case_raw_value, at: rawValueNode)
+        rawValue = nil
+      }
+    }
+
+    // Per SE-0155, enum elements may not have empty parameter lists.
+    if let clause = node.parameterClause, clause.parameters.isEmpty,
+      clause.leftParen.presence == .present, clause.rightParen.presence == .present
+    {
+      if ctx.langOpts.isLanguageModeAtLeast(major: 5, minor: 0) {
+        self.diagnose(.enum_element_empty_arglist, at: clause.leftParen, highlight: Syntax(clause))
+      } else {
+        self.diagnose(.enum_element_empty_arglist_swift4, at: clause.leftParen, highlight: Syntax(clause))
+      }
+      self.diagnose(
+        .enum_element_empty_arglist_delete,
+        at: clause.leftParen,
+        fixIts: [.init(replace: self.generateCharSourceRange(clause), with: "")]
+      )
+      self.diagnose(
+        .enum_element_empty_arglist_add_void,
+        at: clause.leftParen,
+        fixIts: [
+          .init(
+            replace: CharSourceRange(
+              start: SourceLoc(at: clause.leftParen.endPositionBeforeTrailingTrivia, in: self.base),
+              byteLength: 0),
+            with: "Void")
+        ]
+      )
+    }
+
     return .createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -355,25 +452,36 @@ extension ASTGenVisitor {
       nameLoc: nameLoc,
       parameterList: self.generate(enumCaseParameterClause: node.parameterClause),
       equalsLoc: self.generateSourceLoc(node.rawValue?.equal),
-      rawValue: self.generate(expr: node.rawValue?.value)
+      rawValue: rawValue.asNullable
     )
   }
 
-  func generate(enumCaseDecl node: EnumCaseDeclSyntax) -> BridgedEnumCaseDecl {
+  func generate(enumCaseDecl node: EnumCaseDeclSyntax) -> BridgedEnumCaseDecl? {
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
 
     // All attributes goes to each element.
-    let elements = node.elements.lazy.compactMap({ elem -> BridgedEnumElementDecl? in
+    //
+    // `compactMap(in:)` rather than `lazy.compactMap { }.bridgedArray`: the
+    // latter evaluates the transform twice, once to compute `count` and again to
+    // fill the buffer, which would build every element -- attaching its
+    // attributes, and emitting any diagnostic it produces -- twice.
+    let elements = node.elements.compactMap(in: self) { elem -> BridgedEnumElementDecl? in
       guard let elemDecl = self.generate(enumCaseElement: elem) else {
         return nil
       }
       elemDecl.asDecl.attachParsedAttrs(attrs.attributes)
       return elemDecl
-    })
+    }
+    // A case with no usable element, e.g. `case 0:`, has been diagnosed; the C++
+    // parser builds no declaration for it, and one with no elements has no source
+    // range.
+    guard !elements.isEmpty else {
+      return nil
+    }
     return .createParsed(
       declContext: self.declContext,
       caseKeywordLoc: self.generateSourceLoc(node.caseKeyword),
-      elements: elements.bridgedArray(in: self)
+      elements: elements
     )
   }
 }
@@ -405,8 +513,10 @@ extension ASTGenVisitor {
     case .`init`:
       return .Init
     case .read:
+      self.diagnose(.old_coroutine_accessor("borrow", "read"), at: specifier)
       return .yielding_borrow
     case .modify:
+      self.diagnose(.old_coroutine_accessor("mutate", "modify"), at: specifier)
       return .yielding_mutate
     case .borrow:
       if modifiers.first(where: { $0.name.text == "yielding" }) != nil {
@@ -428,7 +538,10 @@ extension ASTGenVisitor {
 
   private func generate(
     accessorDecl node: AccessorDeclSyntax,
-    for storage: BridgedAbstractStorageDecl
+    kind: swift.AccessorKind,
+    for storage: BridgedAbstractStorageDecl,
+    allowBody: Bool = true,
+    requireBody: Bool = false
   ) -> BridgedAccessorDecl? {
     var attrs = BridgedDeclAttributes()
 
@@ -437,19 +550,54 @@ extension ASTGenVisitor {
       attrs.add(attr)
     }
 
-    // The modifiers
-    for m in node.modifiers {
-        if let g = self.generate(declModifier: m) {
-            attrs.add(g)
-        }
+    // The modifiers.
+    //
+    // 'yielding' is not a modifier of its own: it is part of the spelling of the
+    // 'yielding borrow' and 'yielding mutate' accessor kinds, and is consumed by
+    // `generate(accessorSpecifier:modifiers:)` below. Passing it to
+    // `generate(declModifier:)` would not find a declaration attribute for it.
+    for m in node.modifiers where m.name.keywordKind != .yielding {
+      if let g = self.generate(declModifier: m) {
+        attrs.add(g)
+      }
     }
 
-    guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier,
-                                   modifiers: node.modifiers) else {
-      // TODO: We could potentially recover if this is the first accessor by treating
-      // it as an implicit getter.
-      return nil
+    // 'yielding borrow' and 'yielding mutate' are gated on a feature flag. The
+    // parser accepts them regardless so that the diagnostic is about the
+    // feature rather than about the syntax.
+    if kind.requiresCoroutineAccessorsFeature,
+      !self.ctx.langOpts.hasFeature(.CoroutineAccessors)
+    {
+      self.diagnose(
+        .accessor_requires_coroutine_accessors(String(bridged: kind.nameForDiagnostic)),
+        at: node.accessorSpecifier
+      )
     }
+    // 'borrow' and 'mutate' only make sense in a type.
+    if (kind == .borrow || kind == .mutate), !self.declContext.isTypeContext {
+      self.diagnose(
+        .borrow_mutate_accessor_not_supported_in_decl(
+          String(bridged: kind.diagnosticName(article: true, underscored: false))),
+        at: node.accessorSpecifier
+      )
+    }
+    // Only a 'get' accessor may be effectful. For any other kind, diagnose each
+    // specifier and drop it: an AccessorDecl that is both non-'get' and 'async'
+    // violates an AccessorDecl invariant and would trip an assertion.
+    var asyncSpecifier = node.effectSpecifiers?.asyncSpecifier
+    var throwsClause = node.effectSpecifiers?.throwsClause
+    if !kind.allowsEffectsSpecifiers {
+      let kindName = String(bridged: kind.name)
+      for specifier in [asyncSpecifier, throwsClause?.throwsSpecifier].compactMap({ $0 }) {
+        self.diagnose(
+          .invalid_accessor_specifier(kindName, String(syntaxText: specifier.rawText)),
+          at: specifier
+        )
+      }
+      asyncSpecifier = nil
+      throwsClause = nil
+    }
+
     let accessor = BridgedAccessorDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
@@ -458,21 +606,226 @@ extension ASTGenVisitor {
       declLoc: self.generateSourceLoc(node.accessorSpecifier),
       accessorKeywordLoc: self.generateSourceLoc(node.accessorSpecifier),
       parameterList: self.generate(accessorParameters: node.parameters),
-      asyncSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.effectSpecifiers?.throwsClause),
-      thrownType: self.generate(type: node.effectSpecifiers?.thrownError)
+      asyncSpecifierLoc: self.generateSourceLoc(asyncSpecifier),
+      throwsSpecifierLoc: self.generateSourceLoc(throwsClause),
+      thrownType: self.generate(type: throwsClause?.type)
     )
     // With the CoroutineAccessors feature enabled, `_read`/`_modify` are just a
     // spelling of the yielding accessors; rewrite them to match the C++ parser
     // (ParsedAccessors::record).  ASTGen only parses surface source.
     accessor.remapLegacyCoroutineAccessorIfEnabled()
     accessor.asDecl.attachParsedAttrs(attrs)
-    if let body = node.body {
-      self.withDeclContext(accessor.asDeclContext) {
-        accessor.setParsedBody(self.generate(codeBlock: body))
+    if allowBody, let body = node.body {
+      self.attachBody(body, to: accessor.asDecl, declContext: accessor.asDeclContext) {
+        accessor.setParsedBody($0)
+      }
+    } else if requireBody, node.body == nil, !attrs.hasAttribute(.SILGenName),
+      !self.declContext.parentSourceFile.isInterface
+    {
+      // Outside of a protocol, an accessor needs a body unless it is
+      // `@_silgen_name` or in a module interface. The C++ parser diagnoses this at the next token.
+      let name = String(bridged: kind.diagnosticName(article: false, underscored: false))
+      if let next = node.lastToken(viewMode: .sourceAccurate)?.nextToken(viewMode: .sourceAccurate) {
+        self.diagnose(.expected_lbrace_accessor(name), at: next)
+      } else {
+        self.diagnose(.expected_lbrace_accessor(name), at: node)
       }
     }
     return accessor
+  }
+
+  /// Report a second accessor of a kind that already appeared.
+  ///
+  /// The C++ parser reports this from `Parser::parseGetSet` and then keeps the
+  /// duplicate anyway, so the AST is identical either way. Emitting the error is
+  /// nonetheless load-bearing: `AbstractStorageDecl::getAccessor` returns only
+  /// the first accessor of a kind, so the AST verifier's
+  /// "storage declaration has different accessor for this kind" check fails on
+  /// the second one -- and that check only runs when no error has been emitted.
+  private func diagnoseDuplicateAccessor(
+    _ node: AccessorDeclSyntax,
+    kind: swift.AccessorKind,
+    previous: AccessorDeclSyntax,
+    isSubscript: Bool
+  ) {
+    let underscored = self.ctx.langOpts.hasFeature(.CoroutineAccessors)
+    self.diagnose(
+      .duplicate_accessor(
+        isSubscript ? 1 : 0,
+        String(bridged: kind.diagnosticName(article: true, underscored: underscored))
+      ),
+      at: node.accessorSpecifier
+    )
+    self.diagnose(
+      .previous_accessor(
+        String(bridged: kind.diagnosticName(article: false, underscored: underscored)),
+        true
+      ),
+      at: previous.accessorSpecifier
+    )
+  }
+
+  /// An accessor that was generated, with the syntax it came from.
+  private struct ParsedAccessor {
+    let kind: swift.AccessorKind
+    let node: AccessorDeclSyntax
+    let decl: BridgedAccessorDecl
+  }
+
+  /// Diagnose accessors that cannot be provided together, and storage that has
+  /// a writing accessor but nothing to read through.
+  ///
+  /// This is `Parser::ParsedAccessors::classify`.
+  private func classifyAccessors(
+    _ accessors: [ParsedAccessor],
+    isSubscript: Bool,
+    braceLoc: SourceLoc,
+    isInvalid: Bool,
+    storageSyntax: Syntax?
+  ) {
+    // If there was a problem parsing the accessors, mark them all invalid to
+    // avoid tripping later invariants, and don't diagnose what is missing.
+    if isInvalid {
+      for accessor in accessors {
+        accessor.decl.asDecl.setInvalid()
+      }
+    }
+
+    // The first accessor of each kind is the one that counts.
+    var first: [swift.AccessorKind: ParsedAccessor] = [:]
+    for accessor in accessors where first[accessor.kind] == nil {
+      first[accessor.kind] = accessor
+    }
+    func accessor(_ kind: swift.AccessorKind) -> ParsedAccessor? { first[kind] }
+
+    let coroutineAccessors = self.ctx.langOpts.hasFeature(.CoroutineAccessors)
+    func name(_ kind: swift.AccessorKind, article: Bool, legacy: Bool) -> String {
+      String(bridged: kind.diagnosticName(article: article, underscored: legacy))
+    }
+    /// The legacy spelling that corresponds to a yielding accessor.
+    func legacyKind(of kind: swift.AccessorKind) -> swift.AccessorKind? {
+      switch kind {
+      case .yielding_borrow: return ._read
+      case .yielding_mutate: return ._modify
+      default: return nil
+      }
+    }
+    func diagnoseConflict(_ firstKind: swift.AccessorKind, _ secondKind: swift.AccessorKind) {
+      guard let firstAccessor = accessor(firstKind), let secondAccessor = accessor(secondKind) else {
+        return
+      }
+      let legacy =
+        legacyKind(of: firstKind) == secondKind || legacyKind(of: secondKind) == firstKind
+        || coroutineAccessors
+      self.diagnose(
+        .conflicting_accessor(
+          isSubscript ? 1 : 0,
+          name(secondKind, article: true, legacy: legacy),
+          name(firstKind, article: true, legacy: legacy)
+        ),
+        at: secondAccessor.node.accessorSpecifier
+      )
+      self.diagnose(
+        .previous_accessor(name(firstKind, article: false, legacy: legacy), false),
+        at: firstAccessor.node.accessorSpecifier
+      )
+      secondAccessor.decl.asDecl.setInvalid()
+    }
+
+    // The observing accessors are not allowed on subscripts.
+    if isSubscript {
+      for (kind, index) in [(swift.AccessorKind.willSet, UInt(0)), (.didSet, UInt(1))] {
+        if let observer = accessor(kind) {
+          self.diagnose(.observing_accessor_in_subscript(index), at: observer.node.accessorSpecifier)
+          observer.decl.asDecl.setInvalid()
+        }
+      }
+    }
+
+    // 'get', '_read', 'read' and a non-mutable addressor are all exclusive.
+    if accessor(.get) != nil {
+      diagnoseConflict(.get, ._read)
+      diagnoseConflict(.get, .yielding_borrow)
+      diagnoseConflict(.get, .unsafeAddress)
+      diagnoseConflict(.get, .borrow)
+    } else if accessor(._read) != nil {
+      diagnoseConflict(._read, .yielding_borrow)
+      diagnoseConflict(._read, .unsafeAddress)
+      diagnoseConflict(._read, .borrow)
+    } else if accessor(.yielding_borrow) != nil {
+      diagnoseConflict(.yielding_borrow, .unsafeAddress)
+      diagnoseConflict(.yielding_borrow, .borrow)
+    } else if accessor(.unsafeAddress) != nil {
+      // Nothing to check; the C++ parser compares 'yielding borrow' with
+      // 'borrow' here, which can never both exist in this branch.
+    } else if accessor(.borrow) != nil {
+      // Nothing can go wrong.
+    } else if let mutator = [.Init, .set, ._modify, .yielding_mutate, .unsafeMutableAddress, .mutate]
+      .lazy.compactMap({ accessor($0) }).first
+    {
+      // A writing accessor needs a reading one.
+      if !isInvalid {
+        let diagnostic: CompilerDiagnostic
+        let mutatorName = name(
+          mutator.kind, article: true, legacy: mutator.kind == ._modify || coroutineAccessors)
+        if accessor(.unsafeMutableAddress) != nil || accessor(._modify) != nil
+          || accessor(.yielding_mutate) != nil
+        {
+          diagnostic = .missing_reading_accessor(isSubscript ? 1 : 0, mutatorName)
+        } else if accessor(.mutate) != nil {
+          diagnostic = .missing_borrow_accessor(isSubscript ? 1 : 0, mutatorName)
+        } else {
+          diagnostic = .missing_getter(isSubscript ? 1 : 0, mutatorName)
+        }
+        self.diagnose(diagnostic, at: mutator.node.accessorSpecifier)
+      }
+    } else if isSubscript {
+      // Subscripts always have to have some sort of accessor.
+      if !isInvalid {
+        self.diagnose(.subscript_without_get, at: braceLoc)
+      }
+    }
+
+    // '_modify', 'modify' and 'unsafeMutableAddress' are all mutually exclusive;
+    // so are 'mutate' and 'set', and 'unsafeMutableAddress' with 'set'/'mutate'.
+    if accessor(.set) != nil {
+      diagnoseConflict(.set, .unsafeMutableAddress)
+      diagnoseConflict(.set, .mutate)
+    } else if accessor(._modify) != nil {
+      diagnoseConflict(._modify, .yielding_mutate)
+      diagnoseConflict(._modify, .unsafeMutableAddress)
+    } else if accessor(.mutate) != nil {
+      diagnoseConflict(.mutate, .unsafeMutableAddress)
+    }
+
+    if let initAccessor = accessor(.Init) {
+      var enclosing: Syntax? = storageSyntax?.parent
+      while let current = enclosing, !(current.is(ExtensionDeclSyntax.self) || current.is(StructDeclSyntax.self)
+        || current.is(ClassDeclSyntax.self) || current.is(EnumDeclSyntax.self) || current.is(ActorDeclSyntax.self)
+        || current.is(ProtocolDeclSyntax.self))
+      {
+        enclosing = current.parent
+      }
+      if enclosing?.is(ExtensionDeclSyntax.self) == true {
+        self.diagnose(.init_accessor_is_not_in_the_primary_declaration, at: initAccessor.node.accessorSpecifier)
+      } else if !self.declContext.isTypeContext || isSubscript {
+        self.diagnose(.init_accessor_is_not_on_property, at: initAccessor.node.accessorSpecifier)
+      }
+    }
+
+    // A 'borrow' can only be paired with 'mutate'.
+    if let borrow = accessor(.borrow),
+      accessor(.set) != nil || accessor(._modify) != nil || accessor(.yielding_mutate) != nil
+        || accessor(.unsafeMutableAddress) != nil
+    {
+      self.diagnose(.borrow_mutate_pair_restrict("borrow", "mutate"), at: borrow.node.accessorSpecifier)
+    }
+    if let mutate = accessor(.mutate),
+      accessor(.get) != nil || accessor(._read) != nil || accessor(.yielding_borrow) != nil
+        || accessor(.unsafeAddress) != nil
+    {
+      self.diagnose(.borrow_mutate_pair_restrict("mutate", "borrow"), at: mutate.node.accessorSpecifier)
+    }
   }
 
   private func generate(
@@ -480,20 +833,178 @@ extension ASTGenVisitor {
     for storage: BridgedAbstractStorageDecl
   ) -> BridgedAccessorRecord {
     let leftBrace = self.generateSourceLoc(accessorBlock.leftBrace)
-    let rightBrace = self.generateSourceLoc(accessorBlock.rightBrace)
 
-    // FIXME: We need to handle the diagnostics in ParsedAccessors::classify,
-    // or defer them to the type-checker.
+    // A '}' the parser synthesized during recovery still has a position: a
+    // zero-width one past the previous token *and its trailing trivia*, which
+    // for an unterminated accessor block lands inside the following
+    // declaration. The resulting storage declaration then overlaps its
+    // successor, which the availability-scope and ASTScope builders reject. Use
+    // the last token actually present instead, matching the C++ parser, which
+    // ends the range at the last token it consumed.
+    var rightBrace = self.generateSourceLocIfPresent(accessorBlock.rightBrace)
+    if rightBrace == nil {
+      rightBrace = self.generateSourceLoc(
+        accessorBlock.lastToken(viewMode: .sourceAccurate) ?? accessorBlock.leftBrace
+      )
+    }
+
+    // Whether the storage is a protocol requirement.
+    var inProtocol = false
+    for ancestor in sequence(first: accessorBlock.parent, next: { $0?.parent }) {
+      if let ancestor, ancestor.is(VariableDeclSyntax.self) || ancestor.is(SubscriptDeclSyntax.self) {
+        inProtocol = self.isProtocolMember(ancestor)
+        break
+      }
+    }
+
+    // The duplicate check below, and `classifyAccessors` after it, are handled
+    // here because omitting them lets an invalid AST reach the verifier; see
+    // `diagnoseDuplicateAccessor`.
     switch accessorBlock.accessors {
     case .accessors(let accessors):
-      return BridgedAccessorRecord(
+      /// The first accessor seen of each kind, for duplicate detection.
+      var firstOfKind: [swift.AccessorKind: AccessorDeclSyntax] = [:]
+      /// Every accessor that was generated, in order, for `classify`.
+      var generated: [ParsedAccessor] = []
+      /// Whether a 'get' that is 'async' or 'throws' has been seen, and the
+      /// accessors other than 'get' seen so far. An effectful 'get' cannot
+      /// coexist with any other accessor.
+      var hasEffectfulGet = false
+      var nonGetSoFar: [(kind: swift.AccessorKind, node: AccessorDeclSyntax)] = []
+      let isSubscript = accessorBlock.parent?.is(SubscriptDeclSyntax.self) == true
+      /// Set once an accessor in a protocol was diagnosed as having a body.
+      /// The C++ parser stops at the body it did not skip, so the accessors
+      /// after it are dropped and the declaration is invalid.
+      var protocolBodyDiagnosed = false
+
+      let record = BridgedAccessorRecord(
         lBraceLoc: leftBrace,
-        accessors: accessors.lazy.compactMap {
-          self.generate(accessorDecl: $0, for: storage)
-        }.bridgedArray(in: self),
+        // Use `compactMap(in:)` rather than `lazy.compactMap { }.bridgedArray`:
+        // the latter evaluates the transform twice, once to compute `count` and
+        // again to fill the buffer, which would generate every accessor -- and
+        // emit any diagnostic it produces -- twice.
+        accessors: accessors.compactMap(in: self) { node -> BridgedAccessorDecl? in
+          // The kind is computed once here, not again inside
+          // `generate(accessorDecl:kind:for:)`: the mapper diagnoses an unknown
+          // specifier and a deprecated 'read'/'modify' spelling, so calling it
+          // twice would emit those twice.
+          //
+          // TODO: We could potentially recover from an unknown specifier if this
+          // is the first accessor, by treating it as an implicit getter.
+          if protocolBodyDiagnosed {
+            return nil
+          }
+          guard let kind = self.generate(accessorSpecifier: node.accessorSpecifier,
+                                         modifiers: node.modifiers) else {
+            return nil
+          }
+          // A protocol requirement allows only some accessors, and they have no
+          // body or setter parameter name.
+          var allowBody = true
+          if inProtocol {
+            switch kind {
+            case .get, .set, .yielding_borrow, .borrow, .mutate, .yielding_mutate:
+              break
+            default:
+              self.diagnose(.expected_getreadborrowsetmutate_in_protocol, at: node.accessorSpecifier)
+              return nil
+            }
+            if node.parameters != nil {
+              self.diagnose(.protocol_setter_name, at: node.accessorSpecifier)
+            }
+            if let body = node.body {
+              self.diagnose(
+                .unexpected_getset_implementation_in_protocol(
+                  String(bridged: kind.diagnosticName(article: false, underscored: false))),
+                at: body.leftBrace
+              )
+              // The C++ parser does not skip the body, so it then fails to find
+              // the next accessor at the brace.
+              self.diagnose(.expected_getreadborrowsetmutate_in_protocol, at: body.leftBrace)
+              protocolBodyDiagnosed = true
+              allowBody = false
+            }
+          }
+          if let previous = firstOfKind[kind] {
+            self.diagnoseDuplicateAccessor(
+              node,
+              kind: kind,
+              previous: previous,
+              isSubscript: accessorBlock.parent?.is(SubscriptDeclSyntax.self) == true
+            )
+          } else {
+            firstOfKind[kind] = node
+          }
+          if kind == .get {
+            let effects = node.effectSpecifiers
+            if effects?.asyncSpecifier != nil || effects?.throwsClause != nil {
+              if !hasEffectfulGet {
+                for previous in nonGetSoFar {
+                  self.diagnose(
+                    .invalid_accessor_with_effectful_get(String(bridged: previous.kind.name)),
+                    at: previous.node.accessorSpecifier
+                  )
+                }
+              }
+              hasEffectfulGet = true
+            }
+          } else {
+            nonGetSoFar.append((kind, node))
+            if hasEffectfulGet {
+              self.diagnose(
+                .invalid_accessor_with_effectful_get(String(bridged: kind.name)),
+                at: node.accessorSpecifier
+              )
+            }
+          }
+          guard let decl = self.generate(accessorDecl: node, kind: kind, for: storage, allowBody: allowBody, requireBody: !inProtocol) else {
+            return nil
+          }
+          generated.append(ParsedAccessor(kind: kind, node: node, decl: decl))
+          return decl
+        },
         rBraceLoc: rightBrace
       )
+      self.classifyAccessors(
+        generated,
+        isSubscript: isSubscript,
+        braceLoc: leftBrace,
+        isInvalid: accessorBlock.hasError || self.accessorsAreInvalid || protocolBodyDiagnosed,
+        storageSyntax: accessorBlock.parent
+      )
+      return record
     case .getter(let codeBlock):
+      // A protocol requirement lists its accessors; it cannot have an implicit
+      // getter. The C++ parser diagnoses the first token and builds no accessor,
+      // leaving the type checker to ask for an explicit '{ get }'.
+      if inProtocol, let first = codeBlock.first, !accessorBlock.hasError {
+        self.diagnose(.expected_getreadborrowsetmutate_in_protocol, at: first)
+        return BridgedAccessorRecord(
+          lBraceLoc: leftBrace,
+          accessors: .init(),
+          rBraceLoc: rightBrace
+        )
+      }
+      // `var x: Int {}` in a protocol is an empty accessor list: there is no
+      // implicit getter to make of it, and the type checker asks for an explicit
+      // '{ get }'.
+      if inProtocol, codeBlock.isEmpty, !accessorBlock.hasError,
+        !(accessorBlock.parent?.is(SubscriptDeclSyntax.self) ?? false)
+      {
+        return BridgedAccessorRecord(
+          lBraceLoc: leftBrace,
+          accessors: .init(),
+          rBraceLoc: rightBrace
+        )
+      }
+      // `subscript(i: Int) -> Int {}` in a protocol: an empty body is an empty
+      // accessor list, and a subscript requirement needs a getter. (Elsewhere it
+      // is an empty getter body.)
+      if codeBlock.isEmpty, let subscriptDecl = accessorBlock.parent?.as(SubscriptDeclSyntax.self),
+        self.isProtocolMember(subscriptDecl), !accessorBlock.hasError
+      {
+        self.diagnose(.subscript_without_get, at: leftBrace)
+      }
       let accessor = BridgedAccessorDecl.createParsed(
         self.ctx,
         declContext: self.declContext,
@@ -506,15 +1017,11 @@ extension ASTGenVisitor {
         throwsSpecifierLoc: nil,
         thrownType: nil
       )
-      self.withDeclContext(accessor.asDeclContext) {
-        let brace = BridgedBraceStmt.createParsed(
-          self.ctx,
-          lBraceLoc: leftBrace,
-          elements: self.generate(codeBlockItemList: codeBlock).lazy.bridgedArray(in: self),
-          rBraceLoc: rightBrace
-        )
-        accessor.setParsedBody(brace)
+      if self.accessorsAreInvalid {
+        accessor.asDecl.setInvalid()
       }
+      self.attachImplicitGetterBody(
+        accessorBlock, items: codeBlock, leftBrace: leftBrace, rightBrace: rightBrace, to: accessor)
       return BridgedAccessorRecord(
         lBraceLoc: leftBrace,
         accessors: CollectionOfOne(accessor).bridgedArray(in: self),
@@ -523,7 +1030,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedPatternBindingEntry? {
+  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult, isAsyncLet: Bool, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedPatternBindingEntry? {
     if binding.pattern.is(MissingPatternSyntax.self) {
       // The availability checker requires declarations to have valid SourceLocs, but MissingPatternSyntax lowers to
       // an implicit AnyPattern with invalid SourceLocs. A top-level MissingPatternSyntax could therefore cause us to
@@ -532,13 +1039,67 @@ extension ASTGenVisitor {
       return nil
     }
 
+    // A computed property needs a type: there is no initializer to infer it from.
+    var missingType = false
+    if binding.typeAnnotation == nil, let identifier = binding.pattern.as(IdentifierPatternSyntax.self),
+      let accessorBlock = binding.accessorBlock
+    {
+      var hasReadOrWriteAccessor = false
+      switch accessorBlock.accessors {
+      case .getter:
+        hasReadOrWriteAccessor = true
+      case .accessors(let accessors):
+        hasReadOrWriteAccessor = accessors.contains {
+          switch $0.accessorSpecifier.keywordKind {
+          case .get, .set, .unsafeAddress, .unsafeMutableAddress: return true
+          default: return false
+          }
+        }
+      }
+      if hasReadOrWriteAccessor {
+        missingType = true
+        self.diagnose(
+          .computed_property_missing_type,
+          at: identifier,
+          fixIts: [
+            .init(
+              replace: CharSourceRange(
+                start: SourceLoc(at: identifier.endPositionBeforeTrailingTrivia, in: self.base),
+                byteLength: 0),
+              with: ": <# Type #>")
+          ]
+        )
+      }
+    }
+
     let pattern = generate(pattern: binding.pattern)
+    if isAsyncLet {
+      // `async let _ = ...` has no VarDecl to carry the `async` attribute, so
+      // the wildcard itself records it.
+      pattern.markWildcardsAsAsyncLet()
+    }
 
     let equalLoc = generateSourceLoc(binding.initializer?.equal)
 
     var initExpr: BridgedExpr?
     var initContext: BridgedPatternBindingInitializer?
-    if let initializer = binding.initializer {
+    // The C++ parser gives up on the entry after dropping a disallowed
+    // initializer, so any accessors that follow are not parsed.
+    var initializerDisallowed = false
+    if let initializer = binding.initializer, let variable = binding.parent?.parent,
+      self.isProtocolMember(variable)
+    {
+      // A protocol requirement has no initial value. The C++ parser diagnoses
+      // the initializer and drops it.
+      self.diagnose(.disallowed_init, at: initializer.equal)
+      initializerDisallowed = true
+    } else if let initializer = binding.initializer,
+      !(initializer.equal.presence == .missing
+        && initializer.value.as(MemberAccessExprSyntax.self)?.declName.baseName.presence == .missing)
+    {
+      // `var x.: T` has no `=` and a bare `.` for a value. The C++ parser
+      // reads no initializer there, and one made of an error expression makes
+      // property wrapper synthesis fail without a diagnostic.
       // Create a PatternBindingInitializer if we're not in a local context (this
       // ensures that property initializers are correctly treated as being in a
       // local context).
@@ -549,14 +1110,18 @@ extension ASTGenVisitor {
         generate(expr: initializer.value)
       }
     }
-    if let accessors = binding.accessorBlock {
+    if let accessors = binding.accessorBlock, !initializerDisallowed {
+      self.accessorsAreInvalid = missingType
+      defer { self.accessorsAreInvalid = false }
       // FIXME: We ought to have a better way of converting from the Nullable
       // wrapper back to Optional.
       if let primaryVar = pattern.singleVar.raw.map(BridgedVarDecl.init) {
         let storage = primaryVar.asAbstractStorageDecl
         storage.setAccessors(generate(accessorBlock: accessors, for: storage))
+
       } else {
-        self.diagnose(.nonTrivialPatternForAccessor(binding.pattern))
+        self.diagnose(.getset_nontrivial_pattern, at: binding.pattern)
+        self.patternBindingIsInvalid = true
       }
     }
     return BridgedPatternBindingEntry(
@@ -571,10 +1136,16 @@ extension ASTGenVisitor {
     var propagatedType: BridgedTypeRepr?
     var entries: [BridgedPatternBindingEntry] = []
 
+    let isAsyncLet =
+      node.bindingSpecifier.keywordKind == .let && node.modifiers.contains { $0.name.text == "async" }
+
     // Generate the bindings in reverse, keeping track of the TypeRepr to
     // propagate to earlier patterns if needed.
     for binding in node.bindings.reversed() {
-      guard var entry = self.generate(patternBinding: binding, attrs: attrs, topLevelDecl: topLevelDecl) else {
+      guard
+        var entry = self.generate(
+          patternBinding: binding, attrs: attrs, isAsyncLet: isAsyncLet, topLevelDecl: topLevelDecl)
+      else {
         // Missing pattern. Drop this binding.
         continue
       }
@@ -642,16 +1213,74 @@ extension ASTGenVisitor {
       || attrs.attributes.hasAttribute(.Extern)
 
     let topLevelDecl: BridgedTopLevelCodeDecl?
-    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst, !isABIOnly {
+    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode, !isConst, !isABIOnly,
+      !self.suppressTopLevelCode
+    {
       topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
     } else {
       topLevelDecl = nil
     }
 
-    guard let entries = self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl) else {
+    // A declaration nested in an initializer has its own flag.
+    let outerBindingIsInvalid = self.patternBindingIsInvalid
+    self.patternBindingIsInvalid = false
+    let generatedEntries = self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl)
+    let bindingIsInvalid = self.patternBindingIsInvalid
+    self.patternBindingIsInvalid = outerBindingIsInvalid
+    guard let entries = generatedEntries else {
       // No bindings with valid SourceLocs. A PatternBindingDecl generated from this would have an invalid SourceRange,
       // violating availability checker invariants. Drop the PBD instead.
       return nil
+    }
+
+    // Reject accessors on a 'let'.
+    if introducer == .let, !attrs.attributes.hasAttribute(.HasStorage),
+      let accessorBlock = node.bindings.first?.accessorBlock
+    {
+      var observing = false
+      var addressed = false
+      if case .accessors(let accessors) = accessorBlock.accessors {
+        for accessor in accessors {
+          switch accessor.accessorSpecifier.keywordKind {
+          case .willSet, .didSet: observing = true
+          case .unsafeAddress, .unsafeMutableAddress: addressed = true
+          default: break
+          }
+        }
+      }
+      let diagnostic: CompilerDiagnostic =
+        observing
+        ? .let_cannot_be_observing_property
+        : addressed ? .let_cannot_be_addressed_property : .let_cannot_be_computed_property
+      self.diagnose(
+        diagnostic,
+        at: accessorBlock.leftBrace,
+        fixIts: [.init(replace: self.generateCharSourceRange(node.bindingSpecifier), with: "var")]
+      )
+    }
+
+    // Accessors need a single variable. (A pattern with no single variable is
+    // diagnosed with its entry; a parenthesized one has a single variable but
+    // is not a simple pattern to the C++ parser.)
+    var hasAccessors = false
+    for binding in node.bindings where binding.accessorBlock != nil {
+      hasAccessors = true
+      if var located = binding.pattern.as(TuplePatternSyntax.self).map({ Syntax($0) }) {
+        var isParenthesized = false
+        while let tuple = located.as(TuplePatternSyntax.self), tuple.elements.count == 1,
+          let only = tuple.elements.first, only.label == nil
+        {
+          isParenthesized = true
+          located = Syntax(only.pattern)
+        }
+        // The C++ parser locates a parenthesized pattern at its contents.
+        if isParenthesized {
+          self.diagnose(.getset_nontrivial_pattern, at: located)
+        }
+      }
+    }
+    if hasAccessors, node.bindings.count > 1 {
+      self.diagnose(.disallowed_var_multiple_getset, at: node.bindingSpecifier)
     }
 
     let decl = BridgedPatternBindingDecl.createParsed(
@@ -662,8 +1291,14 @@ extension ASTGenVisitor {
       staticSpelling: attrs.staticSpelling,
       introducerLoc: self.generateSourceLoc(node.bindingSpecifier),
       introducer: introducer,
-      entries: entries
+      entries: entries,
+      // Only a declaration that is itself wrapped in a TopLevelCodeDecl is a
+      // global; one in a top-level 'do' block is local.
+      isTopLevelGlobal: topLevelDecl != nil
     )
+    if bindingIsInvalid {
+      decl.asDecl.setInvalid()
+    }
     if let topLevelDecl {
       let range = self.generateImplicitBraceRange(node)
       let body = BridgedBraceStmt.createImplicit(
@@ -679,8 +1314,45 @@ extension ASTGenVisitor {
     }
   }
 
+  /// Whether `node` is declared directly in a protocol.
+  private func isProtocolMember(_ node: some SyntaxProtocol) -> Bool {
+    var parent = node.parent
+    while let current = parent {
+      if let block = current.as(MemberBlockSyntax.self) {
+        return block.parent?.is(ProtocolDeclSyntax.self) == true
+      }
+      // Members of a protocol may be inside `#if`.
+      guard current.is(MemberBlockItemSyntax.self) || current.is(MemberBlockItemListSyntax.self)
+        || current.is(IfConfigDeclSyntax.self) || current.is(IfConfigClauseSyntax.self)
+        || current.is(IfConfigClauseListSyntax.self)
+      else {
+        return false
+      }
+      parent = current.parent
+    }
+    return false
+  }
+
+  /// Diagnose a default argument in a protocol requirement.
+  ///
+  /// The C++ parser also drops the declaration; ASTGen keeps it, which only
+  /// matters for what is diagnosed afterwards.
+  private func diagnoseProtocolDefaultArguments(
+    in parameters: FunctionParameterListSyntax,
+    of node: some SyntaxProtocol,
+    at keyword: TokenSyntax,
+    _ diagnostic: CompilerDiagnostic
+  ) {
+    if isProtocolMember(node), parameters.contains(where: { $0.defaultValue != nil }) {
+      self.diagnose(diagnostic, at: keyword)
+    }
+  }
+
   func generate(subscriptDecl node: SubscriptDeclSyntax) -> BridgedSubscriptDecl {
     let attrs = generateDeclAttributes(node, allowStatic: true)
+    self.diagnoseProtocolDefaultArguments(
+      in: node.parameterClause.parameters, of: node, at: node.subscriptKeyword,
+      .protocol_subscript_argument_init)
 
     let subscriptDecl = BridgedSubscriptDecl.createParsed(
       self.ctx,
@@ -696,17 +1368,78 @@ extension ASTGenVisitor {
     )
     subscriptDecl.asDecl.attachParsedAttrs(attrs.attributes)
 
+    // A subscript is only valid in a type; the C++ parser still builds it, but
+    // marks it invalid.
+    if !self.declContext.isTypeContext {
+      self.diagnose(.subscript_decl_wrong_scope, at: node.subscriptKeyword)
+      subscriptDecl.asDecl.setInvalid()
+    }
+
     if let accessors = node.accessorBlock {
       let storage = subscriptDecl.asAbstractStorageDecl
       storage.setAccessors(generate(accessorBlock: accessors, for: storage))
+    } else if !node.hasError,
+      !sequence(first: Syntax(node).parent, next: { $0?.parent }).contains(where: { $0?.is(ABIAttributeArgumentsSyntax.self) == true })
+    {
+      // A subscript needs at least a getter. (One in an '@abi' attribute is
+      // only a stub.)
+      let next = node.returnClause.lastToken(viewMode: .sourceAccurate)?.nextToken(viewMode: .sourceAccurate)
+      let location = next.map(Syntax.init) ?? Syntax(node.returnClause)
+      if self.isProtocolMember(node) {
+        self.diagnose(
+          .expected_lbrace_subscript_protocol,
+          at: location,
+          fixIts: [
+            .init(
+              replace: self.generateCharSourceRange(
+                start: node.returnClause.endPositionBeforeTrailingTrivia,
+                length: SourceLength(utf8Length: 0)
+              ),
+              with: " { get <#set#> }"
+            )
+          ]
+        )
+      } else {
+        self.diagnose(.expected_lbrace_subscript, at: location)
+      }
     }
     return subscriptDecl
   }
 
   func generate(accessorBlockFile node: AccessorBlockFileSyntax, for storage: BridgedAbstractStorageDecl) -> [BridgedAccessorDecl] {
     var accessors: [BridgedAccessorDecl] = []
+    var firstOfKind: [swift.AccessorKind: AccessorDeclSyntax] = [:]
     for elem in node.accessors {
-      if let accessor = self.generate(accessorDecl: elem, for: storage) {
+      guard let kind = self.generate(accessorSpecifier: elem.accessorSpecifier,
+                                     modifiers: elem.modifiers) else {
+        continue
+      }
+      if let previous = firstOfKind[kind] {
+        self.diagnoseDuplicateAccessor(elem, kind: kind, previous: previous, isSubscript: false)
+      } else {
+        firstOfKind[kind] = elem
+        // An accessor the storage was already written with is the first of its
+        // kind, and what a macro-provided one duplicates.
+        let existing = storage.accessorLoc(kind)
+        if existing.isValid {
+          let underscored = self.ctx.langOpts.hasFeature(.CoroutineAccessors)
+          self.diagnose(
+            .duplicate_accessor(
+              0,
+              String(bridged: kind.diagnosticName(article: true, underscored: underscored))
+            ),
+            at: elem.accessorSpecifier
+          )
+          self.diagnose(
+            .previous_accessor(
+              String(bridged: kind.diagnosticName(article: false, underscored: underscored)),
+              true
+            ),
+            at: existing
+          )
+        }
+      }
+      if let accessor = self.generate(accessorDecl: elem, kind: kind, for: storage) {
         accessors.append(accessor)
       }
     }
@@ -761,7 +1494,21 @@ extension ASTGenVisitor {
   } 
   
   func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl? {
+    self.rejectedDeclAttribute = false
     var attrs = self.generateDeclAttributes(node, allowStatic: true)
+
+    // A synthesized 'func' keyword means the parser invented this declaration
+    // while recovering -- `associatedtype X<T>` produces one for the `<T>` -- and
+    // has already diagnosed it. Everything about such a declaration is
+    // synthesized, so its source range is not trustworthy, and building it gives
+    // ASTScope a child that does not sit inside its parent.
+    guard node.funcKeyword.presence == .present else {
+      return nil
+    }
+    self.diagnoseProtocolDefaultArguments(
+      in: node.signature.parameterClause.parameters, of: node, at: node.funcKeyword,
+      .protocol_method_argument_init)
+
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
@@ -780,7 +1527,7 @@ extension ASTGenVisitor {
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: signature.parameterList,
-      asyncSpecifierLoc: signature.asyncLoc,
+      asyncSpecifierLoc: signature.asyncLoc.isValid ? signature.asyncLoc : self.generateSourceLoc(node.modifiers.first(where: { $0.name.text == "async" })),
       throwsSpecifierLoc: signature.throwsLoc,
       thrownType: signature.thrownType.asNullable,
       yieldList: signature.yieldList.asNullable,
@@ -793,11 +1540,21 @@ extension ASTGenVisitor {
     if signature.isRethrows {
       attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
     }
+    if self.rejectedDeclAttribute {
+      decl.asDecl.setInvalid()
+      self.rejectedDeclAttribute = false
+    }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
-      self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(codeBlock: body))
+      if self.isProtocolMember(node) {
+        // A protocol requirement has no body. The C++ parser diagnoses the
+        // body and skips it.
+        self.diagnose(.protocol_method_with_body, at: body.leftBrace)
+      } else {
+        self.attachBody(body, to: decl.asDecl, declContext: decl.asDeclContext) {
+          decl.setParsedBody($0)
+        }
       }
     }
 
@@ -806,6 +1563,18 @@ extension ASTGenVisitor {
 
   func generate(initializerDecl node: InitializerDeclSyntax) -> BridgedConstructorDecl {
     var attrs = self.generateDeclAttributes(node, allowStatic: false)
+    self.diagnoseProtocolDefaultArguments(
+      in: node.signature.parameterClause.parameters, of: node, at: node.initKeyword,
+      .protocol_init_argument_init)
+    // Initializers only exist in types. The C++ parser points at the token after
+    // `init` and tells the type checker not to touch the declaration.
+    let constructorsNotAllowed = !self.declContext.isTypeContext
+    if constructorsNotAllowed {
+      self.diagnose(
+        .initializer_decl_wrong_scope,
+        at: node.initKeyword.nextToken(viewMode: .sourceAccurate).map(Syntax.init) ?? Syntax(node.initKeyword)
+      )
+    }
     let signature = self.generate(
       functionSignature: node.signature,
       for: .initializer
@@ -819,7 +1588,7 @@ extension ASTGenVisitor {
       isIUO: node.optionalMark?.rawTokenKind == .exclamationMark,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
       parameterList: signature.parameterList,
-      asyncSpecifierLoc: signature.asyncLoc,
+      asyncSpecifierLoc: signature.asyncLoc.isValid ? signature.asyncLoc : self.generateSourceLoc(node.modifiers.first(where: { $0.name.text == "async" })),
       throwsSpecifierLoc: signature.throwsLoc,
       thrownType: signature.thrownType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
@@ -831,15 +1600,26 @@ extension ASTGenVisitor {
       attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .Rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
-    
-    guard signature.returnType == nil else {
-      // TODO: Diagnose.
-      fatalError("unexpected return type in initializer decl")
+    if constructorsNotAllowed {
+      decl.asDecl.setInvalid()
+    }
+
+    if let returnClause = node.signature.returnClause {
+      // `init() -> T`. The result type is ignored -- an initializer's result is
+      // implicit -- but it has to be reported, or this is accepted where the C++
+      // parser rejects it.
+      self.diagnose(.initializer_result_type, at: returnClause.type)
     }
 
     if let body = node.body {
-      self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(codeBlock: body))
+      if self.isProtocolMember(node) {
+        // A protocol requirement has no body. The C++ parser diagnoses the
+        // body and skips it.
+        self.diagnose(.protocol_init_with_body, at: body.leftBrace)
+      } else {
+        self.attachBody(body, to: decl.asDecl, declContext: decl.asDeclContext) {
+          decl.setParsedBody($0)
+        }
       }
     }
 
@@ -856,9 +1636,26 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
+    // The C++ parser reads `deinit async` as a deinitializer with a name.
+    if let async = node.effectSpecifiers?.asyncSpecifier {
+      self.diagnose(.destructor_has_name, at: async)
+    }
+
+    // A 'deinit' is only allowed in a struct, enum, or class, or in an
+    // '@_objcImplementation' extension. The C++ parser reports a bad placement
+    // and marks the decl invalid so the type checker leaves it alone; without
+    // that, Sema dereferences a null nominal type.
+    if !self.declContext.allowsDestructorDecl {
+      self.diagnose(
+        .destructor_decl_outside_class_or_noncopyable,
+        at: node.deinitKeyword
+      )
+      decl.asDecl.setInvalid()
+    }
+
     if let body = node.body {
-      self.withDeclContext(decl.asDeclContext) {
-        decl.setParsedBody(self.generate(codeBlock: body))
+      self.attachBody(body, to: decl.asDecl, declContext: decl.asDeclContext) {
+        decl.setParsedBody($0)
       }
     }
 
@@ -959,11 +1756,30 @@ extension BridgedOperatorFixity {
 
 extension ASTGenVisitor {
   func generate(operatorDecl node: OperatorDeclSyntax) -> BridgedOperatorDecl? {
+    guard self.declContext.isModuleScopeContext else {
+      self.diagnose(.operator_decl_inner_scope, at: node.operatorKeyword)
+      return nil
+    }
+    // An identifier or a stray operator character glued to the name (`--aa`,
+    // `aa--`) was diagnosed by the parser, which then drops the declaration; a
+    // declaration with the truncated name would clash with its neighbors.
+    for unexpected in [node.unexpectedBetweenOperatorKeywordAndName, node.unexpectedBetweenNameAndOperatorPrecedenceAndTypes] {
+      if let first = unexpected?.first?.as(TokenSyntax.self),
+        first.presence == .present, first.rawTokenKind != .leftBrace, first.rawTokenKind != .colon,
+        first.rawTokenKind != .semicolon, first.rawTokenKind != .comma
+      {
+        // The C++ parser checks the start of a postfix operator's name first.
+        if node.fixitySpecifier.keywordKind == .postfix,
+          node.name.rawText.first == UInt8(ascii: "?") || node.name.rawText.first == UInt8(ascii: "!")
+        {
+          self.diagnose(.postfix_operator_name_cannot_start_with_unwrap, at: node.name)
+        }
+        return nil
+      }
+    }
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
-    let (precedenceGroupName, precedenceGroupLoc) =
-      self.generateIdentifierAndSourceLoc(node.operatorPrecedenceAndTypes?.precedenceGroup)
 
     let fixity: BridgedOperatorFixity
     if let value = BridgedOperatorFixity(from: node.fixitySpecifier.keywordKind) {
@@ -973,17 +1789,60 @@ extension ASTGenVisitor {
       self.diagnose(.unexpectedTokenKind(token: node.fixitySpecifier))
     }
 
-    return .createParsed(
+    // A postfix operator cannot start like the built-in unwrapping operators.
+    if fixity == .postfix, node.name.rawText.first == UInt8(ascii: "?") || node.name.rawText.first == UInt8(ascii: "!") {
+      self.diagnose(.postfix_operator_name_cannot_start_with_unwrap, at: node.name)
+    }
+
+    // Designated types, `infix operator +++ : Group, Type`, are no longer
+    // accepted: the C++ parser stops at the comma.
+    if let comma = node.operatorPrecedenceAndTypes?.designatedTypes.first?.leadingComma {
+      self.diagnose(.statement_same_line_without_semi, at: comma)
+      self.diagnose(.expected_expr, at: comma)
+    }
+
+    // Only an infix operator may declare a precedence group. A prefix or postfix
+    // operator decl carries no group at all, so passing one through would
+    // violate an OperatorDecl invariant.
+    var precedenceAndTypes = node.operatorPrecedenceAndTypes
+    if fixity != .infix, let group = precedenceAndTypes {
+      self.diagnose(.precedencegroup_not_infix, at: group.colon)
+      precedenceAndTypes = nil
+    }
+
+    // A missing group name, as in `infix operator +++ : ;`, names nothing.
+    let (precedenceGroupName, precedenceGroupLoc) =
+      self.generateIdentifierAndSourceLoc(
+        precedenceAndTypes?.precedenceGroup.presence == .missing ? nil : precedenceAndTypes?.precedenceGroup
+      )
+
+    let decl = BridgedOperatorDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       fixity: fixity,
       operatorKeywordLoc: self.generateSourceLoc(node.operatorKeyword),
       name: name,
       nameLoc: nameLoc,
-      colonLoc: self.generateSourceLoc(node.operatorPrecedenceAndTypes?.colon),
+      // The colon and the group name go together: without a name there is no group.
+      colonLoc: precedenceGroupName == nil ? nil : self.generateSourceLoc(precedenceAndTypes?.colon),
       precedenceGroupName: precedenceGroupName,
       precedenceGroupLoc: precedenceGroupLoc
     )
+
+    // The C++ parser parses the fixity as a declaration modifier, so the
+    // declaration carries an `infix`, `prefix` or `postfix` attribute.
+    var attrs = BridgedDeclAttributes()
+    let fixityKind: swift.DeclAttrKind =
+      switch fixity {
+      case .infix: .Infix
+      case .prefix: .Prefix
+      case .postfix: .Postfix
+      }
+    attrs.add(
+      BridgedDeclAttribute.createSimple(
+        self.ctx, kind: fixityKind, atLoc: nil, nameLoc: self.generateSourceLoc(node.fixitySpecifier)))
+    decl.asDecl.attachParsedAttrs(attrs)
+    return decl
   }
 }
 
@@ -1002,6 +1861,10 @@ extension swift.Associativity {
 
 extension ASTGenVisitor {
   func generate(precedenceGroupDecl node: PrecedenceGroupDeclSyntax) -> BridgedPrecedenceGroupDecl? {
+    guard self.declContext.isModuleScopeContext else {
+      self.diagnose(.decl_inner_scope, at: node.precedencegroupKeyword)
+      return nil
+    }
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
@@ -1014,8 +1877,11 @@ extension ASTGenVisitor {
       var lowerThanRelation: PrecedenceGroupRelationSyntax? = nil
     }
 
-    func diagnoseDuplicateSyntax(_ duplicate: some SyntaxProtocol, original: some SyntaxProtocol) {
-      self.diagnose(.duplicateSyntax(duplicate: duplicate, original: original))
+    func diagnoseDuplicateAttribute(_ duplicate: some SyntaxProtocol, name: TokenSyntax) {
+      self.diagnose(
+        .precedencegroup_attribute_redeclared(String(syntaxText: name.rawText)),
+        at: duplicate
+      )
     }
 
     let body = node.groupAttributes.reduce(into: PrecedenceGroupBody()) { body, element in
@@ -1024,14 +1890,14 @@ extension ASTGenVisitor {
         let keyword = relation.higherThanOrLowerThanLabel
         switch keyword.keywordKind {
         case .higherThan:
-          if let current = body.higherThanRelation {
-            diagnoseDuplicateSyntax(relation, original: current)
+          if body.higherThanRelation != nil {
+            diagnoseDuplicateAttribute(relation, name: keyword)
           } else {
             body.higherThanRelation = relation
           }
         case .lowerThan:
-          if let current = body.lowerThanRelation {
-            diagnoseDuplicateSyntax(relation, original: current)
+          if body.lowerThanRelation != nil {
+            diagnoseDuplicateAttribute(relation, name: keyword)
           } else {
             body.lowerThanRelation = relation
           }
@@ -1039,14 +1905,14 @@ extension ASTGenVisitor {
           return self.diagnose(.unexpectedTokenKind(token: keyword))
         }
       case .precedenceGroupAssignment(let assignment):
-        if let current = body.assignment {
-          diagnoseDuplicateSyntax(assignment, original: current)
+        if body.assignment != nil {
+          diagnoseDuplicateAttribute(assignment, name: assignment.assignmentLabel)
         } else {
           body.assignment = assignment
         }
       case .precedenceGroupAssociativity(let associativity):
-        if let current = body.associativity {
-          diagnoseDuplicateSyntax(node, original: current)
+        if body.associativity != nil {
+          diagnoseDuplicateAttribute(associativity, name: associativity.associativityLabel)
         } else {
           body.associativity = associativity
         }
@@ -1058,7 +1924,7 @@ extension ASTGenVisitor {
       if let value = swift.Associativity(from: token.keywordKind) {
         associativityValue = value
       } else {
-        self.diagnose(.unexpectedTokenKind(token: token))
+        self.diagnose(.expected_precedencegroup_associativity, at: token)
         associativityValue = .none
       }
     } else {
@@ -1067,10 +1933,13 @@ extension ASTGenVisitor {
 
     let assignmentValue: Bool
     if let token = body.assignment?.value {
-      if token.keywordKind == .true {
+      switch token.keywordKind {
+      case .true:
         assignmentValue = true
-      } else {
-        self.diagnose(.unexpectedTokenKind(token: token))
+      case .false:
+        assignmentValue = false
+      default:
+        self.diagnose(.expected_precedencegroup_assignment, at: token)
         assignmentValue = false
       }
     } else {
@@ -1118,7 +1987,18 @@ extension BridgedImportKind {
 }
 
 extension ASTGenVisitor {
-  func generate(importDecl node: ImportDeclSyntax) -> BridgedImportDecl {
+  func generate(importDecl node: ImportDeclSyntax) -> BridgedImportDecl? {
+    // An import is only valid at file scope; the C++ parser builds nothing for
+    // one that is not.
+    guard self.declContext.isModuleScopeContext else {
+      self.diagnose(.decl_inner_scope, at: node.importKeyword)
+      return nil
+    }
+    // `import` without a module name has been diagnosed by the parser, which
+    // builds no declaration.
+    if node.path.contains(where: { $0.name.presence == .missing }) {
+      return nil
+    }
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
     let importKind: BridgedImportKind
     if let specifier = node.importKindSpecifier {
@@ -1130,6 +2010,29 @@ extension ASTGenVisitor {
       }
     } else {
       importKind = .module
+    }
+
+    // A non-module import needs at least a module name to import *from*, e.g.
+    // 'import var Module.member'. The C++ parser reports this and builds no
+    // ImportDecl; `ImportDecl::create` asserts the same invariant.
+    if importKind != .module, node.path.count == 1, let first = node.path.first {
+      self.diagnose(.decl_expected_module_name, at: first.name)
+      return nil
+    }
+
+    // Only a module alias, not the real name it stands for, may be imported.
+    if let first = node.path.first {
+      let name = self.generateIdentifier(first.name)
+      let aliasRef = self.ctx.aliasForAliasedRealModuleName(name)
+      if aliasRef.count != 0 {
+        let aliasText = String(decoding: UnsafeBufferPointer(start: aliasRef.data, count: aliasRef.count), as: UTF8.self)
+        self.diagnose(
+          .expected_module_alias(name, self.ctx.getIdentifier(aliasRef)),
+          at: first.name,
+          fixIts: [.init(replace: self.generateCharSourceRange(first.name), with: aliasText)]
+        )
+        return nil
+      }
     }
 
     let decl = BridgedImportDecl.createParsed(
@@ -1223,7 +2126,9 @@ extension ASTGenVisitor {
       guard let member = self.generate(memberBlockItem: node) else {
         return
       }
-      // TODO: Set semicolon loc.
+      if let semicolon = node.semicolon, semicolon.presence == .present {
+        member.setTrailingSemiLoc(self.generateSourceLoc(semicolon))
+      }
       allMembers.append(member)
 
       // Hoist 'VarDecl' and 'EnumElementDecl' to the block.
@@ -1238,15 +2143,126 @@ extension ASTGenVisitor {
     return allMembers
   }
 
-  @inline(__always)
-  func generate(inheritedTypeList node: InheritedTypeListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate(type: $0.type) }.bridgedArray(in: self)
+  /// Generate an inheritance clause, diagnosing the placement of a `class`
+  /// requirement as `Parser::parseInheritance` does.
+  func generate(
+    inheritedTypeList node: InheritedTypeListSyntax,
+    allowClassRequirement: Bool = false,
+    allowAnyObject: Bool = false
+  ) -> BridgedArrayRef {
+    var firstClassRequirement: ClassRestrictionTypeSyntax? = nil
+    // Entries the C++ parser drops after diagnosing them.
+    var dropped = Set<SyntaxIdentifier>()
+    for (index, entry) in node.enumerated() {
+      guard let classRequirement = entry.type.as(ClassRestrictionTypeSyntax.self),
+        classRequirement.classKeyword.presence == .present
+      else {
+        continue
+      }
+      if !allowClassRequirement {
+        dropped.insert(entry.id)
+        self.diagnose(.unexpected_class_constraint, at: classRequirement.classKeyword)
+        if allowAnyObject {
+          self.diagnose(
+            .suggest_anyobject,
+            at: classRequirement.classKeyword,
+            fixIts: [.init(replace: self.generateCharSourceRange(classRequirement.classKeyword), with: "AnyObject")]
+          )
+        }
+      } else if firstClassRequirement != nil {
+        // If we already saw a class requirement, complain.
+        dropped.insert(entry.id)
+        self.diagnose(.redundant_class_requirement, at: classRequirement.classKeyword)
+      } else {
+        firstClassRequirement = classRequirement
+        // If the class requirement was not the first requirement, complain.
+        if index != 0 {
+          self.diagnose(.late_class_requirement, at: classRequirement.classKeyword)
+        }
+      }
+    }
+    return node.compactMap(in: self) { entry in
+      dropped.contains(entry.id) ? nil : self.generate(type: entry.type)
+    }
   }
 
   @inline(__always)
   func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax) -> BridgedArrayRef {
-    node.lazy.map {
+    node.lazy.filter { $0.name.presence == .present }.map {
       self.generateLocatedIdentifier($0.name)
     }.bridgedArray(in: self)
+  }
+}
+
+extension ExprSyntax {
+  /// Whether this expression is one of the literal forms an enum case's raw
+  /// value may take without the `LiteralExpressions` feature.
+  ///
+  /// Mirrors `isValidEnumRawValueLiteral` in ParseDecl.cpp. A negated numeric
+  /// literal is written as a prefix operator applied to the literal, and the C++
+  /// parser folds the sign into the literal while parsing, so accept that shape
+  /// too.
+  var isValidEnumRawValueLiteral: Bool {
+    var expr = self
+    if let prefix = expr.as(PrefixOperatorExprSyntax.self), prefix.operator.rawText == "-" {
+      expr = prefix.expression
+    }
+    switch expr.as(ExprSyntaxEnum.self) {
+    case .integerLiteralExpr, .floatLiteralExpr, .stringLiteralExpr,
+      .booleanLiteralExpr, .nilLiteralExpr:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+extension ASTGenVisitor {
+  /// Diagnose misuse of `#sourceLocation`, as the C++ parser does.
+  func check(poundSourceLocation node: PoundSourceLocationSyntax) {
+    let wasInEnvironment = self.inPoundSourceLocationEnvironment
+    self.inPoundSourceLocationEnvironment = false
+
+    guard let arguments = node.arguments else {
+      // `#sourceLocation()` closes the directive opened earlier.
+      if !wasInEnvironment, let next = node.rightParen.nextToken(viewMode: .sourceAccurate) {
+        self.diagnose(.unexpected_line_directive, at: next)
+      }
+      return
+    }
+    if let line = Int(arguments.lineNumber.text.filter { $0 != "_" }), line == 0 {
+      self.diagnose(.line_directive_line_zero, at: arguments.lineNumber)
+      return
+    }
+    self.inPoundSourceLocationEnvironment = true
+  }
+}
+
+extension ASTGenVisitor {
+  /// Whether \p node is a member of an enum, possibly inside `#if`.
+  func isDirectlyInEnumBody(_ node: some SyntaxProtocol) -> Bool {
+    var current = node.parent
+    while let parent = current {
+      if let block = parent.as(MemberBlockSyntax.self) {
+        return block.parent?.is(EnumDeclSyntax.self) == true
+      }
+      current = parent.parent
+    }
+    return false
+  }
+}
+
+extension ASTGenVisitor {
+  /// Diagnose a declaration named with the reserved '$' prefix.
+  func diagnoseDollarDeclName(_ token: TokenSyntax) {
+    // Backticks do not exempt a name.
+    let text = token.identifier?.name ?? token.text
+    guard text.count > 1, text.hasPrefix("$"), token.presence == .present else {
+      return
+    }
+    if self.ctx.allowsDollarIdentifierDecls(at: self.generateSourceLoc(token), in: self.declContext) {
+      return
+    }
+    self.diagnose(.dollar_identifier_decl(self.generateIdentifier(token)), at: token)
   }
 }

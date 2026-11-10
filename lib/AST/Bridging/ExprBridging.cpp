@@ -521,6 +521,9 @@ BridgedPrefixUnaryExpr_createParsed(BridgedASTContext cContext,
 BridgedRegexLiteralExpr
 BridgedRegexLiteralExpr_createParsed(BridgedASTContext cContext, SourceLoc loc,
                                      BridgedStringRef cRegexText) {
+  // Let `Lexer::getLocForEndOfToken` lex the literal as a regex, as it does
+  // for literals made by the C++ parser.
+  cContext.unbridged().SourceMgr.recordRegexLiteralStartLoc(loc);
   return RegexLiteralExpr::createParsed(cContext.unbridged(), loc,
                                         cRegexText.unbridged());
 }

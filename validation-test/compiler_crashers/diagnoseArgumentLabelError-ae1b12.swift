@@ -1,4 +1,7 @@
 // {"kind":"typecheck","original":"803bd5c6","signature":"swift::diagnoseArgumentLabelError(swift::ASTContext&, swift::ArgumentList const*, llvm::ArrayRef<swift::Identifier>, swift::ParameterContext, swift::InFlightDiagnostic*)","signatureAssert":"Assertion failed: ((numMissing + numExtra + numWrong > 0) && \"Should not call this function with nothing to diagnose\"), function diagnoseArgumentLabelError","signatureNext":"RelabelArguments::diagnoseForAmbiguity"}
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 func a<b>(
   b , b , _: b

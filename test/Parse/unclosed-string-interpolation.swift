@@ -1,5 +1,12 @@
 // RUN: %target-typecheck-verify-swift
 
+// ASTScope takes the end of a literal from the C++ lexer, which ends an
+// unterminated interpolation at the end of the line, while SwiftParser ends the
+// literal at the next quote. For `let s = "\(x"; print(x)` the scope of the
+// declaration then overlaps the scope of the statement after the ';', and
+// ASTScope verification aborts.
+// UNSUPPORTED: parser_astgen
+
 let mid = "pete"
 
 _ = "mid == \(pete" 

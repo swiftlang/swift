@@ -1,4 +1,7 @@
 // {"extraArgs":["-language-mode","6"],"kind":"typecheck","original":"74c5578c","signature":"swift::collectExistentialConformances(swift::CanType, swift::CanType, bool)","signatureAssert":"Assertion failed: (conformance), function collectExistentialConformances","signatureNext":"ExprRewriter::coerceExistential"}
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck -language-mode 6 %s
 protocol a
   let b: a.Type

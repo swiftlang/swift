@@ -382,6 +382,6 @@ case (_?)?: break // expected-warning {{case is already handled by previous patt
 
 // <rdar://problem/20365753> Bogus diagnostic "refutable pattern match can fail"
 let (responseObject: Int?) = op1
-// expected-error @-1 {{expected ',' separator}} {{25-25=,}}
-// expected-error @-2 {{expected pattern}}
+// expected-cparser-error @-1 {{expected ',' separator}} {{25-25=,}}
+// expected-cparser-error @-2 {{expected pattern}} expected-astgen-error@-2 {{unexpected code '?' in tuple pattern}}
 // expected-error @-3 {{cannot convert value of type 'Int?' to specified type '(responseObject: _)'}}

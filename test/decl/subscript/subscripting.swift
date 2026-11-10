@@ -235,8 +235,8 @@ struct MissingGetterSubscript2 {
 }
 
 struct MissingReturnTypeAndEmptyBodySubscript {
-  subscript(i: Int) { // expected-error{{expected '->' for subscript element type}}
-  // expected-error@-1{{expected subscripting element type}}
+  subscript(i: Int) { // expected-cparser-error{{expected '->' for subscript element type}}
+  // expected-cparser-error@-1{{expected subscripting element type}} expected-astgen-error@-1{{expected '->' and return type in subscript}}
   }
 }
 
@@ -396,13 +396,13 @@ func testSubscript1(_ s1 : SubscriptTest1) {
   // expected-error@-1 {{no exact matches in call to subscript}}
   _ = s1.subscript("hello")
   // expected-error@-1 {{no exact matches in call to subscript}}
-  _ = s1.subscript("hello"
+  _ = s1.subscript("hello" // expected-astgen-error {{expected ')' to end function call}}
   // expected-error@-1 {{no exact matches in call to subscript}}
   // expected-note@-2 {{to match this opening '('}}
 
   let _ = s1["hello"]
   // expected-error@-1 {{ambiguous use of 'subscript(_:)'}}
-  // expected-error@-2 {{expected ')' in expression list}}
+  // expected-cparser-error@-2 {{expected ')' in expression list}}
 }
 
 struct SubscriptTest2 {

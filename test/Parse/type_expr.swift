@@ -338,13 +338,13 @@ func testFunctionCollectionTypes() {
   _ = [@convention(swift) (Int) throws -> Int]().count
   _ = [(inout Int) throws -> (inout () -> Void) -> Void]().count
   _ = [String: (@autoclosure (Int) -> Int32) -> Void]().keys // expected-error {{argument type of '@autoclosure' parameter must be '()'}}
-  let _ = [(Int) -> throws Int]() // expected-error{{'throws' may only occur before '->'}}
-  let _ = [Int throws Int](); // expected-error{{'throws' may only occur before '->'}} expected-error {{consecutive statements on a line must be separated by ';'}}
+  let _ = [(Int) -> throws Int]() // expected-cparser-error{{'throws' may only occur before '->'}} expected-astgen-error {{'throws' must precede '->'}}
+  let _ = [Int throws Int](); // expected-cparser-error{{'throws' may only occur before '->'}} expected-astgen-error {{single argument function types require parentheses}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} expected-astgen-error {{expected '->' in array element}}
 }
 
 func testInvalidArrowWithClosure() {
   _ = { undefined -> undefined2 }
-  // expected-error@-1 {{expected 'in' after the closure signature}}
+  // expected-cparser-error@-1 {{expected 'in' after the closure signature}} expected-astgen-error@-1 {{expected 'in' in closure signature}}
   // expected-error@-2 {{cannot find type 'undefined2' in scope}}
   // expected-error@-3 {{cannot infer type of closure parameter 'undefined' without a type annotation}}
 
@@ -511,7 +511,7 @@ func complexSequence() {
   // expected-note @-4 {{use '.self' to reference the type object}} {{11-11=(}} {{36-36=).self}}
 }
 
-func takesVoid(f: Void -> ()) {} // expected-error {{single argument function types require parentheses}} {{19-23=()}}
+func takesVoid(f: Void -> ()) {} // expected-cparser-error {{single argument function types require parentheses}} {{19-23=()}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-warning {{when calling this function in Swift 4 or later, you must pass a '()' tuple; did you mean for the input type to be '()'?}} expected-astgen-error {{expected ')' in function type}}
 
 func takesOneArg<T>(_: T.Type) {}
 func takesTwoArgs<T>(_: T.Type, _: Int) {}

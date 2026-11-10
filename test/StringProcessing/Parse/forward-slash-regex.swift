@@ -45,8 +45,8 @@ let y = 0
 do {
   let z=/0/
   // expected-error@-1 {{type annotation missing in pattern}}
-  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-3 {{expected expression}}
+  // expected-cparser-error@-2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-3 {{expected expression}} expected-astgen-error@-3 {{unexpected code '=/0/' in 'do' statement}}
 }
 do {
   _=/0/
@@ -65,17 +65,17 @@ _ = (!/x/)
 // expected-error@-1 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
 
 _ = !/ /
-// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}
 // expected-error@-2 {{cannot convert value of type 'Regex<Substring>' to expected argument type 'Bool'}}
 
 _ = !!/ /
-// expected-error@-1 {{regex literal may not start with space; add backslash to escape}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} expected-astgen-error@-1 {{bare slash regex literal may not start with space}}
 
 _ = !!/x/
 _ = (!!/x/)
 
-_ = /^)
-// expected-error@-1 {{unterminated regex literal}}
+_ = /^) // expected-astgen-note {{to match this opening '/'}}
+// expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{expected '/' to end regex literal}}
 // expected-error@-2 {{closing ')' does not balance any groups openings}}
 
 _ = /x/! // expected-error {{cannot force unwrap value of non-optional type 'Regex<Substring>'}}
@@ -104,8 +104,8 @@ _ = /x/? // expected-error {{cannot use optional chaining on non-optional value 
 _ = 0; /x/ // expected-warning {{regular expression literal is unused}}
 
 do {
-  _ = 0; /x /
-} // expected-error {{expected expression after operator}}
+  _ = 0; /x / // expected-astgen-error {{expected expression after operator}}
+} // expected-cparser-error {{expected expression after operator}}
 
 _ = /x/ ? 0 : 1 // expected-error {{cannot convert value of type 'Regex<Substring>' to expected condition type 'Bool'}}
 do {
@@ -115,8 +115,8 @@ _ = .random() ? /x/ : .blah // expected-error {{type 'Regex<Substring>' has no m
 
 _ = /x/ ?? /x/ // expected-warning {{left side of nil coalescing operator '??' has non-optional type 'Regex<Substring>', so the right side is never used}}
 do {
-  _ = /x / ?? /x / // expected-error {{unary operator cannot be separated from its operand}}
-} // expected-error {{expected expression after operator}}
+  _ = /x / ?? /x / // expected-cparser-error {{unary operator cannot be separated from its operand}} expected-astgen-error {{expected expression after operator}}
+} // expected-cparser-error {{expected expression after operator}}
 
 _ = /x/??/x/ // expected-error {{'/' is not a postfix unary operator}}
 // expected-error@-1 2 {{cannot use optional chaining on non-optional value of type 'Regex<Substring>'}}
@@ -131,11 +131,11 @@ _ = /x/...
 // expected-error@-1 {{unary operator '...' cannot be applied to an operand of type 'Regex<Substring>'}}
 
 do {
-  _ = /x /...
+  _ = /x /... // expected-astgen-error {{'/' is not a prefix unary operator}} expected-astgen-error {{unexpected code '...' in 'do' statement}}
   // expected-error@-1 {{'/' is not a prefix unary operator}}
-  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-3 {{operator with postfix spacing cannot start a subexpression}}
-} // expected-error {{expected expression}}
+  // expected-cparser-error@-2 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-2 {{expected expression in operator}}
+  // expected-cparser-error@-3 {{operator with postfix spacing cannot start a subexpression}} expected-astgen-error@-3 {{consecutive statements on a line must be separated by newline or ';'}}
+} // expected-cparser-error {{expected expression}}
 
 do {
   _ = true / false /; // expected-error {{expected expression after operator}}
@@ -145,20 +145,20 @@ _ = "\(/x/)"
 
 func defaulted(x: Regex<Substring> = /x/) {}
 
-func foo<T>(_ x: T, y: T) {} // expected-note {{'foo(_:y:)' declared here}}
+func foo<T>(_ x: T, y: T) {} // expected-cparser-note {{'foo(_:y:)' declared here}}
 foo(/abc/, y: /abc/)
 
 // TODO: The parser ought to have better recovery in cases where a binary
 // operator chain is missing an operand, currently we throw everything away.
 foo(/abc/, y: /abc /)
 // expected-error@-1:21 {{expected expression after operator}}
-// expected-error@-2 {{missing argument for parameter 'y' in call}}
+// expected-cparser-error@-2 {{missing argument for parameter 'y' in call}}
 
 func bar<T>(_ x: inout T) {}
 bar(&/x/) // expected-error {{cannot pass immutable value as inout argument: literals are not mutable}}
 
 struct S {
-  subscript(x: Regex<Substring>) -> Void { () } // expected-note {{'subscript(_:)' declared here}}
+  subscript(x: Regex<Substring>) -> Void { () } // expected-cparser-note {{'subscript(_:)' declared here}}
   subscript(fn: (Int, Int) -> Int) -> Int { 0 }
 }
 
@@ -166,7 +166,7 @@ func testSubscript(_ x: S) {
   x[/x/]
   x[/x /]
   // expected-error@-1:9 {{expected expression after operator}}
-  // expected-error@-2 {{missing argument for parameter #1 in subscript}}
+  // expected-cparser-error@-2 {{missing argument for parameter #1 in subscript}}
 
   _ = x[/] / 2
 }
@@ -175,8 +175,8 @@ func testReturn() -> Regex<Substring> {
   if .random() {
     return /x/
   }
-  return /x /
-} // expected-error {{expected expression after operator}}
+  return /x / // expected-astgen-error {{expected expression after operator}}
+} // expected-cparser-error {{expected expression after operator}}
 
 func testThrow() throws {
   throw /x/ // expected-error {{thrown expression type 'Regex<Substring>' does not conform to 'Error'}}
@@ -187,7 +187,7 @@ do {
 }
 do {
   _ = [/abc /: /abc /]
-  // expected-error@-1:14 {{expected expression after operator}}
+  // expected-error@-1:14 {{expected expression after operator}} expected-astgen-error@-1:22 {{expected expression after operator}}
 }
 _ = [/abc/:/abc/] // expected-error {{generic struct 'Dictionary' requires that 'Regex<Substring>' conform to 'Hashable'}}
 _ = [/abc/ : /abc/] // expected-error {{generic struct 'Dictionary' requires that 'Regex<Substring>' conform to 'Hashable'}}
@@ -248,8 +248,8 @@ let z =
 
 // While '.' is technically an operator character, it seems more likely that
 // the user hasn't written the member name yet.
-_ = 0. / 1 / 2 // expected-error {{expected member name following '.'}}
-_ = 0 . / 1 / 2 // expected-error {{expected member name following '.'}}
+_ = 0. / 1 / 2 // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
+_ = 0 . / 1 / 2 // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member access}}
 
 switch "" {
 case _ where /x/:
@@ -284,21 +284,21 @@ _ = /x/ as! String // expected-warning {{cast from 'Regex<Substring>' to unrelat
 _ = type(of: /x/)
 
 do {
-  let /x/ // expected-error {{expected pattern}}
+  let /x/ // expected-error {{expected pattern}} expected-astgen-error {{expected '=' in variable}}
 }
 
 do {
-  _ = try /x/; _ = try /x /
+  _ = try /x/; _ = try /x / // expected-astgen-error {{expected expression after operator}}
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
-} // expected-error {{expected expression after operator}}
+} // expected-cparser-error {{expected expression after operator}}
 do {
-  _ = try? /x/; _ = try? /x /
+  _ = try? /x/; _ = try? /x / // expected-astgen-error {{expected expression after operator}}
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
-} // expected-error {{expected expression after operator}}
+} // expected-cparser-error {{expected expression after operator}}
 do {
-  _ = try! /x/; _ = try! /x /
+  _ = try! /x/; _ = try! /x / // expected-astgen-error {{expected expression after operator}}
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
-} // expected-error {{expected expression after operator}}
+} // expected-cparser-error {{expected expression after operator}}
 
 _ = await /x/ // expected-warning {{no 'async' operations occur within 'await' expression}}{{5-11=}}
 
@@ -343,14 +343,14 @@ func bazbaz(_ x: (Int, Int) -> Int, _ y: Int) {}
 bazbaz(/, 0)
 bazbaz(^^/, 0)
 
-func qux<T>(_ x: (Int, Int) -> Int, _ y: T) -> Int { 0 }
+func qux<T>(_ x: (Int, Int) -> Int, _ y: T) -> Int { 0 } // expected-astgen-note {{'qux' declared here}}
 _ = qux(/, 1) / 2
 do {
   _ = qux(/, "(") / 2
 
-  _ = qux(/, "(")/2
+  _ = qux(/, "(")/2 // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{missing argument for parameter #2 in call}} expected-astgen-warning {{integer literal is unused}}
   // expected-error@-1 {{cannot convert value of type 'Regex<(Substring, Substring)>' to expected argument type '(Int, Int) -> Int'}}
-  // expected-error@-2:19 {{expected ',' separator}}
+  // expected-cparser-error@-2:19 {{expected ',' separator}} expected-astgen-error@-2 {{expected ')' to end function call}}
 }
 _ = qux((/), "(") / 2
 _ = qux(/, 1) // this comment tests to make sure we don't try and end the regex on the starting '/' of '//'.
@@ -394,39 +394,39 @@ _ = /([)])/
 _ = /]]][)]/
 
 _ = /
-// expected-error@-1 {{unterminated regex literal}}
+// expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{to end regex literal}} expected-astgen-note@-1 {{to match this opening}}
 
 _ = /)
-// expected-error@-1 {{unterminated regex literal}}
+// expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{to end regex literal}} expected-astgen-note@-1 {{to match this opening}}
 // expected-error@-2 {{closing ')' does not balance any groups openings}}
 
 let fn: (Int, Int) -> Int = (/)
 
 _ = /\()/
 // expected-error@-1 {{'/' is not a prefix unary operator}}
-// expected-error@-2 {{'/' is not a postfix unary operator}}
-// expected-error@-3 {{invalid component of Swift key path}}
+// expected-cparser-error@-2 {{'/' is not a postfix unary operator}}
+// expected-cparser-error@-3 {{invalid component of Swift key path}} expected-astgen-error@-3 {{unexpected code '/' in source file}}
   
 do {
-  let _: Regex = (/whatever\)/
+  let _: Regex = (/whatever\)/ // expected-astgen-error {{expected ')' to end tuple}}
   // expected-note@-1 {{to match this opening '('}}
-} // expected-error {{expected ')' in expression list}}
+} // expected-cparser-error {{expected ')' in expression list}}
 do {
   _ = /(()()))/
   // expected-error@-1 {{'/' is not a prefix unary operator}}
-  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-3 {{expected expression}}
+  // expected-cparser-error@-2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-3 {{expected expression}} expected-astgen-error@-3 {{unexpected code ')/' in 'do' statement}}
   // expected-error@-4 {{cannot call value of non-function type '()'}}
 }
 do {
   _ = /[x])/
   // expected-error@-1 {{'/' is not a prefix unary operator}}
-  // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-3 {{expected expression}}
+  // expected-cparser-error@-2 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-3 {{expected expression}} expected-astgen-error@-3 {{unexpected code ')/' in 'do' statement}}
 }
 do {
-  _ = /[\]])/
-  // expected-error@-1 {{expected expression path in Swift key path}}
+  _ = /[\]])/ // expected-astgen-error {{'/' is not a prefix unary operator}} expected-astgen-error {{unexpected code '])/' in 'do' statement}}
+  // expected-cparser-error@-1 {{expected expression path in Swift key path}} expected-astgen-error@-1 {{expected root in key path}}
 }
 
 _ = ^/x/
@@ -437,13 +437,13 @@ _ = (^/x)/
 
 _ = (!!/x/)
 
-_ = ^/"/"
+_ = ^/"/" // expected-astgen-note {{to match this opening}} expected-astgen-warning {{string literal is unused}} expected-astgen-error {{to end string literal}}
 // expected-error@-1 {{'^' is not a prefix unary operator}}
-// expected-error@-2 {{unterminated string literal}}
+// expected-cparser-error@-2 {{unterminated string literal}} expected-astgen-error@-2 {{consecutive statements on a line must be separated by newline or ';'}}
 
-_ = ^/"[/"
+_ = ^/"[/" // expected-astgen-note {{to match this opening}} expected-astgen-warning {{string literal is unused}} expected-astgen-error {{to end string literal}}
 // expected-error@-1 {{'^' is not a prefix unary operator}}
-// expected-error@-2 {{unterminated string literal}}
+// expected-cparser-error@-2 {{unterminated string literal}} expected-astgen-error@-2 {{consecutive statements on a line must be separated by newline or ';'}}
 // expected-error@-3 {{cannot parse regular expression: expected custom character class members}}
 
 _ = (^/)("/")
@@ -455,22 +455,22 @@ _ = /./
 
 // You need to escape if you want a regex literal to start with these characters.
 _ = /\ /
-_ = / / // expected-error {{regex literal may not start with space; add backslash to escape}} {{6-6=\}}
+_ = / / // expected-cparser-error {{regex literal may not start with space; add backslash to escape}} {{6-6=\}} expected-astgen-error {{bare slash regex literal may not start with space}}
 _ = /  /
-// expected-error@-1 {{regex literal may not start with space; add backslash to escape}} {{6-6=\}}
-// expected-error@-2 {{regex literal may not end with space; use extended literal instead}} {{5-5=#}} {{9-9=#}}
+// expected-cparser-error@-1 {{regex literal may not start with space; add backslash to escape}} {{6-6=\}}
+// expected-cparser-error@-2 {{regex literal may not end with space; use extended literal instead}} {{5-5=#}} {{9-9=#}} expected-astgen-error@-2 {{bare slash regex literal may not start with space}}
 _ = #/  /#
 _ = /x\ /
 _ = /\ \ /
 
 // There are intentionally trailing spaces here
-_ = /      
-// expected-error@-1 {{unterminated regex literal}}
-// expected-error@-2 {{regex literal may not start with space; add backslash to escape}} {{6-6=\}}
+_ = / // expected-astgen-note {{to match this opening '/'}}
+// expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{expected '/' to end regex literal}}
+// expected-cparser-error@-2 {{regex literal may not start with space; add backslash to escape}} {{6-6=\}} expected-astgen-error@-2 {{bare slash regex literal may not start with space}}
 
 // There are intentionally trailing spaces here
-_ = /^        
-// expected-error@-1 {{unterminated regex literal}}
+_ = /^ // expected-astgen-note {{to match this opening '/'}}
+// expected-cparser-error@-1 {{unterminated regex literal}} expected-astgen-error@-1 {{expected '/' to end regex literal}}
 
 _ = /\)/
 _ = /)/ // expected-error {{closing ')' does not balance any groups openings}}

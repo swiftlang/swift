@@ -4,6 +4,8 @@
 // RUN:     -debug-diagnostic-names
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated \
 // RUN:     -verify-additional-prefix disabled- \
+// RUN:     %if parser_astgen %{ -verify-additional-prefix disabledx-astgen- %} \
+// RUN:     %else %{ -verify-additional-prefix disabledx-cparser- %} \
 // RUN:     -debug-diagnostic-names
 
 // REQUIRES: swift_feature_CoroutineAccessors
@@ -53,7 +55,8 @@ var iybr: Int {
   read { // expected-enabled-warning{{old_coroutine_accessor}}
          // expected-enabled-error@-1{{duplicate_accessor}}
          // expected-enabled-note@-5{{previous_accessor}}
-         // expected-disabled-error@-3{{expected_accessor_kw}}
+         // expected-disabledx-cparser-error@-3{{expected_accessor_kw}}
+         // expected-disabledx-astgen-error@-4{{unexpected code in variable [bridged_error]}}
     fatalError()
   }
 }
@@ -69,7 +72,8 @@ var iryb: Int {
       // expected-enabled-note@-5{{previous_accessor}}
       // expected-disabled-error@-2{{cannot_find_in_scope}}
       // expected-disabled-error@-3{{cannot_find_in_scope}}
-      // expected-disabled-error@-4{{statement_same_line_without_semi}}
+      // expected-disabledx-cparser-error@-4{{statement_same_line_without_semi}}
+      // expected-disabledx-astgen-error@-5{{consecutive statements on a line must be separated by newline or ';' [bridged_error]}}
     fatalError()
   }
 }
@@ -96,7 +100,8 @@ var igr: Int {
   read { // expected-enabled-warning{{old_coroutine_accessor}}
          // expected-enabled-error@-1{{variable cannot provide both a 'yielding borrow' accessor and a getter}}
          // expected-enabled-note@-5{{previous_accessor}}
-         // expected-disabled-error@-3{{expected_accessor_kw}}
+         // expected-disabledx-cparser-error@-3{{expected_accessor_kw}}
+         // expected-disabledx-astgen-error@-4{{unexpected code in variable [bridged_error]}}
     yield _i
   }
 }

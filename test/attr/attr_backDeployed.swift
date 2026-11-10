@@ -446,10 +446,10 @@ public func unknownOSFunc1() {}
 @backDeployed(before: unknownOS 1.0) // expected-warning {{unknown platform 'unknownOS' for '@backDeployed' attribute}}
 public func unknownOSFunc2() {}
 
-@backDeployed(before: @) // expected-error {{expected platform in '@backDeployed' attribute}}
+@backDeployed(before: @) // expected-cparser-error {{expected platform in '@backDeployed' attribute}} expected-astgen-error {{expected version restriction in version}} expected-astgen-error {{unexpected code '@' in attribute}}
 public func badPlatformFunc1() {}
 
-@backDeployed(before: @ 12.0) // expected-error {{expected platform in '@backDeployed' attribute}}
+@backDeployed(before: @ 12.0) // expected-cparser-error {{expected platform in '@backDeployed' attribute}} expected-astgen-error {{expected version restriction in version}} expected-astgen-error {{unexpected code '@ 12.0' in attribute}}
 public func badPlatformFunc2() {}
 
 @backDeployed(before: macOS) // expected-error {{expected version number in '@backDeployed' attribute}}
@@ -464,7 +464,7 @@ public func missingVersionFunc3() {}
 @backDeployed(before: macOS 0) // expected-warning {{expected version number in '@backDeployed' attribute; this is an error in the Swift 6 language mode}}
 public func missingVersionFunc4() {}
 
-@backDeployed(before: macOS 12.0, iOS 15.0,) // expected-error {{unexpected ',' separator}} {{43-44=}}
+@backDeployed(before: macOS 12.0, iOS 15.0,) // expected-cparser-error {{unexpected ',' separator}} {{43-44=}} expected-astgen-error {{expected version restriction in version}}
 public func unexpectedSeparatorFunc() {}
 
 @backDeployed(before: macOS 12.0.1) // expected-warning {{'@backDeployed' only uses major and minor version number}}
@@ -499,34 +499,34 @@ public func knownAndUnknownMacroVersioned() {}
 @backDeployed(before: _emptyMacro)
 public func emptyMacro() {}
 
-@backDeployed() // expected-error {{expected 'before:' in '@backDeployed' attribute}}
-// expected-error@-1 {{expected at least one platform version in '@backDeployed' attribute}}
+@backDeployed() // expected-cparser-error {{expected 'before:' in '@backDeployed' attribute}}
+// expected-cparser-error@-1 {{expected at least one platform version in '@backDeployed' attribute}} expected-astgen-error@-1 {{expected argument for '@backDeployed' attribute}}
 public func emptyAttributeFunc() {}
 
-@backDeployed(macOS 12.0) // expected-error {{expected 'before:' in '@backDeployed' attribute}} {{15-15=before:}}
+@backDeployed(macOS 12.0) // expected-cparser-error {{expected 'before:' in '@backDeployed' attribute}} {{15-15=before:}} expected-astgen-error {{expected 'before:' in '@backDeployed' arguments}}
 public func missingBeforeFunc() {}
 
-@backDeployed(before) // expected-error {{expected ':' after 'before' in '@backDeployed' attribute}} {{21-21=:}}
-// expected-error@-1 {{expected at least one platform version in '@backDeployed' attribute}}
+@backDeployed(before) // expected-cparser-error {{expected ':' after 'before' in '@backDeployed' attribute}} {{21-21=:}}
+// expected-cparser-error@-1 {{expected at least one platform version in '@backDeployed' attribute}} expected-astgen-error@-1 {{expected ':' and version list in '@backDeployed' arguments}}
 public func missingColonAfterBeforeFunc() {}
 
-@backDeployed(before macOS 12.0) // expected-error {{expected ':' after 'before' in '@backDeployed' attribute}} {{21-21=:}}
+@backDeployed(before macOS 12.0) // expected-cparser-error {{expected ':' after 'before' in '@backDeployed' attribute}} {{21-21=:}} expected-astgen-error {{expected ':' in '@backDeployed' arguments}}
 public func missingColonBetweenBeforeAndPlatformFunc() {}
 
-@backDeployed(before: macOS 12.0,) // expected-error {{unexpected ',' separator}} {{33-34=}}
+@backDeployed(before: macOS 12.0,) // expected-cparser-error {{unexpected ',' separator}} {{33-34=}} expected-astgen-error {{expected version restriction in version}}
 public func unexpectedTrailingCommaFunc() {}
 
-@backDeployed(before: macOS 12.0,, iOS 15.0) // expected-error {{unexpected ',' separator}} {{34-35=}}
+@backDeployed(before: macOS 12.0,, iOS 15.0) // expected-cparser-error {{unexpected ',' separator}} {{34-35=}} expected-astgen-error {{expected version restriction in version}}
 public func extraCommaFunc() {}
 
-@backDeployed(before:) // expected-error {{expected at least one platform version in '@backDeployed' attribute}}
+@backDeployed(before:) // expected-cparser-error {{expected at least one platform version in '@backDeployed' attribute}} expected-astgen-error {{expected version restriction in version}}
 public func emptyPlatformVersionsFunc() {}
 
-@backDeployed // expected-error {{expected '(' in '@backDeployed' attribute}}
+@backDeployed // expected-cparser-error {{expected '(' in '@backDeployed' attribute}} expected-astgen-error {{expected '(', '@backDeployed' arguments, and ')' in attribute}}
 public func expectedLeftParenFunc() {}
 
-@backDeployed(before: macOS 12.0 // expected-note {{to match this opening '('}}
-public func expectedRightParenFunc() {} // expected-error {{expected ')' in '@backDeployed' argument list}}
+@backDeployed(before: macOS 12.0 // expected-note {{to match this opening '('}} expected-astgen-error {{expected ')' to end attribute}}
+public func expectedRightParenFunc() {} // expected-cparser-error {{expected ')' in '@backDeployed' argument list}}
 
 // MARK: - Legacy attribute spelling
 

@@ -36,11 +36,11 @@ struct A<T> {
   }
 }
 
-// expected-error @+1 {{expected ')' in '@differentiable' attribute}}
-let c: @differentiable(reverse (Float) -> Float
+// expected-cparser-error @+1 {{expected ')' in '@differentiable' attribute}} expected-astgen-error@+1 {{expected ')' to end attribute}}
+let c: @differentiable(reverse (Float) -> Float // expected-astgen-note {{to match this opening '('}}
 
-// expected-error @+1 {{expected ')' in '@differentiable' attribute}}
-let c: @differentiable(notValidArg (Float) -> Float
+// expected-cparser-error @+1 {{expected ')' in '@differentiable' attribute}} expected-astgen-error@+1 {{unexpected initializer in pattern; did you mean to use '='?}}
+let c: @differentiable(notValidArg (Float) -> Float // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{expected argument for '@differentiable' attribute}} expected-astgen-error {{expected ')' to end attribute}} expected-astgen-error {{unexpected code '-> Float' in source file}}
 
 // expected-error @+1 {{unknown differentiability kind 'notValidArg'; only 'reverse' is supported}}
 let d: @differentiable(notValidArg) (Float) -> Float
@@ -73,8 +73,8 @@ struct B {
   // CHECK: (pattern_named "propertyB6"
   // CHECK-NEXT: (type_attributed attrs="@differentiable(reverse) "
 
-  // expected-error @+1 {{expected ')' in '@differentiable' attribute}}
-  let propertyB7: @differentiable(reverse (linear) -> Float
+  // expected-cparser-error @+1 {{expected ')' in '@differentiable' attribute}} expected-astgen-error@+1 {{expected ')' to end attribute}}
+  let propertyB7: @differentiable(reverse (linear) -> Float // expected-astgen-note {{to match this opening '('}}
 }
 
 // Using 'reverse' as a typealias

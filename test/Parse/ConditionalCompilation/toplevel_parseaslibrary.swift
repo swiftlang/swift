@@ -7,5 +7,5 @@ func foo() {}
 #if FOO
   foo() // expected-error {{expressions are not allowed at the top level}}
 #else
-  if true { foo() } // expected-error {{statements are not allowed at the top level}}
+  if true { foo() } // expected-cparser-error {{statements are not allowed at the top level}}
 #endif

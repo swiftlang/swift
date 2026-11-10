@@ -66,12 +66,12 @@
 #endif
 
 #if swift(>=2.2.1)
-  _ = 2.2.1 // expected-error {{expected named member of numeric literal}}
+  _ = 2.2.1 // expected-cparser-error {{expected named member of numeric literal}} expected-astgen-error {{value of type 'Double' has no member '1'}}
 #endif
 
 class C {
 #if swift(>=2.2.1)
-  let val = 2.2.1 // expected-error {{expected named member of numeric literal}}
+  let val = 2.2.1 // expected-cparser-error {{expected named member of numeric literal}} expected-astgen-error {{value of type 'Double' has no member '1'}}
 #endif
 }
 

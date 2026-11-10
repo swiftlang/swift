@@ -1,3 +1,6 @@
 // {"kind":"typecheck","signature":"cloneRawLiteralExpr(swift::ASTContext&, swift::LiteralExpr*)","signatureAssert":"Assertion failed: (detail::isPresent(Val) && \"dyn_cast on a non-existent value\"), function dyn_cast","signatureNext":"deriveBodyRawRepresentable_init"}
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 a enum a : Double { case = 3.7 case

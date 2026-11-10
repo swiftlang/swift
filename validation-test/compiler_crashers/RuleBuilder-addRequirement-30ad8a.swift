@@ -1,4 +1,7 @@
 // {"kind":"typecheck","original":"3a09b141","signature":"swift::rewriting::RuleBuilder::addRequirement(swift::Requirement const&, swift::ProtocolDecl const*, std::__1::optional<llvm::ArrayRef<swift::rewriting::Term>>)","signatureAssert":"Assertion failed: (otherType->isParameterPack()), function addRequirement","signatureNext":"RuleBuilder::initWithConditionalRequirements"}
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a {
   associatedtype b : a

@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -parse -enable-bare-slash-regex -experimental-skip-all-function-bodies -verify -stats-output-dir %t %s
 // RUN: %{python} %utils/process-stats-dir.py --set-csv-baseline %t/stats.csv %t
-// RUN: %FileCheck -input-file %t/stats.csv %s
+// RUN: %FileCheck -input-file %t/stats.csv %s --check-prefix=%if parser_astgen %{ASTGEN%} %else %{CPARSER%}
 
 // REQUIRES: swift_swift_parser
 
@@ -11,15 +11,19 @@
 // The printing implementation differs in asserts and no-asserts builds, it will
 // either print `"Parse.NumFunctionsParsed" 0` or not print it at all. Make sure
 // we don't output any non-zero value.
-// CHECK-NOT: {{"Parse.NumFunctionsParsed" [^0]}}
+// CPARSER-NOT: {{"Parse.NumFunctionsParsed" [^0]}}
+//
+// ASTGen builds the bodies that contain a regex literal even when asked to skip
+// them, since whether a `/` starts one depends on what follows.
+// ASTGEN-NOT: {{"Parse.NumFunctionsParsed" -}}
 
 // Ensures there is a parse error
 var : Int // expected-error{{expected pattern}}
 
 // Balanced `{}`, so okay.
-func a() { / {}/ }
-func b() { / \{}/ }
-func c() { / {"{"}/ }
+func a() { / {}/ } // expected-astgen-error {{bare slash regex literal may not start with space}}
+func b() { / \{}/ } // expected-astgen-error {{bare slash regex literal may not start with space}}
+func c() { / {"{"}/ } // expected-astgen-error {{bare slash regex literal may not start with space}}
 
 // Some cases of infix '/' that we should continue to skip.
 func d() {

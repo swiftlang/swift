@@ -69,38 +69,38 @@ package(set) // expected-note {{previous modifier specified here}}
 public(set) // expected-error {{multiple incompatible access-level modifiers specified}}
 public var customSetterDuplicateAttr3 = 0
 
-private(get) // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-12=set}}
+private(get) // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} {{9-12=set}} expected-astgen-error {{expected 'set' in modifier}}
 var invalidSubject = 0
 
-private(42) // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-11=set}}
+private(42) // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} {{9-11=set}} expected-astgen-error {{expected 'set' in modifier}}
 var invalidSubject2 = 0
 
-private(a bunch of random tokens) // expected-error{{expected 'set' as subject of 'private' modifier}} expected-error{{expected declaration}}
+private(a bunch of random tokens) // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} expected-cparser-error{{expected declaration}} expected-astgen-error {{expected 'set' in modifier}}
 var invalidSubject3 = 0
 
 
-package(get) // expected-error{{expected 'set' as subject of 'package' modifier}} {{9-12=set}}
+package(get) // expected-cparser-error{{expected 'set' as subject of 'package' modifier}} {{9-12=set}} expected-astgen-error {{expected 'set' in modifier}} expected-astgen-error {{internal variable cannot have a package setter}}
 var invalidSubject4 = 0
 
-package(42) // expected-error{{expected 'set' as subject of 'package' modifier}} {{9-11=set}}
+package(42) // expected-cparser-error{{expected 'set' as subject of 'package' modifier}} {{9-11=set}} expected-astgen-error {{expected 'set' in modifier}} expected-astgen-error {{internal variable cannot have a package setter}}
 var invalidSubject5 = 0
 
-private((())) // expected-error{{expected 'set' as subject of 'private' modifier}} expected-error{{expected declaration}}
+private((())) // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} expected-astgen-error {{unexpected code ')' in variable}} expected-cparser-error{{expected declaration}} expected-astgen-error {{expected 'set' in modifier}}
 var invalidSubject6 = 0
 
-private( missingFunc(_ x: Int) -> Bool // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set)}} expected-error{{expected declaration}}
+private( missingFunc(_ x: Int) -> Bool // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set)}} expected-astgen-error {{expected 'func' in function}} expected-cparser-error{{expected declaration}} expected-astgen-error {{expected 'set)' to end modifier}}
 let independentVar1 = 0
 
-private(set // expected-error{{expected ')' in 'private' modifier}} {{12-12=)}}
+private(set // expected-cparser-error{{expected ')' in 'private' modifier}} {{12-12=)}} expected-astgen-error {{expected ')' to end modifier}} expected-astgen-note {{to match this opening '('}}
 var unterminatedSubject = 0
 
-private(42 // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-11=set)}}
+private(42 // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} {{9-11=set)}} expected-astgen-error {{expected 'set)' to end modifier}} expected-astgen-error {{unexpected code '42' in variable}}
 var unterminatedInvalidSubject = 0
 
-private() // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set}}
+private() // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set}} expected-astgen-error {{expected 'set' in modifier}}
 var emptySubject = 0
 
-private( // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set)}}
+private( // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set)}} expected-astgen-error {{expected 'set)' to end modifier}}
 var unterminatedEmptySubject = 0
 
 // Check that the parser made it here.
@@ -108,7 +108,7 @@ duplicateAttr(1) // expected-error{{argument passed to call that takes no argume
 
 // CHECK ALLOWED DECLS
 private import Swift
-private(set) infix operator ~~~ // expected-error {{unexpected modifier 'private' in operator declaration}} {{1-14=}}
+private(set) infix operator ~~~ // expected-cparser-error {{unexpected modifier 'private' in operator declaration}} {{1-14=}} expected-astgen-error {{unexpected code 'private(set)' before operator declaration}}
 
 private typealias MyInt = Int
 
@@ -349,8 +349,8 @@ extension PkgGenericStruct where Param: InternalProto {
 }
 
 func f() {}
-private( // expected-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set)}}
-if true { // expected-error{{expected declaration}} {{none}}
+private( // expected-cparser-error{{expected 'set' as subject of 'private' modifier}} {{9-9=set)}} expected-astgen-error {{expected 'set)' to end modifier}} expected-astgen-error {{expected declaration after 'private' modifier}}
+if true { // expected-cparser-error{{expected declaration}} {{none}}
   f()
 }
 var unrelatedVar = "Swift"

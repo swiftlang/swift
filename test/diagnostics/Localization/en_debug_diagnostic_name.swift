@@ -1,4 +1,5 @@
-// RUN: not %target-swift-frontend -debug-diagnostic-names -localization-path %S/Inputs -locale en -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK_NAMES
+// RUN: not %target-swift-frontend -debug-diagnostic-names -disable-experimental-feature ParserASTGen -localization-path %S/Inputs -locale en -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK_NAMES
+// These tests use lexer/parser diagnostics, which ASTGen does not localize.
 
 _ = "HI!
 // CHECK_NAMES: error: unterminated string literal [lex_unterminated_string]{{$}}

@@ -997,8 +997,9 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
     }
 
     // If this is a known experimental feature, allow it in +Asserts
-    // (non-release) builds for testing purposes.
-    if (Opts.RestrictNonProductionExperimentalFeatures &&
+    // (non-release) builds for testing purposes. Turning a feature off is
+    // always fine: it is how a feature that is on by default is opted out of.
+    if (Opts.RestrictNonProductionExperimentalFeatures && isEnableFeatureFlag &&
         !feature->isAvailableInProduction()) {
       Diags.diagnose(SourceLoc(),
                      diag::experimental_not_supported_in_production,
@@ -1044,6 +1045,8 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
     // Enable the feature if requested.
     if (isEnableFeatureFlag)
       Opts.enableFeature(*feature, forMigration);
+    else
+      Opts.disableFeature(*feature);
 
     // 'StandaloneSwiftAvailability' implies 'SwiftRuntimeAvailability'
     if (*feature == Feature::StandaloneSwiftAvailability)

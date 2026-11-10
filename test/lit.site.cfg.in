@@ -203,6 +203,9 @@ config.freestanding_sdk_name = "@SWIFT_SDK_FREESTANDING_LIB_SUBDIR@"
 if '@SWIFT_BUILD_SWIFT_SYNTAX@' == 'TRUE':
   config.available_features.add('swift_swift_parser')
 
+# Whether the compiler parses with ASTGen unless told otherwise.
+config.swift_astgen_by_default = '@SWIFT_ENABLE_ASTGEN_BY_DEFAULT@' == 'TRUE'
+
 if '@SWIFT_BUILD_SARIF@' == 'TRUE':
   config.available_features.add('swift_sarif')
 

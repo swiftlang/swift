@@ -24,6 +24,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Statistic.h"
 
 using namespace swift;
 
@@ -118,9 +119,70 @@ static StaticSpellingKind unbridged(BridgedStaticSpelling kind) {
   return static_cast<StaticSpellingKind>(kind);
 }
 
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createStaticSpelling(BridgedStaticSpelling spelling) {
+  return BridgedDiagnosticArgument(DiagnosticArgument(unbridged(spelling)));
+}
+
+BridgedDiagnosticArgument
+BridgedDiagnosticArgument_createDeclAttribute(BridgedDeclAttribute attribute) {
+  return BridgedDiagnosticArgument(DiagnosticArgument(attribute.unbridged()));
+}
+
 void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
                                    BridgedDeclAttributes attrs) {
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());
+}
+
+bool BridgedSourceFile_isInterface(BridgedSourceFile sf) {
+  return sf.unbridged()->Kind == SourceFileKind::Interface;
+}
+
+void BridgedASTContext_recordFunctionBodyParsed(BridgedASTContext cContext) {
+  if (auto *stats = cContext.unbridged().Stats)
+    ++stats->getFrontendCounters().NumFunctionsParsed;
+}
+
+void BridgedASTContext_recordIterableDeclContextParsed(
+    BridgedASTContext cContext) {
+  if (auto *stats = cContext.unbridged().Stats)
+    ++stats->getFrontendCounters().NumIterableDeclContextParsed;
+}
+
+/// Record the ';' on the last declaration the parser would have produced for
+/// \p decl, as `Parser::parseDeclItem` does.
+static void setTrailingSemiLoc(Decl *decl, SourceLoc semiLoc) {
+  if (auto *caseDecl = dyn_cast<EnumCaseDecl>(decl)) {
+    auto elements = caseDecl->getElements();
+    if (!elements.empty())
+      decl = elements.back();
+  } else if (auto *pbd = dyn_cast<PatternBindingDecl>(decl)) {
+    VarDecl *last = nullptr;
+    for (unsigned i : range(pbd->getNumPatternEntries()))
+      pbd->getPattern(i)->forEachVariable([&](VarDecl *var) { last = var; });
+    if (last)
+      decl = last;
+  }
+  decl->TrailingSemiLoc = semiLoc;
+}
+
+void BridgedDecl_setTrailingSemiLoc(BridgedDecl cDecl, SourceLoc semiLoc) {
+  setTrailingSemiLoc(cDecl.unbridged(), semiLoc);
+}
+
+void BridgedASTNode_setTrailingSemiLoc(BridgedASTNode node,
+                                       SourceLoc semiLoc) {
+  switch (node.getKind()) {
+  case BridgedASTNodeKindExpr:
+    node.castToExpr().unbridged()->TrailingSemiLoc = semiLoc;
+    break;
+  case BridgedASTNodeKindStmt:
+    node.castToStmt().unbridged()->TrailingSemiLoc = semiLoc;
+    break;
+  case BridgedASTNodeKindDecl:
+    setTrailingSemiLoc(node.castToDecl().unbridged(), semiLoc);
+    break;
+  }
 }
 
 void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
@@ -172,7 +234,8 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedDeclAttributes cAttrs, SourceLoc staticLoc,
     BridgedStaticSpelling cStaticSpelling, SourceLoc introducerLoc,
-    BridgedVarDeclIntroducer cIntroducer, BridgedArrayRef cBindingEntries) {
+    BridgedVarDeclIntroducer cIntroducer, BridgedArrayRef cBindingEntries,
+    bool isTopLevelGlobal) {
 
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
@@ -189,7 +252,7 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
       VD->attachParsedAttrs(cAttrs.unbridged());
       VD->setStatic(staticLoc.isValid());
       VD->setIntroducer(introducer);
-      VD->setTopLevelGlobal(isa<TopLevelCodeDecl>(declContext));
+      VD->setTopLevelGlobal(isTopLevelGlobal);
     });
 
     entries.emplace_back(pattern, entry.equalLoc, entry.init.unbridged(),
@@ -220,6 +283,55 @@ void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
 void BridgedFuncDecl_setParsedBody(BridgedFuncDecl decl,
                                    BridgedBraceStmt body) {
   decl.unbridged()->setBody(body.unbridged(), FuncDecl::BodyKind::Parsed);
+}
+
+void BridgedDecl_setHasTopLevelLocalContextCaptures(BridgedDecl decl) {
+  // Only a FuncDecl carries the flag; the caller does not have to filter, which
+  // matches how the C++ parser applies this to whatever declarations follow a
+  // top-level 'guard'.
+  if (auto *fn = dyn_cast<FuncDecl>(decl.unbridged()))
+    fn->setHasTopLevelLocalContextCaptures();
+}
+
+void BridgedDecl_setBodyDelayed(BridgedDecl decl, SourceRange range,
+                                bool hasNestedTypeDeclarations) {
+  auto *afd = cast<AbstractFunctionDecl>(decl.unbridged());
+  afd->setBodyDelayed(range);
+  afd->setHasNestedTypeDeclarations(hasNestedTypeDeclarations);
+}
+
+void BridgedDecl_setMembersDelayed(BridgedDecl decl,
+                                   bool hasOperatorDeclarations,
+                                   bool hasNestedClassDeclarations,
+                                   bool hasDerivativeDeclarations) {
+  IterableDeclContext *idc;
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(decl.unbridged()))
+    idc = nominal;
+  else
+    idc = cast<ExtensionDecl>(decl.unbridged());
+  if (hasOperatorDeclarations)
+    idc->setMaybeHasOperatorDeclarations();
+  if (hasNestedClassDeclarations)
+    idc->setMaybeHasNestedClassDeclarations();
+  if (hasDerivativeDeclarations)
+    idc->setMaybeHasDerivativeDeclarations();
+}
+
+void BridgedDecl_setHasNestedTypeDeclarations(BridgedDecl decl, bool value) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setHasNestedTypeDeclarations(value);
+}
+
+void BridgedDecl_setBodyFingerprint(BridgedDecl decl,
+                                    BridgedFingerprint fingerprint) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setBodyFingerprint(fingerprint.unbridged());
+}
+
+void BridgedDecl_setDelayedBodyParsed(BridgedDecl decl, BridgedBraceStmt body,
+                                      BridgedFingerprint fingerprint) {
+  cast<AbstractFunctionDecl>(decl.unbridged())
+      ->setBodyParsed(body.unbridged(), fingerprint.unbridged());
 }
 
 void BridgedDestructorDecl_setParsedBody(BridgedDestructorDecl decl,
@@ -336,6 +448,7 @@ static void setParsedMembers(IterableDeclContext *IDC, BridgedArrayRef cMembers,
 
   IDC->setMaybeHasOperatorDeclarations();
   IDC->setMaybeHasNestedClassDeclarations();
+  IDC->setMaybeHasDerivativeDeclarations();
   // FIXME: Split requests. e.g. DeclMembersFingerprintRequest.
   ctx.evaluator.cacheOutput(ParseMembersRequest{IDC},
                             FingerprintAndMembers{fp, members});
@@ -407,8 +520,7 @@ BridgedEnumElementDecl BridgedEnumElementDecl_createParsed(
 
   return new (context)
       EnumElementDecl(nameLoc, declName, parameterList, equalsLoc,
-                      cast_or_null<LiteralExpr>(rawValue.unbridged()),
-                      cDeclContext.unbridged());
+                      rawValue.unbridged(), cDeclContext.unbridged());
 }
 
 BridgedNominalTypeDecl BridgedStructDecl_createParsed(
@@ -663,6 +775,14 @@ void BridgedAbstractStorageDecl_setAccessors(
 // MARK: AccessorDecl
 //===----------------------------------------------------------------------===//
 
+SourceLoc
+BridgedAbstractStorageDecl_getAccessorLoc(BridgedAbstractStorageDecl storage,
+                                          AccessorKind kind) {
+  if (auto *accessor = storage.unbridged()->getAccessor(kind))
+    return accessor->getLoc();
+  return SourceLoc();
+}
+
 void BridgedAccessorDecl_setParsedBody(BridgedAccessorDecl decl,
                                        BridgedBraceStmt body) {
   decl.unbridged()->setBody(body.unbridged(),
@@ -715,3 +835,37 @@ BridgedYieldList BridgedYieldList_createParsed(BridgedASTContext cContext,
   return YieldList::create(context, leftParenLoc,
                            cYieldTypes.unbridged<TypeRepr *>(), rightParenLoc);
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: AccessorKind
+//===----------------------------------------------------------------------===//
+
+BridgedStringRef AccessorKind_nameForDiagnostic(swift::AccessorKind kind) {
+  // Returns a static string, so it outlives the call.
+  return getAccessorNameForDiagnostic(kind, /*article=*/false,
+                                      /*underscored=*/false);
+}
+
+BridgedStringRef AccessorKind_nameForDiagnosticStyled(swift::AccessorKind kind,
+                                                      bool article,
+                                                      bool underscored) {
+  // Returns a static string, so it outlives the call.
+  return getAccessorNameForDiagnostic(kind, article, underscored);
+}
+
+bool AccessorKind_requiresCoroutineAccessorsFeature(swift::AccessorKind kind) {
+  return requiresFeatureCoroutineAccessors(kind);
+}
+
+BridgedStringRef AccessorKind_name(swift::AccessorKind kind) {
+  // Returns a static string, so it outlives the call.
+  return accessorKindName(kind);
+}
+
+bool AccessorKind_allowsEffectsSpecifiers(swift::AccessorKind kind) {
+  // Matches Parser::parseAccessorSpecifiers: only 'get' may be effectful.
+  // 'DistributedGet' is derived after parsing, so it does not appear here.
+  return kind == swift::AccessorKind::Get;
+}
+
+void BridgedDecl_setInvalid(BridgedDecl decl) { decl.unbridged()->setInvalid(); }

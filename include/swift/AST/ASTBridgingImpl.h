@@ -521,6 +521,14 @@ void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl) {
   cDecl.unbridged()->setImplicit();
 }
 
+bool BridgedParamDecl_hasName(BridgedParamDecl cDecl) {
+  return cDecl.unbridged()->hasName();
+}
+
+BridgedStringRef BridgedParamDecl_getNameStr(BridgedParamDecl cDecl) {
+  return cDecl.unbridged()->getNameStr();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedSubscriptDecl
 //===----------------------------------------------------------------------===//

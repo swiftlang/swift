@@ -60,22 +60,22 @@ struct GenericWithIntParam<T: ~Copyable & ~Escapable, let N: Int> {}
 
 extension Generic where T == 123 {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
 extension Generic where T == 123.Type {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
-                                         // expected-error@-1 {{expected '{' in extension}}
+                                         // expected-cparser-error@-1 {{expected '{' in extension}} expected-astgen-error@-1 {{unexpected code '.Type' in extension}}
 extension Generic where T == 123? {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
-                                     // expected-error@-1 {{expected '{' in extension}}
+                                     // expected-cparser-error@-1 {{expected '{' in extension}} expected-astgen-error@-1 {{unexpected code '?' in extension}}
 
 func f(_: Generic<123>) {} // expected-error {{cannot use value type '123' for generic argument 'T'}}
 func g<let N: Int>(_: Generic<N>) {} // expected-error {{cannot use value type 'N' for generic argument 'T'}}
-func h(_: (Int, 123)) {} // expected-error {{expected type}}
-func i(_: () -> 123) {} // expected-error {{expected type}}
+func h(_: (Int, 123)) {} // expected-error {{expected type}} expected-astgen-error {{unexpected code '123' in tuple type}}
+func i(_: () -> 123) {} // expected-cparser-error {{expected type}} expected-astgen-error {{expected return type in function type}} expected-astgen-error {{unexpected code '123' in parameter clause}}
 func j(_: (A<123>) -> ()) {} // OK
-func k(_: some 123) {} // expected-error {{expected parameter type following ':'}}
+func k(_: some 123) {} // expected-cparser-error {{expected parameter type following ':'}} expected-astgen-error {{expected type in type}} expected-astgen-error {{unexpected code '123' in parameter clause}}
 func l(_: GenericWithIntParam<123, Int>) {}
 // expected-error@-1 {{cannot pass type 'Int' as a value for generic value 'N'}}
 // expected-error@-2 {{cannot use value type '123' for generic argument 'T'}}
 func m(_: GenericWithIntParam<Int, 123>) {} // OK
 
-typealias One = 1 // expected-error {{expected type in type alias declaration}}
+typealias One = 1 // expected-cparser-error {{expected type in type alias declaration}} expected-astgen-error {{expected type in typealias declaration}} expected-astgen-warning {{integer literal is unused}}
 
 // Unsupported type in value type parameter definition.
 do {

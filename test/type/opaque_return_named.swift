@@ -12,13 +12,13 @@ func f2() -> <T: Collection, U: SignedInteger> T { // expected-note{{required by
 
 func f4() async -> <T> T { () }
 
-func g0() -> <T> { } // expected-error{{expected type for function result}}
-func g1() -> async <T> T { () } // expected-error{{'async' may only occur before '->'}}
-func g2() -> <T> T async { () } // expected-error{{'async' may only occur before '->'}}
+func g0() -> <T> { } // expected-cparser-error{{expected type for function result}} expected-astgen-error{{expected type in named opaque return type}}
+func g1() -> async <T> T { () } // expected-cparser-error{{'async' may only occur before '->'}} expected-astgen-error{{'async' must precede '->'}}
+func g2() -> <T> T async { () } // expected-cparser-error{{'async' may only occur before '->'}} expected-astgen-error{{'async' must precede '->'}}
 
 let x0: <T> Int = 1
 var x1: <T> (Int, Int) = (1, 1)
-var x2: <T> (<U> Int, Int) = (1, 1) // expected-error{{expected type}} expected-error{{cannot convert value of type '(Int, Int)' to specified type 'Int'}}
+var x2: <T> (<U> Int, Int) = (1, 1) // expected-error{{expected type}} expected-cparser-error{{cannot convert value of type '(Int, Int)' to specified type 'Int'}} expected-astgen-error{{unexpected code '<U> Int, Int' in tuple type}}
 for _: <T> Int in [1, 2, 3] { } // FIXME mention of 'some' is wrong: expected-error{{some' type can only be declared on a single property declaration}}
 
 struct S0 { subscript(i: Int) -> <T> T { 1 } }

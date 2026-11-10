@@ -22,8 +22,8 @@ func foo5() -> Int {
   // We only allow coercions as a narrow case in the parser, so attempting to
   // double them up is invalid.
   if .random() { 1 } else { 2 } as Int as Int
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code 'as Int' in function}}
 }
 
 func foo6() -> Int {
@@ -54,8 +54,8 @@ func foo10() -> String {
 func foo11() -> Bool {
   // We don't parse this.
   if .random() { 1 as Any } else { 2 as Any } is String
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code 'is String' in function}}
   // expected-error@-3 {{cannot convert value of type 'Any' to specified type 'Bool'}}
 }
 
@@ -118,24 +118,24 @@ do {
   // expected-error@-1 {{extraneous argument label 'x:' in call}}
   // expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
-  takesValue(_: x: if .random() { 0 } else { 1 })
-  // expected-error@-1 {{expected argument label before colon}}
-  // expected-error@-2 {{expected ',' separator}}
+  takesValue(_: x: if .random() { 0 } else { 1 }) // expected-astgen-note {{to match this opening '('}} expected-astgen-warning {{integer literal is unused}} expected-astgen-warning {{integer literal is unused}}
+  // expected-cparser-error@-1 {{expected argument label before colon}}
+  // expected-cparser-error@-2 {{expected ',' separator}} expected-astgen-error@-2 {{unexpected code ')' in 'do' statement}}
   // expected-error@-3 {{cannot find 'x' in scope}}
-  // expected-error@-4 {{extra argument in call}}
-  // expected-error@-5 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  // expected-cparser-error@-4 {{extra argument in call}} expected-astgen-error@-4 {{unexpected code ':' in 'do' statement}}
+  // expected-cparser-error@-5 {{'if' may only be used as expression in return, throw, or as the source of an assignment}} expected-astgen-error@-5 {{expected ')' to end function call}}
 }
 func takesValueWithLabel<T>(x: T) {}
 do {
   takesValueWithLabel(x: if .random() { 1 } else { 2 })
   // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
-  takesValueWithLabel(x: y: if .random() { 1 } else { 2 })
-  // expected-error@-1 {{expected argument label before colon}}
-  // expected-error@-2 {{expected ',' separator}}
+  takesValueWithLabel(x: y: if .random() { 1 } else { 2 }) // expected-astgen-note {{to match this opening '('}} expected-astgen-warning {{integer literal is unused}} expected-astgen-warning {{integer literal is unused}}
+  // expected-cparser-error@-1 {{expected argument label before colon}}
+  // expected-cparser-error@-2 {{expected ',' separator}} expected-astgen-error@-2 {{unexpected code ')' in 'do' statement}}
   // expected-error@-3 {{cannot find 'y' in scope}}
-  // expected-error@-4 {{extra argument in call}}
-  // expected-error@-5 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  // expected-cparser-error@-4 {{extra argument in call}} expected-astgen-error@-4 {{unexpected code ':' in 'do' statement}}
+  // expected-cparser-error@-5 {{'if' may only be used as expression in return, throw, or as the source of an assignment}} expected-astgen-error@-5 {{expected ')' to end function call}}
 }
 func takesValueAndTrailingClosure<T>(_ x: T, _ fn: () -> Int) {}
 takesValueAndTrailingClosure(if .random() { 0 } else { 1 }) { 2 }
@@ -429,14 +429,14 @@ func testLabelRejection1() -> Int {
 
 func testLabelRejection2() -> Int {
   // This was never legal, so reject.
-  x: if .random() { 0 } else { 1 } as Int
-  // expected-error@-1 {{'if' cannot have a jump label when used as expression}}
+  x: if .random() { 0 } else { 1 } as Int // expected-astgen-warning {{integer literal is unused}} expected-astgen-warning {{integer literal is unused}}
+  // expected-cparser-error@-1 {{'if' cannot have a jump label when used as expression}} expected-astgen-error@-1 {{unexpected code 'as Int' in function}}
 }
 
 do {
   if .random() { 1 } else { 2 } = 3
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code '= 3' in 'do' statement}}
   // expected-warning@-3 2{{integer literal is unused}}}
 }
 let m: Void = if .random() { 1 } else { 2 } // expected-error {{cannot convert value of type 'Int' to specified type 'Void'}}
@@ -497,7 +497,7 @@ do {
 // We don't allow postfix parsing.
 do {
   let _ = if .random() { [1] } else { [1, 2] }.count
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{reference to member 'count' cannot be resolved without a contextual type}}
 
   let _ = (if .random() { [1] } else { [1, 2] }).count
@@ -505,8 +505,8 @@ do {
 }
 do {
   let _ = if .random() { Int?.none } else { 1 as Int? }?.bitWidth
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code '?.bitWidth' in 'do' statement}}
 
   // FIXME: The type error is likely due to not solving the conjunction before attempting default type var bindings.
   let _ = (if .random() { Int?.none } else { 1 as Int? })?.bitWidth
@@ -515,8 +515,8 @@ do {
 }
 do {
   let _ = if .random() { Int?.none } else { 1 as Int? }!
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code '!' in 'do' statement}}
 
   let _ = (if .random() { Int?.none } else { 1 as Int? })!
   // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
@@ -524,7 +524,7 @@ do {
 do {
   func takesInts(_ x: Int...) {}
   let _ = if .random() { takesInts } else { takesInts }(1, 2, 3)
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-warning@-2 {{expression of type '(Int, Int, Int)' is unused}}
 
   let _ = (if .random() { takesInts } else { takesInts })(1, 2, 3)
@@ -532,7 +532,7 @@ do {
 }
 func testSubscriptPostfix(_ x: HasSubscript) {
   if .random() { x } else { x }[1, 2, 3]
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-warning@-2 {{expression of type 'HasSubscript' is unused}}
   // expected-warning@-3 {{expression of type '[Int]' is unused}}
   // expected-warning@-4 {{expression of type 'HasSubscript' is unused}}
@@ -543,7 +543,7 @@ func testSubscriptPostfix(_ x: HasSubscript) {
 do {
   func takesClosure(_ fn: () -> Int) {}
 
-  let _ = if .random() { takesClosure } else { takesClosure } { 3 }
+  let _ = if .random() { takesClosure } else { takesClosure } { 3 } // expected-astgen-error {{'let' declarations cannot be computed properties}}
   // expected-error@-1 {{getter/setter can only be defined for a single variable}}
 
   let _ = (if .random() { takesClosure } else { takesClosure }) { 3 }

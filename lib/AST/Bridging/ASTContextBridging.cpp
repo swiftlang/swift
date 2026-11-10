@@ -33,6 +33,30 @@ Identifier BridgedASTContext__getIdentifier(BridgedASTContext cContext,
   return cContext.unbridged().getIdentifier(cStr.unbridged());
 }
 
+BridgedStringRef BridgedASTContext_aliasForAliasedRealModuleName(
+    BridgedASTContext cContext, Identifier name) {
+  auto &ctx = cContext.unbridged();
+  using Option = ASTContext::ModuleAliasLookupOption;
+  if (!ctx.getRealModuleName(name, Option::realNameFromAlias).empty())
+    return BridgedStringRef();
+  return ctx.getRealModuleName(name, Option::aliasFromRealName).str();
+}
+
+bool BridgedASTContext_allowsDollarIdentifierDecls(BridgedASTContext cContext,
+                                                   SourceLoc loc,
+                                                   BridgedDeclContext cDC) {
+  auto &ctx = cContext.unbridged();
+  if (ctx.LangOpts.EnableDollarIdentifiers)
+    return true;
+  if (auto *sf = cDC.unbridged()->getParentSourceFile())
+    if (sf->Kind == SourceFileKind::Interface)
+      return true;
+  if (loc.isInvalid())
+    return false;
+  auto bufferID = ctx.SourceMgr.findBufferContainingLoc(loc);
+  return ctx.SourceMgr.getGeneratedSourceInfo(bufferID) != nullptr;
+}
+
 Identifier BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext,
                                                  size_t idx) {
   return cContext.unbridged().getDollarIdentifier(idx);
@@ -40,6 +64,15 @@ Identifier BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext,
 
 BridgedLangOptions BridgedASTContext_langOpts(BridgedASTContext cContext) {
   return cContext.unbridged().LangOpts;
+}
+
+bool BridgedLangOptions_isLanguageModeAtLeast(BridgedLangOptions cLangOpts,
+                                              SwiftInt major, SwiftInt minor) {
+  for (auto mode : LanguageMode::allSupportedModes()) {
+    if (mode.version() == std::make_pair((unsigned)major, (unsigned)minor))
+      return cLangOpts.unbridged().isLanguageModeAtLeast(mode);
+  }
+  llvm_unreachable("not a supported language mode");
 }
 
 unsigned BridgedASTContext::getMajorLanguageVersion() const {

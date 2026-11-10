@@ -11,14 +11,14 @@ func async() throws { }
 
 @main struct MyProgram {
   static func main() async throws {
-    // expected-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{9-14=await}}
+    // expected-cparser-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{9-14=await}} expected-astgen-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{9-15=}}{{15-15=await }}
     try async asyncFunc()
 
-    // expected-error@+2 {{found 'async' in expression; did you mean 'await'?}}{{5-10=await}}
-    // expected-warning@+1 {{'try' must precede 'await'}}{{5-11=}}{{15-15=await }}
-    async try asyncFunc()
+    // expected-cparser-error@+2 {{found 'async' in expression; did you mean 'await'?}}{{5-10=await}} expected-astgen-error@+2 {{consecutive statements on a line must be separated by newline or ';'}}
+    // expected-cparser-warning@+1 {{'try' must precede 'await'}}{{5-11=}}{{15-15=await }}
+    async try asyncFunc() // expected-astgen-error {{function is unused}} expected-astgen-error {{expression is 'async' but is not marked with 'await'}} expected-astgen-note {{call is 'async'}}
 
-    // expected-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{13-18=await}}
+    // expected-cparser-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{13-18=await}} expected-astgen-error@+1 {{found 'async' in expression; did you mean 'await'?}}{{13-19=}}{{19-19=await }}
     let _ = async anotherAsyncFunc()
 
     // Don't emit a diagnostic here

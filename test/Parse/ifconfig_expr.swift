@@ -43,15 +43,15 @@ func testInvalidContent(baseExpr: MyStruct, otherExpr: Int) {
 
   baseExpr      // expected-warning {{expression of type 'MyStruct' is unused}}
 #if CONDITION_1
-    + otherExpr // expected-error {{unary operator cannot be separated from its operand}}
-                // expected-warning@-1 {{result of operator '+' is unused}}
+    + otherExpr // expected-cparser-error {{unary operator cannot be separated from its operand}} expected-astgen-error {{unexpected code '+ otherExpr' in conditional compilation clause}}
+                // expected-cparser-warning@-1 {{result of operator '+' is unused}}
 #endif
 
   baseExpr
 #if CONDITION_1
     .methodOne() // expected-warning {{result of call to 'methodOne()' is unused}}
 
-  print("debug") // expected-error {{unexpected tokens in '#if' expression body}}
+  print("debug") // expected-cparser-error {{unexpected tokens in '#if' expression body}} expected-astgen-error {{unexpected code 'print("debug")' in conditional compilation block}}
 #endif
 }
 
@@ -67,7 +67,7 @@ func testExprKind(baseExpr: MyStruct, idx: Int) {
 
   baseExpr
 #if CONDITION_1
-  .methodOne() + 12 // expected-error {{unexpected tokens in '#if' expression body}}
+  .methodOne() + 12 // expected-cparser-error {{unexpected tokens in '#if' expression body}} expected-astgen-error {{unexpected code '+ 12' in conditional compilation block}}
                     // expected-warning@-1 {{result of call to 'methodOne()' is unused}}
 #endif
 }
@@ -84,7 +84,7 @@ func emptyElse(baseExpr: MyStruct) {
 #if CONDITION_1
     .methodOne() // expected-warning {{result of call to 'methodOne()' is unused}}
 #elseif CONDITION_2
-  return         // expected-error {{unexpected tokens in '#if' expression body}}
+  return         // expected-cparser-error {{unexpected tokens in '#if' expression body}} expected-astgen-error {{unexpected 'return' keyword in conditional compilation block}}
 #endif
 }
 
@@ -185,8 +185,8 @@ func canImportVersioned() {
   let a = 1
 #endif
   
-// expected-error@+1{{'canImport' version check has invalid version ''}}
-#if canImport(A, _version:) // expected-error {{expected expression in list of expressions}}
+// expected-cparser-error@+1{{'canImport' version check has invalid version ''}}
+#if canImport(A, _version:) // expected-cparser-error {{expected expression in list of expressions}} expected-astgen-error {{expected value in function call}}
   let a = 1
 #endif
 

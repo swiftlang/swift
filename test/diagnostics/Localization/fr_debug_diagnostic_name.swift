@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: swift-serialize-diagnostics --input-file-path=%S/Inputs/fr.strings --output-directory=%t/
 // RUN: swift-serialize-diagnostics --input-file-path=%S/Inputs/en.strings --output-directory=%t/
-// RUN: not %target-swift-frontend -debug-diagnostic-names -localization-path %S/Inputs -locale fr -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK_NAMES
+// RUN: not %target-swift-frontend -debug-diagnostic-names -disable-experimental-feature ParserASTGen -localization-path %S/Inputs -locale fr -typecheck %s 2>&1 | %FileCheck %s --check-prefix=CHECK_NAMES
+// These tests use lexer/parser diagnostics, which ASTGen does not localize.
 
 _ = "HI!
 // CHECK_NAMES: error: chaîne non terminée littérale [lex_unterminated_string]{{$}}

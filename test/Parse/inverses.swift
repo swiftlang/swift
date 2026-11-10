@@ -83,8 +83,8 @@ func superb(_ thing: some ~Copyable, thing2: some ~Clone) {}
 func ownership1(_ t: borrowing any ~Equatable) {} // expected-error {{type 'Equatable' cannot be suppressed}}
 
 func ownership2(_ t: ~ borrowing Int) {} // expected-error {{cannot find type 'borrowing' in scope}}
-                                         // expected-error@-1 {{unnamed parameters must be written with the empty name '_'}}
-                                         // expected-error@-2 {{expected ',' separator}}
+                                         // expected-cparser-error@-1 {{unnamed parameters must be written with the empty name '_'}} expected-astgen-error@-1 {{expected identifier and ':' in parameter}}
+                                         // expected-cparser-error@-2 {{expected ',' separator}} expected-astgen-error@-2 {{expected ',' in parameter}}
 
 func ownership3(_ t: consuming some ~Clone) {}
 
@@ -108,7 +108,7 @@ typealias Z2 = ~A.B.C // expected-error {{type 'A.B.C' cannot be suppressed}}
 typealias Z3 = ~A? // expected-error {{type 'A?' cannot be suppressed}}
 typealias Z4 = ~Rope<Int> // expected-error {{type 'Rope<Int>' cannot be suppressed}}
 typealias Z5 = (~Int) -> Void // expected-error {{type 'Int' cannot be suppressed}}
-typealias Z6 = ~() -> () // expected-error {{single argument function types require parentheses}}
+typealias Z6 = ~() -> () // expected-cparser-error {{single argument function types require parentheses}} expected-astgen-error {{expected '(' to start function type}} expected-astgen-error {{expected ')' in function type}}
                          // expected-error@-1 {{type '()' cannot be suppressed}}
 typealias Z7 = ~(Copyable & CopyHashable) // expected-error {{type 'CopyHashable' cannot be suppressed}}
 typealias Z8 = ~Copyable & CopyHashable // expected-error {{composition cannot contain '~Copyable' when another member requires 'Copyable'}}

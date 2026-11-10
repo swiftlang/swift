@@ -15,4 +15,4 @@
 #if 6
 var u: V { didSet {} }
 
-// expected-error@+1{{expected #else or #endif at end of conditional compilation block}}
+// expected-cparser-error@+1{{expected #else or #endif at end of conditional compilation block}}

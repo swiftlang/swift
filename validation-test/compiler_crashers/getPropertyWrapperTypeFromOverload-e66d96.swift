@@ -1,4 +1,7 @@
 // {"kind":"typecheck","original":"c9d8f598","signature":"getPropertyWrapperTypeFromOverload(swift::constraints::ConstraintSystem&, swift::constraints::SelectedOverload, llvm::function_ref<swift::VarDecl* (swift::VarDecl*)>)","signatureAssert":"Assertion failed: (!cs.hasType(D) && \"Should have recorded type for wrapper var\"), function getPropertyWrapperTypeFromOverload","signatureNext":"ConstraintSystem::getPropertyWrapperProjectionType"}
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck %s
 @propertyWrapper struct a {
   wrappedValue : Bool  init(wrappedValue: Bool)

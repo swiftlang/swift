@@ -117,13 +117,13 @@ func passAssocType<T : HasAssocType>(_ t: T) {
 // https://github.com/apple/swift/issues/53530
 do {
   let _ = [[1, 2, 3][0]] // ok
-  let _ = [[1, 2, 3] [1]] // expected-warning {{unexpected subscript in array literal; did you mean to write two separate elements instead?}}
-  // expected-note@-1 {{add a separator between the elements}}{{21-21=,}}
-  // expected-note@-2 {{remove the space between the elements to silence this warning}}{{21-22=}}
+  let _ = [[1, 2, 3] [1]] // expected-cparser-warning {{unexpected subscript in array literal; did you mean to write two separate elements instead?}}
+  // expected-cparser-note@-1 {{add a separator between the elements}}{{21-21=,}}
+  // expected-cparser-note@-2 {{remove the space between the elements to silence this warning}}{{21-22=}}
   let _ = [
-    [1, 2, 3] [1] // expected-warning {{unexpected subscript in array literal; did you mean to write two separate elements instead?}}
-  // expected-note@-1 {{add a separator between the elements}}{{14-14=,}}
-  // expected-note@-2 {{remove the space between the elements to silence this warning}}{{14-15=}}
+    [1, 2, 3] [1] // expected-cparser-warning {{unexpected subscript in array literal; did you mean to write two separate elements instead?}}
+  // expected-cparser-note@-1 {{add a separator between the elements}}{{14-14=,}}
+  // expected-cparser-note@-2 {{remove the space between the elements to silence this warning}}{{14-15=}}
   ]
 }
 

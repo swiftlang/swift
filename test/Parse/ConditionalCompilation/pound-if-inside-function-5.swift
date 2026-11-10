@@ -4,12 +4,12 @@
 struct S {
   func foo() {
 #if true
-  } // expected-error {{unexpected '}' in conditional compilation block}}
+  } // expected-cparser-error {{unexpected '}' in conditional compilation block}} expected-astgen-error {{unexpected brace in conditional compilation clause}}
 #endif
   }
   func bar() {
 #if false
-  } // expected-error {{unexpected '}' in conditional compilation block}}
+  } // expected-cparser-error {{unexpected '}' in conditional compilation block}} expected-astgen-error {{unexpected brace in conditional compilation clause}}
 #endif
   }
   func baz() {}

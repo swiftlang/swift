@@ -23,7 +23,7 @@ _ = .́duh() // expected-error {{cannot find operator '.́' in scope}} // expect
 func s̈pin̈al_tap̈() {}
 
 // Private-use characters aren't valid in Swift source.
-() // expected-error{{invalid character in source file}} {{1-4= }}
+() // expected-cparser-error{{invalid character in source file}} {{1-4= }} expected-astgen-error {{invalid character in source file}}
 
 // Placeholders are recognized as identifiers but with error.
 func <#some name#>() {} // expected-error {{editor placeholder in source file}}
@@ -35,7 +35,7 @@ protocol enum {} // expected-error {{keyword 'enum' cannot be used as an identif
 protocol test {
   associatedtype public // expected-error {{keyword 'public' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{18-24=`public`}}
 }
-func _(_ x: Int) {} // expected-error {{keyword '_' cannot be used as an identifier here}} // expected-note {{if this name is unavoidable, use backticks to escape it}} {{6-7=`_`}}
+func _(_ x: Int) {} // expected-cparser-error {{keyword '_' cannot be used as an identifier here}} expected-astgen-error {{'_' cannot be used as an identifier here}} // expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{6-7=`_`}}
 
 // SIL keywords are tokenized as normal identifiers in non-SIL mode.
 _ = undef // expected-error {{cannot find 'undef' in scope}}

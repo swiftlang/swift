@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Parse/ParseDeclName.h"
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/Basic/StringExtras.h"
@@ -256,4 +257,8 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx, StringRef baseName,
 
   // Build the result.
   return DeclNameRef({ctx, baseNameId, argumentLabelIds});
+}
+
+bool BridgedStringRef_isParsableDeclName(BridgedStringRef name) {
+  return static_cast<bool>(swift::parseDeclName(name.unbridged()));
 }

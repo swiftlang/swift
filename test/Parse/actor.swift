@@ -4,9 +4,9 @@
 
 
 
-actor MyActor1 // expected-error {{expected '{' in actor}}
+actor MyActor1 // expected-cparser-error {{expected '{' in actor}} expected-astgen-error {{expected member block in actor}}
 
 actor MyActor2 { // expected-note@:16 {{to match this opening '{'}}
     init() {
     }
-func hello() { } // expected-error@+1 {{expected '}' in actor}}
+func hello() { } // expected-cparser-error@+1 {{expected '}' in actor}} expected-astgen-error {{expected '}' to end actor}}

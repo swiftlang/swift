@@ -9,6 +9,6 @@ _ = /x/
 // expected-error@-2 {{cannot find 'x' in scope}}
 // expected-error@-3 {{'/' is not a postfix unary operator}}
 
-_ = #/x/# // expected-error {{expected a macro identifier}}
+_ = #/x/# // expected-cparser-error {{expected a macro identifier}} expected-astgen-error {{missing 'Regex' declaration, probably because the '_StringProcessing' module was not imported properly}}
 
 func foo(_ x: Regex<Substring>) {} // expected-error {{cannot find type 'Regex' in scope}}

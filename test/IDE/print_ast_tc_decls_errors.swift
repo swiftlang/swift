@@ -206,7 +206,7 @@ var topLevelVar1 = 42
 // CHECK: class C1
 class C1 {
   // CHECK: init(data: <<error type>>)
-  init(data:) // expected-error {{expected parameter type following ':'}}
+  init(data:) // expected-cparser-error {{expected parameter type following ':'}} expected-astgen-error {{expected type in parameter}}
 }
 
 

@@ -22,11 +22,11 @@ protocol Protocol4 {
 }
 
 protocol Protocol5 {
-  var a: Int { get set willSet { print("HI")} } // expected-error {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-error {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
+  var a: Int { get set willSet { print("HI")} } // expected-cparser-error 2 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-astgen-error {{unexpected code 'set willSet' in accessor}} expected-astgen-error {{protocol property getter cannot have a default implementation specified here; use extension instead}} expected-astgen-error {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
 }
 
 protocol Protocol6 {
-  var a: Int { get { 0 } set willSet { print("HI")} } // expected-error {{protocol property getter cannot have a default implementation specified here; use extension instead}} expected-error {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
+  var a: Int { get { 0 } set willSet { print("HI")} } // expected-error {{protocol property getter cannot have a default implementation specified here; use extension instead}} expected-error {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-astgen-error {{unexpected code 'willSet' in accessor}}
 }
 
 protocol Protocol7 {
@@ -34,7 +34,7 @@ protocol Protocol7 {
 }
 
 protocol Protocol8 {
-  var a: Int { set willSet { print("HI") } } // expected-error {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-error {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
+  var a: Int { set willSet { print("HI") } } // expected-cparser-error 2 {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}} expected-astgen-error {{unexpected code 'willSet' in accessor}} expected-astgen-error {{protocol property setter cannot have a default implementation specified here; use extension instead}} expected-astgen-error {{expected 'get', 'yielding borrow', 'borrow', 'set', 'mutate' or 'yielding mutate' in a protocol property}}
 }
 
 protocol Protocol9 {

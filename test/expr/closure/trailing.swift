@@ -50,16 +50,16 @@ func notLiterals() {
 
   var x: Int? = nil { get { } } // expected-error {{variable with getter/setter cannot have an initial value}}
   _ = 1 {}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{9-9=do }}
   _ = "hello" {}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{15-15=do }}
   _ = [42] {}
   // expected-error@-1 {{cannot call value of non-function type '[Int]'}}
   _ = (6765, 10946, 17711) {}
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{closure expression is unused}} expected-note@-2 {{did you mean to use a 'do' statement?}} {{28-28=do }}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{closure expression is unused}} expected-astgen-error@-2 {{cannot call value of non-function type '(Int, Int, Int)'}} expected-cparser-note@-2 {{did you mean to use a 'do' statement?}} {{28-28=do }}
 }
 
 class C {
@@ -77,15 +77,15 @@ var c = C().map
   $0 + 1
 }
 
-var c2 = C().map // expected-note{{callee is here}}
+var c2 = C().map // expected-note {{callee is here}}
 
-{ // expected-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
+{ // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-astgen-note {{did you mean to use a 'do' statement?}}
   $0 + 1
 }
 
-var c3 = C().map // expected-note{{callee is here}}
+var c3 = C().map // expected-note {{callee is here}}
 // blah blah blah
-{ // expected-warning{{braces here form a trailing closure separated from its callee by multiple newlines}}
+{ // expected-warning {{braces here form a trailing closure separated from its callee by multiple newlines}} expected-astgen-note {{did you mean to use a 'do' statement?}}
   $0 + 1
 }
 
@@ -94,7 +94,7 @@ var c3 = C().map // expected-note{{callee is here}}
 // <rdar://problem/16835718> Ban multiple trailing closures
 func multiTrailingClosure(_ a : () -> (), b : () -> ()) {  // expected-note {{'multiTrailingClosure(_:b:)' declared here}}
   multiTrailingClosure({}) {} // ok
-  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter 'b' in call}} expected-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{27-27=do }}
+  multiTrailingClosure {} {}   // expected-error {{missing argument for parameter 'b' in call}} expected-cparser-error {{consecutive statements on a line must be separated by ';'}} {{26-26=;}} expected-astgen-error {{consecutive statements on a line must be separated by newline or ';'}} expected-error {{closure expression is unused}} expected-note{{did you mean to use a 'do' statement?}} {{27-27=do }}
 }
 
 func labeledArgumentAndTrailingClosure() {

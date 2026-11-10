@@ -122,9 +122,9 @@ public func requirementOnNonGenericFunction(x: Int, y: Int) {
 public func missingRequirement<X:P, Y>(x: X, y: Y) {
 }
 
-@_specialize(where) // expected-error{{expected type}}
-@_specialize() // expected-error{{expected a parameter label or a where clause in '_specialize' attribute}} expected-error{{expected declaration}}
-@specialized() // expected-error{{expected a where clause in 'specialized' attribute}} expected-error{{expected declaration}}
+@_specialize(where) // expected-cparser-error{{expected type}} expected-astgen-error {{expected left-hand type, '==', and right-hand type in same type requirement}} expected-astgen-error {{too few generic parameters are specified in '_specialize' attribute (got 0, but expected 2)}} expected-astgen-note {{missing constraint for 'X' in '_specialize' attribute}} expected-astgen-note {{missing constraint for 'Y' in '_specialize' attribute}}
+@_specialize() // expected-error{{expected a parameter label or a where clause in '_specialize' attribute}} expected-cparser-error{{expected declaration}}
+@specialized() // expected-cparser-error{{expected a where clause in 'specialized' attribute}} expected-astgen-error {{too few generic parameters are specified in 'specialized' attribute (got 0, but expected 2)}} expected-cparser-error{{expected declaration}} expected-astgen-error {{expected argument for '@specialized' attribute}} expected-astgen-note {{missing constraint for 'X' in 'specialized' attribute}} expected-astgen-note {{missing constraint for 'Y' in 'specialized' attribute}}
 public func funcWithEmptySpecializeAttr<X: P, Y>(x: X, y: Y) {
 }
 
@@ -147,24 +147,24 @@ public func funcWithTwoGenericParameters<X, Y>(x: X, y: Y) {
 @_specialize(exported: true, where X == Int, Y == Int)
 @_specialize(exported: false, where X == Int, Y == Int)
 @_specialize(exported: false where X == Int, Y == Int) // expected-error{{missing ',' in '_specialize' attribute}}
-@_specialize(exported: yes, where X == Int, Y == Int) // expected-error{{expected a boolean true or false value in '_specialize' attribute}}
-@_specialize(exported: , where X == Int, Y == Int) // expected-error{{expected a boolean true or false value in '_specialize' attribute}}
+@_specialize(exported: yes, where X == Int, Y == Int) // expected-cparser-error{{expected a boolean true or false value in '_specialize' attribute}} expected-astgen-error {{expected 'false' in attribute argument}} expected-astgen-error {{missing 'where' clause in '_specialize' attribute}} expected-astgen-error {{unexpected code 'yes, where X == Int, Y == Int' in attribute}}
+@_specialize(exported: , where X == Int, Y == Int) // expected-cparser-error{{expected a boolean true or false value in '_specialize' attribute}} expected-astgen-error {{expected 'false' in attribute argument}}
 
 @_specialize(kind: partial, where X == Int, Y == Int)
 @_specialize(kind: partial, where X == Int)
 @_specialize(kind: full, where X == Int, Y == Int)
 @_specialize(kind: any, where X == Int, Y == Int) // expected-error{{expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute}}
-@_specialize(kind: false, where X == Int, Y == Int) // expected-error{{expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute}}
+@_specialize(kind: false, where X == Int, Y == Int) // expected-cparser-error{{expected 'partial' or 'full' as values of the 'kind' parameter in '_specialize' attribute}} expected-astgen-error {{expected value in attribute argument}} expected-astgen-error {{missing 'where' clause in '_specialize' attribute}} expected-astgen-error {{unexpected code 'false, where X == Int, Y == Int' in attribute}}
 @_specialize(kind: partial where X == Int, Y == Int) // expected-error{{missing ',' in '_specialize' attribute}}
 @_specialize(kind: partial, where X == Int, Y == Int)
-@_specialize(kind: , where X == Int, Y == Int)
+@_specialize(kind: , where X == Int, Y == Int) // expected-astgen-error {{expected value in attribute argument}}
 
 @_specialize(exported: true, kind: partial, where X == Int, Y == Int)
 @_specialize(exported: true, exported: true, where X == Int, Y == Int) // expected-error{{parameter 'exported' was already defined in '_specialize' attribute}}
 @_specialize(kind: partial, exported: true, where X == Int, Y == Int)
 @_specialize(kind: partial, kind: partial, where X == Int, Y == Int) // expected-error{{parameter 'kind' was already defined in '_specialize' attribute}}
 
-@_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{expected type}} expected-error{{cannot find type 'exported' in scope}} expected-error{{cannot find type 'kind' in scope}} expected-error{{cannot find type 'partial' in scope}}
+@_specialize(where X == Int, Y == Int, exported: true, kind: partial) // expected-error{{expected type}} expected-error{{cannot find type 'exported' in scope}} expected-cparser-error{{cannot find type 'kind' in scope}} expected-cparser-error{{cannot find type 'partial' in scope}} expected-astgen-error {{unexpected code 'true, kind: partial' in attribute}}
 public func anotherFuncWithTwoGenericParameters<X: P, Y>(x: X, y: Y) {
 }
 
@@ -274,11 +274,11 @@ public func copy2NonExported<S>(_ s: S) -> S where S: P {
 }
 
 // Check missing alignment.
-@_specialize(where S: _Trivial(64, )) // expected-error{{expected non-negative alignment to be specified in layout constraint}}
+@_specialize(where S: _Trivial(64, )) // expected-error{{expected non-negative alignment to be specified in layout constraint}} expected-astgen-error {{expected alignment in layout requirement}}
 // Check non-numeric size.
-@_specialize(where S: _Trivial(Int)) // expected-error{{expected non-negative size to be specified in layout constraint}}
+@_specialize(where S: _Trivial(Int)) // expected-error{{expected non-negative size to be specified in layout constraint}} expected-astgen-error {{expected size in layout requirement}} expected-astgen-error {{unexpected code 'Int' in layout requirement}}
 // Check non-numeric alignment.
-@_specialize(where S: _Trivial(64, X)) // expected-error{{expected non-negative alignment to be specified in layout constraint}}
+@_specialize(where S: _Trivial(64, X)) // expected-error{{expected non-negative alignment to be specified in layout constraint}} expected-astgen-error {{expected alignment in layout requirement}} expected-astgen-error {{unexpected code 'X' in layout requirement}}
 @inline(never)
 public func copy3<S>(_ s: S) -> S {
   return s
@@ -393,7 +393,7 @@ public func oneGenericParam2Good<T>(_ t: T) -> T {
 
 @specialized(where T == Int, U == Int) // expected-error{{cannot find type 'U' in scope}},
 @specialized(where T == T1) // expected-error{{cannot find type 'T1' in scope}},
-@specialized(where T : _Trivial) // expected-error{{layout constraints are only allowed inside '_specialize' attributes}} expected-error{{empty 'where' clause in 'specialized' attribute}}
+@specialized(where T : _Trivial) // expected-error{{layout constraints are only allowed inside '_specialize' attributes}} expected-cparser-error{{empty 'where' clause in 'specialized' attribute}}
 public func oneGenericParam2<T>(_ t: T) -> T {
   return t
 }
@@ -409,14 +409,14 @@ public func twoGenericParams2<T, U>(_ t: T, u: U) -> (T, U) {
 func nonGenericParam2(x: Int) {}
 
 // 'exported:' needs the ExtendedSpecializedAttribute feature.
-// expected-error@+2 {{unsupported parameter exported in 'specialized attribute'}}
-// expected-error@+1 {{expected declaration}}
-@specialized(exported: false, where T == Int)
+// expected-cparser-error@+2 {{unsupported parameter exported in 'specialized attribute'}} expected-astgen-error@+2 {{expected type in conformance requirement}}
+// expected-cparser-error@+1 {{expected declaration}} expected-astgen-error@+1 {{expected 'where' in 'where' clause}}
+@specialized(exported: false, where T == Int) // expected-astgen-error {{too few generic parameters are specified in 'specialized' attribute (got 0, but expected 1)}} expected-astgen-note {{missing constraint for 'T' in 'specialized' attribute}} expected-astgen-error {{cannot find type 'exported' in scope}} expected-astgen-error {{unexpected code 'false, where T == Int' in attribute}}
 public func exportedFalse<T>(_ t: T) {}
 
-// expected-error@+2 {{unsupported parameter kind in 'specialized attribute'}}
-// expected-error@+1 {{expected declaration}}
-@specialized(kind: full, where T == Int)
+// expected-cparser-error@+2 {{unsupported parameter kind in 'specialized attribute'}} expected-astgen-error@+2 {{expected left-hand type, '==', and right-hand type in same type requirement}}
+// expected-cparser-error@+1 {{expected declaration}} expected-astgen-error@+1 {{expected 'where' in 'where' clause}}
+@specialized(kind: full, where T == Int) // expected-astgen-error {{too few generic parameters are specified in 'specialized' attribute (got 0, but expected 1)}} expected-astgen-note {{missing constraint for 'T' in 'specialized' attribute}} expected-astgen-error {{cannot find type 'kind' in scope}} expected-astgen-error {{cannot find type 'full' in scope}} expected-astgen-error {{unexpected code 'where T == Int' in attribute}}
 public func unsupportedKind<T>(_ t: T) {}
 
 @_specialize(where T == Int)

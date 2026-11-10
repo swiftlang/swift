@@ -47,8 +47,8 @@ func foo5() -> Int {
   case false:
     2
   } as Int as Int
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code 'as Int' in function}}
 }
 
 
@@ -102,8 +102,8 @@ func foo11() -> Bool {
   case false:
     2 as Any
   } is String
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code 'is String' in function}}
 }
 
 func foo12() -> Bool {
@@ -165,24 +165,24 @@ do {
   // expected-error@-1 {{extraneous argument label 'x:' in call}}
   // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
-  takesValue(_: x: switch Bool.random() { case true: 1 case false: 2 })
-  // expected-error@-1 {{expected argument label before colon}}
-  // expected-error@-2 {{expected ',' separator}}
+  takesValue(_: x: switch Bool.random() { case true: 1 case false: 2 }) // expected-astgen-note {{to match this opening '('}} expected-astgen-warning {{integer literal is unused}} expected-astgen-warning {{integer literal is unused}}
+  // expected-cparser-error@-1 {{expected argument label before colon}}
+  // expected-cparser-error@-2 {{expected ',' separator}} expected-astgen-error@-2 {{unexpected code ')' in 'do' statement}}
   // expected-error@-3 {{cannot find 'x' in scope}}
-  // expected-error@-4 {{extra argument in call}}
-  // expected-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+  // expected-cparser-error@-4 {{extra argument in call}} expected-astgen-error@-4 {{unexpected code ':' in 'do' statement}}
+  // expected-cparser-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}} expected-astgen-error@-5 {{expected ')' to end function call}}
 }
 func takesValueWithLabel<T>(x: T) {}
 do {
   takesValueWithLabel(x: switch Bool.random() { case true: 1 case false: 2 })
   // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
-  takesValueWithLabel(x: y: switch Bool.random() { case true: 1 case false: 2 })
-  // expected-error@-1 {{expected argument label before colon}}
-  // expected-error@-2 {{expected ',' separator}}
+  takesValueWithLabel(x: y: switch Bool.random() { case true: 1 case false: 2 }) // expected-astgen-note {{to match this opening '('}} expected-astgen-warning {{integer literal is unused}} expected-astgen-warning {{integer literal is unused}}
+  // expected-cparser-error@-1 {{expected argument label before colon}}
+  // expected-cparser-error@-2 {{expected ',' separator}} expected-astgen-error@-2 {{unexpected code ')' in 'do' statement}}
   // expected-error@-3 {{cannot find 'y' in scope}}
-  // expected-error@-4 {{extra argument in call}}
-  // expected-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+  // expected-cparser-error@-4 {{extra argument in call}} expected-astgen-error@-4 {{unexpected code ':' in 'do' statement}}
+  // expected-cparser-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}} expected-astgen-error@-5 {{expected ')' to end function call}}
 }
 func takesValueAndTrailingClosure<T>(_ x: T, _ fn: () -> Int) {}
 takesValueAndTrailingClosure(switch Bool.random() { case true: 0 case false: 1 }) { 2 }
@@ -490,54 +490,54 @@ let _ = type(of: switch Bool.random() { case true: 1 case false: 2 })
 
 do {
   switch Bool.random() { case true: 1 case false: 2 } = 3
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code '= 3' in 'do' statement}}
   // expected-warning@-3 2{{integer literal is unused}}
 }
 
 // We currently prefer to parse these as trailing closures. We may want to tell
 // the user to just wrap the expression in parens.
 do {
-  _ = (switch fatalError() {}, 1) // expected-error {{expected '{' after 'switch' subject expression}}
+  _ = (switch fatalError() {}, 1) // expected-cparser-error {{expected '{' after 'switch' subject expression}} expected-astgen-error {{unexpected code in 'switch' statement}}
   // expected-error@-1 {{extra trailing closure passed in call}}
   // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
   _ = (switch fatalError() { #if FOO
-    // expected-error@-1 {{extra trailing closure passed in call}}
-    // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+    // expected-cparser-error@-1 {{extra trailing closure passed in call}}
+    // expected-cparser-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
   #endif
-  }, 0) // expected-error {{expected '{' after 'switch' subject expression}}
+  }, 0) // expected-cparser-error {{expected '{' after 'switch' subject expression}}
 
   _ = (switch Bool.random() { #if FOO
-    // expected-error@-1 {{cannot pass immutable value of type '() -> ()' as inout argument}}
-    // expected-error@-2 {{type '() -> ()' cannot conform to 'RandomNumberGenerator'}}
-    // expected-note@-3 {{required by static method 'random(using:)' where 'T' = '() -> ()'}}
-    // expected-note@-4 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-cparser-error@-1 {{cannot pass immutable value of type '() -> ()' as inout argument}}
+    // expected-cparser-error@-2 {{type '() -> ()' cannot conform to 'RandomNumberGenerator'}} expected-astgen-error@-2 {{switch must be exhaustive}}
+    // expected-cparser-note@-3 {{required by static method 'random(using:)' where 'T' = '() -> ()'}}
+    // expected-cparser-note@-4 {{only concrete types such as structs, enums and classes can conform to protocols}} expected-astgen-note@-4 {{add missing cases: 'true', 'false'}}
     // expected-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
-  case true: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case true: // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}}
     1
-  case false: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case false: // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}}
     2
   #endif
-  }, 0) // expected-error {{expected '{' after 'switch' subject expression}}
+  }, 0) // expected-cparser-error {{expected '{' after 'switch' subject expression}}
 
   _ = (switch Bool.random() { #if FOO
-    // expected-error@-1 {{cannot pass immutable value of type '() -> ()' as inout argument}}
-    // expected-error@-2 {{type '() -> ()' cannot conform to 'RandomNumberGenerator'}}
-    // expected-note@-3 {{required by static method 'random(using:)' where 'T' = '() -> ()'}}
-    // expected-note@-4 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-cparser-error@-1 {{cannot pass immutable value of type '() -> ()' as inout argument}}
+    // expected-cparser-error@-2 {{type '() -> ()' cannot conform to 'RandomNumberGenerator'}}
+    // expected-cparser-note@-3 {{required by static method 'random(using:)' where 'T' = '() -> ()'}}
+    // expected-cparser-note@-4 {{only concrete types such as structs, enums and classes can conform to protocols}}
     // expected-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
-  case true: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case true: // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}}
     1
-  case false: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case false: // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}}
     2
   #else
-  case true: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case true: // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}}
     1
-  case false: // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case false: // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}}
     2
   #endif
-  }, 0) // expected-error {{expected '{' after 'switch' subject expression}}
+  }, 0) // expected-cparser-error {{expected '{' after 'switch' subject expression}}
 }
 
 // These are syntactically okay because the #if starts on a newline. This seems
@@ -653,7 +653,7 @@ do {
 // We don't allow postfix parsing.
 do {
   let _ = switch Bool.random() { case true: [1] case false: [1, 2] }.count
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-error@-2 {{reference to member 'count' cannot be resolved without a contextual type}}
 
   let _ = (switch Bool.random() { case true: [1] case false: [1, 2] }).count
@@ -661,8 +661,8 @@ do {
 }
 do {
   let _ = switch Bool.random() { case true: Int?.none case false: 1 }?.bitWidth
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code '?.bitWidth' in 'do' statement}}
 
   // FIXME: The type error is likely due to not solving the conjunction before attempting default type var bindings.
   let _ = (switch Bool.random() { case true: Int?.none case false: 1 })?.bitWidth
@@ -671,8 +671,8 @@ do {
 }
 do {
   let _ = switch Bool.random() { case true: Int?.none case false: 1 }!
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
-  // expected-error@-2 {{expected expression}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{unexpected code '!' in 'do' statement}}
 
   let _ = (switch Bool.random() { case true: Int?.none case false: 1 })!
   // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
@@ -681,7 +681,7 @@ do {
   func fn(_ x: Int...) {}
 
   let _ = switch Bool.random() { case true: fn case false: fn }(1, 2, 3)
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-warning@-2 {{expression of type '(Int, Int, Int)' is unused}}
 
   let _ = (switch Bool.random() { case true: fn case false: fn })(1, 2, 3)
@@ -689,7 +689,7 @@ do {
 }
 func takesSubscript(_ x: HasSubscript) {
   let _ = switch Bool.random() { case true: x case false: x }[1, 2, 3]
-  // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
+  // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} expected-astgen-error@-1 {{consecutive statements on a line must be separated by newline or ';'}}
   // expected-warning@-2 {{expression of type '[Int]' is unused}}
 
   let _ = (switch Bool.random() { case true: x case false: x })[1, 2, 3]
@@ -698,7 +698,7 @@ func takesSubscript(_ x: HasSubscript) {
 do {
   func fn(_ fn: () -> Int) {}
 
-  let _ = switch Bool.random() { case true: fn case false: fn } { 3 }
+  let _ = switch Bool.random() { case true: fn case false: fn } { 3 } // expected-astgen-error {{'let' declarations cannot be computed properties}}
   // expected-error@-1 {{getter/setter can only be defined for a single variable}}
 
   let _ = (switch Bool.random() { case true: fn case false: fn }) { 3 }
@@ -854,11 +854,11 @@ func returnBranches6PoundIf2() -> Int {
   // We don't allow multiple expressions, but inactive #ifs don't count.
   let i = switch Bool.random() {
   case true:
-    #if false
+    #if false // expected-astgen-error {{expected expression in branch of 'switch' expression}}
     print("hello")
     0
     #endif
-    // expected-error@-1 {{expected expression in branch of 'switch' expression}}
+    // expected-cparser-error@-1 {{expected expression in branch of 'switch' expression}}
   case false:
     1
   }
@@ -1064,10 +1064,10 @@ func testPoundIfBranch2() -> Int {
 func testPoundIfBranch3() -> Int {
   let x = switch Bool.random() {
   case true:
-    #if false
+    #if false // expected-astgen-error {{expected expression in branch of 'switch' expression}}
     0
     #endif
-  // expected-error@-1 {{expected expression in branch of 'switch' expression}}
+  // expected-cparser-error@-1 {{expected expression in branch of 'switch' expression}}
   case false:
     0
   }

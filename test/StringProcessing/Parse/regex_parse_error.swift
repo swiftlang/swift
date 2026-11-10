@@ -8,11 +8,11 @@ _ = #/(/# // expected-error@:8 {{expected ')'}}
 _ = /)/ // expected-error@:6 {{closing ')' does not balance any groups openings}}
 _ = #/)/# // expected-error@:7 {{closing ')' does not balance any groups openings}}
 
-_ = #/\\/''/ // expected-error@:5 {{unterminated regex literal}}
-_ = #/\| // expected-error@:5 {{unterminated regex literal}}
-_ = #// // expected-error@:5 {{unterminated regex literal}}
+_ = #/\\/''/ // expected-cparser-error@:5 {{unterminated regex literal}} expected-astgen-error {{to end regex literal}}
+_ = #/\| // expected-cparser-error@:5 {{unterminated regex literal}} expected-astgen-error {{to end regex literal}}
+_ = #// // expected-cparser-error@:5 {{unterminated regex literal}} expected-astgen-error {{to end regex literal}}
 
-_ = #/xy // expected-error@:5 {{unterminated regex literal}}
+_ = #/xy // expected-cparser-error@:5 {{unterminated regex literal}} expected-astgen-error {{to end regex literal}}
 
 _ = #/(?/# // expected-error@:9 {{expected group specifier}}
 _ = #/(?'/# // expected-error@:10 {{expected group name}}
@@ -21,24 +21,24 @@ _ = #/(?'abc /# // expected-error@:13 {{expected '''}}
 
 do {
   _ = #/(?'a
-  // expected-error@-1:7 {{unterminated regex literal}}
+  // expected-cparser-error@-1:7 {{unterminated regex literal}} expected-astgen-error@-1 {{to end regex literal}}
   // expected-error@-2:13 {{cannot parse regular expression: expected '''}}
 }
 
 _ = #/\(?'abc/#
 
 do {
-  _ = /\
+  _ = /\ // expected-astgen-error {{expected root in key path}}
   /
-  // expected-error@-1:3 {{expected expression path in Swift key path}}
+  // expected-cparser-error@-1:3 {{expected expression path in Swift key path}} expected-astgen-error@-1 {{expected expression after operator}}
 }
 
 do {
   _ = #/\
-  /#
-  // expected-error@-2:7 {{unterminated regex literal}}
+  /# // expected-astgen-error {{is not a prefix unary operator}}
+  // expected-cparser-error@-2:7 {{unterminated regex literal}} expected-astgen-error@-2 {{to end regex literal}}
   // expected-error@-3:10 {{expected escape sequence}}
-  // expected-error@-3:5 {{expected a macro identifier}}
+  // expected-cparser-error@-3:5 {{expected a macro identifier}} expected-astgen-error@-3 {{expected identifier in macro expansion}}
 }
 
 func foo<T>(_ x: T, _ y: T) {}

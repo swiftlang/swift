@@ -34,9 +34,9 @@ func unnamed() {
 // Regression tests.
 
 var nestedClosuresWithBrokenInference = { f: Int in {} }
-    // expected-error@-1 {{consecutive statements on a line must be separated by ';'}} {{44-44=;}}
-    // expected-error@-2 {{expected expression}}
-    // expected-error@-3 {{cannot find 'f' in scope}}
+    // expected-cparser-error@-1 {{consecutive statements on a line must be separated by ';'}} {{44-44=;}}
+    // expected-cparser-error@-2 {{expected expression}} expected-astgen-error@-2 {{expected ')' to end parameter clause}}
+    // expected-cparser-error@-3 {{cannot find 'f' in scope}} expected-astgen-error@-3 {{expected '(' to start parameter clause}}
 
 // https://github.com/apple/swift/issues/53941
 do {

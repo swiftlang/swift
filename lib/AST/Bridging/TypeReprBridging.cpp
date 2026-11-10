@@ -264,6 +264,13 @@ BridgedCompileTimeLiteralTypeRepr_createParsed(BridgedASTContext cContext,
       CompileTimeLiteralTypeRepr(base.unbridged(), specifierLoc);
 }
 
+BridgedConstValueTypeRepr
+BridgedConstValueTypeRepr_createParsed(BridgedASTContext cContext,
+                                       BridgedTypeRepr base, SourceLoc atLoc) {
+  return new (cContext.unbridged())
+      ConstValueTypeRepr(base.unbridged(), atLoc);
+}
+
 BridgedFunctionTypeRepr BridgedFunctionTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr argsTy, SourceLoc asyncLoc,
     SourceLoc throwsLoc, BridgedNullableTypeRepr thrownType,

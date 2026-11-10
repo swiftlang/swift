@@ -1,4 +1,7 @@
 // {"extraArgs":["-experimental-allow-module-with-compiler-errors","-cxx-interoperability-mode=default","-emit-clang-header-min-access","internal","-emit-clang-header-path","/dev/null"],"kind":"typecheck","original":"03a34d91","signature":"void llvm::function_ref<void (swift::GenericRequirement)>::callback_fn<swift::irgen::GenericTypeRequirements::GenericTypeRequirements(swift::irgen::IRGenModule&, swift::GenericSignature)::$_0>(long, swift::GenericRequirement)","signatureAssert":"Assertion failed: (generics->isReducedType(reqt.getTypeParameter())), function operator()","signatureNext":"PolymorphicConvention::enumerateUnfulfilledRequirements"}
+// The crash depends on the C++ parser's handling of this input, which ASTGen
+// handles differently. Expect it to fail, so that we notice if it crashes again.
+// XFAIL: parser_astgen
 // RUN: not --crash %target-swift-frontend -typecheck -experimental-allow-module-with-compiler-errors -cxx-interoperability-mode=default -emit-clang-header-min-access internal -emit-clang-header-path /dev/null %s
 protocol a {
   associatedtype b

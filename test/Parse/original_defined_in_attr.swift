@@ -4,21 +4,21 @@
 @_originallyDefinedIn(module: "foo", OSX 13.13) // expected-error {{'@_originallyDefinedIn' requires that 'foo()' have explicit availability for macOS}}
 public func foo() {}
 
-@_originallyDefinedIn(modulename: "foo", OSX 13.13) // expected-error {{expected 'module: "original"' in the first argument to '@_originallyDefinedIn'}}
+@_originallyDefinedIn(modulename: "foo", OSX 13.13) // expected-cparser-error {{expected 'module: "original"' in the first argument to '@_originallyDefinedIn'}} expected-astgen-error {{expected 'module' in @_originallyDefinedIn arguments}} expected-astgen-error {{'@_originallyDefinedIn' requires that 'foo1()' have explicit availability for macOS}}
 public func foo1() {}
 
 @_originallyDefinedIn(module: "foo", OSX 13.13.3) // expected-warning {{'@_originallyDefinedIn' only uses major and minor version number}}
 // expected-error@-1 {{'@_originallyDefinedIn' requires that 'ToplevelClass' have explicit availability for macOS}}
 public class ToplevelClass {}
 
-@_originallyDefinedIn(module: "foo") // expected-error {{expected at least one platform version in '@_originallyDefinedIn' attribute}}
+@_originallyDefinedIn(module: "foo") // expected-cparser-error {{expected at least one platform version in '@_originallyDefinedIn' attribute}} expected-astgen-error {{expected ',' and version list in @_originallyDefinedIn arguments}}
 public class ToplevelClass1 {}
 
-@_originallyDefinedIn(OSX 13.13.3) // expected-error {{expected 'module: "original"' in the first argument to '@_originallyDefinedIn'}}
+@_originallyDefinedIn(OSX 13.13.3) // expected-cparser-error {{expected 'module: "original"' in the first argument to '@_originallyDefinedIn'}} expected-astgen-error {{expected 'module:' in @_originallyDefinedIn arguments}} expected-astgen-error {{expected code 'OSX' to be surrounded by '"'}} expected-astgen-error {{expected ',' in @_originallyDefinedIn arguments}} expected-astgen-error {{expected platform in version restriction}}
 public class ToplevelClass2 {}
 
-@_originallyDefinedIn(module: "foo",
-public class ToplevelClass3 {} // expected-error {{expected platform in '@_originallyDefinedIn' attribute}}
+@_originallyDefinedIn(module: "foo", // expected-astgen-note {{to match this opening '('}} expected-astgen-error {{expected version restriction in version}} expected-astgen-error {{expected ')' to end attribute}}
+public class ToplevelClass3 {} // expected-cparser-error {{expected platform in '@_originallyDefinedIn' attribute}}
 
 @available(OSX 13.10, *)
 @_originallyDefinedIn(module: "foo", * 13.13) // expected-warning {{* as platform name has no effect}} expected-error {{expected at least one platform version in '@_originallyDefinedIn' attribute}}

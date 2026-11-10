@@ -481,7 +481,7 @@ protocol SomeProtocolA {}
 protocol SomeProtocolB {}
 protocol SomeProtocolC {}
 struct SomeStructC: SomeProtocolA, SomeProtocolB, SomeProtocolC {}
-let someProperty: SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-19=some }}
+let someProperty: SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-cparser-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-19=some }} expected-astgen-error {{'some' should appear at the beginning of a composition}}{{35-40=}}{{19-32=some SomeProtocolA}}
 let someOtherProperty: some SomeProtocolA & some SomeProtocolB = SomeStructC() // expected-error {{'some' should appear at the beginning of a composition}}{{45-50=}}
 let someThirdProperty: some SomeProtocolA & SomeProtocolB & some SomeProtocolC = SomeStructC() // expected-error {{'some' should appear at the beginning of a composition}}{{61-66=}}
 

@@ -27,6 +27,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/Locale.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/ScopedPrinter.h"
@@ -2018,9 +2019,22 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
           SMLoc::getFromPointer(expectedDiagIter->MessageRange.begin());
       auto EndLoc = SMLoc::getFromPointer(expectedDiagIter->MessageRange.end());
 
-      llvm::SMFixIt fixIt(llvm::SMRange{StartLoc, EndLoc}, I->Message);
-      addError(expectedDiagIter->MessageRange.begin(),
-               "incorrect message found", fixIt);
+      // Only offer to rewrite the expectation when the replacement is
+      // single-byte-per-column. llvm::SMDiagnostic::print lays fix-its out
+      // assuming one byte per column and asserts otherwise, so a message
+      // quoting a multi-byte character -- which is exactly what the confusable
+      // -character diagnostics do -- would crash the verifier rather than
+      // report the mismatch.
+      if ((size_t)llvm::sys::locale::columnWidth(I->Message) ==
+          I->Message.size()) {
+        llvm::SMFixIt fixIt(llvm::SMRange{StartLoc, EndLoc}, I->Message);
+        addError(expectedDiagIter->MessageRange.begin(),
+                 "incorrect message found", fixIt);
+      } else {
+        addError(expectedDiagIter->MessageRange.begin(),
+                 llvm::formatv("incorrect message found; expected \"{0}\"",
+                               I->Message));
+      }
     } else if (I->Column != *expectedDiagIter->ColumnNo) {
       // The difference must be only in the column
       addError(expectedDiagIter->MessageRange.begin(),

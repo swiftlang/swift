@@ -8,11 +8,11 @@ func f4(_ x: Int, _ y: Int, z: Int) { }
 
 func test01() {
   _ = f0(_:y:z:)
-  _ = f0(:y:z:) // expected-error{{an empty argument label is spelled with '_'}}{{10-10=_}}
+  _ = f0(:y:z:) // expected-cparser-error{{an empty argument label is spelled with '_'}}{{10-10=_}} expected-astgen-error {{expected label in function call}} expected-astgen-error {{cannot find 'y' in scope}} expected-astgen-error {{unexpected code ':z:' in function call}}
   _ = f1(_:`while`:) // expected-warning{{keyword 'while' does not need to be escaped in argument list}}{{12-13=}}{{18-19=}}
   _ = f2(_:`let`:) // expected-warning {{keyword 'let' does not need to be escaped in argument list}} {{12-13=}} {{16-17=}}
   _ = f3(_:`var`:) // expected-warning {{keyword 'var' does not need to be escaped in argument list}} {{12-13=}} {{16-17=}}
-  _ = f4(_::z:) // expected-error{{an empty argument label is spelled with '_'}}{{12-12=_}}
+  _ = f4(_::z:) // expected-cparser-error{{an empty argument label is spelled with '_'}}{{12-12=_}} expected-astgen-error {{'_' cannot be used as an identifier here}} expected-astgen-error {{cannot find '::z' in scope}} expected-astgen-error {{unexpected code ':' in function call}}
 }
 
 struct S0 {
@@ -23,13 +23,13 @@ struct S0 {
 
   func testS0() {
     _ = f0(_:y:z:)
-    _ = f0(:y:z:) // expected-error{{an empty argument label is spelled with '_'}}{{12-12=_}}
+    _ = f0(:y:z:) // expected-cparser-error{{an empty argument label is spelled with '_'}}{{12-12=_}} expected-astgen-error {{expected label in function call}} expected-astgen-error {{cannot find 'y' in scope}} expected-astgen-error {{unexpected code ':z:' in function call}}
     _ = f1(_:`while`:) // expected-warning{{keyword 'while' does not need to be escaped in argument list}}{{14-15=}}{{20-21=}}
     _ = f2(_:`let`:) // expected-warning {{keyword 'let' does not need to be escaped in argument list}} {{14-15=}} {{18-19=}}
     _ = f3(_:`var`:) // expected-warning {{keyword 'var' does not need to be escaped in argument list}} {{14-15=}} {{18-19=}}
     
     _ = self.f0(_:y:z:)
-    _ = self.f0(:y:z:) // expected-error{{an empty argument label is spelled with '_'}}{{17-17=_}}
+    _ = self.f0(:y:z:) // expected-cparser-error{{an empty argument label is spelled with '_'}}{{17-17=_}} expected-astgen-error {{expected label in function call}} expected-astgen-error {{cannot find 'y' in scope}} expected-astgen-error {{unexpected code ':z:' in function call}}
     _ = self.f1(_:`while`:) // expected-warning{{keyword 'while' does not need to be escaped in argument list}}{{19-20=}}{{25-26=}}
     _ = self.f2(_:`let`:) // expected-warning {{keyword 'let' does not need to be escaped in argument list}}{{19-20=}}{{23-24=}}
     _ = self.f3(_:`var`:) // expected-warning {{keyword 'var' does not need to be escaped in argument list}}{{19-20=}}{{23-24=}}
@@ -68,13 +68,13 @@ class C1 : C0 {
 
   func testC0() {
     _ = f0(_:y:z:)
-    _ = f0(:y:z:) // expected-error{{an empty argument label is spelled with '_'}}{{12-12=_}}
+    _ = f0(:y:z:) // expected-cparser-error{{an empty argument label is spelled with '_'}}{{12-12=_}} expected-astgen-error {{expected label in function call}} expected-astgen-error {{cannot find 'y' in scope}} expected-astgen-error {{unexpected code ':z:' in function call}}
     _ = f1(_:`while`:) // expected-warning{{keyword 'while' does not need to be escaped in argument list}}{{14-15=}}{{20-21=}}
     _ = f2(_:`let`:) // expected-warning {{keyword 'let' does not need to be escaped in argument list}} {{14-15=}} {{18-19=}}
     _ = f3(_:`var`:) // expected-warning {{keyword 'var' does not need to be escaped in argument list}} {{14-15=}} {{18-19=}}
     
     _ = super.f0(_:y:z:)
-    _ = super.f0(:y:z:) // expected-error{{an empty argument label is spelled with '_'}}{{18-18=_}}
+    _ = super.f0(:y:z:) // expected-cparser-error{{an empty argument label is spelled with '_'}}{{18-18=_}} expected-astgen-error {{expected label in function call}} expected-astgen-error {{cannot find 'y' in scope}} expected-astgen-error {{unexpected code ':z:' in function call}}
     _ = super.f1(_:`while`:) // expected-warning{{keyword 'while' does not need to be escaped in argument list}}{{20-21=}}{{26-27=}}
     _ = self.f2(_:`let`:) // expected-warning {{keyword 'let' does not need to be escaped in argument list}} {{19-20=}} {{23-24=}}
     _ = self.f3(_:`var`:) // expected-warning {{keyword 'var' does not need to be escaped in argument list}} {{19-20=}} {{23-24=}}
@@ -83,13 +83,13 @@ class C1 : C0 {
 }
 
 struct S1 {
-  init(x: Int) {} // expected-note {{'init(x:)' declared here}}
+  init(x: Int) {} // expected-cparser-note {{'init(x:)' declared here}}
 
   func testS1() {
     _ = S1.init(x:)(1)
     _ = S1.init(`x`: 1)  // expected-warning {{keyword 'x' does not need to be escaped in argument list}} {{17-18=}} {{19-20=}}
 
     // Test for unknown token.
-    _ = S1.init(x: 0xG) // expected-error {{'G' is not a valid hexadecimal digit (0-9, A-F) in integer literal}} expected-error {{missing argument for parameter 'x' in call}}
+    _ = S1.init(x: 0xG) // expected-error {{'G' is not a valid hexadecimal digit (0-9, A-F) in integer literal}} expected-cparser-error {{missing argument for parameter 'x' in call}}
   }
 }

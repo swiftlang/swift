@@ -29,8 +29,8 @@ c = .Blue
 
 let partialApplication = Color.Grayscale
 
-// Cases are excluded from non-enums.
-case FloatingCase // expected-error{{enum 'case' is not allowed outside of an enum}}
+// Cases are excluded from non-enums. (The one at file scope is in
+// enum_case_outside_enum.swift: SwiftParser takes the rest of the file as its body.)
 
 struct SomeStruct {
   case StructCase // expected-error{{enum 'case' is not allowed outside of an enum}}
@@ -55,15 +55,15 @@ enum EnumCaseAttributes {
 
 // Recover when a switch 'case' label is spelled inside an enum (or outside).
 enum SwitchEnvy {
-  case X: // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case X(Y): // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case X, Y: // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case X where true: // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case X(Y), Z(W): // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case X(Y) where true: // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case 0: // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case _: // expected-error{{'case' label can only appear inside a 'switch' statement}}
-  case (_, var x, 0): // expected-error{{'case' label can only appear inside a 'switch' statement}}
+  case X: // expected-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-note {{'X' previously declared here}} expected-astgen-note {{'X' previously declared here}}
+  case X(Y): // expected-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{cannot find type 'Y' in scope}}
+  case X, Y: // expected-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{invalid redeclaration of 'X'}}
+  case X where true: // expected-cparser-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{unexpected code 'where true:' in enum}} expected-astgen-error {{invalid redeclaration of 'X'}}
+  case X(Y), Z(W): // expected-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{cannot find type 'Y' in scope}} expected-astgen-error {{cannot find type 'W' in scope}}
+  case X(Y) where true: // expected-cparser-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{unexpected code 'where true:' in enum}} expected-astgen-error {{cannot find type 'Y' in scope}}
+  case 0: // expected-cparser-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{identifier can only start with a letter or underscore, not a number}} expected-astgen-error {{unexpected code ':' in enum}}
+  case _: // expected-cparser-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{'_' cannot be used as an identifier here}} expected-astgen-error {{unexpected code ':' in enum}}
+  case (_, var x, 0): // expected-cparser-error{{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{expected identifier in enum case}} expected-astgen-error {{expected ':' and type in parameter}} expected-astgen-error {{unexpected code '0' in parameter clause}} expected-astgen-error {{unexpected code ':' in enum}}
 }
 
 enum HasMethodsPropertiesAndCtors {
@@ -93,13 +93,13 @@ enum ImproperlyHasIVars {
 
 // We used to crash on this.  rdar://14678675
 enum rdar14678675 {
-  case U1, // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case U1, // expected-cparser-error{{expected identifier after comma in enum 'case' declaration}} expected-astgen-error {{expected identifier in enum case}}
   case U2 
   case U3
 }
 
 enum Recovery1 {
-  case: // expected-error {{'case' label can only appear inside a 'switch' statement}} expected-error {{expected pattern}}
+  case: // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{unexpected code ':' in enum}} expected-cparser-error {{expected pattern}} expected-astgen-error {{expected identifier in enum case}}
 }
 enum Recovery2 {
   case UE1: // expected-error {{'case' label can only appear inside a 'switch' statement}}
@@ -107,19 +107,19 @@ enum Recovery2 {
 enum Recovery3 {
   case UE2(Void): // expected-error {{'case' label can only appear inside a 'switch' statement}}
 }
-enum Recovery4 { // expected-note {{in declaration of 'Recovery4'}}
-  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-error {{expected declaration}}
+enum Recovery4 { // expected-cparser-note {{in declaration of 'Recovery4'}}
+  case Self Self // expected-error {{keyword 'Self' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-12=`Self`}} expected-cparser-error {{consecutive declarations on a line must be separated by ';'}} {{12-12=;}} expected-cparser-error {{expected declaration}} expected-astgen-error {{unexpected 'Self' keyword in enum}}
 }
 enum Recovery5 {
-  case .UE3 // expected-error {{extraneous '.' in enum 'case' declaration}} {{8-9=}}
+  case .UE3 // expected-cparser-error {{extraneous '.' in enum 'case' declaration}} {{8-9=}} expected-astgen-error {{unexpected code '.' in enum case}}
   case .UE4, .UE5
-  // expected-error@-1{{extraneous '.' in enum 'case' declaration}} {{8-9=}}
-  // expected-error@-2{{extraneous '.' in enum 'case' declaration}} {{14-15=}}
+  // expected-cparser-error@-1{{extraneous '.' in enum 'case' declaration}} {{8-9=}} expected-astgen-error@-1 {{unexpected code '.' in enum case}}
+  // expected-cparser-error@-2{{extraneous '.' in enum 'case' declaration}} {{14-15=}} expected-astgen-error@-2 {{unexpected code '.' in enum case}}
 }
 enum Recovery6 {
-  case Snout, _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}} expected-note {{'_' previously declared here}}
-  case _; // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}} expected-error {{invalid redeclaration of '_'}}
-  case Tusk, // expected-error {{expected identifier after comma in enum 'case' declaration}}
+  case Snout, _; // expected-cparser-error {{keyword '_' cannot be used as an identifier here}} expected-astgen-error {{'_' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{15-16=`_`}} expected-cparser-note {{'_' previously declared here}}
+  case _; // expected-cparser-error {{keyword '_' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}} expected-cparser-error {{invalid redeclaration of '_'}} expected-astgen-error {{'_' cannot be used as an identifier here}}
+  case Tusk, // expected-cparser-error {{expected identifier after comma in enum 'case' declaration}} expected-astgen-error {{expected identifier in enum case}}
 } 
 
 enum RawTypeEmpty : Int {} // expected-error {{an enum with no cases cannot declare a raw type}} expected-note {{add stubs for conformance}}
@@ -471,8 +471,8 @@ enum switch {} // expected-error {{keyword 'switch' cannot be used as an identif
 
 enum SE0155 {
   case emptyArgs() // expected-warning {{enum element with associated values must have at least one associated value}}
-  // expected-note@-1 {{did you mean to remove the empty associated value list?}} {{17-19=}}
-  // expected-note@-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
+  // expected-note @-1 {{did you mean to remove the empty associated value list?}} {{17-19=}}
+  // expected-note @-2 {{did you mean to explicitly add a 'Void' associated value?}} {{18-18=Void}}
 }
 
 // https://github.com/apple/swift/issues/53662
@@ -491,7 +491,7 @@ enum E_53662_var {
 
 enum E_53662_underscore {
   case identifier
-  case _ // expected-error {{keyword '_' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
+  case _ // expected-cparser-error {{keyword '_' cannot be used as an identifier here}} expected-astgen-error {{'_' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{8-9=`_`}}
   case identifier2
 }
 
@@ -502,26 +502,26 @@ enum E_53662_Comma {
 enum E_53662_Newline {
   case identifier1
   case identifier2
-  case 
-  case identifier // expected-error {{keyword 'case' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`case`}}
+  case // expected-astgen-error {{expected identifier in enum case}}
+  case identifier // expected-cparser-error {{keyword 'case' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`case`}}
 }
 
 enum E_53662_Newline2 {
-  case 
-  func foo() {} // expected-error {{keyword 'func' cannot be used as an identifier here}} expected-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`func`}}
+  case // expected-astgen-error {{expected identifier in enum case}}
+  func foo() {} // expected-cparser-error {{keyword 'func' cannot be used as an identifier here}} expected-cparser-note {{if this name is unavoidable, use backticks to escape it}} {{3-7=`func`}}
 }
 
 enum E_53662_PatternMatching {
-  case let .foo(x, y): // expected-error {{'case' label can only appear inside a 'switch' statement}}
+  case let .foo(x, y): // expected-cparser-error {{'case' label can only appear inside a 'switch' statement}} expected-astgen-error {{keyword 'let' cannot be used as an identifier here}} expected-astgen-note {{if this name is unavoidable, use backticks to escape it}} expected-astgen-error {{unexpected code '.' in enum}} expected-astgen-error {{expected 'func' in function}} expected-astgen-error {{expected ':' and type in parameter}} expected-astgen-error {{expected ':' and type in parameter}} expected-astgen-error {{unexpected code ':' in enum}}
 }
 
 enum CasesWithMissingElement: Int {
   // expected-error@-1 {{'CasesWithMissingElement' declares raw type 'Int', but does not conform to RawRepresentable and conformance could not be synthesized}}
   // expected-note@-2 {{add stubs for conformance}}
 
-  case a = "hello", // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case a = "hello", // expected-cparser-error{{expected identifier after comma in enum 'case' declaration}} expected-astgen-error {{expected identifier in enum case}}
   // expected-error@-1 {{cannot convert value of type 'String' to raw type 'Int'}}
 
-  case b = "hello", // expected-error{{expected identifier after comma in enum 'case' declaration}}
+  case b = "hello", // expected-cparser-error{{expected identifier after comma in enum 'case' declaration}} expected-astgen-error {{expected identifier in enum case}}
   // expected-error@-1 {{cannot convert value of type 'String' to raw type 'Int'}}
 }

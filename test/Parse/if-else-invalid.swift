@@ -4,18 +4,20 @@
 // RUN: %target-typecheck-verify-swift
 
 do {
-  func something() -> Bool {}
+  // The statements ASTGen keeps after a bad 'else' are type-checked, so keep
+  // them free of semantic diagnostics.
+  @discardableResult func something() -> Bool {}
   func foo() {}
 
   do {
     if something() {
-    // expected-error@+1:11 {{expected '{' or 'if' after 'else'}}{{none}}
+    // expected-error@+1:11 {{expected '{' or 'if' after 'else'}}{{none}} expected-astgen-error@+1:11 {{expected '}' to end 'if' statement}}
     } else
   }
 
   do {
     if something() {
-    // expected-error@+1:11 {{expected '{' or 'if' after 'else'}}{{none}}
+    // expected-error@+1:11 {{expected '{' or 'if' after 'else'}}{{none}} expected-astgen-error@+1:11 {{expected '}' to end 'if' statement}}
     } else
     foo()
   }
@@ -37,8 +39,8 @@ do {
 
  do {
     if something() {
-    // expected-error@+1:12 {{expected '{' or 'if' after 'else'}}{{none}}
+    // expected-error@+1:12 {{expected '{' or 'if' after 'else'}}{{none}} expected-astgen-error@+2:10 {{expected '}' to end 'if' statement}}
     } else something()
-    foo1()
+    foo()
   }
 }

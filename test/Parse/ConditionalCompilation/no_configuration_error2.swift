@@ -6,4 +6,4 @@
 // expected-error@-1 {{incomplete condition in conditional compilation directive}}
 class D {}
 #endif
-// expected-error@-1 {{unexpected conditional compilation block terminator}}
+// expected-cparser-error@-1 {{unexpected conditional compilation block terminator}}

@@ -79,7 +79,7 @@ multiple_trailing_with_defaults(duration: 42) {} // expected-warning{{backward m
 
 multiple_trailing_with_defaults(duration: 42) {} completion: {}
 
-func test_multiple_trailing_syntax_without_labels() {
+func test_multiple_trailing_syntax_without_labels() { //
   func fn(f: () -> Void, g: () -> Void) {}
 
   fn {} g: {} // Ok
@@ -111,14 +111,14 @@ func produce(fn: () -> Int?, default d: () -> Int) -> Int { // expected-note {{d
 }
 // TODO: The diagnostics here are perhaps a little overboard.
 _ = produce { 0 } default: { 1 } // expected-error {{missing argument for parameter 'default' in call}} expected-error {{consecutive statements}} expected-error {{'default' label can only appear inside a 'switch' statement}}
-_ = produce { 2 } `default`: { 3 } // expected-error {{labeled block needs 'do'}} expected-warning {{integer literal is unused}}
+_ = produce { 2 } `default`: { 3 } // expected-cparser-error {{labeled block needs 'do'}} expected-cparser-warning {{integer literal is unused}}
 
 func f() -> Int { 42 }
 
 // This should be interpreted as a trailing closure, instead of being 
 // interpreted as a computed property with undesired initial value.
 struct TrickyTest {
-    var x : Int = f () { // expected-error {{extra trailing closure passed in call}}
+    var x : Int = f () { // expected-cparser-error {{extra trailing closure passed in call}}
         3
     }
 }
@@ -128,7 +128,7 @@ struct IsolationTest {
 
   func test() {
     acceptClosureWithParameter {
-      nonisolated parameter in return parameter // expected-error {{the parameter list of a 'nonisolated' closure requires parentheses}} {{19-19=(}} {{29-29=)}}
+      nonisolated parameter in return parameter // expected-cparser-error {{the parameter list of a 'nonisolated' closure requires parentheses}} {{19-19=(}} {{29-29=)}}
     }
   }
-}
+} //

@@ -1,11 +1,11 @@
 // RUN: %target-typecheck-verify-swift -swift-version 6
 
-@ MainActor  // expected-error {{extraneous whitespace between '@' and attribute name}}
+@ MainActor  // expected-cparser-error {{extraneous whitespace between '@' and attribute name}} expected-astgen-error {{extraneous whitespace after '@' is not permitted}}
 class Foo {
-  func funcWithEscapingClosure(_ x: @ escaping () -> Int) {} // expected-error {{extraneous whitespace between '@' and attribute name}}
+  func funcWithEscapingClosure(_ x: @ escaping () -> Int) {} // expected-cparser-error {{extraneous whitespace between '@' and attribute name}} expected-astgen-error {{extraneous whitespace after '@' is not permitted}}
 }
 
-@available (*, deprecated) // expected-error {{extraneous whitespace between attribute name and '('}}
+@available (*, deprecated) // expected-cparser-error {{extraneous whitespace between attribute name and '('}} expected-astgen-error {{extraneous whitespace before '(' is not permitted}}
 func deprecated() {}
 
 @propertyWrapper
@@ -16,11 +16,11 @@ struct MyPropertyWrapper {
 }
 
 struct PropertyWrapperTest {
-  @MyPropertyWrapper (param: 2)  // expected-error {{extraneous whitespace between attribute name and '('}}
+  @MyPropertyWrapper (param: 2)  // expected-cparser-error {{extraneous whitespace between attribute name and '('}} expected-astgen-error {{extraneous whitespace before '(' is not permitted}}
   var x: Int
 
   @MyPropertyWrapper
-  (param: 2) // expected-error {{expected 'var' keyword in property declaration}} expected-error {{property declaration does not bind any variables}} expected-error {{expected pattern}}
+  (param: 2) // expected-cparser-error {{expected 'var' keyword in property declaration}} expected-cparser-error {{property declaration does not bind any variables}} expected-cparser-error {{expected pattern}} expected-astgen-error {{unexpected code '(param: 2)' in variable}}
   var y: Int
 }
 
@@ -34,14 +34,14 @@ let closure2 = { @MainActor
   let _: Int = a
 }
 
-// expected-error@+1 {{extraneous whitespace between '@' and attribute name}}
+// expected-cparser-error@+1 {{extraneous whitespace between '@' and attribute name}} expected-astgen-error@+1 {{extraneous whitespace after '@' is not permitted}}
 @ 
 MainActor
 func mainActorFunc() {}
 
 
 @inline // expected-error {{expected '(' in 'inline' attribute}}
-(never) func neverInline() {} // expected-error {{expected declaration}}
+(never) func neverInline() {} // expected-cparser-error {{expected declaration}} expected-astgen-error {{unexpected code '(never)' in function}}
 
 @objc
-(whatever) func whateverObjC() {} // expected-error {{expected declaration}}
+(whatever) func whateverObjC() {} // expected-cparser-error {{expected declaration}} expected-astgen-error {{unexpected code '(whatever)' in function}}
