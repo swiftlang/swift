@@ -1250,21 +1250,20 @@ public:
   template <typename StorageType>
   void emitDebugVariableDeclaration(
       StorageType Storage, DebugTypeInfo Ty, SILType SILTy,
-      const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
-      bool InCoroContext = false,
+      SILDebugVariable VarInfo, bool InCoroContext = false,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
     assert(IGM.DebugInfo && "debug info not enabled");
 
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(
-          Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
+          Builder, Storage, Ty, VarInfo, InCoroContext,
           ArtificialKind::RealValue, DbgInstrKind);
       return;
     }
 
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
+        Builder, Storage, Ty, VarInfo, InCoroContext,
         ArtificialKind::RealValue, DbgInstrKind);
   }
 
@@ -6337,8 +6336,7 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
   auto DbgTy = DebugTypeInfo::getErrorResult(
       ErrorInfo.getReturnValueType(IGM.getSILModule(), FnTy,
                                    IGM.getMaximalTypeExpansionContext()),IGM);
-  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
-                                         getDebugScope(), {}, *Var,
+  IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy, *Var,
                                          /*InCoroContext=*/false, ArtificialValue);
 }
 
@@ -6521,8 +6519,8 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
     return;
 
   emitDebugVariableDeclaration(
-      Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), VarInfo,
-      IsInCoro, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
+      Copy, DbgTy, SILTy, VarInfo, IsInCoro,
+      AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
 
   // Erase any LLVM instructions emitted by the debug BB. They were only needed
   // to produce the dbg intrinsic; salvage converts references into DWARF exprs.
@@ -7062,7 +7060,7 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
     }
 
     emitDebugVariableDeclaration(
-        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, IsInCoro,
+        addr, DbgTy, SILTy, *VarInfo, IsInCoro,
         AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
   }
 }
@@ -7358,8 +7356,7 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
 
   IGM.DebugInfo->emitVariableDeclaration(
-      Builder, Storage, DbgTy, i->getDebugScope(), i->getLoc(), *VarInfo,
-      InCoroContext(*CurSILFn, *i));
+      Builder, Storage, DbgTy, *VarInfo, InCoroContext(*CurSILFn, *i));
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {
