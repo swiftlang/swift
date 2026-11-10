@@ -156,8 +156,7 @@ public:
     auto value = TI.getFixedExtraInhabitantValue(IGM, bits, 0);
     IRABIDetailsProvider::ExtraInhabitant result;
     for (unsigned i = 0; i < layout->size; ++i) {
-      unsigned offset =
-          IGM.Triple.isLittleEndian() ? i : layout->size - i - 1;
+      unsigned offset = IGM.Triple.isLittleEndian() ? i : layout->size - i - 1;
       result.mask.push_back(mask.extractBitsAsZExtValue(8, offset * 8));
       result.value.push_back(value.extractBitsAsZExtValue(8, offset * 8));
     }

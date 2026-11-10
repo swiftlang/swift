@@ -442,9 +442,9 @@ void ClangValueTypePrinter::printValueTypeDecl(
             os << cxx_synthesis::getCxxOpaqueStorageClassName()
                << "(vwTable->size, vwTable->getAlignment());\n";
           }
-          os << "    vwTable->initializeWithCopy(" << copyStorage << ", "
-                "const_cast<char "
-                "*>(other._getOpaquePointer()), metadata._0);\n";
+          os << "    vwTable->initializeWithCopy(" << copyStorage
+             << ", const_cast<char *>(other._getOpaquePointer()), "
+                "metadata._0);\n";
         }
         os << "  }\n";
       }
@@ -637,8 +637,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
         if (!first)
           os << " &&\n           ";
         first = false;
-        os << "(static_cast<unsigned char>(_storage[" << i << "]) & "
-           << mask << ") == " << (extraInhabitant->value[i] & mask);
+        os << "(static_cast<unsigned char>(_storage[" << i << "]) & " << mask
+           << ") == " << (extraInhabitant->value[i] & mask);
       }
       os << ";\n  }\n";
       os << "  ";

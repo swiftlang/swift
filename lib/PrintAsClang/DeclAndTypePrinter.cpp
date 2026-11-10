@@ -782,9 +782,10 @@ private:
             [&](auto &types) {
               auto *ED = elementDecl->getParentEnum();
               // Printing function body
-              StringRef resultStorage = owningPrinter.hasInlineMovedFromState(ED)
-                                            ? "result._storage"
-                                            : "result._getOpaquePointer()";
+              StringRef resultStorage =
+                  owningPrinter.hasInlineMovedFromState(ED)
+                      ? "result._storage"
+                      : "result._getOpaquePointer()";
               outOfLineOS << "    auto result = ";
               outOfLineSyntaxPrinter.printNominalTypeQualifier(
                   ED, ED->getModuleContext());
@@ -803,9 +804,8 @@ private:
                                     << cxx_synthesis::getCxxImplNamespaceName()
                                     << "::_impl_RefCountedClass::"
                                        "copyOpaquePointer(val);\n";
-                        outOfLineOS
-                            << "    memcpy(" << resultStorage
-                            << ", &ptr, sizeof(ptr));\n";
+                        outOfLineOS << "    memcpy(" << resultStorage
+                                    << ", &ptr, sizeof(ptr));\n";
                         outOfLineOS << "} else if constexpr (::swift::"
                                     << cxx_synthesis::getCxxImplNamespaceName()
                                     << "::isValueType<" << type << ">) {\n";
@@ -830,9 +830,8 @@ private:
                         outOfLineOS << ">::type::getOpaquePointer(*valCopy)";
                         outOfLineOS << ");\n";
                         outOfLineOS << "} else {\n";
-                        outOfLineOS
-                            << "    memcpy(" << resultStorage
-                            << ", &val, sizeof(val));\n";
+                        outOfLineOS << "    memcpy(" << resultStorage
+                                    << ", &val, sizeof(val));\n";
                         outOfLineOS << "}\n";
                       });
                 } else {
@@ -847,9 +846,8 @@ private:
                   assert(objectTypeDecl != nullptr || paramType->isOptional());
 
                   if (isTriviallyCopyable(objectTypeDecl, optKind)) {
-                    outOfLineOS
-                        << "    memcpy(" << resultStorage
-                        << ", &val, sizeof(val));\n";
+                    outOfLineOS << "    memcpy(" << resultStorage
+                                << ", &val, sizeof(val));\n";
                   } else if (isa_and_nonnull<ClassDecl>(objectTypeDecl)) {
                     outOfLineOS
                         << "    auto op = swift::"
@@ -3289,8 +3287,8 @@ bool DeclAndTypePrinter::isOpaqueLayout(const NominalTypeDecl *decl) {
     return true;
   // The size and alignment are also unknown when a field is resilient.
   if (!interopContext.getIrABIDetails().getTypeSizeAlignment(
-      decl, decl->hasGenericParamList() ? ResilienceExpansion::Minimal
-                                        : ResilienceExpansion::Maximal))
+          decl, decl->hasGenericParamList() ? ResilienceExpansion::Minimal
+                                            : ResilienceExpansion::Maximal))
     return true;
   // A noncopyable inline wrapper needs an invalid Swift representation for
   // its moved-from state. Otherwise use the allocation's null state.
