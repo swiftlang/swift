@@ -4562,10 +4562,55 @@ namespace {
             unsatisfiedIsolation, setThrows, usesDistributedThunk);
       }
 
+      // A ~Transferable value can never cross an isolation boundary.
+      diagnoseNonTransferableArgumentsAndResult(apply, fnType, calleeDecl,
+                                                getContextIsolation(),
+                                                *unsatisfiedIsolation);
+
       // Sendable checking for arguments and results are deferred to region
       // isolation.
 
       return false;
+    }
+
+    void diagnoseNonTransferableArgumentsAndResult(
+        ApplyExpr *apply, FunctionType *fnType, ValueDecl *calleeDecl,
+        ActorIsolation contextIsolation, ActorIsolation calleeIsolation) {
+      bool exits = !calleeIsolation.isActorIsolated();
+      // A synchronous nonisolated callee runs on the caller's executor.
+      if (exits && !fnType->isAsync())
+        return;
+
+      auto diagnose = [&](Type type, SourceLoc loc, bool isResult) {
+        type = type->getWithoutSpecifierType();
+        if (type->hasError() || type->isTransferable())
+          return;
+
+        auto isolation = exits ? contextIsolation : calleeIsolation;
+        if (!calleeDecl) {
+          ctx.Diags.diagnose(loc, diag::non_transferable_crosses_isolation,
+                             isResult, type, contextIsolation, calleeIsolation);
+          return;
+        }
+
+        auto diag = isResult
+                        ? (exits ? diag::non_transferable_result_exits_actor
+                                 : diag::non_transferable_result_into_actor)
+                        : (exits ? diag::non_transferable_arg_exits_actor
+                                 : diag::non_transferable_arg_into_actor);
+        ctx.Diags.diagnose(loc, diag, type, calleeDecl, isolation);
+      };
+
+      if (auto *selfApply = dyn_cast<SelfApplyExpr>(
+              apply->getFn()->getValueProvidingExpr())) {
+        auto *base = selfApply->getBase();
+        diagnose(getType(base), base->getStartLoc(), /*isResult=*/false);
+      }
+
+      for (auto arg : *apply->getArgs())
+        diagnose(getType(arg.getExpr()), arg.getStartLoc(), /*isResult=*/false);
+
+      diagnose(fnType->getResult(), apply->getLoc(), /*isResult=*/true);
     }
 
     Expr *getCurrentContextIsolation(Expr *expr) {
