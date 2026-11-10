@@ -6640,6 +6640,9 @@ NOTE(in_derived_witness, none,
 ERROR(non_sendable_arg_into_actor,none,
       "non-Sendable type %0 cannot be sent into %2 context in call to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_isolated_capture,none,
+      "capture of %1 with non-'Transferable' type %0 in a %2 closure",
+      (Type, DeclName, ActorIsolation))
 GROUPED_ERROR(non_sendable_arg_exits_actor,NonSendableExitingActor,none,
       "non-Sendable type %0 cannot exit %2 context in call to nonisolated "
       "%kind1",
