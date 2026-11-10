@@ -675,7 +675,10 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
     if (auto c = dyn_cast<ClassDecl>(theDecl)) {
       
       assert(hasKnownSwiftMetadata(IGF.IGM, c));
-      metadata = emitIdempotentClassMetadataInitialization(IGF, metadata);
+      // The metadata of a Swift subclass of a C++ foreign reference type is not
+      // a class object.
+      if (!c->getForeignReferenceSuperclassOrSelf())
+        metadata = emitIdempotentClassMetadataInitialization(IGF, metadata);
     }
     auto response = MetadataResponse::forComplete(metadata);
     IGF.setScopedLocalTypeMetadata(theType, response);

@@ -110,6 +110,11 @@ namespace irgen {
   /// Emit metadata for a foreign struct, enum or class.
   void emitForeignTypeMetadata(IRGenModule &IGM, NominalTypeDecl *decl);
 
+  /// Emit the metadata of a Swift subclass of a C++ foreign reference type,
+  /// which has the layout of foreign reference type metadata.
+  void emitForeignReferenceSubclassMetadata(IRGenModule &IGM,
+                                            ClassDecl *classDecl);
+
   /// Emit the metadata associated with the given struct declaration.
   void emitStructMetadata(IRGenModule &IGM, StructDecl *theStruct);
 
