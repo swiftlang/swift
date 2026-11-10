@@ -1201,16 +1201,16 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
       if (!rawMutableIteratorProto)
         return false;
 
-      // Check if present: `func __beginMutatingUnsafe() -> RawMutableIterator`
-      auto beginMutatingId = ctx.getIdentifier("__beginMutatingUnsafe");
+      // Check if present: `func beginMutating() -> RawMutableIterator`
+      auto beginMutatingId = ctx.getIdentifier("beginMutating");
       auto beginMutating =
           lookupDirectSingleWithoutExtensions<FuncDecl>(decl, beginMutatingId);
       if (!beginMutating)
         return false;
       auto rawMutableIteratorTy = beginMutating->getResultInterfaceType();
 
-      // Check if present: `func __endMutatingUnsafe() -> RawMutableIterator`
-      auto endMutatingId = ctx.getIdentifier("__endMutatingUnsafe");
+      // Check if present: `func endMutating() -> RawMutableIterator`
+      auto endMutatingId = ctx.getIdentifier("endMutating");
       auto endMutating =
           lookupDirectSingleWithoutExtensions<FuncDecl>(decl, endMutatingId);
       if (!endMutating)

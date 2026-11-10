@@ -28,9 +28,11 @@ public protocol CxxDictionary<Key, Value>: ExpressibleByDictionaryLiteral {
   init()
 
   /// Do not implement this function manually in Swift.
-  func __findUnsafe(_ key: Key) -> RawIterator
+  @unsafe(always)
+  func find(_ key: Key) -> RawIterator
   /// Do not implement this function manually in Swift.
-  mutating func __findMutatingUnsafe(_ key: Key) -> RawMutableIterator
+  @unsafe(always)
+  mutating func findMutating(_ key: Key) -> RawMutableIterator
 
   /// Do not implement this function manually in Swift.
   @discardableResult
@@ -45,13 +47,16 @@ public protocol CxxDictionary<Key, Value>: ExpressibleByDictionaryLiteral {
   mutating func __eraseUnsafe(_ iter: RawMutableIterator) -> RawMutableIterator
 
   /// Do not implement this function manually in Swift.
-  func __beginUnsafe() -> RawIterator
+  @unsafe(always)
+  func begin() -> RawIterator
 
   /// Do not implement this function manually in Swift.
-  func __endUnsafe() -> RawIterator
+  @unsafe(always)
+  func end() -> RawIterator
 
   /// Do not implement this function manually in Swift.
-  mutating func __endMutatingUnsafe() -> RawMutableIterator
+  @unsafe(always)
+  mutating func endMutating() -> RawMutableIterator
 }
 
 extension CxxDictionary {
@@ -85,8 +90,8 @@ extension CxxDictionary {
     self.init()
     for value in values {
       let key = try keyForValue(value)
-      var iter = __findMutatingUnsafe(key)
-      if iter != __endMutatingUnsafe() {
+      var iter = unsafe findMutating(key)
+      if unsafe iter != endMutating() {
         iter.pointee.second.push_back(value)
       } else {
         var vector = Value()
@@ -99,8 +104,8 @@ extension CxxDictionary {
   @inlinable
   public subscript(key: Key) -> Value? {
     get {
-      let iter = __findUnsafe(key)
-      guard iter != __endUnsafe() else {
+      let iter = unsafe find(key)
+      guard unsafe iter != end() else {
         return nil
       }
       return iter.pointee.second
@@ -110,8 +115,8 @@ extension CxxDictionary {
         self.erase(key)
         return
       }
-      var iter = self.__findMutatingUnsafe(key)
-      if iter != self.__endMutatingUnsafe() {
+      var iter = unsafe self.findMutating(key)
+      if unsafe iter != self.endMutating() {
         // This key already exists in the dictionary.
         iter.pointee.second = newValue
       } else {
@@ -127,15 +132,15 @@ extension CxxDictionary {
     key: Key, default defaultValue: @autoclosure () -> Value
   ) -> Value {
     get {
-      let iter = __findUnsafe(key)
-      guard iter != __endUnsafe() else {
+      let iter = unsafe find(key)
+      guard unsafe iter != end() else {
         return defaultValue()
       }
       return iter.pointee.second
     }
     set(newValue) {
-      var iter = self.__findMutatingUnsafe(key)
-      if iter != self.__endMutatingUnsafe() {
+      var iter = unsafe self.findMutating(key)
+      if unsafe iter != self.endMutating() {
         iter.pointee.second = newValue
       } else {
         let keyValuePair = Element(first: key, second: newValue)
@@ -150,8 +155,8 @@ extension CxxDictionary {
   ) throws(E) -> R where R: CxxDictionary, R.Key == Key {
     var result = R.init()
 
-    var iterator = __beginUnsafe()
-    let endIterator = __endUnsafe()
+    var iterator = unsafe begin()
+    let endIterator = unsafe end()
 
     while iterator != endIterator {
       let pair = iterator.pointee
@@ -176,8 +181,8 @@ extension CxxDictionary {
   ) throws(E) -> R where R: CxxDictionary, R.Key == Key {
     var result = R.init()
 
-    var iterator = __beginUnsafe()
-    let endIterator = __endUnsafe()
+    var iterator = unsafe begin()
+    let endIterator = unsafe end()
 
     while iterator != endIterator {
       let pair = iterator.pointee
@@ -200,8 +205,8 @@ extension CxxDictionary {
 
   public func filter(_ isIncluded: (_ key: Key, _ value: Value) throws -> Bool) rethrows -> Self {
     var filteredDictionary = Self.init()
-    var iterator = __beginUnsafe()
-    let endIterator = __endUnsafe()
+    var iterator = unsafe begin()
+    let endIterator = unsafe end()
 
     while iterator != endIterator {
       let pair = iterator.pointee
@@ -219,8 +224,8 @@ extension CxxDictionary {
   @inlinable
   @discardableResult
   public mutating func removeValue(forKey key: Key) -> Value? {
-    let iter = self.__findMutatingUnsafe(key)
-    guard iter != self.__endMutatingUnsafe() else { return nil }
+    let iter = unsafe self.findMutating(key)
+    guard unsafe iter != self.endMutating() else { return nil }
 
     let value = iter.pointee.second
     self.__eraseUnsafe(iter)
@@ -233,8 +238,8 @@ extension CxxDictionary {
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value
   ) throws(E) where S.Element == (Key, Value) {
     for (key, value) in other {
-      var iter = self.__findMutatingUnsafe(key)
-      if iter != self.__endMutatingUnsafe() {
+      var iter = unsafe self.findMutating(key)
+      if unsafe iter != self.endMutating() {
         iter.pointee.second = try combine(iter.pointee.second, value)
       } else {
         let keyValuePair = Element(first: key, second: value)
@@ -249,8 +254,8 @@ extension CxxDictionary {
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value
   ) throws(E) where Key: Hashable {
     for (key, value) in other {
-      var iter = self.__findMutatingUnsafe(key)
-      if iter != self.__endMutatingUnsafe() {
+      var iter = unsafe self.findMutating(key)
+      if unsafe iter != self.endMutating() {
         iter.pointee.second = try combine(iter.pointee.second, value)
       } else {
         let keyValuePair = Element(first: key, second: value)
@@ -264,10 +269,10 @@ extension CxxDictionary {
     _ other: __owned T,
     uniquingKeysWith combine: (Value, Value) throws(E) -> Value
   ) throws(E) where T.Key == Key, T.Value == Value {
-    var iterator = other.__beginUnsafe()
-    while iterator != other.__endUnsafe() {
-      var iter = self.__findMutatingUnsafe(iterator.pointee.first)
-      if iter != self.__endMutatingUnsafe() {
+    var iterator = unsafe other.begin()
+    while unsafe iterator != other.end() {
+      var iter = unsafe self.findMutating(iterator.pointee.first)
+      if unsafe iter != self.endMutating() {
         iter.pointee.second = try combine(iter.pointee.second, iterator.pointee.second)
       } else {
         let keyValuePair = Element(first: iterator.pointee.first, second: iterator.pointee.second)
@@ -313,12 +318,51 @@ extension Dictionary {
   public init(_ dictionary: some CxxDictionary<Key, Value>) {
     self.init()
 
-    var it = dictionary.__beginUnsafe()
-    let endIterator = dictionary.__endUnsafe()
+    var it = unsafe dictionary.begin()
+    let endIterator = unsafe dictionary.end()
     while it != endIterator {
       self[it.pointee.first] = it.pointee.second
       it = it.successor()
     }
     withExtendedLifetime(dictionary) {}
+  }
+}
+
+extension CxxDictionary {
+  @available(*, deprecated, renamed: "find(_:)")
+  @unsafe
+  @inlinable
+  public func __findUnsafe(_ key: Key) -> RawIterator {
+    unsafe find(key)
+  }
+
+  @available(*, deprecated, renamed: "findMutating(_:)")
+  @unsafe
+  @inlinable
+  public mutating func __findMutatingUnsafe(_ key: Key) -> RawMutableIterator {
+    unsafe findMutating(key)
+  }
+
+  @available(*, deprecated, renamed: "begin()")
+  @unsafe
+  @_disfavoredOverload
+  @inlinable
+  public func __beginUnsafe() -> RawIterator {
+    unsafe begin()
+  }
+
+  @available(*, deprecated, renamed: "end()")
+  @unsafe
+  @_disfavoredOverload
+  @inlinable
+  public func __endUnsafe() -> RawIterator {
+    unsafe end()
+  }
+
+  @available(*, deprecated, renamed: "endMutating()")
+  @unsafe
+  @inlinable
+  public mutating func __endMutatingUnsafe() -> RawMutableIterator {
+    unsafe endMutating()
   }
 }

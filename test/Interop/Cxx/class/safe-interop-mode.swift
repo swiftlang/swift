@@ -270,6 +270,8 @@ func useSafeEscapableIf(x: SafeEscapableIf) {
 func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     let _ = c.__beginUnsafe() // expected-note{{reference to unsafe instance method '__beginUnsafe()'}}
+    // expected-warning@-1{{'__beginUnsafe()' is deprecated: renamed to 'begin()'}}
+    // expected-note@-2{{use 'begin()' instead}}
 }
 
 #if canImport(CoreFoundation)

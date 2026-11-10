@@ -82,10 +82,12 @@ struct GoodStruct {
 // NOTE-MISSING: static func +(lhs: GoodStruct, rhs: Never) -> Int32
 //
 // CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
+// CHECK-NEXT:   @available(*, deprecated, renamed: "begin()")
 // CHECK-NEXT:   func __beginUnsafe() -> Never
 // CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func begin() -> Never
 // CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
+// CHECK-NEXT:   @available(*, deprecated, renamed: "end()")
 // CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT:   @available(*, unavailable, message: "return type is unavailable in Swift")
 // CHECK-NEXT:   func end() -> Never

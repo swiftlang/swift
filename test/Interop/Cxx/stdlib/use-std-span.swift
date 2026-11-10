@@ -731,17 +731,17 @@ StdSpanTestSuite.test("Init span from empty buffer") {
     let cs3 = ConstSpanOfInt(UnsafeBufferPointer(emptySlice))
     expectEqual(cs3.size(), 0)
     expectTrue(cs3.empty())
-    expectEqual(cs3.__dataUnsafe(), UnsafePointer(emptySlice.baseAddress))
+    expectEqual(unsafe cs3.data(), UnsafePointer(emptySlice.baseAddress))
 
     let cs4 = ConstSpanOfInt(emptySlice)
     expectEqual(cs4.size(), 0)
     expectTrue(cs4.empty())
-    expectEqual(cs4.__dataUnsafe(), UnsafePointer(emptySlice.baseAddress))
+    expectEqual(unsafe cs4.data(), UnsafePointer(emptySlice.baseAddress))
 
     let s2 = SpanOfInt(emptySlice)
     expectEqual(s2.size(), 0)
     expectTrue(s2.empty())
-    expectEqual(s2.__dataUnsafe(), emptySlice.baseAddress)
+    expectEqual(unsafe s2.data(), emptySlice.baseAddress)
   }
 }
 
@@ -773,13 +773,13 @@ StdSpanTestSuite.test("Convert empty Swift span with nil base address")
       let cxxSpan = ConstSpanOfInt(s)
       expectEqual(cxxSpan.size(), 0)
       expectTrue(cxxSpan.empty())
-      expectEqual(cxxSpan.__dataUnsafe(), UnsafePointer(emptySlice.baseAddress))
+      expectEqual(unsafe cxxSpan.data(), UnsafePointer(emptySlice.baseAddress))
 
       let ms = MutableSpan(_unsafeElements: emptySlice)
       let cxxMutSpan = SpanOfInt(ms)
       expectEqual(cxxMutSpan.size(), 0)
       expectTrue(cxxMutSpan.empty())
-      expectEqual(cxxMutSpan.__dataUnsafe(), emptySlice.baseAddress)
+      expectEqual(unsafe cxxMutSpan.data(), emptySlice.baseAddress)
     }
   }
 }

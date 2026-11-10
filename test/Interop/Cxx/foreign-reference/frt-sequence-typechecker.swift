@@ -17,8 +17,8 @@ let _ = ipv.begin() // expected-error {{must be marked with 'unsafe'}}
 // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
 let _ = ipv.end() // expected-error {{must be marked with 'unsafe'}}
 // expected-note@-1 {{reference to unsafe instance method 'end()'}}
-let _ = ipv.__beginUnsafe()
-let _ = ipv.__endUnsafe()
+let _ = ipv.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+let _ = ipv.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 for i in ipv {
   let _: ImmortalNode? = i
 }
@@ -36,8 +36,8 @@ let _ = spv.begin() // expected-error {{must be marked with 'unsafe'}}
 // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
 let _ = spv.end() // expected-error {{must be marked with 'unsafe'}}
 // expected-note@-1 {{reference to unsafe instance method 'end()'}}
-let _ = spv.__beginUnsafe()
-let _ = spv.__endUnsafe()
+let _ = spv.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+let _ = spv.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 for i in spv {
   let _: SharedNode? = i
 }
@@ -49,8 +49,8 @@ let _ = ivv.begin() // expected-error {{must be marked with 'unsafe'}}
 // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
 let _ = ivv.end() // expected-error {{must be marked with 'unsafe'}}
 // expected-note@-1 {{reference to unsafe instance method 'end()'}}
-let _ = ivv.__beginUnsafe()
-let _ = ivv.__endUnsafe()
+let _ = ivv.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+let _ = ivv.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 for i in ivv {
   let _: ImmortalNode2 = i
 }
@@ -69,8 +69,8 @@ let _ = rpc.begin() // expected-error {{must be marked with 'unsafe'}}
 // expected-note@-1 {{reference to unsafe instance method 'begin()'}}
 let _ = rpc.end() // expected-error {{must be marked with 'unsafe'}}
 // expected-note@-1 {{reference to unsafe instance method 'end()'}}
-let _: ImmortalNode? = rpc.__beginUnsafe()
-let _: ImmortalNode? = rpc.__endUnsafe()
+let _: ImmortalNode? = rpc.__beginUnsafe() // expected-warning {{'__beginUnsafe()' is deprecated: renamed to 'begin()'}} expected-note {{use 'begin()' instead}}
+let _: ImmortalNode? = rpc.__endUnsafe() // expected-warning {{'__endUnsafe()' is deprecated: renamed to 'end()'}} expected-note {{use 'end()' instead}}
 
 // operator[] returns const ImmortalNode* which is a get-only subscript that
 // returns ImmortalNode? (FRT pointer stripping + nullable pointer).
