@@ -6640,6 +6640,26 @@ NOTE(in_derived_witness, none,
 ERROR(non_sendable_arg_into_actor,none,
       "non-Sendable type %0 cannot be sent into %2 context in call to %kind1",
       (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_arg_into_actor,none,
+      "non-'Transferable' type %0 cannot be sent into %2 context in call to "
+      "%kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_arg_exits_actor,none,
+      "non-'Transferable' type %0 cannot exit %2 context in call to "
+      "nonisolated %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_result_into_actor,none,
+      "non-'Transferable' result type %0 cannot be sent from %2 context in "
+      "call to %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_result_exits_actor,none,
+      "non-'Transferable' result type %0 cannot exit %2 context in call to "
+      "nonisolated %kind1",
+      (Type, const ValueDecl *, ActorIsolation))
+ERROR(non_transferable_crosses_isolation,none,
+      "non-'Transferable' %select{type|result type}0 %1 cannot cross from %2 "
+      "to %3 context",
+      (bool, Type, ActorIsolation, ActorIsolation))
 ERROR(non_transferable_isolated_capture,none,
       "capture of %1 with non-'Transferable' type %0 in a %2 closure",
       (Type, DeclName, ActorIsolation))
