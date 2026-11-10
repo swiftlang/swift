@@ -20,11 +20,11 @@ postfix operator ++*+* : A { }
 // expected-cparser-error@-1 {{only infix operators may declare a precedence}} {{24-28=}} expected-astgen-error@-1 {{only infix operators may declare a precedence}}
 // expected-cparser-error@-2 {{operator should no longer be declared with body}} {{27-31=}} expected-astgen-error@-2 {{operator should not be declared with body}}
 
-postfix operator ++**+ : A // expected-astgen-error {{operator must be declared as 'prefix', 'postfix', or 'infix'}}
-// expected-cparser-error@-1 {{only infix operators may declare a precedence}} {{24-27=}} expected-astgen-error@-1 {{only infix operators may declare a precedence}}
+postfix operator ++**+ : A
+// expected-cparser-error@-1 {{only infix operators may declare a precedence}} {{24-27=}} expected-astgen-error@-1 {{only infix operators may declare a precedence}} expected-astgen-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}}
 
-operator ++*** : A // expected-astgen-error {{only infix operators may declare a precedence}}
-// expected-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}}
+operator ++*** : A
+// expected-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}} expected-astgen-error@-1 {{only infix operators may declare a precedence}}
 
 operator +*+++ { }
 // expected-error@-1 {{operator must be declared as 'prefix', 'postfix', or 'infix'}}

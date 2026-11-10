@@ -14,7 +14,7 @@ import ASTBridging
 import SwiftDiagnostics
 import SwiftIfConfig
 @_spi(ExperimentalLanguageFeatures) import SwiftWarningControl
-@_spi(ExperimentalLanguageFeatures) import SwiftParser
+@_spi(ExperimentalLanguageFeatures) @_spi(Compiler) import SwiftParser
 import SwiftParserDiagnostics
 @_spi(Compiler) import SwiftSyntax
 
@@ -119,7 +119,11 @@ extension Parser.LanguageFeatures {
     mapFeature(.OnceFunctions, to: .onceFunctions)
     mapFeature(.CoroutineFunctions, to: .coroutineFunctions)
     mapFeature(.ExtendedSpecializedAttribute, to: .extendedSpecializedAttribute)
-    mapFeature(.BareSlashRegexLiterals, to: .bareSlashRegexLiterals)
+    // Bare slash regex literals are on for the parser unless the language mode
+    // predates Swift 6 and the feature was not asked for.
+    if context.majorLanguageVersion < 6, !context.langOpts.hasFeature(.BareSlashRegexLiterals) {
+      insert(.disableBareSlashRegexLiterals)
+    }
   }
 }
 
