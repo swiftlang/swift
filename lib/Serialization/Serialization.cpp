@@ -6509,7 +6509,8 @@ public:
         S.DeclTypeAbbrCodes[ProtocolCompositionTypeLayout::Code];
     ProtocolCompositionTypeLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, composition->hasExplicitAnyObject(),
-        inverseCopyable, inverseEscapable, inverseDeinitable, protocols);
+        composition->hasExplicitAnyReference(), inverseCopyable,
+        inverseEscapable, inverseDeinitable, protocols);
   }
 
   void

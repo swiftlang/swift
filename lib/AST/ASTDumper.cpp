@@ -6987,6 +6987,7 @@ namespace {
       printCommon("protocol_composition_type", label);
 
       printFlag(T->hasExplicitAnyObject(), "any_object");
+      printFlag(T->hasExplicitAnyReference(), "any_reference");
 
       for (auto ip : T->getInverses()) {
         switch (ip) {

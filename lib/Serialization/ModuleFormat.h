@@ -1497,6 +1497,7 @@ namespace decls_block {
   TYPE_LAYOUT(ProtocolCompositionTypeLayout,
     PROTOCOL_COMPOSITION_TYPE,
     BCFixed<1>,          // has AnyObject constraint
+    BCFixed<1>,          // has AnyReference constraint
     BCFixed<1>,          // has ~Copyable constraint
     BCFixed<1>,          // has ~Escapable constraint
     BCFixed<1>,          // has ~Deinitable constraint
