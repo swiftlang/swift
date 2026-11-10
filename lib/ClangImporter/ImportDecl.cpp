@@ -4998,15 +4998,18 @@ namespace {
           hasUnsafeAPIAttr(decl) && !isEscapable(resultTypeForEscapability);
 
       auto warnForEscapableReturnType = [&] {
-        if (isEscapableAnnotatedType(retType.getTypePtr())) {
+        if (isEscapableAnnotatedType(resultTypeForEscapability.getTypePtr())) {
           // Swift drops lifetime dependencies on Escapable targets, so this
           // annotation is not enforced. Import the API as @unsafe.
           skipLifetime(
               Diagnostic(diag::cxx_unsafe_skipped_lifetime_escapable_result));
+          auto policy = Impl.getClangASTContext().getPrintingPolicy();
+          policy.SuppressTagKeyword = true;
           Impl.addImportDiagnostic(
               decl,
               Diagnostic(diag::return_escapable_with_lifetimebound,
-                         Impl.SwiftContext.AllocateCopy(retType.getAsString())),
+                         Impl.SwiftContext.AllocateCopy(
+                             resultTypeForEscapability.getAsString(policy))),
               decl->getLocation());
         }
       };
@@ -5098,6 +5101,8 @@ namespace {
 
               paramHasAnnotation[idx] = true;
               unsigned targetIdx;
+              const clang::ParmVarDecl *target = nullptr;
+              clang::QualType targetTy;
               if (hasThisParam && param == clang::LifetimeCaptureByAttr::This) {
                 // A constructor's 'this' is the object it produces, so the
                 // capture is a result dependence.
@@ -5106,8 +5111,22 @@ namespace {
                   continue;
                 }
                 targetIdx = result->getSelfIndex();
+                targetTy = method->getThisType()->getPointeeType();
               } else {
                 targetIdx = param - hasThisParam;
+                target = decl->getParamDecl(targetIdx);
+                targetTy = target->getType().getNonReferenceType();
+              }
+              // Swift drops lifetime dependencies on Escapable targets, so this
+              // annotation is not enforced. Import the API as @unsafe.
+              if (isEscapable(targetTy)) {
+                skipLifetime(Diagnostic(
+                    diag::cxx_unsafe_skipped_lifetime_escapable_target,
+                    annotated != nullptr,
+                    annotated ? annotated->getName() : StringRef(),
+                    target != nullptr,
+                    target ? target->getName() : StringRef()));
+                continue;
               }
               auto &deps = capturedArgDependences
                                .try_emplace(targetIdx, dependencyVecSize)

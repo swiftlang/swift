@@ -108,7 +108,7 @@ View returnsViewLifetimebound(const Owner &o [[clang::lifetimebound]]);
 // A lifetime dependency whose target is Escapable is dropped, so the annotation
 // is not enforced: import the function as unsafe.
 // expected-warning@+1{{the returned type 'Owner' is annotated as escapable; it cannot have lifetime dependencies}}
-Owner returnsOwnerLifetimebound(const View &v [[clang::lifetimebound]]); // expected-note {{this lifetime annotation is not enforced: the result is Escapable, so Swift drops the dependency}}
+Owner returnsOwnerLifetimebound(const View &v [[clang::lifetimebound]]); // expected-note {{this lifetime annotation is ignored: the result is Escapable, so Swift drops the dependency}}
 
 // A hand-written lifetime annotation says what the result depends on, so the
 // importer neither asks for an annotation nor infers one.
