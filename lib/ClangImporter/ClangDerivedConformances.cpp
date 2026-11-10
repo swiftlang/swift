@@ -613,11 +613,8 @@ categorizeIteratorFromTypeTag(const clang::TypeDecl *tyDecl) {
   return category;
 }
 
-std::optional<CxxIteratorCategory>
-CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
-                                 CxxRecordDeclDescriptor desc) const {
-  auto *decl = desc.decl;
-  auto &sema = desc.sema;
+static const clang::TypeDecl *
+findIteratorTypeTag(clang::Sema &sema, const clang::CXXRecordDecl *decl) {
   auto &ctx = decl->getASTContext();
 
   // Look for a non-primary specialization of std::iterator_traits<decl>.
@@ -650,42 +647,35 @@ CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
     // Only look for iterator_concept if we are using C++20 or above.
     auto *conceptDecl = lookupCxxTypeMember(sema, decl, "iterator_concept");
     if (conceptDecl)
-      return categorizeIteratorFromTypeTag(conceptDecl);
+      return conceptDecl;
 
     // iterator_concept should take precedence, but if it is absent, fallback
     // to iterator_category.
   }
 
-  if (auto *categoryDecl = lookupCxxTypeMember(sema, decl, "iterator_category")) {
-    auto info = categorizeIteratorFromTypeTag(categoryDecl);
-    if (info == CxxIteratorCategory::Contiguous)
-      info = CxxIteratorCategory::RandomAccess;
-    return info;
-  }
-
-  return {};
+  return lookupCxxTypeMember(sema, decl, "iterator_category");
 }
 
-static bool hasTypeMember(const clang::CXXRecordDecl *clangDecl,
-                          StringRef name) {
-  clang::IdentifierInfo *id = &clangDecl->getASTContext().Idents.get(name);
-  auto members = clangDecl->lookup(id);
-  if (members.empty())
-    return false;
-  // NOTE: If this is a templated typedef, Clang might have instantiated
-  // several equivalent typedef decls, so members.isSingleResult() may
-  // return false here. But if they aren't equivalent, Clang should have
-  // already complained about this. Let's assume that they are equivalent.
-  // (see filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
-  return isa<clang::TypeDecl>(members.front());
+std::optional<CxxIteratorCategory>
+CxxIteratorInfoRequest::evaluate(Evaluator &evaluator,
+                                 CxxRecordDeclDescriptor desc) const {
+  auto *tag = findIteratorTypeTag(desc.sema, desc.decl);
+  if (!tag)
+    return {};
+
+  auto info = categorizeIteratorFromTypeTag(tag);
+  if (tag->getName() == "iterator_category" &&
+      info == CxxIteratorCategory::Contiguous)
+    info = CxxIteratorCategory::RandomAccess;
+  return info;
 }
 
 bool swift::hasIteratorCategoryOrIteratorConcept(
-    const clang::CXXRecordDecl *clangDecl) {
-  if (hasTypeMember(clangDecl, "iterator_category"))
-    return true;
-  return clangDecl->getASTContext().getLangOpts().CPlusPlus20 &&
-         hasTypeMember(clangDecl, "iterator_concept");
+    clang::Sema &sema, const clang::CXXRecordDecl *clangDecl) {
+  auto *def = clangDecl->getDefinition();
+  if (!def)
+    return false;
+  return findIteratorTypeTag(sema, def) != nullptr;
 }
 
 ValueDecl *
@@ -726,12 +716,6 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
   if (!ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator) ||
       !ctx.getProtocol(KnownProtocolKind::UnsafeCxxMutableInputIterator))
     return; // Don't even bother if we don't have protocols for input iterators
-
-  // FIXME: hasIteratorCategoryOrIteratorConcept() is more conservative than
-  // it should be because it doesn't consider an inherited iterator_category or
-  // iterator_concept.
-  // For now, checking this maintains existing behavior and ensures consistency
-  // across ClangImporter, where clang::Sema isn't always readily available.
 
   auto iterInfo = evaluateOrDefault(
       ctx.evaluator, CxxIteratorInfoRequest({clangDecl, clangSema}), {});

@@ -1346,8 +1346,9 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
     if (isSwiftClassType(cxxRecordReturnType))
       return safe();
 
+    clang::Sema &sema = ctx.getClangModuleLoader()->getClangSema();
     if (hasIteratorAPIAttr(cxxRecordReturnType) ||
-        hasIteratorCategoryOrIteratorConcept(cxxRecordReturnType))
+        hasIteratorCategoryOrIteratorConcept(sema, cxxRecordReturnType))
       return unsafe(CxxUnsafetyReason::ReturnsIterator);
 
     // Mark this as safe to help our diganostics down the road.
@@ -1358,7 +1359,7 @@ importer::shouldRenameCXXMethodAsUnsafe(const clang::CXXMethodDecl *method,
     // A projection of a view type (such as a string_view) from a self
     // contained parent is a proejction (unsafe).
     if (!anySubobjectsSelfContained(cxxRecordReturnType) &&
-        isViewType(cxxRecordReturnType)) {
+        isViewType(sema, cxxRecordReturnType)) {
         return parentIsSelfContained ? unsafe(CxxUnsafetyReason::ViewProjection)
                                      : safe();
     }
