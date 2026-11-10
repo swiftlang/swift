@@ -327,18 +327,23 @@ public:
     out << "]";
   }
 
-  void printAvailability() {
-    if (!hasMacroParameter("spanAvailability"))
+  // Prints the availability of the stdlib type `DeclName` as the macro
+  // parameter `ParamName`, so that wrappers using that type are not more
+  // available than it is.
+  void printAvailability(StringRef DeclName, StringRef ParamName) {
+    if (!hasMacroParameter(ParamName))
       return;
 
-    ValueDecl *D = getKnownSingleDecl(SwiftContext, "Span");
+    ValueDecl *D = getKnownSingleDecl(SwiftContext, DeclName);
+    if (!D)
+      return;
     const SemanticAvailableAttributes availabilityAttrs =
         D->getSemanticAvailableAttrs(/*includingInactive=*/true);
     if (availabilityAttrs.empty())
       return; // don't print availability when targeting embedded
 
     printSeparator();
-    out << "spanAvailability: ";
+    out << ParamName << ": ";
     out << "\"";
     llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
     for (auto attr : availabilityAttrs) {
@@ -347,7 +352,9 @@ public:
       auto introducedOpt = attr.getIntroduced();
       if (!introducedOpt.has_value()) continue;
       printSeparator();
-      out << prettyPlatformString(*platform) << " " << introducedOpt.value();
+      // Use the spelling that is valid in source: prettyPlatformString would
+      // give e.g. `any Apple OS` or `Mac Catalyst`.
+      out << platformString(*platform) << " " << introducedOpt.value();
     }
     out << "\"";
   }
@@ -425,10 +432,32 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     out << ")";
   }
 
+  void printReferenceReturn(Type swiftReturnType) {
+    printSeparator();
+    out << ".reference(pointer: .return)";
+    needsRefAvailability = true;
+    // The macro needs to see the pointer type behind typedefs like
+    // `using reference = value_type &`.
+    if (swiftReturnType.getPointer() != swiftReturnType->getDesugaredType())
+      registerTypeMapping(swiftReturnType);
+  }
+
+  // Whether the macro can wrap C++ references in Ref<Cell<T>>.
+  bool hasReferenceSupport() {
+    return hasSwiftifyInfoCase("reference") &&
+           hasMacroParameter("refAvailability");
+  }
+
+  // Cell and ConstCell share their availability, and are newer than both Ref
+  // and Span, so Cell's availability covers the whole wrapper.
+  void printRefAvailability() {
+    if (needsRefAvailability)
+      printAvailability("Cell", "refAvailability");
+  }
+
   bool registerStdSpanTypeMapping(Type swiftType, const clang::QualType clangType) {
     if (isStdSpanType(clangType)) {
-      typeMapping.try_emplace(swiftType->getString(),
-                              swiftType->getDesugaredType()->getString());
+      registerTypeMapping(swiftType);
       return true;
     }
     return false;
@@ -450,6 +479,12 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   }
 
 private:
+  // Lets the macro see through the type alias that `swiftType` is spelled with.
+  void registerTypeMapping(Type swiftType) {
+    typeMapping.try_emplace(swiftType->getString(),
+                            swiftType->getDesugaredType()->getString());
+  }
+
   void printParamOrReturn(ssize_t pointerIndex) {
     if (pointerIndex == SELF_PARAM_INDEX)
       out << ".self";
@@ -461,23 +496,25 @@ private:
 
   std::optional<bool> hasOrNullSupportCached = std::nullopt;
   bool hasOrNullSupport() {
-    if (hasOrNullSupportCached.has_value())
-      return hasOrNullSupportCached.value();
+    if (!hasOrNullSupportCached.has_value())
+      hasOrNullSupportCached = hasSwiftifyInfoCase("countedByOrNull");
+    return hasOrNullSupportCached.value();
+  }
 
+  bool hasSwiftifyInfoCase(StringRef CaseName) {
     auto *D = getKnownSingleDecl(SwiftContext, "_SwiftifyInfo");
     auto *Enum = dyn_cast_or_null<EnumDecl>(D);
     if (!Enum)
       return false;
     for (auto *Element :
-         Enum->lookupDirect(SwiftContext.getIdentifier("countedByOrNull"))) {
-      if (isa<EnumElementDecl>(Element)) {
-        hasOrNullSupportCached = true;
+         Enum->lookupDirect(SwiftContext.getIdentifier(CaseName))) {
+      if (isa<EnumElementDecl>(Element))
         return true;
-      }
     }
-    hasOrNullSupportCached = false;
     return false;
   }
+
+  bool needsRefAvailability = false;
 };
 
 // Searches for template instantiations that are not behind type aliases.
@@ -738,7 +775,39 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
     bool returnHasBoundsInfo = returnIsStdSpan || CAT != nullptr;
     bool returnValueIsNonEscapable = isNonEscapable(clangReturnTy);
-    bool returnValueCanBeNonEscapable = returnValueIsNonEscapable || returnHasBoundsInfo;
+
+    Type swiftReturnTy;
+    if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
+      swiftReturnTy = funcDecl->getResultInterfaceType();
+    else if (const auto *ctorDecl = dyn_cast<ConstructorDecl>(MappedDecl))
+      swiftReturnTy = ctorDecl->getResultInterfaceType();
+    else
+      ABORT("Unexpected AbstractFunctionDecl subclass.");
+
+    // A C++ lvalue reference imported as Unsafe[Mutable]Pointer<T> can be
+    // wrapped in Ref<[Const]Cell<T>> if it has lifetime info. Functions
+    // returning a reference that are imported as initializers return a copy,
+    // so only plain functions qualify.
+    bool returnIsReference = false;
+    if (isa<FuncDecl>(MappedDecl) && clangReturnTy->isLValueReferenceType()) {
+      if (!Self.SwiftContext.LangOpts.hasFeature(Feature::Cells))
+        DLOG("Reference return value needs the Cells feature\n");
+      else if (ConcretePointeeType(swiftReturnTy).isNull())
+        DLOG("Reference return value not imported as a pointer\n");
+      else if (isNonEscapable(clangReturnTy->getPointeeType()))
+        DLOG("Reference to ~Escapable type cannot be stored in a Cell\n");
+      else if (cast<clang::FunctionDecl>(ClangDecl)->isOverloadedOperator())
+        // The operator functions are hidden behind subscripts and operators.
+        DLOG("Reference returned by an overloaded operator\n");
+      else if (!printer.hasReferenceSupport())
+        DLOG("_SwiftifyImport does not support references\n");
+      else
+        returnIsReference = true;
+      // Clang rejects nullability on references, and API notes cannot add it.
+      ASSERT(!returnIsReference || !swiftReturnTy->getOptionalObjectType());
+    }
+    bool returnValueCanBeNonEscapable =
+        returnValueIsNonEscapable || returnHasBoundsInfo || returnIsReference;
     bool returnHasLifetimeInfo = false;
     if (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
             ClangDecl)) {
@@ -884,14 +953,11 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       DLOG("Found both std::span and lifetime info for return value\n");
       attachMacro = true;
     }
-
-    Type swiftReturnTy;
-    if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
-      swiftReturnTy = funcDecl->getResultInterfaceType();
-    else if (const auto *ctorDecl = dyn_cast<ConstructorDecl>(MappedDecl))
-      swiftReturnTy = ctorDecl->getResultInterfaceType();
-    else
-      ABORT("Unexpected AbstractFunctionDecl subclass.");
+    if (returnIsReference && returnHasLifetimeInfo) {
+      DLOG("Found both reference and lifetime info for return value\n");
+      printer.printReferenceReturn(swiftReturnTy);
+      attachMacro = true;
+    }
 
     if (CheckForwardDecls.IsIncompatibleImport(swiftReturnTy, clangReturnTy))
       return false;
@@ -933,6 +999,10 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
+    return;
+  // Functions imported as property accessors (`swift_name("getter:...")`)
+  // cannot get a peer overload.
+  if (isa<AccessorDecl>(MappedDecl))
     return;
   const clang::Decl *ClangDecl = MappedDecl->getClangDecl();
 
@@ -1013,11 +1083,12 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
       DLOG("No relevant bounds or lifetime info found\n");
       return;
     }
-    printer.printAvailability();
+    printer.printAvailability("Span", "spanAvailability");
     printer.printTypeMapping();
     if (!LegacyOptionalRequested) {
       printer.printNullableAsEmptySpan();
     }
+    printer.printRefAvailability();
     out << ")";
   }
 
