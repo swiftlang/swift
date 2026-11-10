@@ -939,9 +939,18 @@ TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
 /// \param name The name of the entity to look for.
 /// \param loc The source location at which name lookup occurs.
 /// \param options Options that control name lookup.
-LookupResult lookupUnqualified(
-    DeclContext *dc, DeclNameRef name, SourceLoc loc,
-    NLOptions options = defaultUnqualifiedLookupOptions);
+/// \param filter If provided, only the declarations found by lookup for which
+/// the filter returns true are considered for the result. The filter runs
+/// before overridden and shadowed declarations are removed, which avoids the
+/// cost of computing overrides and shadowing for declarations that the caller
+/// would discard anyway. As a result, the filter must make the same decision
+/// for any declarations that could override or shadow one another, such as
+/// functions with the same signature. Otherwise, a rejected declaration could
+/// fail to hide an accepted one.
+LookupResult
+lookupUnqualified(DeclContext *dc, DeclNameRef name, SourceLoc loc,
+                  NLOptions options = defaultUnqualifiedLookupOptions,
+                  llvm::function_ref<bool(ValueDecl *)> filter = nullptr);
 
 /// Perform unqualified type lookup at the given source location
 /// within a particular declaration context.
