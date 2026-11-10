@@ -207,6 +207,20 @@ private:
       commandline.push_back(arg);
     }
 
+    // Pass the in-process plugin server path if any library plugin above is
+    // loaded in-process.
+    auto &inProcPluginServerPath =
+        instance.getInvocation().getSearchPathOptions().InProcessPluginServerPath;
+    bool needInProcPluginServer = llvm::any_of(
+        depInfo.getMacroDependencies(), [](const auto &macro) {
+          return !macro.second.LibraryPath.empty() &&
+                 macro.second.ExecutablePath.empty();
+        });
+    if (needInProcPluginServer && !inProcPluginServerPath.empty()) {
+      commandline.push_back("-resolved-in-process-plugin-server-path");
+      commandline.push_back(mapPath(inProcPluginServerPath));
+    }
+
     // Update CAS dependencies.
     if (auto err = collectCASDependencies(depInfo))
       return err;
@@ -448,6 +462,17 @@ private:
     return;
   }
 
+  void trackMacroPlugins(const ModuleDependencyInfo &dependencyInfo) {
+    for (const auto &entry : dependencyInfo.getMacroDependencies()) {
+      // An executable plugin has no library and is the implementation itself,
+      // so it needs to be tracked. The plugin server paired with a library is
+      // from the toolchain and covered by the compiler version.
+      const auto &plugin = entry.second;
+      tracker->trackFile(plugin.LibraryPath.empty() ? plugin.ExecutablePath
+                                                    : plugin.LibraryPath);
+    }
+  }
+
   bool collectCASDependencies(ModuleDependencyInfo &dependencyInfoCopy) {
     if (!instance.getInvocation().getCASOptions().EnableCaching)
       return false;
@@ -461,10 +486,7 @@ private:
       llvm::for_each(
           sourceDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
-                     [this](const auto &entry) {
-                       tracker->trackFile(entry.second.LibraryPath);
-                     });
+      trackMacroPlugins(dependencyInfoCopy);
       StringRef readLegacyTypeInfoPath =
           instance.getInvocation().getIRGenOptions().ReadLegacyTypeInfoPath;
       if (!readLegacyTypeInfoPath.empty()) {
@@ -510,10 +532,7 @@ private:
       llvm::for_each(
           textualDep->auxiliaryFiles,
           [this](const std::string &file) { tracker->trackFile(file); });
-      llvm::for_each(dependencyInfoCopy.getMacroDependencies(),
-                     [this](const auto &entry) {
-                       tracker->trackFile(entry.second.LibraryPath);
-                     });
+      trackMacroPlugins(dependencyInfoCopy);
       auto root = tracker->createTreeFromDependencies();
       if (!root)
         return diagnoseCASFSCreationError(root.takeError());
