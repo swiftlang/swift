@@ -3540,6 +3540,13 @@ NodePointer Demangler::demangleFunctionSpecialization() {
           }
           break;
         }
+        case FunctionSigSpecializationParamKind::DifferentiableFunctionProp: {
+          for (int I = 0; I != 3; ++I) {
+            paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
+            paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Identifier));
+          }
+          continue;
+        }
         case FunctionSigSpecializationParamKind::ConstantPropKeyPath:
           paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
           paramToAdd = addChild(paramToAdd, popNode(Node::Kind::Type));
@@ -3582,6 +3589,14 @@ NodePointer Demangler::demangleFuncSpecParam(Node::Kind Kind) {
       return addChild(Param, createNode(
         Node::Kind::FunctionSignatureSpecializationParamKind,
         uint64_t(FunctionSigSpecializationParamKind::EscapingClosureProp)));
+    case 'a':
+      // Consumes three (function identifier, component type) pairs, ordered
+      // original, JVP, VJP. The parameters will be added later.
+      return addChild(
+          Param,
+          createNode(Node::Kind::FunctionSignatureSpecializationParamKind,
+                     uint64_t(FunctionSigSpecializationParamKind::
+                                  DifferentiableFunctionProp)));
     case 'C': {
       // Consumes an identifier and multiple type parameters.
       // The parameters will be added later.
