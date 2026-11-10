@@ -36,6 +36,7 @@ let embeddedSwiftDiagnostics = ModulePass(name: "embedded-swift-diagnostics") {
   for (function, _) in allFunctions {
     do {
       assert(checker.callStack.isEmpty)
+      checker.anchor = nil
       try checker.checkFunction(function)
     } catch let violation as Violation {
       checker.diagnose(violation, popCallStack: true)
@@ -47,10 +48,85 @@ let embeddedSwiftDiagnostics = ModulePass(name: "embedded-swift-diagnostics") {
   checkVTables(moduleContext)
 }
 
+/// Keeps track of which functions or conformances are checked.
+///
+/// A problem in a function of another module is reported at the innermost call in the current
+/// module that reaches it (the "anchor"). So something which is reached from several such calls
+/// has to be checked once for each of them, otherwise only the first call would get the
+/// diagnostic - which can then be suppressed by a `@diagnose` attribute that doesn't apply to the
+/// other calls.
+private struct VisitTracker<Item: Hashable> {
+  private struct State {
+    /// No problem was found, neither directly nor in anything it uses. Such an item doesn't have to
+    /// be checked again from another call.
+    var isClean = false
+
+    /// The anchors from which the item is currently checked. Used to avoid infinite recursion.
+    var inProgress = Set<Instruction?>()
+
+    /// The anchors from which the item is completely checked.
+    var checked = Set<Instruction?>()
+  }
+
+  private var states: [Item: State] = [:]
+
+  enum BeginResult {
+    /// The item is known to have no problems.
+    case clean
+
+    /// The item is in progress or was checked from the same anchor before. Its problems, if any,
+    /// are not known (yet).
+    case skipped
+
+    /// The item must be checked, and `end` must be called afterwards.
+    case start
+  }
+
+  mutating func begin(_ item: Item, from anchor: Instruction?) -> BeginResult {
+    var state = states[item, default: State()]
+    if state.isClean {
+      return .clean
+    }
+    if state.checked.contains(anchor) || !state.inProgress.insert(anchor).inserted {
+      return .skipped
+    }
+    states[item] = state
+    return .start
+  }
+
+  /// Finishes the check which was started with `begin`.
+  ///
+  /// `isComplete` is false if the check was aborted by a thrown error.
+  mutating func end(_ item: Item, from anchor: Instruction?, isComplete: Bool, isClean: Bool) {
+    states[item]!.inProgress.remove(anchor)
+    if isComplete {
+      states[item]!.checked.insert(anchor)
+      if isClean {
+        states[item]!.isClean = true
+      }
+    }
+  }
+}
+
 private struct FunctionChecker {
   let context: ModulePassContext
-  var visitedFunctions = Set<Function>()
-  var visitedConformances = Set<Conformance>()
+
+  /// The innermost call in the current module on the call stack, or nil.
+  var anchor: Instruction? = nil
+
+  /// The functions which are checked, and the state of those checks.
+  var functions = VisitTracker<Function>()
+
+  /// The conformances which are checked, and the state of those checks.
+  var conformances = VisitTracker<Conformance>()
+
+  /// The number of problems found so far.
+  var problemCount = 0
+
+  /// The number of times something was not checked because it is in progress or was checked
+  /// from the same call before. The result of such a check is incomplete or not known.
+  var skippedCount = 0
+
   var reportedProblems = Set<ReportedProblem>()
   var callStack: Stack<CallSite>
 
@@ -64,16 +140,33 @@ private struct FunctionChecker {
   }
 
   mutating func checkFunction(_ function: Function) throws {
-    guard function.isDefinition,
-          // Avoid infinite recursion
-          visitedFunctions.insert(function).inserted
-    else {
+    guard function.isDefinition else {
       return
+    }
+    switch functions.begin(function, from: anchor) {
+    case .clean:
+      return
+    case .skipped:
+      skippedCount += 1
+      return
+    case .start:
+      break
+    }
+    // The anchor is changed by the checks of callees, and not restored if they throw.
+    let visitAnchor = anchor
+    let problemsBefore = problemCount
+    let skippedBefore = skippedCount
+    var isComplete = false
+    defer {
+      functions.end(function, from: visitAnchor, isComplete: isComplete,
+                    isClean: problemCount == problemsBefore && skippedCount == skippedBefore)
     }
 
     for inst in function.instructions {
       try checkInstruction(inst)
     }
+
+    isComplete = true
   }
 
   mutating func checkInstruction(_ instruction: Instruction) throws {
@@ -331,21 +424,43 @@ private struct FunctionChecker {
     // * When passing an opened existential to a generic function, it's valid in Embedded swift even if the
     //   generic is not specialized. We need to check such generic functions, too.
     if let callee = apply.referencedFunction {
+      let savedAnchor = anchor
+      if apply.parentFunction.reportLocation(of: apply.location, context) != nil {
+        anchor = apply
+      }
       callStack.push(CallSite(apply: apply, callee: callee))
       try checkFunction(callee)
       _ = callStack.pop()
+      anchor = savedAnchor
     }
   }
 
   // Check for any violations in witness tables for existentials.
   mutating func checkConformance(_ conformance: Conformance, at instruction: Instruction) throws {
     guard conformance.isConcrete,
-          // Avoid infinite recursion
-          visitedConformances.insert(conformance).inserted,
           let witnessTable = context.lookupWitnessTable(for: conformance)
     else {
       return
     }
+    let isReportable = instruction.parentFunction.reportLocation(of: instruction.location, context) != nil
+    let visitAnchor = isReportable ? instruction : anchor
+    switch conformances.begin(conformance, from: visitAnchor) {
+    case .clean:
+      return
+    case .skipped:
+      skippedCount += 1
+      return
+    case .start:
+      break
+    }
+    let problemsBefore = problemCount
+    let skippedBefore = skippedCount
+    var isComplete = false
+    defer {
+      conformances.end(conformance, from: visitAnchor, isComplete: isComplete,
+                       isClean: problemCount == problemsBefore && skippedCount == skippedBefore)
+    }
+
     for entry in witnessTable.entries {
       switch entry {
       case .invalid, .associatedType:
@@ -354,10 +469,15 @@ private struct FunctionChecker {
         // Witnesses that are not valid for embedded aren't actually put into
         // the witness table. Ignore them.
         if let witness = witness, witness.hasValidSignatureForEmbedded {
+          let savedAnchor = anchor
+          if instruction.parentFunction.reportLocation(of: instruction.location, context) != nil {
+            anchor = instruction
+          }
           callStack.push(CallSite(location: instruction.location, function: instruction.parentFunction,
                                   kind: .conformance))
           try checkFunction(witness)
           _ = callStack.pop()
+          anchor = savedAnchor
         }
       case .baseProtocol(_, let witness):
         try checkConformance(witness, at: instruction)
@@ -369,12 +489,15 @@ private struct FunctionChecker {
         }
       }
     }
+
+    isComplete = true
   }
 
   mutating func diagnose(_ violation: Violation, popCallStack: Bool) {
     // A problem which is found in a function of another module - e.g. in a standard library
     // function or in a specialization of such a function - is reported at the innermost call site
     // in the module which is currently compiled, because that's the code the user can change.
+    problemCount += 1
     let error = violation.diagnostic
     var diagPrinted = false
     var isDuplicate = false
@@ -411,12 +534,19 @@ private struct FunctionChecker {
         }
       }
     }
+    // The problem is in another module and not reachable from any call in the current module,
+    // e.g. because the containing function is only referenced from a vtable.
     if !diagPrinted {
-      // The problem is in another module and not reachable from any call in the current module,
-      // e.g. because the containing function is only referenced from a vtable. There is nothing
-      // better to point at than the original location, which means loading the other module's
-      // source file.
-      context.diagnosticEngine.diagnose(error)
+      // An allocation in such a function is never executed by the code being compiled, and there is
+      // no location in the current module at which it could be reported, or at which a
+      // `@diagnose` attribute could suppress it. Don't diagnose it.
+      //
+      // Other problems are still diagnosed, because they can make the module unbuildable.
+      // There is nothing better to point at than the original location, which means loading the
+      // other module's source file.
+      if !(violation.isHeapAllocation && !violation.function.isInCurrentModule(context)) {
+        context.diagnosticEngine.diagnose(error)
+      }
     }
 
     while let callSite = savedCallStack.pop() {
@@ -440,7 +570,10 @@ private struct FunctionChecker {
   }
 
   /// Emit a diagnostic describing a heap allocation.
-  mutating func diagnoseHeapAllocation(_ violation: Violation) throws {
+  mutating func diagnoseHeapAllocation(_ allocation: Violation) throws {
+    var violation = allocation
+    violation.isHeapAllocation = true
+
     // Under -no-allocations mode, heap allocations are fatal
     if context.options.noAllocations {
       throw violation
@@ -518,6 +651,10 @@ private struct Violation: Error {
 
   /// The function which contains the offending code.
   let function: Function
+
+  /// True if the problem is a heap allocation, which is not diagnosed if it is in code the user
+  /// can neither change nor reach (see `FunctionChecker.diagnose`).
+  var isHeapAllocation = false
 
   init(_ id: DiagID, _ arguments: DiagnosticArgument..., in instruction: Instruction) {
     self.diagnostic = Diagnostic(id, arguments, at: instruction.location)
