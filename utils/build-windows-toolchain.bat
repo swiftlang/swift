@@ -11,7 +11,7 @@
 setlocal enableextensions enabledelayedexpansion
 
 :: Work around CI invocation in vsdevcmd
-:: The build relies on build.ps1, which should not be called in a vs dev cmd
+:: The build relies on BuildMulti.ps1, which should not be called in a vs dev cmd
 if "%VSCMD_ARG_HOST_ARCH%"=="" goto Start
 echo This script should not be called in a vs developer command prompt
 echo Reeinvoking script in the default environment
@@ -98,7 +98,7 @@ if not "%DEBUG_INFO%"=="" set "DebugInfoArg=-DebugInfo"
 call :CloneRepositories || (exit /b 1)
 
 :: We only have write access to BuildRoot, so use that as the image root.
-powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
+powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0BuildMulti.ps1 ^
   %HostArchNameArg% ^
   -SourceCache %SourceRoot% ^
   -BinaryCache %BuildRoot% ^
