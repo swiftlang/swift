@@ -572,6 +572,7 @@ private struct InstructionScanner {
   private let accessPath: AccessPath
   private let storageDefBlock: BasicBlock?
   private let aliasAnalysis: AliasAnalysis
+  private let loadAddress: AddressWithAccessPath
 
   private(set) var potentiallyRedundantSubpath: AccessPath? = nil
   private(set) var availableValues = Array<AvailableValue>()
@@ -581,6 +582,7 @@ private struct InstructionScanner {
     self.accessPath = accessPath
     self.storageDefBlock = accessPath.base.reference?.referenceRoot.parentBlock
     self.aliasAnalysis = aliasAnalysis
+    self.loadAddress = AddressWithAccessPath(load.address)
   }
 
   enum ScanResult {
@@ -692,11 +694,11 @@ private struct InstructionScanner {
     if load.loadOwnership == .take {
       // In case of `take`, don't allow reading instructions in the liverange.
       // Otherwise we cannot shrink the memory liverange afterwards.
-      if instruction.mayReadOrWrite(address: load.address, aliasAnalysis) {
+      if instruction.mayReadOrWrite(address: loadAddress, aliasAnalysis) {
         return .overwritten
       }
     } else {
-      if instruction.mayWrite(toAddress: load.address, aliasAnalysis) {
+      if instruction.mayWrite(toAddress: loadAddress, aliasAnalysis) {
         return .overwritten
       }
     }
