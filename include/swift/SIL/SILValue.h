@@ -620,6 +620,11 @@ public:
 
   bool isBorrowAccessorResult() const;
 
+  /// Returns true if this is a value yielded with a guaranteed convention by a
+  /// begin_apply, i.e. a value that the coroutine has lent to us and which we
+  /// therefore only borrow.
+  bool isGuaranteedCoroutineYield() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.

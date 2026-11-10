@@ -2874,6 +2874,13 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       if (fArg && fArg->isClosureCapture() && fArg->getType().isAddress()) {
         moveChecker.diagnosticEmitter.emitPromotedBoxArgumentError(markedValue,
                                                                    fArg);
+      } else if (stripAccessMarkers(markedValue->getOperand())
+                     ->isGuaranteedCoroutineYield()) {
+        // A value lent to us by a coroutine is borrowed, so this is the
+        // "borrowed and cannot be consumed" error rather than the
+        // escaping-closure catch-all below.
+        moveChecker.diagnosticEmitter.emitAddressDiagnosticNoCopy(markedValue,
+                                                                  user);
       } else {
         moveChecker.diagnosticEmitter
             .emitAddressEscapingClosureCaptureLoadedAndConsumed(markedValue);

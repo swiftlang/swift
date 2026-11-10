@@ -2889,7 +2889,7 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
   // default expression, since we cannot guarantee the lifetime of the
   // pointee value.
   if (auto paramRecordDecl = param->getType()->getAsCXXRecordDecl()) {
-    if (isViewType(paramRecordDecl) &&
+    if (isViewType(getClangSema(), paramRecordDecl) &&
         !paramRecordDecl->hasUserDeclaredCopyConstructor())
       return false;
   }
