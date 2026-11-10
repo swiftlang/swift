@@ -328,7 +328,8 @@ auto SwiftLookupTable::translateDeclContext(const clang::DeclContext *dc)
 }
 
 std::optional<SwiftLookupTable::StoredContext>
-SwiftLookupTable::translateContext(EffectiveClangContext context) {
+SwiftLookupTable::translateContext(EffectiveClangContext context,
+                                   const clang::NamedDecl *member) {
   switch (context.getKind()) {
   case EffectiveClangContext::DeclContext: {
     return translateDeclContext(context.getAsDeclContext());
@@ -340,7 +341,7 @@ SwiftLookupTable::translateContext(EffectiveClangContext context) {
 
   case EffectiveClangContext::UnresolvedContext:
     // Resolve the context.
-    if (auto decl = resolveContext(context.getUnresolvedName()))
+    if (auto decl = resolveContext(context.getUnresolvedName(), member))
       return translateDeclToContext(decl);
 
     return std::nullopt;
@@ -349,10 +350,35 @@ SwiftLookupTable::translateContext(EffectiveClangContext context) {
   llvm_unreachable("Invalid EffectiveClangContext.");
 }
 
+/// Whether the given declaration can be imported as a member of an
+/// Objective-C protocol through swift_name. Swift only allows typealiases to
+/// be nested in a protocol, so this is limited to typedefs that are imported
+/// as a typealias rather than as a new nominal type.
+static bool canImportAsMemberOfObjCProtocol(const clang::NamedDecl *decl) {
+  auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl);
+  if (!typedefDecl)
+    return false;
+
+  // A typedef of a tag type is imported as the tag type itself.
+  if (typedefDecl->getUnderlyingType()->getAsTagDecl())
+    return false;
+
+  // A swift_newtype typedef is imported as a struct.
+  if (typedefDecl->hasAttr<clang::SwiftNewTypeAttr>())
+    return false;
+
+  // A CF typedef may be imported as a class.
+  if (isCFTypeDecl(typedefDecl))
+    return false;
+
+  return true;
+}
+
 /// Lookup an unresolved context name and resolve it to a Clang
 /// declaration context or typedef name.
 const clang::NamedDecl *
-SwiftLookupTable::resolveContext(StringRef unresolvedName) {
+SwiftLookupTable::resolveContext(StringRef unresolvedName,
+                                 const clang::NamedDecl *member) {
   SmallVector<StringRef, 1> nameComponents;
   unresolvedName.split(nameComponents, '.');
 
@@ -368,8 +394,8 @@ SwiftLookupTable::resolveContext(StringRef unresolvedName) {
     bool entryFound = false;
     for (auto entry : entries) {
       if (auto decl = entry.dyn_cast<clang::NamedDecl *>()) {
-        if (isa<clang::TagDecl>(decl) ||
-            isa<clang::ObjCInterfaceDecl>(decl) ||
+        if (isa<clang::TagDecl>(decl) || isa<clang::ObjCInterfaceDecl>(decl) ||
+            isa<clang::ObjCProtocolDecl>(decl) ||
             isa<clang::NamespaceDecl>(decl)) {
           entryFound = true;
           parentContext = EffectiveClangContext(cast<clang::DeclContext>(decl));
@@ -389,6 +415,12 @@ SwiftLookupTable::resolveContext(StringRef unresolvedName) {
   }
   
   if (!parentContext)
+    return nullptr;
+
+  if (member &&
+      isa_and_nonnull<clang::ObjCProtocolDecl>(
+          parentContext.getAsDeclContext()) &&
+      !canImportAsMemberOfObjCProtocol(member))
     return nullptr;
 
   return parentContext.getAsDeclContext()
@@ -588,7 +620,8 @@ void SwiftLookupTable::addEntry(DeclName name, SingleEntry newEntry,
   assert(newEntry);
 
   // Translate the context.
-  auto contextOpt = translateContext(effectiveContext);
+  auto contextOpt = translateContext(effectiveContext,
+                                     newEntry.dyn_cast<clang::NamedDecl *>());
   if (!contextOpt) {
     // We might be able to resolve this later.
     if (isa<clang::NamedDecl *>(newEntry)) {
