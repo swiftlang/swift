@@ -66,7 +66,6 @@ below to get started.
 - <doc:macros>
 - <doc:concurrency>
 - <doc:key-path-expressions>
-- <doc:managed-memory-access>
 - <doc:manual-memory-management>
 - <doc:type-casting-and-existential-types>
 - <doc:operator-declarations>
