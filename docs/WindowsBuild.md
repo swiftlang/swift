@@ -84,4 +84,4 @@ Set-ItemProperty -Path "HKLM:\SYSTEM\CurrentControlSet\Control\Session Manager\D
 
 - Open a regular (non admin, non Visual Studio) CMD shell.
 - Run `S:\SourceCache\swift\utils\build.cmd -Windows`. This will build the toolchain, its installer and run all the test suite.
-- (Optional): The available flags for `build.cmd` are documented in `swift/utils/build.ps1`.
+- (Optional): The available flags for `build.cmd` are documented in `swift/utils/BuildSequential.ps1`. `BuildMulti.ps1` takes the same flags and builds the SDKs and runs the tests in parallel.
