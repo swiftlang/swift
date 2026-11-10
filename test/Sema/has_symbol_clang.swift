@@ -10,8 +10,12 @@ func testFunctions() {
 }
 
 func testGlobalVars() {
-  // FIXME: Add support for clang global vars
-  if #_hasSymbol(clangGlobalVar) {} // expected-error {{'#_hasSymbol' cannot be used with this declaration}}
+  if #_hasSymbol(clangGlobalVar) {}
+  if #_hasSymbol(clangStaticGlobalVar) {} // expected-error {{'#_hasSymbol' cannot be used with this declaration}}
+  if #_hasSymbol(clangStaticConstGlobalVar) {} // expected-error {{'#_hasSymbol' cannot be used with this declaration}}
+  if #_hasSymbol(clangConstGlobalVar) {} // expected-error {{'#_hasSymbol' cannot be used with this declaration}}
+  if #_hasSymbol(clangDefinedGlobalVar) {} // expected-error {{'#_hasSymbol' cannot be used with this declaration}}
+  if #_hasSymbol(clangThreadLocalGlobalVar) {} // expected-error {{'#_hasSymbol' cannot be used with this declaration}}
 }
 
 func testTypes() {

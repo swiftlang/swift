@@ -5741,11 +5741,25 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
 /// Diagnoses whether the given clang::Decl can be referenced by a
 /// `if #_hasSymbol(...)` condition. Returns true if a diagnostic was emitted.
 static bool diagnoseHasSymbolConditionClangDecl(SourceLoc loc,
+                                                const ValueDecl *decl,
                                                 const clang::Decl *clangDecl,
                                                 ASTContext &ctx) {
   if (isa<clang::ObjCInterfaceDecl>(clangDecl) ||
       isa<clang::FunctionDecl>(clangDecl))
     return false;
+
+  if (auto *var = dyn_cast<clang::VarDecl>(clangDecl)) {
+    // Only variables that refer to an externally defined, non-thread-local
+    // symbol can be checked. Constants that were imported as computed
+    // properties have no storage to refer to, and variables that are defined
+    // in a header are emitted into the client.
+    auto *swiftVar = dyn_cast<VarDecl>(decl);
+    if (swiftVar && swiftVar->hasStorage() &&
+        var->getStorageDuration() == clang::SD_Static &&
+        var->isExternallyVisible() &&
+        var->hasDefinition() == clang::VarDecl::DeclarationOnly)
+      return false;
+  }
 
   if (auto *method = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
     // FIXME: Allow objc_direct methods when supported by IRGen.
@@ -5793,8 +5807,8 @@ static bool diagnoseHasSymbolCondition(PoundHasSymbolInfo *info,
   }
 
   if (auto *clangDecl = decl->getClangDecl()) {
-    if (diagnoseHasSymbolConditionClangDecl(symbolExpr->getLoc(), clangDecl,
-                                            ctx))
+    if (diagnoseHasSymbolConditionClangDecl(symbolExpr->getLoc(), decl,
+                                            clangDecl, ctx))
       return true;
   }
 

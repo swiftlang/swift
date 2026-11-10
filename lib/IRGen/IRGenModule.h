@@ -1392,6 +1392,13 @@ public:
   llvm::Constant *getAddrOfClangGlobalDecl(clang::GlobalDecl global,
                                            ForDefinition_t forDefinition);
 
+  /// Override the linkage computed by Clang for \p global with \p linkage if
+  /// \p declModule, the module that the corresponding declaration belongs to,
+  /// is imported @_weakLinked.
+  void overrideLinkageForWeakLinkedClangDecl(
+      llvm::GlobalValue *global, const ModuleDecl *declModule,
+      llvm::GlobalValue::LinkageTypes linkage);
+
   /// Global blocks, keyed by their invoke function and constant capture.
   llvm::DenseMap<std::pair<llvm::Constant *, llvm::Constant *>,
                  llvm::Constant *> GlobalBlocks;
