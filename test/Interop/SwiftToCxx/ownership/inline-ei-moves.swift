@@ -28,6 +28,19 @@
 // CHECK: void _setMovedFrom() noexcept {
 // CHECK-NEXT: _storage[0] = static_cast<char>(2);
 
+// Swift returns this indirectly, initializing the result over its moved-from
+// state.
+@frozen public struct LargeRef {
+  public var ref: Ref
+  public var a = 1, b = 2, c = 3, d = 4
+  public init(_ ref: Ref) { self.ref = ref }
+  public func check() -> Bool { ref.id == 42 && a + b + c + d == 10 }
+}
+
+// CHECK-LABEL: class SWIFT_SYMBOL({{.*}}) LargeRef final {
+// CHECK: LargeRef(LargeRef &&other) noexcept {
+// CHECK: bool _isMovedFrom() const noexcept {
+
 // Weak optional references have no extra inhabitants, so moving this inline
 // value still copies it.
 @frozen public struct NoExtraInhabitants {
@@ -113,6 +126,22 @@ public final class Ref {
 // CHECK: SingleRef(const SingleRef &other) noexcept {
 // CHECK-NEXT: if (other._isMovedFrom()) {
 // CHECK: void _setMovedFrom() noexcept {
+
+// The moved-from state shares spare bits with the case tag, and C++ case
+// constructors start from that state.
+@frozen public enum SpareBitChoice {
+  case first(Ref)
+  case second(Ref)
+  case neither
+  public func check() -> Bool {
+    if case .second(let ref) = self { return ref.id == 42 }
+    return false
+  }
+}
+
+// CHECK-LABEL: class SWIFT_SYMBOL({{.*}}) SpareBitChoice final {
+// CHECK: SpareBitChoice(SpareBitChoice &&other) noexcept {
+// CHECK: bool _isMovedFrom() const noexcept {
 
 // Trivial wrappers keep their defaulted special members despite having extra
 // inhabitants. Adding a user-provided move would change their C++ type traits.

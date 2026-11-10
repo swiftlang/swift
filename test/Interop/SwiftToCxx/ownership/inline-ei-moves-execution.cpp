@@ -48,6 +48,7 @@ using namespace InlineMoves;
 
 static_assert(sizeof(SingleRef) == sizeof(void *), "no added state storage");
 static_assert(sizeof(ReferenceChoice) == sizeof(void *), "no added state storage");
+static_assert(sizeof(SpareBitChoice) == sizeof(void *), "no added state storage");
 static_assert(std::is_standard_layout<SingleRef>::value, "");
 static_assert(std::is_nothrow_move_constructible<SingleRef>::value, "");
 static_assert(std::is_nothrow_move_assignable<SingleRef>::value, "");
@@ -164,10 +165,18 @@ int main(int argc, char **argv) {
     assert(retainCount(ref) == 1);
     checkMoves(ReferenceChoice::value(ref), ref);
     assert(retainCount(ref) == 1);
+    checkMoves(SpareBitChoice::second(ref), ref);
+    assert(retainCount(ref) == 1);
+    checkMoves(LargeRef::init(ref), ref);
+    assert(retainCount(ref) == 1);
 
     auto choice = ReferenceChoice::empty();
     auto movedChoice = std::move(choice);
     assert(movedChoice.isEmpty());
+    auto spareBits = SpareBitChoice::neither();
+    auto movedSpareBits = std::move(spareBits);
+    assert(movedSpareBits.isNeither());
+    assert(SpareBitChoice::first(ref).isFirst());
 
     {
       auto choice = ReferenceChoice::value(ref);
@@ -246,6 +255,11 @@ int main(int argc, char **argv) {
   assert(std::string(cString) == "string from C++");
   assert(std::string(emptyString).empty());
   assert(std::string(standardString) == standard);
+  std::vector<swift::String> strings;
+  strings.push_back(std::move(standardString));
+  strings.push_back(std::move(cString));
+  assert(std::string(strings[0]) == standard);
+  assert(std::string(strings[1]) == "string from C++");
 
   auto trivial = TrivialBool::init(true);
   auto copiedTrivial = std::move(trivial);
