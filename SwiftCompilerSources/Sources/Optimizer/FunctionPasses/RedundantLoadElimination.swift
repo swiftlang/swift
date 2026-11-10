@@ -107,10 +107,7 @@ func eliminateRedundantLoads(in function: Function,
     var iter = block.instructions.reversed().first
     while let succ = iter, let inst = succ.previous {
 
-      // TODO: replace this with `if let inst as? LoadingInstruction` once the toolchain builders are
-      // upgraded to a compiler version with fast type casting (https://github.com/swiftlang/swift/pull/88270).
-      if inst is LoadInst || inst is CopyAddrInst {
-        let load = inst as! LoadingInstruction
+      if let load = inst.asLoadingInstruction {
         if !context.continueWithNextSubpassRun(for: load) {
           return changed
         }
@@ -130,6 +127,21 @@ func eliminateRedundantLoads(in function: Function,
     }
   }
   return changed
+}
+
+private extension Instruction {
+  // TODO: replace this with `self as? LoadingInstruction` once the toolchain builders are upgraded to a compiler
+  // version with fast type casting (https://github.com/swiftlang/swift/pull/88270). Until then, casting to the
+  // concrete classes avoids a slow dynamic cast to the protocol.
+  var asLoadingInstruction: LoadingInstruction? {
+    if let load = self as? LoadInst {
+      return load
+    }
+    if let copy = self as? CopyAddrInst {
+      return copy
+    }
+    return nil
+  }
 }
 
 /// Either a `load` or a `copy_addr` (which is equivalent to a load+store).
