@@ -37,6 +37,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerUnion.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
 
 #endif // #ifdef NOT_COMPILED_WITH_SWIFT_PURE_BRIDGING_MODE
@@ -961,6 +962,22 @@ enum class ObjCSelectorFamily : unsigned {
 #define OBJC_SELECTOR_FAMILY(LABEL, PREFIX) LABEL,
 #include "swift/AST/ObjCSelectorFamily.def"
 };
+
+/// Is a result returned at +1 by a method in this selector family?
+/// The spelling-based form of the rule Clang applies via NSReturnsRetained.
+inline bool isPlusOneSelectorFamily(ObjCSelectorFamily family) {
+  switch (family) {
+  case ObjCSelectorFamily::Alloc:
+  case ObjCSelectorFamily::Copy:
+  case ObjCSelectorFamily::Init:
+  case ObjCSelectorFamily::MutableCopy:
+  case ObjCSelectorFamily::New:
+    return true;
+  case ObjCSelectorFamily::None:
+    return false;
+  }
+  llvm_unreachable("bad selector family");
+}
 
 /// Represents an Objective-C selector.
 class ObjCSelector {
