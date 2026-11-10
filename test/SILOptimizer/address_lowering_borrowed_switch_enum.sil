@@ -448,7 +448,8 @@ bb3:
   return %r : $()
 }
 
-// The scratch is deallocated in the latch, before the back edge.
+// The scratch is deallocated after the payload's last use, before the back
+// edge.
 //
 // CHECK-LABEL: sil [serialized] [ossa] @resilient_switch_in_loop : {{.*}} {
 // CHECK:       bb0([[ENUM:%[^,]+]] : $*ResilientEnum<T>):
@@ -459,12 +460,12 @@ bb3:
 // CHECK-NEXT:    [[SCRATCH:%[^,]+]] = alloc_stack $ResilientEnum<T>
 // CHECK-NEXT:    [[PAYLOAD:%[^,]+]] = unchecked_borrow_enum_data_addr [[ENUM]] : $*ResilientEnum<T>, #ResilientEnum.opaque!enumelt in [[SCRATCH]] : $*ResilientEnum<T>
 // CHECK:         apply {{%[^,]+}}<T>([[PAYLOAD]])
+// CHECK-NEXT:    dealloc_stack [[SCRATCH]] : $*ResilientEnum<T>
 // CHECK:         cond_br {{%[^,]+}}, [[LATCH:bb[0-9]+]], [[BREAK:bb[0-9]+]]
 // CHECK:       [[LATCH]]:
-// CHECK-NEXT:    dealloc_stack [[SCRATCH]] : $*ResilientEnum<T>
 // CHECK-NEXT:    br [[HEADER]]
 // CHECK:       [[BREAK]]:
-// CHECK-NEXT:    dealloc_stack [[SCRATCH]] : $*ResilientEnum<T>
+// CHECK-NEXT:    br
 // CHECK-LABEL: } // end sil function 'resilient_switch_in_loop'
 sil [serialized] [ossa] @resilient_switch_in_loop : $@convention(thin) <T> (@in_guaranteed ResilientEnum<T>) -> () {
 bb0(%0 : @guaranteed $ResilientEnum<T>):

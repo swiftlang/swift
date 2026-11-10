@@ -22,23 +22,23 @@ public func makeStream() -> AsyncStream<String> {
 // CHECK:         switch_enum {{.*}}, case #Optional.some!enumelt: [[OUTER_BODY:bb[0-9]+]], case #Optional.none!enumelt: [[OUTER_EXIT:bb[0-9]+]]
 //
 // Outer-loop body allocates the per-outer-iteration AsyncStream iterator
-// storage. The `[lexical] [var_decl]` alloc is the `$x$generator`.
+// storage. The `[lexical] [var_decl]` alloc is the `$x$generator`, which
+// makeAsyncIterator() initializes directly. The stream is freed in this block.
 // CHECK:       [[OUTER_BODY]]({{.*}}):
-// CHECK:         [[STREAM:%[^,]+]] = alloc_stack $AsyncStream<String>
-// CHECK:         [[ITER:%[^,]+]] = alloc_stack $AsyncStream<String>.Iterator
 // CHECK:         [[GEN:%[^,]+]] = alloc_stack [lexical] [var_decl] $AsyncStream<String>.Iterator
-// CHECK:         br [[INNER_HEADER:bb[0-9]+]]
+// CHECK:         [[STREAM:%[^,]+]] = alloc_stack $AsyncStream<String>
+// CHECK:         apply {{%[^ ]+}}<String>([[GEN]], [[STREAM]])
+// CHECK:         dealloc_stack [[STREAM]]
+// CHECK-NEXT:    br [[INNER_HEADER:bb[0-9]+]]
 //
 // CHECK:       [[INNER_HEADER]]:
 // CHECK:         switch_enum {{.*}}, case #Optional.some!enumelt: {{bb[0-9]+}}, case #Optional.none!enumelt: [[OUTER_BACK:bb[0-9]+]]
 //
-// Outer-loop back-edge: deallocates ALL the outer-body allocs, then loops
-// back to the outer header.
+// Outer-loop back-edge: deallocates the iterator, then loops back to the outer
+// header.
 // CHECK:       [[OUTER_BACK]]:
 // CHECK:         destroy_addr [[GEN]]
-// CHECK:         dealloc_stack [[GEN]]
-// CHECK:         dealloc_stack [[ITER]]
-// CHECK:         dealloc_stack [[STREAM]]
+// CHECK-NEXT:    dealloc_stack [[GEN]]
 // CHECK-NEXT:    br [[OUTER_HEADER]]
 //
 // Outer-loop exit: only the outer iterator is deallocated.

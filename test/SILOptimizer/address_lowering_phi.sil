@@ -167,7 +167,6 @@ exit(%box : @owned $Optional<T>):
 }
 
 // CHECK-LABEL: sil [ossa] @f013_testBBArgSelect_useProjections_interference : {{.*}} {
-// CHECK:         [[S2_ADDR:%[^,]+]] = alloc_stack $Box<T>
 // CHECK:         [[PHI_ADDR:%[^,]+]] = alloc_stack $Box<T>
 // CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[PHI_ADDR]] : $*Box<T>, #Box.t
 // CHECK:         apply undef<T>([[T_ADDR]])
@@ -175,9 +174,11 @@ exit(%box : @owned $Optional<T>):
 // CHECK:       [[RIGHT]]:
 // CHECK:         br [[MERGE:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
+// CHECK:         [[S2_ADDR:%[^,]+]] = alloc_stack $Box<T>
 // CHECK:         [[S2_FIELD_ADDR:%[^,]+]] = struct_element_addr [[S2_ADDR]] : $*Box<T>, #Box.t
 // CHECK:         copy_addr [take] [[T_ADDR]] to [init] [[S2_FIELD_ADDR]]
 // CHECK:         copy_addr [take] [[S2_ADDR]] to [init] [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[S2_ADDR]]
 // CHECK:         br [[MERGE]]
 // CHECK:       [[MERGE]]:
 // CHECK:         apply undef<Box<T>>([[PHI_ADDR]])
@@ -185,7 +186,6 @@ exit(%box : @owned $Optional<T>):
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         dealloc_stack [[PHI_ADDR]]
-// CHECK:         dealloc_stack [[S2_ADDR]]
 // CHECK-LABEL: } // end sil function 'f013_testBBArgSelect_useProjections_interference'
 sil [ossa] @f013_testBBArgSelect_useProjections_interference : $@convention(thin) <T> () -> () {
 entry:
@@ -710,10 +710,10 @@ exit(%t2 : @owned $T):
 // CHECK:         apply undef<T>([[BOX_ADDR]])
 // CHECK:         [[T_ADDR:%[^,]+]] = struct_element_addr [[BOX_ADDR]] : $*Box<T>, #Box.t
 // CHECK:         copy_addr [take] [[T_ADDR]] to [init] [[PHI_ADDR]]
+// CHECK:         dealloc_stack [[BOX_ADDR]]
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK:         destroy_addr [[PHI_ADDR]]
-// CHECK:         dealloc_stack [[BOX_ADDR]]
 // CHECK:         dealloc_stack [[PHI_ADDR]]
 // CHECK-LABEL: } // end sil function 'f122_single_phi_argument_destructure'
 sil [ossa]@f122_single_phi_argument_destructure : $@convention(thin) <T> () -> () {

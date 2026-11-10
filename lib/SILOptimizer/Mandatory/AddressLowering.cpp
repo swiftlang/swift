@@ -1156,8 +1156,25 @@ static Operand *getProjectedDefOperand(SILValue value) {
     return &cast<MarkDependenceInst>(value)
                 ->getAllOperands()[MarkDependenceInst::Dependent];
 
-  case ValueKind::MoveValueInst:
-    return &cast<MoveValueInst>(value)->getOperandRef();
+  case ValueKind::MoveValueInst: {
+    // A variable gets its own storage so that the larger value it was taken
+    // from is not kept alive until the variable's last use. Rewriting replaces
+    // the operand, so after allocation consult the move's storage instead.
+    auto *move = cast<MoveValueInst>(value);
+    SILValue source = move->getOperand();
+    if (!move->isFromVarDecl() ||
+        source->getOwnershipKind() != OwnershipKind::Owned)
+      return &move->getOperandRef();
+    if (isa<UncheckedEnumDataInst>(source))
+      return nullptr;
+    if (auto *result = dyn_cast<SILPhiArgument>(source))
+      if (isa_and_nonnull<SwitchEnumInst>(result->getTerminatorForResult()))
+        return nullptr;
+    if (isa<MultipleValueInstructionResult>(source) &&
+        getProjectedDefOperand(source))
+      return nullptr;
+    return &move->getOperandRef();
+  }
 
   case ValueKind::MultipleValueInstructionResult: {
     SILInstruction *destructure =
@@ -1419,6 +1436,8 @@ public:
   void finalizeOpaqueStorage();
 
   void sinkProjections();
+
+  void shrinkBlockLocalAllocations();
 
 protected:
   void allocateValue(SILValue value);
@@ -1909,8 +1928,72 @@ void OpaqueStorageAllocation::sinkProjections() {
       continue;
     auto sank = sinkToUses(inst, pass.domInfo);
     if (sank == SinkResult::NoUsers) {
+      if (auto *alloc = dyn_cast<AllocStackInst>(inst))
+        allocs.erase(alloc);
       pass.deleter.forceDelete(inst);
     }
+  }
+}
+
+/// Confine each alloc_stack whose uses are all in one block to that block, with
+/// a single dealloc_stack.
+void OpaqueStorageAllocation::shrinkBlockLocalAllocations() {
+  for (auto maybeAlloc : allocs) {
+    if (!maybeAlloc.has_value())
+      continue;
+    auto *alloc = maybeAlloc.value();
+    if (findTransitiveUsesForAddress(alloc) != AddressUseKind::NonEscaping)
+      continue;
+
+    SILBasicBlock *block = nullptr;
+    InstructionSet users(pass.function);
+    SmallVector<DeallocStackInst *, 2> deallocs;
+    SmallVector<SILValue, 8> worklist{alloc};
+    bool isBlockLocal = true;
+    while (isBlockLocal && !worklist.empty()) {
+      for (Operand *use : worklist.pop_back_val()->getUses()) {
+        if (use->isTypeDependent())
+          continue;
+        auto *user = use->getUser();
+        auto *dealloc = dyn_cast<DeallocStackInst>(user);
+        if (dealloc && dealloc->getOperand() == alloc) {
+          deallocs.push_back(dealloc);
+          continue;
+        }
+        if (dealloc || isa<TermInst>(user) ||
+            (block && user->getParent() != block)) {
+          isBlockLocal = false;
+          break;
+        }
+        block = user->getParent();
+        if (users.insert(user))
+          llvm::append_range(worklist, user->getResults());
+      }
+    }
+    if (!isBlockLocal || !block)
+      continue;
+
+    SILInstruction *first = nullptr;
+    SILInstruction *last = nullptr;
+    for (auto &inst : *block) {
+      if (users.contains(&inst)) {
+        if (!first)
+          first = &inst;
+        last = &inst;
+      }
+    }
+    bool hasLocalDealloc =
+        deallocs.size() == 1 && deallocs.front()->getParent() == block;
+    // Start at the first use, so that the new dealloc_stack nests inside any
+    // allocation made earlier in the block.
+    if (alloc->getParent() != block || !hasLocalDealloc)
+      alloc->moveBefore(first);
+    if (hasLocalDealloc)
+      continue;
+    for (auto *dealloc : deallocs)
+      pass.deleter.forceDelete(dealloc);
+    pass.getBuilder(std::next(last->getIterator()))
+        .createDeallocStack(pass.genLoc(), alloc);
   }
 }
 
@@ -4436,6 +4519,21 @@ void UseRewriter::rewriteDestructure(SILInstruction *destructure) {
   }
 }
 
+static void markStorageLexical(SILValue address) {
+  if (auto base = getAccessBase(address)) {
+    if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
+      allocStack->setIsLexical();
+      return;
+    }
+    // Function arguments are inherently lexical.
+    if (isa<SILFunctionArgument>(base))
+      return;
+  }
+
+  SWIFT_ASSERT_ONLY(address->dump());
+  llvm_unreachable("^^^ unknown lexical address producer");
+}
+
 template <typename Introducer>
 void UseRewriter::visitLifetimeIntroducer(Introducer *introducer) {
   assert(use == getProjectedDefOperand(introducer));
@@ -4445,20 +4543,8 @@ void UseRewriter::visitLifetimeIntroducer(Introducer *introducer) {
   markRewritten(introducer, address);
 
   // Lifetime introducers are irrelevant unless they are marked lexical.
-  if (introducer->isLexical()) {
-    if (auto base = getAccessBase(address)) {
-      if (auto *allocStack = dyn_cast<AllocStackInst>(base)) {
-        allocStack->setIsLexical();
-        return;
-      }
-      // Function arguments are inherently lexical.
-      if (isa<SILFunctionArgument>(base))
-        return;
-    }
-
-    SWIFT_ASSERT_ONLY(address->dump());
-    llvm_unreachable("^^^ unknown lexical address producer");
-  }
+  if (introducer->isLexical())
+    markStorageLexical(address);
 }
 
 void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
@@ -4466,7 +4552,19 @@ void UseRewriter::visitBeginBorrowInst(BeginBorrowInst *borrow) {
 }
 
 void UseRewriter::visitMoveValueInst(MoveValueInst *mvi) {
-  visitLifetimeIntroducer(mvi);
+  if (pass.valueStorageMap.getStorage(mvi).isDefProjection) {
+    visitLifetimeIntroducer(mvi);
+    return;
+  }
+
+  SILValue srcAddr = pass.valueStorageMap.getStorage(use->get()).storageAddress;
+  AddressMaterialization addrMat(pass, mvi, builder);
+  SILValue destAddr = addrMat.materializeAddress(mvi);
+  builder.createCopyAddr(mvi->getLoc(), srcAddr, destAddr, IsTake,
+                         IsInitialization);
+  markRewritten(mvi, destAddr);
+  if (mvi->isLexical())
+    markStorageLexical(destAddr);
 }
 
 // Opening an opaque existential. Rewrite the opened existentials here on
@@ -5471,6 +5569,8 @@ void swift::lowerAddress(SILPassManager *pm, SILFunction *function) {
   allocator.sinkProjections();
 
   deleteRewrittenInstructions(pass);
+
+  allocator.shrinkBlockLocalAllocations();
 
   StackNesting::fixNesting(function);
 
