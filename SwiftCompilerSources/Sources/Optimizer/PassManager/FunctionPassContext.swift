@@ -168,6 +168,28 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
+  typealias DifferentiableFunctionArgumentMangling = (
+    argumentIndex: Int,
+    function: DifferentiableFunctionInst,
+    originalRoot: ThinToThickFunctionInst,
+    jvpRoot: ThinToThickFunctionInst,
+    vjpRoot: ThinToThickFunctionInst
+  )
+
+  func mangle(withDifferentiableFunctionArguments args: [DifferentiableFunctionArgumentMangling],
+              from applySiteCallee: Function) -> String {
+    let bridgedArgManglings = args.map {
+      BridgedPassContext.DifferentiableFunctionArgMangling(
+        argIdx: $0.argumentIndex, inst: $0.function.bridged,
+        originalRoot: $0.originalRoot.bridged, jvpRoot: $0.jvpRoot.bridged,
+        vjpRoot: $0.vjpRoot.bridged)
+    }
+    return bridgedArgManglings.withBridgedArrayRef { bridgedDifferentiableFunctionArgs in
+      String(taking: bridgedPassContext.mangleWithDifferentiableFunctionArgs(
+        bridgedDifferentiableFunctionArgs, applySiteCallee.bridged))
+    }
+  }
+
   func mangle(withConstantCaptureArguments constArgs: [(argumentIndex: Int, argument: Value)],
               from applySiteCallee: Function
   ) -> String {
