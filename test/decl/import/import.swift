@@ -54,13 +54,13 @@ import var x // expected-error {{expected module name}}
 import struct Swift.nonexistent // expected-error {{struct 'nonexistent' does not exist in module 'Swift'}}
 import func SwiftUI.Text.++ // expected-cparser-error{{cannot include postfix operator in import declaration}}{{25-28=}} expected-astgen-error {{unexpected code '.++' in source file}} expected-astgen-error {{no such module 'SwiftUI'}}
 
-import Swift.import.abc // expected-cparser-error {{expected identifier in import declaration}} expected-astgen-error {{expected name in import}} expected-astgen-error {{no such module 'Swift.'}} expected-astgen-error {{no such module '.abc'}}
+import Swift.import.abc // expected-cparser-error {{expected identifier in import declaration}} expected-astgen-error {{expected name in import}}
 // expected-cparser-error @-1 {{keyword 'import' cannot be used as an identifier here}} expected-astgen-error@-1 {{expected name in import}}
 // expected-cparser-note @-2 {{if this name is unavoidable, use backticks to escape it}}
-import where Swift.Int // expected-cparser-error {{expected identifier}} expected-astgen-error {{unexpected code 'where Swift.Int' in source file}} expected-astgen-error {{no such module ''}}
+import where Swift.Int // expected-cparser-error {{expected identifier}} expected-astgen-error {{unexpected code 'where Swift.Int' in source file}}
 // expected-cparser-error @-1 {{keyword 'where' cannot be used as an identifier here}} expected-astgen-error@-1 {{expected name in import}}
 // expected-cparser-note @-2 {{if this name is unavoidable, use backticks to escape it}}
-import 2 // expected-cparser-error {{expected identifier}} expected-astgen-error {{expected name in import}} expected-astgen-error {{no such module ''}} expected-astgen-warning {{integer literal is unused}}
+import 2 // expected-cparser-error {{expected identifier}} expected-astgen-error {{expected name in import}} expected-astgen-warning {{integer literal is unused}}
 
 import really.nonexistent // expected-error {{no such module 'really.nonexistent'}}
 

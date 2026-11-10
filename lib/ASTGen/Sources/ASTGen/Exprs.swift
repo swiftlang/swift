@@ -1068,6 +1068,11 @@ extension ASTGenVisitor {
   }
 
   func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedExpr {
+    // `#` without a macro name has been diagnosed by the parser; there is no
+    // macro to look up.
+    if node.macroName.presence == .missing {
+      return BridgedErrorExpr.create(self.ctx, loc: self.generateSourceRange(node)).asExpr
+    }
     switch self.maybeGenerateBuiltinPound(freestandingMacroExpansion: node) {
     case .generated(let astNode):
       guard let astNode else {

@@ -57,6 +57,11 @@ extension ASTGenVisitor {
     case .implicitlyUnwrappedOptionalType(let node):
       return self.generate(implicitlyUnwrappedOptionalType: node).asTypeRepr
     case .memberType(let node):
+      // `Int.` without a member name has been diagnosed by the parser; there is
+      // nothing to look up.
+      if node.name.presence == .missing {
+        return BridgedErrorTypeRepr.create(self.ctx, range: self.generateSourceRange(node)).asTypeRepr
+      }
       return self.generate(memberType: node).asTypeRepr
     case .metatypeType(let node):
       return self.generate(metatypeType: node)

@@ -256,7 +256,9 @@ extension ASTGenVisitor {
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
-    let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
+    let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.filter {
+      $0.name.presence == .present
+    }.map {
       self.generateLocatedIdentifier($0.name)
     }
 
@@ -1758,6 +1760,23 @@ extension ASTGenVisitor {
       self.diagnose(.operator_decl_inner_scope, at: node.operatorKeyword)
       return nil
     }
+    // An identifier or a stray operator character glued to the name (`--aa`,
+    // `aa--`) was diagnosed by the parser, which then drops the declaration; a
+    // declaration with the truncated name would clash with its neighbors.
+    for unexpected in [node.unexpectedBetweenOperatorKeywordAndName, node.unexpectedBetweenNameAndOperatorPrecedenceAndTypes] {
+      if let first = unexpected?.first?.as(TokenSyntax.self),
+        first.presence == .present, first.rawTokenKind != .leftBrace, first.rawTokenKind != .colon,
+        first.rawTokenKind != .semicolon, first.rawTokenKind != .comma
+      {
+        // The C++ parser checks the start of a postfix operator's name first.
+        if node.fixitySpecifier.keywordKind == .postfix,
+          node.name.rawText.first == UInt8(ascii: "?") || node.name.rawText.first == UInt8(ascii: "!")
+        {
+          self.diagnose(.postfix_operator_name_cannot_start_with_unwrap, at: node.name)
+        }
+        return nil
+      }
+    }
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
@@ -1791,8 +1810,11 @@ extension ASTGenVisitor {
       precedenceAndTypes = nil
     }
 
+    // A missing group name, as in `infix operator +++ : ;`, names nothing.
     let (precedenceGroupName, precedenceGroupLoc) =
-      self.generateIdentifierAndSourceLoc(precedenceAndTypes?.precedenceGroup)
+      self.generateIdentifierAndSourceLoc(
+        precedenceAndTypes?.precedenceGroup.presence == .missing ? nil : precedenceAndTypes?.precedenceGroup
+      )
 
     let decl = BridgedOperatorDecl.createParsed(
       self.ctx,
@@ -1801,7 +1823,8 @@ extension ASTGenVisitor {
       operatorKeywordLoc: self.generateSourceLoc(node.operatorKeyword),
       name: name,
       nameLoc: nameLoc,
-      colonLoc: self.generateSourceLoc(precedenceAndTypes?.colon),
+      // The colon and the group name go together: without a name there is no group.
+      colonLoc: precedenceGroupName == nil ? nil : self.generateSourceLoc(precedenceAndTypes?.colon),
       precedenceGroupName: precedenceGroupName,
       precedenceGroupLoc: precedenceGroupLoc
     )
@@ -1969,6 +1992,11 @@ extension ASTGenVisitor {
     // one that is not.
     guard self.declContext.isModuleScopeContext else {
       self.diagnose(.decl_inner_scope, at: node.importKeyword)
+      return nil
+    }
+    // `import` without a module name has been diagnosed by the parser, which
+    // builds no declaration.
+    if node.path.contains(where: { $0.name.presence == .missing }) {
       return nil
     }
     let attrs = self.generateDeclAttributes(node, allowStatic: false)
@@ -2160,7 +2188,7 @@ extension ASTGenVisitor {
 
   @inline(__always)
   func generate(precedenceGroupNameList node: PrecedenceGroupNameListSyntax) -> BridgedArrayRef {
-    node.lazy.map {
+    node.lazy.filter { $0.name.presence == .present }.map {
       self.generateLocatedIdentifier($0.name)
     }.bridgedArray(in: self)
   }

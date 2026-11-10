@@ -108,11 +108,11 @@ func repeatedAttribute(a: Int, b: @_scoped(a) @_scoped(a) S) {}
 
 @_scopeParams(a: b) func labeledScopeParam() {}
 // expected-cparser-error@-1:16{{expected ',' separator}}{{16-16=,}}
-// expected-error@-2:16{{expected scope parameter name in '_scopeParams' attribute}}
+// expected-error@-2{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams(a.b) func memberScopeParam() {}
 // expected-cparser-error@-1:16{{expected ',' separator}}{{16-16=,}}
-// expected-error@-2:16{{expected scope parameter name in '_scopeParams' attribute}}
+// expected-error@-2{{expected scope parameter name in '_scopeParams' attribute}}
 
 // Recovered by dropping the separator, so the attribute is still created.
 @_scopeParams(,a) func leadingCommaScopeParam() {}

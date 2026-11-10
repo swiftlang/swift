@@ -5,7 +5,7 @@
 
 /// Test some invalid syntax first
 
-protocol Invalid1<> {} // expected-astgen-error {{an associated type named '' must be declared in the protocol 'Invalid1' or a protocol it inherits}}
+protocol Invalid1<> {}
 // expected-cparser-error@-1 {{expected an identifier to name primary associated type}} expected-astgen-error@-1 {{expected name in primary associated type clause}}
 
 protocol Invalid2<A B> {} // expected-astgen-error {{unexpected code 'B>' in protocol}}
@@ -13,7 +13,7 @@ protocol Invalid2<A B> {} // expected-astgen-error {{unexpected code 'B>' in pro
 // expected-note@-2 {{to match this opening '<'}}
 // expected-error@-3 {{an associated type named 'A' must be declared in the protocol 'Invalid2' or a protocol it inherits}}
 
-protocol Invalid3<Element, +> {} // expected-astgen-error {{unexpected code '+>' in protocol}} expected-astgen-error {{an associated type named '' must be declared in the protocol 'Invalid3' or a protocol it inherits}}
+protocol Invalid3<Element, +> {} // expected-astgen-error {{unexpected code '+>' in protocol}}
 // expected-cparser-error@-1 {{expected an identifier to name primary associated type}} expected-astgen-error@-1 {{expected '>' to end primary associated type clause}}
 // expected-cparser-error@-2 {{expected '>' to complete primary associated type list}} expected-astgen-error@-2 {{expected name in primary associated type clause}}
 // expected-note@-3 {{to match this opening '<'}}

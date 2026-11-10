@@ -1168,7 +1168,10 @@ extension ASTGenVisitor {
       }
     }
 
-    return arguments.lazy.map(self.generate(differentiabilityArgument:)).bridgedArray(in: self)
+    // A missing parameter, as in `wrt: -1`, was diagnosed by the parser; it
+    // names nothing to look up.
+    return arguments.filter { $0.argument.presence == .present }.lazy
+      .map(self.generate(differentiabilityArgument:)).bridgedArray(in: self)
   }
 
   /// E.g.:
@@ -1423,6 +1426,10 @@ extension ASTGenVisitor {
       return nil
     }
 
+    // `@_dynamicReplacement(for:` without a name: nothing was replaced.
+    if arg.declName.baseName.presence == .missing {
+      return nil
+    }
     let replacedFunction = self.generateDeclNameRef(declReferenceExpr: arg.declName)
 
     return .createParsed(

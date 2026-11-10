@@ -35,7 +35,7 @@ do {
 
 do {
   _ = #/\
-  /# // expected-astgen-error {{is not a prefix unary operator}} expected-astgen-error {{no macro named}}
+  /# // expected-astgen-error {{is not a prefix unary operator}}
   // expected-cparser-error@-2:7 {{unterminated regex literal}} expected-astgen-error@-2 {{to end regex literal}}
   // expected-error@-3:10 {{expected escape sequence}}
   // expected-cparser-error@-3:5 {{expected a macro identifier}} expected-astgen-error@-3 {{expected identifier in macro expansion}}

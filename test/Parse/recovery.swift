@@ -315,7 +315,7 @@ struct ErrorTypeInVarDecl1 {
 }
 
 struct ErrorTypeInVarDecl2 {
-  var v1 : Int. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member type}} expected-astgen-error {{'' is not a member type of struct 'Swift.Int'}}
+  var v1 : Int. // expected-cparser-error {{expected member name following '.'}} expected-astgen-error {{expected name in member type}}
   var v2 : Int
 }
 
