@@ -6831,6 +6831,9 @@ public:
   /// Constructs a protocol composition corresponding to the `AnyObject` type.
   static Type theAnyObjectType(const ASTContext &C);
 
+  /// Constructs a protocol composition corresponding to the `AnyReference` type.
+  static Type theAnyReferenceType(const ASTContext &C);
+
   /// Constructs a protocol composition corresponding to the `~IP` type.
   static Type getInverseOf(const ASTContext &C, InvertibleProtocolKind IP);
 
