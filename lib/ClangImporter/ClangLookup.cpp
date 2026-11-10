@@ -430,231 +430,237 @@ lookupClangConstructors(ClangImporter::Implementation &Impl,
   return result;
 }
 
-/// Synthesize static factory methods for a C++ foreign reference type.
-static llvm::SmallVector<clang::CXXMethodDecl *, 4>
-synthesizeStaticFactoryForCXXForeignRef(
-    ClangImporter::Implementation &ImporterImpl,
-    const clang::CXXRecordDecl *cxxRecordDecl) {
-  if (!cxxRecordDecl->isCompleteDefinition() || cxxRecordDecl->isAbstract())
-    return {};
+/// Whether \a ctor can be the basis of a synthesized static factory.
+static bool isFRTFactoryCandidate(const clang::CXXConstructorDecl *ctor) {
+  return !ctor->isDeleted() && ctor->getAccess() != clang::AS_private &&
+         ctor->getAccess() != clang::AS_protected &&
+         !ctor->isCopyOrMoveConstructor() && !ctor->isVariadic();
+}
 
-  clang::ASTContext &clangCtx = cxxRecordDecl->getASTContext();
-  clang::Sema &clangSema = ImporterImpl.getClangSema();
+/// Whether to synthesize static factories for \a record: it must not provide
+/// its own, and must have a constructor to synthesize them from and a usable
+/// operator new to allocate with.
+static bool canSynthesizeFRTFactories(ClangImporter::Implementation &Impl,
+                                      const clang::CXXRecordDecl *record) {
+  // A user-provided static factory is a static member function (or member
+  // function template) that is imported as an initializer.
+  bool hasUserProvidedStaticFactory =
+      llvm::any_of(record->decls(), [&](const clang::Decl *member) {
+        const auto *method =
+            dyn_cast_or_null<clang::CXXMethodDecl>(member->getAsFunction());
+        return method && method->isStatic() &&
+               Impl.importFullName(method, Impl.CurrentVersion)
+                   .getDeclName()
+                   .getBaseName()
+                   .isConstructor();
+      });
+  if (hasUserProvidedStaticFactory)
+    return false;
 
-  if (clang::Sema::SFINAETrap trap(clangSema);
-      !clangSema.hasReachableDefinition(
-          const_cast<clang::CXXRecordDecl *>(cxxRecordDecl)))
-    return {};
+  if (!record->isCompleteDefinition() || record->isAbstract())
+    return false;
 
-  clang::QualType cxxRecordTy = clangCtx.getCanonicalTagType(cxxRecordDecl);
-  clang::SourceLocation cxxRecordDeclLoc = cxxRecordDecl->getLocation();
+  clang::Sema &S = Impl.getClangSema();
 
-  llvm::SmallVector<clang::CXXConstructorDecl *, 4> ctorDeclsForSynth;
-  for (clang::CXXConstructorDecl *ctorDecl : cxxRecordDecl->ctors()) {
-    if (ctorDecl->isDeleted() || ctorDecl->getAccess() == clang::AS_private ||
-        ctorDecl->getAccess() == clang::AS_protected ||
-        ctorDecl->isCopyOrMoveConstructor() || ctorDecl->isVariadic())
-      continue;
-    ctorDeclsForSynth.push_back(ctorDecl);
-  }
+  if (clang::Sema::SFINAETrap trap(S);
+      !S.hasReachableDefinition(const_cast<clang::CXXRecordDecl *>(record)))
+    return false;
 
-  if (ctorDeclsForSynth.empty())
-    return {};
+  if (llvm::none_of(record->ctors(), isFRTFactoryCandidate))
+    return false;
 
   clang::ImplicitAllocationParameters IAP(clang::AlignedAllocationMode::No);
-  clang::Sema::SFINAETrap trap(clangSema);
-  auto foundAllocation = clangSema.FindAllocationFunctions(
-      cxxRecordDeclLoc, clang::SourceRange(),
+  clang::Sema::SFINAETrap trap(S);
+  auto foundAllocation = S.FindAllocationFunctions(
+      record->getLocation(), clang::SourceRange(),
       clang::AllocationFunctionScope::Both,
-      clang::AllocationFunctionScope::Both, cxxRecordTy, /*IsArray=*/false, IAP,
-      clang::MultiExprArg(), /*Diagnose=*/false);
+      clang::AllocationFunctionScope::Both,
+      record->getASTContext().getCanonicalTagType(record), /*IsArray=*/false,
+      IAP, clang::MultiExprArg(), /*Diagnose=*/false);
   if (trap.hasErrorOccurred() || !foundAllocation)
-    return {};
+    return false;
 
   clang::FunctionDecl *operatorNew = foundAllocation->OperatorNew;
-  if (!operatorNew || operatorNew->isDeleted() ||
-      operatorNew->getAccess() == clang::AS_private ||
-      operatorNew->getAccess() == clang::AS_protected)
-    return {};
+  return operatorNew && !operatorNew->isDeleted() &&
+         operatorNew->getAccess() != clang::AS_private &&
+         operatorNew->getAccess() != clang::AS_protected;
+}
 
-  clang::QualType cxxRecordPtrTy = clangCtx.getPointerType(cxxRecordTy);
-  // Adding `_Nonnull` to the return type of synthesized static factory
+/// Create the declaration of a static factory of \a record that returns a new
+/// object constructed with \a ctor, without its body. \a index distinguishes
+/// the names of the factories synthesized for \a record.
+static clang::CXXMethodDecl *
+createFRTFactoryDecl(ClangImporter::Implementation &Impl,
+                     const clang::CXXRecordDecl *record,
+                     clang::CXXConstructorDecl *ctor, unsigned index,
+                     clang::QualType returnType) {
+  clang::ASTContext &clangCtx = record->getASTContext();
+  clang::IdentifierTable &clangIdents = clangCtx.Idents;
+  clang::SourceLocation recordLoc = record->getLocation();
+  unsigned numParams = ctor->getNumParams();
+
+  std::string funcName = "__returns_" + record->getNameAsString();
+  if (numParams > 0)
+    funcName += "_" + std::to_string(numParams) + "_params";
+  funcName += "_" + std::to_string(index);
+
+  clang::QualType funcTy = clangCtx.getFunctionType(
+      returnType,
+      ctor->getType()->castAs<clang::FunctionProtoType>()->getParamTypes(),
+      clang::FunctionProtoType::ExtProtoInfo());
+
+  auto beginLoc = ctor->getBeginLoc(), endLoc = ctor->getEndLoc(),
+       nameLoc = ctor->getNameInfo().getLoc();
+  if (beginLoc.isInvalid() || endLoc.isInvalid() || nameLoc.isInvalid())
+    beginLoc = endLoc = nameLoc = recordLoc;
+
+  auto *factory = clang::CXXMethodDecl::Create(
+      clangCtx, const_cast<clang::CXXRecordDecl *>(record), beginLoc,
+      clang::DeclarationNameInfo(&clangIdents.get(funcName), nameLoc), funcTy,
+      clangCtx.getTrivialTypeSourceInfo(funcTy), clang::SC_Static,
+      /*UsesFPIntrin=*/false, /*isInline=*/true,
+      clang::ConstexprSpecKind::Unspecified, endLoc);
+  factory->setAccess(clang::AS_public);
+
+  // Mirror the constructor's parameters, and spell them in the Swift name.
+  llvm::SmallVector<clang::ParmVarDecl *, 4> params;
+  std::string swiftName = "init(";
+  for (unsigned i = 0; i < numParams; ++i) {
+    auto *ctorParam = ctor->getParamDecl(i);
+    clang::QualType paramTy = ctorParam->getType();
+
+    auto *paramIdent = ctorParam->getIdentifier();
+    if (!paramIdent)
+      paramIdent = &clangIdents.get("__unnamed_param_" + std::to_string(i));
+
+    auto paramBeginLoc = ctorParam->getBeginLoc(),
+         paramEndLoc = ctorParam->getEndLoc();
+    if (paramBeginLoc.isInvalid() || paramEndLoc.isInvalid())
+      paramBeginLoc = paramEndLoc = recordLoc;
+
+    clang::Expr *defaultArg = nullptr;
+    if (ctorParam->hasDefaultArg() && Impl.isDefaultArgSafeToImport(ctorParam))
+      defaultArg = ctorParam->getDefaultArg();
+
+    auto *param = clang::ParmVarDecl::Create(
+        clangCtx, factory, paramBeginLoc, paramEndLoc, paramIdent, paramTy,
+        clangCtx.getTrivialTypeSourceInfo(paramTy), clang::SC_None, defaultArg);
+    param->setScopeInfo(/*scopeDepth=*/0, /*parameterIndex=*/i);
+    if (importer::hasUnsafeAPIAttr(ctorParam))
+      param->addAttr(clang::SwiftAttrAttr::Create(clangCtx, "import_unsafe"));
+    param->setIsUsed();
+    params.push_back(param);
+
+    swiftName += paramTy->isRValueReferenceType() ? "consuming:" : "_:";
+  }
+  swiftName += ")";
+  factory->setParams(params);
+
+  auto ownership = importer::ReturnOwnershipInfo(ctor);
+  if (ownership.hasReturnsRetained)
+    factory->addAttr(
+        clang::SwiftAttrAttr::Create(clangCtx, "returns_retained"));
+  if (ownership.hasReturnsUnretained)
+    factory->addAttr(
+        clang::SwiftAttrAttr::Create(clangCtx, "returns_unretained"));
+  for (auto *attr : ctor->attrs())
+    if (isa<clang::AvailabilityAttr, clang::DeprecatedAttr,
+            clang::UnavailableAttr>(attr))
+      factory->addAttr(attr->clone(clangCtx));
+
+  factory->addAttr(clang::SwiftNameAttr::Create(clangCtx, swiftName));
+  factory->addAttr(clang::NoDebugAttr::CreateImplicit(clangCtx));
+  factory->setImplicit();
+  factory->setImplicitlyInline();
+  return factory;
+}
+
+/// Give \a factory a body that returns 'new Record(args...)', forwarding the
+/// factory's parameters to \a ctor. Returns false if that fails.
+static bool buildFRTFactoryBody(ClangImporter::Implementation &Impl,
+                                clang::CXXMethodDecl *factory,
+                                clang::CXXConstructorDecl *ctor) {
+  clang::ASTContext &clangCtx = factory->getASTContext();
+  clang::Sema &S = Impl.getClangSema();
+  const clang::CXXRecordDecl *record = factory->getParent();
+  clang::QualType recordTy = clangCtx.getCanonicalTagType(record);
+
+  auto ctorArgs = importer::buildClangForwardingArgs(
+      clangCtx, S, factory->parameters(), Impl);
+  llvm::SmallVector<clang::Expr *, 4> ctorArgsToAdd;
+  if (S.CompleteConstructorCall(ctor, recordTy, ctorArgs, ctor->getLocation(),
+                                ctorArgsToAdd))
+    return false;
+
+  clang::ExprResult ctorExpr = S.BuildCXXConstructExpr(
+      clang::SourceLocation(), recordTy, ctor, /*Elidable=*/false,
+      ctorArgsToAdd, /*HadMultipleCandidates=*/false,
+      /*IsListInitialization=*/false, /*IsStdInitListInitialization=*/false,
+      /*RequiresZeroInit=*/false, clang::CXXConstructionKind::Complete,
+      clang::SourceRange());
+  if (ctorExpr.isInvalid())
+    return false;
+
+  // BuildCXXNew() needs some valid location (here, the record's) to determine
+  // the CXXNewInitializationStyle.
+  clang::ExprResult newExpr = S.BuildCXXNew(
+      clang::SourceRange(), /*UseGlobal=*/false, clang::SourceLocation(), {},
+      clang::SourceLocation(), clang::SourceRange(), recordTy,
+      clangCtx.getTrivialTypeSourceInfo(recordTy), std::nullopt,
+      record->getLocation(), ctorExpr.get());
+  if (newExpr.isInvalid())
+    return false;
+
+  clang::Stmt *returnStmt =
+      importer::createClangReturnStmt(clangCtx, newExpr.get());
+  factory->setBody(clang::CompoundStmt::Create(
+      clangCtx, {returnStmt}, clang::FPOptionsOverride(),
+      clang::SourceLocation(), clang::SourceLocation()));
+  return true;
+}
+
+/// Synthesize static factories for a C++ foreign reference type, one for each
+/// eligible constructor, appending them to \a factories.
+static void synthesizeFRTFactories(
+    ClangImporter::Implementation &Impl, const clang::CXXRecordDecl *record,
+    llvm::SmallVectorImpl<clang::CXXMethodDecl *> &factories) {
+
+  if (!canSynthesizeFRTFactories(Impl, record))
+    return;
+
+  clang::ASTContext &clangCtx = record->getASTContext();
+  clang::Sema &clangSema = Impl.getClangSema();
+
+  // The factories return a _Nonnull pointer to the new object.
+  clang::QualType returnTy =
+      clangCtx.getPointerType(clangCtx.getCanonicalTagType(record));
   bool nullabilityCannotBeAdded =
       clangSema.CheckImplicitNullabilityTypeSpecifier(
-          cxxRecordPtrTy, clang::NullabilityKind::NonNull, cxxRecordDeclLoc,
+          returnTy, clang::NullabilityKind::NonNull, record->getLocation(),
           /*isParam=*/false, /*OverrideExisting=*/true);
-  assert(!nullabilityCannotBeAdded &&
-         "Failed to add _Nonnull specifier to synthesized "
-         "static factory's return type");
+  ASSERT(!nullabilityCannotBeAdded &&
+         "failed to add _Nonnull to the return type of static factories");
 
-  clang::IdentifierTable &clangIdents = clangCtx.Idents;
+  unsigned index = 0;
+  for (auto *ctor : record->ctors()) {
+    if (!isFRTFactoryCandidate(ctor))
+      continue;
 
-  llvm::SmallVector<clang::CXXMethodDecl *, 4> synthesizedFactories;
-  unsigned int selectedCtorDeclCounter = 0;
-  for (clang::CXXConstructorDecl *selectedCtorDecl : ctorDeclsForSynth) {
-    clang::Sema::SFINAETrap ctorTrap(clangSema);
-
-    unsigned int ctorParamCount = selectedCtorDecl->getNumParams();
-    selectedCtorDeclCounter++;
-
-    std::string funcName = "__returns_" + cxxRecordDecl->getNameAsString();
-    if (ctorParamCount > 0)
-      funcName += "_" + std::to_string(ctorParamCount) + "_params";
-    funcName += "_" + std::to_string(selectedCtorDeclCounter);
-    clang::IdentifierInfo *funcNameToSynth = &clangIdents.get(funcName);
-
-    auto ctorFunctionProtoTy =
-        selectedCtorDecl->getType()->getAs<clang::FunctionProtoType>();
-    clang::ArrayRef<clang::QualType> paramTypes =
-        ctorFunctionProtoTy->getParamTypes();
-    clang::FunctionProtoType::ExtProtoInfo EPI;
-    clang::QualType funcTypeToSynth =
-        clangCtx.getFunctionType(cxxRecordPtrTy, paramTypes, EPI);
-
-    auto methodBeginLoc = selectedCtorDecl->getBeginLoc(),
-         methodEndLoc = selectedCtorDecl->getEndLoc(),
-         methodNameLoc = selectedCtorDecl->getNameInfo().getLoc();
-
-    if (methodBeginLoc.isInvalid() || methodEndLoc.isInvalid() ||
-        methodNameLoc.isInvalid())
-      methodBeginLoc = methodEndLoc = methodNameLoc = cxxRecordDeclLoc;
-
-    clang::CXXMethodDecl *synthCxxMethodDecl = clang::CXXMethodDecl::Create(
-        clangCtx, const_cast<clang::CXXRecordDecl *>(cxxRecordDecl),
-        methodBeginLoc,
-        clang::DeclarationNameInfo(funcNameToSynth, methodNameLoc),
-        funcTypeToSynth, clangCtx.getTrivialTypeSourceInfo(funcTypeToSynth),
-        clang::SC_Static, /*UsesFPIntrin=*/false, /*isInline=*/true,
-        clang::ConstexprSpecKind::Unspecified, methodEndLoc);
-    assert(
-        synthCxxMethodDecl &&
-        "Unable to synthesize static factory for c++ foreign reference type");
-    synthCxxMethodDecl->setAccess(clang::AccessSpecifier::AS_public);
-
-    llvm::SmallVector<clang::ParmVarDecl *, 4> synthParams;
-    for (unsigned int i = 0; i < ctorParamCount; ++i) {
-      auto *origParam = selectedCtorDecl->getParamDecl(i);
-      clang::IdentifierInfo *paramIdent = origParam->getIdentifier();
-      if (!paramIdent) {
-        std::string dummyName = "__unnamed_param_" + std::to_string(i);
-        paramIdent = &clangIdents.get(dummyName);
-      }
-      auto paramBeginLoc = origParam->getBeginLoc(),
-           paramEndLoc = origParam->getEndLoc();
-      if (paramBeginLoc.isInvalid() || paramEndLoc.isInvalid())
-        paramBeginLoc = paramEndLoc = cxxRecordDeclLoc;
-
-      clang::Expr *defaultArg = nullptr;
-      if (origParam->hasDefaultArg() &&
-          ImporterImpl.isDefaultArgSafeToImport(origParam))
-        defaultArg = origParam->getDefaultArg();
-
-      auto *param = clang::ParmVarDecl::Create(
-          clangCtx, synthCxxMethodDecl, paramBeginLoc, paramEndLoc, paramIdent,
-          origParam->getType(),
-          clangCtx.getTrivialTypeSourceInfo(origParam->getType()),
-          clang::SC_None, defaultArg);
-      param->setScopeInfo(/*scopeDepth=*/0, /*parameterIndex=*/i);
-      if (importer::hasUnsafeAPIAttr(origParam))
-        param->addAttr(clang::SwiftAttrAttr::Create(clangCtx, "import_unsafe"));
-      param->setIsUsed();
-      synthParams.push_back(param);
+    // Skip this constructor if synthesizing its factory hits a SFINAE error.
+    clang::Sema::SFINAETrap trap(clangSema);
+    auto *factory = createFRTFactoryDecl(Impl, record, ctor, ++index, returnTy);
+    if (buildFRTFactoryBody(Impl, factory, ctor) && !trap.hasErrorOccurred()) {
+      Impl.foreignReferenceFactoryToOriginalConstructor[factory] = ctor;
+      factories.push_back(factory);
     }
-    synthCxxMethodDecl->setParams(synthParams);
-
-    if (selectedCtorDecl->hasAttrs()) {
-      auto attrInfo = importer::ReturnOwnershipInfo(selectedCtorDecl);
-      if (attrInfo.hasReturnsRetained)
-        synthCxxMethodDecl->addAttr(
-            clang::SwiftAttrAttr::Create(clangCtx, "returns_retained"));
-
-      if (attrInfo.hasReturnsUnretained)
-        synthCxxMethodDecl->addAttr(
-            clang::SwiftAttrAttr::Create(clangCtx, "returns_unretained"));
-
-      for (auto *attr : selectedCtorDecl->getAttrs()) {
-        if (isa<clang::AvailabilityAttr>(attr) ||
-            isa<clang::DeprecatedAttr>(attr) ||
-            isa<clang::UnavailableAttr>(attr))
-          synthCxxMethodDecl->addAttr(attr->clone(clangCtx));
-      }
-    }
-
-    std::string swiftInitStr = "init(";
-    for (unsigned i = 0; i < ctorParamCount; ++i) {
-      auto paramType = selectedCtorDecl->getParamDecl(i)->getType();
-      swiftInitStr += paramType->isRValueReferenceType() ? "consuming:" : "_:";
-    }
-    swiftInitStr += ")";
-    synthCxxMethodDecl->addAttr(
-        clang::SwiftNameAttr::Create(clangCtx, swiftInitStr));
-
-    auto ctorArgs = importer::buildClangForwardingArgs(
-        clangCtx, clangSema, synthParams, ImporterImpl);
-    llvm::SmallVector<clang::Expr *, 4> ctorArgsToAdd;
-
-    if (clangSema.CompleteConstructorCall(
-            selectedCtorDecl, cxxRecordTy, ctorArgs,
-            selectedCtorDecl->getLocation(), ctorArgsToAdd))
-      continue;
-
-    clang::ExprResult synthCtorExprResult = clangSema.BuildCXXConstructExpr(
-        clang::SourceLocation(), cxxRecordTy, selectedCtorDecl,
-        /*Elidable=*/false, ctorArgsToAdd,
-        /*HadMultipleCandidates=*/false,
-        /*IsListInitialization=*/false,
-        /*IsStdInitListInitialization=*/false,
-        /*RequiresZeroInit=*/false, clang::CXXConstructionKind::Complete,
-        clang::SourceRange());
-    if (synthCtorExprResult.isInvalid())
-      continue;
-    clang::Expr *synthCtorExpr = synthCtorExprResult.get();
-
-    clang::ExprResult synthNewExprResult = clangSema.BuildCXXNew(
-        clang::SourceRange(), /*UseGlobal=*/false, clang::SourceLocation(), {},
-        clang::SourceLocation(), clang::SourceRange(), cxxRecordTy,
-        clangCtx.getTrivialTypeSourceInfo(cxxRecordTy), std::nullopt,
-        cxxRecordDeclLoc, synthCtorExpr);
-    // NOTE: ^ some valid location is needed here because BuildCXXNew uses that
-    //       to determine the CXXNewInitializationStyle
-    if (synthNewExprResult.isInvalid())
-      continue;
-    auto *synthNewExpr = cast<clang::CXXNewExpr>(synthNewExprResult.get());
-
-    clang::ReturnStmt *synthRetStmt =
-        importer::createClangReturnStmt(clangCtx, synthNewExpr);
-    assert(synthRetStmt && "Unable to synthesize return statement for "
-                           "static factory of c++ foreign reference type");
-
-    clang::CompoundStmt *synthFuncBody = clang::CompoundStmt::Create(
-        clangCtx, {synthRetStmt}, clang::FPOptionsOverride(),
-        clang::SourceLocation(), clang::SourceLocation());
-    assert(synthRetStmt && "Unable to synthesize function body for static "
-                           "factory of c++ foreign reference type");
-
-    synthCxxMethodDecl->setBody(synthFuncBody);
-    synthCxxMethodDecl->addAttr(clang::NoDebugAttr::CreateImplicit(clangCtx));
-
-    synthCxxMethodDecl->setImplicit();
-    synthCxxMethodDecl->setImplicitlyInline();
-
-    if (ctorTrap.hasErrorOccurred())
-      // Skip this constructor if we hit any SFINAE error
-      continue;
-
-    ImporterImpl.foreignReferenceFactoryToOriginalConstructor[synthCxxMethodDecl] =
-        selectedCtorDecl;
-    synthesizedFactories.push_back(synthCxxMethodDecl);
   }
-
-  return synthesizedFactories;
 }
 
 llvm::ArrayRef<ValueDecl *>
 ClangImporter::Implementation::lookupAndImportSynthesizedFactories(
     ClassDecl *Record) {
   // C foreign reference types don't have any constructors or operator new to
-  // synthesize factoreis from.
+  // synthesize factories from.
   const auto *CXXRecord =
       dyn_cast<clang::CXXRecordDecl>(Record->getClangDecl());
   if (!CXXRecord)
@@ -670,22 +676,11 @@ ClangImporter::Implementation::lookupAndImportSynthesizedFactories(
   if (!CXXRecord)
     return {};
 
-  bool hasUserProvidedStaticFactory =
-      llvm::any_of(CXXRecord->decls(), [&](const clang::Decl *member) {
-        const auto *method =
-            dyn_cast_or_null<clang::CXXMethodDecl>(member->getAsFunction());
-        return method && method->isStatic() &&
-               importFullName(method, CurrentVersion)
-                   .getDeclName()
-                   .getBaseName()
-                   .isConstructor();
-      });
-  if (hasUserProvidedStaticFactory)
-    return {};
+  llvm::SmallVector<clang::CXXMethodDecl *, 4> methods;
+  synthesizeFRTFactories(*this, CXXRecord, methods);
 
   TinyPtrVector<ValueDecl *> factories;
-  for (const clang::CXXMethodDecl *method :
-       synthesizeStaticFactoryForCXXForeignRef(*this, CXXRecord)) {
+  for (const auto *method : methods) {
     auto *factory = cast_or_null<ValueDecl>(importDecl(method, CurrentVersion));
     if (!factory)
       continue;
