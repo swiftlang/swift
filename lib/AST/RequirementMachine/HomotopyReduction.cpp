@@ -159,20 +159,25 @@ void RewriteSystem::computeRecursiveRules() {
 /// once in empty context. Returns a pair consisting of a loop ID and a rule ID,
 /// otherwise returns None.
 ///
-/// Minimization performs three passes over the rewrite system.
+/// Minimization calls this repeatedly from each of the four homotopy
+/// reduction passes in minimizeRewriteSystem(), which delete, in order:
 ///
-/// 1) First, rules that are not conformance rules are deleted, with
-///    \p redundantConformances equal to nullptr.
+/// 1) Simplified rules.
+/// 2) Rules with unresolved name symbols.
+/// 3) Conformance rules that are not minimal conformances, after minimal
+///    conformances are computed.
+/// 4) All other redundant rules.
 ///
-/// 2) Second, minimal conformances are computed.
+/// \p isRedundantRuleFn restricts the rules that the current pass may delete.
 ///
-/// 3) Finally, redundant conformance rules are deleted, with
-/// \p redundantConformances equal to the set of conformance rules that are
-///    not minimal conformances.
+/// Only the loops in LiveLoopIDs are visited. Deleted loops are removed from
+/// LiveLoopIDs as they are encountered, so that subsequent calls do not visit
+/// them again.
 std::optional<std::pair<unsigned, unsigned>>
 RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
-  for (unsigned loopID : indices(Loops)) {
+  unsigned numLiveLoops = 0;
+  for (unsigned loopID : LiveLoopIDs) {
     auto &loop = Loops[loopID];
     if (loop.isDeleted())
       continue;
@@ -190,10 +195,13 @@ RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
       continue;
     }
 
+    LiveLoopIDs[numLiveLoops++] = loopID;
+
     for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
       redundancyCandidates.emplace_back(loopID, ruleID);
     }
   }
+  LiveLoopIDs.resize(numLiveLoops);
 
   std::optional<std::pair<unsigned, unsigned>> found;
 
@@ -441,6 +449,10 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
   Minimized = 1;
 
   propagateExplicitBits();
+
+  ASSERT(LiveLoopIDs.empty());
+  for (unsigned loopID : indices(Loops))
+    LiveLoopIDs.push_back(loopID);
 
   if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
     for (auto &loop : Loops) {

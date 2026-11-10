@@ -367,6 +367,13 @@ private:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
+  /// The IDs of all loops that are not deleted, in increasing order, and
+  /// possibly some deleted loops that have not been removed yet.
+  ///
+  /// Populated by minimizeRewriteSystem(), and compacted by findRuleToDelete()
+  /// as homotopy reduction deletes loops.
+  std::vector<unsigned> LiveLoopIDs;
+
   /// A list of pairs where the first element is a rule number and the second
   /// element is an equivalent rewrite path in terms of non-redundant rules.
   std::vector<std::pair<unsigned, RewritePath>> RedundantRules;
