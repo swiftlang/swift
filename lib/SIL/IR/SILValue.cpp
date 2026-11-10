@@ -216,6 +216,22 @@ bool ValueBase::isBorrowAccessorResult() const {
          resultConvention == ResultConvention::GuaranteedAddress;
 }
 
+bool ValueBase::isGuaranteedCoroutineYield() const {
+  auto *result = isaResultOf<BeginApplyInst>(this);
+  if (!result)
+    return false;
+
+  // Only the yielded values are interesting; skip the token and the
+  // callee-allocation result.
+  auto *bai = result->getParent<BeginApplyInst>();
+  auto yieldedValues = bai->getYieldedValues();
+  unsigned index = result->getIndex();
+  if (index >= yieldedValues.size())
+    return false;
+
+  return bai->getSubstCalleeConv().getYields()[index].isGuaranteedInCallee();
+}
+
 bool ValueBase::hasDebugTrace() const {
   for (auto *op : getUses()) {
     if (auto *debugValue = dyn_cast<DebugValueInst>(op->getUser())) {
