@@ -482,7 +482,7 @@ GenericSignature autodiff::getDifferentiabilityWitnessGenericSignature(
   auto derivativeCanGenSig = derivativeGenSig.getCanonicalSignature();
   auto origCanGenSig = origGenSig.getCanonicalSignature();
   if (origCanGenSig == derivativeCanGenSig &&
-      derivativeCanGenSig->areAllParamsConcrete())
+      !derivativeCanGenSig->isEffectivelyGeneric())
     return GenericSignature();
   // Otherwise, return the derivative generic signature.
   return derivativeGenSig;

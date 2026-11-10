@@ -161,7 +161,7 @@ void GenericSignatureImpl::forEachParam(
     callback(genericParams[index], genericParamsAreCanonical[index]);
 }
 
-bool GenericSignatureImpl::areAllParamsConcrete() const {
+bool GenericSignatureImpl::isEffectivelyGeneric() const {
   unsigned numConcreteGenericParams = 0;
   for (const auto &req : getRequirements()) {
     switch (req.getKind()) {
@@ -182,7 +182,7 @@ bool GenericSignatureImpl::areAllParamsConcrete() const {
     }
   }
 
-  return numConcreteGenericParams == getGenericParams().size();
+  return numConcreteGenericParams != getGenericParams().size();
 }
 
 bool GenericSignatureImpl::hasParameterPack() const {
@@ -243,6 +243,10 @@ ArrayRef<Requirement> GenericSignature::getRequirements() const {
   return isNull()
       ? ArrayRef<Requirement>{}
       : getPointer()->getRequirements();
+}
+
+bool GenericSignature::isEffectivelyGeneric() const {
+  return !isNull() && getPointer()->isEffectivelyGeneric();
 }
 
 rewriting::RequirementMachine *

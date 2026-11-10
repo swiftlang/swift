@@ -2848,10 +2848,7 @@ void AttributeChecker::visitCoroutineAttr(CoroutineAttr *attr) {
 void AttributeChecker::visitUsedAttr(UsedAttr *attr) {
   if (D->getDeclContext()->isLocalContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
-  else if (D->getDeclContext()->isGenericContext() &&
-           !D->getDeclContext()
-                ->getGenericSignatureOfContext()
-                ->areAllParamsConcrete())
+  else if (D->getDeclContext()->isEffectivelyGenericContext())
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope, attr);
   else if (auto *VarD = dyn_cast<VarDecl>(D)) {
     if (!VarD->isStatic() && !D->getDeclContext()->isModuleScopeContext()) {
@@ -2876,10 +2873,7 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
 
   if (D->getDeclContext()->isLocalContext()) {
     diagnose(attr->getLocation(), diag::attr_only_at_non_local_scope, attr);
-  } else if (D->getDeclContext()->isGenericContext() &&
-             !D->getDeclContext()
-                  ->getGenericSignatureOfContext()
-                  ->areAllParamsConcrete()) {
+  } else if (D->getDeclContext()->isEffectivelyGenericContext()) {
     diagnose(attr->getLocation(), diag::attr_only_at_non_generic_scope, attr);
   } else if (!VarD->isStatic() &&
              !D->getDeclContext()->isModuleScopeContext()) {
@@ -3757,7 +3751,7 @@ static void checkSpecializeAttrRequirements(AbstractSpecializeAttr *attr,
   if (!attr->isFullSpecialization())
     return;
 
-  if (specializedSig->areAllParamsConcrete())
+  if (!specializedSig->isEffectivelyGeneric())
     return;
 
   SmallVector<GenericTypeParamType *, 2> unspecializedParams;

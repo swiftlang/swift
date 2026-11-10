@@ -882,10 +882,9 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
     CanGenericSignature constrainedInvocationGenSig) {
   auto originalInvocationGenSig = original->getInvocationGenericSignature();
   if (!originalInvocationGenSig) {
-    assert(!constrainedInvocationGenSig ||
-           constrainedInvocationGenSig->areAllParamsConcrete() &&
-               "derivative function cannot have invocation generic signature "
-               "when original function doesn't");
+    assert(!constrainedInvocationGenSig.isEffectivelyGeneric() &&
+           "derivative function cannot have invocation generic signature "
+           "when original function doesn't");
     if (auto patternSig = original->getPatternGenericSignature()) {
       auto constrainedPatternSig =
         autodiff::getConstrainedDerivativeGenericSignature(
@@ -936,9 +935,9 @@ static SILFunctionType *getConstrainedAutoDiffOriginalFunctionType(
             constrainedInvocationGenSig)));
   }
   return SILFunctionType::get(
-      constrainedInvocationGenSig->areAllParamsConcrete()
-          ? GenericSignature()
-          : constrainedInvocationGenSig,
+      constrainedInvocationGenSig->isEffectivelyGeneric()
+          ? constrainedInvocationGenSig
+          : GenericSignature(),
       original->getExtInfo(), original->getCoroutineKind(),
       original->getCalleeConvention(), newParameters, original->getYields(),
       newResults, original->getOptionalErrorResult(),
@@ -5345,7 +5344,7 @@ TypeConverter::getConstantOverrideInfo(TypeExpansionContext context,
     overrideInterfaceTy = derivedInfo.FormalType;
   }
 
-  if (genericSig && !genericSig->areAllParamsConcrete()) {
+  if (genericSig.isEffectivelyGeneric()) {
     overrideInterfaceTy = cast<AnyFunctionType>(
         GenericFunctionType::get(genericSig, overrideInterfaceTy->getParams(),
                                  overrideInterfaceTy->getYields(),

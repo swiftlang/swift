@@ -3406,7 +3406,7 @@ struct BridgedSubstitutionMap {
   BridgedOwnedString getDebugDescription() const;
   BRIDGED_INLINE bool isEmpty() const;
   BRIDGED_INLINE bool isEqualTo(BridgedSubstitutionMap rhs) const;
-  BRIDGED_INLINE bool hasAnySubstitutableParams() const;
+  BRIDGED_INLINE bool isEffectivelyGeneric() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE
   BridgedSubstitutionMap subst(BridgedSubstitutionMap subMap) const;
   BRIDGED_INLINE SwiftInt getNumConformances() const;
@@ -3422,7 +3422,7 @@ struct BridgedGenericSignature {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTTypeArray getGenericParams() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType mapTypeIntoEnvironment(BridgedASTType type) const;
   BRIDGED_INLINE BridgedCanGenericSignature getCanonicalSignature() const;
-  BRIDGED_INLINE bool areAllParamsConcrete() const;
+  BRIDGED_INLINE bool isEffectivelyGeneric() const;
   BRIDGED_INLINE bool canBeEmittedInEmbeddedSwift() const;
 };
 

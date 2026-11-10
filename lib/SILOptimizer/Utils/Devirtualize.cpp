@@ -716,7 +716,7 @@ SILFunction *swift::getTargetClassMethod(SILModule &module, FullApplySite as, Cl
   if (auto *vtable = module.lookUpSpecializedVTable(silType)) {
     // We cannot de-virtualize a generic method call to a specialized method.
     // This would result in wrong argument/return calling conventions.
-    if (as.getSubstitutionMap().hasAnySubstitutableParams())
+    if (as.getSubstitutionMap().isEffectivelyGeneric())
       return nullptr;
 
     return vtable->getEntry(module, member)->getImplementation();

@@ -3996,7 +3996,7 @@ static SILFunction *getOrCreateKeyPathGetter(
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4095,7 +4095,7 @@ static SILFunction *getOrCreateKeyPathSetter(
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4234,7 +4234,7 @@ static SILFunction *getOrCreateKeyPathAppliedMethod(
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4307,7 +4307,7 @@ static SILFunction *getOrCreateUnappliedKeypathMethod(
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }
@@ -4405,7 +4405,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
                  : nullptr;
 
-  if (genericSig && genericSig->areAllParamsConcrete()) {
+  if (!genericSig.isEffectivelyGeneric()) {
     genericSig = nullptr;
     genericEnv = nullptr;
   }

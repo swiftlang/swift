@@ -3021,7 +3021,7 @@ public:
 
   /// True if this application has generic substitutions.
   bool hasSubstitutions() const {
-    return Substitutions.hasAnySubstitutableParams();
+    return Substitutions.isEffectivelyGeneric();
   }
 
   /// The substitutions used to bind the generic arguments of this function.
@@ -4583,7 +4583,7 @@ public:
   /// True if this builtin application has substitutions, which represent type
   /// parameters to the builtin.
   bool hasSubstitutions() const {
-    return Substitutions.hasAnySubstitutableParams();
+    return Substitutions.isEffectivelyGeneric();
   }
 
   /// Return the type parameters to the builtin.

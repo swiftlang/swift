@@ -2234,7 +2234,7 @@ public:
     auto fnTy = requireObjectType(SILFunctionType, calleeTy, "callee operand");
 
     // If there are substitutions, verify them and apply them to the callee.
-    if (!subs.hasAnySubstitutableParams()) {
+    if (!subs.isEffectivelyGeneric()) {
       require(!fnTy->isPolymorphic(),
               "callee of apply without substitutions must not be polymorphic");
       return fnTy;
@@ -7758,9 +7758,7 @@ public:
 
       // Make sure that our SILFunction only has context generic params if our
       // SILFunctionType is non-polymorphic.
-      if (F->getGenericEnvironment() &&
-          !F->getGenericEnvironment()->getGenericSignature()
-              ->areAllParamsConcrete()) {
+      if (F->getGenericSignature().isEffectivelyGeneric()) {
         require(FTy->isPolymorphic(),
                 "non-generic function definitions cannot have a "
                 "generic environment");

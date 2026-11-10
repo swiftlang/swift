@@ -218,6 +218,10 @@ public:
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const;
 
+  /// Check if this is a non-null generic signature with at least one generic
+  /// parameter that is not fixed to a concrete type.
+  bool isEffectivelyGeneric() const;
+
   /// Returns the generic environment that provides fresh contextual types
   /// (archetypes) that correspond to the interface types in this generic
   /// signature.
@@ -351,9 +355,9 @@ public:
   void forEachParam(
     llvm::function_ref<void(GenericTypeParamType *, bool)> callback) const;
 
-  /// Check if the generic signature makes all generic parameters
-  /// concrete.
-  bool areAllParamsConcrete() const;
+  /// Check if the generic signature has at least one generic parameter that
+  /// is not fixed to a concrete type.
+  bool isEffectivelyGeneric() const;
 
   /// Check if the generic signature has a parameter pack.
   bool hasParameterPack() const;

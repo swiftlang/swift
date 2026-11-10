@@ -143,7 +143,7 @@ extension ApplySite {
   public var callee: Value { operands[ApplyOperandConventions.calleeIndex].value }
 
   public var hasSubstitutions: Bool {
-    return substitutionMap.hasAnySubstitutableParams
+    return substitutionMap.isEffectivelyGeneric
   }
 
   public var isAsync: Bool {

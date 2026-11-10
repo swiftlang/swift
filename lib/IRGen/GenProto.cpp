@@ -4504,7 +4504,7 @@ GenericTypeRequirements::GenericTypeRequirements(IRGenModule &IGM,
                                                  GenericSignature ncGenerics) {
   // We only need to do something here if the declaration context is
   // somehow generic.
-  if (!ncGenerics || ncGenerics->areAllParamsConcrete()) return;
+  if (!ncGenerics.isEffectivelyGeneric()) return;
 
   // Construct a representative function type.
   auto generics = ncGenerics.getCanonicalSignature();
