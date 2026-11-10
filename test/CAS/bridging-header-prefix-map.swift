@@ -29,7 +29,7 @@
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps-1.json -o %t/MyApp.cmd -b %t/header.cmd
 
 // RUN: %target-swift-frontend-plain @%t/header.cmd /^header/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
+// RUN: %cache-tool print-output-keys -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain @%t/header.cmd /^header/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 

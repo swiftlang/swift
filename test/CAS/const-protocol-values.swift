@@ -8,11 +8,11 @@
 // RUN:   -scanner-prefix-map-paths %t /^tmp -I %t/include
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json A casFSRootID > %t/A.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/A.casid | %FileCheck %s --check-prefix=A-FS
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/A.casid | %FileCheck %s --check-prefix=A-FS
 // A-FS-NOT: protocols.json
 
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json Test casFSRootID > %t/test.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-include-tree-list @%t/test.casid | %FileCheck %s --check-prefix=TEST-FS
+// RUN: %cache-tool print-include-tree-list -cas-path %t/cas @%t/test.casid | %FileCheck %s --check-prefix=TEST-FS
 // TEST-FS: protocols.json
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py --cas %t/cas %swift_frontend_plain %t/deps.json -o %t/MyApp.cmd

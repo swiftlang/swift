@@ -104,11 +104,48 @@ public:
       return 1;
     }
 
+    // The legacy `-cache-tool-action <action>` spelling of the subcommand takes
+    // all the positional arguments as inputs. Otherwise, the first positional
+    // argument that is a subcommand name is the subcommand, and the rest are
+    // inputs, e.g. `print-include-tree-list print-base-key` has input
+    // `print-base-key`.
+    StringRef SubCommand;
+    const Arg *LegacyAction = ParsedArgs.getLastArg(OPT_cache_tool_action);
+    if (LegacyAction) {
+      SubCommand = LegacyAction->getValue();
+      Inputs = ParsedArgs.getAllArgValues(OPT_INPUT);
+    } else {
+      SubCommand = ParsedArgs.getSubCommand(
+          Table.getSubCommands(),
+          [](ArrayRef<StringRef>) {
+            llvm_unreachable("later subcommand names are inputs");
+          },
+          [&](ArrayRef<StringRef> Positionals) {
+            Inputs.assign(Positionals.begin(), Positionals.end());
+          },
+          /*AllowSubCommandNamesAsPositionals=*/true);
+    }
+    auto Kind =
+        llvm::StringSwitch<SwiftCacheToolAction>(SubCommand)
+            .Case("print-base-key", SwiftCacheToolAction::PrintBaseKey)
+            .Case("print-output-keys", SwiftCacheToolAction::PrintOutputKeys)
+            .Case("validate-outputs", SwiftCacheToolAction::ValidateOutputs)
+            .Case("render-diags", SwiftCacheToolAction::RenderDiags)
+            .Case("print-include-tree-list",
+                  SwiftCacheToolAction::PrintIncludeTreeList)
+            .Case("print-compile-cache-key",
+                  SwiftCacheToolAction::PrintCompileCacheKey)
+            .Default(SwiftCacheToolAction::Invalid);
+
     if (ParsedArgs.getLastArg(OPT_help)) {
-      std::string ExecutableName =
-          llvm::sys::path::stem(MainExecutablePath).str();
-      Table.printHelp(llvm::outs(), ExecutableName.c_str(), "Swift Cache Tool",
-                      0, 0, /*ShowAllAliases*/ false);
+      Table.printHelp(llvm::outs(),
+                      "swift-cache-tool <subcommand> [options] [<inputs>] "
+                      "[-- <swift-frontend command-line>]",
+                      "Swift Cache Tool",
+                      /*ShowHidden=*/false, /*ShowAllAliases=*/false,
+                      llvm::opt::Visibility(),
+                      Kind == SwiftCacheToolAction::Invalid ? StringRef()
+                                                            : SubCommand);
       return 0;
     }
 
@@ -133,26 +170,14 @@ public:
       CASOpts.CASPath = *Path;
     }
 
-    Inputs = ParsedArgs.getAllArgValues(OPT_INPUT);
     FrontendArgs = ParsedArgs.getAllArgValues(OPT__DASH_DASH);
-    if (auto *A = ParsedArgs.getLastArg(OPT_cache_tool_action))
-      ActionKind =
-          llvm::StringSwitch<SwiftCacheToolAction>(A->getValue())
-              .Case("print-base-key", SwiftCacheToolAction::PrintBaseKey)
-              .Case("print-output-keys", SwiftCacheToolAction::PrintOutputKeys)
-              .Case("validate-outputs", SwiftCacheToolAction::ValidateOutputs)
-              .Case("render-diags", SwiftCacheToolAction::RenderDiags)
-              .Case("print-include-tree-list",
-                    SwiftCacheToolAction::PrintIncludeTreeList)
-              .Case("print-compile-cache-key",
-                    SwiftCacheToolAction::PrintCompileCacheKey)
-              .Default(SwiftCacheToolAction::Invalid);
-
+    ActionKind = Kind;
     if (ActionKind == SwiftCacheToolAction::Invalid) {
-      llvm::errs()
-          << "Invalid option specified for -cache-tool-action: "
-          << "print-base-key|print-output-keys|validate-outputs|render-diags|"
-          << "print-include-tree-list|print-compile-cache-key\n";
+      if (LegacyAction)
+        Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                       LegacyAction->getSpelling(), SubCommand);
+      else
+        Diags.diagnose(SourceLoc(), diag::error_missing_subcommand);
       return 1;
     }
 
