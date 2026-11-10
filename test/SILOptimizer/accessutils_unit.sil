@@ -767,3 +767,71 @@ bb0(%0 : $Builtin.RawPointer):
   return %4
 }
 
+
+sil @borrowObjectSelf : $@convention(method) (@guaranteed S) -> @guaranteed_address TwoInts
+sil @borrowAddressSelf : $@convention(method) (@in_guaranteed S) -> @guaranteed_address TwoInts
+sil @mutatingMutate : $@convention(method) (@inout S) -> @inout TwoInts
+sil @nonmutatingMutateObjectSelf : $@convention(method) (@guaranteed S) -> @inout TwoInts
+sil @nonmutatingMutateAddressSelf : $@convention(method) (@in_guaranteed S) -> @inout TwoInts
+
+// A borrow or mutate accessor result is a projection of an address-typed 'self'. Otherwise the result is a
+// borrowMutateAccessor base.
+//
+// CHECK-LABEL: Accesses for borrowMutateAccessorResults
+// CHECK-NEXT:  Value:   %5 = struct_element_addr %4 : $*TwoInts, #TwoInts.b
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: borrowMutateAccessor -   %4 = apply %3(%0) : $@convention(method) (@guaranteed S) -> @guaranteed_address TwoInts
+// CHECK-NEXT:    Path: "s1"
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  Value:   %9 = struct_element_addr %8 : $*TwoInts, #TwoInts.b
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: argument - %1 = argument of bb0 : $*S
+// CHECK-NEXT:    Path: "v**.s1"
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  Value:   %13 = struct_element_addr %12 : $*TwoInts, #TwoInts.a
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: argument - %2 = argument of bb0 : $*S
+// CHECK-NEXT:    Path: "v**.s0"
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  Value:   %17 = struct_element_addr %16 : $*TwoInts, #TwoInts.a
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: borrowMutateAccessor -   %16 = apply %15(%0) : $@convention(method) (@guaranteed S) -> @inout TwoInts
+// CHECK-NEXT:    Path: "s0"
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  Value:   %21 = struct_element_addr %20 : $*TwoInts, #TwoInts.a
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: argument - %1 = argument of bb0 : $*S
+// CHECK-NEXT:    Path: "v**.s0"
+// CHECK-NEXT:     no Storage paths
+// CHECK-NEXT:  End accesses for borrowMutateAccessorResults
+sil [ossa] @borrowMutateAccessorResults : $@convention(thin) (@guaranteed S, @in_guaranteed S, @inout S) -> () {
+bb0(%0 : @guaranteed $S, %1 : $*S, %2 : $*S):
+  specify_test "access_path"
+  %borrowObjectSelf = function_ref @borrowObjectSelf : $@convention(method) (@guaranteed S) -> @guaranteed_address TwoInts
+  %r1 = apply %borrowObjectSelf(%0) : $@convention(method) (@guaranteed S) -> @guaranteed_address TwoInts
+  %a1 = struct_element_addr %r1, #TwoInts.b
+  %l1 = load [trivial] %a1
+  %borrowAddressSelf = function_ref @borrowAddressSelf : $@convention(method) (@in_guaranteed S) -> @guaranteed_address TwoInts
+  %r2 = apply %borrowAddressSelf(%1) : $@convention(method) (@in_guaranteed S) -> @guaranteed_address TwoInts
+  %a2 = struct_element_addr %r2, #TwoInts.b
+  %l2 = load [trivial] %a2
+  %mutatingMutate = function_ref @mutatingMutate : $@convention(method) (@inout S) -> @inout TwoInts
+  %r3 = apply %mutatingMutate(%2) : $@convention(method) (@inout S) -> @inout TwoInts
+  %a3 = struct_element_addr %r3, #TwoInts.a
+  store %l1 to [trivial] %a3
+  %nonmutatingMutateObjectSelf = function_ref @nonmutatingMutateObjectSelf : $@convention(method) (@guaranteed S) -> @inout TwoInts
+  %r4 = apply %nonmutatingMutateObjectSelf(%0) : $@convention(method) (@guaranteed S) -> @inout TwoInts
+  %a4 = struct_element_addr %r4, #TwoInts.a
+  store %l2 to [trivial] %a4
+  %nonmutatingMutateAddressSelf = function_ref @nonmutatingMutateAddressSelf : $@convention(method) (@in_guaranteed S) -> @inout TwoInts
+  %r5 = apply %nonmutatingMutateAddressSelf(%1) : $@convention(method) (@in_guaranteed S) -> @inout TwoInts
+  %a5 = struct_element_addr %r5, #TwoInts.a
+  store %l2 to [trivial] %a5
+  %isNotDistinct = function_ref @_isNotDistinct : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %8 = apply %isNotDistinct<TwoInts, S>(%r3, %2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %9 = apply %isNotDistinct<TwoInts, S>(%r4, %2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %10 = apply %isNotDistinct<TwoInts, TwoInts>(%r5, %r2) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %11 = apply %isNotDistinct<TwoInts, TwoInts>(%r1, %r4) : $@convention(thin) <τ_0_0, τ_0_1> (@inout τ_0_0, @inout τ_0_1) -> ()
+  %12 = tuple ()
+  return %12 : $()
+}

@@ -82,6 +82,9 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   /// An address which is derived from a `Builtin.RawPointer`.
   case pointer(PointerToAddressInst)
 
+  /// The address result of a borrow or mutate accessor with an object `self`.
+  case borrowMutateAccessor(ApplyInst)
+
   // The result of an `index_addr` with a non-constant index.
   // This can only occur in access paths returned by `Value.constantAccessPath`.
   // In "regular" access paths such `index_addr` projections are contained in the `projectionPath` (`i*`).
@@ -115,6 +118,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       } else {
         self = .pointer(p2a)
       }
+    case let apply as ApplyInst where apply.selfObjectOfBorrowMutateAccessorResult != nil:
+      self = .borrowMutateAccessor(apply)
     default:
       self = .unidentified
     }
@@ -132,6 +137,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       case .yield(let result):   return result
       case .storeBorrow(let sb): return sb
       case .pointer(let p):      return p
+      case .borrowMutateAccessor(let apply): return apply
       case .index(let ia):       return ia
     }
   }
@@ -148,6 +154,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       case .yield(let result): return "yield - \(result)"
       case .storeBorrow(let sb): return "storeBorrow - \(sb)"
       case .pointer(let p):    return "pointer - \(p)"
+      case .borrowMutateAccessor(let apply): return "borrowMutateAccessor - \(apply)"
       case .index(let ia):     return "index - \(ia)"
     }
   }
@@ -157,7 +164,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class, .tail:
         return true
-      case .box, .stack, .global, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
+      case .box, .stack, .global, .argument, .yield, .storeBorrow, .pointer, .borrowMutateAccessor, .index,
+           .unidentified:
         return false
     }
   }
@@ -168,7 +176,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       case .box(let pbi):      return pbi.box
       case .class(let rea):    return rea.instance
       case .tail(let rta):     return rta.instance
-      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
+      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .borrowMutateAccessor, .index, .unidentified:
         return nil
     }
   }
@@ -196,7 +204,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .class(let rea):    return rea.fieldIsLet
       case .global(let g):     return g.isLet
-      case .box, .stack, .tail, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
+      case .box, .stack, .tail, .argument, .yield, .storeBorrow, .pointer, .borrowMutateAccessor, .index,
+           .unidentified:
         return false
     }
   }
@@ -208,7 +217,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     case .class(let rea):    return rea.instance.referenceRoot is AllocRefInstBase
     case .tail(let rta):     return rta.instance.referenceRoot is AllocRefInstBase
     case .stack, .storeBorrow: return true
-    case .global, .argument, .yield, .pointer, .index, .unidentified:
+    case .global, .argument, .yield, .pointer, .borrowMutateAccessor, .index, .unidentified:
       return false
     }
   }
@@ -218,7 +227,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     switch self {
       case .box, .class, .tail, .stack, .storeBorrow, .global:
         return true
-      case .argument, .yield, .pointer, .index, .unidentified:
+      case .argument, .yield, .pointer, .borrowMutateAccessor, .index, .unidentified:
         return false
     }
   }
@@ -233,7 +242,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       return true
     case .box, .class, .tail:
       return reference!.referenceRoot.isLexical
-    case .yield, .pointer, .index, .storeBorrow, .unidentified:
+    case .yield, .pointer, .borrowMutateAccessor, .index, .storeBorrow, .unidentified:
       return false
     }
   }
@@ -265,6 +274,8 @@ public enum AccessBase : CustomStringConvertible, Hashable {
       return sb1 == sb2
     case (.pointer(let p1), .pointer(let p2)):
       return p1 == p2
+    case (.borrowMutateAccessor(let apply1), .borrowMutateAccessor(let apply2)):
+      return apply1 == apply2
     case (.index(let ia1), .index(let ia2)):
       return ia1 == ia2
     default:
@@ -309,7 +320,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
 
     switch (self, other) {
     
-    // First handle all pairs of the same kind (except `yield`, `pointer` and `index`).
+    // First handle all pairs of the same kind (except `yield`, `pointer`, `borrowMutateAccessor` and `index`).
     case (.box(let pb), .box(let otherPb)):
       return pb.fieldIndex != otherPb.fieldIndex ||
         isDifferentAllocation(pb.box.referenceRoot, otherPb.box.referenceRoot) ||
@@ -859,7 +870,7 @@ extension ValueUseDefWalker where Path == SmallProjectionPath {
         return walkUp(value: rea.instance, path: path.push(.classField, index: rea.fieldIndex)) != .abortWalk
       case .tail(let rta):
         return walkUp(value: rta.instance, path: path.push(.tailElements, index: 0)) != .abortWalk
-      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .index, .unidentified:
+      case .stack, .global, .argument, .yield, .storeBorrow, .pointer, .borrowMutateAccessor, .index, .unidentified:
         return false
     }
   }
