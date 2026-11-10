@@ -185,7 +185,7 @@ func canImportVersioned() {
   let a = 1
 #endif
   
-// expected-error@+1{{'canImport' version check has invalid version ''}}
+// expected-cparser-error@+1{{'canImport' version check has invalid version ''}}
 #if canImport(A, _version:) // expected-cparser-error {{expected expression in list of expressions}} expected-astgen-error {{expected value in function call}}
   let a = 1
 #endif

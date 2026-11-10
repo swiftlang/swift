@@ -43,7 +43,7 @@ func notAProtocol() {}
 @_typeEraser(Undeclared) // expected-error {{cannot find type 'Undeclared' in scope}}
 protocol B1 {}
 
-@_typeEraser((Int, Int)) // expected-cparser-error {{type eraser must be a class, struct, or enum}}
+@_typeEraser((Int, Int)) // expected-error {{type eraser must be a class, struct, or enum}}
 protocol B2 {}
 
 protocol InvalidTypeEraser {}
@@ -116,10 +116,10 @@ class NoLabel: D5 { // expected-note {{type eraser declared here}}
 @_typeEraser(NoLabel) // expected-error {{type eraser 'NoLabel' must have an initializer of the form 'init<T: D5>(erasing: T)'}}
 protocol D5 {}
 
-class NonGenericInit<T: D6>: D6 { // expected-cparser-note {{type eraser declared here}}
+class NonGenericInit<T: D6>: D6 { // expected-note {{type eraser declared here}}
   init(_ t: T) {}
 }
-@_typeEraser(NonGenericInit<Self>) // expected-cparser-error {{type eraser 'NonGenericInit<Self>' must have an initializer of the form 'init<T: D6>(erasing: T)'}}
+@_typeEraser(NonGenericInit<Self>) // expected-error {{type eraser 'NonGenericInit<Self>' must have an initializer of the form 'init<T: D6>(erasing: T)'}}
 protocol D6 {}
 
 // MARK: - Unviable initializers

@@ -453,6 +453,14 @@ extension ASTGenVisitor {
   }
 
   func generate(consumeExpr node: ConsumeExprSyntax) -> BridgedConsumeExpr {
+    // The temporary `_move` spelling is accepted with a warning.
+    if node.consumeKeyword.rawText == "_move" {
+      self.diagnose(
+        .move_consume_final_spelling,
+        at: node.expression,
+        fixIts: [.init(replace: self.generateCharSourceRange(node.consumeKeyword), with: "consume")]
+      )
+    }
     return .createParsed(
       self.ctx,
       consumeLoc: self.generateSourceLoc(node.consumeKeyword),
@@ -914,6 +922,35 @@ extension ASTGenVisitor {
           self.ctx,
           backslashLoc: self.generateSourceLoc(node.backslash),
           parsedRoot: rootExpr.asNullable,
+          parsedPath: BridgedExpr?.none.asNullable,
+          hasLeadingDot: false
+        ).asExpr
+      }
+      // `\(x)`: the C++ parser reads the parenthesized expression as the root,
+      // and the type checker says it is an interpolation outside of a string.
+      if let tuple = node.root?.as(TupleTypeSyntax.self), tuple.elements.count == 1,
+        let element = tuple.elements.first, element.firstName == nil,
+        let name = element.type.as(IdentifierTypeSyntax.self),
+        name.genericArgumentClause == nil, name.name.presence == .present, name.name.rawTokenKind == .identifier,
+        tuple.leftParen.presence == .present, tuple.rightParen.presence == .present
+      {
+        let nameAndLoc = self.generateDeclNameRef(moduleSelector: name.moduleSelector, baseName: name.name)
+        let inner: BridgedExpr = BridgedUnresolvedDeclRefExpr.createParsed(
+          self.ctx,
+          name: nameAndLoc.name,
+          kind: .ordinary,
+          loc: nameAndLoc.loc
+        ).asExpr
+        let paren: BridgedExpr? = BridgedParenExpr.createParsed(
+          self.ctx,
+          leftParenLoc: self.generateSourceLoc(tuple.leftParen),
+          expr: inner,
+          rightParenLoc: self.generateSourceLoc(tuple.rightParen)
+        ).asExpr
+        return BridgedKeyPathExpr.createParsed(
+          self.ctx,
+          backslashLoc: self.generateSourceLoc(node.backslash),
+          parsedRoot: paren.asNullable,
           parsedPath: BridgedExpr?.none.asNullable,
           hasLeadingDot: false
         ).asExpr

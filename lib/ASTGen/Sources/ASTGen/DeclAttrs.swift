@@ -14,6 +14,7 @@ import ASTBridging
 import BasicBridging
 import SwiftDiagnostics
 import SwiftIfConfig
+@_spi(Compiler) import SwiftParser
 
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
@@ -3350,6 +3351,34 @@ extension ASTGenVisitor {
       if args.count > 1, let comma = args.first?.trailingComma {
         self.diagnose(.attr_type_eraser_expected_rparen, at: comma)
         return nil
+      }
+    }
+    // An argument that is not a plain name, e.g., `Eraser<Self>` or a tuple
+    // type: read its source text as a type, so that the type checker can reject
+    // or accept it as it would the C++ parser's type.
+    if let args = node.arguments?.as(LabeledExprListSyntax.self), args.count == 1, let arg = args.first,
+      arg.label == nil, arg.trailingComma == nil, !arg.expression.is(DeclReferenceExprSyntax.self),
+      let baseAddress = self.base.baseAddress
+    {
+      let start = arg.expression.positionAfterSkippingLeadingTrivia.utf8Offset
+      let end = arg.expression.endPositionBeforeTrailingTrivia.utf8Offset
+      if start < end, end <= self.base.count {
+        let text = UnsafeBufferPointer(start: baseAddress + start, count: end - start)
+        var parser = Parser(text)
+        let syntax = TypeSyntax.parse(from: &parser)
+        let typeVisitor = ASTGenVisitor(
+          diagnosticEngine: self.diagnosticEngine,
+          sourceBuffer: text,
+          declContext: self.declContext,
+          astContext: self.ctx,
+          configuredRegions: self.configuredRegions
+        )
+        return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node),
+          typeExpr: .createParsed(self.ctx, type: typeVisitor.generate(type: syntax))
+        )
       }
     }
     let type: BridgedTypeRepr? = self.generateSingleAttrOption(attribute: node, { token in

@@ -834,11 +834,43 @@ public func buildTopLevelASTNodes(
 
   // Diagnose any errors from evaluating #ifs. Those inside a body that is built
   // on demand are held back until the body is.
+  // A `#if` without a condition is reported where the C++ parser does, for
+  // every one of them: the evaluator only sees those that are not nested in a
+  // region it has already given up on.
+  func isMissingCondition(_ diagnostic: Diagnostic) -> Bool {
+    diagnostic.node.is(MissingExprSyntax.self)
+  }
   if delayFunctionBodies != 0 {
     visitor.diagnoseAll(
-      sourceFile.pointee.heldBackDiagnostics(astContext: ctx).ifConfigOutside
+      sourceFile.pointee.heldBackDiagnostics(astContext: ctx).ifConfigOutside.filter { !isMissingCondition($0) }
     )
   } else {
-    visitor.diagnoseAll(visitor.configuredRegions.diagnostics)
+    visitor.diagnoseAll(visitor.configuredRegions.diagnostics.filter { !isMissingCondition($0) })
+  }
+  visitor.diagnoseIncompleteConditions(in: Syntax(sourceFile.pointee.syntax))
+}
+
+private final class IncompleteConditionFinder: SyntaxVisitor {
+  var directives: [TokenSyntax] = []
+
+  override func visit(_ node: IfConfigClauseSyntax) -> SyntaxVisitorContinueKind {
+    if node.condition?.is(MissingExprSyntax.self) == true, node.poundKeyword.presence == .present {
+      directives.append(node.poundKeyword)
+    }
+    return .visitChildren
+  }
+}
+
+extension ASTGenVisitor {
+  /// Diagnose each `#if` or `#elseif` that has no condition.
+  func diagnoseIncompleteConditions(in root: Syntax) {
+    let finder = IncompleteConditionFinder(viewMode: .sourceAccurate)
+    finder.walk(root)
+    for directive in finder.directives {
+      self.diagnose(
+        .incomplete_conditional_compilation_directive,
+        at: SourceLoc(at: directive.endPositionBeforeTrailingTrivia, in: self.base)
+      )
+    }
   }
 }

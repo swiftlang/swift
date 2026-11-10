@@ -131,7 +131,7 @@ struct S {
 do {
   @objc default @MainActor
   // expected-error@-1:9 {{declaration is only valid at file scope}}
-  // expected-cparser-error@-2:4 {{attribute cannot be attached to a file-level default}} expected-astgen-error@-2 {{unexpected code '@objc' before file-level default}}
+  // expected-cparser-error@-2:4 {{attribute cannot be attached to a file-level default}} expected-astgen-error@-2 {{attribute cannot be attached to a file-level default}}
 }
 
 switch 3 {

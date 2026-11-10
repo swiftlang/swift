@@ -103,16 +103,16 @@ func repeatedAttribute(a: Int, b: @_scoped(a) @_scoped(a) S) {}
 // expected-error@-1:15{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams(a, immortal) func immortalScopeParam() {}
-// expected-cparser-error@-1:18{{'immortal' cannot be used as a scope parameter name}} expected-astgen-error@-1 {{invalid argument in '_scopeParams' attribute}}
+// expected-error@-1:18{{'immortal' cannot be used as a scope parameter name}}
 // expected-cparser-note@-2:18{{if this name is unavoidable, use backticks to escape it}}{{18-26=`immortal`}}
 
 @_scopeParams(a: b) func labeledScopeParam() {}
 // expected-cparser-error@-1:16{{expected ',' separator}}{{16-16=,}}
-// expected-cparser-error@-2:16{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-2 {{invalid argument in '_scopeParams' attribute}}
+// expected-error@-2:16{{expected scope parameter name in '_scopeParams' attribute}}
 
 @_scopeParams(a.b) func memberScopeParam() {}
 // expected-cparser-error@-1:16{{expected ',' separator}}{{16-16=,}}
-// expected-cparser-error@-2:16{{expected scope parameter name in '_scopeParams' attribute}} expected-astgen-error@-2 {{invalid argument in '_scopeParams' attribute}}
+// expected-error@-2:16{{expected scope parameter name in '_scopeParams' attribute}}
 
 // Recovered by dropping the separator, so the attribute is still created.
 @_scopeParams(,a) func leadingCommaScopeParam() {}
@@ -138,7 +138,7 @@ func scopeParamsOnNonFunctionType(x: @_scopeParams(a) S) {}
 // expected-error@-1:38{{'@_scopeParams' only applies to function types}}
 
 func malformedScopeParamsOnFunctionType(body: @_scopeParams(0) @Sendable () -> Void) {}
-// expected-cparser-error@-1:61{{expected scope parameter name in '_scopeParams' attribute}}
+// expected-error@-1:61{{expected scope parameter name in '_scopeParams' attribute}}
 
 func repeatedScopeParamsOnFunctionType(body: @_scopeParams(a) @_scopeParams(b) () -> Void) {}
 // expected-error@-1:63{{duplicate attribute}}

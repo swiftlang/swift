@@ -235,7 +235,7 @@ func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
 }
 
 func testDisembodiedStringInterpolation(x: Int) {
-  \(x) // expected-cparser-error{{string interpolation can only appear inside a string literal}}
+  \(x) // expected-error{{string interpolation can only appear inside a string literal}}
   \(x, radix: 16) // expected-cparser-error{{string interpolation can only appear inside a string literal}} expected-astgen-error {{expected type in tuple type}} expected-astgen-error {{unexpected code '16' in tuple type}}
 }
 
@@ -1163,7 +1163,7 @@ func testSyntaxErrors() {
   _ = \.a?; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
   _ = \.a!; // expected-astgen-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
   _ = \A     ; // expected-astgen-error {{key path must have at least one component}}
-  _ = \A,    ; // expected-astgen-error {{unexpected code ',' in function}} expected-astgen-error {{key path must have at least one component}}
+  _ = \A,    ; // expected-astgen-error {{key path must have at least one component}} expected-astgen-error {{unexpected code ',' in function}}
   _ = \A<    ; // expected-astgen-note {{to match this opening '<'}} expected-astgen-error {{expected '>' to end generic argument clause}}
   _ = \A.  ; // expected-cparser-error{{expected member name following '.'}} expected-astgen-error {{expected identifier in key path property component}}
   _ = \A.a ; // expected-astgen-error {{value of type 'A' has no member 'a'}}

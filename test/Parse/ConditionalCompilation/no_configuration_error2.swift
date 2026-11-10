@@ -3,7 +3,7 @@
 // No space next to the '#if'
 
 #if
-// expected-cparser-error@-1 {{incomplete condition in conditional compilation directive}} expected-astgen-error@-1 {{invalid conditional compilation expression}}
+// expected-error@-1 {{incomplete condition in conditional compilation directive}}
 class D {}
 #endif
 // expected-cparser-error@-1 {{unexpected conditional compilation block terminator}}
