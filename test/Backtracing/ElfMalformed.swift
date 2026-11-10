@@ -138,7 +138,7 @@ struct ElfMalformed {
     // CHECK: segment-overflow: image: loaded, uuid: none, info: endOfText=base+0
     check("segment-overflow", makeElf(
       phdrs: [Phdr(type: PT_LOAD, flags: PF_X,
-                   vaddr: 0xffff_ffff_ffff_fff0, memsz: 0x100),
+                   vaddr: 0xffff_ffff_ffff_fff0, memsz: ~0),
               Phdr(type: PT_NOTE, vaddr: 0xffff_ffff_ffff_fff0, memsz: 0x100),
               Phdr(type: PT_NOTE, vaddr: 0x10, memsz: ~0)],
       size: 160))
@@ -148,6 +148,21 @@ struct ElfMalformed {
     check("good-segment", makeElf(
       phdrs: [Phdr(type: PT_LOAD, flags: PF_X, vaddr: 0, memsz: 128)],
       size: 160))
+
+    // A fixed-address (non-PIE) executable has absolute p_vaddr values, which
+    // must be taken relative to the lowest PT_LOAD address.
+    var buildId = Bytes()
+    buildId.u32(4); buildId.u32(4); buildId.u32(3)
+    buildId.data += [0x47, 0x4e, 0x55, 0, 0xde, 0xad, 0xbe, 0xef]
+    var fixedElf = makeElf(
+      phdrs: [Phdr(type: PT_LOAD, flags: PF_X, offset: 0,
+                   vaddr: 0x400000, filesz: 320, memsz: 320),
+              Phdr(type: PT_NOTE, offset: 192, vaddr: 0x4000c0,
+                   filesz: 20, memsz: 20)],
+      size: 320)
+    fixedElf.replaceSubrange(192..<212, with: buildId.data)
+    // CHECK: fixed-address: image: loaded, uuid: deadbeef, info: endOfText=base+320, info-uuid: deadbeef
+    check("fixed-address", fixedElf)
 
     // Header entries that are too small overlap each other and are rejected.
     // CHECK: small-phentsize: image: rejected, info: none
