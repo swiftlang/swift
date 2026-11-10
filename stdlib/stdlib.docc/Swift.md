@@ -66,6 +66,7 @@ below to get started.
 - <doc:macros>
 - <doc:concurrency>
 - <doc:key-path-expressions>
+- <doc:managed-memory-access>
 - <doc:manual-memory-management>
 - <doc:type-casting-and-existential-types>
 - <doc:operator-declarations>
@@ -85,6 +86,7 @@ below to get started.
 - <doc:Distributed-collection>
 - <doc:RegexBuilder-collection>
 - <doc:Synchronization-collection>
+- <doc:CompatibilitySpan-collection>
 
 ### Deprecated
 
