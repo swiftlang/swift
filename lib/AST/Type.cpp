@@ -4507,6 +4507,13 @@ Type ProtocolCompositionType::theAnyObjectType(const ASTContext &C) {
                                       /*HasExplicitAnyObject=*/true);
 }
 
+/// Constructs a protocol composition containing the `AnyReference` constraint.
+Type ProtocolCompositionType::theAnyReferenceType(const ASTContext &C) {
+  return ProtocolCompositionType::get(C, {}, /*Inverses=*/{},
+                                      /*HasExplicitAnyObject=*/false,
+                                      /*HasExplicitAnyReference=*/true);
+}
+
 Type ProtocolCompositionType::getInverseOf(const ASTContext &C,
                                            InvertibleProtocolKind IP) {
   return ProtocolCompositionType::get(C, {}, /*Inverses=*/{IP},
