@@ -922,6 +922,20 @@ bool CompareDeclSpecializationRequest::evaluate(
           fewerEffectiveParameters = true;
         }
 
+        // The adjusted type of an autoclosure parameter is its result type, so
+        // compare the execution semantics of the autoclosures separately.
+        if (!ignoreExecutionSemantics && param1.isAutoClosure() &&
+            param2.isAutoClosure()) {
+          auto semantics1 = param1.getPlainType()
+                                ->castTo<FunctionType>()
+                                ->getExecutionSemantics();
+          auto semantics2 = param2.getPlainType()
+                                ->castTo<FunctionType>()
+                                ->getExecutionSemantics();
+          if (!canConvertExecutionSemantics(semantics1, semantics2))
+            return false;
+        }
+
         Type paramType1 = getAdjustedParamType(param1);
         Type paramType2 = getAdjustedParamType(param2);
 
