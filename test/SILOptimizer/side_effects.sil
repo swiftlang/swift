@@ -1458,10 +1458,12 @@ bb0(%0 : $*WrapperSE):
   return %r
 }
 
+// The store through the accessor result is not attributed to %0, because the result has its own access base.
+//
 // CHECK-LABEL: sil [ossa] @call_mutate_accessor_se
 // CHECK-NEXT:  [%0: read v**, write v**.v**, destroy v**.v**]
-// CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
-// CHECK-NEXT:  [global: write,copy,deinit_barrier]
+// CHECK-NEXT:  [%1: read c*.v**, write c*.v**, copy c*.v**, destroy c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @call_mutate_accessor_se : $@convention(thin) (@inout WrapperSE, @owned X) -> () {
 bb0(%0 : $*WrapperSE, %1 : @owned $X):

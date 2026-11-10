@@ -377,6 +377,10 @@ extension LifetimeDependence.Scope {
       }
     case .tail, .pointer, .index:
       self = .unknown(accessBase.address!)
+    case let .borrowMutateAccessor(apply):
+      // The address is only valid within the accessor's borrow of 'self'. Root the dependence on 'self'.
+      let selfArgument = apply.selfArgument!
+      self.init(base: guaranteedReferenceRoot(of: selfArgument) ?? selfArgument, context)
     case .unidentified:
       self = .unknown(address)
     case let .stack(allocStack):
@@ -1204,6 +1208,11 @@ extension LifetimeDependenceDefUseWalker {
         return escapingDependence(on: operand)
       }
       break
+    case let .borrowMutateAccessor(apply):
+      // Treat a store to the address result of an accessor with an address 'self' like a store to 'self'.
+      if let selfAddress = apply.selfAddressOfBorrowMutateAccessorAddressResult {
+        return visitStoredUses(of: operand, into: selfAddress)
+      }
     case .global, .class, .tail, .storeBorrow, .index, .unidentified:
       // An address produced by .storeBorrow should never be stored into.
       //
@@ -1605,6 +1614,11 @@ extension LifetimeDependenceUseDefAddressWalker {
     switch access.base {
     case .box, .global, .class, .tail, .pointer, .index, .unidentified:
       break
+    case let .borrowMutateAccessor(apply):
+      // The address result of an accessor with an address 'self' is within the variable of 'self'.
+      if let selfAddress = apply.selfAddressOfBorrowMutateAccessorAddressResult {
+        return walkUp(newLifetime: selfAddress)
+      }
     case let .stack(allocStack):
       // Ignore stack locations. Their access scopes do not affect lifetime dependence.
       return walkUp(stackInitializer: allocStack, at: address, access: access)

@@ -512,3 +512,31 @@ bb3(%12 : @owned $Optional<@callee_guaranteed () -> ()>):
   %14 = tuple ()
   return %14
 }
+
+struct NEPairForAccessor : ~Escapable {
+  var a: NE
+  var b: NE
+}
+
+sil @yieldNEPairForAccessor : $@yield_once @convention(thin) (@inout NEPairForAccessor) -> @yields @inout NEPairForAccessor
+sil @mutateNEPairForAccessorB : $@convention(method) (@inout NEPairForAccessor) -> @inout NE
+
+// The store target is the address result of a mutate accessor whose 'self' depends on the inout argument %0. The
+// stored value depends on %1, so it escapes.
+sil [ossa] @store_to_yield_through_mutate_accessor_result : $@convention(thin) (@inout NEPairForAccessor, @guaranteed NE) -> () {
+// expected-note @-1{{it depends on the lifetime of an argument of 'store_to_yield_through_mutate_accessor_result'}}
+bb0(%0 : $*NEPairForAccessor, %1 : @guaranteed $NE):
+  %2 = function_ref @yieldNEPairForAccessor : $@yield_once @convention(thin) (@inout NEPairForAccessor) -> @yields @inout NEPairForAccessor
+  (%3, %4) = begin_apply %2(%0) : $@yield_once @convention(thin) (@inout NEPairForAccessor) -> @yields @inout NEPairForAccessor
+  %5 = mark_dependence [nonescaping] %3 : $*NEPairForAccessor on %0 : $*NEPairForAccessor
+  %6 = function_ref @mutateNEPairForAccessorB : $@convention(method) (@inout NEPairForAccessor) -> @inout NE
+  %7 = apply %6(%5) : $@convention(method) (@inout NEPairForAccessor) -> @inout NE
+  %8 = copy_value %1
+  %9 = mark_dependence [nonescaping] %8 : $NE on %1 : $NE
+  store %9 to [assign] %7
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note @-2{{this use causes the lifetime-dependent value to escape}}
+  %11 = end_apply %4 as $()
+  %12 = tuple ()
+  return %12
+}

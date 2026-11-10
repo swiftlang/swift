@@ -1270,7 +1270,7 @@ private extension AccessPath {
     case .box(let inst as Instruction), .class(let inst as Instruction),
       .index(let inst as Instruction),
       .pointer(let inst as Instruction), .stack(let inst as Instruction),
-      .storeBorrow(let inst as Instruction),
+      .storeBorrow(let inst as Instruction), .borrowMutateAccessor(let inst as Instruction),
       .tail(let inst as Instruction):
       if loop.contains(block: inst.parentBlock) {
         return false
