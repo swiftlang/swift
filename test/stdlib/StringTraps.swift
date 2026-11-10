@@ -357,3 +357,28 @@ StringTraps.test("UTF8View foreign index(before:) trap on i == startIndex")
   i = s.utf8.index(before: i)
 }
 #endif
+
+// Returning a count outside 0...capacity from the initializer must trap, for
+// both the small-string and large-string paths.
+for capacity in [8, 15, 64] {
+  StringTraps.test("init(unsafeUninitializedCapacity:)/negativeCount/capacity\(capacity)")
+    .skip(.custom(
+      { _isFastAssertConfiguration() },
+      reason: "this trap is not guaranteed to happen in -Ounchecked"))
+    .code {
+    expectCrashLater()
+    _ = String(unsafeUninitializedCapacity: capacity) { _ in -1 }
+  }
+
+  StringTraps.test("init(unsafeUninitializedCapacity:)/countTooLarge/capacity\(capacity)")
+    .skip(.custom(
+      { _isFastAssertConfiguration() },
+      reason: "this trap is not guaranteed to happen in -Ounchecked"))
+    .code {
+    expectCrashLater()
+    _ = String(unsafeUninitializedCapacity: capacity) { buffer in
+      for i in 0..<buffer.count { buffer[i] = UInt8(ascii: "a") }
+      return capacity + 1
+    }
+  }
+}
