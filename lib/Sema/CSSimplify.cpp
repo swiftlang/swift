@@ -3004,24 +3004,16 @@ ConstraintSystem::matchFunctionExecutionSemantics(
   auto inverses1 = getInverses(func1, dep1);
   auto inverses2 = getInverses(func2, dep2);
 
-  if (inverses1 != inverses2) {
-    // A conversion can suppress more invertible protocols, but never fewer.
-    if (kind < ConstraintKind::Subtype || !(inverses1 - inverses2).empty()) {
-      if (!shouldAttemptFixes())
-        return SolutionKind::Error;
+  // A conversion can suppress more invertible protocols, but never fewer.
+  if (inverses1 != inverses2 &&
+      (kind < ConstraintKind::Subtype || !(inverses1 - inverses2).empty())) {
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
 
-      auto *fix = ExecutionSemanticsMismatch::create(
-          *this, func1, func2, getConstraintLocator(locator));
-      if (recordFix(fix, FixImpact::FunctionTypeMismatch))
-        return SolutionKind::Error;
-    }
-
-    // Score each invertible protocol that differs, so that overload
-    // resolution prefers the closest execution semantics.
-    auto difference = (inverses1 - inverses2);
-    difference.insertAll(inverses2 - inverses1);
-    increaseScore(SK_FunctionConversion, locator,
-                  std::distance(difference.begin(), difference.end()));
+    auto *fix = ExecutionSemanticsMismatch::create(
+        *this, func1, func2, getConstraintLocator(locator));
+    if (recordFix(fix, FixImpact::FunctionTypeMismatch))
+      return SolutionKind::Error;
   }
 
   return SolutionKind::Solved;
