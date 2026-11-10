@@ -7549,7 +7549,7 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
     if (linearParamIndices->contains(i)) {
       auto resultType =
           transposeResultTypes[transposeResultTypesIndex++].getType();
-      originalParams.push_back(AnyFunctionType::Param(resultType));
+      originalParams.push_back(AnyFunctionType::Param::bodyAccess(resultType));
     }
     // Otherwise, the next original parameter is the next transpose parameter.
     else {
@@ -7569,7 +7569,8 @@ getTransposeOriginalFunctionType(AnyFunctionType *transposeFnType,
         transposeFnType->isThrowing(), transposeFnType->getThrownError(),
         /*genericSignature=*/nullptr);
     originalType = makeFunctionType(
-        AnyFunctionType::Param(selfType), /* yields */ {}, originalType,
+        AnyFunctionType::Param::bodyAccess(selfType), /* yields */ {},
+        originalType,
         /*throws=*/false, Type(), transposeFnType->getOptGenericSignature());
   }
   // Otherwise, the original function type is simply:
@@ -9746,10 +9747,12 @@ void AttributeChecker::visitUnsafeSelfDependentResultAttr(
 }
 
 void AttributeChecker::visitScopeParamsAttr(ScopeParamsAttr *attr) {
-  // TODO: What to do for ABI?
-  if (!ABIRoleInfo(D).providesAPI())
+  // `checkScopedSignature` diagnoses the scope parameters for functions where
+  // scopes are supported.
+  if (auto *fn = dyn_cast<AbstractFunctionDecl>(D);
+      fn && resolvesScopesInSignature(fn))
     return;
-  // TODO: Support explicit scope parameters.
+  // TODO: Support explicit scope parameters of types and accessors.
   diagnoseAndRemoveAttr(attr, diag::scope_params_unsupported);
 }
 

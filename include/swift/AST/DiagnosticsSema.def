@@ -9250,15 +9250,13 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 
 // TODO: support these cases!
 ERROR(scoped_unsupported_position, none,
-      "'@_scoped' is not supported here", ())
+      "'@%0' is not supported here", (StringRef))
 ERROR(scoped_applied_repeatedly, none,
       "scope restrictions cannot be specified more than once", ())
 ERROR(scoped_labeled, none,
       "labeled scope restrictions are not supported", ())
 ERROR(scoped_multiple, none,
       "multiple scope restrictions are not supported", ())
-ERROR(scoped_nonescapable_self, none,
-      "the scope of a non-escapable 'self' is not supported", ())
 ERROR(scoped_function_type_param, none,
       "scopes named by function type parameters are not supported", ())
 ERROR(scoped_nonescapable_in_param_position, none,
@@ -9273,18 +9271,29 @@ ERROR(scoped_nonescapable_in_typealias, none,
 ERROR(scoped_nonescapable_in_generic_argument, none,
       "non-escapable type in a generic argument is not supported when scope "
       "restrictions are enabled", ())
-ERROR(scoped_elided_result, none,
-      "non-escapable result of a function with scope restrictions must have "
-      "its scope written with '@_scoped'", ())
+ERROR(scoped_elided, none,
+      "non-escapable type in a function signature must have its scope "
+      "written with '@_scoped'", ())
 ERROR(scoped_param_scope_unsupported, none,
-      "the scope of %0 is not supported", (Identifier))
+      "depending on the scope of the type of parameter %0 is not supported",
+      (Identifier))
 ERROR(scope_params_unsupported, none,
-      "explicit scope parameters are not supported", ())
-ERROR(access_scope_unsupported, none,
-      "binding the access scope of a parameter is not supported", ())
+      "explicit scope parameters are not supported on types", ())
+ERROR(access_scope_immortal_unsupported, none,
+      "binding an access scope to 'immortal' is not supported", ())
+ERROR(access_scope_bound_to_param_unsupported, none,
+      "binding an access scope to a parameter's access is not supported", ())
+ERROR(access_scope_bound_repeatedly, none,
+      "a parameter's access scope cannot be bound more than once", ())
 
 ERROR(scoped_unknown_param, none,
-      "cannot find parameter %0 for scope restriction", (Identifier))
+      "cannot find parameter %0", (Identifier))
+ERROR(scope_unknown, none,
+      "cannot find scope %0", (Identifier))
+ERROR(scope_param_redeclared, none,
+      "invalid redeclaration of scope parameter %0", (Identifier))
+ERROR(scope_param_unused, none,
+      "scope parameter %0 is not used in function signature", (Identifier))
 ERROR(scoped_consuming_param, none,
       "consumed parameters have no access scope", ())
 NOTE(scoped_consuming_param_here, none,
@@ -9293,8 +9302,6 @@ NOTE(scoped_init_param_consuming_by_default, none,
      "initializer parameters are 'consuming' by default", ())
 ERROR(scoped_self_no_access, none,
       "'self' has no access scope here", ())
-ERROR(scoped_escapable_param, none,
-      "%0 has an escapable type, so it has no scope", (Identifier))
 
 
 //------------------------------------------------------------------------------

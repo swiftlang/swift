@@ -1875,7 +1875,8 @@ bool AllowTupleSplatForSingleParameter::attempt(
   auto newArgType = TupleType::get(argElts, cs.getASTContext());
 
   args.clear();
-  args.push_back(AnyFunctionType::Param(newArgType, param.getLabel()));
+  args.push_back(
+      AnyFunctionType::Param::bodyAccess(newArgType, param.getLabel()));
 
   auto *fix = new (cs.getAllocator()) AllowTupleSplatForSingleParameter(
       cs, paramTy, cs.getConstraintLocator(locator));

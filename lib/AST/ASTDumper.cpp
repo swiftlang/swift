@@ -6740,6 +6740,10 @@ namespace {
               printFieldQuoted(param.getInternalLabel().str(),
                                Label::always("internal_name"));
             dumpParameterFlags(param.getParameterFlags());
+            if (!param.hasBodyAccess())
+              printFieldRaw(
+                  [&](raw_ostream &OS) { param.getAccessScope().print(OS); },
+                  Label::always("access_scope"));
 
             printRec(param.getPlainType(), Label::optional("plain_type"));
 
@@ -6874,6 +6878,9 @@ namespace {
           printFieldQuoted(str, Label::always("lifetime"));
         }
       }
+
+      if (auto numScopeParams = T->getScopeSignature().getNumParams())
+        printField(numScopeParams, Label::always("num_scope_params"));
 
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));

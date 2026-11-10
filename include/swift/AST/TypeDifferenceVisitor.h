@@ -254,7 +254,10 @@ public:
 
   bool visitAnyFunctionType(CanAnyFunctionType type1,
                             CanAnyFunctionType type2) {
-    if (!type1->hasSameExtInfoAs(type2))
+    // Scopes aren't mangled, and debug info checks that types round-trip.
+    auto extInfo1 = type1->getExtInfo().withScopeSignature(ScopeSignature());
+    auto extInfo2 = type2->getExtInfo().withScopeSignature(ScopeSignature());
+    if (!extInfo1.isEqualTo(extInfo2, useClangTypes(type1)))
       return asImpl().visitDifferentTypeStructure(type1, type2);
 
     if (asImpl().visit(type1.getResult(), type2.getResult()))

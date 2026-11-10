@@ -22,6 +22,7 @@
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/TrailingObjects.h"
@@ -32,6 +33,7 @@
 
 namespace swift {
 
+class AnyFunctionType;
 class ASTContext;
 class NominalTypeDecl;
 class Type;
@@ -187,14 +189,21 @@ public:
   friend bool operator!=(ScopeDepth lhs, ScopeDepth rhs) {
     return !(lhs == rhs);
   }
+
+  /// The element at this depth from the top of \p binders, a stack of the
+  /// enclosing binders indexed by de Bruijn level, or null if the binder is
+  /// further out.
+  template <typename Binders>
+  auto lookUpIn(Binders &&binders) const -> decltype(&binders[0]) {
+    if (Value >= binders.size())
+      return nullptr;
+    return &binders[binders.size() - 1 - Value];
+  }
 };
 
 /// A reference to a scope from within a type.
 ///
-/// DISCUSSION: Indexing is parameters (for access scopes) followed by scopes
-/// within types ordered by first occurrence of that type. `consuming`
-/// parameters increment the index but their "access scope" does not exist and
-/// won't be referenced, since they are owned.
+/// Indexing is explicit `@_scopeParams`, then accesses of `&foo` parameters.
 ///
 /// Uses de Bruijn indexing, not levels, so that it's cheap to pass function
 /// types without rewriting.
@@ -206,8 +215,12 @@ public:
     Immortal,
     /// A scope parameter of an enclosing type.
     Param,
+    /// The scope for the body of a call to a given function. Represents the
+    /// access scope of a parameter which isn't bound or referred to. Only known
+    /// to live for the body of the call.
+    Body,
 
-    Last_Kind = Param
+    Last_Kind = Body
   };
 
 private:
@@ -222,8 +235,10 @@ private:
                 "unable to fit a ScopeRef::Kind in the given number of bits");
 
   uint32_t TheKind : NumKindBits;
-  /// Interpreted according to the kind: zero for `Immortal`, and the depth
-  /// above the index for `Param`.
+  /// Interpreted according to the kind:
+  /// - 32 of 0 for `Immortal`,
+  /// - `NumParamDepthBits` then `NumParamIndexBits` for `Param`
+  /// - `NumParamDepthBits` followed by `NumParamDepthBits` of 0 for `Body`
   uint32_t Data : NumDataBits;
 
   ScopeRef(Kind kind, uint32_t data) : TheKind(unsigned(kind)), Data(data) {
@@ -240,6 +255,16 @@ public:
     return {Kind::Param, (depth.Value << ParamDepthShift) | index};
   }
 
+  static ScopeRef forBody(ScopeDepth depth) {
+    ASSERT(llvm::isUInt<NumParamDepthBits>(depth.Value) &&
+           "scope reference overflow");
+    return {Kind::Body, depth.Value << ParamDepthShift};
+  }
+
+  /// Create a Body scope at depth 0, to use as the default access scope of a
+  /// parameter.
+  static ScopeRef forCallBody() { return forBody(ScopeDepth::zero()); }
+
   Kind getKind() const { return Kind(TheKind); }
 
   /// The number of function types between this reference and its binder.
@@ -251,22 +276,21 @@ public:
   /// Here `&a` has depth 1, since the type of `body` is between it and the
   /// type of `with`.
   ScopeDepth getDepth() const {
-    ASSERT(getKind() == Kind::Param);
+    ASSERT(getKind() != Kind::Immortal);
     return ScopeDepth(Data >> ParamDepthShift);
   }
 
   /// The index of the scope parameter in its binder.
   ///
   /// ```
-  /// func foo(_ a: MyArray, _ x: MyRef, _ y: MyRef) -> @_scoped(&a) MyRef
-  /// // access: &0            &1 ~~~~~    &2 ~~~~~
-  /// //  value:                    3           4
+  /// @_scopeParams(s, t)
+  /// func foo(_ a: MyArray, _ b: MyArray, _ x: @_scoped(t) MyRef,
+  ///          _ y: @_scoped(s) MyRef) -> @_scoped(&b) MyRef
   /// ```
   ///
-  /// Here `&a`, the access scope of `a`, has index 0. The scopes of `x` and `y`
-  /// have indexes 3 and 4 (assuming `MyRef` only contains one scope), after the
-  /// access scopes of all three parameters. MyArray does not contain any
-  /// scopes, since it is `Escapable`.
+  /// Here `s` and `t` have indexes 0 and 1, in the order they're declared, and
+  /// `&b`, the access scope of `b`, has index 2, since the result refers to it.
+  /// The accesses of `a`, `x`, and `y` are body scopes and don't have an index.
   unsigned getIndex() const {
     ASSERT(getKind() == Kind::Param);
     return Data & ParamIndexMask;
@@ -276,12 +300,18 @@ public:
   ///
   /// Immortal scopes are not shifted, since they are global.
   ScopeRef shifted(ScopeDepth by) const {
-    if (getKind() == Kind::Immortal)
+    switch (getKind()) {
+    case Kind::Immortal:
       return *this;
-    return forParam(ScopeDepth(getDepth().Value + by.Value), getIndex());
+    case Kind::Param:
+      return forParam(ScopeDepth(getDepth().Value + by.Value), getIndex());
+    case Kind::Body:
+      return forBody(ScopeDepth(getDepth().Value + by.Value));
+    }
+    llvm_unreachable("unhandled kind");
   }
 
-  /// Prints `^depth.index`, or `immortal`.
+  /// Prints `^depth.index`, `^depth.body`, or `immortal`.
   void print(llvm::raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;
 
@@ -299,6 +329,29 @@ public:
 static_assert(std::has_unique_object_representations_v<ScopeRef>,
               "equal ScopeRefs must have equal opaque values");
 
+/// The scope parameters a function type expects from callers, which the scopes
+/// in its parameters and result can refer to.
+class ScopeSignature {
+  unsigned NumParams = 0;
+
+public:
+  ScopeSignature() = default;
+  explicit ScopeSignature(unsigned numParams) : NumParams(numParams) {}
+
+  unsigned getNumParams() const { return NumParams; }
+
+  bool empty() const { return NumParams == 0; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const { ID.AddInteger(NumParams); }
+
+  friend bool operator==(ScopeSignature lhs, ScopeSignature rhs) {
+    return lhs.NumParams == rhs.NumParams;
+  }
+  friend bool operator!=(ScopeSignature lhs, ScopeSignature rhs) {
+    return !(lhs == rhs);
+  }
+};
+
 /// The number of scope parameters a value of the declared type is restricted
 /// by.
 unsigned getNumScopeParams(const NominalTypeDecl *decl);
@@ -309,7 +362,9 @@ bool hasScopeUnsaturatedType(Type ty);
 
 // FIXME: Types that differ only in scopes are reconciled after solving with a
 // cast, which doesn't cover lvalues or function conversions yet.
-/// \p ty without its scope arguments, which the constraint solver ignores.
+/// \p ty without its scopes, which the constraint solver ignores: its nominal
+/// types' scope arguments, and the access scopes of its function types'
+/// parameters.
 Type eraseScopes(Type ty);
 
 } // end namespace swift

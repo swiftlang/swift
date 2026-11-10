@@ -326,7 +326,8 @@ ManagedValue SILGenFunction::emitTangentVectorToOptionalTangentVector(
       constructorDecl,
       SubstitutionMap::get(constructorDecl->getGenericSignature(),
                            {wrappedType}, {diffConf}));
-  PreparedArguments args({AnyFunctionType::Param(optionalOfWrappedTanType)});
+  PreparedArguments args(
+      {AnyFunctionType::Param::bodyAccess(optionalOfWrappedTanType)});
   args.add(loc, RValue(*this, {optVal}, optionalOfWrappedTanType));
 
   auto result = emitApplyAllocatingInitializer(loc, initDecl, std::move(args),

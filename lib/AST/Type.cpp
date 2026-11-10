@@ -731,7 +731,7 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
   }
 
   auto selfTy = dc->getSelfInterfaceType();
-  auto selfParam = AnyFunctionType::Param(selfTy);
+  auto selfParam = AnyFunctionType::Param::bodyAccess(selfTy);
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   if (sig) {
     GenericFunctionType::ExtInfo info;
@@ -2049,7 +2049,7 @@ AnyFunctionType::Param::getCanonical(CanGenericSignature genericSig) const {
   // Param.
   return Param(getPlainType()->getReducedType(genericSig),
                getLabel(), getParameterFlags(),
-               /*InternalLabel=*/Identifier());
+               /*InternalLabel=*/Identifier(), getAccessScope());
 }
 
 CanType TypeBase::computeCanonicalType() {
@@ -2984,7 +2984,12 @@ public:
   
   CanType visitFunctionType(FunctionType *func, CanType subst) {
     if (auto substFunc = dyn_cast<FunctionType>(subst)) {
-      if (!func->hasSameExtInfoAs(substFunc))
+      // FIXME: Scopes are ignored, and the result mixes the access scopes of
+      // the substituted parameters with the scope signature of the original.
+      auto extInfo = func->getExtInfo().withScopeSignature(ScopeSignature());
+      auto substExtInfo =
+          substFunc->getExtInfo().withScopeSignature(ScopeSignature());
+      if (!extInfo.isEqualTo(substExtInfo, useClangTypes(func)))
         return CanType();
       
       if (func->getParams().size() != substFunc->getParams().size())
@@ -3844,6 +3849,10 @@ static bool matchesFunctionType(CanAnyFunctionType fn1, CanAnyFunctionType fn2,
     if (!ext2.isNoEscape())
       ext1 = ext1.withNoEscape(false);
   }
+  // FIXME: Scopes are ignored; overrides need to check that signatures
+  // actually match.
+  ext1 = ext1.withScopeSignature(ScopeSignature());
+  ext2 = ext2.withScopeSignature(ScopeSignature());
   bool compareClangTypes = useClangTypes(fn1);
   // Under AllowMissingClangType (set for deserialization near-matches), a
   // function type that carries a Clang type is compatible with one that lacks
@@ -4696,6 +4705,17 @@ Type AnyFunctionType::getGlobalActor() const {
   }
 }
 
+ScopeSignature AnyFunctionType::getScopeSignature() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getScopeSignature();
+  case TypeKind::GenericFunction:
+    return cast<GenericFunctionType>(this)->getScopeSignature();
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 llvm::ArrayRef<LifetimeDependenceInfo>
 AnyFunctionType::getLifetimeDependencies() const {
   switch (getKind()) {
@@ -4795,7 +4815,8 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
   return ExtInfo(
       bits,
       useClangFunctionType ? getCanonicalClangTypeInfo() : ClangTypeInfo(),
-      globalActor, thrownError, typeDependencies, getLifetimeDependencies());
+      globalActor, thrownError, typeDependencies, getLifetimeDependencies(),
+      getScopeSignature());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -5196,7 +5217,8 @@ AnyFunctionType *AnyFunctionType::getWithoutDifferentiability() const {
   SmallVector<Param, 8> newParams;
   for (auto &param : getParams()) {
     Param newParam(param.getPlainType(), param.getLabel(),
-                   param.getParameterFlags().withNoDerivative(false));
+                   param.getParameterFlags().withNoDerivative(false),
+                   /*internalLabel=*/Identifier(), param.getAccessScope());
     newParams.push_back(newParam);
   }
   auto nonDiffExtInfo =
@@ -5574,7 +5596,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
                 NonDifferentiableDifferentiabilityParameter,
             DerivativeFunctionTypeError::TypeAndIndex(paramType, i));
 
-      differentialParams.push_back(AnyFunctionType::Param(
+      differentialParams.push_back(AnyFunctionType::Param::bodyAccess(
           paramTan->getType(), Identifier(), diffParam.getParameterFlags()));
     }
     Type differentialResult;
@@ -5643,7 +5665,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
     for (auto i : range(resultTanTypes.size())) {
       auto resultTanType = resultTanTypes[i];
       auto flags = ParameterTypeFlags().withInOut(false);
-      pullbackParams.push_back(AnyFunctionType::Param(
+      pullbackParams.push_back(AnyFunctionType::Param::bodyAccess(
           resultTanType, Identifier(), flags));
     }
     // Then append semantic result parameters.
@@ -5653,7 +5675,7 @@ AnyFunctionType::getAutoDiffDerivativeFunctionLinearMapType(
       auto semanticResultParamTan =
           semanticResultParamType->getAutoDiffTangentSpace(lookupConformance);
       auto flags = ParameterTypeFlags().withInOut(true);
-      pullbackParams.push_back(AnyFunctionType::Param(
+      pullbackParams.push_back(AnyFunctionType::Param::bodyAccess(
           semanticResultParamTan->getType(), Identifier(), flags));
     }
     // FIXME: Verify ExtInfo state is correct, not working by accident.

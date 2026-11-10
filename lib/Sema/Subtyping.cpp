@@ -1451,7 +1451,8 @@ static Type subtypeJoinMeetImpl(Operation op, Type lhs, Type rhs,
         auto lhsParam = lhsFunc->getParams()[i];
         auto rhsParam = rhsFunc->getParams()[i];
 
-        if (lhsParam.getParameterFlags() != rhsParam.getParameterFlags())
+        if (lhsParam.getParameterFlags() != rhsParam.getParameterFlags() ||
+            lhsParam.getAccessScope() != rhsParam.getAccessScope())
           return fail();
 
         Type paramType;

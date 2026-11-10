@@ -928,7 +928,8 @@ bool swift::isRepresentableInLanguage(
         type = OptionalType::get(type);
       }
 
-      completionHandlerParams.push_back(AnyFunctionType::Param(type));
+      completionHandlerParams.push_back(
+          AnyFunctionType::Param::bodyAccess(type));
 
       // Make sure that the parameter type is representable in Objective-C.
       if (!type->isRepresentableIn(language, const_cast<FuncDecl *>(FD))) {

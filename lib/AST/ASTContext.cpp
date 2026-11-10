@@ -1989,7 +1989,8 @@ static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
     auto *ctor = cast<ConstructorDecl>(candidate);
     auto fnType = ctor->getMethodInterfaceType()->castTo<FunctionType>();
     if (fnType->getNumParams() == 1 &&
-        fnType->getParams()[0] == AnyFunctionType::Param(fromType) &&
+        fnType->getParams()[0] ==
+            AnyFunctionType::Param::bodyAccess(fromType) &&
         fnType->getResult()->isEqual(toType)) {
       return ConcreteDeclRef(ctor);
     }
@@ -4569,12 +4570,12 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
   // Determine the type of the container.
   auto containerTy = dc->getDeclaredInterfaceType();
   if (!containerTy || containerTy->hasError())
-    return AnyFunctionType::Param(ErrorType::get(Ctx));
+    return AnyFunctionType::Param::bodyAccess(ErrorType::get(Ctx));
 
   // Determine the type of 'self' inside the container.
   auto selfTy = dc->getSelfInterfaceType();
   if (!selfTy || selfTy->hasError())
-    return AnyFunctionType::Param(ErrorType::get(Ctx));
+    return AnyFunctionType::Param::bodyAccess(ErrorType::get(Ctx));
 
   bool isStatic = false;
   SelfAccessKind selfAccess = SelfAccessKind::NonMutating;
@@ -4656,7 +4657,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
 
   // 'static' functions have 'self' of type metatype<T>.
   if (isStatic)
-    return AnyFunctionType::Param(MetatypeType::get(selfTy, Ctx));
+    return AnyFunctionType::Param::bodyAccess(MetatypeType::get(selfTy, Ctx));
 
   // `self` is isolated if typechecker says the function is isolated to it.
   bool isIsolated =
@@ -4685,7 +4686,7 @@ AnyFunctionType::Param swift::computeSelfParam(AbstractFunctionDecl *AFD,
     flags = flags.withAddressable(true);
   }
 
-  return AnyFunctionType::Param(selfTy, Identifier(), flags);
+  return AnyFunctionType::Param::bodyAccess(selfTy, Identifier(), flags);
 }
 
 void UnboundGenericType::Profile(llvm::FoldingSetNodeID &ID,
@@ -5308,9 +5309,9 @@ bool AnyFunctionType::canComposeTuple(ArrayRef<Param> params) {
     return false;
 
   for (auto &param : params) {
-    // We generally cannot handle parameter flags, though we can carve out an
-    // exception for ownership flags such as __owned, which we can thunk, and
-    // flags that can freely dropped from a function type such as
+    // We generally cannot handle parameter flags or access scopes, though we
+    // can carve out an exception for ownership flags such as __owned, which we
+    // can thunk, and flags that can freely dropped from a function type such as
     // @_nonEphemeral. Note that @noDerivative can also be freely dropped, as
     // we've already ensured that the destination function is not
     // @differentiable.
@@ -5319,7 +5320,7 @@ bool AnyFunctionType::canComposeTuple(ArrayRef<Param> params) {
         param.isInOut() ? ParamSpecifier::InOut : ParamSpecifier::Default);
     flags = flags.withNonEphemeral(false)
                  .withNoDerivative(false);
-    if (!flags.isNone())
+    if (!flags.isNone() || !param.hasBodyAccess())
       return false;
   }
 
@@ -5374,9 +5375,7 @@ void AnyFunctionType::relabelParams(MutableArrayRef<Param> params,
   assert(params.size() == argList->size());
   for (auto i : indices(params)) {
     auto &param = params[i];
-    param = AnyFunctionType::Param(param.getPlainType(), argList->getLabel(i),
-                                   param.getParameterFlags(),
-                                   param.getInternalLabel());
+    param = param.withLabel(argList->getLabel(i));
   }
 }
 
@@ -5405,6 +5404,7 @@ static void profileParams(llvm::FoldingSetNodeID &ID,
     ID.AddPointer(param.getInternalLabel().get());
     ID.AddPointer(param.getPlainType().getPointer());
     ID.AddInteger(param.getParameterFlags().toRaw());
+    ID.AddInteger(param.getAccessScope().getOpaqueValue());
   }
 }
 
@@ -5481,15 +5481,18 @@ FunctionType *FunctionType::get(ArrayRef<AnyFunctionType::Param> params,
       info.has_value() ? !info->getLifetimeDependencies().empty() : false;
   auto numLifetimeDependencies =
       hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
+  bool hasScopeSignature =
+      info.has_value() && !info->getScopeSignature().empty();
   size_t allocSize =
       totalSizeToAlloc<AnyFunctionType::Param, AnyFunctionType::Yield,
                        ClangTypeInfo, Type, uint8_t,
                        ASTExtInfoBuilder::TypeDependency, size_t,
-                       LifetimeDependenceInfo>(
+                       LifetimeDependenceInfo, ScopeSignature>(
           params.size(), yields.size(), hasClangInfo ? 1 : 0, numTypes,
           typeDependencies.empty() ? 0 : 1, typeDependencies.size(),
           hasLifetimeDependenceInfo ? 1 : 0,
-          hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
+          hasLifetimeDependenceInfo ? numLifetimeDependencies : 0,
+          hasScopeSignature ? 1 : 0);
 
   void *mem = ctx.Allocate(allocSize, alignof(FunctionType), arena);
 
@@ -5565,6 +5568,9 @@ FunctionType::FunctionType(ArrayRef<AnyFunctionType::Param> params,
                               lifetimeDependenceInfo.end(),
                               getTrailingObjects<LifetimeDependenceInfo>());
     }
+    auto scopeSignature = info->getScopeSignature();
+    if (!scopeSignature.empty())
+      *getTrailingObjects<ScopeSignature>() = scopeSignature;
   }
 }
 
@@ -5655,12 +5661,15 @@ GenericFunctionType *GenericFunctionType::get(GenericSignature sig,
   auto numLifetimeDependencies =
       hasLifetimeDependenceInfo ? info->getLifetimeDependencies().size() : 0;
 
+  bool hasScopeSignature =
+      info.has_value() && !info->getScopeSignature().empty();
   size_t allocSize =
       totalSizeToAlloc<AnyFunctionType::Param, AnyFunctionType::Yield, Type,
-                       size_t, LifetimeDependenceInfo>(
+                       size_t, LifetimeDependenceInfo, ScopeSignature>(
           params.size(), yields.size(), numTypes,
           hasLifetimeDependenceInfo ? 1 : 0,
-          hasLifetimeDependenceInfo ? numLifetimeDependencies : 0);
+          hasLifetimeDependenceInfo ? numLifetimeDependencies : 0,
+          hasScopeSignature ? 1 : 0);
   void *mem = ctx.Allocate(allocSize, alignof(GenericFunctionType));
 
   auto properties = getGenericFunctionRecursiveProperties(
@@ -5702,6 +5711,9 @@ GenericFunctionType::GenericFunctionType(
                               lifetimeDependenceInfo.end(),
                               getTrailingObjects<LifetimeDependenceInfo>());
     }
+    auto scopeSignature = info->getScopeSignature();
+    if (!scopeSignature.empty())
+      *getTrailingObjects<ScopeSignature>() = scopeSignature;
   }
 }
 

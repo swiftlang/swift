@@ -4808,6 +4808,10 @@ static Type mapSignatureType(ASTContext &ctx, Type type) {
         return mapSignatureFunctionType(ctx, type, false, false, false, 1);
       }
 
+      if (auto *nominal = dyn_cast<NominalType>(type.getPointer());
+          nominal && nominal->hasScopeArgs())
+        return mapSignatureType(ctx, nominal->withoutScopeArgs());
+
       return std::nullopt;
     });
 }
@@ -4899,8 +4903,9 @@ static Type mapSignatureFunctionType(ASTContext &ctx, Type type,
       newFlags = newFlags.withInOut(false);
     }
 
-    AnyFunctionType::Param newParam(newParamType, param.getLabel(), newFlags,
-                                    param.getInternalLabel());
+    // Don't allow overloading by access scopes either.
+    auto newParam = AnyFunctionType::Param::bodyAccess(
+        newParamType, param.getLabel(), newFlags, param.getInternalLabel());
     newParams.push_back(newParam);
   }
 
@@ -4969,7 +4974,6 @@ OverloadSignature ValueDecl::getOverloadSignature() const {
 }
 
 CanType ValueDecl::getOverloadSignatureType() const {
-  // FIXME: Erase scopes.
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(this)) {
     bool isMethod = afd->hasImplicitSelfDecl();
     return mapSignatureFunctionType(getASTContext(), getInterfaceType(),
@@ -10392,7 +10396,8 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
       type, isVariadic(), isAutoClosure(), isNonEphemeral(), getSpecifier(),
       isIsolated(), /*isNoDerivative*/ false, isCompileTimeLiteral(),
       isSending(), isAddressable(), isConstVal());
-  return AnyFunctionType::Param(type, label, flags, internalLabel);
+  // The access scopes of a function's parameters only appear in its type.
+  return AnyFunctionType::Param::bodyAccess(type, label, flags, internalLabel);
 }
 
 std::optional<DefaultArgumentInitializer *>

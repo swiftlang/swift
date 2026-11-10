@@ -8210,13 +8210,16 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
     if (!paramTy)
       return paramTy.takeError();
 
-    params.emplace_back(paramTy.get(), MF.getIdentifier(labelID),
-                        ParameterTypeFlags(isVariadic, isAutoClosure,
-                                           isNonEphemeral, *ownership,
-                                           isIsolated, isNoDerivative,
-                                           isCompileTimeLiteral, isSending,
-                                           isAddressable, isConstValue),
-                        MF.getIdentifier(internalLabelID));
+    // FIXME: Scopes aren't serialized, neither access bindings nor the scope
+    // arguments of nominal types, so clients see a module's types without
+    // them.
+    params.push_back(AnyFunctionType::Param::bodyAccess(
+        paramTy.get(), MF.getIdentifier(labelID),
+        ParameterTypeFlags(isVariadic, isAutoClosure, isNonEphemeral,
+                           *ownership, isIsolated, isNoDerivative,
+                           isCompileTimeLiteral, isSending, isAddressable,
+                           isConstValue),
+        MF.getIdentifier(internalLabelID)));
   }
 
   SmallVector<AnyFunctionType::Yield, 1> yields;

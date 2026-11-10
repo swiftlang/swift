@@ -462,7 +462,7 @@ protected:
     HasCachedType : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+16,
+  SWIFT_INLINE_BITFIELD_FULL(AnyFunctionType, TypeBase, NumAFTExtInfoBits+1+1+1+1+1+1,
     /// Extra information which affects how the function is called, like
     /// regparm and the calling convention.
     ExtInfoBits : NumAFTExtInfoBits,
@@ -470,7 +470,8 @@ protected:
     HasClangTypeInfo : 1,
     HasThrownError : 1,
     HasLifetimeDependencies : 1,
-    HasTypeDependencies : 1
+    HasTypeDependencies : 1,
+    HasScopeSignature : 1
   );
 
   SWIFT_INLINE_BITFIELD_FULL(ArchetypeType, TypeBase, 1+1+16,
@@ -3113,6 +3114,12 @@ public:
     return Bits.NominalType.ScopeArgCount != 0;
   }
 
+  /// The same type without the arguments for its declaration's scope
+  /// parameters.
+  NominalType *withoutScopeArgs() const {
+    return get(getDecl(), getParent(), getGenericArgs(), getASTContext());
+  }
+
   static NominalType *get(NominalTypeDecl *D, Type parent, const ASTContext &C) {
     return get(D, parent, {}, C);
   }
@@ -3512,13 +3519,25 @@ public:
 
   class Param {
   public:
-    explicit Param(Type t,
-                   Identifier l = Identifier(),
-                   ParameterTypeFlags f = ParameterTypeFlags(),
-                   Identifier internalLabel = Identifier())
-        : Ty(t), Label(l), InternalLabel(internalLabel), Flags(f) {
+    explicit Param(Type t, Identifier l, ParameterTypeFlags f,
+                   Identifier internalLabel, ScopeRef accessScope)
+        : Ty(t), Label(l), InternalLabel(internalLabel), Flags(f),
+          AccessScope(accessScope) {
       assert(t && "param type must be non-null");
       assert(!t->is<InOutType>() && "set flags instead");
+      ASSERT(accessScope.getKind() != ScopeRef::Kind::Immortal &&
+             "an access can't be immortal");
+      ASSERT((accessScope == ScopeRef::forCallBody() ||
+              f.getValueOwnership() != ValueOwnership::Owned) &&
+             "consumed parameters have no access");
+    }
+
+    /// A parameter whose access scope isn't referenced, and can be treated as
+    /// lasting for the call's body.
+    static Param bodyAccess(Type t, Identifier l = Identifier(),
+                            ParameterTypeFlags f = ParameterTypeFlags(),
+                            Identifier internalLabel = Identifier()) {
+      return Param(t, l, f, internalLabel, ScopeRef::forCallBody());
     }
 
   private:
@@ -3541,7 +3560,11 @@ public:
     
     /// Parameter specific flags.
     ParameterTypeFlags Flags = {};
-    
+
+    /// The scope of the parameter's access for the call, which is the call's
+    /// body unless the signature refers to or binds the access scope.
+    ScopeRef AccessScope;
+
   public:
     /// FIXME: Remove this. Return the formal type of the parameter in the
     /// function type, including the InOutType if there is one.
@@ -3587,6 +3610,18 @@ public:
     Param getCanonical(CanGenericSignature genericSig) const;
     
     ParameterTypeFlags getParameterFlags() const { return Flags; }
+
+    /// The scope of the parameter's access, which is the call's body unless the
+    /// signature refers to or binds it.
+    ///
+    /// Consumed parameters can't be depended on in the signature, but still
+    /// have a body access scope.
+    ScopeRef getAccessScope() const { return AccessScope; }
+
+    /// Whether the scope of the parameter's access is the call's body.
+    bool hasBodyAccess() const {
+      return AccessScope == ScopeRef::forCallBody();
+    }
 
     /// Whether the parameter is varargs
     bool isVariadic() const { return Flags.isVariadic(); }
@@ -3635,32 +3670,40 @@ public:
 
     /// Returns \c true if the two \c Params are equal in their canonicalized
     /// form.
-    /// Two \c Params are equal if their external label, flags and
+    /// Two \c Params are equal if their external label, flags, access scope and
     /// *canonicalized* types match. The internal label and sugar types are
     /// *not* considered for type equality.
     bool operator==(Param const &b) const {
       return (Label == b.Label &&
               getPlainType()->isEqual(b.getPlainType()) &&
-              Flags == b.Flags);
+              Flags == b.Flags && AccessScope == b.AccessScope);
     }
     bool operator!=(Param const &b) const { return !(*this == b); }
 
     /// Return the parameter without external and internal labels.
     Param getWithoutLabels() const {
       return Param(Ty, /*Label=*/Identifier(), Flags,
-                   /*InternalLabel=*/Identifier());
+                   /*InternalLabel=*/Identifier(), AccessScope);
     }
 
     Param withLabel(Identifier newLabel) const {
-      return Param(Ty, newLabel, Flags, InternalLabel);
+      return Param(Ty, newLabel, Flags, InternalLabel, AccessScope);
     }
 
     Param withType(Type newType) const {
-      return Param(newType, Label, Flags, InternalLabel);
+      return Param(newType, Label, Flags, InternalLabel, AccessScope);
     }
 
     Param withFlags(ParameterTypeFlags flags) const {
-      return Param(Ty, Label, flags, InternalLabel);
+      return Param(Ty, Label, flags, InternalLabel, AccessScope);
+    }
+
+    Param withAccessScope(ScopeRef scope) const {
+      return Param(Ty, Label, Flags, InternalLabel, scope);
+    }
+
+    Param withBodyAccess() const {
+      return withAccessScope(ScopeRef::forCallBody());
     }
   };
 
@@ -3703,7 +3746,8 @@ public:
     /// the call machinery, processing yields as if they were
     /// parameters of a call.  Return this reinterpreted as a parameter.
     Param asParam() const {
-      return Param(getType(), Identifier(), getFlags().asParamFlags());
+      return Param::bodyAccess(getType(), Identifier(),
+                               getFlags().asParamFlags());
     }
 
     Yield subst(SubstitutionMap subs,
@@ -3765,6 +3809,8 @@ protected:
           !Info.value().getLifetimeDependencies().empty();
       Bits.AnyFunctionType.HasTypeDependencies =
           !Info->getTypeDependencies().empty();
+      Bits.AnyFunctionType.HasScopeSignature =
+          !Info->getScopeSignature().empty();
       // The use of both assert() and static_assert() is intentional.
       assert(Bits.AnyFunctionType.ExtInfoBits == Info.value().getBits() &&
              "Bits were dropped!");
@@ -3778,6 +3824,7 @@ protected:
       Bits.AnyFunctionType.HasThrownError = false;
       Bits.AnyFunctionType.HasLifetimeDependencies = false;
       Bits.AnyFunctionType.HasTypeDependencies = false;
+      Bits.AnyFunctionType.HasScopeSignature = false;
     }
     this->NumParams = NumParams;
     assert(this->NumParams == NumParams && "Params dropped!");
@@ -3862,6 +3909,10 @@ public:
     return Bits.AnyFunctionType.HasLifetimeDependencies;
   }
 
+  bool hasScopeSignature() const {
+    return Bits.AnyFunctionType.HasScopeSignature;
+  }
+
   /// Type has lifetime dependencies derived from explicit @_lifetime
   /// attributes.
   bool hasExplicitLifetimeDependencies() const;
@@ -3933,8 +3984,10 @@ public:
     assert(hasExtInfo());
     return ExtInfo(Bits.AnyFunctionType.ExtInfoBits, getClangTypeInfo(),
                    getGlobalActor(), getThrownError(), getTypeDependencies(),
-                   getLifetimeDependencies());
+                   getLifetimeDependencies(), getScopeSignature());
   }
+
+  ScopeSignature getScopeSignature() const;
 
   /// Get the canonical ExtInfo for the function type.
   ///
@@ -4217,7 +4270,7 @@ class FunctionType final
           FunctionType, AnyFunctionType::Param, AnyFunctionType::Yield,
           ClangTypeInfo, Type, uint8_t /*NumTypeDependencies*/,
           ASTExtInfoBuilder::TypeDependency, size_t /*NumLifetimeDependencies*/,
-          LifetimeDependenceInfo> {
+          LifetimeDependenceInfo, ScopeSignature> {
   friend TrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<AnyFunctionType::Param>) const {
@@ -4251,6 +4304,10 @@ class FunctionType final
 
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
     return hasLifetimeDependencies() ? getNumLifetimeDependencies() : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ScopeSignature>) const {
+    return hasScopeSignature() ? 1 : 0;
   }
 
 public:
@@ -4333,6 +4390,12 @@ public:
 
   std::optional<LifetimeDependenceInfo> getLifetimeDependenceForResult() const {
     return getLifetimeDependenceFor(getNumParams());
+  }
+
+  ScopeSignature getScopeSignature() const {
+    if (!hasScopeSignature())
+      return ScopeSignature();
+    return *getTrailingObjects<ScopeSignature>();
   }
 
   uint16_t
@@ -4455,7 +4518,8 @@ class GenericFunctionType final
       public llvm::FoldingSetNode,
       private llvm::TrailingObjects<
           GenericFunctionType, AnyFunctionType::Param, AnyFunctionType::Yield,
-          Type, size_t /*NumLifetimeDependencies*/, LifetimeDependenceInfo> {
+          Type, size_t /*NumLifetimeDependencies*/, LifetimeDependenceInfo,
+          ScopeSignature> {
   friend TrailingObjects;
       
   GenericSignature Signature;
@@ -4478,6 +4542,10 @@ class GenericFunctionType final
 
   size_t numTrailingObjects(OverloadToken<LifetimeDependenceInfo>) const {
     return hasLifetimeDependencies() ? getNumLifetimeDependencies() : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ScopeSignature>) const {
+    return hasScopeSignature() ? 1 : 0;
   }
 
   /// Construct a new generic function type.
@@ -4535,6 +4603,12 @@ public:
       }
     }
     return std::nullopt;
+  }
+
+  ScopeSignature getScopeSignature() const {
+    if (!hasScopeSignature())
+      return ScopeSignature();
+    return *getTrailingObjects<ScopeSignature>();
   }
 
   /// Retrieve the generic signature of this function type.
