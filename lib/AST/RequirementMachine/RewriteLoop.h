@@ -513,7 +513,7 @@ public:
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
 };
 
-/// Return value of RewritePathEvaluator::applyRewriteRule();
+/// Return value of RewritePathEvaluator::applyRelation().
 struct AppliedRewriteStep {
   Term lhs;
   Term rhs;
@@ -565,8 +565,8 @@ struct RewritePathEvaluator {
   void apply(const RewriteStep &step,
              const RewriteSystem &system);
 
-  AppliedRewriteStep applyRewriteRule(const RewriteStep &step,
-                                      const RewriteSystem &system);
+  std::pair<Term, Term> applyRewriteRule(const RewriteStep &step,
+                                         const RewriteSystem &system);
 
   std::pair<MutableTerm, MutableTerm>
   applyPrefixSubstitutions(const RewriteStep &step,

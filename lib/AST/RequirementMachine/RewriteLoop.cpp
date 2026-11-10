@@ -72,16 +72,21 @@ void RewriteStep::dump(llvm::raw_ostream &out,
                        const RewriteSystem &system) const {
   switch (Kind) {
   case Rule: {
-    auto result = evaluator.applyRewriteRule(*this, system);
+    auto [lhs, rhs] = evaluator.applyRewriteRule(*this, system);
 
-    if (!result.prefix.empty()) {
-      out << result.prefix;
+    // Rewriting the subterm doesn't change the prefix and suffix.
+    const auto &term = evaluator.getCurrentTerm();
+    MutableTerm prefix(term.begin(), term.begin() + StartOffset);
+    MutableTerm suffix(term.end() - EndOffset, term.end());
+
+    if (!prefix.empty()) {
+      out << prefix;
       out << ".";
     }
-    out << "(" << result.lhs << " => " << result.rhs << ")";
-    if (!result.suffix.empty()) {
+    out << "(" << lhs << " => " << rhs << ")";
+    if (!suffix.empty()) {
       out << ".";
-      out << result.suffix;
+      out << suffix;
     }
 
     break;
@@ -597,7 +602,10 @@ MutableTerm &RewritePathEvaluator::getCurrentTerm() {
   return Primary.back();
 }
 
-AppliedRewriteStep
+/// Applies a rewrite rule to the subterm of the current term at the step's
+/// offsets, and returns the rule's left and right hand sides in the direction
+/// that they were applied.
+std::pair<Term, Term>
 RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
                                        const RewriteSystem &system) {
   auto &term = getCurrentTerm();
@@ -629,14 +637,10 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
     bug("Invalid subterm");
   }
 
-  MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-  MutableTerm suffix(term.end() - step.EndOffset, term.end());
+  term.rewriteSubTerm(term.begin() + step.StartOffset,
+                      term.begin() + step.StartOffset + lhs.size(), rhs);
 
-  term = prefix;
-  term.append(rhs);
-  term.append(suffix);
-
-  return {lhs, rhs, prefix, suffix};
+  return {lhs, rhs};
 }
 
 std::pair<MutableTerm, MutableTerm>
@@ -1031,7 +1035,7 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
   case RewriteStep::Rule:
-    (void) applyRewriteRule(step, system);
+    (void)applyRewriteRule(step, system);
     break;
 
   case RewriteStep::PrefixSubstitutions:
