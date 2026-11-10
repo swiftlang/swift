@@ -9163,7 +9163,8 @@ static Type stripParameterizedProtocolArgs(Type type) {
       return ProtocolCompositionType::get(
           type->getASTContext(), processedMembers,
           compositionType->getInverses(),
-          compositionType->hasExplicitAnyObject());
+          compositionType->hasExplicitAnyObject(),
+          compositionType->hasExplicitAnyReference());
     }
     return type;
   }

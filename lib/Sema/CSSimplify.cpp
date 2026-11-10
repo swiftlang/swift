@@ -4146,7 +4146,8 @@ ConstraintSystem::matchDeepEqualityTypes(Type type1, Type type2,
       return SolutionKind::Error;
     if (pct1->getInverses() != pct2->getInverses())
       return SolutionKind::Error;
-    if (pct1->hasExplicitAnyObject() != pct2->hasExplicitAnyObject())
+    if (pct1->hasExplicitAnyObject() != pct2->hasExplicitAnyObject() ||
+        pct1->hasExplicitAnyReference() != pct2->hasExplicitAnyReference())
       return SolutionKind::Error;
     for (unsigned i = 0, e = members1.size(); i < e; ++i) {
       auto member1 = members1[i];

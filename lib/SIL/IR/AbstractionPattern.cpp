@@ -2989,7 +2989,8 @@ public:
         TC.Context,
         substMembers,
         pct->getInverses(),
-        pct->hasExplicitAnyObject()));
+        pct->hasExplicitAnyObject(),
+        pct->hasExplicitAnyReference()));
   }
 
   /// Visit a tuple pattern.  Note that, because of vanishing tuples,

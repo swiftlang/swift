@@ -58,10 +58,10 @@ static Type getOptionalSuperclass(Type type) {
       if (!found)
         return Type();
 
-      superclass = ExistentialType::get(
-          ProtocolCompositionType::get(type->getASTContext(), members,
-                                       compositionTy->getInverses(),
-                                       compositionTy->hasExplicitAnyObject()));
+      superclass = ExistentialType::get(ProtocolCompositionType::get(
+          type->getASTContext(), members, compositionTy->getInverses(),
+          compositionTy->hasExplicitAnyObject(),
+          compositionTy->hasExplicitAnyReference()));
     } else {
       // Avoid producing superclass for situations like `any P` where `P` is
       // `protocol P : C`.

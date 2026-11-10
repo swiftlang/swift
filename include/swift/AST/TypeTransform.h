@@ -1113,7 +1113,8 @@ case TypeKind::Id:
       return ProtocolCompositionType::get(ctx,
                                           substMembers,
                                           pc->getInverses(),
-                                          pc->hasExplicitAnyObject());
+                                          pc->hasExplicitAnyObject(),
+                                          pc->hasExplicitAnyReference());
     }
 
     case TypeKind::ParameterizedProtocol: {
