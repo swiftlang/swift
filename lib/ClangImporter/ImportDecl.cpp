@@ -5310,10 +5310,6 @@ namespace {
     /// Whether the C++ standard library overlay in stdlib/public/Cxx still
     /// spells \a stubName in a protocol requirement. Uses of these stubs are
     /// not deprecated yet, because Swift itself asks for them by name.
-    ///
-    /// Matching is on the stub name rather than the C++ base name because
-    /// '__beginMutatingUnsafe' derives from the imported name 'beginMutating',
-    /// not from 'begin'.
     static bool overlayStillSpellsUnsafeStub(DeclBaseName stubName,
                                              const clang::CXXMethodDecl *decl) {
       if (stubName.isSpecial())
@@ -5321,12 +5317,7 @@ namespace {
       auto name = stubName.getIdentifier().str();
       // Spelled in protocol requirements, so they can be witnessed by any
       // conforming type.
-      if (llvm::StringSwitch<bool>(name)
-              .Cases({"__beginUnsafe", "__endUnsafe", "__beginMutatingUnsafe",
-                      "__endMutatingUnsafe", "__findUnsafe",
-                      "__findMutatingUnsafe", "__eraseUnsafe", "__dataUnsafe"},
-                     true)
-              .Default(false))
+      if (name == "__eraseUnsafe")
         return true;
       // Spelled by the overlay only for standard library types
       // ('CxxSet.insert(_:)', 'std.string.append(_:)'), so a user type's stub

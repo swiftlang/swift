@@ -17,17 +17,19 @@ public protocol CxxConvertibleToCollection<Element> {
     where RawIterator.Pointee == Element
 
   /// Do not implement this function manually in Swift.
-  func __beginUnsafe() -> RawIterator
+  @unsafe(always)
+  func begin() -> RawIterator
 
   /// Do not implement this function manually in Swift.
-  func __endUnsafe() -> RawIterator
+  @unsafe(always)
+  func end() -> RawIterator
 }
 
 extension CxxConvertibleToCollection {
   @inlinable
   public func forEach(_ body: (RawIterator.Pointee) throws -> Void) rethrows {
-    var rawIterator = __beginUnsafe()
-    let endIterator = __endUnsafe()
+    var rawIterator = unsafe begin()
+    let endIterator = unsafe end()
     while rawIterator != endIterator {
       try body(rawIterator.pointee)
       rawIterator = rawIterator.successor()
@@ -79,5 +81,23 @@ extension SetAlgebra {
 
     self.init()
     elements.forEach { self.insert($0) }
+  }
+}
+
+// The copies of these in other protocols are disfavored, so that these win when
+// a type conforms to several of them.
+extension CxxConvertibleToCollection {
+  @available(*, deprecated, renamed: "begin()")
+  @unsafe
+  @inlinable
+  public func __beginUnsafe() -> RawIterator {
+    unsafe begin()
+  }
+
+  @available(*, deprecated, renamed: "end()")
+  @unsafe
+  @inlinable
+  public func __endUnsafe() -> RawIterator {
+    unsafe end()
   }
 }
