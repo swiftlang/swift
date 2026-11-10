@@ -4635,6 +4635,8 @@ NodePointer Demangler::demangleGenericRequirement() {
       name = "R";
     } else if (c == 'N') {
       name = "N";
+    } else if (c == 'O') {
+      name = "O";
     } else if (c == 'C') {
       name = "C";
     } else if (c == 'D') {

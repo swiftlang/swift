@@ -544,3 +544,5 @@ async_MainTQ0_ ---> (1) await resume partial function for async main entry point
 async_MainTu ---> async function pointer to async main entry point
 _async_MainTY1_ ---> (2) suspend resume partial function for async main entry point
 $s1AyycfcySiGfD1BV ---> $s1AyycfcySiGfD1BV
+$s1m1fyyxRlzOlF ---> m.f<A where A: _AnyReference>(A) -> ()
+$s1m1kyyAA1P_pRlsO_XPF ---> m.k(any m.P<Self: _AnyReference>) -> ()

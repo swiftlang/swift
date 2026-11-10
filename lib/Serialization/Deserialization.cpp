@@ -1451,6 +1451,7 @@ getActualLayoutConstraintKind(uint64_t rawKind) {
   CASE(Trivial)
   CASE(TrivialOfExactSize)
   CASE(TrivialOfAtMostSize)
+  CASE(ObjectReference)
   CASE(Class)
   CASE(NativeClass)
   CASE(UnknownLayout)

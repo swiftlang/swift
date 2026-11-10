@@ -4788,6 +4788,9 @@ void ASTMangler::appendOpParamForLayoutConstraint(LayoutConstraint layout) {
   case LayoutConstraintKind::NativeRefCountedObject:
     appendOperatorParam("N");
     break;
+  case LayoutConstraintKind::ObjectReference:
+    appendOperatorParam("O");
+    break;
   case LayoutConstraintKind::Class:
     appendOperatorParam("C");
     break;

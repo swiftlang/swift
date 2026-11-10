@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1045; // load_borrow value hint
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1046; // add _ObjectReference layout constraint
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -538,6 +538,7 @@ enum LayoutRequirementKind : uint8_t {
   NativeClass = 7,
   BridgeObject = 8,
   TrivialStride = 9,
+  ObjectReference = 10
 };
 using LayoutRequirementKindField = BCFixed<4>;
 

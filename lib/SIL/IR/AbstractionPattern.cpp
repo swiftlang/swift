@@ -2580,6 +2580,7 @@ public:
       
       case LayoutConstraintKind::UnknownLayout:
       case LayoutConstraintKind::Trivial:
+      case LayoutConstraintKind::ObjectReference:
         // These constraints don't really constrain the ABI, so we can
         // eliminate them.
         layout = LayoutConstraint();

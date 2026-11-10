@@ -96,6 +96,8 @@ class LayoutConstraintInfo
     return isNativeRefCountedObject(Kind);
   }
 
+  bool isObjectReference() const { return isObjectReference(Kind); }
+
   bool isClass() const {
     return isClass(Kind);
   }
@@ -206,6 +208,8 @@ class LayoutConstraintInfo
 
   static bool isAnyRefCountedObject(LayoutConstraintKind Kind);
 
+  static bool isObjectReference(LayoutConstraintKind Kind);
+
   static bool isClass(LayoutConstraintKind Kind);
 
   static bool isNativeClass(LayoutConstraintKind Kind);
@@ -232,6 +236,7 @@ class LayoutConstraintInfo
   static LayoutConstraintInfo UnknownLayoutConstraintInfo;
   static LayoutConstraintInfo RefCountedObjectConstraintInfo;
   static LayoutConstraintInfo NativeRefCountedObjectConstraintInfo;
+  static LayoutConstraintInfo ObjectReferenceConstraintInfo;
   static LayoutConstraintInfo ClassConstraintInfo;
   static LayoutConstraintInfo NativeClassConstraintInfo;
   static LayoutConstraintInfo TrivialConstraintInfo;
