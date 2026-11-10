@@ -215,7 +215,7 @@ void SILGenCleanup::run() {
                        /*includeTrivialVars=*/true);
   // Release compilers verify ownership once, in OwnershipModelEliminator.
   if (CONDITIONAL_ASSERT_enabled())
-    function->verifyOwnership(/*deadEndBlocks=*/nullptr);
+    function->verifyOwnership();
 
   DeadEndBlocks deadEndBlocks(function);
   SILGenCanonicalize sgCanonicalize(deadEndBlocks);

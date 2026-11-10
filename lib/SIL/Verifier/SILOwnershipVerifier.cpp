@@ -73,10 +73,6 @@ class SILValueOwnershipChecker {
   /// The result of performing the check.
   std::optional<bool> result;
 
-  /// A cache of dead-end basic blocks that we use to determine if we can
-  /// ignore "leaks".
-  DeadEndBlocks *deadEndBlocks = nullptr;
-
   /// The value whose ownership we will check.
   SILValue value;
 
@@ -101,11 +97,10 @@ class SILValueOwnershipChecker {
   GuaranteedPhiVerifier &guaranteedPhiVerifier;
 
 public:
-  /// \p deadEndBlocks is nullptr for complete OSSA lifetimes
-  SILValueOwnershipChecker(DeadEndBlocks *deadEndBlocks, SILValue value,
+  SILValueOwnershipChecker(SILValue value,
                            LinearLifetimeChecker::ErrorBuilder &errorBuilder,
                            GuaranteedPhiVerifier &guaranteedPhiVerifier)
-      : result(), deadEndBlocks(deadEndBlocks), value(value),
+      : result(), value(value),
         errorBuilder(errorBuilder),
         guaranteedPhiVerifier(guaranteedPhiVerifier) {
     assert(value && "Can not initialize a checker with an empty SILValue");
@@ -173,7 +168,7 @@ bool SILValueOwnershipChecker::check() {
   llvm::copy(regularUsers, std::back_inserter(allRegularUsers));
   llvm::copy(extendLifetimeUses, std::back_inserter(allRegularUsers));
 
-  LinearLifetimeChecker checker(deadEndBlocks);
+  LinearLifetimeChecker checker(/*deadEndBlocks=*/nullptr);
   auto linearLifetimeResult = checker.checkValue(value, allLifetimeEndingUsers,
                                                  allRegularUsers, errorBuilder);
   result = !linearLifetimeResult.getFoundError();
@@ -528,9 +523,6 @@ bool SILValueOwnershipChecker::gatherUsers(
 bool SILValueOwnershipChecker::checkDeadEnds(
     SILBasicBlock *block, ArrayRef<Operand *> regularUses,
     ArrayRef<Operand *> extendedLifetimeUses) {
-  if (deadEndBlocks && deadEndBlocks->isDeadEnd(block))
-    return true;
-
   if (extendLifetimeUses.size() == 0)
     return false;
 
@@ -638,7 +630,7 @@ bool SILValueOwnershipChecker::checkYieldWithoutLifetimeEndingUses(
     coroutineEndUses.push_back(use);
   }
 
-  LinearLifetimeChecker checker(deadEndBlocks);
+  LinearLifetimeChecker checker(/*deadEndBlocks=*/nullptr);
   auto linearLifetimeResult =
       checker.checkValue(yield, coroutineEndUses, regularUses, errorBuilder);
   if (linearLifetimeResult.getFoundError()) {
@@ -967,7 +959,6 @@ void SILInstruction::verifyOperandOwnership(
 static void
 verifySILValueHelper(const SILFunction *f, SILValue value,
                      LinearLifetimeChecker::ErrorBuilder &errorBuilder,
-                     DeadEndBlocks *deadEndBlocks,
                      GuaranteedPhiVerifier &guaranteedPhiVerifier) {
   assert(!isa<SILUndef>(value) &&
          "We assume we are always passed arguments or instruction results");
@@ -977,12 +968,11 @@ verifySILValueHelper(const SILFunction *f, SILValue value,
   if (!f->hasOwnership() || !f->shouldVerifyOwnership())
     return;
 
-  SILValueOwnershipChecker(deadEndBlocks, value, errorBuilder,
-                           guaranteedPhiVerifier)
+  SILValueOwnershipChecker(value, errorBuilder, guaranteedPhiVerifier)
       .check();
 }
 
-void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
+void SILValue::verifyOwnership() const {
   // Do not validate SILUndef values.
   if (isa<SILUndef>(*this))
     return;
@@ -1013,10 +1003,8 @@ void SILValue::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
   LinearLifetimeChecker::ErrorBuilder errorBuilder(
       *f, BehaviorKind::PrintMessageAndAssert);
-  GuaranteedPhiVerifier guaranteedPhiVerifier(f, deadEndBlocks,
-                                              errorBuilder);
-  verifySILValueHelper(f, *this, errorBuilder, deadEndBlocks,
-                       guaranteedPhiVerifier);
+  GuaranteedPhiVerifier guaranteedPhiVerifier(f, errorBuilder);
+  verifySILValueHelper(f, *this, errorBuilder, guaranteedPhiVerifier);
 }
 
 void SILModule::verifyOwnership() const {
@@ -1029,12 +1017,6 @@ void SILModule::verifyOwnership() const {
 }
 
 void SILFunction::verifyOwnership() const {
-  verifyOwnership(nullptr);
-}
-
-void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
-  deadEndBlocks = nullptr;
-
   if (!getModule().getOptions().VerifySILOwnership)
     return;
 
@@ -1056,20 +1038,17 @@ void SILFunction::verifyOwnership(DeadEndBlocks *deadEndBlocks) const {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndAssert);
   }
 
-  GuaranteedPhiVerifier guaranteedPhiVerifier(this, deadEndBlocks,
-                                              *errorBuilder);
+  GuaranteedPhiVerifier guaranteedPhiVerifier(this, *errorBuilder);
   for (auto &block : *this) {
     for (auto *arg : block.getArguments()) {
       LinearLifetimeChecker::ErrorBuilder newBuilder = *errorBuilder;
-      verifySILValueHelper(this, arg, newBuilder, deadEndBlocks,
-                           guaranteedPhiVerifier);
+      verifySILValueHelper(this, arg, newBuilder, guaranteedPhiVerifier);
     }
 
     for (auto &inst : block) {
       for (auto result : inst.getResults()) {
         LinearLifetimeChecker::ErrorBuilder newBuilder = *errorBuilder;
-        verifySILValueHelper(this, result, newBuilder, deadEndBlocks,
-                             guaranteedPhiVerifier);
+        verifySILValueHelper(this, result, newBuilder, guaranteedPhiVerifier);
       }
     }
   }

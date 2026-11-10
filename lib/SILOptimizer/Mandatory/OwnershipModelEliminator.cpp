@@ -942,7 +942,7 @@ struct OwnershipModelEliminator : SILModuleTransform {
         // without assertions.
         f.verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache(),
                  /*dominanceInfo=*/nullptr, /*SingleFunction=*/true,
-                 /*isCompleteOSSA=*/true, /*checkLinearLifetime=*/false);
+                 /*checkLinearLifetime=*/false);
         // The Swift verifier is separate from the C++ verifier and checks
         // additional OSSA invariants, such as borrowed-from and reborrow flags.
         getPassManager()->runSwiftFunctionVerification(&f);
