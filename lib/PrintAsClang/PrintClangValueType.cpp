@@ -473,17 +473,19 @@ void ClangValueTypePrinter::printValueTypeDecl(
       } else {
         os << " {\n";
         // 'assignWithCopy' needs a value on both sides. Otherwise, copy the
-        // source into a new object and move that in.
+        // source into a new object and move that in. The 'class' keyword
+        // finds the type even when the parameter has the same name.
+        std::string copyOfOther = "static_cast<class " + baseName + ">(other)";
         if (isOpaqueLayout) {
           os << "    if (!_storage.isAllocated() || "
                 "!other._storage.isAllocated()) {\n";
-          os << "      *this = " << baseName << "(other);\n";
+          os << "      *this = " << copyOfOther << ";\n";
           os << "      return *this;\n";
           os << "    }\n";
         }
         if (hasInlineMovedFromState) {
           os << "    if (_isMovedFrom() || other._isMovedFrom()) {\n";
-          os << "      *this = " << baseName << "(other);\n";
+          os << "      *this = " << copyOfOther << ";\n";
           os << "      return *this;\n";
           os << "    }\n";
         }
@@ -583,10 +585,11 @@ void ClangValueTypePrinter::printValueTypeDecl(
     }
     // Print out the private accessors to the underlying Swift value storage.
     // Every use of a value by Swift goes through these, so they are where a
-    // moved-from noncopyable value, which holds no Swift value, is caught.
-    // 'OpaqueStorage' checks its own allocation.
+    // moved-from value, which holds no Swift value, is caught. A Swift member
+    // named 'abort' must not replace the C function. 'OpaqueStorage' checks
+    // its own allocation.
     StringRef movedFromCheck =
-        hasInlineMovedFromState ? "if (_isMovedFrom()) abort(); " : "";
+        hasInlineMovedFromState ? "if (_isMovedFrom()) ::abort(); " : "";
     os << "  ";
     printer.printInlineForThunk();
     os << "const char * _Nonnull _getOpaquePointer() const noexcept { "

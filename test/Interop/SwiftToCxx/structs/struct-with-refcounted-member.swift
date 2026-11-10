@@ -57,7 +57,7 @@ public func identity<T>(_ value: T) -> T {
 // CHECK-NEXT:   }
 // CHECK-NEXT:   SWIFT_INLINE_THUNK StructWithRefcountedMember &operator =(const StructWithRefcountedMember &other) noexcept {
 // CHECK-NEXT:     if (_isMovedFrom() || other._isMovedFrom()) {
-// CHECK-NEXT:       *this = StructWithRefcountedMember(other);
+// CHECK-NEXT:       *this = static_cast<class StructWithRefcountedMember>(other);
 // CHECK-NEXT:       return *this;
 // CHECK-NEXT:     }
 // CHECK-NEXT:     void *newReference;

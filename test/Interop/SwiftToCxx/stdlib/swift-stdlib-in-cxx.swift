@@ -124,7 +124,7 @@
 // CHECK-NEXT:  }
 // CHECK-NEXT:  SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
 // CHECK-NEXT:  if (_isMovedFrom() || other._isMovedFrom()) {
-// CHECK-NEXT:  *this = String(other);
+// CHECK-NEXT:  *this = static_cast<class String>(other);
 // CHECK-NEXT:  return *this;
 // CHECK-NEXT:  }
 // CHECK:  vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
@@ -166,7 +166,7 @@
 // CHECK: class SWIFT_SYMBOL({{.*}}) UTF8View final {
 // CHECK: SWIFT_INLINE_THUNK UTF8View &operator =(const UTF8View &other) noexcept {
 // CHECK-NEXT: if (_isMovedFrom() || other._isMovedFrom()) {
-// CHECK-NEXT: *this = UTF8View(other);
+// CHECK-NEXT: *this = static_cast<class UTF8View>(other);
 // CHECK-NEXT: return *this;
 // CHECK-NEXT: }
 // CHECK: vwTable->assignWithCopy(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);

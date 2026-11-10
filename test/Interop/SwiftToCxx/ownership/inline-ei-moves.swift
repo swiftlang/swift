@@ -129,6 +129,19 @@ public final class Ref {
 // CHECK: alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT: friend class _impl::_impl_TrivialBool;
 
+// The special members name their parameter 'other', and the moved-from check
+// calls the C 'abort', so neither may pick up these Swift names instead.
+@frozen public struct other {
+  public var ref: Ref
+  public var count = 0
+  public init(_ ref: Ref) { self.ref = ref }
+  public mutating func abort() {}
+}
+
+// CHECK-LABEL: class SWIFT_SYMBOL({{.*}}) other final {
+// CHECK: *this = static_cast<class other>(other);
+// CHECK: _getOpaquePointer() const noexcept { if (_isMovedFrom()) ::abort(); return _storage; }
+
 public func borrow(_ value: borrowing PaddedRef) -> Int { Int(value.prefix) }
 public func update(_ value: inout PaddedRef) { value.prefix += 1 }
 public func borrowGeneric<T>(_ value: borrowing T) -> Int { MemoryLayout<T>.size }

@@ -152,8 +152,8 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // CHECK-NEXT:     other._setMovedFrom();
 // CHECK-NEXT:     }
 // CHECK-NEXT:     vwTable->destroy(_oldValue, metadata._0);
-// CHECK:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { if (_isMovedFrom()) abort(); return _storage; }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { if (_isMovedFrom()) abort(); return _storage; }
+// CHECK:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { if (_isMovedFrom()) ::abort(); return _storage; }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { if (_isMovedFrom()) ::abort(); return _storage; }
 // CHECK:   bool _isMovedFrom() const noexcept {
 // CHECK:   void _setMovedFrom() noexcept {
 // CHECK:   friend class _impl::_impl_MoveOnlyWithRef;
