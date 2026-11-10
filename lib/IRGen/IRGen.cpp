@@ -51,12 +51,14 @@
 #include "clang/Frontend/CompilerInstance.h"
 #include "llvm/Analysis/AliasAnalysis.h"
 #include "llvm/Analysis/InlineCost.h"
+#include "llvm/Analysis/ObjCARCUtil.h"
 #include "llvm/Bitcode/BitcodeWriter.h"
 #include "llvm/Bitcode/BitcodeWriterPass.h"
 #include "llvm/CodeGen/BasicTTIImpl.h"
 #include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DataLayout.h"
+#include "llvm/IR/Intrinsics.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -576,8 +578,22 @@ void swift::performLLVMOptimizations(
   // rely on any other LLVM ARC transformations, but we do need ARC
   // contraction to add the objc_retainAutoreleasedReturnValue
   // assembly markers and remove clang.arc.used.
-  if (Opts.shouldOptimize() && !DisableObjCARCContract &&
-      !Opts.DisableLLVMOptzns)
+  //
+  // Even at -Onone, we still need to run ObjCARCContract for code Clang
+  // generated at -O1 or above (e.g. for imported inline functions with
+  // -Xcc -O2): to remove clang.arc.use / clang.arc.noop.use, and to insert
+  // the assembly markers Clang leaves to it (recorded in a module flag that
+  // Swift itself sets only when optimizing). Run it only if any of these
+  // actually appear and LTO isn't used (LTO runs ObjCARCContract).
+  if (!DisableObjCARCContract &&
+      (Opts.shouldOptimize()
+           ? !Opts.DisableLLVMOptzns
+           : !isThinLTO && !isFullLTO &&
+                 (Intrinsic::getDeclarationIfExists(
+                      Module, Intrinsic::objc_clang_arc_use) ||
+                  Intrinsic::getDeclarationIfExists(
+                      Module, Intrinsic::objc_clang_arc_noop_use) ||
+                  Module->getModuleFlag(objcarc::getRVMarkerModuleFlagStr()))))
     MPM.addPass(createModuleToFunctionPassAdaptor(ObjCARCContractPass()));
 
   if (Opts.Verify) {
