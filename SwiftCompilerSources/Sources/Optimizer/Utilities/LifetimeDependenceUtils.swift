@@ -955,6 +955,11 @@ extension LifetimeDependenceDefUseWalker {
     if let phi = Phi(using: operand), phi.isReturnValue {
       return returnedDependence(result: operand)
     }
+    // An on-stack closure that consumes a capture, such as an at-most-once closure, carries the capture's dependence. Unlike
+    // a borrowed capture, OSSA does not keep the consumed capture's source alive while the closure is live.
+    if let pa = operand.instruction as? PartialApplyInst, pa.isOnStack {
+      return dependentUse(of: operand, dependentValue: pa)
+    }
     // Delegate ownership forwarding operations to the ForwardingDefUseWalker.
     return walkDownDefault(forwarding: operand)
   }
