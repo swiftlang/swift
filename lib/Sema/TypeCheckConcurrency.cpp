@@ -3095,6 +3095,60 @@ namespace {
       expr->setImplicitlyAsync();
     }
 
+    /// Whether \p closure runs in the isolation context that it is formed in.
+    bool isSameIsolationContextAsParent(AbstractClosureExpr *closure) {
+      auto closureIsolation =
+          getActorIsolationOfContext(closure, getClosureActorIsolation);
+      auto *closureType = closure->getType()->castTo<AnyFunctionType>();
+
+      // These run on the executor of their caller, and a non-'Transferable'
+      // closure can only be called in the context it is formed in.
+      if (closureIsolation.isNonisolatedNonsending() ||
+          (!closureIsolation.isActorIsolated() && !closureType->isAsync()))
+        return true;
+
+      auto *parent = closure->getParent();
+      auto parentIsolation =
+          getActorIsolationOfContext(parent, getClosureActorIsolation);
+      if (closureIsolation.isActorIsolated())
+        return closureIsolation == parentIsolation;
+
+      // An asynchronous nonisolated closure runs on the generic executor, like
+      // an asynchronous function that is isolated neither to an actor nor to
+      // its caller.
+      return !parentIsolation.isActorIsolated() &&
+             !parentIsolation.isNonisolatedNonsending() &&
+             parent->isAsyncContext();
+    }
+
+    /// A non-'Transferable' value can't change its isolation domain, so a
+    /// closure can only capture one if it runs in the isolation of its parent.
+    bool diagnoseNonTransferableCapture(AbstractClosureExpr *closure,
+                                        const CapturedValue &capture) {
+      // Other closures can't capture non-'Transferable' values at all, which
+      // is diagnosed when their captures are computed.
+      auto *closureType = closure->getType()->getAs<AnyFunctionType>();
+      if (!closureType || !closureType->isNonTransferable())
+        return false;
+
+      auto *var = dyn_cast_or_null<VarDecl>(capture.getDecl());
+      if (!var)
+        return false;
+
+      Type type = getDeclContext()
+                      ->mapTypeIntoEnvironment(var->getInterfaceType())
+                      ->getReferenceStorageReferent();
+      if (type->hasError() || type->isTransferable() ||
+          isSameIsolationContextAsParent(closure))
+        return false;
+
+      ctx.Diags.diagnose(
+          capture.getLoc(), diag::non_transferable_isolated_capture, type,
+          var->getName(),
+          getActorIsolationOfContext(closure, getClosureActorIsolation));
+      return true;
+    }
+
     /// Check closure captures for Sendable violations.
     void checkLocalCaptures(AnyFunctionRef localFunc) {
       auto *dc = getDeclContext();
@@ -3136,6 +3190,9 @@ namespace {
         // If the closure won't execute concurrently with the context in
         // which the declaration occurred, it's okay.
         auto decl = capture.getDecl();
+
+        if (closure && diagnoseNonTransferableCapture(closure, capture))
+          continue;
 
         // 'nonisolated' local variables are always okay to capture in
         // 'Sendable' closures because they can be accessed from anywhere.
