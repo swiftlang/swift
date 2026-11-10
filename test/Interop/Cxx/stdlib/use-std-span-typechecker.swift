@@ -46,3 +46,11 @@ takesIterable(s2)
 // expected-darwin-error@-1 {{'takesIterable' is only available}}
 // expected-darwin-note@-2 {{add 'if #available' version check}}
 takesSpan(s2)
+
+func spanData(_ s: SpanOfInt, _ cs: ConstSpanOfInt) {
+  let _: UnsafeMutablePointer<Int32>? = unsafe s.data()
+  let _: UnsafePointer<Int32>? = unsafe cs.data()
+  let _ = s.__dataUnsafe()
+  // expected-warning@-1 {{'__dataUnsafe()' is deprecated: renamed to 'data()'}}
+  // expected-note@-2 {{use 'data()' instead}}
+}

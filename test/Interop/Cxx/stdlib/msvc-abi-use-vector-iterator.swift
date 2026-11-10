@@ -9,8 +9,8 @@ import MsvcUseVecIt
 
 func test() -> Bool {
     let result = f()
-    let begin = result.pointee.providers.__beginUnsafe()
-    let end = result.pointee.providers.__endUnsafe()
+    let begin = unsafe result.pointee.providers.begin()
+    let end = unsafe result.pointee.providers.end()
     return begin != end
 }
 

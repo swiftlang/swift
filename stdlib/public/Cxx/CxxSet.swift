@@ -30,8 +30,10 @@ public protocol CxxSet<Element>: ExpressibleByArrayLiteral {
 
   init()
 
-  func __endUnsafe() -> RawIterator
-  func __findUnsafe(_ value: Element) -> RawIterator
+  @unsafe(always)
+  func end() -> RawIterator
+  @unsafe(always)
+  func find(_ value: Element) -> RawIterator
 
   @discardableResult
   mutating func __insertUnsafe(_ element: Element) -> InsertionResult
@@ -62,7 +64,7 @@ extension CxxSet {
   /// in the set.
   @inlinable
   public func contains(_ element: Element) -> Bool {
-    return self.__findUnsafe(element) != self.__endUnsafe()
+    return unsafe self.find(element) != self.end()
   }
 }
 
@@ -106,12 +108,29 @@ extension CxxUniqueSet {
   @discardableResult
   @inlinable
   public mutating func remove(_ member: Element) -> Element? {
-    let iter = self.__findUnsafe(member)
-    guard iter != self.__endUnsafe() else {
+    let iter = unsafe self.find(member)
+    guard unsafe iter != self.end() else {
       return nil
     }
     let value = iter.pointee
     self.__eraseUnsafe(iter)
     return value
+  }
+}
+
+extension CxxSet {
+  @available(*, deprecated, renamed: "end()")
+  @unsafe
+  @_disfavoredOverload
+  @inlinable
+  public func __endUnsafe() -> RawIterator {
+    unsafe end()
+  }
+
+  @available(*, deprecated, renamed: "find(_:)")
+  @unsafe
+  @inlinable
+  public func __findUnsafe(_ value: Element) -> RawIterator {
+    unsafe find(value)
   }
 }

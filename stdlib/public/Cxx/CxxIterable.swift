@@ -29,10 +29,12 @@ public protocol CxxIterable<Element> : Iterable, ~Copyable, ~Escapable where Fai
           RawIterator.DereferenceResult.Pointee == Element
 
   /// Do not implement this function manually in Swift.
-  func __beginUnsafe() -> RawIterator
+  @unsafe(always)
+  func begin() -> RawIterator
 
   /// Do not implement this function manually in Swift.
-  func __endUnsafe() -> RawIterator
+  @unsafe(always)
+  func end() -> RawIterator
 }
 
 @frozen
@@ -104,7 +106,57 @@ extension CxxIterable where Element: ~Copyable, Self: ~Copyable {
   @inlinable
   @_lifetime(borrow self)
   public borrowing func makeBorrowingIterator() -> CxxBorrowingIterator<Self> {
-    let iterator = CxxBorrowingIterator<Self>(begin: __beginUnsafe(), end: __endUnsafe(), sequence: self)
+    let iterator = unsafe CxxBorrowingIterator<Self>(begin: begin(), end: end(), sequence: self)
     return iterator
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension CxxIterable where Element: ~Copyable, Self: ~Copyable & ~Escapable {
+  @available(*, deprecated, renamed: "begin()")
+  @unsafe
+  @_disfavoredOverload
+  @inlinable
+  public borrowing func __beginUnsafe() -> RawIterator {
+    unsafe begin()
+  }
+
+  @available(*, deprecated, renamed: "end()")
+  @unsafe
+  @_disfavoredOverload
+  @inlinable
+  public borrowing func __endUnsafe() -> RawIterator {
+    unsafe end()
+  }
+}
+
+// Picks one of the disfavored copies when a type conforms to both protocols.
+@available(SwiftStdlib 6.4, *)
+extension CxxIterable where Self: CxxDictionary {
+  @available(*, deprecated, renamed: "begin()")
+  @unsafe
+  @_disfavoredOverload
+  @inlinable
+  public func __beginUnsafe() -> RawIterator {
+    unsafe begin()
+  }
+
+  @available(*, deprecated, renamed: "end()")
+  @unsafe
+  @_disfavoredOverload
+  @inlinable
+  public func __endUnsafe() -> RawIterator {
+    unsafe end()
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension CxxIterable where Self: CxxSet {
+  @available(*, deprecated, renamed: "end()")
+  @unsafe
+  @_disfavoredOverload
+  @inlinable
+  public func __endUnsafe() -> RawIterator {
+    unsafe end()
   }
 }

@@ -30,10 +30,12 @@ public protocol CxxSequence<Element>: CxxConvertibleToCollection, Sequence {
   // methods _have_ to be mutating.
 
   /// Do not implement this function manually in Swift.
-  mutating func __beginUnsafe() -> RawIterator
+  @unsafe(always)
+  mutating func begin() -> RawIterator
 
   /// Do not implement this function manually in Swift.
-  mutating func __endUnsafe() -> RawIterator
+  @unsafe(always)
+  mutating func end() -> RawIterator
 }
 
 /// Prevents a C++ sequence from being copied or moved implicitly. Makes sure
@@ -63,8 +65,8 @@ public struct CxxIterator<T>: IteratorProtocol where T: CxxSequence {
   @inlinable
   public init(sequence: __shared T) {
     self.sequence = CxxSequenceBox<T>(sequence)
-    self.rawIterator = self.sequence.sequence.__beginUnsafe()
-    self.endIterator = self.sequence.sequence.__endUnsafe()
+    self.rawIterator = unsafe self.sequence.sequence.begin()
+    self.endIterator = unsafe self.sequence.sequence.end()
   }
 
   @inlinable

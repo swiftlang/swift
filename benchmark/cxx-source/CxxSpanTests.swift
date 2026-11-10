@@ -63,8 +63,8 @@ func makeSpanOnce() {
 public func run_CxxSpanOfU32_RawIterator(_ n: Int) {
   var sum: UInt32 = 0
   for _ in 0..<(n * iterRepeatFactor * 2) {
-    var b = span.__beginUnsafe()
-    let e = span.__endUnsafe()
+    var b = unsafe span.begin()
+    let e = unsafe span.end()
     while b != e {
       sum = sum &+ b.pointee
       b = b.successor()

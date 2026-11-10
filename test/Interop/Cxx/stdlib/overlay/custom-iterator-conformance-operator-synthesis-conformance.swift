@@ -19,7 +19,7 @@ import CustomSequence
 @inlinable
 public func testEqualEqual() -> Bool {
     let m = HasInheritedConstIterator()
-    return m.__beginUnsafe() == m.__endUnsafe()
+    return unsafe m.begin() == m.end()
 }
 
 @inlinable
