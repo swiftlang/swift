@@ -29,8 +29,10 @@ static bool peepholeTupleDestructorOperand(TupleAddrConstructorInst *ctor) {
   //   =>
   // store [assign] %6 to %9
 
-  auto numTupleElts = ctor->getNumElements();
-  if (ctor->getNumElements() == 0)
+  // Note that the number of element operands can be less than the number of
+  // tuple type elements, because empty tuple elements are omitted.
+  unsigned numTupleElts = ctor->getElements().size();
+  if (numTupleElts == 0)
     return false;
 
   auto multiVal = dyn_cast<MultipleValueInstructionResult>(ctor->getElement(0));
