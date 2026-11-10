@@ -12,7 +12,7 @@
 // RUN: %swift_frontend_plain @%t/dummy.cmd -Rcache-compile-job 2>&1 | %FileCheck --check-prefix=CACHE-HIT-CLANG %s
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
-// RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
+// RUN: llvm-cas make-blob --cas %t/cas --data %t/map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd

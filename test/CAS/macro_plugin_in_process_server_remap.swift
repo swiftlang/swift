@@ -45,12 +45,12 @@
 // CMD: -resolved-in-process-plugin-server-path
 // CMD-NEXT: /^toolchain/lib/swift/host/[[LIB]]
 
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-base-key -- \
+// RUN: %cache-tool print-base-key -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain -emit-module -o %t/MyApp.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name MyApp -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
 // RUN:   %t/macro.swift @%t/MyApp-a.cmd > %t/key-a.casid
-// RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-base-key -- \
+// RUN: %cache-tool print-base-key -cas-path %t/cas -- \
 // RUN:   %target-swift-frontend-plain -emit-module -o %t/MyApp.swiftmodule -cache-compile-job -cas-path %t/cas \
 // RUN:   -swift-version 5 -module-name MyApp -O \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import \
