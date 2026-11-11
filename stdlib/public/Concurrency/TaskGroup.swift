@@ -129,7 +129,7 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 ///         group.cancelAll()
 ///         return 0
 ///     }
-///     let second = await group.next() ?? 0
+///     let second = try await group.next() ?? 0
 ///     group.cancelAll()
 ///     return first + second
 ///
@@ -382,15 +382,15 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///     group.addTask { 1 }
   ///     group.addTask { 2 }
   ///
-  ///     print(await group.next())
-  ///     // Prints either "2" or "1".
+  ///     print(await group.next() as Any)
+  ///     // Prints either "Optional(2)" or "Optional(1)".
   ///
   /// If there aren't any pending tasks in the task group,
   /// this method returns `nil`,
   /// which lets you write the following
   /// to wait for a single task to complete:
   ///
-  ///     if let first = try await group.next() {
+  ///     if let first = await group.next() {
   ///        return first
   ///     }
   ///
@@ -398,7 +398,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// to wait for all the child tasks to complete,
   /// collecting the values they returned:
   ///
-  ///     while let value = try await group.next() {
+  ///     while let value = await group.next() {
   ///        collected += value
   ///     }
   ///     return collected
@@ -408,7 +408,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// You can also use a `for`-`await`-`in` loop to collect results of a task group:
   ///
-  ///     for await try value in group {
+  ///     for await value in group {
   ///         collected += value
   ///     }
   ///
@@ -717,8 +717,8 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///     group.addTask { 1 }
   ///     group.addTask { 2 }
   ///
-  ///     print(await group.next())
-  ///     // Prints either "2" or "1".
+  ///     print(try await group.next() as Any)
+  ///     // Prints either "Optional(2)" or "Optional(1)".
   ///
   /// If there aren't any pending tasks in the task group,
   /// this method returns `nil`,
@@ -733,7 +733,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// to wait for all the child tasks to complete,
   /// collecting the values they returned:
   ///
-  ///     while let first = try await group.next() {
+  ///     while let value = try await group.next() {
   ///        collected += value
   ///     }
   ///     return collected
