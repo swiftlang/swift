@@ -3967,6 +3967,19 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
     case PerformanceConstraints::ManualOwnership: OS << "[manual_ownership] "; break;
   }
 
+  for (unsigned i = 0;
+       i <= unsigned(InstrumentationKind::Last_InstrumentationKind); ++i) {
+    auto kind = InstrumentationKind(i);
+    if (!(getDisabledInstrumentation() & getInstrumentationMask(kind)))
+      continue;
+    switch (kind) {
+    case InstrumentationKind::Address: OS << "[no_instrumentation_address] "; break;
+    case InstrumentationKind::Thread: OS << "[no_instrumentation_thread] "; break;
+    case InstrumentationKind::MemTagStack: OS << "[no_instrumentation_memtag_stack] "; break;
+    case InstrumentationKind::Coverage: OS << "[no_instrumentation_coverage] "; break;
+    }
+  }
+
   if (isPerformanceConstraint())
     OS << "[perf_constraint] ";
 

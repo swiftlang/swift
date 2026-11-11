@@ -746,6 +746,13 @@ BridgedReferenceOwnershipAttr_createParsed(BridgedASTContext cContext,
       ReferenceOwnershipAttr(range, unbridged(cKind));
 }
 
+BridgedInstrumentationAttr BridgedInstrumentationAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
+    bool isDefault, uint8_t disabledKinds) {
+  return new (cContext.unbridged())
+      InstrumentationAttr(atLoc, range, isDefault, disabledKinds);
+}
+
 BridgedSectionAttr BridgedSectionAttr_createParsed(BridgedASTContext cContext,
                                                    SourceLoc atLoc,
                                                    SourceRange range,

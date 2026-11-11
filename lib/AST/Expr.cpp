@@ -2142,6 +2142,11 @@ std::optional<StringRef> AbstractClosureExpr::getSection() const {
                            SectionForDeclRequest{this}, std::nullopt);
 }
 
+InstrumentationMask AbstractClosureExpr::getDisabledInstrumentation() const {
+  return evaluateOrDefault(getASTContext().evaluator,
+                           DisabledInstrumentationForDeclRequest{this}, 0);
+}
+
 Expr *AbstractClosureExpr::getSingleExpressionBody() const {
   if (auto closure = dyn_cast<ClosureExpr>(this))
     return closure->getSingleExpressionBody();

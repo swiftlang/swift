@@ -90,6 +90,10 @@ struct EmbeddedBuildConfiguration: BuildConfiguration {
     return configuration.hasAttribute(name: name)
   }
 
+  func isModuleInstrumentationEnabled(kind: String) throws -> Bool {
+    return try configuration.isModuleInstrumentationEnabled(kind: kind)
+  }
+
   func canImport(
     importPath: [(TokenSyntax, String)],
     version: CanImportVersion

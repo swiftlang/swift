@@ -90,6 +90,17 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     staticBuildConfiguration.hasAttribute(name: name)
   }
   
+  func isModuleInstrumentationEnabled(kind: String) throws -> Bool {
+    var kindName = kind
+    let bridgedKind = kindName.withBridgedString {
+      BridgedOptionalInstrumentationKind(from: $0)
+    }
+    guard bridgedKind.hasValue else {
+      throw IfConfigError.unexpectedInstrumentationKind
+    }
+    return ctx.isModuleInstrumentationEnabled(bridgedKind.value)
+  }
+
   func canImport(
     importPath: [(TokenSyntax, String)],
     version: CanImportVersion
@@ -191,9 +202,12 @@ struct CompilerBuildConfiguration: BuildConfiguration {
 
 enum IfConfigError: Error, CustomStringConvertible {
   case unexpectedRuntimeCondition
+  case unexpectedInstrumentationKind
 
   var description: String {
     switch self {
+      case .unexpectedInstrumentationKind:
+        return "unexpected argument for the 'moduleInstrumentation' condition; expected 'address', 'thread', 'memtagStack', or 'coverage'"
       case .unexpectedRuntimeCondition:
         return "unexpected argument for the '_runtime' condition; expected '_Native' or '_ObjC'"
     }

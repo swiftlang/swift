@@ -22,6 +22,7 @@
 ///
 /// See include guidelines and caveats in `BasicBridging.h`.
 #include "swift/Basic/SwiftBridging.h"
+#include <optional>
 #include <stdint.h>
 
 namespace llvm {
@@ -83,6 +84,41 @@ enum class ENUM_EXTENSIBILITY_ATTR(closed) InlineKind : uint8_t {
   Always SWIFT_NAME("always") = 2,
   Last_InlineKind = Always
 };
+
+/// Kinds of compiler-inserted instrumentation that can be disabled with
+/// @instrumentation(disable:), and tested for with
+/// moduleInstrumentation(...).
+enum class ENUM_EXTENSIBILITY_ATTR(closed) InstrumentationKind : uint8_t {
+  Address SWIFT_NAME("address") = 0,
+  Thread SWIFT_NAME("thread") = 1,
+  MemTagStack SWIFT_NAME("memtagStack") = 2,
+  Coverage SWIFT_NAME("coverage") = 3,
+  Last_InstrumentationKind = Coverage
+};
+
+/// A set of instrumentation kinds, as a bitmask indexed by
+/// InstrumentationKind.
+using InstrumentationMask = uint8_t;
+
+SWIFT_UNAVAILABLE("Unavailable in Swift")
+inline InstrumentationMask getInstrumentationMask(InstrumentationKind kind) {
+  return InstrumentationMask(1u << unsigned(kind));
+}
+
+/// Whether the mask contains the given instrumentation kind.
+SWIFT_UNAVAILABLE("Unavailable in Swift")
+inline bool hasInstrumentationKind(InstrumentationMask mask,
+                                   InstrumentationKind kind) {
+  return mask & getInstrumentationMask(kind);
+}
+
+/// Returns the in-source spelling of the given instrumentation kind.
+SWIFT_UNAVAILABLE("Unavailable in Swift")
+llvm::StringRef getInstrumentationKindSpelling(InstrumentationKind kind);
+
+/// Returns the instrumentation kind with the given in-source spelling, if any.
+SWIFT_UNAVAILABLE("Unavailable in Swift")
+std::optional<InstrumentationKind> parseInstrumentationKind(llvm::StringRef str);
 
 /// This enum represents the possible values of the @_effects attribute.
 /// These values are ordered from the strongest guarantee to the weakest,

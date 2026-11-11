@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/Lexer.h"
@@ -391,6 +392,18 @@ public:
       return E;
     }
 
+    // 'moduleInstrumentation' '(' instrumentation-kind ')'
+    if (*KindName == "moduleInstrumentation") {
+      auto KindStr = getDeclRefStr(Arg, DeclRefKind::Ordinary);
+      if (!KindStr || !parseInstrumentationKind(*KindStr)) {
+        D.diagnose(ArgLoc, diag::unsupported_platform_condition_argument,
+                   "instrumentation kind");
+        return nullptr;
+      }
+
+      return E;
+    }
+
     // ( 'os' | 'arch' | '_endian' | '_pointerBitWidth' | '_runtime' | '_hasAtomicBitWidth' | 'objectFormat' ) '(' identifier ')''
     auto Kind = getPlatformConditionKind(*KindName);
     if (!Kind.has_value()) {
@@ -626,6 +639,10 @@ public:
     } else if (KindName == "hasAttribute") {
       auto attributeName = getDeclRefStr(Arg);
       return hasAttribute(Ctx.LangOpts, attributeName);
+    } else if (KindName == "moduleInstrumentation") {
+      auto kind = parseInstrumentationKind(getDeclRefStr(Arg));
+      return Ctx.SILOpts.getEnabledInstrumentation() &
+             getInstrumentationMask(*kind);
     }
 
     auto Val = getDeclRefStr(Arg);

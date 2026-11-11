@@ -757,6 +757,49 @@ public:
   }
 };
 
+/// Defines the @instrumentation attribute.
+///
+/// `@instrumentation(disable: <kind>...)` disables the given kinds of
+/// compiler-inserted instrumentation for a function, subscript, or closure,
+/// and for the closures nested within it. `@instrumentation(default)` resets
+/// any disabling that would otherwise be propagated from an enclosing scope.
+class InstrumentationAttr : public DeclAttribute {
+public:
+  InstrumentationAttr(SourceLoc AtLoc, SourceRange Range, bool IsDefault,
+                      InstrumentationMask DisabledKinds, bool Implicit = false)
+      : DeclAttribute(DeclAttrKind::Instrumentation, AtLoc, Range, Implicit),
+        IsDefault(IsDefault), DisabledKinds(DisabledKinds) {}
+
+  InstrumentationAttr(bool IsDefault, InstrumentationMask DisabledKinds)
+      : InstrumentationAttr(SourceLoc(), SourceRange(), IsDefault,
+                            DisabledKinds, /*Implicit=*/true) {}
+
+  /// Whether this attribute includes 'default', which resets the
+  /// instrumentation settings propagated from the enclosing scope.
+  const bool IsDefault;
+
+  /// The kinds of instrumentation listed in 'disable:'.
+  const InstrumentationMask DisabledKinds;
+
+  bool disables(InstrumentationKind kind) const {
+    return DisabledKinds & getInstrumentationMask(kind);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Instrumentation;
+  }
+
+  InstrumentationAttr *clone(ASTContext &ctx) const {
+    return new (ctx) InstrumentationAttr(AtLoc, Range, IsDefault, DisabledKinds,
+                                         isImplicit());
+  }
+
+  bool isEquivalent(const InstrumentationAttr *other, Decl *attachedTo) const {
+    return IsDefault == other->IsDefault &&
+           DisabledKinds == other->DisabledKinds;
+  }
+};
+
 /// Defines the @_cdecl attribute.
 class CDeclAttr : public DeclAttribute {
 public:

@@ -196,6 +196,10 @@ static bool usesFeatureUnderscoreOwned(Decl *D) {
   return D->getAttrs().hasAttribute<OwnedAttr>();
 }
 
+static bool usesFeatureInstrumentation(Decl *D) {
+  return D->getAttrs().hasAttribute<InstrumentationAttr>();
+}
+
 // TODO: Return true for inlinable function bodies with module selectors in them
 UNINTERESTING_FEATURE(ModuleSelector)
 

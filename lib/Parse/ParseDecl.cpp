@@ -3398,6 +3398,81 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
+  case DeclAttrKind::Instrumentation: {
+    if (!consumeIfAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    auto isDisableLabel = [&](const Token &tok) {
+      return tok.is(tok::identifier) && tok.getText() == "disable";
+    };
+
+    bool isDefault = false;
+    InstrumentationMask disabledKinds = 0;
+    bool hadError = false;
+
+    // ('default' | 'disable' ':' kind (',' kind)*) (',' ...)*
+    while (true) {
+      if (consumeIf(tok::kw_default)) {
+        isDefault = true;
+      } else if (isDisableLabel(Tok) && peekToken().is(tok::colon)) {
+        consumeToken(tok::identifier);
+        consumeToken(tok::colon);
+
+        while (true) {
+          if (Tok.isNot(tok::identifier)) {
+            diagnose(Tok, diag::attr_instrumentation_expected_kind);
+            hadError = true;
+            break;
+          }
+
+          if (auto kind = parseInstrumentationKind(Tok.getText())) {
+            disabledKinds |= getInstrumentationMask(*kind);
+          } else {
+            diagnose(Tok, diag::attr_unknown_option, Tok.getText(),
+                     AttrName);
+            hadError = true;
+          }
+          consumeToken(tok::identifier);
+
+          // Another kind follows unless the comma introduces 'default' or
+          // 'disable:'.
+          if (Tok.isNot(tok::comma) || peekToken().is(tok::kw_default) ||
+              isDisableLabel(peekToken()))
+            break;
+          consumeToken(tok::comma);
+        }
+      } else {
+        diagnose(Tok, diag::attr_instrumentation_expected_default_or_disable);
+        hadError = true;
+      }
+
+      if (hadError || !consumeIf(tok::comma))
+        break;
+    }
+
+    if (hadError) {
+      skipUntil(tok::r_paren);
+      consumeIf(tok::r_paren);
+      return makeParserSuccess();
+    }
+
+    AttrRange = SourceRange(Loc, Tok.getRange().getStart());
+    if (!consumeIf(tok::r_paren)) {
+      diagnose(Loc, diag::attr_expected_rparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) InstrumentationAttr(
+          AtLoc, AttrRange, isDefault, disabledKinds));
+
+    break;
+  }
+
   case DeclAttrKind::Target: {
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,

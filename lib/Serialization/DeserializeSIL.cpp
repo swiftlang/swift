@@ -861,7 +861,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo, serializedStage,
-      hasOwnershipForTrivialValues;
+      hasOwnershipForTrivialValues, disabledInstrumentation;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -872,7 +872,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues,
-      funcTyID, replacedFunctionID,
+      disabledInstrumentation, funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangNodeOwnerID,
       parentModuleID, SemanticsIDs);
 
@@ -1057,6 +1057,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     fn->setEffectsKind(EffectsKind(effect));
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setPerfConstraints((PerformanceConstraints)perfConstr);
+    fn->setDisabledInstrumentation(InstrumentationMask(disabledInstrumentation));
     fn->setIsAlwaysWeakImported(isWeakImported);
     if (codeGenerationModel) {
       fn->setCodeGenerationModel(static_cast<CodeGenerationModel>(codeGenerationModel - 1));
@@ -4538,7 +4539,8 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
-      onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues;
+      onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues,
+      disabledInstrumentation;
   ArrayRef<uint64_t> SemanticsIDs;
   SILFunctionLayout::readRecord(
       scratch, rawLinkage, isTransparent, serializedKind, isThunk,
@@ -4549,7 +4551,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo, serializedStage, hasOwnershipForTrivialValues,
-      funcTyID, replacedFunctionID,
+      disabledInstrumentation, funcTyID, replacedFunctionID,
       usedAdHocWitnessFunctionID, genericSigID, clangOwnerID, parentModuleID,
       SemanticsIDs);
   auto linkage = fromStableSILLinkage(rawLinkage);

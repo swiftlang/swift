@@ -617,6 +617,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // The optimized function, which takes over the body of the original
   // function, goes into the same section as the original function.
   NewF->setSection(F->section());
+  NewF->setDisabledInstrumentation(F->getDisabledInstrumentation());
 
   // Do the last bit of work to the newly created optimized function.
   DeadArgumentFinalizeOptimizedFunction();

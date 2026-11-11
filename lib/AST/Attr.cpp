@@ -1512,6 +1512,32 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Instrumentation: {
+    Printer.printAttrName("@instrumentation");
+    auto instrAttr = cast<InstrumentationAttr>(this);
+    Printer << "(";
+    if (instrAttr->IsDefault) {
+      Printer << "default";
+      if (instrAttr->DisabledKinds)
+        Printer << ", ";
+    }
+    if (instrAttr->DisabledKinds) {
+      Printer << "disable: ";
+      bool first = true;
+      for (unsigned i = 0; i <= unsigned(InstrumentationKind::Last_InstrumentationKind); ++i) {
+        auto kind = InstrumentationKind(i);
+        if (!instrAttr->disables(kind))
+          continue;
+        if (!first)
+          Printer << ", ";
+        first = false;
+        Printer << getInstrumentationKindSpelling(kind);
+      }
+    }
+    Printer << ")";
+    break;
+  }
+
   case DeclAttrKind::Target: {
     Printer.printAttrName("@_target");
     Printer << "(\"" << cast<TargetAttr>(this)->Value << "\")";
@@ -2293,6 +2319,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "_expose";
   case DeclAttrKind::Section:
     return "section";
+  case DeclAttrKind::Instrumentation:
+    return "instrumentation";
   case DeclAttrKind::Documentation:
     return "_documentation";
   case DeclAttrKind::Nonisolated:

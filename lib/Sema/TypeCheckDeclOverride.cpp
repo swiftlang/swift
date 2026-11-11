@@ -1645,6 +1645,7 @@ namespace  {
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(Nonexhaustive)
     UNINTERESTING_ATTR(NoLocks)
+    UNINTERESTING_ATTR(Instrumentation)
     UNINTERESTING_ATTR(NoAllocation)
     UNINTERESTING_ATTR(NoRuntime)
     UNINTERESTING_ATTR(NoExistentials)

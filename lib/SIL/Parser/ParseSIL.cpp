@@ -771,6 +771,7 @@ struct DeclSILOptional {
     EffectsKind *MRK = nullptr;
     ActorIsolation *actorIsolation = nullptr;
     std::optional<SILStage> *functionStage = nullptr;
+    InstrumentationMask *disabledInstrumentation = nullptr;
 };
 } // end anonymous namespace
 
@@ -887,6 +888,22 @@ static bool parseDeclSILOptional(
       *options.perfConstraints = PerformanceConstraints::NoObjCBridging;
     else if (options.perfConstraints && SP.P.Tok.getText() == "manual_ownership")
       *options.perfConstraints = PerformanceConstraints::ManualOwnership;
+    else if (options.disabledInstrumentation &&
+             SP.P.Tok.getText() == "no_instrumentation_address")
+      *options.disabledInstrumentation |=
+          getInstrumentationMask(InstrumentationKind::Address);
+    else if (options.disabledInstrumentation &&
+             SP.P.Tok.getText() == "no_instrumentation_thread")
+      *options.disabledInstrumentation |=
+          getInstrumentationMask(InstrumentationKind::Thread);
+    else if (options.disabledInstrumentation &&
+             SP.P.Tok.getText() == "no_instrumentation_memtag_stack")
+      *options.disabledInstrumentation |=
+          getInstrumentationMask(InstrumentationKind::MemTagStack);
+    else if (options.disabledInstrumentation &&
+             SP.P.Tok.getText() == "no_instrumentation_coverage")
+      *options.disabledInstrumentation |=
+          getInstrumentationMask(InstrumentationKind::Coverage);
     else if (options.isPerformanceConstraint && SP.P.Tok.getText() == "perf_constraint")
       *options.isPerformanceConstraint = true;
     else if (options.markedAsUsed && SP.P.Tok.getText() == "used")
@@ -7854,6 +7871,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   OptimizationMode optimizationMode = OptimizationMode::NotSet;
   PerformanceConstraints perfConstr = PerformanceConstraints::None;
   bool isPerformanceConstraint = false;
+  InstrumentationMask disabledInstrumentation = 0;
   bool markedAsUsed = false;
   bool hasOwnershipForTrivial = false;
   StringRef asmName;
@@ -7880,7 +7898,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
           &isWeakImported, &codeGenerationModel, &needStackProtection, nullptr,
           &availability, &isWithoutActuallyEscapingThunk,
           &hasOwnershipForTrivial, &Semantics,
-          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, &functionStage},
+          &SpecAttrs, &ClangDecl, &MRK, &actorIsolation, &functionStage,
+          &disabledInstrumentation},
           FunctionState, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_function_name) ||
       P.parseIdentifier(FnName, FnNameLoc, /*diagnoseDollarPrefix=*/false,
@@ -7939,6 +7958,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     FunctionState.F->setOptimizationMode(optimizationMode);
     FunctionState.F->setPerfConstraints(perfConstr);
     FunctionState.F->setIsPerformanceConstraint(isPerformanceConstraint);
+    FunctionState.F->setDisabledInstrumentation(disabledInstrumentation);
     FunctionState.F->setEffectsKind(MRK);
     FunctionState.F->setMarkedAsUsed(markedAsUsed);
     FunctionState.F->setAsmName(asmName);

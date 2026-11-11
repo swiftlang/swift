@@ -5413,6 +5413,32 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Determine the kinds of compiler-inserted instrumentation that are disabled
+/// for the given declaration or closure, based on explicit `@instrumentation`
+/// attributes and the propagation rules for them.
+///
+/// Produces a mask of `InstrumentationKind`s.
+class DisabledInstrumentationForDeclRequest
+    : public SimpleRequest<DisabledInstrumentationForDeclRequest,
+                           InstrumentationMask(
+                               llvm::PointerUnion<const Decl *,
+                                                  const AbstractClosureExpr *>),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  InstrumentationMask
+  evaluate(Evaluator &evaluator,
+           llvm::PointerUnion<const Decl *, const AbstractClosureExpr *>
+               declOrClosure) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 class UniqueUnderlyingTypeSubstitutionsRequest
     : public SimpleRequest<UniqueUnderlyingTypeSubstitutionsRequest,
                            std::optional<SubstitutionMap>(

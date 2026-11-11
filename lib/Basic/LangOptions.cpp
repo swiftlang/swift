@@ -30,6 +30,28 @@
 
 using namespace swift;
 
+StringRef swift::getInstrumentationKindSpelling(InstrumentationKind kind) {
+  switch (kind) {
+  case InstrumentationKind::Address: return "address";
+  case InstrumentationKind::Thread: return "thread";
+  case InstrumentationKind::MemTagStack: return "memtagStack";
+  case InstrumentationKind::Coverage: return "coverage";
+  }
+
+  llvm_unreachable("Unhandled InstrumentationKind in switch.");
+}
+
+std::optional<InstrumentationKind>
+swift::parseInstrumentationKind(StringRef str) {
+  for (unsigned i = 0;
+       i <= unsigned(InstrumentationKind::Last_InstrumentationKind); ++i) {
+    auto kind = InstrumentationKind(i);
+    if (str == getInstrumentationKindSpelling(kind))
+      return kind;
+  }
+  return std::nullopt;
+}
+
 StringRef LangOptions::getCOMInteropModelConditionalCompilationFlag() const {
   if (!EnableCOMInterop || !COMModel)
     return {};

@@ -366,6 +366,10 @@ private:
 
   PerformanceConstraints perfConstraints = PerformanceConstraints::None;
 
+  /// The kinds of compiler-inserted instrumentation (sanitizers, coverage)
+  /// that are disabled for this function by @instrumentation(disable:).
+  InstrumentationMask disabledInstrumentation = 0;
+
   /// The undefs of each type in the function.
   llvm::SmallMapVector<SILType, SILUndef *, 1> undefValues;
 
@@ -1220,6 +1224,16 @@ public:
 
   void setPerfConstraints(PerformanceConstraints perfConstr) {
     perfConstraints = perfConstr;
+  }
+
+  /// The kinds of instrumentation disabled for this function by
+  /// @instrumentation(disable:), as a mask of InstrumentationKind.
+  InstrumentationMask getDisabledInstrumentation() const {
+    return disabledInstrumentation;
+  }
+
+  void setDisabledInstrumentation(InstrumentationMask mask) {
+    disabledInstrumentation = mask;
   }
 
   // see `IsPerformanceConstraint`

@@ -1,0 +1,28 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s | %target-sil-opt -enable-sil-verify-all | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// CHECK-LABEL: sil [no_instrumentation_address] @address :
+sil [no_instrumentation_address] @address : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0
+}
+
+// CHECK-LABEL: sil [no_instrumentation_address] [no_instrumentation_thread] [no_instrumentation_memtag_stack] [no_instrumentation_coverage] @all :
+sil [no_instrumentation_address] [no_instrumentation_thread] [no_instrumentation_memtag_stack] [no_instrumentation_coverage] @all : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0
+}
+
+// CHECK-LABEL: sil @none :
+// CHECK-NOT: no_instrumentation
+sil @none : $@convention(thin) () -> () {
+bb0:
+  %0 = tuple ()
+  return %0
+}

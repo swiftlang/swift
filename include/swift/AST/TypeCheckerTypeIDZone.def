@@ -623,6 +623,11 @@ SWIFT_REQUEST(TypeChecker, SectionForDeclRequest,
                   llvm::PointerUnion<const Decl *,
                                      const AbstractClosureExpr *>),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, DisabledInstrumentationForDeclRequest,
+              InstrumentationMask(
+                  llvm::PointerUnion<const Decl *,
+                                     const AbstractClosureExpr *>),
+              Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UniqueUnderlyingTypeSubstitutionsRequest,
               std::optional<SubstitutionMap>(const Decl *),
               SeparatelyCached, NoLocationInfo)

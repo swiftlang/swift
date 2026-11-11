@@ -2344,6 +2344,16 @@ NOTE(cdecl_suggest_objc,none,
 ERROR(section_empty_name,none,
       "'@section' section name cannot be empty", ())
 
+// @instrumentation
+ERROR(attr_inline_always_with_instrumentation_disable,none,
+      "'@inline(always)' cannot be combined with "
+      "'@instrumentation(disable:)'", ())
+NOTE(attr_instrumentation_disable_here,none,
+     "'@instrumentation(disable:)' declared here", ())
+NOTE(attr_instrumentation_inline_always_alternative,none,
+     "use '#if moduleInstrumentation(...)' to choose between "
+     "'@inline(always)' and '@instrumentation(disable:)'", ())
+
 // @_silgen_name and friends
 WARNING(reserved_runtime_symbol_name,none,
         "symbol name '%0' is reserved for the Swift runtime and cannot be "

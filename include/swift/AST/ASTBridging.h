@@ -305,6 +305,19 @@ bool BridgedASTContext_testCanImport(BridgedASTContext cContext,
                                      const SwiftInt *_Nullable versionComponents,
                                      SwiftInt numVersionComponents);
 
+BRIDGED_OPTIONAL(swift::InstrumentationKind, InstrumentationKind)
+
+/// Look up an instrumentation kind by its spelling (e.g., "address").
+SWIFT_NAME("BridgedOptionalInstrumentationKind.init(from:)")
+BridgedOptionalInstrumentationKind
+BridgedOptionalInstrumentationKind_fromString(BridgedStringRef cStr);
+
+/// Whether the given kind of instrumentation is enabled for the module being
+/// compiled, as tested by `#if moduleInstrumentation(...)`.
+SWIFT_NAME("BridgedASTContext.isModuleInstrumentationEnabled(self:_:)")
+bool BridgedASTContext_isModuleInstrumentationEnabled(
+    BridgedASTContext cContext, swift::InstrumentationKind kind);
+
 SWIFT_NAME("getter:BridgedASTContext.staticBuildConfigurationPtr(self:)")
 void * _Nonnull BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext);
 
@@ -1380,6 +1393,11 @@ BridgedSectionAttr BridgedSectionAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceRange range,
                                                    bool isDefault,
                                                    BridgedStringRef cName);
+
+SWIFT_NAME("BridgedInstrumentationAttr.createParsed(_:atLoc:range:isDefault:disabledKinds:)")
+BridgedInstrumentationAttr BridgedInstrumentationAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, bool isDefault, uint8_t disabledKinds);
 
 SWIFT_NAME("BridgedSemanticsAttr.createParsed(_:atLoc:range:value:)")
 BridgedSemanticsAttr BridgedSemanticsAttr_createParsed(

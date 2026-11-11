@@ -2029,14 +2029,23 @@ IRGenSILFunction::IRGenSILFunction(IRGenModule &IGM, SILFunction *f,
                     f->getOptimizationMode(), f->getDebugScope(),
                     f->getLocation()),
       CurSILFn(f) {
-  // Apply sanitizer attributes to the function.
+  // Apply sanitizer attributes to the function, except for the kinds of
+  // instrumentation disabled with @instrumentation(disable:).
   // TODO: Check if the function is supposed to be excluded from ASan either by
-  // being in the external file or via annotations.
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Address)
+  // being in the external file.
+  InstrumentationMask enabled =
+      IGM.getSILModule().getOptions().getEnabledInstrumentation();
+  InstrumentationMask instrumented = enabled & ~f->getDisabledInstrumentation();
+  InstrumentationMask optedOut = enabled & f->getDisabledInstrumentation();
+  if (hasInstrumentationKind(instrumented, InstrumentationKind::Address))
     CurFn->addFnAttr(llvm::Attribute::SanitizeAddress);
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::MemTagStack)
+  if (hasInstrumentationKind(instrumented, InstrumentationKind::MemTagStack))
     CurFn->addFnAttr(llvm::Attribute::SanitizeMemTag);
-  if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread) {
+  // The sanitizer attributes are opt-in, but SanitizerCoverage instruments
+  // every function unless it is marked 'nosanitize_coverage'.
+  if (hasInstrumentationKind(optedOut, InstrumentationKind::Coverage))
+    CurFn->addFnAttr(llvm::Attribute::NoSanitizeCoverage);
+  if (hasInstrumentationKind(instrumented, InstrumentationKind::Thread)) {
     auto declContext = f->getDeclContext();
     if (isa_and_nonnull<DestructorDecl>(declContext)) {
       // Do not report races in deinit and anything called from it

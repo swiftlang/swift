@@ -5661,6 +5661,18 @@ public:
       printFlag("default");
     printFoot();
   }
+  void visitInstrumentationAttr(InstrumentationAttr *Attr, Label label) {
+    printCommon(Attr, "instrumentation_attr", label);
+    if (Attr->IsDefault)
+      printFlag("default");
+    for (unsigned i = 0;
+         i <= unsigned(InstrumentationKind::Last_InstrumentationKind); ++i) {
+      auto kind = InstrumentationKind(i);
+      if (Attr->disables(kind))
+        printFlag(("disable_" + getInstrumentationKindSpelling(kind)).str());
+    }
+    printFoot();
+  }
   void visitSemanticsAttr(SemanticsAttr *Attr, Label label) {
     printCommon(Attr, "semantics_attr", label);
     printFieldQuoted(Attr->Value, Label::always("value"));

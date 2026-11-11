@@ -3586,6 +3586,25 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
     IRGenOpts.Sanitizers = Opts.Sanitizers;
   }
 
+  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
+    Opts.SanitizeCoverage = parseSanitizerCoverageArgValue(
+        A, LangOpts.Target, Diags, Opts.Sanitizers);
+  } else if ((Opts.Sanitizers & SanitizerKind::Fuzzer) ||
+             (Opts.Sanitizers & SanitizerKind::FuzzerNoLink)) {
+
+    // Automatically set coverage flags, unless coverage type was explicitly
+    // requested.
+    // Updated to match clang at Jul 2019.
+    Opts.SanitizeCoverage.IndirectCalls = true;
+    Opts.SanitizeCoverage.TraceCmp = true;
+    Opts.SanitizeCoverage.PCTable = true;
+    if (LangOpts.Target.isOSLinux()) {
+      Opts.SanitizeCoverage.StackDepth = true;
+    }
+    Opts.SanitizeCoverage.Inline8bitCounters = true;
+    Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
+  }
+
   if (const Arg *A = Args.getLastArg(options::OPT_sanitize_recover_EQ)) {
     IRGenOpts.SanitizersWithRecoveryInstrumentation =
         parseSanitizerRecoverArgValues(A, Opts.Sanitizers, Diags,
@@ -4085,24 +4104,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (auto LTOKind = ParseLLVMLTOKind(Args, Diags))
      Opts.LLVMLTOKind = LTOKind.value();
 
-  if (const Arg *A = Args.getLastArg(options::OPT_sanitize_coverage_EQ)) {
-    Opts.SanitizeCoverage =
-        parseSanitizerCoverageArgValue(A, Triple, Diags, Opts.Sanitizers);
-  } else if ((Opts.Sanitizers & SanitizerKind::Fuzzer) ||
-             (Opts.Sanitizers & SanitizerKind::FuzzerNoLink)) {
-
-    // Automatically set coverage flags, unless coverage type was explicitly
-    // requested.
-    // Updated to match clang at Jul 2019.
-    Opts.SanitizeCoverage.IndirectCalls = true;
-    Opts.SanitizeCoverage.TraceCmp = true;
-    Opts.SanitizeCoverage.PCTable = true;
-    if (Triple.isOSLinux()) {
-      Opts.SanitizeCoverage.StackDepth = true;
-    }
-    Opts.SanitizeCoverage.Inline8bitCounters = true;
-    Opts.SanitizeCoverage.CoverageType = llvm::SanitizerCoverageOptions::SCK_Edge;
-  }
+  Opts.SanitizeCoverage = SILOpts.SanitizeCoverage;
 
   if (Args.hasArg(OPT_disable_reflection_metadata)) {
     Opts.ReflectionMetadata = ReflectionMetadataMode::None;
