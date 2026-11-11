@@ -21,6 +21,7 @@
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
+#include "swift/SILOptimizer/Differentiation/Common.h"
 #include "llvm/ADT/DenseMap.h"
 
 namespace swift {
@@ -112,10 +113,6 @@ private:
   void populateBranchingTraceDecl(SILBasicBlock *originalBB,
                                   SILLoopInfo *loopInfo);
 
-  /// Given an `apply` / `begin_apply` instruction, conditionally gets a linear
-  /// map tuple field AST type for its linear map function if it is active.
-  Type getLinearMapType(ADContext &context, FullApplySite fai);
-
   /// Generates linear map struct and branching enum declarations for the given
   /// function. Linear map structs are populated with linear map fields and a
   /// branching enum field.
@@ -123,6 +120,15 @@ private:
                                              SILFunction *derivative);
 
 public:
+  /// Get the saved linear-map type of an active call or async-let initializer.
+  Type getLinearMapType(ADContext &context, ApplySite site);
+
+  std::optional<AsyncLetInfo> getAsyncLet(SILInstruction *inst) const {
+    if (kind != AutoDiffLinearMapKind::Pullback)
+      return std::nullopt;
+    return swift::autodiff::getAsyncLet(inst, activityInfo, config);
+  }
+
   bool shouldDifferentiateApplySite(FullApplySite applySite);
   bool shouldDifferentiateInstruction(SILInstruction *inst);
 
