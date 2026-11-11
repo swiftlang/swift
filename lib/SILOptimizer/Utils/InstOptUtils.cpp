@@ -2305,7 +2305,7 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
     }
     tupleType = swift::TupleType::get(tupleElements, packType->getASTContext());
 
-    silType = PESI->getFunction()->getLoweredType(tupleType);
+    silType = PESI->getFunction()->getLoweredType(tupleType).getObjectType();
   }
 
   for (Operand *U : getDebugUses(API)) {
