@@ -4102,7 +4102,13 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     }
   }
   
-  if (getASTContext().LangOpts.hasFeature(Feature::AddressableParameters)) {
+  // Like @_lifetime, @_addressable is allowed in safe interop wrappers without
+  // the feature: they need it to keep references into borrowed values valid.
+  auto *pendingAddressableAttr = getWithoutClaiming<AddressableTypeAttr>(attrs);
+  if (getASTContext().LangOpts.hasFeature(Feature::AddressableParameters) ||
+      (pendingAddressableAttr &&
+       getASTContext().SourceMgr.isImportMacroGeneratedLoc(
+           pendingAddressableAttr->getStartLoc()))) {
     if (auto addressableAttr = claim<AddressableTypeAttr>(attrs)) {
       if (options.is(TypeResolverContext::VariadicFunctionInput) &&
           !options.hasBase(TypeResolverContext::EnumElementDecl)) {
