@@ -213,9 +213,11 @@ void SILGenCleanup::run() {
   breakInfiniteLoops(getPassManager(), function);
   completeAllLifetimes(getPassManager(), function,
                        /*includeTrivialVars=*/true);
-  // Release compilers verify ownership once, in OwnershipModelEliminator.
-  if (CONDITIONAL_ASSERT_enabled())
-    getPassManager()->runMandatoryVerification(function);
+
+  // Run the mandatory verification, also in compilers built without assertions.
+  // Most importantly, this is the first time ownership is verified after SILGen,
+  // i.e. right after lifetime completion.
+  getPassManager()->runMandatoryVerification(function);
 
   DeadEndBlocks deadEndBlocks(function);
   SILGenCanonicalize sgCanonicalize(deadEndBlocks);
