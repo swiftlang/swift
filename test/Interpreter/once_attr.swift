@@ -24,3 +24,31 @@ func testForwardingToTrappingFunction(_ x: Int, _ y: Int) -> Int {
 
 print("forwarding: \(testForwardingToTrappingFunction(41, 1))")
 // CHECK: forwarding: 42
+
+// An inlined throwing exactly-once closure, called with `try`, whose `catch`
+// block has another predecessor.
+
+struct Failure: Error {}
+
+@inline(__always)
+func callThrowing(_ body: @once () throws -> Int) throws -> Int {
+  try body()
+}
+
+@inline(never)
+func testInlinedThrowing(_ shouldThrow: Bool, _ tag: String) {
+  do {
+    let r = try callThrowing {
+      if shouldThrow { throw Failure() }
+      return tag.count
+    }
+    print("inlined throwing: \(r)")
+  } catch {
+    print("inlined throwing: caught")
+  }
+}
+
+testInlinedThrowing(true, "a")
+// CHECK-NEXT: inlined throwing: caught
+testInlinedThrowing(false, "bc")
+// CHECK-NEXT: inlined throwing: 2

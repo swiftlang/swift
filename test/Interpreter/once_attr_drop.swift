@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature OnceFunctions -Onone %s -o %t/onone.out
-// RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature OnceFunctions -O -DOPTIMIZED %s -o %t/opt.out
+// RUN: %target-build-swift -target %target-future-triple -enable-experimental-feature OnceFunctions -O %s -o %t/opt.out
 // RUN: %target-codesign %t/onone.out %t/opt.out
 
 // Each case that calls a closure runs to completion, and each case that drops
@@ -30,8 +30,8 @@
 // RUN: %target-run %t/opt.out callGenericEscaping | %FileCheck %s --check-prefix=CALL-callGenericEscaping
 // RUN: %target-run %t/onone.out callAsync | %FileCheck %s --check-prefix=CALL-callAsync
 // RUN: %target-run %t/opt.out callAsync | %FileCheck %s --check-prefix=CALL-callAsync
-// FIXME: [called-once] The throwing case is compiled out at -O. See callThrowing.
 // RUN: %target-run %t/onone.out callThrowing | %FileCheck %s --check-prefix=CALL-callThrowing
+// RUN: %target-run %t/opt.out callThrowing | %FileCheck %s --check-prefix=CALL-callThrowing
 // RUN: %target-run %t/onone.out callGeneric | %FileCheck %s --check-prefix=CALL-callGeneric
 // RUN: %target-run %t/opt.out callGeneric | %FileCheck %s --check-prefix=CALL-callGeneric
 // RUN: %target-run %t/onone.out callGenericInout | %FileCheck %s --check-prefix=CALL-callGenericInout
@@ -171,10 +171,6 @@ func runGeneric<T>(_ value: T, _ generic: consuming Generic<T>) {
 
 // A throwing exactly-once closure that consumes a capture and then throws must
 // destroy the capture once and still count as called.
-//
-// FIXME: [called-once] This is compiled out when optimization is enabled
-// because SILCombine asserts on a throwing closure of this shape at -O.
-#if !OPTIMIZED
 struct Failure: Error {}
 
 @inline(never)
@@ -194,7 +190,6 @@ func runThrowing(_ resource: consuming Resource) {
     print("caught")
   }
 }
-#endif
 
 @inline(never)
 func runAsync(_ resource: consuming Resource) async {
@@ -350,10 +345,8 @@ case "callGenericEscaping":
   runGeneric(1, Generic(value: 1, name: "g"))
 case "callAsync":
   await runAsync(Resource(name: "a"))
-#if !OPTIMIZED
 case "callThrowing":
   runThrowing(Resource(name: "t"))
-#endif
 case "callGeneric":
   runGenericConsuming(1, Generic(value: 1, name: "g"))
 case "dropGeneric":

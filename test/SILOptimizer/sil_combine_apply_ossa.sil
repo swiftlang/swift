@@ -1578,3 +1578,79 @@ bb0(%0 : @owned $Builtin.NativeObject):
   %6 = tuple ()
   return %6 : $()
 }
+
+sil @throwingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error
+
+// The combined try_apply destroys the closure's capture in both successors.
+//
+// CHECK-LABEL: sil [ossa] @test_try_apply_of_at_most_once_closure :
+// CHECK:         [[FN:%.*]] = function_ref @throwingClosure
+// CHECK-NEXT:    try_apply [[FN]](%0) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK:       [[NORMAL]]({{.*}}):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       [[ERROR]]({{.*}}):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'test_try_apply_of_at_most_once_closure'
+sil [ossa] @test_try_apply_of_at_most_once_closure : $@convention(thin) (@owned Builtin.NativeObject) -> @error any Error {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @throwingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error
+  %2 = partial_apply [called_at_most_once] %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error
+  try_apply %2() : $@callable(once) @callee_owned () -> @error any Error, normal bb1, error bb2
+
+bb1(%4 : $()):
+  %5 = tuple ()
+  return %5 : $()
+
+bb2(%7 : @owned $any Error):
+  throw %7 : $any Error
+}
+
+// CHECK-LABEL: sil [ossa] @test_try_apply_of_exactly_once_closure :
+// CHECK:         [[FN:%.*]] = function_ref @throwingClosure
+// CHECK-NEXT:    try_apply [[FN]](%0) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK:       [[NORMAL]]({{.*}}):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       [[ERROR]]({{.*}}):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'test_try_apply_of_exactly_once_closure'
+sil [ossa] @test_try_apply_of_exactly_once_closure : $@convention(thin) (@owned Builtin.NativeObject) -> @error any Error {
+bb0(%0 : @owned $Builtin.NativeObject):
+  %1 = function_ref @throwingClosure : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error
+  %2 = partial_apply [called_once] %1(%0) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> @error any Error
+  try_apply %2() : $@once @callee_owned () -> @error any Error, normal bb1, error bb2
+
+bb1(%4 : $()):
+  %5 = tuple ()
+  return %5 : $()
+
+bb2(%7 : @owned $any Error):
+  throw %7 : $any Error
+}
+
+sil @consumingThrowingClosure : $@convention(thin) (@in Builtin.NativeObject) -> @error any Error
+
+// The copy of the consumed address capture is deallocated in both successors.
+//
+// CHECK-LABEL: sil [ossa] @test_try_apply_of_closure_with_in_capture :
+// CHECK:         [[TEMP:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK:         [[COPY:%.*]] = alloc_stack $Builtin.NativeObject
+// CHECK-NEXT:    copy_addr [[TEMP]] to [init] [[COPY]]
+// CHECK-NEXT:    try_apply {{%.*}}([[COPY]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK:       [[NORMAL]]({{.*}}):
+// CHECK-NEXT:    dealloc_stack [[COPY]]
+// CHECK:       [[ERROR]]({{.*}}):
+// CHECK-NEXT:    dealloc_stack [[COPY]]
+// CHECK:       } // end sil function 'test_try_apply_of_closure_with_in_capture'
+sil [ossa] @test_try_apply_of_closure_with_in_capture : $@convention(thin) (@in Builtin.NativeObject) -> @error any Error {
+bb0(%0 : $*Builtin.NativeObject):
+  %1 = function_ref @consumingThrowingClosure : $@convention(thin) (@in Builtin.NativeObject) -> @error any Error
+  %2 = partial_apply [called_at_most_once] %1(%0) : $@convention(thin) (@in Builtin.NativeObject) -> @error any Error
+  try_apply %2() : $@callable(once) @callee_owned () -> @error any Error, normal bb1, error bb2
+
+bb1(%4 : $()):
+  %5 = tuple ()
+  return %5 : $()
+
+bb2(%7 : @owned $any Error):
+  throw %7 : $any Error
+}
