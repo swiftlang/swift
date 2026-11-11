@@ -10,9 +10,15 @@ protocol P { associatedtype A }
 struct S<T: P> { var a: T.A }
 
 class C<A>: P {
-  // CHECK-LABEL: define hidden swiftcc i1 @"$s29dynamic_self_outlined_destroy1CC1fySbypF"
-  // CHECK: call ptr @"$s29dynamic_self_outlined_destroy1SVyAA1CCyxGXDGlWOh"
+  // `is` only materializes (and then destroys) an S<Self> when the deployment
+  // target predates swift_dynamicCastTest, so this doesn't exercise the
+  // outlined destroy on every platform.  Just make sure it compiles.
   func f(_ x: Any) -> Bool { x is S<Self> }
+
+  // `as?` always produces a value that has to be destroyed.
+  // CHECK-LABEL: define hidden swiftcc i1 @"$s29dynamic_self_outlined_destroy1CC1gySbypF"
+  // CHECK: call ptr @"$s29dynamic_self_outlined_destroy1SVyAA1CCyxGXDGSglWOh"
+  func g(_ x: Any) -> Bool { (x as? S<Self>) != nil }
 }
 
-// CHECK-LABEL: define linkonce_odr hidden ptr @"$s29dynamic_self_outlined_destroy1SVyAA1CCyxGXDGlWOh"(ptr %0, ptr %A, ptr %"S<Self>")
+// CHECK-LABEL: define linkonce_odr hidden ptr @"$s29dynamic_self_outlined_destroy1SVyAA1CCyxGXDGSglWOh"(ptr %0, ptr %A, ptr %"S<Self>", ptr %"Optional<S<Self>>")
