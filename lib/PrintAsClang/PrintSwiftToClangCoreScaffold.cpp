@@ -455,11 +455,13 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << clsCls << "::operator SwiftExistentialType<>() const noexcept {\n";
   os << "  SwiftExistentialType<> result(\n";
   os << "      typename SwiftExistentialType<>::uninit_t{});\n";
+  os << "  if (!_value)\n";
+  os << "    _swift_stdlib_reportFatalError(\"fatal error\", 11,\n";
+  os << "        \"cannot convert null class existential to Any\", 44, 0);\n";
   os << "  result._type = swift_getObjectType(\n";
-  os << "      reinterpret_cast<void *_Nonnull>(_value));\n";
-  os << "  result._buffer[0] = reinterpret_cast<void *_Nonnull>(_value);\n";
-  os << "  if (_value) swift_retain(\n";
-  os << "      reinterpret_cast<void *_Nonnull>(_value));\n";
+  os << "      reinterpret_cast<void *>(_value));\n";
+  os << "  result._buffer[0] = reinterpret_cast<void *>(_value);\n";
+  os << "  _retainClassValue(_value);\n";
   os << "  return result;\n";
   os << "}\n\n";
 
