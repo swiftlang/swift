@@ -24,6 +24,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/AbstractionPattern.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "clang/AST/ASTContext.h"
@@ -1593,16 +1594,7 @@ getNonDefaultClangCallingConvention(IRGenModule &IGM,
   if (!clangType)
     return std::nullopt;
 
-  const clang::FunctionType *functionType = nullptr;
-  if (auto *pointer = clangType->getAs<clang::PointerType>())
-    functionType = pointer->getPointeeType()->getAs<clang::FunctionType>();
-  else if (auto *reference = clangType->getAs<clang::ReferenceType>())
-    functionType =
-        reference->getPointeeType()->getAs<clang::FunctionType>();
-  else
-    functionType = clangType->getAs<clang::FunctionType>();
-
-  ASSERT(functionType && "unexpected Clang function type");
+  auto *functionType = AbstractionPattern::getClangFunctionType(clangType);
   auto callingConv = functionType->getCallConv();
   // Both representations otherwise use the platform C convention. Compare
   // against the free-function default so that a method's default thiscall

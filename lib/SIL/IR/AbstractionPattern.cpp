@@ -497,14 +497,14 @@ bool AbstractionPattern::matchesTuple(CanType substType) const {
   llvm_unreachable("bad kind");
 }
 
-static const clang::FunctionType *
-getClangFunctionType(const clang::Type *clangType) {
+const clang::FunctionType *
+AbstractionPattern::getClangFunctionType(const clang::Type *clangType) {
+  if (auto refTy = clangType->getAs<clang::ReferenceType>())
+    clangType = refTy->getPointeeType().getTypePtr();
   if (auto ptrTy = clangType->getAs<clang::PointerType>()) {
     clangType = ptrTy->getPointeeType().getTypePtr();
   } else if (auto blockTy = clangType->getAs<clang::BlockPointerType>()) {
     clangType = blockTy->getPointeeType().getTypePtr();
-  } else if (auto refTy = clangType->getAs<clang::ReferenceType>()) {
-    clangType = refTy->getPointeeType().getTypePtr();
   }
   return clangType->castAs<clang::FunctionType>();
 }
@@ -515,7 +515,8 @@ const clang::Type *getClangFunctionParameterType(const clang::Type *ty,
   // TODO: adjust for error type parameter.
 
   // If we're asking about parameters, we'd better have a FunctionProtoType.
-  auto fnType = getClangFunctionType(ty)->castAs<clang::FunctionProtoType>();
+  auto fnType = AbstractionPattern::getClangFunctionType(ty)
+                    ->castAs<clang::FunctionProtoType>();
   assert(index < fnType->getNumParams());
   return fnType->getParamType(index).getTypePtr();
 }

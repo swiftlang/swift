@@ -4205,8 +4205,7 @@ public:
           }
         }
       }
-      SILType silTy = SILType::getPrimitiveObjectType(type.getType());
-      if (silTy.isSensitive())
+      if (substTL.getLoweredType().isSensitive())
         return ParameterConvention::Indirect_In_Guaranteed;
     }
     return getIndirectCParameterConvention(getParamType(index));
@@ -4473,24 +4472,11 @@ static CanSILFunctionType getSILFunctionTypeForAbstractCFunction(
     clangType = extInfoBuilder.getClangTypeInfo().getType();
 
   if (clangType) {
-    const clang::FunctionType *fnType;
-    if (auto blockPtr = clangType->getAs<clang::BlockPointerType>()) {
-      fnType = blockPtr->getPointeeType()->castAs<clang::FunctionType>();
-    } else if (auto ptr = clangType->getAs<clang::PointerType>()) {
-      fnType = ptr->getPointeeType()->getAs<clang::FunctionType>();
-    } else if (auto ref = clangType->getAs<clang::ReferenceType>()) {
-      fnType = ref->getPointeeType()->getAs<clang::FunctionType>();
-    } else if (auto fn = clangType->getAs<clang::FunctionType>()) {
-      fnType = fn;
-    } else {
-      llvm_unreachable("unexpected type imported as a function type");
-    }
-    if (fnType) {
-      return getSILFunctionType(
-          TC, TypeExpansionContext::minimal(), origType, substType,
-          extInfoBuilder, CFunctionTypeConventions(fnType), ForeignInfo(),
-          constant, constant, std::nullopt, ProtocolConformanceRef());
-    }
+    auto *fnType = AbstractionPattern::getClangFunctionType(clangType);
+    return getSILFunctionType(
+        TC, TypeExpansionContext::minimal(), origType, substType,
+        extInfoBuilder, CFunctionTypeConventions(fnType), ForeignInfo(),
+        constant, constant, std::nullopt, ProtocolConformanceRef());
   }
 
   // TODO: Ought to support captures in block funcs.
