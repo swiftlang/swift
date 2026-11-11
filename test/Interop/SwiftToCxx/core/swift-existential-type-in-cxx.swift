@@ -103,7 +103,10 @@
 // CHECK: SwiftClassExistentialType<Tags...>::operator SwiftExistentialType<>() const noexcept {
 // CHECK:   SwiftExistentialType<> result(
 // CHECK:       typename SwiftExistentialType<>::uninit_t{});
+// CHECK:   if (!_value)
+// CHECK:     _swift_stdlib_reportFatalError(
 // CHECK:   result._type = swift_getObjectType(
+// CHECK:   _retainClassValue(_value);
 // CHECK: }
 
 // CHECK: } // namespace _impl
