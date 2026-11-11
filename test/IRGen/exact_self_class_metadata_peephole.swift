@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=ONONE
-// RUN: %target-swift-frontend -O -disable-llvm-optzns -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=O
+// RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=ONONE --check-prefix=CHECK-%target-ptrauth
+// RUN: %target-swift-frontend -O -disable-llvm-optzns -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-ir %s | %FileCheck %s --check-prefix=CHECK --check-prefix=O --check-prefix=CHECK-%target-ptrauth
 
 @_silgen_name("useMetadata")
 func useMetadata<T>(_: T.Type)
@@ -69,6 +69,7 @@ final private class FinalPrivateNonfinalSubclass<U>: PrivateNonfinal<U, String, 
   @inline(never)
   final func burts() {
     // CHECK: [[TYPE:%.*]] = load {{.*}} %0
+    // CHECK-ptrauth: [[TYPE:%.*]] = inttoptr i64 {{%.*}} to ptr
     // CHECK: call {{.*}} @useMetadata(ptr [[TYPE]], ptr [[TYPE]])
     useMetadata(FinalPrivateNonfinalSubclass<U>.self)
     // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}}FinalPrivateNonfinalSubclass
@@ -90,6 +91,7 @@ final private class PrivateFinal<T, U, V> {
   // CHECK-LABEL: define {{.*}}PrivateFinal{{.*}}butts
   func butts() {
     // CHECK: [[TYPE:%.*]] = load {{.*}} %0
+    // CHECK-ptrauth: [[TYPE:%.*]] = inttoptr i64 {{%.*}} to ptr
     // CHECK: call {{.*}} @useMetadata(ptr [[TYPE]], ptr [[TYPE]])
     useMetadata(PrivateFinal<T, U, V>.self)
     // CHECK: [[INSTANTIATED_TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}}PrivateFinal

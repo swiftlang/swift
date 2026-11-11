@@ -21,6 +21,7 @@
 #include "GenConstant.h"
 #include "GenEnum.h"
 #include "GenIntegerLiteral.h"
+#include "GenPointerAuth.h"
 #include "GenStruct.h"
 #include "GenTuple.h"
 #include "TypeInfo.h"
@@ -450,7 +451,8 @@ Explosion irgen::emitConstantValue(IRGenModule &IGM, SILValue operand,
 }
 
 llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
-                                         StructLayout *ClassLayout) {
+                                         StructLayout *ClassLayout,
+                                         llvm::Constant *objectAddress) {
   auto *sTy = cast<llvm::StructType>(ClassLayout->getType());
 
   SmallVector<Explosion, 32> elements;
@@ -505,8 +507,18 @@ llvm::Constant *irgen::emitConstantObject(IRGenModule &IGM, ObjectInst *OI,
         IGM.swiftStaticArrayMetadata = IGM.getAddrOfLLVMVariable(entity, NotForDefinition, DebugTypeInfo());
       }
     }
+    // The runtime stores the isa of an object as an
+    // __ptrauth_objc_isa_pointer, which is signed with the address of the
+    // object. Sign the isa of a read-only object the same way. Without the
+    // address, leave it unsigned: the caller only uses that initializer to
+    // create the global, and then emits the initializer again.
+    llvm::Constant *isa = IGM.swiftStaticArrayMetadata;
+    auto &isaSchema = IGM.getOptions().PointerAuth.ObjCIsaPointers;
+    if (isaSchema && (objectAddress || !isaSchema.isAddressDiscriminated()))
+      isa = IGM.getConstantSignedPointer(isa, isaSchema, PointerAuthEntity(),
+                                         objectAddress);
     elements[0].add(llvm::ConstantStruct::get(ObjectHeaderTy, {
-      IGM.swiftStaticArrayMetadata,
+      isa,
       IGM.swiftImmortalRefCount }));
   } else {
     elements[0].add(llvm::Constant::getNullValue(ObjectHeaderTy));

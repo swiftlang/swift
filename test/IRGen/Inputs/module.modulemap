@@ -36,6 +36,10 @@ module PointerAuth {
   header "ptrauth_field_fptr_import.h"
 }
 
+module PointerAuthDataPointers {
+  header "ptrauth_field_data_ptr_import.h"
+}
+
 module CFBridgedType {
   header "CFBridgedType.h"
 }

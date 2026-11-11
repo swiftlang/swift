@@ -351,6 +351,7 @@ public class ClassWithOptionalResult {
 // CHECK:      load ptr
 
 // CHECK: [[ISA:%.*]] = load ptr, ptr %0
+// CHECK-arm64e: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-NEXT: [[BASE:%.*]] = load [[INT]], ptr @"$s16class_resilience21ResilientGenericChildCMo"
 // CHECK-NEXT: [[METADATA_OFFSET:%.*]] = add [[INT]] [[BASE]], {{4|8}}
 // CHECK-NEXT: [[FIELD_OFFSET_TMP:%.*]] = getelementptr inbounds i8, ptr [[ISA]], [[INT]] [[METADATA_OFFSET]]
@@ -376,6 +377,7 @@ public class ClassWithOptionalResult {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc ptr @"$s15resilient_class29ResilientGenericOutsideParentC0B11_resilienceE22genericExtensionMethodxmyF"(ptr swiftself %0) {{.*}} {
 // CHECK: [[ISA:%.*]] = load ptr, ptr %0
+// CHECK-arm64e: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK:      [[BASE:%.*]] = load [[INT]], ptr @"$s15resilient_class29ResilientGenericOutsideParentCMo"
 // CHECK-NEXT: [[GENERIC_PARAM_OFFSET:%.*]] = add [[INT]] [[BASE]], 0
 // CHECK-NEXT: [[GENERIC_PARAM_TMP:%.*]] = getelementptr inbounds i8, ptr [[ISA]], [[INT]] [[GENERIC_PARAM_OFFSET]]
@@ -560,6 +562,7 @@ public class ClassWithOptionalResult {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc i32 @"$s16class_resilience14ResilientChildC5fields5Int32VvgTj"(ptr swiftself %0)
 // CHECK: [[ISA:%.*]] = load ptr, ptr %0
+// CHECK-arm64e: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-NEXT: [[BASE_ADDR:%.*]] = load [[INT]], ptr @"$s16class_resilience14ResilientChildCMo"
 // CHECK-NEXT: [[BASE:%.*]] = add [[INT]] [[BASE_ADDR]], {{4|8}}
 // CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, ptr [[ISA]], [[INT]] [[BASE]]
@@ -573,6 +576,7 @@ public class ClassWithOptionalResult {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s16class_resilience14ResilientChildC5fields5Int32VvsTj"(i32 %0, ptr swiftself %1)
 // CHECK: [[ISA:%.*]] = load ptr, ptr %1
+// CHECK-arm64e: [[ISA:%.*]] = inttoptr i64 {{%.*}} to ptr
 // CHECK-NEXT: [[BASE:%.*]] = load [[INT]], ptr @"$s16class_resilience14ResilientChildCMo"
 // CHECK-NEXT: [[METADATA_OFFSET:%.*]] = add [[INT]] [[BASE]], {{8|16}}
 // CHECK-NEXT: [[VTABLE_OFFSET_TMP:%.*]] = getelementptr inbounds i8, ptr [[ISA]], [[INT]] [[METADATA_OFFSET]]

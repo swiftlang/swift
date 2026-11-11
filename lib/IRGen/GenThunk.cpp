@@ -649,6 +649,7 @@ llvm::Constant *IRGenModule::defineAsyncFunctionPointer(LinkEntity entity,
   auto asyncEntity = LinkEntity::forAsyncFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(asyncEntity, init, DebugTypeInfo()));
+  setTrueConstGlobal(var);
   return var;
 }
 
@@ -711,6 +712,7 @@ llvm::Constant *IRGenModule::defineCoroFunctionPointer(LinkEntity entity,
   auto coroEntity = LinkEntity::forCoroFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(coroEntity, init, DebugTypeInfo()));
+  setTrueConstGlobal(var);
   return var;
 }
 
@@ -811,8 +813,16 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
         return;
       }
       
-      auto methodDesc = IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
-      
+      llvm::Value *methodDesc =
+          IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
+      // Callers pass the method descriptor signed.
+      if (auto &schema =
+              IGM.getOptions().PointerAuth.ClassMethodDescriptorsAsArguments) {
+        auto authInfo =
+            PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
+        methodDesc = emitPointerAuthSign(IGF, methodDesc, authInfo);
+      }
+
       auto isMethod = IGF.Builder.CreateICmpEQ(methodArg, methodDesc);
       
       auto falseBB = IGF.createBasicBlock("");
@@ -855,7 +865,14 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   LookUpNonoverriddenMethods(IGF, classDecl, method).layout();
   
   // Use the runtime to look up vtable entries.
+  llvm::Value *signedDescription = description;
+  if (auto &schema = getOptions().PointerAuth.TypeDescriptorsAsArguments) {
+    auto authInfo = PointerAuthInfo::emit(
+        IGF, schema, nullptr,
+        PointerAuthEntity::Special::TypeDescriptorAsArgument);
+    signedDescription = emitPointerAuthSign(IGF, description, authInfo);
+  }
   auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFunctionPointer(),
-                                        {metadata, method, description});
+                                        {metadata, method, signedDescription});
   IGF.Builder.CreateRet(result);
 }

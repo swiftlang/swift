@@ -1459,17 +1459,6 @@ namespace {
         IGM.addGenericROData(dataPtr);
       }
 
-      dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
-
-      llvm::Constant *fields[] = {
-        rootPtr,
-        superPtr,
-        IGM.getObjCEmptyCachePtr(),
-        IGM.getObjCEmptyVTablePtr(),
-        dataPtr
-      };
-      auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
-                                            llvm::ArrayRef(fields));
       llvm::Constant *uncastMetaclass;
       if (specializedGenericType) {
         uncastMetaclass =
@@ -1480,7 +1469,23 @@ namespace {
             IGM.getAddrOfMetaclassObject(getClass(), ForDefinition);
       }
       auto metaclass = cast<llvm::GlobalVariable>(uncastMetaclass);
-      metaclass->setInitializer(init);
+
+      auto &options = IGM.getOptions().PointerAuth;
+      ConstantInitBuilder builder(IGM);
+      auto fields = builder.beginStruct(IGM.ObjCClassStructTy);
+      auto addClassPointer = [&](llvm::Constant *pointer,
+                                 const PointerAuthSchema &schema) {
+        if (pointer->isNullValue())
+          fields.add(pointer);
+        else
+          fields.addSignedPointer(pointer, schema, PointerAuthEntity());
+      };
+      addClassPointer(rootPtr, options.ObjCIsaPointers);
+      addClassPointer(superPtr, options.ObjCSuperPointers);
+      fields.add(IGM.getObjCEmptyCachePtr());
+      fields.add(IGM.getObjCEmptyVTablePtr());
+      addClassPointer(dataPtr, options.ObjCClassROPointers);
+      fields.finishAndSetAsInitializer(metaclass);
     }
     
   private:
@@ -1986,7 +1991,13 @@ namespace {
       }
       llvm::Constant *methodListPtr =
           buildMethodList(methods, namePrefix, linkage);
-      builder.add(methodListPtr);
+      // Like Clang, only class and category method lists are signed.
+      if (isBuildingProtocol() || methodListPtr->isNullValue())
+        builder.add(methodListPtr);
+      else
+        builder.addSignedPointer(
+            methodListPtr, IGM.getOptions().PointerAuth.ObjCMethodListPointer,
+            PointerAuthEntity());
     }
 
     llvm::Constant *buildOptExtendedMethodTypes() {

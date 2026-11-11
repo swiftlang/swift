@@ -152,6 +152,15 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Protocol conformance descriptors.
   PointerAuthSchema ProtocolConformanceDescriptors;
 
+  /// Protocol requirement descriptors referenced indirectly.
+  PointerAuthSchema ProtocolRequirementDescriptors;
+
+  /// Class method descriptors referenced indirectly.
+  PointerAuthSchema ClassMethodDescriptors;
+
+  /// Class method descriptors when passed as arguments.
+  PointerAuthSchema ClassMethodDescriptorsAsArguments;
+
   /// Protocol conformance descriptors when passed as arguments.
   PointerAuthSchema ProtocolConformanceDescriptorsAsArguments;
 

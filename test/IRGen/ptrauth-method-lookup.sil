@@ -1,0 +1,35 @@
+// RUN: %swift -swift-version 5 -target arm64e-apple-ios14.0 -parse-stdlib -parse-as-library -enable-library-evolution %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls | %FileCheck %s
+
+// REQUIRES: CPU=arm64e
+// REQUIRES: OS=ios
+
+sil_stage canonical
+
+open class A {
+  init()
+  public func foo()
+  open func bar()
+}
+
+sil @A_foo : $@convention(method) (@guaranteed A) -> ()
+sil @A_bar : $@convention(method) (@guaranteed A) -> ()
+sil @A_init : $@convention(method) (@thick A.Type) -> @owned A
+sil @A_dealloc : $@convention(method) (@owned A) -> ()
+
+sil_vtable A {
+  #A.deinit!deallocator : @A_dealloc
+  #A.init!allocator : @A_init
+  #A.foo : @A_foo [nonoverridden]
+  #A.bar : @A_bar
+}
+
+// The method lookup function receives the method descriptor signed, so it
+// compares it with the signed descriptor of the nonoverridden method, and it
+// passes the type descriptor to swift_lookUpClassMethod signed.
+
+// CHECK-DAG: [[FOO:@"\$s4test1AC3fooyyFTq\.ptrauth(\.[0-9]+)?"]] = private constant { ptr, i32, i64, i64 } { ptr @"$s4test1AC3fooyyFTq", i32 2, i64 0, i64 26458 }, section "llvm.ptrauth"
+// CHECK-DAG: [[DESC:@"\$s4test1ACMn\.ptrauth(\.[0-9]+)?"]] = private constant { ptr, i32, i64, i64 } { ptr @"$s4test1ACMn", i32 2, i64 0, i64 44678 }, section "llvm.ptrauth"
+
+// CHECK-LABEL: define swiftcc ptr @"$s4test1ACMu"(ptr %0, ptr %1)
+// CHECK: icmp eq ptr %1, [[FOO]]
+// CHECK: call ptr @swift_lookUpClassMethod(ptr %0, ptr %1, ptr [[DESC]])

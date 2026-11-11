@@ -73,8 +73,10 @@ struct GenericCacheEntry final
     auto pattern = generics.DefaultInstantiationPattern.get();
 
     // Call the pattern's instantiation function.
-    auto metadata =
-        pattern->InstantiationFunction(description, arguments, pattern);
+    auto metadata = pattern->InstantiationFunction(
+        swift_sign_data_non_address(
+            description, SpecialPointerAuthDiscriminators::TypeDescriptor),
+        arguments, pattern);
 
     // If there's no completion function, do a quick-and-dirty check to
     // see if all of the type arguments are already complete.  If they

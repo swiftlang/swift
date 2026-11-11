@@ -20,6 +20,6 @@ extension E : Q {
 }
 #endif
 
-// CHECK-DIRECT: @"$s1A1EO1B1QADWP" ={{( dllexport)?}}{{( protected)?}} constant [2 x ptr] [ptr @"$s1A1EO1B1QADMc", ptr @"$s1A1EOAA1PAAWP"]
+// CHECK-DIRECT: @"$s1A1EO1B1QADWP" ={{( dllexport)?}}{{( protected)?}} constant [2 x ptr] [ptr @"$s1A1EO1B1QADMc{{(\.ptrauth(\.[0-9]+)?)?}}", ptr @"$s1A1EOAA1PAAWP"]
 // CHECK-INDIRECT: @"$s1A1EO1B1QADWP" ={{( dllexport)?}}{{( protected)?}} constant [2 x ptr] [ptr @"$s1A1EO1B1QADMc", ptr null]
 

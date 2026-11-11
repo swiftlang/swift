@@ -1016,6 +1016,8 @@ static Lazy<SingletonTypeMetadataCache> SingletonMetadata;
 MetadataResponse
 swift::swift_getSingletonMetadata(MetadataRequest request,
                                   const TypeContextDescriptor *description) {
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
   auto result = SingletonMetadata.get().getOrInsert(description, request,
                                                     description);
 
@@ -5066,6 +5068,10 @@ void *
 swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
                                const MethodDescriptor *method,
                                const ClassDescriptor *description) {
+  method = swift_auth_data_non_address(
+      method, SpecialPointerAuthDiscriminators::ClassMethodDescriptor);
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
   assert(metadata->isTypeMetadata());
 
 #ifndef NDEBUG
@@ -6823,7 +6829,7 @@ static bool doesNotRequireInstantiation(
 
 #if SWIFT_PTRAUTH
 static const unsigned swift_ptrauth_key_associated_type =
-  ptrauth_key_process_independent_code;
+  ptrauth_key_process_independent_data;
 
 /// Given an unsigned pointer to an associated-type protocol witness,
 /// fill in the appropriate slot in the witness table we're building.
@@ -6832,13 +6838,11 @@ static void initAssociatedConformanceWitness(const Metadata **slot,
                                              const ProtocolRequirement &reqt) {
   assert(reqt.Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
-  // FIXME: this should use ptrauth_key_process_independent_data
-  // now that it no longer stores a function pointer.
-  swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+  swift_ptrauth_init_data(slot, witness, reqt.Flags.getExtraDiscriminator());
 }
 
 static const unsigned swift_ptrauth_key_associated_conformance =
-  ptrauth_key_process_independent_code;
+  ptrauth_key_process_independent_data;
 
 /// Given an unsigned pointer to an associated-conformance protocol witness,
 /// fill in the appropriate slot in the witness table we're building.
@@ -6846,9 +6850,7 @@ static void initAssociatedConformanceProtocolWitness(void **slot, void *witness,
                                               const ProtocolRequirement &reqt) {
   assert(reqt.Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction);
-  // FIXME: this should use ptrauth_key_process_independent_data
-  // now that it no longer stores a function pointer.
-  swift_ptrauth_init(slot, witness, reqt.Flags.getExtraDiscriminator());
+  swift_ptrauth_init_data(slot, witness, reqt.Flags.getExtraDiscriminator());
 }
 #endif
 
@@ -6918,10 +6920,9 @@ static void copyProtocolWitness(void **dest, void * const *src,
                              // might be proven unused and null'ed)
     return;
 
-  // FIXME: these should both use ptrauth_key_process_independent_data now.
   case ProtocolRequirementFlags::Kind::AssociatedConformanceAccessFunction:
   case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
-    swift_ptrauth_copy(
+    swift_ptrauth_copy_data(
         dest, src, reqt.Flags.getExtraDiscriminator(),
         /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
                              // might be proven unused and null'ed)
