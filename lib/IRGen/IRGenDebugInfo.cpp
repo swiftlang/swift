@@ -4429,7 +4429,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
   // Insert a dbg.value at the current insertion point.
   if (isa<llvm::Argument>(Storage) && !Var->getArg()) {
-    const auto InsertPt = ParentBlock->getFirstNonPHIOrDbg();
+    const auto InsertPt = ParentBlock->getFirstNonPHIOrPseudoProbe();
     if (InsertPt != ParentBlock->end()) {
       // SelectionDAGISel only generates debug info for a dbg.value
       // that is associated with a llvm::Argument if either its !DIVariable
