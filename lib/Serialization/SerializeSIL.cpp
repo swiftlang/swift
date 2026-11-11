@@ -362,6 +362,14 @@ namespace {
 
     /// Serialize and write SILDebugScope graph in post order.
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
+    /// The line, column and filename of a serialized location.
+    struct EncodedLoc {
+      unsigned Row, Column;
+      IdentifierID FNameID;
+    };
+    /// Encode \p Loc's position, or std::nullopt if it has none.
+    std::optional<EncodedLoc> encodeLoc(SILLocation Loc,
+                                        const SourceManager &SM);
     void writeSourceLoc(SILLocation SLoc, const SourceManager &SM);
     void writeApplyArgLocs(ApplySite AS, const SourceManager &SM);
 
@@ -1195,25 +1203,11 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       }
 
       if (DebugVar->Loc) {
-        auto RawLoc = DebugVar->Loc.value();
-        SourceLoc Loc = RawLoc.getSourceLoc();
-        if (Loc.isValid()) {
+        if (auto Encoded = encodeLoc(*DebugVar->Loc, SM)) {
           attrs |= 1 << 9;
-          auto LC = SM.getPresumedLineAndColumnForLoc(Loc);
-          auto FName = SM.getDisplayNameForLoc(Loc);
-          auto FNameID = S.addUniquedStringRef(FName);
-
-          ListOfValues.push_back(LC.first);
-          ListOfValues.push_back(LC.second);
-          ListOfValues.push_back(FNameID);
-        } else if (RawLoc.isFilenameAndLocation()) {
-          // getSourceLoc produces an empty SourceLoc for FilenameAndLocation,
-          // so this needs to be handled separately. rdar://25225083.
-          attrs |= 1 << 9;
-          auto FNameLoc = RawLoc.getFilenameAndLocation();
-          ListOfValues.push_back(FNameLoc->line);
-          ListOfValues.push_back(FNameLoc->column);
-          ListOfValues.push_back(S.addUniquedStringRef(FNameLoc->filename));
+          ListOfValues.push_back(Encoded->Row);
+          ListOfValues.push_back(Encoded->Column);
+          ListOfValues.push_back(Encoded->FNameID);
         }
       }
 
@@ -3578,8 +3572,6 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
 }
 
 void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
-  auto SLoc = Loc.getSourceLoc();
-  auto OpaquePtr = SLoc.getOpaquePointerValue();
   uint8_t LocationKind;
   switch(Loc.getKind()) {
     case SILLocation::ReturnKind:
@@ -3597,6 +3589,9 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
       break;
   }
 
+  const void *OpaquePtr = Loc.isFilenameAndLocation()
+                              ? Loc.getFilenameAndLocation()
+                              : Loc.getSourceLoc().getOpaquePointerValue();
   if (SourceLocMap.find(OpaquePtr) != SourceLocMap.end()) {
     SourceLocRefLayout::emitRecord(Out, ScratchRecord,
                                    SILAbbrCodes[SourceLocRefLayout::Code],
@@ -3604,22 +3599,36 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
     return;
   }
 
-  ValueID Row = 0;
-  ValueID Column = 0;
-  ValueID FNameID = 0;
-
-  if (!SLoc.isValid()) {
+  auto Encoded = encodeLoc(Loc, SM);
+  if (!Encoded) {
     //emit empty source loc
     SourceLocRefLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[SourceLocRefLayout::Code], 0, 0, (unsigned)0);
     return;
   }
 
-  std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-  FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
   SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
   SourceLocLayout::emitRecord(Out, ScratchRecord,
-                              SILAbbrCodes[SourceLocLayout::Code], Row, Column,
-                              FNameID, LocationKind, (unsigned)Loc.isImplicit());
+                              SILAbbrCodes[SourceLocLayout::Code],
+                              Encoded->Row, Encoded->Column, Encoded->FNameID,
+                              LocationKind, (unsigned)Loc.isImplicit());
+}
+
+std::optional<SILSerializer::EncodedLoc>
+SILSerializer::encodeLoc(SILLocation Loc, const SourceManager &SM) {
+  SourceLoc SLoc = Loc.getSourceLoc();
+  if (SLoc.isValid()) {
+    auto LC = SM.getPresumedLineAndColumnForLoc(SLoc);
+    return EncodedLoc{LC.first, LC.second,
+                      S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc))};
+  }
+  // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so this
+  // needs to be handled separately. rdar://25225083.
+  if (Loc.isFilenameAndLocation()) {
+    auto FNameLoc = Loc.getFilenameAndLocation();
+    return EncodedLoc{FNameLoc->line, FNameLoc->column,
+                      S.addUniquedStringRef(FNameLoc->filename)};
+  }
+  return std::nullopt;
 }
 
 void SILSerializer::writeApplyArgLocs(ApplySite AS, const SourceManager &SM) {
@@ -3700,22 +3709,14 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
     InlinedID = DebugScopeMap[Inlined];
   }
 
-  SourceLoc SLoc = Scope->getLoc().getSourceLoc();
-
   ValueID Row = 0;
   ValueID Column = 0;
   ValueID FNameID = 0;
   // TODO: we can emit SourceLocRef here
-  if (SLoc.isValid()) {
-    std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-    FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
-  } else if (Scope->Loc.isFilenameAndLocation()) {
-    // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so
-    // this needs to be handled separately. rdar://25225083.
-    auto FNameLoc = Scope->Loc.getFilenameAndLocation();
-    Row = FNameLoc->line;
-    Column = FNameLoc->column;
-    FNameID = S.addUniquedStringRef(FNameLoc->filename);
+  if (auto Encoded = encodeLoc(Scope->getLoc(), SM)) {
+    Row = Encoded->Row;
+    Column = Encoded->Column;
+    FNameID = Encoded->FNameID;
   }
 
   DebugScopeMap.insert({Scope, DebugScopeMap.size() + 1});
