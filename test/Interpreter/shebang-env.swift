@@ -9,6 +9,7 @@
 // RUN: env PATH=$(dirname %swift_driver_plain) %t.shebang.swift a b c | %raw-FileCheck -check-prefix=THREE-ARGS %s
 
 // REQUIRES: swift_interpreter
+// UNSUPPORTED: OS=windows-msvc
 
 print("Begin")
 for arg in CommandLine.arguments {
