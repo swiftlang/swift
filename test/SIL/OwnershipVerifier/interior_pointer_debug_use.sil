@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -enable-sil-verify-all=0 -o /dev/null %s 2>&1
 
-// REQUIRES: asserts
-
 // A debug_value does not require its operand to be alive. So debug uses which
 // are reached through an interior pointer must not be treated as implicit
 // regular users of the enclosing borrow scope. This file has patterns in it

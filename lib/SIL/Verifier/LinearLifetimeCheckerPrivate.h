@@ -14,7 +14,10 @@
 #define SWIFT_SIL_LINEARLIFETIMECHECKER_PRIVATE_H
 
 #include "swift/SIL/LinearLifetimeChecker.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+
+extern llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled;
 
 namespace swift {
 
@@ -94,52 +97,54 @@ class LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::ErrorBuilder {
   const SILFunction *function;
   ErrorBehaviorKind behavior;
   std::optional<Error> error;
-  unsigned *errorMessageCounter;
+
+  /// If the ownership verifier is in testing mode, errors are numbered per
+  /// function so that FileCheck tests can match the exact number of errors.
+  static inline const SILFunction *errorMessageCounterFunction = nullptr;
+  static inline unsigned errorMessageCounter = 0;
 
 public:
   ErrorBuilder(const SILFunction &fn,
-               LinearLifetimeChecker::ErrorBehaviorKind behavior,
-               unsigned *errorMessageCounter = nullptr)
-      : function(&fn), behavior(behavior), error(Error()),
-        errorMessageCounter(errorMessageCounter) {}
+               LinearLifetimeChecker::ErrorBehaviorKind behavior)
+      : function(&fn), behavior(behavior), error(Error()) {}
 
   ErrorBuilder(const SILFunction &fn,
-               LinearLifetimeChecker::ErrorBehaviorKind::inner_t behavior,
-               unsigned *errorMessageCounter = nullptr)
-      : ErrorBuilder(fn, LinearLifetimeChecker::ErrorBehaviorKind(behavior),
-                     errorMessageCounter) {}
+               LinearLifetimeChecker::ErrorBehaviorKind::inner_t behavior)
+      : ErrorBuilder(fn, LinearLifetimeChecker::ErrorBehaviorKind(behavior)) {}
 
   ErrorBuilder(const ErrorBuilder &other)
       : function(other.function), behavior(other.behavior),
-        error(other.error), errorMessageCounter(other.errorMessageCounter) {}
+        error(other.error) {}
 
   ErrorBuilder &operator=(const ErrorBuilder &other) {
     function = other.function;
     behavior = other.behavior;
     error = other.error;
-    errorMessageCounter = other.errorMessageCounter;
     return *this;
   }
 
   Error consumeAndGetFinalError() && {
     auto result = *error;
     error = std::nullopt;
-    errorMessageCounter = nullptr;
     return result;
   }
 
   void tryDumpErrorCounter() const {
-    if (!errorMessageCounter) {
+    if (!IsSILOwnershipVerifierTestingEnabled) {
       return;
     }
-    llvm::errs() << "Error#: " << *errorMessageCounter << ". ";
+    if (function != errorMessageCounterFunction) {
+      errorMessageCounterFunction = function;
+      errorMessageCounter = 0;
+    }
+    llvm::errs() << "Error#: " << errorMessageCounter << ". ";
   }
 
   void tryIncrementErrorCounter() {
-    if (!errorMessageCounter) {
+    if (!IsSILOwnershipVerifierTestingEnabled) {
       return;
     }
-    ++(*errorMessageCounter);
+    ++errorMessageCounter;
   }
 
   bool handleLeak(llvm::function_ref<void()> &&messagePrinterFunc) {

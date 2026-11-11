@@ -40,16 +40,9 @@
 
 using namespace swift;
 
-// This is an option to put the SILOwnershipVerifier in testing mode. This
-// causes the following:
-//
-// 1. Instead of printing an error message and aborting, the verifier will print
-// the message and continue. This allows for FileCheck testing of the verifier.
-//
-// 2. SILInstruction::verifyOperandOwnership() is disabled. This is used for
-// verification in SILBuilder. This causes errors to be printed twice, once when
-// we build the IR and a second time when we perform a full verification of the
-// IR. For testing purposes, we just want the later.
+// This is an option to put the SILOwnershipVerifier in testing mode: instead of
+// printing an error message and aborting, the verifier will print the message
+// and continue. This allows for FileCheck testing of the verifier.
 llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled(
     "sil-ownership-verifier-enable-testing",
     llvm::cl::desc("Put the sil ownership verifier in testing mode. See "
@@ -904,10 +897,6 @@ void SILInstruction::verifyOperandOwnership(
   if (disableOwnershipVerification(getModule()))
     return;
 
-  // If we are testing the verifier, bail so we only print errors once when
-  // performing a full verification, instead of additionally in the SILBuilder.
-  if (IsSILOwnershipVerifierTestingEnabled)
-    return;
   // If this is a terminator instruction, do not verify in SILBuilder. This is
   // because when building a new function, one must create the destination block
   // first which is an unnatural pattern and pretty brittle.
@@ -993,18 +982,15 @@ void SILValue::verifyOwnership() const {
   if (disableOwnershipVerification(f->getModule()))
     return;
 
-  // If we are testing the verifier, bail so we only print errors once when
-  // performing a full verification a function at a time by the
-  // OwnershipVerifierStateDumper pass, instead of additionally in the
-  // SILBuilder and in the actual SIL verifier that may be run by sil-opt.
-  if (IsSILOwnershipVerifierTestingEnabled)
-    return;
-
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
-  LinearLifetimeChecker::ErrorBuilder errorBuilder(
-      *f, BehaviorKind::PrintMessageAndAssert);
-  GuaranteedPhiVerifier guaranteedPhiVerifier(f, errorBuilder);
-  verifySILValueHelper(f, *this, errorBuilder, guaranteedPhiVerifier);
+  std::optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
+  if (IsSILOwnershipVerifierTestingEnabled) {
+    errorBuilder.emplace(*f, BehaviorKind::PrintMessageAndReturnFalse);
+  } else {
+    errorBuilder.emplace(*f, BehaviorKind::PrintMessageAndAssert);
+  }
+  GuaranteedPhiVerifier guaranteedPhiVerifier(f, *errorBuilder);
+  verifySILValueHelper(f, *this, *errorBuilder, guaranteedPhiVerifier);
 }
 
 void SILModule::verifyOwnership() const {
@@ -1029,11 +1015,9 @@ void SILFunction::verifyOwnership() const {
     return;
 
   using BehaviorKind = LinearLifetimeChecker::ErrorBehaviorKind;
-  unsigned errorCounter = 0;
   std::optional<LinearLifetimeChecker::ErrorBuilder> errorBuilder;
   if (IsSILOwnershipVerifierTestingEnabled) {
-    errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndReturnFalse,
-                         &errorCounter);
+    errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndReturnFalse);
   } else {
     errorBuilder.emplace(*this, BehaviorKind::PrintMessageAndAssert);
   }

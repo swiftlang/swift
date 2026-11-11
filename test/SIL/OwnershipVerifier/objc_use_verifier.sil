@@ -1,5 +1,4 @@
 // RUN: %target-sil-opt -enable-sil-verify-all=0 -module-name ObjectiveC -o /dev/null %s 2>&1
-// REQUIRES: asserts
 // REQUIRES: objc_interop
 
 @objc protocol NSBurrito {}

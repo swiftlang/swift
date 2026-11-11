@@ -632,7 +632,9 @@ static void runCommandLineSelectedPasses(SILModule *Module,
       isMandatory, IRGenMod);
 
   if (Module->getOptions().VerifyAll) {
-    Module->verify();
+    // If no passes were run, the module was already verified after parsing.
+    if (!options.Passes.empty())
+      Module->verify();
     SILPassManager pm(Module, isMandatory, IRGenMod);
     pm.runSwiftModuleVerification();
   }
