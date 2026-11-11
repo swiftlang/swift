@@ -380,6 +380,8 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << cls << "::" << "SwiftExistentialType(\n";
   os << "    " << cls << " &&other) noexcept\n";
   os << "    : _type(other._type) {\n";
+  os << "  static_assert(ExistentialTagTraits<Tags...>::IsCopyable,\n";
+  os << "      \"moving a ~Copyable existential; Tags contain NonCopyable\");\n";
   os << "  _getVWT()->initializeBufferWithCopyOfBuffer(\n";
   os << "      _buffer, other._buffer, _type);\n";
   os << "  _copyWitnessTables(other);\n";
@@ -409,6 +411,8 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << cls << " &\n";
   os << cls << "::operator=(\n";
   os << "    " << cls << " &&other) noexcept {\n";
+  os << "  static_assert(ExistentialTagTraits<Tags...>::IsCopyable,\n";
+  os << "      \"moving a ~Copyable existential; Tags contain NonCopyable\");\n";
   os << "  if (this != &other) {\n";
   os << "    _destroyValue();\n";
   os << "    _type = other._type;\n";
