@@ -477,9 +477,9 @@ static RValue emitCollectionDowncastExpr(SILGenFunction &SGF,
 }
 
 static ManagedValue
-adjustForConditionalCheckedCastOperand(SILLocation loc, ManagedValue src,
-                                       CanType sourceType, SILGenFunction &SGF,
-                                       CastStrategy strategy) {
+adjustForCheckedCastOperand(SILLocation loc, ManagedValue src,
+                            CanType sourceType, SILGenFunction &SGF,
+                            CastStrategy strategy) {
   // Reabstract to the most general abstraction, and put it into a
   // temporary if necessary.
   AbstractionPattern abstraction = SGF.SGM.M.Types.getMostGeneralAbstraction();
@@ -546,6 +546,20 @@ RValue Lowering::emitUnconditionalCheckedCast(SILGenFunction &SGF,
   return emitter.emitUnconditionalCast(operandValue, C);
 }
 
+RValue Lowering::emitUnconditionalCheckedCast(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              ManagedValue operand,
+                                              Type operandType,
+                                              Type targetType,
+                                              SGFContext C) {
+  auto sourceType = operandType->getCanonicalType();
+  CheckedCastEmitter emitter(SGF, loc, sourceType, targetType);
+  operand = adjustForCheckedCastOperand(loc, operand, sourceType, SGF,
+                                        emitter.getStrategy());
+  auto result = emitter.emitUnconditionalCast(operand, C);
+  return result;
+}
+
 RValue Lowering::emitConditionalCheckedCast(
     SILGenFunction &SGF, SILLocation loc, ManagedValue operand,
     Type operandType, Type optTargetType, CheckedCastKind castKind,
@@ -567,8 +581,8 @@ RValue Lowering::emitConditionalCheckedCast(
 
   CanType sourceType = operandType->getCanonicalType();
   CheckedCastEmitter emitter(SGF, loc, sourceType, resultObjectType);
-  operand = adjustForConditionalCheckedCastOperand(loc, operand, sourceType,
-                                                   SGF, emitter.getStrategy());
+  operand = adjustForCheckedCastOperand(loc, operand, sourceType,
+                                        SGF, emitter.getStrategy());
 
   auto someDecl = SGF.getASTContext().getOptionalSomeDecl();
   auto &resultTL = SGF.getTypeLowering(optTargetType);
