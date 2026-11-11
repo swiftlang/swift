@@ -159,6 +159,11 @@ void ClangImporter::getBridgingHeaderOptions(
   depsInvocation.getFrontendOpts().PathPrefixMappings.clear();
   depsInvocation.getFrontendOpts().OutputFile.clear();
 
+  // Reset CASOptions since that should be coming from swift. The include tree
+  // is passed via `-clang-include-tree-root`.
+  depsInvocation.getCASOpts() = clang::CASOptions();
+  depsInvocation.getFrontendOpts().CASIncludeTreeID.clear();
+
   llvm::BumpPtrAllocator allocator;
   llvm::StringSaver saver(allocator);
   clangArgs.clear();
