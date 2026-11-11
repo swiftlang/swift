@@ -4427,9 +4427,10 @@ public:
     Type paramTy;
     SET_OR_RETURN_ERROR(paramTy, MF.getTypeChecked(interfaceTypeID));
 
-    if (paramTy->hasError() && !MF.allowCompilerErrors()) {
-      // FIXME: This should never happen, because we don't serialize
-      // error types.
+    if (paramTy->hasError() && !MF.allowCompilerErrors() &&
+        !MF.compiledAllowingCompilerErrors()) {
+      // This should never happen, because error types are only serialized
+      // when allowing errors.
       DC->printContext(llvm::errs());
       paramTy->dump(llvm::errs());
       return MF.diagnoseFatal();
@@ -9167,7 +9168,10 @@ Expected<Type> ModuleFile::getTypeChecked(TypeID TID) {
 
 #ifndef NDEBUG
   PrettyStackTraceType trace(getContext(), "deserializing", typeOrOffset.get());
-  if (typeOrOffset.get()->hasError() && !allowCompilerErrors()) {
+  // A module built with errors may legitimately contain error types. Reading
+  // one has already been diagnosed, here or by an earlier error.
+  if (typeOrOffset.get()->hasError() && !allowCompilerErrors() &&
+      !compiledAllowingCompilerErrors()) {
     typeOrOffset.get()->dump(llvm::errs());
     llvm_unreachable("deserialization produced an invalid type "
                      "(rdar://problem/30382791)");
