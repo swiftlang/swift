@@ -9,14 +9,14 @@
 // RUN: split-file %s %t
 
 // Modern projection visible
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/wrong.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -verify-additional-prefix modern-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
-// RUN: %target-build-swift -emit-executable %t/impl.swift %t/main.swift -o %t/modern -I %t/include -module-cache-path %t/module-cache -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -disable-objc-attr-requires-foundation-module -verify -verify-ignore-unrelated %t/wrong.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -verify-additional-prefix modern-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-build-swift -emit-executable -Xfrontend -disable-objc-attr-requires-foundation-module %t/impl.swift %t/main.swift -o %t/modern -I %t/include -module-cache-path %t/module-cache -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -enable-experimental-feature ObjCAttrAllowsCArrays
 // RUN: %target-codesign %t/modern
 // RUN: %target-run %t/modern | %FileCheck %s
 
 // Legacy projection visible
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/wrong.swift -I %t/include -target %target-has-inline-array-triple -verify-additional-prefix legacy-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
-// RUN: %target-build-swift -emit-executable %t/impl.swift %t/main.swift -o %t/legacy -I %t/include -module-cache-path %t/module-cache -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -disable-objc-attr-requires-foundation-module -verify -verify-ignore-unrelated %t/wrong.swift -I %t/include -target %target-has-inline-array-triple -verify-additional-prefix legacy-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-build-swift -emit-executable -Xfrontend -disable-objc-attr-requires-foundation-module %t/impl.swift %t/main.swift -o %t/legacy -I %t/include -module-cache-path %t/module-cache -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays
 // RUN: %target-codesign %t/legacy
 // RUN: %target-run %t/legacy | %FileCheck %s
 
@@ -31,9 +31,9 @@ module CLib {
 }
 
 //--- include/CLib.h
-#import <Foundation/Foundation.h>
+#import <objc/NSObject.h>
 
-NS_ASSUME_NONNULL_BEGIN
+#pragma clang assume_nonnull begin
 
 @interface Impl : NSObject
 - (void)bump:(int (*)[4])buf;
@@ -43,7 +43,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 void cBump(int (*buf)[4]);
 
-NS_ASSUME_NONNULL_END
+#pragma clang assume_nonnull end
 
 //--- impl.swift
 import CLib

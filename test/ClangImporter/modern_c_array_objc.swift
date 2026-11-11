@@ -9,19 +9,19 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -verify-additional-prefix modern-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
-// RUN: %target-swift-frontend -typecheck -verify %t/representability.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -parse-as-library -enable-experimental-feature ObjCAttrAllowsCArrays
-// RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -o /dev/null -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -verify-additional-prefix modern-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/representability.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -parse-as-library -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %t/codegen.swift -I %t/include -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -o /dev/null -enable-experimental-feature ObjCAttrAllowsCArrays
 
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -verify-additional-prefix legacy-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
-// RUN: %target-swift-frontend -typecheck -verify %t/representability.swift -I %t/include -parse-as-library -enable-experimental-feature ObjCAttrAllowsCArrays
-// RUN: %target-swift-frontend -emit-sil %t/codegen.swift -I %t/include -o /dev/null -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %t/typecheck.swift -I %t/include -verify-additional-prefix legacy-c-array- -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/representability.swift -I %t/include -parse-as-library -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil %t/codegen.swift -I %t/include -o /dev/null -enable-experimental-feature ObjCAttrAllowsCArrays
 
-// RUN: %target-swift-frontend -typecheck -verify %t/disabled.swift -I %t/include
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %t/disabled.swift -I %t/include
 
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/availability.swift -I %t/include -enable-experimental-feature ModernImportedCArraysOnly
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %t/availability.swift -I %t/include -enable-experimental-feature ModernImportedCArraysOnly
 
-// RUN: %target-swift-ide-test -print-module -module-to-print=CLib -source-filename=x -I %t/include --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly -target %target-has-inline-array-triple | %FileCheck %s
+// RUN: %target-swift-ide-test(mock-sdk: %clang-importer-sdk) -print-module -module-to-print=CLib -source-filename=x -I %t/include --access-filter-private -enable-experimental-feature ModernImportedCArraysOnly -target %target-has-inline-array-triple | %FileCheck %s
 
 //--- include/module.modulemap
 module CLib {
@@ -30,7 +30,11 @@ module CLib {
 }
 
 //--- include/CLib.h
-#import <Foundation/Foundation.h>
+#import <Foundation.h>
+
+// The mock SDK doesn't define these.
+#define NS_ASSUME_NONNULL_BEGIN _Pragma("clang assume_nonnull begin")
+#define NS_ASSUME_NONNULL_END _Pragma("clang assume_nonnull end")
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -132,7 +136,11 @@ typedef int NTArray[4] __attribute__((swift_wrapper(struct)));
 // the storage as well as its accessors.
 // (anyAppleOS can't express a version below InlineArray's.)
 #define OLD_AVAILABILITY \
-    API_AVAILABLE(macos(12.0), ios(15.0), tvos(15.0), watchos(8.0), visionos(1.0))
+    __attribute__((availability(macos, introduced=12.0))) \
+    __attribute__((availability(ios, introduced=15.0))) \
+    __attribute__((availability(tvos, introduced=15.0))) \
+    __attribute__((availability(watchos, introduced=8.0))) \
+    __attribute__((availability(visionos, introduced=1.0)))
 @interface OldAvailability : NSObject
 @property (nonatomic) int (*row)[4] OLD_AVAILABILITY;
 @property (nonatomic, readonly) int (*readonlyRow)[4] OLD_AVAILABILITY;
@@ -149,7 +157,7 @@ typedef int NTArray[4] __attribute__((swift_wrapper(struct)));
 // The availability of a requirement of a protocol without availability is
 // inferred from its types, and that has to include the types of its modern
 // projection as well as InlineArray's.
-API_AVAILABLE(anyappleos(30.0))
+__attribute__((availability(anyappleos, introduced=30.0)))
 @interface FutureObject : NSObject
 @end
 

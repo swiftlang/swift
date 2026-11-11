@@ -8,18 +8,18 @@
 // RUN: split-file %s %t
 
 // Library with the modern projection visible, client with the legacy projection
-// RUN: %target-swift-frontend -emit-module -parse-as-library %t/lib.swift -module-name Lib -o %t/Lib.swiftmodule -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -enable-experimental-feature ObjCAttrAllowsCArrays
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/client.swift -I %t -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays -verify-additional-prefix modern-lib-
-// RUN: %target-swift-frontend -emit-ir %t/lowering.swift -I %t -target %target-has-inline-array-triple -DLIB_MODERN_C_ARRAYS -o %t/lowering.ll -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -parse-as-library %t/lib_source.swift -module-name Lib -o %t/Lib.swiftmodule -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -DMODERN_C_ARRAYS -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %t/client.swift -I %t -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays -verify-additional-prefix modern-lib-
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %t/lowering.swift -I %t -target %target-has-inline-array-triple -DLIB_MODERN_C_ARRAYS -o %t/lowering.ll -enable-experimental-feature ObjCAttrAllowsCArrays
 // RUN: %FileCheck %s --input-file %t/lowering.ll
 
 // Library with the legacy projection visible, client with the modern projection
-// RUN: %target-swift-frontend -emit-module -parse-as-library %t/lib.swift -module-name Lib -o %t/Lib.swiftmodule -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays
-// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated %t/client.swift -I %t -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays -verify-additional-prefix legacy-lib-
-// RUN: %target-swift-frontend -emit-ir %t/lowering.swift -I %t -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -o %t/lowering.ll -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -parse-as-library %t/lib_source.swift -module-name Lib -o %t/Lib.swiftmodule -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %t/client.swift -I %t -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays -verify-additional-prefix legacy-lib-
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir %t/lowering.swift -I %t -enable-experimental-feature ModernImportedCArrays -target %target-has-inline-array-triple -o %t/lowering.ll -enable-experimental-feature ObjCAttrAllowsCArrays
 // RUN: %FileCheck %s --input-file %t/lowering.ll
 
-//--- lib.swift
+//--- lib_source.swift
 import Foundation
 
 #if MODERN_C_ARRAYS

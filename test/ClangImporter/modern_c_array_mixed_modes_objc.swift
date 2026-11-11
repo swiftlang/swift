@@ -51,9 +51,9 @@
 
 //--- include/CLib.h
 
-#import <Foundation/Foundation.h>
+#import <objc/NSObject.h>
 
-NS_ASSUME_NONNULL_BEGIN
+#pragma clang assume_nonnull begin
 
 @protocol P
 - (void)showBuf:(int (*)[4])array;
@@ -67,7 +67,7 @@ NS_ASSUME_NONNULL_BEGIN
    completionHandler:(void (^)(int (*)[4]))handler;
 @end
 
-NS_ASSUME_NONNULL_END
+#pragma clang assume_nonnull end
 
 //--- include/module.modulemap
 
