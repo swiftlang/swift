@@ -206,6 +206,8 @@ extension ASTGenVisitor {
         return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
       case .Diagnose:
         return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
+      case .TailAllocated:
+        return handle(self.generateTailAllocatedAttr(attribute: node)?.asDeclAttribute)
       case .Target:
         return handle(self.generateTargetAttr(attribute: node)?.asDeclAttribute)
       case .Transpose:
@@ -2043,6 +2045,40 @@ extension ASTGenVisitor {
         atLoc: self.generateSourceLoc(node.atSign),
         range: self.generateAttrSourceRange(node),
         value: value
+      )
+    }
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @_tailAllocated(counts: _tailCounts, _HashTable.Word, Key, Value)
+  ///   ```
+  func generateTailAllocatedAttr(attribute node: AttributeSyntax) -> BridgedTailAllocatedAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard let countsArg = args.popFirst(), countsArg.label?.rawText == "counts",
+        let declRef = countsArg.expression.as(DeclReferenceExprSyntax.self),
+        declRef.argumentNames == nil, declRef.moduleSelector == nil,
+        !args.isEmpty
+      else {
+        // TODO: Diagnose.
+        return nil
+      }
+      var types: [BridgedTypeRepr] = []
+      while let arg = args.popFirst() {
+        guard arg.label == nil, let type = self.generateTypeRepr(expr: arg.expression) else {
+          // TODO: Diagnose.
+          return nil
+        }
+        types.append(type)
+      }
+      let (countsName, countsNameLoc) = self.generateIdentifierAndSourceLoc(declRef.baseName)
+      return .createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        countsName: countsName,
+        countsNameLoc: countsNameLoc,
+        types: types.lazy.bridgedArray(in: self)
       )
     }
   }

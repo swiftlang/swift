@@ -438,6 +438,7 @@ public:
   void visitUsedAttr(UsedAttr *attr);
   void visitSectionAttr(SectionAttr *attr);
   void visitTargetAttr(TargetAttr *attr);
+  void visitTailAllocatedAttr(TailAllocatedAttr *attr);
 
   void visitDynamicCallableAttr(DynamicCallableAttr *attr);
 
@@ -2882,6 +2883,82 @@ void AttributeChecker::visitSectionAttr(SectionAttr *attr) {
     diagnose(attr->getLocation(), diag::attr_only_on_static_properties, attr);
   } else if (!VarD->hasStorageOrWrapsStorage()) {
     diagnose(attr->getLocation(), diag::attr_not_on_computed_properties, attr);
+  }
+}
+
+void AttributeChecker::visitTailAllocatedAttr(TailAllocatedAttr *attr) {
+  auto *classDecl = cast<ClassDecl>(D);
+  if (!Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    diagnoseAndRemoveAttr(attr, diag::attr_tail_allocated_requires_embedded);
+    return;
+  }
+  // An actor's deallocation doesn't go through dealloc_ref.
+  if (classDecl->isAnyActor()) {
+    diagnoseAndRemoveAttr(attr, diag::attr_tail_allocated_actor);
+    return;
+  }
+  // The deallocation uses the nearest attribute, so one in a superclass would
+  // describe an allocation that no longer exists.
+  if (auto *superclass = classDecl->getSuperclassDecl()) {
+    if (auto *inheritedOwner = superclass->getTailAllocatedAttr().second) {
+      diagnoseAndRemoveAttr(attr, diag::attr_tail_allocated_inherited,
+                            classDecl, inheritedOwner);
+      return;
+    }
+  }
+
+  // Resolve the element types in the class's generic context.
+  auto resolution = TypeResolution::forInterface(
+      classDecl, TypeResolverContext::None,
+      /*unboundTyOpener=*/nullptr, /*placeholderHandler=*/nullptr,
+      /*packElementOpener=*/nullptr);
+  auto typeReprs = attr->getTypeReprs();
+  for (unsigned i = 0, e = typeReprs.size(); i != e; ++i) {
+    Type type = resolution.resolveType(typeReprs[i]);
+    if (!type || type->hasError()) {
+      attr->setInvalid();
+      return;
+    }
+    attr->setType(i, type);
+  }
+
+  // The counts property, in the class or a superclass: one Int per element
+  // type (Int, or a tuple of Ints), read by the deinit. It must be final, so
+  // that a subclass can't change the counts.
+  VarDecl *countsVar = attr->getCountsDecl(classDecl);
+  // An invalid type has been diagnosed already.
+  if (countsVar && countsVar->getInterfaceType()->hasError()) {
+    attr->setInvalid();
+    return;
+  }
+  Type intType = Ctx.getIntType();
+  Type countsType = intType;
+  if (typeReprs.size() > 1) {
+    SmallVector<TupleTypeElt, 4> elts(typeReprs.size(), TupleTypeElt(intType));
+    countsType = TupleType::get(elts, Ctx);
+  }
+  auto *getter =
+      countsVar ? countsVar->getAccessor(AccessorKind::Get) : nullptr;
+  if (!countsVar || !countsVar->isFinal() ||
+      !countsVar->getInterfaceType()->isEqual(countsType) ||
+      (getter && (getter->hasAsync() || getter->hasThrows()))) {
+    diagnose(attr->getCountsNameLoc(),
+             diag::attr_tail_allocated_counts_property, attr->getCountsName(),
+             classDecl, countsType);
+    attr->setInvalid();
+    return;
+  }
+  // The deinit, which reads the property, can be emitted in another module.
+  auto classScope = classDecl->getFormalAccessScope(
+      /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true);
+  auto countsScope = countsVar->getFormalAccessScope(
+      /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true);
+  if ((classScope.isPublic() && !countsScope.isPublic()) ||
+      (classScope.isPackage() && !countsScope.isPublicOrPackage())) {
+    diagnose(attr->getCountsNameLoc(),
+             diag::attr_tail_allocated_counts_not_visible,
+             attr->getCountsName(), classDecl, classScope.isPackage());
+    attr->setInvalid();
   }
 }
 

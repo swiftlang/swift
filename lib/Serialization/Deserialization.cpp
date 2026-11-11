@@ -6977,6 +6977,24 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::TailAllocated_DECL_ATTR: {
+        bool isImplicit;
+        IdentifierID countsNameID;
+        ArrayRef<uint64_t> typeIDs;
+        serialization::decls_block::TailAllocatedDeclAttrLayout::readRecord(
+            scratch, isImplicit, countsNameID, typeIDs);
+        SmallVector<Type, 3> types;
+        for (auto typeID : typeIDs) {
+          auto type = MF.getTypeChecked(typeID);
+          if (!type)
+            return type.takeError();
+          types.push_back(type.get());
+        }
+        Attr = TailAllocatedAttr::create(ctx, MF.getIdentifier(countsNameID),
+                                         types, isImplicit);
+        break;
+      }
+
       case decls_block::TypeEraser_DECL_ATTR: {
         bool isImplicit;
         TypeID typeEraserID;

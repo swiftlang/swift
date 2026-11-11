@@ -1458,5 +1458,9 @@ ERROR(invalid_multiple_return_borrow_accessor, none,
 ERROR(unsupported_borrow_abstraction, none,
       "cannot witness borrow requirement for result type %0",
       (Type))
+
+ERROR(tail_allocated_wrong_element_types, none,
+      "%0 must be tail-allocated with its '@_tailAllocated' element types",
+      (Type))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

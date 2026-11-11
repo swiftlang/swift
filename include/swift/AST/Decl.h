@@ -5554,6 +5554,10 @@ public:
   /// is no superclass.
   ClassDecl *getSuperclassDecl() const;
 
+  /// The `@_tailAllocated` attribute of this class or of its nearest superclass
+  /// that has one, and the class it is attached to; {nullptr, nullptr} if none.
+  std::pair<TailAllocatedAttr *, ClassDecl *> getTailAllocatedAttr() const;
+
   /// Check if this class is a superclass or equal to the given class.
   bool isSuperclassOf(const ClassDecl *other) const;
 

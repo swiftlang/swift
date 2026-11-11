@@ -875,6 +875,59 @@ public:
   }
 };
 
+/// The `@_tailAllocated(counts: property, T...)` attribute on a class whose
+/// instances are allocated with tail-allocated elements. It names the types of
+/// the tail-allocated elements, in the order they are allocated, and a property
+/// holding their counts (an `Int`, or a tuple of one `Int` per type), so that
+/// the deallocation can name the tail elements the allocation had.
+class TailAllocatedAttr final : public DeclAttribute {
+  /// The element types as written; empty if the attribute was deserialized.
+  ArrayRef<TypeRepr *> TypeReprs;
+  /// The resolved element types, set by the type checker or deserialization.
+  MutableArrayRef<Type> Types;
+  Identifier CountsName;
+  SourceLoc CountsNameLoc;
+
+  TailAllocatedAttr(Identifier countsName, SourceLoc countsNameLoc,
+                    ArrayRef<TypeRepr *> typeReprs, MutableArrayRef<Type> types,
+                    SourceLoc atLoc, SourceRange range, bool implicit)
+      : DeclAttribute(DeclAttrKind::TailAllocated, atLoc, range, implicit),
+        TypeReprs(typeReprs), Types(types), CountsName(countsName),
+        CountsNameLoc(countsNameLoc) {}
+
+public:
+  /// Create the attribute as written in source.
+  static TailAllocatedAttr *createParsed(ASTContext &ctx, SourceLoc atLoc,
+                                         SourceRange range,
+                                         Identifier countsName,
+                                         SourceLoc countsNameLoc,
+                                         ArrayRef<TypeRepr *> typeReprs);
+
+  /// Create the attribute with resolved types.
+  static TailAllocatedAttr *create(ASTContext &ctx, Identifier countsName,
+                                   ArrayRef<Type> types, bool implicit);
+
+  ArrayRef<TypeRepr *> getTypeReprs() const { return TypeReprs; }
+  /// The element types, or null types if they haven't been resolved.
+  ArrayRef<Type> getTypes() const { return Types; }
+  void setType(unsigned index, Type type) { Types[index] = type; }
+
+  Identifier getCountsName() const { return CountsName; }
+  SourceLoc getCountsNameLoc() const { return CountsNameLoc; }
+
+  /// The counts property of \p owner, the class this attribute is attached to:
+  /// the instance property with that name in \p owner or a superclass.
+  VarDecl *getCountsDecl(const ClassDecl *owner) const;
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::TailAllocated;
+  }
+
+  UNIMPLEMENTED_CLONE(TailAllocatedAttr)
+
+  bool isEquivalent(const TailAllocatedAttr *other, Decl *attachedTo) const;
+};
+
 /// Defines the @_alignment attribute.
 class AlignmentAttr : public DeclAttribute {
 public:

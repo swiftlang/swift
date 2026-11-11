@@ -13379,6 +13379,16 @@ Type ClassDecl::getSuperclass() const {
     Type());
 }
 
+std::pair<TailAllocatedAttr *, ClassDecl *>
+ClassDecl::getTailAllocatedAttr() const {
+  for (auto *cls = const_cast<ClassDecl *>(this); cls;
+       cls = cls->getSuperclassDecl()) {
+    if (auto *attr = cls->getAttrs().getAttribute<TailAllocatedAttr>())
+      return {attr, cls};
+  }
+  return {nullptr, nullptr};
+}
+
 ClassDecl *ClassDecl::getSuperclassDecl() const {
   ASTContext &ctx = getASTContext();
   auto result = evaluateOrDefault(ctx.evaluator,

@@ -529,6 +529,15 @@ namespace {
     }
 
     bool visitDeallocRefInst(const DeallocRefInst *RHS) {
+      auto *LHSInst = cast<DeallocRefInst>(LHS);
+      auto LHSTypes = LHSInst->getTailAllocatedTypes();
+      auto RHSTypes = RHS->getTailAllocatedTypes();
+      unsigned NumTypes = LHSTypes.size();
+      assert(NumTypes == RHSTypes.size());
+      for (unsigned Idx = 0; Idx < NumTypes; ++Idx) {
+        if (LHSTypes[Idx] != RHSTypes[Idx])
+          return false;
+      }
       return true;
     }
 

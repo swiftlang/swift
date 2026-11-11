@@ -7116,9 +7116,7 @@ void IRGenSILFunction::visitAllocPackMetadataInst(AllocPackMetadataInst *i) {
 static void
 buildTailArrays(IRGenSILFunction &IGF,
                 SmallVectorImpl<std::pair<SILType, llvm::Value *>> &TailArrays,
-                AllocRefInstBase *ARI) {
-  auto Types = ARI->getTailAllocatedTypes();
-  auto Counts = ARI->getTailAllocatedCounts();
+                ArrayRef<SILType> Types, ArrayRef<Operand> Counts) {
   for (unsigned Idx = 0, NumTypes = Types.size(); Idx < NumTypes; ++Idx) {
     Explosion ElemCount = IGF.getLoweredExplosion(Counts[Idx].get());
     TailArrays.push_back({Types[Idx], ElemCount.claimNext()});
@@ -7138,7 +7136,8 @@ void IRGenSILFunction::visitAllocRefInst(swift::AllocRefInst *i) {
     StackAllocSize = IGM.IRGen.Opts.StackPromotionSizeLimit - EstimatedStackSize;
   }
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
-  buildTailArrays(*this, TailArrays, i);
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
 
   llvm::Value *alloced = emitClassAllocation(*this, i->getType(), i->isObjC(), i->isBare(),
                                              StackAllocSize, TailArrays);
@@ -7168,7 +7167,8 @@ void IRGenSILFunction::visitAllocRefDynamicInst(swift::AllocRefDynamicInst *i) {
   }
 
   SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
-  buildTailArrays(*this, TailArrays, i);
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
 
   Explosion metadata = getLoweredExplosion(i->getMetatypeOperand());
   auto metadataValue = metadata.claimNext();
@@ -7268,7 +7268,10 @@ void IRGenSILFunction::visitDeallocRefInst(swift::DeallocRefInst *i) {
     return;
   }
   auto classType = i->getOperand()->getType();
-  emitClassDeallocation(*this, classType, selfValue);
+  SmallVector<std::pair<SILType, llvm::Value *>, 4> TailArrays;
+  buildTailArrays(*this, TailArrays, i->getTailAllocatedTypes(),
+                  i->getTailAllocatedCounts());
+  emitClassDeallocation(*this, classType, selfValue, TailArrays);
 }
 
 void IRGenSILFunction::visitDeallocPartialRefInst(swift::DeallocPartialRefInst *i) {

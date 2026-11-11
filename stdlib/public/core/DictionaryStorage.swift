@@ -256,6 +256,9 @@ extension __RawDictionaryStorage {
 }
 
 @unsafe @usableFromInline
+#if hasFeature(TailAllocatedAttribute)
+@_tailAllocated(counts: _tailCounts, _HashTable.Word, Key, Value)
+#endif
 final internal class _DictionaryStorage<Key: Hashable, Value>
   : __RawDictionaryStorage, @unsafe _NSDictionaryCore {
   // This type is made with allocWithTailElems, so no init is ever called.
@@ -264,6 +267,19 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
   override internal init(_doNotCallMe: ()) {
     _internalInvariantFailure("This class cannot be directly initialized")
   }
+
+#if hasFeature(TailAllocatedAttribute)
+  /// The numbers of bitmap words, keys and values allocated, for typed
+  /// deallocation. (The word count is `_UnsafeBitset.wordCount`, without its
+  /// checks, so the deinit stays free of traps.)
+  @usableFromInline
+  internal final var _tailCounts: (Int, Int, Int) {
+    let bucketCount = unsafe _bucketCount
+    let wordCount = (bucketCount &+ (Int.bitWidth &- 1))
+      &>> Int.bitWidth.trailingZeroBitCount
+    return (wordCount, bucketCount, bucketCount)
+  }
+#endif
 
   deinit {
     guard unsafe _count > 0 else { return }

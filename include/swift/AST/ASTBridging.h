@@ -1388,6 +1388,13 @@ BridgedSemanticsAttr BridgedSemanticsAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,
     swift::SourceRange range, BridgedStringRef cValue);
 
+SWIFT_NAME("BridgedTailAllocatedAttr.createParsed(_:atLoc:range:countsName:"
+           "countsNameLoc:types:)")
+BridgedTailAllocatedAttr BridgedTailAllocatedAttr_createParsed(
+    BridgedASTContext cContext, swift::SourceLoc atLoc,
+    swift::SourceRange range, swift::Identifier countsName,
+    swift::SourceLoc countsNameLoc, BridgedArrayRef cTypes);
+
 SWIFT_NAME("BridgedTargetAttr.createParsed(_:atLoc:range:value:)")
 BridgedTargetAttr BridgedTargetAttr_createParsed(
     BridgedASTContext cContext, swift::SourceLoc atLoc,

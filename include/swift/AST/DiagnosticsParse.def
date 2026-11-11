@@ -1929,6 +1929,12 @@ ERROR(documentation_attr_metadata_expected_text,none,
 ERROR(documentation_attr_duplicate_metadata,none,
       "cannot give more than one metadata argument to the same item", ())
 
+ERROR(attr_tail_allocated_expected_counts,none,
+      "expected 'counts:' and a property name in '@_tailAllocated'", ())
+ERROR(attr_tail_allocated_expected_type,none,
+      "expected at least one element type after the counts property in "
+      "'@_tailAllocated'", ())
+
 ERROR(attr_rawlayout_expected_label,none,
       "expected %0 argument to '@_rawLayout'", (StringRef))
 ERROR(attr_rawlayout_expected_integer_size,none,

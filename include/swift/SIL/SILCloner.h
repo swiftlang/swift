@@ -3626,9 +3626,16 @@ template<typename ImplClass>
 void
 SILCloner<ImplClass>::visitDeallocRefInst(DeallocRefInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  auto CountArgs =
+      getOpValueArray<8>(OperandValueArrayRef(Inst->getTailAllocatedCounts()));
+  SmallVector<SILType, 4> ElemTypes;
+  for (SILType OrigElemType : Inst->getTailAllocatedTypes()) {
+    ElemTypes.push_back(getOpType(OrigElemType));
+  }
   recordClonedInstruction(
       Inst, getBuilder().createDeallocRef(getOpLocation(Inst->getLoc()),
-                                          getOpValue(Inst->getOperand())));
+                                          getOpValue(Inst->getOperand()),
+                                          ElemTypes, CountArgs));
 }
 
 template<typename ImplClass>

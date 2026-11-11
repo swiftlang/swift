@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ArgumentScope.h"
+#include "ArgumentSource.h"
 #include "RValue.h"
 #include "SILGenFunction.h"
 #include "SwitchEnumBuilder.h"
@@ -240,6 +241,72 @@ void SILGenFunction::emitDeallocatingDestructor(DestructorDecl *dd,
   return emitDeallocatingMoveOnlyDestructor(dd);
 }
 
+bool SILGenFunction::getTailAllocatedElementTypes(
+    CanType classType, SmallVectorImpl<CanType> &formalTypes,
+    SmallVectorImpl<SILType> &loweredTypes) {
+  if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    return false;
+  auto *classDecl = classType->getClassDecl();
+  if (!classDecl)
+    return false;
+  auto [attr, owner] = classDecl->getTailAllocatedAttr();
+  if (!attr || attr->isInvalid())
+    return false;
+  auto ownerSubs =
+      classType->getSuperclassForDecl(owner)->getContextSubstitutionMap();
+  auto sig = owner->getGenericSignature().getCanonicalSignature();
+  for (Type type : attr->getTypes()) {
+    CanType formalType = type.subst(ownerSubs)->getCanonicalType();
+    formalTypes.push_back(formalType);
+    loweredTypes.push_back(
+        getLoweredType(AbstractionPattern(sig, type->getCanonicalType()),
+                       formalType)
+            .getObjectType());
+  }
+  return true;
+}
+
+void SILGenFunction::emitTailAllocatedElements(
+    SILLocation loc, SILValue selfValue, SmallVectorImpl<SILType> &tailTypes,
+    SmallVectorImpl<SILValue> &tailCounts) {
+  CanType selfType = selfValue->getType().getASTType();
+  SmallVector<CanType, 4> formalTypes;
+  if (!getTailAllocatedElementTypes(selfType, formalTypes, tailTypes))
+    return;
+  auto [attr, owner] = selfType->getClassDecl()->getTailAllocatedAttr();
+  VarDecl *countsVar = attr->getCountsDecl(owner);
+  if (!countsVar) {
+    tailTypes.clear();
+    return;
+  }
+
+  FullExpr scope(Cleanups, CleanupLocation(loc));
+  ManagedValue base = emitManagedBeginBorrow(loc, selfValue);
+  // The property may be declared in a superclass of the class (e.g.
+  // ManagedBuffer) or of the attribute's owner.
+  auto *propertyClass = countsVar->getDeclContext()->getSelfClassDecl();
+  CanType baseType =
+      selfType->getSuperclassForDecl(propertyClass)->getCanonicalType();
+  if (baseType != selfType)
+    base = B.createUpcast(loc, base, getLoweredType(baseType));
+  RValue counts = emitRValueForStorageLoad(
+      loc, base, baseType, /*isSuper=*/false, countsVar, PreparedArguments(),
+      baseType->getContextSubstitutionMap(), AccessSemantics::Ordinary,
+      countsVar->getInterfaceType(), SGFContext(),
+      /*isBaseGuaranteed=*/true);
+  SILValue countsValue = std::move(counts).forwardAsSingleValue(*this, loc);
+
+  // Each count as a builtin integer: the Int's pointer-width value.
+  SmallVector<SILValue, 4> ints;
+  if (tailTypes.size() == 1)
+    ints.push_back(countsValue);
+  else
+    B.emitDestructureValueOperation(loc, countsValue, ints);
+  VarDecl *intValue = getASTContext().getIntDecl()->getStoredProperties()[0];
+  for (SILValue n : ints)
+    tailCounts.push_back(B.createStructExtract(loc, n, intValue));
+}
+
 void SILGenFunction::emitDeallocatingClassDestructor(DestructorDecl *dd,
                                                      bool isIsolated) {
   MagicFunctionName = DeclName(SGM.M.getASTContext().getIdentifier("deinit"));
@@ -267,6 +334,13 @@ void SILGenFunction::emitDeallocatingClassDestructor(DestructorDecl *dd,
     std::tie(dtorValue, dtorTy) =
         emitSiblingMethodRef(loc, initialSelfValue, dtorConstant, subMap);
 
+    // So that the deallocation passes the allocation's size, read the tail
+    // element counts of a class with @_tailAllocated while self is still
+    // intact (Embedded Swift only).
+    SmallVector<SILType, 4> tailTypes;
+    SmallVector<SILValue, 4> tailCounts;
+    emitTailAllocatedElements(loc, initialSelfValue, tailTypes, tailCounts);
+
     // Call the destroying destructor.
     SILValue selfForDealloc;
     {
@@ -293,7 +367,7 @@ void SILGenFunction::emitDeallocatingClassDestructor(DestructorDecl *dd,
 
     // Deallocate the object.
     selfForDealloc = B.createUncheckedRefCast(loc, selfForDealloc, classTy);
-    B.createDeallocRef(loc, selfForDealloc);
+    B.createDeallocRef(loc, selfForDealloc, tailTypes, tailCounts);
 
   });
 }

@@ -4290,6 +4290,57 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       return makeParserSuccess();
     break;
   }
+  case DeclAttrKind::TailAllocated: {
+    // @_tailAllocated(counts: property, T...)
+    if (!consumeIfAttributeLParen()) {
+      diagnose(Loc, diag::attr_expected_lparen, AttrName,
+               DeclAttribute::isDeclModifier(DK));
+      return makeParserSuccess();
+    }
+    Identifier countsName;
+    SourceLoc countsNameLoc;
+    if (!(Tok.is(tok::identifier) && Tok.getText() == "counts" &&
+          peekToken().is(tok::colon))) {
+      diagnose(Tok.getLoc(), diag::attr_tail_allocated_expected_counts);
+      skipUntil(tok::r_paren);
+      consumeIf(tok::r_paren);
+      return makeParserSuccess();
+    }
+    consumeToken(tok::identifier);
+    consumeToken(tok::colon);
+    if (!Tok.is(tok::identifier)) {
+      diagnose(Tok.getLoc(), diag::attr_tail_allocated_expected_counts);
+      skipUntil(tok::r_paren);
+      consumeIf(tok::r_paren);
+      return makeParserSuccess();
+    }
+    countsNameLoc =
+        consumeIdentifier(countsName, /*diagnoseDollarPrefix=*/false);
+    if (!consumeIf(tok::comma)) {
+      diagnose(Tok.getLoc(), diag::attr_tail_allocated_expected_type);
+      skipUntil(tok::r_paren);
+      consumeIf(tok::r_paren);
+      return makeParserSuccess();
+    }
+    SmallVector<TypeRepr *, 3> types;
+    do {
+      auto type = parseType(diag::expected_type);
+      if (type.isNull())
+        return makeParserSuccess();
+      types.push_back(type.get());
+    } while (consumeIf(tok::comma));
+    SourceLoc rParenLoc;
+    if (!consumeIf(tok::r_paren, rParenLoc)) {
+      diagnose(Tok.getLoc(), diag::attr_expected_rparen, AttrName,
+               /*isModifier=*/false);
+      return makeParserSuccess();
+    }
+    Attributes.add(TailAllocatedAttr::createParsed(
+        Context, AtLoc, SourceRange(Loc, rParenLoc), countsName, countsNameLoc,
+        types));
+    break;
+  }
+
   case DeclAttrKind::RawLayout: {
     if (!isAtAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,

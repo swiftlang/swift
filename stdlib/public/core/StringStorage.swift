@@ -275,6 +275,9 @@ fileprivate func _allocateStringStorage(
 // NOTE: older runtimes called this class _StringStorage. The two
 // must coexist without conflicting ObjC class names, so it was
 // renamed. The old name must not be used in the new runtime.
+#if hasFeature(TailAllocatedAttribute)
+@_tailAllocated(counts: _tailCount, UInt8)
+#endif
 final internal class __StringStorage
   : __SwiftNativeNSString, _AbstractStringStorage {
 #if _pointerBitWidth(_64)
@@ -497,6 +500,15 @@ extension __StringStorage {
   internal var start: UnsafePointer<UInt8> {
      unsafe UnsafePointer(mutableStart)
   }
+
+#if hasFeature(TailAllocatedAttribute)
+  /// The number of bytes allocated, for typed deallocation: the code units
+  /// and, if present, the breadcrumbs pointer.
+  internal var _tailCount: Int {
+    _capacityAndFlags._realCapacity
+      &+ (hasBreadcrumbs ? MemoryLayout<Int>.stride : 0)
+  }
+#endif
 
   @inline(__always)
   private final var end: UnsafePointer<UInt8> {

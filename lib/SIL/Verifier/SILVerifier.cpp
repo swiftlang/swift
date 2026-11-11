@@ -2187,6 +2187,37 @@ public:
       require(Counts[Idx].get()->getType().is<BuiltinIntegerType>(),
               "count needs integer type");
     }
+    checkTailAllocatedAttr(ARI->getType(), ARI->getTailAllocatedTypes());
+  }
+
+  /// Both the allocation and the deallocation of a class with
+  /// @_tailAllocated must use the attribute's element types, so that they
+  /// pass the same size and type ID.
+  void checkTailAllocatedAttr(SILType classType, ArrayRef<SILType> Types) {
+    auto *classDecl = classType.getClassDecl();
+    if (Types.empty() || !classDecl)
+      return;
+    auto [attr, owner] = classDecl->getTailAllocatedAttr();
+    if (!attr)
+      return;
+    auto attrTypes = attr->getTypes();
+    // Not type-checked (e.g. a parsed SIL file without Sema).
+    if (llvm::any_of(attrTypes, [](Type type) { return !type; }))
+      return;
+    require(Types.size() == attrTypes.size(),
+            "tail elements must be the @_tailAllocated element types");
+    auto ownerType = classType.getASTType()->getSuperclassForDecl(owner);
+    auto subs = ownerType->getContextSubstitutionMap();
+    // Lowered with the owner's generic abstraction, like a stored property
+    // (SILGen lowers them so for both the allocation and the deallocation).
+    auto sig = owner->getGenericSignature().getCanonicalSignature();
+    for (unsigned Idx = 0, End = Types.size(); Idx != End; ++Idx) {
+      auto expected = F.getLoweredType(
+          Lowering::AbstractionPattern(sig, attrTypes[Idx]->getCanonicalType()),
+          attrTypes[Idx].subst(subs));
+      require(Types[Idx].getASTType() == expected.getASTType(),
+              "tail elements must be the @_tailAllocated element types");
+    }
   }
 
   void checkAllocRefInst(AllocRefInst *AI) {
@@ -4310,6 +4341,18 @@ public:
 
     require(!checkResilience(cd, F),
             "cannot directly deallocate resilient class");
+
+    for (auto &Count : DI->getTailAllocatedCounts())
+      require(Count.get()->getType().is<BuiltinIntegerType>(),
+              "count needs integer type");
+    auto *attr = cd->getTailAllocatedAttr().first;
+    if (attr && !attr->isInvalid() &&
+        F.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      require(DI->getNumTailTypes() != 0,
+              "dealloc_ref of a class with @_tailAllocated must name its tail "
+              "elements");
+    checkTailAllocatedAttr(DI->getOperand()->getType(),
+                           DI->getTailAllocatedTypes());
   }
   void checkDeallocPartialRefInst(DeallocPartialRefInst *DPRI) {
     require(DPRI->getInstance()->getType().isObject(),

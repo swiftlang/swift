@@ -1412,11 +1412,19 @@ extension KeyPathComponent: @unsafe Hashable {
 // A class that maintains ownership of another object while a mutable projection
 // into it is underway. The lifetime of the instance of this class is also used
 // to begin and end exclusive 'modify' access to the projected address.
+#if hasFeature(TailAllocatedAttribute)
+@_tailAllocated(counts: _tailCount, Builtin.UnsafeValueBuffer)
+#endif
 internal final class ClassHolder<ProjectionType> {
 
   /// The type of the scratch record passed to the runtime to record
   /// accesses to guarantee exclusive access.
   internal typealias AccessRecord = Builtin.UnsafeValueBuffer
+
+#if hasFeature(TailAllocatedAttribute)
+  /// The number of access records allocated, for typed deallocation.
+  internal final var _tailCount: Int { 1 }
+#endif
 
   internal var previous: AnyObject?
   internal var instance: AnyObject

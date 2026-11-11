@@ -255,6 +255,9 @@ protected:
     SHARED_FIELD(AllocPackMetadataInst, uint8_t
       isNested : 1);
 
+    SHARED_FIELD(DeallocRefInst, uint8_t
+      numTailTypes: NumAllocRefTailTypesBits);
+
     SHARED_FIELD(PartialApplyInst, uint8_t
                  isNested : 1);
 
