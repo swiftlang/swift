@@ -510,6 +510,22 @@ public:
   /// header.
   std::optional<ClangHeaderExposeBehavior> ClangHeaderExposedDecls;
 
+  /// Whether the generated clang header has C++ content.
+  bool clangHeaderHasCxxContent(bool enableCxxInterop) const {
+    // FIXME: Expose Swift with @expose by default.
+    return ClangHeaderExposedDecls.has_value() || enableCxxInterop;
+  }
+
+  /// Whether the C++ content of the generated clang header only includes
+  /// declarations that are '@_expose(Cxx)' or members of such types.
+  bool clangHeaderRequiresExposeAttr() const {
+    // FIXME: should we detect any presence of @expose and require it then?
+    return ClangHeaderExposedDecls ==
+               ClangHeaderExposeBehavior::HasExposeAttr ||
+           ClangHeaderExposedDecls ==
+               ClangHeaderExposeBehavior::HasExposeAttrOrImplicitDeps;
+  }
+
   // Include declarations that are at least as visible as the acces specified
   // by -emit-clang-header-min-access
   std::optional<AccessLevel> ClangHeaderMinAccess;
