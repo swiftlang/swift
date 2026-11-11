@@ -23,7 +23,7 @@ func repeat_while_loop(x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb1 belongs to a loop, original header bb1, pullback header bb3
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#AARG0:]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#A0:]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#A0:]] = alloc_stack [var_decl] $Float, var, name "result"
 // DEBUG-NEXT:  [AD] The following active value is loop-local, zeroing its adjoint value in loop header:   %[[#A1:]] = apply %[[#A2:]](%[[#AARG0]], %[[#A3:]], %[[#A4:]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // DEBUG-NEXT:  [AD] Setting adjoint value for   %[[#A1]] = apply %[[#A2]](%[[#AARG0]], %[[#A3]], %[[#A4]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // DEBUG-NEXT:  [AD] No debug variable found.
@@ -80,7 +80,7 @@ func repeat_while_loop(x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb2 belongs to a loop, original header bb1, pullback header bb3
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#AARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#A0]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#A0]] = alloc_stack [var_decl] $Float, var, name "result"
 // DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#A1]] = apply %[[#A2]](%[[#AARG0]], %[[#A3]], %[[#A4]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#A5]] = begin_access [modify] [static] %[[#A0]] : $*Float
 
@@ -119,9 +119,9 @@ func repeat_while_loop_nested(_ x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb4 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#BARG0:]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00:]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00:]] = alloc_stack [var_decl] $Float, var, name "result"
 // DEBUG-NEXT:  [AD] The following active value is loop-local, checking if it's adjoint is a projection
-// DEBUG-NEXT:  [AD] Adjoint for the following value is NOT a projection, zeroing its adjoint buffer in loop header:   %[[#B01:]] = alloc_stack [var_decl] $Float, var, name "temp", type $Float
+// DEBUG-NEXT:  [AD] Adjoint for the following value is NOT a projection, zeroing its adjoint buffer in loop header:   %[[#B01:]] = alloc_stack [var_decl] $Float, var, name "temp"
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B02:]] = begin_access [read] [static] %[[#B01]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B03:]] = load [trivial] %[[#B02]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B04:]] = apply %[[#B05:]](%[[#B03]], %[[#BARG0]], %[[#B06:]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
@@ -147,8 +147,8 @@ func repeat_while_loop_nested(_ x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb2 belongs to a loop, original header bb2, pullback header bb6
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#BARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B01]] = alloc_stack [var_decl] $Float, var, name "temp", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00]] = alloc_stack [var_decl] $Float, var, name "result"
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B01]] = alloc_stack [var_decl] $Float, var, name "temp"
 // DEBUG-NEXT:  [AD] The following active value is loop-local, checking if it's adjoint is a projection
 // DEBUG-NEXT:  [AD] Adjoint for the following value is a projection, skipping:   %[[#B02]] = begin_access [read] [static] %[[#B01]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is loop-local, zeroing its adjoint value in loop header:   %[[#B03]] = load [trivial] %[[#B02]] : $*Float
@@ -164,8 +164,8 @@ func repeat_while_loop_nested(_ x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb3 belongs to a loop, original header bb2, pullback header bb6
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#BARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B01]] = alloc_stack [var_decl] $Float, var, name "temp", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00]] = alloc_stack [var_decl] $Float, var, name "result"
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B01]] = alloc_stack [var_decl] $Float, var, name "temp"
 // DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#B02]] = begin_access [read] [static] %[[#B01]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#B03]] = load [trivial] %[[#B02]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#B04]] = apply %[[#B05]](%[[#B03]], %[[#BARG0]], %[[#B06]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
@@ -173,13 +173,13 @@ func repeat_while_loop_nested(_ x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb1 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#BARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
-// DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#B01]] = alloc_stack [var_decl] $Float, var, name "temp", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00]] = alloc_stack [var_decl] $Float, var, name "result"
+// DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#B01]] = alloc_stack [var_decl] $Float, var, name "temp"
 
 // DEBUG-NEXT:  [AD] Original bb5 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#BARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
-// DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#B01]] = alloc_stack [var_decl] $Float, var, name "temp", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B00]] = alloc_stack [var_decl] $Float, var, name "result"
+// DEBUG-NEXT:  [AD] The following active value is loop-local, but it was already processed, skipping:   %[[#B01]] = alloc_stack [var_decl] $Float, var, name "temp"
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B02]] = begin_access [read] [static] %[[#B01]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B03]] = load [trivial] %[[#B02]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#B04]] = apply %[[#B05]](%[[#B03]], %[[#BARG0]], %[[#B06]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
@@ -217,15 +217,15 @@ func repeat_while_loop_condition(_ x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb6 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#CARG0:]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00:]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00:]] = alloc_stack [var_decl] $Float, var, name "result"
 
 // DEBUG-NEXT:  [AD] Original bb1 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#CARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result"
 
 // DEBUG-NEXT:  [AD] Original bb5 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#CARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result"
 // DEBUG-NEXT:  [AD] The following active value is loop-local, checking if it's adjoint is a projection
 // DEBUG-NEXT:  [AD] Adjoint for the following value is a projection, skipping:   %[[#C01:]] = begin_access [read] [static] %[[#C00]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is loop-local, zeroing its adjoint value in loop header:   %[[#C02:]] = load [trivial] %[[#C01]] : $*Float
@@ -247,7 +247,7 @@ func repeat_while_loop_condition(_ x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb4 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#CARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result"
 // DEBUG-NEXT:  [AD] The following active value is loop-local, checking if it's adjoint is a projection
 // DEBUG-NEXT:  [AD] Adjoint for the following value is a projection, skipping:   %[[#C08:]] = begin_access [read] [static] %[[#C00]] : $*Float
 // DEBUG-NEXT:  [AD] The following active value is loop-local, zeroing its adjoint value in loop header:   %[[#C09:]] = load [trivial] %[[#C08]] : $*Float
@@ -263,11 +263,11 @@ func repeat_while_loop_condition(_ x: Float) -> Float {
 
 // DEBUG-NEXT:  [AD] Original bb7 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#CARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result"
 
 // DEBUG-NEXT:  [AD] Original bb3 belongs to a loop, original header bb1, pullback header bb10
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#CARG0]] = argument of bb0 : $Float
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result", type $Float
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#C00]] = alloc_stack [var_decl] $Float, var, name "result"
 
 // DEBUG-NEXT:  [AD] End search for adjoints of loop-local active values
 
@@ -289,11 +289,11 @@ pullback(at: [1, 2, 3], of: identity)(FloatArrayTan([4, -5, 6]))
 
 // DEBUG-NEXT:  [AD] Original bb1 belongs to a loop, original header bb1, pullback header bb3
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#DARG0:]] = argument of bb0 : $Array<Float>
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#D0:]] = alloc_stack [var_decl] $Array<Float>, var, name "results", type $Array<Float>
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#D0:]] = alloc_stack [var_decl] $Array<Float>, var, name "results"
 
 // DEBUG-NEXT:  [AD] Original bb2 belongs to a loop, original header bb1, pullback header bb3
 // DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping: %[[#DARG0:]] = argument of bb0 : $Array<Float>
-// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#D0]] = alloc_stack [var_decl] $Array<Float>, var, name "results", type $Array<Float>
+// DEBUG-NEXT:  [AD] The following active value is NOT loop-local, skipping:   %[[#D0]] = alloc_stack [var_decl] $Array<Float>, var, name "results"
 // DEBUG-NEXT:  [AD] The following active value is loop-local, zeroing its adjoint value in loop header:   %[[#D1:]] = apply %[[#]]<Float>(%[[#]]) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // DEBUG-NEXT:  [AD] Setting adjoint value for   %[[#D:]] = apply %[[#]]<Float>(%[[#]]) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // DEBUG-NEXT:  [AD] No debug variable found.

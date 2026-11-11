@@ -139,7 +139,7 @@ public func rethrowAfterLet(_ flag: Bool) throws {
 // The epilog is emitted into the block of its only return, not in the scope
 // of the final trap.
 // CHECK-LABEL: sil hidden @$s1a21returnInBlockThenTrapySiAA1CCn_SbtF
-// CHECK: [[RIBTT_C:%[0-9]+]] = alloc_stack [var_decl] [moveable_value_debuginfo] $C, var, name "c"
+// CHECK: [[RIBTT_C:%[0-9]+]] = alloc_stack [var_decl] [moveable_value_debuginfo] $C, var, name "c", argno 1
 // CHECK: debug_value {{.*}}, let, name "x", {{.*}}, scope [[RIBTT_X:[0-9]+]]
 // CHECK: debug_value {{.*}}, let, name "y", {{.*}}, scope [[RIBTT_Y:[0-9]+]]
 // CHECK: destroy_addr [[RIBTT_C]], {{.*}}, scope [[RIBTT_Y]]

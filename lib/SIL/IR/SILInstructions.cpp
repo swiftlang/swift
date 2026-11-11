@@ -271,7 +271,7 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       Var->Loc = {};
     if (Var->Scope == Loc.getScope())
       Var->Scope = nullptr;
-    if (Var->Type == elementType)
+    if (Var->Type == elementType.getObjectType())
       Var->Type = {};
     if (Var->DIExpr) {
       // alloc_stack cannot carry a DIExpression.
