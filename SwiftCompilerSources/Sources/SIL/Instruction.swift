@@ -617,6 +617,10 @@ final public class DiagnoseInst : Instruction, UnaryInstruction {
 
     /// The marked address is the destination of a second initialization of immutable storage.
     case letReinit
+
+    /// The marked address holds `self` in a derived class initializer, which may be used before `super.init`
+    /// initializes its superclass part.
+    case missingSuperInit
   }
 
   public var kind: DiagnoseKind { DiagnoseKind(rawValue: bridged.Diagnose_getKind())! }

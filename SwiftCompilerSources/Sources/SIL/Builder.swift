@@ -292,6 +292,12 @@ public struct Builder {
     return notifyNew(dr.getAs(DeallocStackRefInst.self))
   }
 
+  @discardableResult
+  public func createDeallocPartialRef(_ operand: Value, metatype: Value) -> DeallocPartialRefInst {
+    let dr = bridged.createDeallocPartialRef(operand.bridged, metatype.bridged)
+    return notifyNew(dr.getAs(DeallocPartialRefInst.self))
+  }
+
   public func createAddressToPointer(address: Value, pointerType: Type,
                                      needStackProtection: Bool) -> AddressToPointerInst {
     let dr = bridged.createAddressToPointer(address.bridged, pointerType.bridged, needStackProtection)
@@ -753,6 +759,10 @@ public struct Builder {
 
   public func createStructElementAddr(structAddress: Value, fieldIndex: Int) -> StructElementAddrInst {
     return notifyNew(bridged.createStructElementAddr(structAddress.bridged, fieldIndex).getAs(StructElementAddrInst.self))
+  }
+
+  public func createRefElementAddr(classReference: Value, fieldIndex: Int) -> RefElementAddrInst {
+    return notifyNew(bridged.createRefElementAddr(classReference.bridged, fieldIndex).getAs(RefElementAddrInst.self))
   }
 
   public func createDestructureStruct(struct: Value) -> DestructureStructInst {

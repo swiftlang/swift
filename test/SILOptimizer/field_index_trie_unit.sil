@@ -107,3 +107,152 @@ bb0:
   specify_test "field_index_trie %nested"
   return %e : $()
 }
+
+// Class instances: one leaf per stored property, reached through class field projections.
+
+class Base {
+  var x: Builtin.Int64
+  var y: Klass
+  init()
+}
+
+class Derived : Base {
+  var d: Klass
+  var s: SPair
+  override init()
+}
+
+class EmptyDerived : Klass {}
+
+class Recursive {
+  var next: Recursive
+  var n: Builtin.Int64
+  init()
+}
+
+class Generic<T> {
+  var t: T
+  var k: Klass
+  init()
+}
+
+struct HoldsBase {
+  var b: Base
+  var k: Klass
+}
+
+// A struct holding a class with stored properties: the class reference is still a single leaf.
+// CHECK-LABEL: begin running test {{.*}} on test_struct_of_class: field_index_trie
+// CHECK: leafCount: 2
+// CHECK: <root> -> 0..<2
+// CHECK: s0 -> 0..<1
+// CHECK: s1 -> 1..<2
+// CHECK-LABEL: end running test {{.*}} on test_struct_of_class: field_index_trie
+sil @test_struct_of_class : $@convention(thin) (@in_guaranteed HoldsBase) -> () {
+bb0(%0 : $*HoldsBase):
+  specify_test "field_index_trie %0"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_class_root: field_index_trie
+// CHECK: leafCount: 2
+// CHECK: <root> -> 0..<2
+// CHECK: c0 -> 0..<1
+// CHECK: c1 -> 1..<2
+// CHECK: field 0 -> 0..<1
+// CHECK: field 1 -> 1..<2
+// CHECK-LABEL: end running test {{.*}} on test_class_root: field_index_trie
+sil @test_class_root : $@convention(thin) (@guaranteed Base) -> () {
+bb0(%0 : $Base):
+  specify_test "field_index_trie %0 true"
+  %r = tuple ()
+  return %r : $()
+}
+
+// Without the class-instance mode, the same class is a single opaque leaf.
+// CHECK-LABEL: begin running test {{.*}} on test_class_root_opaque: field_index_trie
+// CHECK: leafCount: 1
+// CHECK: <root> -> 0..<1
+// CHECK-LABEL: end running test {{.*}} on test_class_root_opaque: field_index_trie
+sil @test_class_root_opaque : $@convention(thin) (@guaranteed Base) -> () {
+bb0(%0 : $Base):
+  specify_test "field_index_trie %0"
+  %r = tuple ()
+  return %r : $()
+}
+
+// The inherited fields x and y have no leaves: their indices conservatively select the whole
+// instance. The struct-typed field s is expanded.
+// CHECK-LABEL: begin running test {{.*}} on test_class_derived: field_index_trie
+// CHECK: leafCount: 3
+// CHECK: <root> -> 0..<3
+// CHECK: c2 -> 0..<1
+// CHECK: c3 -> 1..<3
+// CHECK: c3.s0 -> 1..<2
+// CHECK: c3.s1 -> 2..<3
+// CHECK: field 0 -> 0..<3
+// CHECK: field 1 -> 0..<3
+// CHECK: field 2 -> 0..<1
+// CHECK: field 3 -> 1..<3
+// CHECK-LABEL: end running test {{.*}} on test_class_derived: field_index_trie
+sil @test_class_derived : $@convention(thin) (@guaranteed Derived) -> () {
+bb0(%0 : $Derived):
+  specify_test "field_index_trie %0 true"
+  %r = tuple ()
+  return %r : $()
+}
+
+// A class instance without stored properties of its own has no leaves.
+// CHECK-LABEL: begin running test {{.*}} on test_class_empty_derived: field_index_trie
+// CHECK: leafCount: 0
+// CHECK-NEXT: nodes:
+// CHECK-NEXT: <root> -> 0..<0
+// CHECK-NEXT: }
+// CHECK-LABEL: end running test {{.*}} on test_class_empty_derived: field_index_trie
+sil @test_class_empty_derived : $@convention(thin) (@guaranteed EmptyDerived) -> () {
+bb0(%0 : $EmptyDerived):
+  specify_test "field_index_trie %0 true"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_class_empty_root: field_index_trie
+// CHECK: leafCount: 0
+// CHECK-NEXT: nodes:
+// CHECK-NEXT: <root> -> 0..<0
+// CHECK-NEXT: }
+// CHECK-LABEL: end running test {{.*}} on test_class_empty_root: field_index_trie
+sil @test_class_empty_root : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : $Klass):
+  specify_test "field_index_trie %0 true"
+  %r = tuple ()
+  return %r : $()
+}
+
+// A field referencing the class itself is an opaque leaf.
+// CHECK-LABEL: begin running test {{.*}} on test_class_recursive: field_index_trie
+// CHECK: leafCount: 2
+// CHECK: <root> -> 0..<2
+// CHECK: c0 -> 0..<1
+// CHECK: c1 -> 1..<2
+// CHECK-LABEL: end running test {{.*}} on test_class_recursive: field_index_trie
+sil @test_class_recursive : $@convention(thin) (@guaranteed Recursive) -> () {
+bb0(%0 : $Recursive):
+  specify_test "field_index_trie %0 true"
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_class_generic: field_index_trie
+// CHECK: leafCount: 2
+// CHECK: <root> -> 0..<2
+// CHECK: c0 -> 0..<1
+// CHECK: c1 -> 1..<2
+// CHECK-LABEL: end running test {{.*}} on test_class_generic: field_index_trie
+sil @test_class_generic : $@convention(thin) <T> (@guaranteed Generic<T>) -> () {
+bb0(%0 : $Generic<T>):
+  specify_test "field_index_trie %0 true"
+  %r = tuple ()
+  return %r : $()
+}

@@ -2978,6 +2978,9 @@ public:
     case DiagnoseKind::LetReinit:
       *this << "[let_reinit] ";
       break;
+    case DiagnoseKind::MissingSuperInit:
+      *this << "[missing_super_init] ";
+      break;
     }
     *this << getIDAndType(I->getOperand());
   }

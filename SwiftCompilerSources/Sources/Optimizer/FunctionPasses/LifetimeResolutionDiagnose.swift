@@ -14,9 +14,10 @@ import AST
 import SIL
 
 // Recognizes the markers left behind by LifetimeResolution's `legalize` and emits the user-facing diagnostics:
-//   - `assign undef to [init]`      -> use-before-init
-//   - `diagnose [let_reinit]`       -> second initialization of immutable storage
-//   - `diagnose [unpermitted_copy]` -> use-after-consume
+//   - `assign undef to [init]`        -> use-before-init
+//   - `diagnose [let_reinit]`         -> second initialization of immutable storage
+//   - `diagnose [missing_super_init]` -> use of derived class `self` before `super.init`
+//   - `diagnose [unpermitted_copy]`   -> use-after-consume
 let lifetimeResolutionDiagnosePass = FunctionPass(name: "lifetime-resolution-diagnose") {
   (function: Function, context: FunctionPassContext) in
 
@@ -29,6 +30,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
   // The `diagnose` markers are erased last, as they identify which copies were demoted consumes.
   var unpermittedCopies: [DiagnoseInst] = []
   var letReinits: [DiagnoseInst] = []
+  var missingSuperInits: [DiagnoseInst] = []
   var undefInits: [AssignInst] = []
   for inst in function.instructions {
     switch inst {
@@ -36,6 +38,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
       switch diagnose.kind {
       case .unpermittedCopy: unpermittedCopies.append(diagnose)
       case .letReinit: letReinits.append(diagnose)
+      case .missingSuperInit: missingSuperInits.append(diagnose)
       case .invalid: break
       }
     case let assign as AssignInst where assign.assignOwnership == .initialize && assign.source is Undef:
@@ -53,15 +56,15 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
   }
 
   var diagnoser = Diagnoser(function, unpermittedCopies: unpermittedCopies, context)
-  diagnoser.diagnoseUsesBeforeInit(undefInits)
+  diagnoser.diagnoseUsesBeforeInit(undefInits, missingSuperInits)
   diagnoser.diagnoseLetReinits(letReinits)
   diagnoser.diagnoseUsesAfterConsume()
 
-  for marker in unpermittedCopies + letReinits {
+  for marker in unpermittedCopies + letReinits + missingSuperInits {
     context.erase(instruction: marker)
   }
 
-  if !unpermittedCopies.isEmpty || !letReinits.isEmpty || !undefInits.isEmpty {
+  if !unpermittedCopies.isEmpty || !letReinits.isEmpty || !missingSuperInits.isEmpty || !undefInits.isEmpty {
     // Ensure we actually did emit an error.
     guard context.hadError else {
       fatalError("LifetimeResolutionDiagnose didn't emit an error when it should have! \n\(function)")
@@ -79,7 +82,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
 /// A storage location that LifetimeResolution resolved, with helpers to describe it to the user.
 private struct Storage {
   let root: ResolvableRoot
-  let indices: FieldIndexTrie
+  let space: StateIndexSpace
 
   var allocation: Value { root.storage }
   var function: Function { root.address.parentFunction }
@@ -116,7 +119,7 @@ private struct Storage {
     while true {
       let (kind, index, rest) = remaining.pop()
       switch kind {
-      case .structField:
+      case .structField, .classField:
         guard let fields = type.getNominalFields(in: function), index < fields.count else { return name }
         let fieldName = fields.getUserFacingFieldDecl(withIndex: index)?.userFacingName
                           ?? fields.getNameOfField(withIndex: index)
@@ -136,15 +139,33 @@ private struct Storage {
 
   /// The stored property of `self` that `path` projects into, if any.
   func storedProperty(at path: SmallProjectionPath) -> VarDecl? {
-    guard case (.structField, let index, _) = path.pop(),
+    let (kind, index, _) = path.pop()
+    guard kind == .structField || kind == .classField,
           let fields = type.getNominalFields(in: function), index < fields.count else {
       return nil
     }
     return fields.getUserFacingFieldDecl(withIndex: index)
   }
+
+  /// The path of the first part of the storage among `leaves`, preferring a stored property of `self`
+  /// over all of `self`.
+  func firstPath(of leaves: Set<Int>) -> SmallProjectionPath {
+    var firstPath: SmallProjectionPath? = nil
+    space.fields.forEachCoveringSubtree(of: fieldLeaves(leaves), excludingRoot: root.tracksStoredProperties) { path in
+      if firstPath == nil { firstPath = path }
+    }
+    return firstPath ?? SmallProjectionPath()
+  }
+
+  /// The elements among `leaves` that are fields, which have a path.
+  func fieldLeaves(_ leaves: Set<Int>) -> Set<Int> {
+    leaves.filter { space.fieldRange.contains($0) }
+  }
 }
 
-/// The storage allocation (`alloc_box`, `alloc_stack`, or argument) backing `address`, via its access path.
+/// The storage allocation (`alloc_box`, `alloc_stack`, or argument) backing `address`, via its access path,
+/// or the reference to the class instance whose stored property it is. For derived class `self`, that is the
+/// memory holding the reference.
 private func allocation(backing address: Value) -> Value? {
   switch address.accessPath.base {
   case .box(let projectBox):
@@ -153,6 +174,13 @@ private func allocation(backing address: Value) -> Value? {
     return allocStack
   case .argument(let argument):
     return argument
+  case .class(let projection):
+    let reference = projection.instance.referenceRoot
+    if let load = reference as? LoadInstruction, let markUninitialized = load.address as? MarkUninitializedInst,
+       markUninitialized.kind == .derivedSelf {
+      return allocation(backing: markUninitialized)
+    }
+    return (reference as? MarkUninitializedInst)?.operand.value ?? reference
   default:
     return nil
   }
@@ -171,6 +199,16 @@ private enum UseKind {
   case addressTaken     // converted to a pointer
   case returnFromInit   // `self` returned from an initializer
   case functionExit     // the end of an `inout` parameter's scope, where it must be initialized
+  case superInit        // `self` passed to `super.init`, which needs its own stored properties
+}
+
+/// A part of some storage needed by a use.
+private enum Subelement {
+  /// The part at an access path, or all of the storage if nil.
+  case path(AccessPath?)
+
+  /// The superclass part of `self` in a derived class initializer, which `super.init` initializes.
+  case superclass
 }
 
 /// The classified uses of some storage or value, each with the access path it uses within storage.
@@ -187,29 +225,78 @@ private struct UseMap {
     kills[inst, default: []].append(accessPath)
   }
 
-  /// The strongest use of `subelement` by `inst`, where a nil `subelement` or access path is the whole storage.
-  func use(_ inst: Instruction, of subelement: AccessPath?) -> Use? {
+  /// The strongest use of `subelement` by `inst`, where a nil access path is the whole storage.
+  func use(_ inst: Instruction, of subelement: Subelement) -> Use? {
     let overlapping = uses[inst, default: []].filter { use in
-      guard let subelement, let accessPath = use.accessPath else { return true }
-      return !accessPath.isDistinct(from: subelement)
+      switch subelement {
+      case .superclass:
+        return use.accessPath == nil && use.kind != .superInit
+      case .path(let path):
+        guard let path, let accessPath = use.accessPath else { return true }
+        return !accessPath.isDistinct(from: path)
+      }
     }
     return overlapping.first(where: { $0.kind == .consume }) ?? overlapping.first
   }
 
   /// Whether `inst` overwrites all of `subelement`.
-  func isKill(_ inst: Instruction, of subelement: AccessPath?) -> Bool {
-    kills[inst, default: []].contains { accessPath in
-      subelement.map { accessPath.isEqualOrContains($0) } ?? accessPath.projectionPath.isEmpty
+  func isKill(_ inst: Instruction, of subelement: Subelement) -> Bool {
+    switch subelement {
+    case .superclass:
+      return uses[inst, default: []].contains { $0.kind == .superInit }
+    case .path(let path):
+      return kills[inst, default: []].contains { accessPath in
+        path.map { accessPath.isEqualOrContains($0) } ?? accessPath.projectionPath.isEmpty
+      }
     }
   }
 }
 
 /// Classifies the uses of some storage.
-private struct AddressUseClassifier: AddressDefUseWalker {
+private struct AddressUseClassifier: AddressDefUseWalker, ClassInstanceUseWalker {
   typealias Path = UnusedWalkingPath
   let demotedConsumes: Set<Instruction>
   let isInitSelf: Bool
   var uses = UseMap()
+
+  mutating func storedPropertyUse(_ projection: RefElementAddrInst) -> WalkResult {
+    return walkDownUses(ofAddress: projection, path: UnusedWalkingPath())
+  }
+
+  /// Classifies the uses of the memory holding `self` in a derived class initializer.
+  mutating func walkDownUses(ofDerivedSelf address: Value) {
+    for use in address.uses {
+      switch DerivedSelfUse(use) {
+      case .borrow(let loadBorrow):
+        _ = walkDownUses(ofClassInstance: loadBorrow)
+      case .copy(let load):
+        _ = walkDownUses(ofClassInstance: load)
+      case .superInit(_, let apply):
+        uses.record(apply, .superInit)
+      case .storeBack(let store):
+        uses.kill(store, address.accessPath)
+      case .destroy(let destroy):
+        uses.kill(destroy, address.accessPath)
+      case .deallocate(let load):
+        uses.kill(load, address.accessPath)
+      case .initialStore, .ignored, .unknown:
+        break
+      }
+    }
+  }
+
+  mutating func instanceUse(_ use: Operand) -> WalkResult {
+    let inst = use.instruction
+    switch inst {
+    case is DestroyValueInst, is DiagnoseInst:
+      break
+    case is PartialApplyInst:
+      uses.record(inst, .closureCapture)
+    default:
+      uses.record(inst, isInitSelf && flowsIntoReturn(use) ? .returnFromInit : .read)
+    }
+    return .continueWalk
+  }
 
   mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
     let inst = address.instruction
@@ -314,20 +401,41 @@ private func isConsumingUse(_ use: Operand) -> Bool {
 
 /// Whether `value` is what the function returns, possibly wrapped in an Optional by a failable initializer.
 private func flowsIntoReturn(_ value: Value) -> Bool {
-  var current = value
-  while let use = current.uses.ignoreDebugUses.singleUse {
-    switch use.instruction {
-    case is ReturnInst:
-      return true
-    case let enumInst as EnumInst:
-      current = enumInst
-    case let branch as BranchInst:
-      current = branch.getArgument(for: use)
-    default:
-      return false
-    }
+  guard let use = value.uses.ignoreDebugUses.singleUse else {
+    return false
   }
-  return false
+  return flowsIntoReturn(use)
+}
+
+/// Whether the value used by `use` is what the function returns.
+private func flowsIntoReturn(_ use: Operand) -> Bool {
+  switch use.instruction {
+  case is ReturnInst:
+    return true
+  case let enumInst as EnumInst:
+    return flowsIntoReturn(enumInst)
+  case let branch as BranchInst:
+    return flowsIntoReturn(branch.getArgument(for: use))
+  default:
+    return false
+  }
+}
+
+/// How `method` is named in a diagnostic: an accessor by its storage.
+private func diagnosticName(of method: FuncDecl) -> (name: Identifier, isAccessor: Bool) {
+  let accessor = method as? AccessorDecl
+  return ((accessor?.storage ?? method).baseIdentifier, accessor != nil)
+}
+
+/// The method or accessor called by `inst`, if it is a call.
+private func calledMethod(by inst: Instruction) -> FuncDecl? {
+  guard let apply = inst as? FullApplySite else {
+    return nil
+  }
+  if let classMethod = apply.callee as? ClassMethodInst {
+    return classMethod.member.decl as? FuncDecl
+  }
+  return apply.referencedFunction?.location.decl as? FuncDecl
 }
 
 /// The first use reachable from some starting instruction.
@@ -344,7 +452,7 @@ private struct OffendingUse {
 }
 
 /// Finds the nearest use of `subelement` reachable from `start` without passing through a kill, breadth-first.
-private func findOffendingUse(of subelement: AccessPath?, in uses: UseMap, after start: Instruction,
+private func findOffendingUse(of subelement: Subelement, in uses: UseMap, after start: Instruction,
                               _ context: FunctionPassContext) -> OffendingUse? {
   enum ScanResult { case found(OffendingUse), satisfied, passThrough }
 
@@ -455,6 +563,15 @@ private struct ConsumeSite {
     }
   }
 
+  /// The consumed storage, unless a value was consumed.
+  var address: Value? {
+    switch instruction {
+    case let load as LoadInst: load.address
+    case let copyAddr as CopyAddrInst: copyAddr.source
+    default: nil
+    }
+  }
+
   var isCopyable: Bool { return !marker.operand.value.type.isMoveOnly }
 
   /// The instruction that takes ownership of the copy, or the copy itself if unknown.
@@ -489,6 +606,7 @@ private enum ConsumeViolation: Equatable {
   case consumedInLoop
   case consumedAndUsedAtOnce
   case notReinitialized
+  case usedAfterFailedSuperInit
   case unknownUse
 
   /// Whether the error is located at the consume, rather than at a use shared by several consumes.
@@ -568,7 +686,7 @@ private struct Diagnoser {
     guard let root = ResolvableRoot(allocation, &indexCache, context) else {
       return nil
     }
-    let storage = Storage(root: root, indices: indexCache.fieldIndices(for: root.address.type))
+    let storage = Storage(root: root, space: root.stateIndexSpace(&indexCache))
     storages[allocation.hashable] = storage
     return storage
   }
@@ -579,7 +697,14 @@ private struct Diagnoser {
       return uses
     }
     var classifier = AddressUseClassifier(demotedConsumes: demotedConsumes, isInitSelf: storage.initSelfKind != nil)
-    _ = classifier.walkDownUses(ofAddress: storage.root.address, path: UnusedWalkingPath())
+    switch storage.root.mode {
+    case .storage:
+      _ = classifier.walkDownUses(ofAddress: storage.root.address, path: UnusedWalkingPath())
+    case .rootClassSelf:
+      _ = classifier.walkDownUses(ofClassInstance: storage.root.address)
+    case .derivedClassSelf:
+      classifier.walkDownUses(ofDerivedSelf: storage.root.address)
+    }
     var uses = classifier.uses
 
     // A box captured by a closure, rather than its projected address.
@@ -628,24 +753,35 @@ private struct Diagnoser {
   //===--------------------------------------------------------------------===//
 
   /// `assign undef to [init] %leaf`: the leaf is read before being initialized.
-  mutating func diagnoseUsesBeforeInit(_ markers: [AssignInst]) {
-    // Group the uninitialized leaves of each storage by the use that first observes them.
+  /// `diagnose [missing_super_init] %self`: derived class `self` is used before `super.init`.
+  mutating func diagnoseUsesBeforeInit(_ undefInits: [AssignInst], _ missingSuperInits: [DiagnoseInst]) {
+    // Group the uninitialized elements of each storage by the use that first observes them.
     var reports: [(storage: Storage, use: OffendingUse?, leaves: Set<Int>)] = []
-    for marker in markers {
-      guard let storage = storage(backing: marker.destination) else {
-        diagnostics.diagnose(.definite_init_bug_unknown_storage, at: marker.location)
-        continue
-      }
-      let accessPath = marker.destination.accessPath
-      let leaves = storage.indices.range(of: accessPath.projectionPath)
-      let use = findOffendingUse(of: accessPath, in: uses(of: storage), after: marker, context)
-
+    func report(_ storage: Storage, _ use: OffendingUse?, _ leaves: StateIndexSpace.IndexRange) {
       if let i = reports.firstIndex(where: { $0.storage.allocation == storage.allocation &&
                                              $0.use?.instruction == use?.instruction }) {
         reports[i].leaves.formUnion(leaves)
       } else {
         reports.append((storage, use, Set(leaves)))
       }
+    }
+
+    for marker in undefInits {
+      guard let storage = storage(backing: marker.destination) else {
+        diagnostics.diagnose(.definite_init_bug_unknown_storage, at: marker.location)
+        continue
+      }
+      let leaves = storage.space.range(ofFieldPath: marker.destination.projectionPathFromRoot)
+      report(storage, findOffendingUse(of: .path(marker.destination.accessPath), in: uses(of: storage),
+                                       after: marker, context), leaves)
+    }
+    for marker in missingSuperInits {
+      guard let storage = storage(backing: marker.operand.value),
+            let superclass = storage.space.range(of: .superclass) else {
+        diagnostics.diagnose(.definite_init_bug_unknown_storage, at: marker.location)
+        continue
+      }
+      report(storage, findOffendingUse(of: .superclass, in: uses(of: storage), after: marker, context), superclass)
     }
 
     for (storage, use, leaves) in reports {
@@ -656,6 +792,11 @@ private struct Diagnoser {
   private mutating func emitUseBeforeInit(of storage: Storage, at use: OffendingUse?, _ leaves: Set<Int>) {
     let useLocation = use?.instruction.location ?? storage.definitionLocation
     let isReturn = use?.kind == .returnFromInit
+
+    if storage.root.mode == .derivedClassSelf {
+      emitUseBeforeInit(ofDerivedSelf: storage, at: use, leaves)
+      return
+    }
 
     if storage.root.isRootSelf {
       if isReturn, let use {
@@ -669,6 +810,9 @@ private struct Diagnoser {
         } else {
           diagnostics.diagnose(.return_from_init_without_initing_stored_properties, at: location)
         }
+      } else if storage.root.isClassInstance {
+        emitUseBeforeStoredPropertiesInit(of: storage, at: use, leaves)
+        return
       } else {
         guard shouldEmitError(for: storage.allocation, at: useLocation) else { return }
         diagnostics.diagnose(.use_of_self_before_fully_init, at: useLocation)
@@ -690,11 +834,7 @@ private struct Diagnoser {
     }
 
     // Name the whole variable if it is entirely uninitialized, otherwise its first uninitialized part.
-    var firstPath: SmallProjectionPath? = nil
-    storage.indices.forEachCoveringSubtree(of: leaves) { path in
-      if firstPath == nil { firstPath = path }
-    }
-    let name = storage.name(of: firstPath ?? SmallProjectionPath())
+    let name = storage.name(of: storage.firstPath(of: leaves))
 
     let isLet = storage.root.isLet ? 1 : 0
     let id: DiagID
@@ -709,6 +849,95 @@ private struct Diagnoser {
     diagnostics.diagnose(.variable_defined_here, isLet, at: storage.definitionLocation)
   }
 
+  /// A use of a class instance before all of its own stored properties are initialized.
+  private mutating func emitUseBeforeStoredPropertiesInit(of storage: Storage, at use: OffendingUse?,
+                                                          _ leaves: Set<Int>) {
+    let useLocation = use?.instruction.location ?? storage.definitionLocation
+    guard shouldEmitError(for: storage.allocation, at: useLocation) else { return }
+    if use?.kind == .closureCapture {
+      diagnostics.diagnose(.self_closure_use_uninit, at: useLocation)
+    } else if let method = use.flatMap({ calledMethod(by: $0.instruction) }) {
+      let (name, isAccessor) = diagnosticName(of: method)
+      diagnostics.diagnose(.self_use_before_fully_init, name, isAccessor ? 1 : 0, 0, at: useLocation)
+    } else {
+      diagnostics.diagnose(.variable_used_before_initialized, storage.name(of: storage.firstPath(of: leaves)), 0,
+                           at: useLocation)
+      return
+    }
+    noteUninitializedStoredProperties(of: storage, leaves, fallback: useLocation)
+  }
+
+  /// A use of `self` in a derived class initializer before `super.init`, or before its own stored properties
+  /// are initialized.
+  private mutating func emitUseBeforeInit(ofDerivedSelf storage: Storage, at use: OffendingUse?, _ leaves: Set<Int>) {
+    let superclass = storage.space.range(of: .superclass)!.lowerBound
+    guard leaves.contains(superclass) else {
+      guard let use, use.kind == .superInit else {
+        emitUseBeforeStoredPropertiesInit(of: storage, at: use, leaves)
+        return
+      }
+      // An implicit `super.init` has no location of its own.
+      let isImplicit = use.instruction.location.sourceLoc == nil
+      let location = isImplicit ? function.location : use.instruction.location
+      guard shouldEmitError(for: storage.allocation, at: location) else { return }
+      let id: DiagID = isImplicit ? .ivar_not_initialized_at_implicit_superinit : .ivar_not_initialized_at_superinit
+      diagnostics.diagnose(id, storage.name(of: storage.firstPath(of: leaves)), 0, at: location)
+      return
+    }
+
+    let useLocation = use?.instruction.location ?? storage.definitionLocation
+    if let use, use.kind == .returnFromInit {
+      let location = explicitReturnLocation(of: use) ?? useLocation
+      guard shouldEmitError(for: storage.allocation, at: location) else { return }
+      diagnostics.diagnose(.superselfinit_not_called_before_return, 0, at: location)
+    } else if use?.kind == .closureCapture {
+      guard shouldEmitError(for: storage.allocation, at: useLocation) else { return }
+      diagnostics.diagnose(.self_closure_use_uninit, at: useLocation)
+    } else if let upcast = use?.instruction as? UpcastInst,
+              let (name, isAccessor, location) = inheritedMember(of: upcast) {
+      guard shouldEmitError(for: storage.allocation, at: location) else { return }
+      diagnostics.diagnose(.self_use_before_fully_init, name, isAccessor ? 1 : 0, 1, at: location)
+    } else if let method = use.flatMap({ calledMethod(by: $0.instruction) }) {
+      guard shouldEmitError(for: storage.allocation, at: useLocation) else { return }
+      let (name, isAccessor) = diagnosticName(of: method)
+      diagnostics.diagnose(.self_use_before_fully_init, name, isAccessor ? 1 : 0, 1, at: useLocation)
+    } else {
+      guard shouldEmitError(for: storage.allocation, at: useLocation) else { return }
+      diagnostics.diagnose(.self_before_superinit, at: useLocation)
+    }
+  }
+
+  /// The inherited method, or stored property, accessed through `upcast` of `self`, and where it is accessed.
+  private func inheritedMember(of upcast: Value) -> (name: Identifier, isAccessor: Bool, location: Location)? {
+    for use in upcast.uses {
+      switch use.instruction {
+      case let borrow as BeginBorrowInst:
+        if let member = inheritedMember(of: borrow) {
+          return member
+        }
+      case let classMethod as ClassMethodInst:
+        guard let method = classMethod.member.decl as? FuncDecl,
+              let apply = classMethod.uses.lazy.compactMap({ $0.instruction as? FullApplySite }).first else {
+          continue
+        }
+        let (name, isAccessor) = diagnosticName(of: method)
+        return (name, isAccessor, apply.location)
+      case let projection as RefElementAddrInst:
+        guard let field = upcast.type.getNominalFields(in: function)?
+                            .getUserFacingFieldDecl(withIndex: projection.fieldIndex) else {
+          continue
+        }
+        // The access is located at the assignment or read, rather than the projection.
+        let access = projection.uses.singleUser(ofType: BeginAccessInst.self)
+        let accessor = access?.uses.lazy.filter({ !($0.instruction is EndAccessInst) }).first?.instruction
+        return (field.baseIdentifier, true, (accessor ?? projection).location)
+      default:
+        continue
+      }
+    }
+    return nil
+  }
+
   /// The last `return` statement on the way to `use`, if there is one.
   private func explicitReturnLocation(of use: OffendingUse) -> Location? {
     use.path.reversed().lazy.map { $0.terminator.location }.first(where: { $0.isReturn })
@@ -716,7 +945,7 @@ private struct Diagnoser {
 
   /// One "'self.x' not initialized" note per uninitialized stored property, or part of one.
   private func noteUninitializedStoredProperties(of storage: Storage, _ leaves: Set<Int>, fallback: Location) {
-    storage.indices.forEachCoveringSubtree(of: leaves, excludingRoot: true) { path in
+    storage.space.fields.forEachCoveringSubtree(of: storage.fieldLeaves(leaves), excludingRoot: true) { path in
       let loc = storage.storedProperty(at: path)?.nameLoc ?? sourceLoc(fallback)
       diagnostics.diagnose(.stored_property_not_initialized, storage.name(of: path), at: loc)
     }
@@ -734,12 +963,21 @@ private struct Diagnoser {
         diagnostics.diagnose(.definite_init_bug_unknown_storage, at: marker.location)
         continue
       }
-      guard shouldEmitError(for: storage.allocation, at: marker.location) else { continue }
+      let path = address.projectionPathFromRoot
 
-      let path = address.accessPath.projectionPath
+      // The superclass part of derived class `self`, initialized by a second `super.init`.
+      if storage.root.mode == .derivedClassSelf && path.isEmpty {
+        let superInit = (marker.next as? LoadInst).flatMap { superInitCall(passingSelfLoadedBy: $0) }
+        let location = superInit?.location ?? marker.location
+        guard shouldEmitError(for: storage.allocation, at: location) else { continue }
+        diagnostics.diagnose(.selfinit_multiple_times, 0, at: location)
+        continue
+      }
+
+      guard shouldEmitError(for: storage.allocation, at: marker.location) else { continue }
       diagnostics.diagnose(.immutable_property_already_initialized, storage.name(of: path), at: marker.location)
 
-      let decl = storage.root.isRootSelf ? storage.storedProperty(at: path) : storage.root.varDecl
+      let decl = storage.root.tracksStoredProperties ? storage.storedProperty(at: path) : storage.root.varDecl
       if let decl {
         if decl.hasInitialValue {
           diagnostics.diagnose(.initial_value_provided_in_let_decl, at: decl.nameLoc)
@@ -802,7 +1040,7 @@ private struct Diagnoser {
       consumedType = copy.fromValue.type
       uses = self.uses(of: copy.fromValue)
     } else {
-      let address = (consume.instruction as? LoadInst)?.address ?? (consume.instruction as! CopyAddrInst).source
+      let address = consume.address!
       guard let s = self.storage(backing: address) else { return nil }
       storage = s
       storageValue = s.allocation
@@ -811,7 +1049,16 @@ private struct Diagnoser {
       uses = self.uses(of: s)
     }
 
-    let use = findOffendingUse(of: consumedPath, in: uses, after: consume.instruction, context)
+    // A failed `super.init` already released `self`, which the memory then no longer holds.
+    if let load = consume.instruction as? LoadInst, let superInit = superInitCall(passingSelfLoadedBy: load),
+       let storage, storage.root.mode == .derivedClassSelf {
+      let use = findOffendingUse(of: .path(nil), in: uses, after: superInit, context)
+      return UseAfterConsume(violation: use != nil ? .usedAfterFailedSuperInit : .unknownUse, use: use,
+                             name: storage.rootName, storage: storageValue, consumedType: consumedType,
+                             declaration: nil, consumes: [consume])
+    }
+
+    let use = findOffendingUse(of: .path(consumedPath), in: uses, after: consume.instruction, context)
     let violation: ConsumeViolation
     if let use {
       if use.isLoop {
@@ -824,6 +1071,9 @@ private struct Diagnoser {
         violation = .consumedTwice
       } else if let consumedPath, let usePath = use.accessPath, usePath.contains(consumedPath) {
         violation = .usedAfterPartialConsume
+      } else if use.accessPath == nil, storage?.root.isClassInstance ?? false {
+        // A use of the whole instance after consuming one of its stored properties.
+        violation = .usedAfterPartialConsume
       } else {
         violation = .usedAfterConsume
       }
@@ -835,8 +1085,11 @@ private struct Diagnoser {
     let name: String
     let declaration: (name: String, type: Type, location: SourceLoc?)?
     if let storage {
-      let path = violation == .usedAfterPartialConsume ? use!.accessPath! : consumedPath!
-      name = storage.name(of: path.projectionPath)
+      if violation == .usedAfterPartialConsume {
+        name = use!.accessPath.map { storage.name(of: $0.projectionPathFromRoot) } ?? storage.rootName
+      } else {
+        name = storage.name(of: consumedPath!.projectionPathFromRoot)
+      }
       declaration = storage.isSelf ? nil : storage.root.varDecl.map { (storage.rootName, storage.type, $0.nameLoc) }
     } else {
       let varDecl = storageValue.findVarDecl()
@@ -870,6 +1123,9 @@ private struct Diagnoser {
       diagnostics.diagnose(.sil_movechecking_not_reinitialized_before_end_of_function, report.name,
                            isClosureCapture ? 1 : 0, at: errorLocation)
       noteExit(report.use!, report.name)
+    case .usedAfterFailedSuperInit:
+      diagnostics.diagnose(.self_inside_catch_superselfinit, 0, at: errorLocation)
+      return
     }
 
     // Point out every consume that reaches the use, explaining why it consumes where possible.
@@ -883,7 +1139,8 @@ private struct Diagnoser {
 
     // If the type is copyable, then suggest using `copy` to fix the use-after-consume.
     for consume in report.consumes where consume.isCopyable {
-      diagnostics.diagnose(.sil_movechecking_add_explicit_copy, report.name, at: consume.location)
+      diagnostics.diagnose(.sil_movechecking_add_explicit_copy, copySuggestion(for: consume, in: report),
+                           at: consume.location)
     }
 
     // Explain that the value cannot be implicitly copied, and suggest borrowing instead.
@@ -896,6 +1153,16 @@ private struct Diagnoser {
     for consume in report.consumes {
       if suggestBorrowingParameter(for: consume) { break }
     }
+  }
+
+  /// What to `copy` at `consume` to keep the use in `report` valid.
+  private mutating func copySuggestion(for consume: ConsumeSite, in report: UseAfterConsume) -> String {
+    // Copying the reference to a class instance doesn't keep its stored properties valid.
+    guard report.violation == .usedAfterPartialConsume, let address = consume.address,
+          let storage = storage(backing: address), storage.root.isClassInstance else {
+      return report.name
+    }
+    return storage.name(of: address.projectionPathFromRoot)
   }
 
   /// Points out where the function exits before `name` is reinitialized: by throwing an error, or by an
