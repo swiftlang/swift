@@ -6,14 +6,14 @@
 
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells \
-// RUN:   -disable-availability-checking -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -verify -eager-macro-checking
+// RUN:   -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -verify -eager-macro-checking
 // RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells \
-// RUN:   -disable-availability-checking -strict-memory-safety -Xcc -Werror %t/test.swift -dump-macro-expansions 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --implicit-check-not __swiftmacro
+// RUN:   -strict-memory-safety -Xcc -Werror %t/test.swift -dump-macro-expansions 2>&1 | %FileCheck %s --match-full-lines --strict-whitespace --implicit-check-not __swiftmacro
 
 // Without the Cells feature, no wrappers are generated for reference return values.
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -disable-availability-checking \
+// RUN:   -enable-experimental-feature SafeInteropWrappers \
 // RUN:   -strict-memory-safety -Xcc -Werror %t/test.swift -D NO_CELLS -dump-macro-expansions 2>&1 | %FileCheck %s --check-prefix=NO-CELLS --allow-empty
 // NO-CELLS-NOT: __swiftmacro
 
@@ -133,6 +133,7 @@ inline int &asProperty(Counter &c [[clang::lifetimebound]])
 //--- test.swift
 import RefReturn
 
+@available(SwiftStdlib 6.2, *)
 func test(_ c: inout Counter, _ x: inout CInt, _ y: inout CInt, _ k: inout Container) {
 #if !NO_CELLS
   do {

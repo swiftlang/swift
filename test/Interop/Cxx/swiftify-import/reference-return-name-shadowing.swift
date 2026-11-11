@@ -7,7 +7,7 @@
 // The generated code refers to the stdlib's Ref and Cell, not to C++ types
 // that happen to have the same name.
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
-// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells -disable-availability-checking \
+// RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells \
 // RUN:   -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -verify -eager-macro-checking
 
 //--- Inputs/module.modulemap
@@ -30,6 +30,7 @@ inline const int &constPick(const int &a [[clang::lifetimebound]]) { return a; }
 //--- test.swift
 import Shadowing
 
+@available(SwiftStdlib 6.2, *)
 func test(_ x: inout CInt) {
   // 'Ref' is Copyable, so the exclusive access to 'x' lasts until 'r' goes out
   // of scope rather than until its last use. The 'do' ends it before 'x' is
