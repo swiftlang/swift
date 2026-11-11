@@ -116,7 +116,7 @@ extern "C" void *_Nonnull swift_retain(void *_Nonnull) noexcept;
 
 extern "C" void swift_release(void *_Nonnull) noexcept;
 
-extern "C" SWIFT_CALL void *_Nonnull swift_getObjectType(
+extern "C" void *_Nonnull swift_getObjectType(
     void *_Nonnull object) noexcept;
 
 #pragma clang diagnostic push
@@ -283,7 +283,7 @@ struct BoxPair {
   void *_Nonnull object;
   void *_Nonnull buffer;
 };
-extern "C" BoxPair swift_allocBox(void *_Nonnull type) noexcept;
+extern "C" SWIFT_CALL BoxPair swift_allocBox(void *_Nonnull type) noexcept;
 extern "C" void *_Nonnull swift_projectBox(void *_Nonnull object) noexcept;
 
 // --- Tag traits for existential type parameters ---
