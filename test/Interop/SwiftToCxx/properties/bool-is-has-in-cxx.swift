@@ -21,7 +21,7 @@ public struct IsHasProperties {
     let x1, x2, x3, x4, x5, x6: Int
 }
 
-// CHECK: class SWIFT_SYMBOL({{.*}}) IsHasProperties
+// CHECK: class SWIFT_SYMBOL({{.*}}) IsHasProperties final {
 
 // CHECK: SWIFT_INLINE_THUNK bool isEmpty() const noexcept SWIFT_SYMBOL({{.*}});
 // CHECK-NEXT: SWIFT_INLINE_THUNK bool hasFlavor() const noexcept SWIFT_SYMBOL({{.*}});

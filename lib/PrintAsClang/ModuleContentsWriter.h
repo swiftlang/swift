@@ -57,13 +57,16 @@ struct EmittedClangHeaderDependencyInfo {
 };
 
 /// Prints the declarations of \p M to \p os in C++ language mode.
+/// If provided, \p typeDeclarationsOS receives the nominal forward declarations
+/// and generic eligibility traits that can be emitted before imports.
 ///
 /// \returns Dependencies required by this module.
 EmittedClangHeaderDependencyInfo
 printModuleContentsAsCxx(raw_ostream &os, ModuleDecl &M,
                          SwiftToClangInteropContext &interopContext,
                          AccessLevel minAccess, bool requiresExposedAttribute,
-                         llvm::StringSet<> &exposedModules);
+                         llvm::StringSet<> &exposedModules,
+                         raw_ostream *typeDeclarationsOS = nullptr);
 
 } // end namespace swift
 

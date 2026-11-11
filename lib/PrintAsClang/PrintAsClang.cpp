@@ -671,6 +671,55 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
   SwiftToClangInteropContext interopContext(*M, irGenOpts);
   writePrologue(os, M->getASTContext(), computeMacroGuard(M));
 
+  std::string cxxModuleContentsBuf;
+  llvm::raw_string_ostream cxxModuleContents{cxxModuleContentsBuf};
+  EmittedClangHeaderDependencyInfo cxxDeps;
+  llvm::StringSet<> exposedModules;
+  bool addStdlibDepsInline = false;
+  // FIXME: Expose Swift with @expose by default.
+  bool enableCxx = frontendOpts.ClangHeaderExposedDecls.has_value() ||
+                   M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
+  if (enableCxx) {
+    emitCxxConditional(os, [&] {
+      for (const auto &mod : frontendOpts.clangHeaderExposedImports)
+        exposedModules.insert(mod.moduleName);
+
+      // Imported headers can name constrained Swift generics with local type
+      // arguments. Emit their forward declarations and eligibility traits
+      // before any imports, including those needed by the C and Objective-C
+      // sections.
+      ClangSyntaxPrinter(M->getASTContext(), os)
+          .printIncludeForShimHeader("_SwiftCxxInteroperability.h");
+
+      // Explicit @expose attribute is required only when the user specifies
+      // -clang-header-expose-decls flag.
+      // FIXME: should we detect any presence of @expose and require it then?
+      bool requiresExplicitExpose =
+          frontendOpts.ClangHeaderExposedDecls.has_value() &&
+          (*frontendOpts.ClangHeaderExposedDecls ==
+               FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr ||
+           *frontendOpts.ClangHeaderExposedDecls ==
+               FrontendOptions::ClangHeaderExposeBehavior::
+                   HasExposeAttrOrImplicitDeps);
+      // Swift stdlib dependencies are emitted into the same header when
+      // -clang-header-expose-decls flag is not specified, or when it allows
+      // implicit dependency emission.
+      addStdlibDepsInline =
+          !frontendOpts.ClangHeaderExposedDecls.has_value() ||
+          *frontendOpts.ClangHeaderExposedDecls ==
+              FrontendOptions::ClangHeaderExposeBehavior::
+                  HasExposeAttrOrImplicitDeps ||
+          *frontendOpts.ClangHeaderExposedDecls ==
+              FrontendOptions::ClangHeaderExposeBehavior::AllPublic;
+
+      cxxDeps = printModuleContentsAsCxx(
+          cxxModuleContents, *M, interopContext,
+          frontendOpts.ClangHeaderMinAccess.value_or(AccessLevel::Public),
+          /*requiresExposedAttribute=*/requiresExplicitExpose, exposedModules,
+          /*typeDeclarationsOS=*/M->isStdlibModule() ? nullptr : &os);
+    });
+  }
+
   // C content (@c)
   std::string moduleContentsScratch;
   {
@@ -712,56 +761,18 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
 
   // C++ content
   emitCxxConditional(os, [&] {
-    // FIXME: Expose Swift with @expose by default.
-    bool enableCxx = frontendOpts.ClangHeaderExposedDecls.has_value() ||
-                     M->DeclContext::getASTContext().LangOpts.EnableCXXInterop;
     if (!enableCxx)
       return;
 
-    llvm::StringSet<> exposedModules;
-    for (const auto &mod : frontendOpts.clangHeaderExposedImports)
-      exposedModules.insert(mod.moduleName);
-
-    // Include the shim header only in the C++ mode.
-    ClangSyntaxPrinter(M->getASTContext(), os).printIncludeForShimHeader(
-        "_SwiftCxxInteroperability.h");
-
-    // Explicit @expose attribute is required only when the user specifies
-    // -clang-header-expose-decls flag.
-    // FIXME: should we detect any presence of @expose and require it then?
-    bool requiresExplicitExpose =
-        frontendOpts.ClangHeaderExposedDecls.has_value() &&
-        (*frontendOpts.ClangHeaderExposedDecls ==
-             FrontendOptions::ClangHeaderExposeBehavior::HasExposeAttr ||
-         *frontendOpts.ClangHeaderExposedDecls ==
-             FrontendOptions::ClangHeaderExposeBehavior::
-                 HasExposeAttrOrImplicitDeps);
-    // Swift stdlib dependencies are emitted into the same header when
-    // -clang-header-expose-decls flag is not specified, or when it allows
-    // implicit dependency emission.
-    bool addStdlibDepsInline =
-        !frontendOpts.ClangHeaderExposedDecls.has_value() ||
-        *frontendOpts.ClangHeaderExposedDecls ==
-            FrontendOptions::ClangHeaderExposeBehavior::
-                HasExposeAttrOrImplicitDeps ||
-        *frontendOpts.ClangHeaderExposedDecls ==
-            FrontendOptions::ClangHeaderExposeBehavior::AllPublic;
-
-    std::string moduleContentsBuf;
-    llvm::raw_string_ostream moduleContents{moduleContentsBuf};
-    auto deps = printModuleContentsAsCxx(
-        moduleContents, *M, interopContext,
-        frontendOpts.ClangHeaderMinAccess.value_or(AccessLevel::Public),
-        /*requiresExposedAttribute=*/requiresExplicitExpose, exposedModules);
     // FIXME: In ObjC++ mode, we do not need to reimport duplicate modules.
     llvm::StringMap<StringRef> exposedModuleHeaderNames;
     for (const auto &mod : frontendOpts.clangHeaderExposedImports)
       exposedModuleHeaderNames.insert({mod.moduleName, mod.headerName});
-    writeImports(os, deps.imports, *M, bridgingHeader, frontendOpts,
+    writeImports(os, cxxDeps.imports, *M, bridgingHeader, frontendOpts,
                  clangHeaderSearchInfo, exposedModuleHeaderNames,
                  /*useCxxImport=*/true);
     // Embed the standard library directly.
-    if (addStdlibDepsInline && deps.dependsOnStandardLibrary) {
+    if (addStdlibDepsInline && cxxDeps.dependsOnStandardLibrary) {
       assert(!M->isStdlibModule());
       SwiftToClangInteropContext interopContext(
           *M->getASTContext().getStdlibModule(), irGenOpts);
@@ -775,7 +786,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       os << "#endif // " << macroGuard << "\n";
     }
 
-      os << moduleContents.str();
+    os << cxxModuleContents.str();
   });
   writeEpilogue(os);
 
