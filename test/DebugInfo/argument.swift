@@ -9,6 +9,9 @@ func a(_ arg : Int64)
   var local = arg
 }
 
+// CHECK-DAG: !DILocalVariable(name: "consumed", arg: 1,{{.*}} line: [[@LINE+1]]
+func consume(_ consumed: consuming A) {}
+
 // CHECK-DAG: !DILocalVariable(name: "a", arg: 1,{{.*}} line: [[@LINE+3]]
 // CHECK-DAG: !DILocalVariable(name: "b", arg: 2,{{.*}} line: [[@LINE+2]]
 // CHECK-DAG: !DILocalVariable(name: "c", arg: 3,{{.*}} line: [[@LINE+1]]
@@ -46,6 +49,9 @@ class A {
     var f = factor
     return a*f+offset
   }
+
+// CHECK-DAG: !DILocalVariable(name: "self", arg: 1,{{.*}} line: [[@LINE+1]]
+  consuming func consumeSelf() {}
 
 // CHECK: !DILocalVariable(name: "self", arg: 1,{{.*}} line: [[@LINE+1]]
   deinit {
