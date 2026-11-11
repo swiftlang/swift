@@ -158,6 +158,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Class method descriptors referenced indirectly.
   PointerAuthSchema ClassMethodDescriptors;
 
+  /// Class method descriptors when passed as arguments.
+  PointerAuthSchema ClassMethodDescriptorsAsArguments;
+
   /// Protocol conformance descriptors when passed as arguments.
   PointerAuthSchema ProtocolConformanceDescriptorsAsArguments;
 

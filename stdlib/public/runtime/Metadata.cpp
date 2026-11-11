@@ -5068,6 +5068,10 @@ void *
 swift::swift_lookUpClassMethod(const ClassMetadata *metadata,
                                const MethodDescriptor *method,
                                const ClassDescriptor *description) {
+  method = swift_auth_data_non_address(
+      method, SpecialPointerAuthDiscriminators::ClassMethodDescriptor);
+  description = swift_auth_data_non_address(
+      description, SpecialPointerAuthDiscriminators::TypeDescriptor);
   assert(metadata->isTypeMetadata());
 
 #ifndef NDEBUG

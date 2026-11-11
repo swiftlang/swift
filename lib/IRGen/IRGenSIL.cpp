@@ -9169,8 +9169,14 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
     }
 
     // Get the method descriptor.
-    auto *methodDescriptor =
+    llvm::Value *methodDescriptor =
       IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
+    if (auto &schema =
+            getOptions().PointerAuth.ClassMethodDescriptorsAsArguments) {
+      auto authInfo =
+          PointerAuthInfo::emit(*this, schema, nullptr, PointerAuthEntity());
+      methodDescriptor = emitPointerAuthSign(*this, methodDescriptor, authInfo);
+    }
 
     // Get the method lookup function for the class defining the method.
     auto *lookupFn = IGM.getAddrOfMethodLookupFunction(classDecl,
