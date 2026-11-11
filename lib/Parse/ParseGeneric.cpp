@@ -345,6 +345,15 @@ ParserStatus Parser::parseGenericWhereClause(
           // There was a bug in the layout constraint.
           Status.setIsParseError();
         }
+        // Spelling AnyReference requires the experimental feature AnyReference,
+        // except in SIL which prints it.
+        if (LayoutInfo->isObjectReference() && !isInSILMode() &&
+            !Context.LangOpts.hasFeature(Feature::AnyReference)) {
+          diagnose(LayoutLoc, diag::any_reference_is_experimental);
+          Status.setIsParseError();
+          break;
+        }
+
         auto Layout = LayoutInfo;
         // Types in SIL mode may contain layout constraints.
         if (!AllowLayoutConstraints && !isInSILMode()) {
