@@ -157,7 +157,7 @@ func captureInRegularClosure(
   optF: consuming (@callable(once) () -> Void)? = nil
 ) {
   _ = { [f] in f() } // expected-error {{non-'Copyable' 'f' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
-                     // expected-note@-1 {{consumed here}}
+                     // expected-note@-1 {{called here; calling a '@callable(once)' function consumes it}}
   _ = { g() } // expected-note {{consumed here}}
 
   guard let optF else { return }
@@ -382,4 +382,36 @@ func callRethrowsAtMostOnce() throws {
   rethrowsCallOptionalAtMostOnce(nil)
   rethrowsCallOptionalAtMostOnce { }
   _ = try rethrowsForwardAtMostOnce { () throws -> Int in throw RethrowsError() }
+}
+
+// A stored at-most-once function of a borrowed value can't be called, because
+// calling it consumes it.
+
+struct Callbacks: ~Copyable {
+  var onDone: @callable(once) () -> Void
+
+  func finish() {
+    // expected-error@-1 {{'self' is borrowed and cannot be consumed}}
+    onDone() // expected-note {{called here; calling a '@callable(once)' function consumes it}}
+  }
+}
+
+func testCallStoredFunction(_ c: borrowing Callbacks) {
+  // expected-error@-1 {{'c' is borrowed and cannot be consumed}}
+  c.onDone() // expected-note {{called here; calling a '@callable(once)' function consumes it}}
+}
+
+struct Payload: ~Copyable {}
+func takePayload(_ p: consuming Payload) {}
+
+struct CallbackAndPayload: ~Copyable {
+  var onDone: @callable(once) () -> Void
+  var payload: Payload
+}
+
+// Both consumes share one destructure, which isn't only for a call.
+func testCallAndConsumeFields(_ c: borrowing CallbackAndPayload) {
+  // expected-error@-1 {{'c' is borrowed and cannot be consumed}}
+  c.onDone() // expected-note {{consumed here}}
+  takePayload(c.payload)
 }
