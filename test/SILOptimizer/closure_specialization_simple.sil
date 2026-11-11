@@ -396,3 +396,373 @@ bb0(%0 : @owned $String):
   return %9999 : $()
 }
 
+
+
+class ClosureCaptureClass {}
+
+struct ClosureCaptureNoncopyable: ~Copyable {
+  var c: ClosureCaptureClass
+}
+
+sil @exactly_once_closure_class_fun : $@convention(thin) (@guaranteed ClosureCaptureClass) -> Builtin.Int1
+sil @exactly_once_closure_inout_fun : $@convention(thin) (@inout_aliasable Builtin.Int1) -> Builtin.Int1
+sil @at_most_once_closure_noncopyable_fun : $@convention(thin) (@owned ClosureCaptureNoncopyable) -> Builtin.Int1
+sil @closure_specialization_fatal : $@convention(thin) () -> Never
+
+sil [ossa] @call_escaping_exactly_once_closure_indirect : $@convention(thin) (@owned @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1 {
+bb0(%0 : @owned $@once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>):
+  %1 = alloc_stack $Builtin.Int1
+  %2 = apply %0(%1) : $@once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>
+  %3 = load [trivial] %1
+  dealloc_stack %1
+  return %3
+}
+
+sil [ossa] @call_escaping_at_most_once_closure_indirect : $@convention(thin) (@owned @callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1 {
+bb0(%0 : @owned $@callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>):
+  %1 = alloc_stack $Builtin.Int1
+  %2 = apply %0(%1) : $@callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>
+  %3 = load [trivial] %1
+  dealloc_stack %1
+  return %3
+}
+
+sil [ossa] @call_at_most_once_closure : $@convention(thin) (@owned @noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1 {
+bb0(%0 : @owned $@noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>):
+  %1 = apply %0() : $@noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  return %1
+}
+
+sil shared [transparent] [reabstraction_thunk] [ossa] @escaping_exactly_once_closure_thunk : $@convention(thin) (@owned @once @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1 {
+bb0(%0 : $*Builtin.Int1, %1 : @owned $@once @callee_owned () -> Builtin.Int1):
+  %2 = apply %1() : $@once @callee_owned () -> Builtin.Int1
+  store %2 to [trivial] %0
+  %4 = tuple ()
+  return %4
+}
+
+sil shared [transparent] [reabstraction_thunk] [ossa] @escaping_at_most_once_closure_thunk : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1 {
+bb0(%0 : $*Builtin.Int1, %1 : @owned $@noescape @callable(once) @callee_owned () -> Builtin.Int1):
+  %2 = apply %1() : $@noescape @callable(once) @callee_owned () -> Builtin.Int1
+  store %2 to [trivial] %0
+  %4 = tuple ()
+  return %4
+}
+sil @exactly_once_closure_fun : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+
+sil [ossa] @call_exactly_once_closure : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1 {
+bb0(%0 : @owned $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>):
+  %1 = apply %0() : $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  return %1
+}
+
+sil [ossa] @call_exactly_once_closure_indirect : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1 {
+bb0(%0 : @owned $@noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>):
+  %1 = alloc_stack $Builtin.Int1
+  %2 = apply %0(%1) : $@noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>
+  %3 = load [trivial] %1
+  dealloc_stack %1
+  return %3
+}
+
+sil shared [transparent] [reabstraction_thunk] [ossa] @exactly_once_closure_thunk : $@convention(thin) (@owned @noescape @once @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1 {
+bb0(%0 : $*Builtin.Int1, %1 : @owned $@noescape @once @callee_owned () -> Builtin.Int1):
+  %2 = apply %1() : $@noescape @once @callee_owned () -> Builtin.Int1
+  store %2 to [trivial] %0
+  %4 = tuple ()
+  return %4
+}
+
+// The compensating destroy of a conversion of an exactly-once closure must not
+// survive specialization.
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_conversion :
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     destroy_value
+// CHECK:         [[F:%.*]] = function_ref @$s25call_exactly_once_closure0b1_c1_D4_funBi1_Tf1c_n
+// CHECK:         apply [[F]](%0)
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'test_exactly_once_closure_conversion'
+sil [ossa] @test_exactly_once_closure_conversion : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = function_ref @exactly_once_closure_fun : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %2 = partial_apply [on_stack] [called_once] %1(%0) : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %3 = convert_function %2 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  %4 = function_ref @call_exactly_once_closure : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %5 = apply %4(%3) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  return %5
+}
+
+// An exactly-once closure that is called on another path can't be specialized,
+// because the compensating destroy on this path would trap.
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_multiple_uses :
+// CHECK:       bb2:
+// CHECK:         [[C:%.*]] = convert_function
+// CHECK:         [[F:%.*]] = function_ref @call_exactly_once_closure :
+// CHECK-NEXT:    apply [[F]]([[C]])
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'test_exactly_once_closure_multiple_uses'
+sil [ossa] @test_exactly_once_closure_multiple_uses : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = function_ref @exactly_once_closure_fun : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %3 = partial_apply [on_stack] [called_once] %2(%0) : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  cond_br %1, bb1, bb2
+
+bb1:
+  %5 = apply %3() : $@noescape @once @callee_owned () -> Builtin.Int1
+  br bb3(%5)
+
+bb2:
+  %7 = convert_function %3 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  %8 = function_ref @call_exactly_once_closure : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %9 = apply %8(%7) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  br bb3(%9)
+
+bb3(%11 : $Builtin.Int1):
+  return %11
+}
+
+// The same for a re-abstraction thunk of an exactly-once closure.
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_thunk_multiple_uses :
+// CHECK:       bb2:
+// CHECK:         [[C:%.*]] = convert_function
+// CHECK:         [[F:%.*]] = function_ref @call_exactly_once_closure_indirect :
+// CHECK-NEXT:    apply [[F]]([[C]])
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'test_exactly_once_closure_thunk_multiple_uses'
+sil [ossa] @test_exactly_once_closure_thunk_multiple_uses : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = function_ref @exactly_once_closure_fun : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %3 = partial_apply [on_stack] [called_once] %2(%0) : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %4 = function_ref @exactly_once_closure_thunk : $@convention(thin) (@owned @noescape @once @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1
+  %5 = partial_apply [on_stack] [called_once] %4(%3) : $@convention(thin) (@owned @noescape @once @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1
+  %6 = alloc_stack $Builtin.Int1
+  cond_br %1, bb1, bb2
+
+bb1:
+  %8 = apply %5(%6) : $@noescape @once @callee_owned () -> @out Builtin.Int1
+  %9 = load [trivial] %6
+  br bb3(%9)
+
+bb2:
+  %11 = convert_function %5 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>
+  %12 = function_ref @call_exactly_once_closure_indirect : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %13 = apply %12(%11) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  br bb3(%13)
+
+bb3(%15 : $Builtin.Int1):
+  dealloc_stack %6
+  return %15
+}
+
+// A heap-allocated re-abstraction thunk of an exactly-once closure must be
+// deleted together with the closure.
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_escaping_thunk :
+// CHECK-NOT:     partial_apply
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK-NOT:     partial_apply
+// CHECK:         destroy_value %0
+// CHECK:         [[F:%.*]] = function_ref @$s43call_escaping_exactly_once_closure_indirect{{.*}}
+// CHECK-NEXT:    apply [[F]]([[C]])
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'test_exactly_once_closure_escaping_thunk'
+sil [ossa] @test_exactly_once_closure_escaping_thunk : $@convention(thin) (@owned ClosureCaptureClass) -> Builtin.Int1 {
+bb0(%0 : @owned $ClosureCaptureClass):
+  %1 = function_ref @exactly_once_closure_class_fun : $@convention(thin) (@guaranteed ClosureCaptureClass) -> Builtin.Int1
+  %2 = partial_apply [called_once] %1(%0) : $@convention(thin) (@guaranteed ClosureCaptureClass) -> Builtin.Int1
+  %3 = function_ref @escaping_exactly_once_closure_thunk : $@convention(thin) (@owned @once @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1
+  %4 = partial_apply [called_once] %3(%2) : $@convention(thin) (@owned @once @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1
+  %5 = convert_function %4 to $@once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>
+  %6 = function_ref @call_escaping_exactly_once_closure_indirect : $@convention(thin) (@owned @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %7 = apply %6(%5) : $@convention(thin) (@owned @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  return %7
+}
+
+// The same for an at-most-once closure with a move-only capture, which is
+// transferred to the specialized apply.
+// CHECK-LABEL: sil [ossa] @test_at_most_once_closure_escaping_thunk :
+// CHECK-NOT:     partial_apply
+// CHECK:         [[F:%.*]] = function_ref @$s43call_escaping_at_most_once_closure_indirect{{.*}}
+// CHECK-NEXT:    apply [[F]](%0)
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'test_at_most_once_closure_escaping_thunk'
+sil [ossa] @test_at_most_once_closure_escaping_thunk : $@convention(thin) (@owned ClosureCaptureNoncopyable) -> Builtin.Int1 {
+bb0(%0 : @owned $ClosureCaptureNoncopyable):
+  %1 = function_ref @at_most_once_closure_noncopyable_fun : $@convention(thin) (@owned ClosureCaptureNoncopyable) -> Builtin.Int1
+  %2 = partial_apply [on_stack] [called_at_most_once] %1(%0) : $@convention(thin) (@owned ClosureCaptureNoncopyable) -> Builtin.Int1
+  %3 = function_ref @escaping_at_most_once_closure_thunk : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1
+  %4 = partial_apply [called_at_most_once] %3(%2) : $@convention(thin) (@owned @noescape @callable(once) @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1
+  %5 = convert_function %4 to $@callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>
+  %6 = function_ref @call_escaping_at_most_once_closure_indirect : $@convention(thin) (@owned @callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %7 = apply %6(%5) : $@convention(thin) (@owned @callable(once) @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_mark_dependence :
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     destroy_value
+// CHECK:         [[F:%.*]] = function_ref @$s25call_exactly_once_closure{{.*}}
+// CHECK-NEXT:    apply [[F]](
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'test_exactly_once_closure_mark_dependence'
+sil [ossa] @test_exactly_once_closure_mark_dependence : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = alloc_stack $Builtin.Int1
+  store %0 to [trivial] %1
+  %3 = function_ref @exactly_once_closure_inout_fun : $@convention(thin) (@inout_aliasable Builtin.Int1) -> Builtin.Int1
+  %4 = partial_apply [on_stack] [called_once] %3(%1) : $@convention(thin) (@inout_aliasable Builtin.Int1) -> Builtin.Int1
+  %5 = mark_dependence [nonescaping] %4 on %1
+  %6 = convert_function %5 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  %7 = function_ref @call_exactly_once_closure : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %8 = apply %7(%6) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  dealloc_stack %1
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_debug_value :
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     destroy_value
+// CHECK:         [[F:%.*]] = function_ref @$s25call_exactly_once_closure0b1_c1_D4_funBi1_Tf1c_n
+// CHECK-NEXT:    apply [[F]](%0)
+// CHECK-NEXT:    return
+// CHECK:       } // end sil function 'test_exactly_once_closure_debug_value'
+sil [ossa] @test_exactly_once_closure_debug_value : $@convention(thin) (Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1):
+  %1 = function_ref @exactly_once_closure_fun : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %2 = partial_apply [on_stack] [called_once] %1(%0) : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %3 = convert_function %2 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  debug_value %3, let, name "body"
+  %5 = function_ref @call_exactly_once_closure : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %6 = apply %5(%3) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  return %6
+}
+
+// A dead-end destroy on another path doesn't prevent specialization.
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_dead_end_destroy :
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     destroy_value
+// CHECK:         [[F:%.*]] = function_ref @$s34call_exactly_once_closure_indirect{{.*}}
+// CHECK-NEXT:    apply [[F]](%0)
+// CHECK-NOT:     destroy_value
+// CHECK:       } // end sil function 'test_exactly_once_closure_dead_end_destroy'
+sil [ossa] @test_exactly_once_closure_dead_end_destroy : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = function_ref @exactly_once_closure_fun : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %3 = partial_apply [on_stack] [called_once] %2(%0) : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %4 = function_ref @exactly_once_closure_thunk : $@convention(thin) (@owned @noescape @once @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1
+  %5 = partial_apply [on_stack] [called_once] %4(%3) : $@convention(thin) (@owned @noescape @once @callee_owned () -> Builtin.Int1) -> @out Builtin.Int1
+  %6 = convert_function %5 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>
+  cond_br %1, bb1, bb2
+
+bb1:
+  %8 = function_ref @call_exactly_once_closure_indirect : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %9 = apply %8(%6) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  return %9
+
+bb2:
+  destroy_value [dead_end] %6
+  %12 = function_ref @closure_specialization_fatal : $@convention(thin) () -> Never
+  %13 = apply %12() : $@convention(thin) () -> Never
+  unreachable
+}
+
+// Dropping an exactly-once closure that's converted without deiniting traps,
+// so a destroy on another path prevents specialization.
+// CHECK-LABEL: sil [ossa] @test_exactly_once_closure_dropped_without_deiniting :
+// CHECK:       bb1:
+// CHECK:         [[F:%.*]] = function_ref @call_at_most_once_closure :
+// CHECK-NEXT:    apply [[F]](
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value
+// CHECK:       } // end sil function 'test_exactly_once_closure_dropped_without_deiniting'
+sil [ossa] @test_exactly_once_closure_dropped_without_deiniting : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = function_ref @exactly_once_closure_fun : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %3 = partial_apply [on_stack] [called_once] %2(%0) : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %4 = convert_function %3 to [without_actually_deiniting] $@noescape @callable(once) @callee_owned () -> Builtin.Int1
+  %5 = convert_function %4 to $@noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  cond_br %1, bb1, bb2
+
+bb1:
+  %7 = function_ref @call_at_most_once_closure : $@convention(thin) (@owned @noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %8 = apply %7(%5) : $@convention(thin) (@owned @noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  br bb3(%8)
+
+bb2:
+  destroy_value %5
+  br bb3(%1)
+
+bb3(%12 : $Builtin.Int1):
+  return %12
+}
+
+sil @captureless_closure_fun : $@convention(thin) () -> Builtin.Int1
+
+sil shared [transparent] [reabstraction_thunk] [ossa] @plain_to_exactly_once_closure_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Builtin.Int1) -> @out Builtin.Int1 {
+bb0(%0 : $*Builtin.Int1, %1 : @guaranteed $@noescape @callee_guaranteed () -> Builtin.Int1):
+  %2 = apply %1() : $@noescape @callee_guaranteed () -> Builtin.Int1
+  store %2 to [trivial] %0
+  %4 = tuple ()
+  return %4
+}
+
+// A captureless exactly-once closure has no ownership and is never destroyed.
+// CHECK-LABEL: sil [ossa] @test_captureless_exactly_once_closure :
+// CHECK-NOT:     thin_to_thick_function
+// CHECK:         [[F:%.*]] = function_ref @$s25call_exactly_once_closure{{.*}}
+// CHECK-NEXT:    apply [[F]]()
+// CHECK:       } // end sil function 'test_captureless_exactly_once_closure'
+sil [ossa] @test_captureless_exactly_once_closure : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = function_ref @captureless_closure_fun : $@convention(thin) () -> Builtin.Int1
+  %1 = thin_to_thick_function %0 to $@noescape @once @callee_owned () -> Builtin.Int1
+  %2 = convert_function %1 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  %3 = function_ref @call_exactly_once_closure : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %4 = apply %3(%2) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  return %4
+}
+
+// An exactly-once thunk of a captureless closure must be deleted, too.
+// CHECK-LABEL: sil [ossa] @test_exactly_once_thunk_of_captureless_closure :
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     destroy_value
+// CHECK:         [[F:%.*]] = function_ref @$s34call_exactly_once_closure_indirect{{.*}}
+// CHECK-NEXT:    apply [[F]]()
+// CHECK:       } // end sil function 'test_exactly_once_thunk_of_captureless_closure'
+sil [ossa] @test_exactly_once_thunk_of_captureless_closure : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = function_ref @captureless_closure_fun : $@convention(thin) () -> Builtin.Int1
+  %1 = thin_to_thick_function %0 to $@noescape @callee_guaranteed () -> Builtin.Int1
+  %2 = function_ref @plain_to_exactly_once_closure_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Builtin.Int1) -> @out Builtin.Int1
+  %3 = partial_apply [on_stack] [called_once] %2(%1) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Builtin.Int1) -> @out Builtin.Int1
+  %4 = convert_function %3 to $@noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>
+  %5 = function_ref @call_exactly_once_closure_indirect : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %6 = apply %5(%4) : $@convention(thin) (@owned @noescape @once @callee_owned @substituted <τ_0_0> () -> @out τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  return %6
+}
+
+// Dropping an at-most-once closure with copyable captures doesn't trap, so it
+// can be specialized even if it's dropped on another path.
+// CHECK-LABEL: sil [ossa] @test_at_most_once_closure_dropped_on_other_path :
+// CHECK-NOT:     partial_apply
+// CHECK:         [[F:%.*]] = function_ref @$s25call_at_most_once_closure{{.*}}
+// CHECK-NEXT:    apply [[F]](%0)
+// CHECK:       } // end sil function 'test_at_most_once_closure_dropped_on_other_path'
+sil [ossa] @test_at_most_once_closure_dropped_on_other_path : $@convention(thin) (Builtin.Int1, Builtin.Int1) -> Builtin.Int1 {
+bb0(%0 : $Builtin.Int1, %1 : $Builtin.Int1):
+  %2 = function_ref @exactly_once_closure_fun : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %3 = partial_apply [on_stack] [called_at_most_once] %2(%0) : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
+  %4 = convert_function %3 to $@noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>
+  cond_br %1, bb1, bb2
+
+bb1:
+  %6 = function_ref @call_at_most_once_closure : $@convention(thin) (@owned @noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  %7 = apply %6(%4) : $@convention(thin) (@owned @noescape @callable(once) @callee_owned @substituted <τ_0_0> () -> τ_0_0 for <Builtin.Int1>) -> Builtin.Int1
+  br bb3(%7)
+
+bb2:
+  destroy_value %4
+  br bb3(%1)
+
+bb3(%11 : $Builtin.Int1):
+  return %11
+}

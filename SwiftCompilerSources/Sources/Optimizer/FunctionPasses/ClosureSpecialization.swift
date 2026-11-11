@@ -262,9 +262,11 @@ private func trySpecialize(apply: ApplySite, isRootInvocation: Bool, _ context: 
 
   specialization.unUniqueCaptureArguments(context)
 
+  let closureArgumentValues = specialization.closureArguments.map { $0.0.value }
+
   specialization.rewriteApply(for: specializedFunction, context)
 
-  specialization.deleteDeadClosures(context)
+  specialization.deleteDeadClosures(passedAs: closureArgumentValues, context)
 
   if isNewFunction && isRootInvocation {
     /// Further specialization rounds can leave the cloned callee holding a specializable closure and an `apply` which
@@ -425,7 +427,10 @@ private func analyzeArguments(of apply: ApplySite, _ context: FunctionPassContex
        // Ok, we know that we can perform the optimization but not whether or not the optimization
        // is profitable. Check if the closure is actually called in the callee (or in a function
        // called by the callee). This opens optimization opportunities, like inlining.
-       isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!)
+       isClosureApplied(apply.calleeArgument(of: argOp, in: apply.referencedFunction!)!),
+       // Specializing must not leave a trapping destroy behind, or move a capture that
+       // another use still needs.
+       isOnlyForwarded(to: argOp, from: closure)
     {
       argumentsToSpecialize.append((argOp, closure))
       capturedDependencies.append(contentsOf: argumentDependencies)
@@ -473,16 +478,6 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
   let specializationLevelLimit = 2
 
   switch value {
-  case is ConvertFunctionInst,
-       is ConvertEscapeToNoEscapeInst,
-       is MoveValueInst,
-       is CopyValueInst,
-       // In OSSA a closure can be wrapped in a `begin_borrow` before it is passed as a `@guaranteed`
-       // argument to an apply. This is e.g. the case for a closure which is re-created in a
-       // previously specialized function.
-       is BeginBorrowInst:
-    return findSpecializableClosure(of: (value as! UnaryInstruction).operand.value, &visited, &capturedDependencies)
-
   case let mdi as MarkDependenceInst:
     guard mdi.value.type.isNoEscapeFunction, mdi.value.type.isThickFunction else {
       return nil
@@ -567,7 +562,11 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
     return tttfi
 
   default:
-    return nil
+    // A conversion of a closure.
+    guard let operand = forwardedClosureOperand(of: value) else {
+      return nil
+    }
+    return findSpecializableClosure(of: operand.value, &visited, &capturedDependencies)
   }
 }
 
@@ -951,8 +950,12 @@ private struct SpecializationInfo {
     }
   }
 
-  func deleteDeadClosures(_ context: FunctionPassContext) {
-    for  (_, closure) in closureArguments where !closure.isDeleted {
+  /// `argumentValues` are the values that were passed for `closureArguments`.
+  func deleteDeadClosures(passedAs argumentValues: [Value], _ context: FunctionPassContext) {
+    for ((_, closure), argumentValue) in zip(closureArguments, argumentValues) where !closure.isDeleted {
+      // An exactly-once closure traps when it's destroyed, so the compensating destroy of the argument
+      // must not survive: move it up to the root closure, which can then be deleted.
+      foldDeadForwardingChain(from: argumentValue, to: closure, context)
       if context.tryDeleteDeadClosure(closure: closure) {
         context.notifyInvalidatedStackNesting()
       }
@@ -1185,6 +1188,119 @@ private extension PartialApplyInst {
 
   var allArgumentsCanBeCopied: Bool {
     arguments.allSatisfy { !$0.type.isMoveOnly }
+  }
+}
+
+/// Returns the operand from which `value` forwards a closure, if `value` is a conversion or a
+/// re-abstraction thunk of a closure. `findSpecializableClosure` uses this to look through
+/// conversions, and adds checks of its own for `mark_dependence` and thunks. `isOnlyForwarded` and
+/// `foldDeadForwardingChain` use it to walk the chain that `findSpecializableClosure` found.
+private func forwardedClosureOperand(of value: Value) -> Operand? {
+  switch value {
+  case let conversion as ConvertFunctionInst:
+    return conversion.operand
+  case let conversion as ConvertEscapeToNoEscapeInst:
+    return conversion.operand
+  case let move as MoveValueInst:
+    return move.operand
+  case let copy as CopyValueInst:
+    return copy.operand
+  // In OSSA a closure can be wrapped in a `begin_borrow` before it is passed as a `@guaranteed`
+  // argument to an apply. This is e.g. the case for a closure which is re-created in a
+  // previously specialized function.
+  case let borrow as BeginBorrowInst:
+    return borrow.operand
+  case let mdi as MarkDependenceInst:
+    return mdi.valueOperand
+  case let thunk as PartialApplyInst where thunk.isPartialApplyOfThunk:
+    return thunk.argumentOperands[0]
+  default:
+    return nil
+  }
+}
+
+/// Specializing for a closure argument replaces the argument with a destroy of it, which
+/// `foldDeadForwardingChain` then moves up the chain of conversions and re-abstraction thunks from
+/// `closure` to `argOp`. If the chain contains an exactly-once closure, or `closure` has a move-only
+/// capture, each noncopyable value in the chain must not have any other use, and the fold must be
+/// able to reach `closure`. Otherwise an exactly-once closure would be destroyed on the path to the
+/// specialized apply, which traps, or deleted together with a destroy on another path, which skips
+/// a trap. And a move-only capture would be transferred to the specialized apply while another use
+/// still needs it.
+private func isOnlyForwarded(to argOp: Operand, from closure: Closure) -> Bool {
+  var chain = [argOp]
+  while chain.last!.value != closure {
+    guard let operand = forwardedClosureOperand(of: chain.last!.value) else {
+      return false
+    }
+    chain.append(operand)
+  }
+  let hasExactlyOnceClosure = chain.contains {
+    ($0.value as? PartialApplyInst)?.executionSemantics == .once
+  }
+  let hasMoveOnlyCapture = (closure as? PartialApplyInst).map { !$0.allArgumentsCanBeCopied } ?? false
+  guard hasExactlyOnceClosure || hasMoveOnlyCapture else {
+    return true
+  }
+  for (index, use) in chain.enumerated() {
+    let value = use.value
+    // A value without ownership is never destroyed.
+    if value.type.isMoveOnly, value.ownership != .none {
+      guard use.endsLifetime,
+            value.uses.ignoreDebugUses.allSatisfy({ $0 == use || $0.isDeadEndDestroy })
+      else {
+        return false
+      }
+    }
+    if index > 0, chain[index - 1].value.type.isMoveOnly, !canMoveDestroys(to: use) {
+      return false
+    }
+  }
+  return true
+}
+
+/// True if the destroys of the value that `operand`'s instruction forwards can be replaced with
+/// destroys of `operand`'s value, because the instruction consumes it or it has no ownership.
+private func canMoveDestroys(to operand: Operand) -> Bool {
+  operand.endsLifetime || operand.value.ownership == .none
+}
+
+/// Replaces the destroys of each noncopyable value in the chain of conversions and re-abstraction
+/// thunks from `closure` to `value` with destroys of the value it forwards, and deletes it, so that
+/// `closure` can be deleted.
+///
+/// FIXME: This works around `tryDeleteDeadClosure`, which can't look through a `convert_function`
+/// or delete a thunk that captures a noncopyable closure. Teach it to, and remove this
+/// (rdar://192503315).
+///
+/// FIXME: The steps for conversions repeat `tryRemoveForwardingInstruction` in
+/// SimplifyDestroyValue.swift. Share it once it works in any pass and with these instructions.
+private func foldDeadForwardingChain(from value: Value, to closure: Closure, _ context: FunctionPassContext) {
+  var value = value
+  while value != closure, value.type.isMoveOnly,
+        let operand = forwardedClosureOperand(of: value),
+        canMoveDestroys(to: operand),
+        value.uses.ignoreDebugUses.allSatisfy({ $0.instruction is DestroyValueInst })
+  {
+    let forwardedValue = operand.value
+    for destroy in Array(value.uses.users(ofType: DestroyValueInst.self)) {
+      // A value without ownership is never destroyed.
+      if forwardedValue.ownership != .none {
+        Builder(before: destroy, context).createDestroyValue(operand: forwardedValue, isDeadEnd: destroy.isDeadEnd)
+      }
+      context.erase(instruction: destroy)
+    }
+    if let thunk = value as? PartialApplyInst, thunk.isOnStack {
+      context.notifyInvalidatedStackNesting()
+    }
+    context.erase(instruction: value.definingInstruction!)
+    value = forwardedValue
+  }
+}
+
+private extension Operand {
+  var isDeadEndDestroy: Bool {
+    (instruction as? DestroyValueInst)?.isDeadEnd ?? false
   }
 }
 
