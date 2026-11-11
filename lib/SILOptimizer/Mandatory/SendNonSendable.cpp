@@ -1806,6 +1806,14 @@ public:
 class SendNonSendableImpl {
   RegionAnalysisFunctionInfo *info;
   SmallFrozenMultiMap<Operand *, RequireInst, 8> sendingOpToRequireInstMultiMap;
+
+  /// The region features that the errors about the uses of each sending
+  /// operand in sendingOpToRequireInstMultiMap depend on.
+  ///
+  /// We emit one diagnostic for all of the uses of a sending operand, so this
+  /// is the intersection of the region features of the errors for those uses.
+  llvm::SmallDenseMap<Operand *, RegionFeatures, 8> sendingOpToRegionFeatures;
+
   SmallVector<PartitionOpError, 8> foundVerbatimErrors;
 
 public:
@@ -1833,6 +1841,7 @@ struct DiagnosticEvaluator final
   RegionAnalysisFunctionInfo *info;
   SmallFrozenMultiMap<Operand *, RequireInst, 8>
       &sendingOpToRequireInstMultiMap;
+  llvm::SmallDenseMap<Operand *, RegionFeatures, 8> &sendingOpToRegionFeatures;
 
   /// An error that we know how to emit verbatim without needing to preprocess.
   ///
@@ -1844,13 +1853,26 @@ struct DiagnosticEvaluator final
                       RegionAnalysisFunctionInfo *info,
                       SmallFrozenMultiMap<Operand *, RequireInst, 8>
                           &sendingOpToRequireInstMultiMap,
+                      llvm::SmallDenseMap<Operand *, RegionFeatures, 8>
+                          &sendingOpToRegionFeatures,
                       SmallVectorImpl<PartitionOpError> &foundVerbatimErrors,
                       SendingOperandToStateMap &operandToStateMap)
       : PartitionOpEvaluatorBaseImpl(
             workingPartition, info->getOperandSetFactory(), operandToStateMap),
         info(info),
         sendingOpToRequireInstMultiMap(sendingOpToRequireInstMultiMap),
+        sendingOpToRegionFeatures(sendingOpToRegionFeatures),
         foundVerbatimErrors(foundVerbatimErrors) {}
+
+  /// Record that an error for a use after \p sendingOp sent its region is about
+  /// a region with \p regionFeatures.
+  void recordUseAfterSendRegionFeatures(Operand *sendingOp,
+                                        RegionFeatures regionFeatures) const {
+    auto [iter, inserted] =
+        sendingOpToRegionFeatures.try_emplace(sendingOp, regionFeatures);
+    if (!inserted)
+      iter->second &= regionFeatures;
+  }
 
   void handleLocalUseAfterSendError(LocalUseAfterSendError &&error) const {
     const auto &partitionOp = *error.op;
@@ -1865,6 +1887,7 @@ struct DiagnosticEvaluator final
 
     sendingOpToRequireInstMultiMap.insert(
         error.sendingOp, RequireInst::forUseAfterSend(partitionOp.getSourceInst()));
+    recordUseAfterSendRegionFeatures(error.sendingOp, error.regionFeatures);
   }
 
   void handleInOutSendingNotInitializedAtExitError(
@@ -1877,6 +1900,7 @@ struct DiagnosticEvaluator final
     sendingOpToRequireInstMultiMap.insert(
         sendingOp, RequireInst::forInOutReinitializationNeeded(
                        partitionOp.getSourceInst()));
+    recordUseAfterSendRegionFeatures(sendingOp, error.regionFeatures);
   }
 
   /// Dispatch an error discovered during dataflow to the appropriate handler.
@@ -2004,9 +2028,10 @@ void SendNonSendableImpl::runDiagnosticEvaluator() {
     // Grab its entry partition and setup an evaluator for the partition that
     // has callbacks that emit diagnsotics...
     Partition workingPartition = blockState.getEntryPartition();
-    DiagnosticEvaluator eval(
-        workingPartition, info, sendingOpToRequireInstMultiMap,
-        foundVerbatimErrors, info->getSendingOperandToStateMap());
+    DiagnosticEvaluator eval(workingPartition, info,
+                             sendingOpToRequireInstMultiMap,
+                             sendingOpToRegionFeatures, foundVerbatimErrors,
+                             info->getSendingOperandToStateMap());
 
     // And then evaluate all of our partition ops on the entry partition.
     for (auto &partitionOp : blockState.getPartitionOps()) {
@@ -2038,10 +2063,62 @@ namespace {
 template <typename Impl>
 class RegionIsolationDiagnosticEmitter {
 protected:
+  /// The features of the region that the error is about.
+  RegionFeatures regionFeatures;
+
   /// Set once we emit an error diagnostic.
   bool emittedErrorDiagnostic = false;
 
+  RegionIsolationDiagnosticEmitter(RegionFeatures regionFeatures = {})
+      : regionFeatures(regionFeatures) {}
+
+  RegionIsolationDiagnosticEmitter(const RegionIsolationDiagnosticEmitter &) =
+      delete;
+  RegionIsolationDiagnosticEmitter &
+  operator=(const RegionIsolationDiagnosticEmitter &) = delete;
+
+  ~RegionIsolationDiagnosticEmitter() { emitPendingErrorNote(); }
+
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
+
+private:
+  /// A note about the last error diagnostic that we emitted which we emit after
+  /// the notes that the emitter attaches to that error, i.e. when we emit our
+  /// next error diagnostic or when we are destroyed.
+  struct PendingErrorNote {
+    /// Stored since Impl may already be destroyed when we emit the note.
+    ASTContext &ctx;
+    SourceLoc loc;
+    Diagnostic note;
+  };
+  std::optional<PendingErrorNote> pendingErrorNote;
+
+  void emitPendingErrorNote() {
+    if (!pendingErrorNote)
+      return;
+
+    pendingErrorNote->ctx.Diags.diagnose(pendingErrorNote->loc,
+                                         pendingErrorNote->note);
+    pendingErrorNote.reset();
+  }
+
+  /// Returns true if errors about regions formed by merging in a called closure
+  /// should be downgraded to warnings since the
+  /// DowngradeClosureCalleeRegionErrors blocklist action applies to our
+  /// module.
+  ///
+  /// This allows for qualifying a compiler with this merge against code that
+  /// we have not yet fixed.
+  bool shouldDowngradeClosureCalleeMergeErrors() const {
+    return getASTContext().blockListConfig.hasBlockListAction(
+        getModuleName(), BlockListKeyKind::ModuleName,
+        BlockListAction::DowngradeClosureCalleeRegionErrors);
+  }
+
+  StringRef getModuleName() const {
+    auto *module = asImpl().getFunction()->getModule().getSwiftModule();
+    return module->getRealName().str();
+  }
 
 public:
   ASTContext &getASTContext() const {
@@ -2054,11 +2131,46 @@ public:
   template <typename... T, typename... U>
   InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
                                    U &&...args) {
+    emitPendingErrorNote();
     emittedErrorDiagnostic = true;
-    return std::move(
-        getASTContext()
-            .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-            .warnUntilLanguageMode(asImpl().getErrorLanguageMode()));
+
+    auto &ctx = getASTContext();
+    auto errorLanguageMode = asImpl().getErrorLanguageMode();
+
+    // We only started diagnosing errors about regions formed by merging a
+    // called closure's region with the regions of its arguments and results
+    // after Swift 6 was released.
+    bool isClosureCalleeMergeError =
+        regionFeatures.contains(RegionFeature::ClosureCalleeMerge) &&
+        ctx.LangOpts.isLanguageModeAtLeast(errorLanguageMode);
+
+    // Check the block list action for now to downgrade the errors to warnings.
+    // This should be removed along with `DowngradeClosureCalleeRegionErrors`.
+    if (isClosureCalleeMergeError &&
+        shouldDowngradeClosureCalleeMergeErrors()) {
+      pendingErrorNote.emplace(PendingErrorNote{
+          ctx, loc,
+          Diagnostic(
+              diag::regionbasedisolation_closure_callee_merge_block_listed,
+              getModuleName())});
+
+      auto inFlight = ctx.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+      inFlight.limitBehavior(DiagnosticBehavior::Warning);
+      return inFlight;
+    }
+
+    // Otherwise, if it's a new error, provide a note about how to work around
+    // the error in user code if the data race cannot be fixed yet.
+    if (isClosureCalleeMergeError) {
+      pendingErrorNote.emplace(PendingErrorNote{
+          ctx, loc,
+          Diagnostic(
+              diag::regionbasedisolation_closure_callee_merge_workaround)});
+    }
+
+    auto inFlight = ctx.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+    inFlight.warnUntilLanguageMode(errorLanguageMode);
+    return inFlight;
   }
 
   template <typename... T, typename... U>
@@ -2116,8 +2228,10 @@ class UseAfterSendDiagnosticEmitter
 
 public:
   UseAfterSendDiagnosticEmitter(Operand *sendingOp,
-                                SmallVectorImpl<RequireInst> &requireInsts)
-      : sendingOp(sendingOp), requireInsts(requireInsts) {}
+                                SmallVectorImpl<RequireInst> &requireInsts,
+                                RegionFeatures regionFeatures)
+      : RegionIsolationDiagnosticEmitter(regionFeatures), sendingOp(sendingOp),
+        requireInsts(requireInsts) {}
 
   ~UseAfterSendDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
@@ -2457,9 +2571,11 @@ class UseAfterSendDiagnosticInferrer {
 public:
   UseAfterSendDiagnosticInferrer(Operand *sendOp,
                                  SmallVectorImpl<RequireInst> &requireInsts,
+                                 RegionFeatures regionFeatures,
                                  RegionAnalysisValueMap &valueMap,
                                  SendingOperandToStateMap &sendingOpToStateMap)
-      : sendingOp(sendOp), diagnosticEmitter(sendOp, requireInsts),
+      : sendingOp(sendOp),
+        diagnosticEmitter(sendOp, requireInsts, regionFeatures),
         valueMap(valueMap), sendingOpToStateMap(sendingOpToStateMap),
         baseLoc(sendOp->getUser()->getLoc()),
         baseInferredType(sendOp->get()->getType().getASTType()) {}
@@ -2853,7 +2969,8 @@ void SendNonSendableImpl::emitUseAfterSendDiagnostics() {
     }
 
     UseAfterSendDiagnosticInferrer diagnosticInferrer(
-        sendingOp, requireInstsForError, info->getValueMap(),
+        sendingOp, requireInstsForError,
+        sendingOpToRegionFeatures.lookup(sendingOp), info->getValueMap(),
         info->getSendingOperandToStateMap());
     diagnosticInferrer.infer();
   }
@@ -2898,8 +3015,10 @@ public:
   SendNeverSentDiagnosticEmitterHelper(
       Operand *sendingOperand,
       llvm::PointerUnion<SILValue, SILInstruction *> neverSent,
-      SILDynamicMergedIsolationInfo isolationRegionInfo)
-      : sendingOperand(sendingOperand), neverSent(neverSent),
+      SILDynamicMergedIsolationInfo isolationRegionInfo,
+      RegionFeatures regionFeatures)
+      : RegionIsolationDiagnosticEmitter(regionFeatures),
+        sendingOperand(sendingOperand), neverSent(neverSent),
         isolationRegionInfo(isolationRegionInfo) {}
 
   ~SendNeverSentDiagnosticEmitterHelper() {
@@ -3329,7 +3448,7 @@ public:
       : valueMap(info->getValueMap()),
         diagnosticEmitter(error.op->getSourceOp(),
                           valueMap.getRepresentative(error.sentElement),
-                          error.isolationRegionInfo),
+                          error.isolationRegionInfo, error.regionFeatures),
         sentElement(error.sentElement), partition(std::move(error.partition)),
         info(info) {}
 
@@ -3814,7 +3933,8 @@ public:
 
   InOutSendingReturnedDiagnosticEmitter(RegionAnalysisFunctionInfo *raFuncInfo,
                                         Error &&error)
-      : raFuncInfo(raFuncInfo),
+      : RegionIsolationDiagnosticEmitter(error.regionFeatures),
+        raFuncInfo(raFuncInfo),
         functionExitingInst(cast<TermInst>(error.op->getSourceInst())),
         inoutSendingParam(raFuncInfo->getValueMap().getRepresentative(
             error.inoutSendingElement)),
@@ -4303,9 +4423,11 @@ bool InOutSendingReturnedDiagnosticEmitter::emitOutParamIncomingValueError(
   // See if given the exit partition of the block if we would emit an error
   // when we execute an InOutSendingAtFunctionExit partition op.
   SmallFrozenMultiMap<Operand *, RequireInst, 8> sendingOpToRequireInstMultiMap;
+  llvm::SmallDenseMap<Operand *, RegionFeatures, 8> sendingOpToRegionFeatures;
   SmallVector<PartitionOpError, 2> errors;
   DiagnosticEvaluator evaluator(workingExitPartition, raFuncInfo,
-                                sendingOpToRequireInstMultiMap, errors,
+                                sendingOpToRequireInstMultiMap,
+                                sendingOpToRegionFeatures, errors,
                                 raFuncInfo->getSendingOperandToStateMap());
   PartitionOp op = PartitionOp::InOutSendingAtFunctionExit(
       inoutSendingParamElement, finalValue.getDefiningInsertionPoint());
@@ -4480,7 +4602,8 @@ private:
 public:
   InOutSendingNotDisconnectedAtExitDiagnosticEmitter(
       RegionAnalysisFunctionInfo *info, Error &&error)
-      : functionExitingInst(cast<TermInst>(error.op->getSourceInst())),
+      : RegionIsolationDiagnosticEmitter(error.regionFeatures),
+        functionExitingInst(cast<TermInst>(error.op->getSourceInst())),
         inoutSendingParam(
             info->getValueMap().getRepresentative(error.inoutSendingElement)),
         actorIsolatedRegionInfo(error.isolationInfo), info(info),
@@ -4614,7 +4737,8 @@ private:
 public:
   AssignNeverSendableIntoSendingResultDiagnosticEmitter(
       RegionAnalysisFunctionInfo *info, Error &&error)
-      : srcOperand(error.op->getSourceOp()), outSendingResult(error.destValue),
+      : RegionIsolationDiagnosticEmitter(error.regionFeatures),
+        srcOperand(error.op->getSourceOp()), outSendingResult(error.destValue),
         neverSentValue(error.srcValue),
         isolatedValueIsolationRegionInfo(error.srcIsolationRegionInfo),
         info(info), neverSentElement(error.srcElement),
@@ -5005,8 +5129,9 @@ public:
       RegionAnalysisFunctionInfo *info, TermInst *functionExitingInst,
       SILValue firstInOutSendingParam, SILValue secondInOutSendingParam,
       Element firstElement, Element secondElement,
-      std::optional<Partition> &&partition)
-      : functionExitingInst(functionExitingInst),
+      std::optional<Partition> &&partition, RegionFeatures regionFeatures)
+      : RegionIsolationDiagnosticEmitter(regionFeatures),
+        functionExitingInst(functionExitingInst),
         firstInOutSendingParam(firstInOutSendingParam),
         secondInOutSendingParam(secondInOutSendingParam), info(info),
         firstElement(firstElement), secondElement(secondElement),
@@ -5531,7 +5656,7 @@ void SendNonSendableImpl::emitVerbatimErrors() {
         InOutSendingParametersInSameRegionDiagnosticEmitter diagnosticEmitter(
             info, cast<TermInst>(e.op->getSourceInst()), firstParam.getValue(),
             paramValue, e.firstInoutSendingParam, paramElt,
-            std::move(pairPartition));
+            std::move(pairPartition), e.regionFeatures);
         diagnosticEmitter.emit();
       }
       continue;

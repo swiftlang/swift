@@ -2001,7 +2001,8 @@ struct PartitionOpBuilder {
   }
 
   void addMerge(TrackableValue destValue, Operand *srcOperand,
-                RegionMergeReason reason = RegionMergeReason::Unknown) {
+                RegionMergeReason reason = RegionMergeReason::Unknown,
+                RegionFeatures features = {}) {
     if (destValue.isSendable())
       return;
     auto rep = destValue.getRepresentative().getValue();
@@ -2014,20 +2015,21 @@ struct PartitionOpBuilder {
 
     currentInstPartitionOps->emplace_back(
         PartitionOp::Merge(lookupValueID(rep), lookupValueID(srcOperand->get()),
-                           reason, srcOperand));
+                           reason, srcOperand, features));
   }
 
   /// Mark \p value artifically as being part of an actor-isolated region by
   /// introducing a new fake actor introducing representative and merging them.
   void addActorIntroducingInst(TrackableValue sourceValue,
                                Operand *sourceOperand,
-                               SILIsolationInfo actorIsolation) {
+                               SILIsolationInfo actorIsolation,
+                               RegionFeatures features = {}) {
     auto elt = getActorIntroducingRepresentative(actorIsolation);
     currentInstPartitionOps->emplace_back(
         PartitionOp::AssignFresh(elt, currentInst));
     currentInstPartitionOps->emplace_back(PartitionOp::Merge(
         elt, sourceValue.getID(), RegionMergeReason::ActorIntroducingInst,
-        sourceOperand));
+        sourceOperand, features));
   }
 
   void addActorIntroducingInst(
@@ -3033,20 +3035,14 @@ public:
         continue;
 
       if (fas.isCalleeOperand(op)) {
+        if (auto calleeResult = tryToTrackValue(op.get()))
+          builder.addRequire(*calleeResult);
+
         // A closure may capture non-Sendable state that the call could connect
         // with its arguments and results. As such, we need to conservatively
-        // merge it with the other operands below.
-        if (op.get()->getType().isFunctionTypeWithContext()) {
+        // merge it with them below.
+        if (op.get()->getType().isFunctionTypeWithContext())
           calleeClosure = &op;
-          continue;
-        }
-
-        // Non-closure callees capture nothing, and so we just require them.
-        if (auto calleeResult = tryToTrackValue(op.get())) {
-          builder.addRequire(*calleeResult);
-          continue;
-        }
-
         continue;
       }
 
@@ -3082,12 +3078,6 @@ public:
       }
     }
 
-    // Add the callee last so that we merge into the region of the first
-    // argument. This matters when that argument is a 'sending' indirect
-    // result since we diagnose merges of non-disconnected regions into it.
-    if (calleeClosure)
-      nonSendingParameters.push_back(calleeClosure);
-
     SWIFT_DEFER {
       for (auto &op : fas->getAllOperands()) {
         if (!fas.isInOutSending(op))
@@ -3112,9 +3102,13 @@ public:
 
     // If our result is not a 'sending' result, just do the normal multi-assign.
     if (!type->hasSendingResult()) {
-      return translateSILMultiAssign(
+      translateSILMultiAssign(
           applyResults, ArrayRef<Operand *>(), nonSendingParameters,
           RegionMergeReason::NonisolatedFunction, isolationInfo);
+      if (calleeClosure)
+        translateClosureCalleeMerge(calleeClosure, nonSendingParameters,
+                                    applyResults, isolationInfo);
+      return;
     }
 
     // If our result is a 'sending' result, then pass in empty as our results,
@@ -3122,6 +3116,9 @@ public:
     ArrayRef<SILValue> empty;
     translateSILMultiAssign(empty, ArrayRef<Operand *>(), nonSendingParameters,
                             {});
+    if (calleeClosure)
+      translateClosureCalleeMerge(calleeClosure, nonSendingParameters, empty,
+                                  {});
 
     // Sending direct results.
     for (SILValue result : applyResults) {
@@ -3136,6 +3133,53 @@ public:
         builder.addAssignFresh(lookupResult->value);
       }
     }
+  }
+
+  /// Merge the region of \p calleeOperand, a called closure, with the regions
+  /// of the non-'sending' \p parameters and \p results of the call, which
+  /// translateSILMultiAssign has already merged together.
+  ///
+  /// We mark the merged region with RegionFeature::ClosureCalleeMerge so that
+  /// we can tell apart the errors that we find only because of this merge.
+  ///
+  /// If there are no parameters or results to merge with but the call has
+  /// \p isolationInfo, we instead merge the callee with that isolation like
+  /// translateSILMultiAssign does for its operands. This gives the callee's
+  /// region the isolation of the call, which we name in diagnostics.
+  void translateClosureCalleeMerge(Operand *calleeOperand,
+                                   ArrayRef<Operand *> parameters,
+                                   ArrayRef<SILValue> results,
+                                   SILIsolationInfo isolationInfo) {
+    auto calleeResult = tryToTrackValue(calleeOperand->get());
+    if (!calleeResult || calleeResult->value.isSendable())
+      return;
+
+    // Merge into the region of the first parameter, or the first result if we
+    // do not have any. This matters when that parameter is a 'sending' indirect
+    // result since we diagnose merges of non-disconnected regions into it.
+    auto mergeInto = [&](SILValue value) -> bool {
+      auto lookupResult = tryToTrackValue(value);
+      if (!lookupResult || lookupResult->value.isSendable())
+        return false;
+
+      builder.addMerge(lookupResult->value, calleeOperand,
+                       RegionMergeReason::NonisolatedFunction,
+                       RegionFeature::ClosureCalleeMerge);
+      return true;
+    };
+
+    for (Operand *parameter : parameters)
+      if (mergeInto(parameter->get()))
+        return;
+
+    for (SILValue result : results)
+      if (mergeInto(result))
+        return;
+
+    if (isolationInfo)
+      builder.addActorIntroducingInst(calleeResult->value, calleeOperand,
+                                      isolationInfo,
+                                      RegionFeature::ClosureCalleeMerge);
   }
 
   void translateSILApply(SILInstruction *inst) {

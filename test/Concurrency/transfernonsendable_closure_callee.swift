@@ -58,6 +58,7 @@ actor Custom {
     field = y
     return x // expected-error {{sending 'x' risks causing data races}}
     // expected-note @-1 {{'self'-isolated 'x' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+    // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   }
 
   func localClosure() -> sending NonSendableKlass {
@@ -68,6 +69,7 @@ actor Custom {
     field = y
     return x // expected-error {{sending 'x' risks causing data races}}
     // expected-note @-1 {{'self'-isolated 'x' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+    // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   }
 
   func closureParameter(_ f: (NonSendableKlass) -> Void) -> sending NonSendableKlass {
@@ -75,6 +77,7 @@ actor Custom {
     f(x)
     return x // expected-error {{sending 'x' risks causing data races}}
     // expected-note @-1 {{'self'-isolated 'x' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+    // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   }
 
   func sendableClosureParameter(_ f: @Sendable (NonSendableKlass) -> Void) -> sending NonSendableKlass {
@@ -86,6 +89,7 @@ actor Custom {
   func closureParameterResult(_ f: () -> NonSendableKlass) -> sending NonSendableKlass {
     return f() // expected-error {{sending 'f' risks causing data races}}
     // expected-note @-1 {{'self'-isolated 'f' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+    // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   }
 
   // Make sure that merging in the callee does not hide errors from assigning
@@ -96,6 +100,7 @@ actor Custom {
     // expected-note @-2 {{returning 'self'-isolated 'self.field' risks causing data races since the caller assumes that 'self.field' can be safely sent to other isolation domains, but 'self.field' is accessible to code in the current isolation context}}
     // expected-error @-3 {{returning 'self'-isolated 'f' as a 'sending' result risks causing data races; 'f' is accessible to code in the current isolation context}}
     // expected-note @-4 {{returning 'self'-isolated 'f' risks causing data races since the caller assumes that 'f' can be safely sent to other isolation domains, but 'f' is accessible to code in the current isolation context}}
+    // expected-note @-5 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   }
 
   func optionalClosureParameter(_ f: ((NonSendableKlass) -> Void)?) -> sending NonSendableKlass {
@@ -103,6 +108,7 @@ actor Custom {
     f?(x)
     return x // expected-error {{sending 'x' risks causing data races}}
     // expected-note @-1 {{'self'-isolated 'x' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+    // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   }
 
   func escapingClosureParameter(_ f: @escaping (NonSendableKlass) -> Void) -> sending NonSendableKlass {
@@ -110,6 +116,7 @@ actor Custom {
     f(x)
     return x // expected-error {{sending 'x' risks causing data races}}
     // expected-note @-1 {{'self'-isolated 'x' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+    // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   }
 
   // A 'sending' result is disconnected, so it is not merged with the callee
@@ -126,6 +133,7 @@ func useAfterSendViaClosureCapture() async {
   f(y)
   await transferToMain(y) // expected-error {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -146,6 +154,7 @@ func useAfterSendViaNonsendingAsyncClosureCapture(_ b: NonSendableKlass) async {
   await f(a)
   await transferToMain(a) // expected-error {{sending 'a' risks causing data races}}
   // expected-note @-1 {{sending 'a' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
 }
 
 // Calling a @concurrent closure crosses isolation, so 'a' is sent to the
@@ -155,6 +164,16 @@ func concurrentAsyncClosureSendsArgument() async {
   let f: @concurrent (NonSendableKlass) async -> Void = { _ in }
   await f(a)
   useValue(a)
+}
+
+// Calling a closure with an 'isolated' parameter merges the closure into the
+// region of the actor that we pass it, so we name that actor's isolation.
+func isolatedParameterClosureTakesCallIsolation(_ c: isolated Custom) {
+  let f: (isolated Custom) -> Void = { _ in }
+  f(c)
+  sendValue(f) // expected-error {{sending 'f' risks causing data races}}
+  // expected-note @-1 {{'c'-isolated 'f' is passed as a 'sending' parameter; Uses in callee may race with later 'c'-isolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
 }
 
 // The closure is in CustomActor's region since it captures a CustomActor
@@ -177,6 +196,7 @@ func closureResultAliasesCapture() {
   let closure = { ns }
   sendValue(closure()) // expected-error {{sending 'closure' risks causing data races}}
   // expected-note @-1 {{'closure' used after being passed as a 'sending' parameter; Later uses could race}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(ns) // expected-note {{access can happen concurrently}}
 }
 
@@ -187,6 +207,7 @@ func closureResultAliasesCaptureThroughGenericFunction() {
   let alias = idFn(closure())
   sendValue(alias) // expected-error {{sending 'alias' risks causing data races}}
   // expected-note @-1 {{'alias' used after being passed as a 'sending' parameter; Later uses could race}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(ns) // expected-note {{access can happen concurrently}}
 }
 
@@ -200,10 +221,12 @@ func closureResultSentToTaskGroup(_ ns: NonSendableKlass) async {
     let ns2 = c()
 
     group.addTask { // expected-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-note @-1 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
       useValue(ns1) // expected-note {{closure captures 'ns1' which is accessible to code in the current isolation context}}
     }
 
     group.addTask { // expected-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-note @-1 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
       useValue(ns2) // expected-note {{closure captures 'ns2' which is accessible to code in the current isolation context}}
     }
   }
@@ -214,9 +237,11 @@ func closureResultOfTaskIsolatedCaptureSent(_ ns: NonSendableKlass) {
 
   sendValue(c()) // expected-error {{sending 'c' risks causing data races}}
   // expected-note @-1 {{'c' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
 
   sendValue(c()) // expected-error {{sending 'c' risks causing data races}}
   // expected-note @-1 {{'c' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
 }
 
 // Calling a closure parameter merges 'x' into the closure's task-isolated
@@ -226,6 +251,7 @@ func closureParameterTaskIsolatedSendingClosureResult(_ f: (NonSendableKlass) ->
   f(x)
   // FIXME: This diagnostic should name 'x' and its isolation.
   return { useValue(x) } // expected-error {{task or actor-isolated value cannot be sent}}
+  // expected-note @-1 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
 }
 
 ////////////////////////////////////
@@ -244,6 +270,7 @@ func localFunctionValue() async {
   f(y)
   await transferToMain(y) // expected-error {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -255,6 +282,7 @@ func methodReference() async {
   f(y)
   await transferToMain(y) // expected-error {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -267,6 +295,7 @@ func closureLoadedFromVar() async {
   f(y)
   await transferToMain(y) // expected-error {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -278,6 +307,7 @@ func closureStoredInStruct() async {
   h.f(y)
   await transferToMain(y) // expected-error {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -302,6 +332,7 @@ func closureReabstractedThroughGeneric() async {
   f(y)
   await transferToMain(y) // expected-error {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -314,6 +345,7 @@ func convertedClosure() async {
   try? g(y)
   await transferToMain(y) // expected-error {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -325,6 +357,7 @@ func throwingClosure() async {
   try? f(y)
   await transferToMain(y) // expected-error {{sending 'y' risks causing data races}}
   // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
   useValue(x) // expected-note {{access can happen concurrently}}
 }
 
@@ -334,6 +367,7 @@ func closureParameterGenericArgument<T>(_ f: (T) -> Void, _ make: () -> sending 
   f(t)
   return t // expected-error {{returning 't' as a 'sending' result risks causing data races}}
   // expected-note @-1 {{returning 't' risks causing data races since the caller assumes that 't' can be safely sent to other isolation domains}}
+  // expected-note @-2 {{if this data race cannot be fixed yet, this error can be suppressed by compiling in the Swift 5 language mode or by storing the sent value in a 'nonisolated(unsafe)' variable}}
 }
 
 // Directly calling a local function or closure literal passes its captures as
