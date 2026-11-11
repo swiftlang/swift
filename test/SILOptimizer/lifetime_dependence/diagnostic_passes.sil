@@ -74,7 +74,7 @@ bb0(%0 : @owned $NE):
 // Reassign into a local that outlives the original.
 //
 // CHECK-LABEL: sil [ossa] @testInoutReassign : $@convention(thin) () -> () {
-// CHECK:   [[V1:%.*]] = alloc_stack [var_decl] $NE, var, name "v1", type $NE
+// CHECK:   [[V1:%.*]] = alloc_stack [var_decl] $NE, var, name "v1"
 // CHECK:   [[MD1:%.*]] = mark_dependence [nonescaping]
 // CHECK:   store [[MD1]] to [init] [[V1]]
 // CHECK:   [[MD2:%.*]] = mark_dependence [nonescaping]
