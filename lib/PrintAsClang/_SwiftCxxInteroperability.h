@@ -359,6 +359,18 @@ template <size_t N> struct WitnessTableStorage {
 };
 template <> struct WitnessTableStorage<0> {};
 
+// Witness-function loader shared by both existential wrappers. It touches
+// no wrapper state, so it lives here instead of being defined per class.
+template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
+FnTy _loadWitness(const void *_Nonnull wt) {
+  struct slot {
+    FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
+  };
+  auto *s = reinterpret_cast<const slot *>(
+      reinterpret_cast<const void *const *>(wt) + EntryOffset);
+  return s->fn;
+}
+
 // --- Conditional conversion to Any ---
 //
 // CRTP base for the implicit conversion to Any (SwiftExistentialType<>).
@@ -442,17 +454,6 @@ protected:
   // Defined out-of-line; needs complete VWT.
   SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
   _projectValue() const noexcept;
-
-  template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
-  SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitness(
-      const void *_Nonnull wt) const {
-    struct slot {
-      FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
-    };
-    auto *s = reinterpret_cast<const slot *>(
-        reinterpret_cast<const void *const *>(wt) + EntryOffset);
-    return s->fn;
-  }
 
   // Witness-table copy through a count-dispatched helper: the 0-table
   // storage base declares no member, so the loop cannot be shared.
@@ -551,17 +552,6 @@ protected:
   _getType() const noexcept {
     return swift_getObjectType(
         reinterpret_cast<void *_Nonnull>(_value));
-  }
-
-  template <size_t EntryOffset, uint16_t PtrAuthDisc, typename FnTy>
-  SWIFT_INLINE_PRIVATE_HELPER FnTy _loadWitness(
-      const void *_Nonnull wt) const {
-    struct slot {
-      FnTy __ptrauth_swift_protocol_witness_function_pointer(PtrAuthDisc) fn;
-    };
-    auto *s = reinterpret_cast<const slot *>(
-        reinterpret_cast<const void *const *>(wt) + EntryOffset);
-    return s->fn;
   }
 
   // Witness-table copy through a count-dispatched helper: the 0-table
