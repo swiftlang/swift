@@ -995,10 +995,9 @@ void swift::swift_deallocClassInstance(HeapObject *object,
 
     swift::fatalError(0,
                       "Object %p of class %s deallocated with non-zero retain "
-                      "count %zd. This object's deinit, or something called "
-                      "from it, may have created a strong reference to self "
-                      "which outlived deinit, resulting in a dangling "
-                      "reference.\n",
+                      "count %zd. Possible unsafe concurrent access to stored "
+                      "property containing this object, or escape of self from "
+                      "its deinit.\n",
                       object,
                       descriptor ? descriptor->Name.get() : "<unknown>",
                       retainCount);
