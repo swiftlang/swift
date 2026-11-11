@@ -158,7 +158,7 @@ extension LoadInst : LoadingInstruction {
       // from the `existingLoad` (which usually has a small number of uses) to this load - and delete the
       // `existingLoad`.
       existingLoad.uses.replaceAll(with: self, context)
-      self.operand.set(to: existingLoad.address, context)
+      self.addressOperand.set(to: existingLoad.address, context)
       self.set(ownership: existingLoad.loadOwnership, context)
       self.set(location: existingLoad.location, context)
       self.move(before: existingLoad, context)

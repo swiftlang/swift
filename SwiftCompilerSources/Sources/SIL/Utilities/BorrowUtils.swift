@@ -464,7 +464,7 @@ public enum BeginBorrowValue {
     case let .beginBorrow(beginBorrow):
       return beginBorrow.operand
     case let .loadBorrow(loadBorrow):
-      return loadBorrow.operand
+      return loadBorrow.addressOperand
     case let .dereferenceBorrow(derefBorrow):
       return derefBorrow.operand
     case let .borrowAccessor(apply):

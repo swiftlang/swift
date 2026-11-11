@@ -52,7 +52,7 @@ struct LoadOperation {
   SILValue getOperand() const {
     if (isa<LoadInst *>(value))
       return cast<LoadInst *>(value)->getOperand();
-    return cast<LoadBorrowInst *>(value)->getOperand();
+    return cast<LoadBorrowInst *>(value)->getAddress();
   }
 
   /// Return the ownership qualifier of the underlying load if we have a load or

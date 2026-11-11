@@ -618,6 +618,9 @@ enum class ConstraintSystemFlags {
 
   /// Disable macro expansions.
   DisableMacroExpansions = 0x40,
+
+  /// When set, ignore execution semantics mismatches between function types.
+  IgnoreExecutionSemanticsMismatch = 0x80,
 };
 
 /// Options that affect the constraint system as a whole.

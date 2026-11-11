@@ -289,7 +289,7 @@ void DCE::processBorrow(BorrowedValue borrow) {
   // class reference.
   SILValue borrowedAddress;
   if (auto *loadBorrow = dyn_cast<LoadBorrowInst>(*borrow)) {
-    borrowedAddress = loadBorrow->getOperand();
+    borrowedAddress = loadBorrow->getAddress();
   } else if (auto *apply = dyn_cast<ApplyInst>(*borrow)) {
     if (auto *selfOperand =
             apply->getSelfAddressOfGuaranteedBorrowAccessorResult()) {

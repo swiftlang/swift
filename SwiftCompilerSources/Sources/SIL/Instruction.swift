@@ -946,10 +946,11 @@ final public class DeallocExistentialBoxInst : Instruction, UnaryInstruction, De
 //===----------------------------------------------------------------------===//
 
 @_semantics("fast_cast")
-public protocol LoadInstruction: SingleValueInstruction, UnaryInstruction {}
+public protocol LoadInstruction: SingleValueInstruction {}
 
 extension LoadInstruction {
-  public var address: Value { operand.value }
+  public var addressOperand: Operand { operands[0] }
+  public var address: Value { addressOperand.value }
 }
 
 final public class LoadInst : SingleValueInstruction, LoadInstruction {
@@ -2101,6 +2102,22 @@ final public class BeginBorrowInst : SingleValueInstruction, UnaryInstruction, B
 }
 
 final public class LoadBorrowInst : SingleValueInstruction, LoadInstruction, BeginBorrowInstruction {
+
+  /// The optional value hint.
+  ///
+  /// If not nil, the loaded value is exactly the value of the value hint.
+  /// This is used if the `load_borrow` cannot be replaced by the value hint in OSSA because it would violate
+  /// ownership rules, e.g. if the value hint is consumed (e.g. by a `store`) before the `load_borrow`.
+  /// The value hint is not an ownership use, i.e. it does not need to be alive at the `load_borrow`.
+  public var valueHint: Value? { operands.count == 2 ? operands[1].value : nil }
+
+  /// Sets the value hint, which must have the same type as the `load_borrow`.
+  /// The caller is responsible that the loaded value is exactly the value of `valueHint`.
+  public func set(valueHint: Value, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.LoadBorrow_setValueHint(valueHint.bridged)
+    context.notifyInstructionChanged(self)
+  }
 
   // True if the invariants on `load_borrow` have not been checked and should not be strictly enforced.
   //

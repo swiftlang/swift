@@ -182,7 +182,6 @@ OPERAND_OWNERSHIP(TrivialUse, InitExistentialMetatype)
 OPERAND_OWNERSHIP(TrivialUse, InjectEnumAddr)
 OPERAND_OWNERSHIP(TrivialUse, IsUnique)
 OPERAND_OWNERSHIP(TrivialUse, Load)
-OPERAND_OWNERSHIP(TrivialUse, LoadBorrow)
 OPERAND_OWNERSHIP(TrivialUse, MarkFunctionEscape)
 OPERAND_OWNERSHIP(TrivialUse, ObjCExistentialMetatypeToObject)
 OPERAND_OWNERSHIP(TrivialUse, ObjCMetatypeToObject)
@@ -260,6 +259,8 @@ OPERAND_OWNERSHIP(UnownedInstantaneousUse, ObjCSuperMethod)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedRetainValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedReleaseValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, UnmanagedAutoreleaseValue)
+
+OPERAND_OWNERSHIP(NonUse, UncheckedOwnership)
 
 // These act as a form of conversion that does not imply ownership. Thus from an
 // operand perspective we treat them as a pointer escape and from a value
@@ -457,7 +458,6 @@ AGGREGATE_OWNERSHIP(DestructureTuple)
 AGGREGATE_OWNERSHIP(Enum)
 AGGREGATE_OWNERSHIP(UncheckedEnumData)
 AGGREGATE_OWNERSHIP(SwitchEnum)
-AGGREGATE_OWNERSHIP(UncheckedOwnership)
 #undef AGGREGATE_OWNERSHIP
 
 // A begin_borrow is conditionally nested.
@@ -779,6 +779,14 @@ visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
     return OperandOwnership::TrivialUse;
   }
   return OperandOwnership::PointerEscape;
+}
+
+OperandOwnership OperandOwnershipClassifier::
+visitLoadBorrowInst(LoadBorrowInst *lbi) {
+  if (getOperandIndex() == 0) {
+    return OperandOwnership::TrivialUse;
+  }
+  return OperandOwnership::NonUse;
 }
 
 OperandOwnership
