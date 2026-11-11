@@ -4,6 +4,7 @@
 // that SIL serialization not mix them up.
 
 // REQUIRES: swift_feature_ModernImportedCArrays
+// REQUIRES: swift_feature_ObjCAttrAllowsCArrays
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -134,20 +135,20 @@ import CLib
 @export(implementation) public func modernAsyncFunc() async {
   var array: InlineArray<4, Int32> = [1, 2, 3, 4]
   let result = await Svc().fetch(withBuf: &array)
-  printSvc(result)
+  printBuf("Svc", result)
 }
 
 // FIXME: Workaround for optimize_none_with_opaque_values. Subscripting an
 // InlineArray fails SIL verification there (this is covered by other tests).
-@export(implementation) public func printSvc(_ result: UnsafeMutablePointer<InlineArray<4, Int32>>) {
-  print("Svc", result.pointee[0], result.pointee[1], result.pointee[2], result.pointee[3])
+@export(implementation) public func printBuf(_ label: String, _ buf: UnsafeMutablePointer<InlineArray<4, Int32>>) {
+  print(label, buf.pointee[0], buf.pointee[1], buf.pointee[2], buf.pointee[3])
 }
 
 //--- src/LegacyExec.swift
 
-// RUN: %target-build-swift -emit-sil %t/src/LegacyExec.swift -g -o %t/fragile/LegacyExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple
+// RUN: %target-build-swift -emit-sil %t/src/LegacyExec.swift -g -o %t/fragile/LegacyExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays
 // RUN: %FileCheck --input-file %t/fragile/LegacyExec.sil --check-prefixes SIL,LEGACY %s
-// RUN: %target-build-swift -emit-executable %t/src/LegacyExec.swift %t/fragile/LegacyLib.o %t/fragile/ModernLib.o %t/fragile/Adopter.o -g -o %t/fragile/LegacyExec -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple
+// RUN: %target-build-swift -emit-executable %t/src/LegacyExec.swift %t/fragile/LegacyLib.o %t/fragile/ModernLib.o %t/fragile/Adopter.o -g -o %t/fragile/LegacyExec -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays
 // RUN: %target-codesign %t/fragile/LegacyExec
 // RUN: %target-run %t/fragile/LegacyExec > %t/fragile/LegacyExec.txt
 // RUN: %FileCheck --input-file %t/fragile/LegacyExec.txt --check-prefix OUTPUT %s
@@ -169,6 +170,14 @@ adopter.showBuf(&array)
 let proto: any P = adopter
 proto.showBuf(&array)
 
+class Conformer: NSObject, P {
+  func showBuf(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {
+    print("Conformer", array.pointee.0, array.pointee.1, array.pointee.2, array.pointee.3)
+  }
+}
+let conformer: any P = Conformer()
+conformer.showBuf(&array)
+
 print("legacyAsyncFunc:")
 await legacyAsyncFunc()
 
@@ -182,9 +191,9 @@ print("Svc", asyncResult.pointee.0, asyncResult.pointee.1, asyncResult.pointee.2
 
 //--- src/ModernExec.swift
 
-// RUN: %target-build-swift -emit-sil %t/src/ModernExec.swift -g -o %t/fragile/ModernExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays
+// RUN: %target-build-swift -emit-sil %t/src/ModernExec.swift -g -o %t/fragile/ModernExec.sil -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays -enable-experimental-feature ObjCAttrAllowsCArrays
 // RUN: %FileCheck --input-file %t/fragile/ModernExec.sil --check-prefixes SIL,MODERN %s
-// RUN: %target-build-swift -emit-executable %t/src/ModernExec.swift %t/fragile/LegacyLib.o %t/fragile/ModernLib.o %t/fragile/Adopter.o -g -o %t/fragile/ModernExec -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays
+// RUN: %target-build-swift -emit-executable %t/src/ModernExec.swift %t/fragile/LegacyLib.o %t/fragile/ModernLib.o %t/fragile/Adopter.o -g -o %t/fragile/ModernExec -I %t/include -I %t/fragile -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ModernImportedCArrays -enable-experimental-feature ObjCAttrAllowsCArrays
 // RUN: %target-codesign %t/fragile/ModernExec
 // RUN: %target-run %t/fragile/ModernExec > %t/fragile/ModernExec.txt
 // RUN: %FileCheck --input-file %t/fragile/ModernExec.txt --check-prefix OUTPUT %s
@@ -206,6 +215,14 @@ adopter.showBuf(&array)
 let proto: any P = adopter
 proto.showBuf(&array)
 
+class Conformer: NSObject, P {
+  func showBuf(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {
+    printBuf("Conformer", array)
+  }
+}
+let conformer: any P = Conformer()
+conformer.showBuf(&array)
+
 print("legacyAsyncFunc:")
 await legacyAsyncFunc()
 
@@ -215,7 +232,7 @@ await modernAsyncFunc()
 print("main async:")
 var asyncArray: InlineArray<4, Int32> = [1, 2, 3, 4]
 let asyncResult = await Svc().fetch(withBuf: &asyncArray)
-printSvc(asyncResult)
+printBuf("Svc", asyncResult)
 
 //--- src/Output.txt
 
@@ -228,6 +245,7 @@ printSvc(asyncResult)
 // OUTPUT-NEXT: main:
 // OUTPUT-NEXT: Adopter 2147483647 1 2 3
 // OUTPUT-NEXT: Adopter 2147483647 1 2 3
+// OUTPUT-NEXT: Conformer 2147483647 1 2 3
 // OUTPUT-NEXT: legacyAsyncFunc:
 // OUTPUT-NEXT: Svc 2 2 3 4
 // OUTPUT-NEXT: modernAsyncFunc:

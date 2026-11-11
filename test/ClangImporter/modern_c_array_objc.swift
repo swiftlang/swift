@@ -78,6 +78,10 @@ NS_ASSUME_NONNULL_BEGIN
 
 @protocol P
 - (void)protoTakes:(int (*)[4])array;
+@optional
+- (void)optionalTakes:(int (*)[4])array;
+- (nullable int (*)[4])optionalGives;
+@property (nullable, nonatomic) int (*optionalBuf)[4];
 @end
 
 @interface Adopter : NSObject <P>
@@ -297,6 +301,53 @@ func testAsync(
   // expected-legacy-c-array-note@-2 {{arguments to generic parameter 'Pointee' ('(CInt, CInt, CInt, CInt)' (aka '(Int32, Int32, Int32, Int32)') and 'InlineArray<4, Int32>') are expected to be equal}}
 }
 
+// Conforming from Swift
+
+@available(anyAppleOS 26, *)
+class ModernWitness: NSObject, P {
+  // expected-legacy-c-array-error@-1 {{type 'ModernWitness' does not conform to protocol 'P'}}
+  // expected-legacy-c-array-note@-2 {{add stubs for conformance}}
+  func protoTakes(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+  // expected-legacy-c-array-note@-1 {{candidate has non-matching type '(UnsafeMutablePointer<InlineArray<4, Int32>>) -> ()'}}
+  func optionalTakes(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+}
+
+@available(anyAppleOS 26, *)
+class LegacyWitness: NSObject, P {
+  // expected-modern-c-array-error@-1 {{type 'LegacyWitness' does not conform to protocol 'P'}}
+  // expected-modern-c-array-note@-2 {{add stubs for conformance}}
+  func protoTakes(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+  // expected-modern-c-array-note@-1 {{candidate has non-matching type '(UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) -> ()'}}
+  func optionalTakes(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+}
+
+// Trying to implement the hidden projection, not the visible one, of the
+// optional requirement is diagnosed as a conflict.
+
+@available(anyAppleOS 26, *)
+class ModernRequiredLegacyOptionalWitness: NSObject, P {
+  // expected-legacy-c-array-error@-1 {{type 'ModernRequiredLegacyOptionalWitness' does not conform to protocol 'P'}}
+  // expected-legacy-c-array-note@-2 {{add stubs for conformance}}
+  func protoTakes(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+  // expected-legacy-c-array-note@-1 {{candidate has non-matching type '(UnsafeMutablePointer<InlineArray<4, Int32>>) -> ()'}}
+  func optionalTakes(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+  // expected-modern-c-array-error@-1 {{Objective-C method 'optionalTakes:' provided by method 'optionalTakes' conflicts with optional requirement method 'optionalTakes' in protocol 'P'}}
+  // expected-modern-c-array-note@-7 {{class 'ModernRequiredLegacyOptionalWitness' declares conformance to protocol 'P' here}}
+  // expected-modern-c-array-note@-3 {{add '@nonobjc' to silence this error}}
+}
+
+@available(anyAppleOS 26, *)
+class LegacyRequiredModernOptionalWitness: NSObject, P {
+  // expected-modern-c-array-error@-1 {{type 'LegacyRequiredModernOptionalWitness' does not conform to protocol 'P'}}
+  // expected-modern-c-array-note@-2 {{add stubs for conformance}}
+  func protoTakes(_ array: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) {}
+  // expected-modern-c-array-note@-1 {{candidate has non-matching type '(UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>) -> ()'}}
+  func optionalTakes(_ array: UnsafeMutablePointer<InlineArray<4, Int32>>) {}
+  // expected-legacy-c-array-error@-1 {{Objective-C method 'optionalTakes:' provided by method 'optionalTakes' conflicts with optional requirement method 'optionalTakes' in protocol 'P'}}
+  // expected-legacy-c-array-note@-7 {{class 'LegacyRequiredModernOptionalWitness' declares conformance to protocol 'P' here}}
+  // expected-legacy-c-array-note@-3 {{add '@nonobjc' to silence this error}}
+}
+
 @available(anyAppleOS 26, *)
 func testMirroredInitAndSubscript(
     tuple: UnsafeMutablePointer<(Int32, Int32, Int32, Int32)>,
@@ -478,6 +529,29 @@ func testMirroredInitAndSubscript(
 
   _ = table[0]
   table[1] = pointer
+}
+
+#if MODERN_C_ARRAYS
+typealias Witness = InlineArray<4, Int32>
+#else
+typealias Witness = (Int32, Int32, Int32, Int32)
+#endif
+
+// Conforming from Swift and using the class
+
+@available(anyAppleOS 26, *)
+class Conformer: NSObject, P {
+  func protoTakes(_ array: UnsafeMutablePointer<Witness>) {}
+  func optionalTakes(_ array: UnsafeMutablePointer<Witness>) {}
+  func optionalGives() -> UnsafeMutablePointer<Witness>? { nil }
+  var optionalBuf: UnsafeMutablePointer<Witness>?
+}
+
+@available(anyAppleOS 26, *)
+func testConformer(_ conformer: Conformer, _ pointer: UnsafeMutablePointer<Witness>) {
+  conformer.protoTakes(pointer)
+  let existential: any P = conformer
+  existential.protoTakes(pointer)
 }
 
 #if MODERN_C_ARRAYS

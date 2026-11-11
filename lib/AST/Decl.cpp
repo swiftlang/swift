@@ -11151,6 +11151,45 @@ Type AbstractFunctionDecl::getMethodInterfaceType() const {
   return Ty->castTo<AnyFunctionType>()->getResult();
 }
 
+// These helpers are copied from ImporterImpl.h.
+// FIXME: Refactor C array helpers (these might become Decl methods)
+template <typename DeclTy>
+static DeclTy *getDeclForCounterpartCArrayProjection(const DeclTy *decl) {
+  if (!decl)
+    return nullptr;
+  auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  if (!attr || !attr->getCounterpart())
+    return nullptr;
+
+  return dyn_cast_or_null<DeclTy>(attr->getCounterpart());
+}
+
+template <typename DeclTy>
+static DeclTy *getDeclForCArrayProjection(DeclTy *decl,
+                                          CArrayProjection projection) {
+  if (!decl)
+    return nullptr;
+  auto *attr = decl->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  if (!attr || attr->getProjection() == projection)
+    return decl;
+
+  auto *counterpart = getDeclForCounterpartCArrayProjection(decl);
+  if (!counterpart)
+    return nullptr;
+  auto *counterpartAttr =
+      counterpart->getAttrs().template getAttribute<CArrayProjectionAttr>();
+  return counterpartAttr && counterpartAttr->getProjection() == projection
+             ? counterpart : nullptr;
+}
+
+template <typename DeclTy>
+static DeclTy *getDeclForCArrayProjectionMatching(DeclTy *decl,
+                                                  const ValueDecl *reference) {
+  auto *attr = reference->getAttrs().getAttribute<CArrayProjectionAttr>();
+  return attr ? getDeclForCArrayProjection(decl, attr->getProjection())
+              : decl;
+}
+
 AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
   // Async functions can't have async alternatives
   if (hasAsync())
@@ -11176,7 +11215,7 @@ AbstractFunctionDecl *AbstractFunctionDecl::getAsyncAlternative() const {
     }
   }
 
-  return alternative;
+  return getDeclForCArrayProjectionMatching(alternative, this);
 }
 
 static bool isPotentialCompletionHandler(const ParamDecl *param) {

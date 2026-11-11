@@ -3669,9 +3669,25 @@ private:
     restriction->emitNoteForDecl(ext);
   }
 
+  /// Is this member hidden because it doesn't match the visible C array
+  /// projection (e.g. it's a legacy projection and we're in modern mode)?
+  static bool isHiddenCArrayProjection(const ValueDecl *VD) {
+    auto *attr = VD->getAttrs().getAttribute<CArrayProjectionAttr>();
+    if (!attr)
+      return false;
+
+    auto *clangLoader = VD->getASTContext().getClangModuleLoader();
+    return clangLoader->getVisibleCArrayProjection() != attr->getProjection();
+  }
+
   void addRequirement(Decl *D) {
     auto VD = dyn_cast<ValueDecl>(D);
     if (!VD)
+      return;
+
+    // Skip the hidden projections of members with C array pointers in their
+    // signatures.
+    if (isHiddenCArrayProjection(VD))
       return;
 
     // Also skip overrides, unless they override an unavailable decl, which
