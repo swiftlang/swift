@@ -227,8 +227,7 @@ AllocStackInst::AllocStackInst(
     IsFromVarDecl_t isFromVarDecl,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(0,
-                                 Var ? Var->Type.has_value() : false,
+      SILDebugVariableSupplement(0, false,
                                  Var ? Var->Loc.has_value() : false,
                                  Var ? Var->Scope != nullptr : false),
       // Initialize VarInfo with a temporary raw value of 0. The real
@@ -246,7 +245,7 @@ AllocStackInst::AllocStackInst(
   // `sharedUInt32().AllocStackInst.numOperands`! Otherwise the trailing object
   // addresses are wrong.
   VarInfo = TailAllocatedDebugVariable(
-      Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
+      Var, getTrailingObjects<char>(), nullptr,
       getTrailingObjects<SILLocation>(),
       getTrailingObjects<const SILDebugScope *>(),
       nullptr);
@@ -271,8 +270,9 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       Var->Loc = {};
     if (Var->Scope == Loc.getScope())
       Var->Scope = nullptr;
-    if (Var->Type == elementType.getObjectType())
-      Var->Type = {};
+    ASSERT((!Var->Type || Var->Type == elementType.getObjectType()) &&
+           "alloc_stack cannot have a vartype != element type");
+    Var->Type = {};
     if (Var->DIExpr) {
       // alloc_stack cannot carry a DIExpression.
       // Strip a single implied op_deref. Anything else is an error.
