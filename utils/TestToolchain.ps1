@@ -859,12 +859,12 @@ if ($CompilerSuites -contains "lldb") {
 }
 
 if ($CompilerSuites -and $Steps -contains "Build") {
-  Invoke-BuildStep Test-Compilers $HostPlatform -Suites $CompilerSuites -Build
+  Invoke-BuildStep Test-Compilers $HostPlatform -Suites $CompilerSuites -Build -SummaryVariant "Build"
 }
 
 if ($Steps -contains "Run") {
   if ($CompilerSuites) {
-    Invoke-BuildStep Test-Compilers $HostPlatform -Suites $CompilerSuites -Run
+    Invoke-BuildStep Test-Compilers $HostPlatform -Suites $CompilerSuites -Run -SummaryVariant "Run"
   }
 
   # FIXME(jeffdav): Invoke-BuildStep needs a platform dictionary, even though the Test-

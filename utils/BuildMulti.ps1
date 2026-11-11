@@ -197,7 +197,13 @@ function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides
     "start `"`" /b /wait $(if ($BelowNormal) { "/belownormal" }) $(($CommandLine | ForEach-Object { ConvertTo-CommandLineArgument $_ }) -join " ") > `"$Log`" 2>&1",
     "exit /b %errorlevel%"
   ))
-  $Process = Start-Process -FilePath cmd.exe -ArgumentList "/d /c `"$Batch`"" -NoNewWindow -PassThru
+  # The script writes its timings there, as with Invoke-BuildScript.
+  $TimingDataPath = "$JobLogs\$Name.json"
+  Remove-Item $TimingDataPath -ErrorAction Ignore
+  $Process = Invoke-IsolatingEnvVars {
+    $env:SWIFT_BUILD_TIMINGS_PATH = $TimingDataPath
+    Start-Process -FilePath cmd.exe -ArgumentList "/d /c `"$Batch`"" -NoNewWindow -PassThru
+  }
   # Windows PowerShell only reports the exit code after the handle was opened.
   $null = $Process.Handle
 
@@ -205,12 +211,30 @@ function Start-BuildJob([string] $Name, [string] $Script, [Hashtable] $Overrides
     Name = $Name
     Process = $Process
     Log = $Log
-    Stopwatch = [Diagnostics.Stopwatch]::StartNew()
-    Timing = if ($RecordTimings) { Add-TimingData $BuildPlatform $Name } else { $null }
-    StartTimes = if ($RecordTimings) { Get-ProcessorTimes } else { $null }
+    TimingDataPath = $TimingDataPath
+    Timing = if ($RecordTimings) { Add-TimingData $BuildPlatform $Name -Variant "Background" } else { $null }
   }
   [void]$Jobs.Add($Job)
   return $Job
+}
+
+# Records the time that a job took, with the timings of the steps of its script.
+function Complete-BuildJob([PSCustomObject] $Job) {
+  [void]$Jobs.Remove($Job)
+  if (-not $Job.Timing) { return }
+
+  # The job may have ended well before this script waited for it.
+  $End = if ($Job.Process.HasExited) { $Job.Process.ExitTime } else { [DateTime]::Now }
+  $Job.Timing."Elapsed Time" = $End - $Job.Process.StartTime
+  Import-TimingData $Job.Timing $Job.TimingDataPath
+  # The use of the processors during the steps of the script, for the same reason.
+  $Seconds = 0
+  $BusySeconds = 0
+  foreach ($Step in $Job.Timing.Children) {
+    $Seconds += $Step."Elapsed Time".TotalSeconds
+    $BusySeconds += $Step.CPU * $Step."Elapsed Time".TotalSeconds
+  }
+  $Job.Timing.CPU = if ($Seconds -gt 0) { $BusySeconds / $Seconds } else { 0 }
 }
 
 # Waits for background jobs, prints their logs, and throws if any of them failed.
@@ -218,17 +242,10 @@ function Wait-BuildJobs([Object[]] $Wait) {
   $Failed = @()
   foreach ($Job in $Wait) {
     $Job.Process.WaitForExit()
-    $Job.Stopwatch.Stop()
-    $Jobs.Remove($Job)
-    if ($Job.Timing) {
-      $EndTimes = Get-ProcessorTimes
-      $BusyTime = $EndTimes.Busy - $Job.StartTimes.Busy
-      $TotalTime = $BusyTime + $EndTimes.Idle - $Job.StartTimes.Idle
-      $Job.Timing."Elapsed Time" = $Job.Stopwatch.Elapsed
-      $Job.Timing.CPU = if ($TotalTime -gt 0) { $BusyTime / $TotalTime } else { 0 }
-    }
+    Complete-BuildJob $Job
 
-    Write-Host -ForegroundColor Cyan "===== $($Job.Name) ($($Job.Stopwatch.Elapsed)), from $($Job.Log) ====="
+    $Elapsed = $Job.Process.ExitTime - $Job.Process.StartTime
+    Write-Host -ForegroundColor Cyan "===== $($Job.Name) ($Elapsed), from $($Job.Log) ====="
     [Console]::Out.Write([IO.File]::ReadAllText($Job.Log))
     [Console]::Out.Flush()
     Write-Host -ForegroundColor Cyan "===== $($Job.Name) exited with code $($Job.Process.ExitCode) ====="
@@ -248,15 +265,12 @@ function Stop-BuildJobs {
       Write-Host -ForegroundColor Red "Stopping $($Job.Name), which logs to $($Job.Log)"
       $null = & cmd.exe /d /c "taskkill /T /F /PID $($Job.Process.Id) > nul 2>&1"
     }
+    Complete-BuildJob $Job
   }
-  $Jobs.Clear()
 }
 
 try {
 
-if ($Trace) {
-  Remove-Item "$BinaryCache\build-timings-*.json" -ErrorAction Ignore
-}
 New-Item -ItemType Directory -Path $JobLogs -ErrorAction Ignore | Out-Null
 
 Invoke-BuildScript "SetupDependencies" SetupDependencies.ps1 $Parameters
@@ -330,12 +344,16 @@ if ($Toolchain) {
 }
 
 Wait-BuildJobs $SDKJobs
-foreach ($PlatformRoot in $StagedPlatformRoots) {
-  Write-Host "Merging '$PlatformRoot' into '$(Get-PlatformRoot Windows)'"
-  & robocopy.exe $PlatformRoot (Get-PlatformRoot Windows) /E /NFL /NDL /NJH /NJS /NP | Out-Null
-  # robocopy reports copied files with exit codes below 8.
-  if ($LastExitCode -ge 8) {
-    throw "robocopy failed with exit code $LastExitCode"
+if ($StagedPlatformRoots) {
+  Record-OperationTime $BuildPlatform "Merge-PlatformRoots" {
+    foreach ($PlatformRoot in $StagedPlatformRoots) {
+      Write-Host "Merging '$PlatformRoot' into '$(Get-PlatformRoot Windows)'"
+      & robocopy.exe $PlatformRoot (Get-PlatformRoot Windows) /E /NFL /NDL /NJH /NJS /NP | Out-Null
+      # robocopy reports copied files with exit codes below 8.
+      if ($LastExitCode -ge 8) {
+        throw "robocopy failed with exit code $LastExitCode"
+      }
+    }
   }
 }
 
@@ -416,10 +434,12 @@ if ($Test -and -not $IsCrossCompiling) {
   Write-BuildError $_
   exit 1
 } finally {
-  Write-BuildTimings "BuildMulti"
+  if ($Summary) {
+    Write-Summary
+  }
   if ($Trace) {
     # Stage the trace with the other CI artifacts so that it can be downloaded.
     $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
-    Merge-TimingTraces "$TimingTraceDir\build-timings.json"
+    Write-TimingTrace "$TimingTraceDir\build-timings.json" -TrackPerStep
   }
 }

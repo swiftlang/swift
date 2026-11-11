@@ -305,10 +305,6 @@ $SelectedAndroidSDKArchitectures = @(if ($Android) { $AndroidSDKArchitectures })
 
 try {
 
-if ($Trace) {
-  Remove-Item "$BinaryCache\build-timings-*.json" -ErrorAction Ignore
-}
-
 Invoke-BuildScript "SetupDependencies" SetupDependencies.ps1 $Parameters
 
 if ($DependenciesOnly) {
@@ -389,10 +385,12 @@ if ($Test -and -not $IsCrossCompiling) {
   Write-BuildError $_
   exit 1
 } finally {
-  Write-BuildTimings "BuildSequential"
+  if ($Summary) {
+    Write-Summary
+  }
   if ($Trace) {
     # Stage the trace with the other CI artifacts so that it can be downloaded.
     $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
-    Merge-TimingTraces "$TimingTraceDir\build-timings.json"
+    Write-TimingTrace "$TimingTraceDir\build-timings.json" -TrackPerStep
   }
 }
