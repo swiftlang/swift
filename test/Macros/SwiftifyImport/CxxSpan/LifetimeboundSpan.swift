@@ -86,7 +86,7 @@ public func myFunc(_ span: Span<CInt>) -> Span<CInt> {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @inline(always) @_lifetime(borrow vec) @_disfavoredOverload
-public func myFunc2(_ vec: borrowing VecOfInt) -> Span<CInt> {
+public func myFunc2(_ vec: borrowing @_addressable VecOfInt) -> Span<CInt> {
     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc2(vec)), copying: ())
 }
 ------------------------------
@@ -102,7 +102,7 @@ public func myFunc3(_ span1: Span<CInt>, _ span2: Span<CInt>) -> Span<CInt> {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @inline(always) @_lifetime(borrow vec, copy span) @_disfavoredOverload
-public func myFunc4(_ vec: borrowing VecOfInt, _ span: Span<CInt>) -> Span<CInt> {
+public func myFunc4(_ vec: borrowing @_addressable VecOfInt, _ span: Span<CInt>) -> Span<CInt> {
     return unsafe _swiftifyOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc4(vec, SpanOfInt(span))), copying: ())
 }
 ------------------------------

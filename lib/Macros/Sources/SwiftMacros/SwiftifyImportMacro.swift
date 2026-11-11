@@ -1644,16 +1644,20 @@ func assignSharedCountExtraction(_ args: inout [ParamInfo], _ funcDecl: Function
   }
 }
 
-func isInout(_ type: TypeSyntax) -> Bool {
-  guard let attr = type.as(AttributedTypeSyntax.self) else {
-    return false
-  }
-  return attr.specifiers.contains(where: { e in
+func hasTypeSpecifier(_ attrType: AttributedTypeSyntax, _ specifier: String) -> Bool {
+  return attrType.specifiers.contains(where: { e in
     guard let simpleSpec = e.as(SimpleTypeSpecifierSyntax.self) else {
       return false
     }
-    return simpleSpec.specifier.text == "inout"
+    return simpleSpec.specifier.text == specifier
   })
+}
+
+func isInout(_ type: TypeSyntax) -> Bool {
+  guard let attrType = type.as(AttributedTypeSyntax.self) else {
+    return false
+  }
+  return hasTypeSpecifier(attrType, "inout")
 }
 
 func getReturnLifetimes(
@@ -1687,6 +1691,58 @@ func getReturnLifetimes(
     }
   }
   return args
+}
+
+// The values that the return value borrows from. ClangImporter imports C++
+// references with lifetime info as `borrowing` parameters or a `borrowing`
+// self, and makes them addressable so that the C++ function sees the caller's
+// value rather than a copy. The wrapper has to keep them addressable too:
+// otherwise it passes the address of its own temporary copy to C++, and the
+// returned value outlives that copy.
+func borrowedReturnDependencies(
+  _ dependencies: [SwiftifyExpr: [LifetimeDependence]]
+) -> [SwiftifyExpr] {
+  return dependencies[.return, default: []].filter { $0.type == .borrow }.map(\.dependsOn)
+}
+
+func hasAttribute(_ attributes: AttributeListSyntax, named name: String) -> Bool {
+  return attributes.contains(where: {
+    $0.as(AttributeSyntax.self)?.attributeName.trimmedDescription == name
+  })
+}
+
+func makeBorrowedParamsAddressable(
+  _ signature: FunctionSignatureSyntax, _ funcDecl: FunctionParts,
+  _ dependencies: [SwiftifyExpr: [LifetimeDependence]]
+) -> FunctionSignatureSyntax {
+  // `self` is never a parameter name, so `.self` dependencies drop out here.
+  let borrowedNames = Set(borrowedReturnDependencies(dependencies).compactMap {
+    tryGetParamName(funcDecl, $0)?.trimmed.text
+  })
+  if borrowedNames.isEmpty {
+    return signature
+  }
+  let params = signature.parameterClause.parameters.map { param in
+    guard borrowedNames.contains(param.name.trimmed.text),
+          let attrType = param.type.as(AttributedTypeSyntax.self),
+          hasTypeSpecifier(attrType, "borrowing"),
+          !hasAttribute(attrType.attributes, named: "_addressable")
+    else {
+      return param
+    }
+    let addressable = AttributeListSyntax.Element.attribute(
+      AttributeSyntax("@_addressable").with(\.trailingTrivia, .space))
+    return param.with(\.type, TypeSyntax(attrType.with(\.attributes, attrType.attributes + [addressable])))
+  }
+  return signature.with(\.parameterClause.parameters, FunctionParameterListSyntax(params))
+}
+
+func needsAddressableSelf(
+  _ funcDecl: FunctionParts, _ dependencies: [SwiftifyExpr: [LifetimeDependence]]
+) -> Bool {
+  return borrowedReturnDependencies(dependencies).contains(.`self`)
+    && funcDecl.modifiers.contains(where: { $0.name.text == "borrowing" })
+    && !hasAttribute(funcDecl.attributes, named: "_addressableSelf")
 }
 
 func isMutableSpan(_ type: TypeSyntax) -> Bool {
@@ -1989,7 +2045,8 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     // return value of underlying function is ~Escapable
     builder = NonescapableReturnThunkBuilder(base: builder)
   }
-  let newSignature = try builder.buildFunctionSignature([:], nil)
+  let newSignature = makeBorrowedParamsAddressable(
+    try builder.buildFunctionSignature([:], nil), funcComponents, lifetimeDependencies)
   let basicExtractions = try builder.buildBasicBoundsExtractions()
   let basicChecks = try builder.buildBasicBoundsChecks()
   let compoundChecks = try builder.buildCompoundBoundsChecks()
@@ -2019,6 +2076,9 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   let returnsRef = parsedArgs.contains { $0 is CxxReference }
   let availabilityAttr = try getAvailability(
     newSignature, spanAvailability, returnsRef ? refAvailability : nil)
+  let addressableSelfAttr: [AttributeListSyntax.Element] =
+    needsAddressableSelf(funcComponents, lifetimeDependencies)
+    ? [.attribute(AttributeSyntax("@_addressableSelf"))] : []
   let disfavoredOverload: [AttributeListSyntax.Element] =
     [
       .attribute(
@@ -2047,6 +2107,7 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     ]
   attributes +=
     (availabilityAttr
+    + addressableSelfAttr
     + newLifetimeAttr
     + disfavoredOverload)
   let trivia =
