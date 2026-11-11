@@ -8163,8 +8163,9 @@ void TypeChecker::checkExistentialTypes(
 }
 
 /// Opens a result builder `UnboundGenericType` into a `BoundGenericType`
-/// by creating and solving a constraint between the result builder's
-/// result type and the return type of the attached declaration.
+/// by resolving a reference to one of the builder's methods against the
+/// return type of the attached declaration, using ordinary overload
+/// resolution to choose between overloads of that method.
 struct ResultBuilderUnboundTypeOpener {
   DeclContext *dc;
   CustomAttr *attr;
@@ -8183,21 +8184,19 @@ struct ResultBuilderUnboundTypeOpener {
     }
 
     // @Builder<_>: placeholder is in the type's own generic args
-    if (auto *boundGeneric = type->getAs<BoundGenericType>()) {
-      if (auto *nominalDecl =
-              dyn_cast<NominalTypeDecl>(boundGeneric->getDecl())) {
-        auto *unboundTy = UnboundGenericType::get(
-            nominalDecl, boundGeneric->getParent(), ctx);
-        return open(unboundTy, boundGeneric->getGenericArgs());
-      }
+    auto *nominalType = type->getAs<NominalType>();
+    if (nominalType && nominalType->hasGenericArgs()) {
+      auto *unboundTy = UnboundGenericType::get(
+          nominalType->getDecl(), nominalType->getParent(), ctx);
+      return open(unboundTy, nominalType->getGenericArgs());
     }
 
     // @Array<_>.Builder: placeholder is in the parent type
-    else if (auto *nominalType = type->getAs<NominalType>()) {
-      if (auto *parentBoundGeneric =
-              nominalType->getParent()->getAs<BoundGenericType>()) {
-        if (auto *parentNominalDecl =
-                dyn_cast<NominalTypeDecl>(parentBoundGeneric->getDecl())) {
+    else if (nominalType && nominalType->getParent()) {
+      auto *parentBoundGeneric =
+          nominalType->getParent()->getAs<NominalType>();
+      if (parentBoundGeneric && parentBoundGeneric->hasGenericArgs()) {
+        if (auto *parentNominalDecl = parentBoundGeneric->getDecl()) {
           auto *unboundParent = UnboundGenericType::get(
               parentNominalDecl, parentBoundGeneric->getParent(), ctx);
           auto solvedParent =
@@ -8221,6 +8220,8 @@ struct ResultBuilderUnboundTypeOpener {
   /// constrained to that type, and only the placeholders are solved.
   Type open(UnboundGenericType *unboundTy,
             ArrayRef<Type> genericArgs = {}) const {
+    using namespace constraints;
+
     auto resultBuilderDecl = attr->getNominalDecl();
     if (!resultBuilderDecl) {
       return invalidResultBuilderType();
@@ -8237,90 +8238,138 @@ struct ResultBuilderUnboundTypeOpener {
       return invalidResultBuilderType();
     }
 
-    // Retrieve the supported result types of the result builder.
-    auto resultTypes = getResultBuilderResultTypes(resultBuilderDecl);
-    if (resultTypes.empty()) {
-      return invalidResultBuilderType();
-    }
+    // The solver works with contextual types, but type resolution produces
+    // interface types.
+    owningDeclReturnType = dc->mapTypeIntoEnvironment(owningDeclReturnType);
 
-    auto genericSig = unboundTyDecl->getGenericSignature();
+    auto &ctx = dc->getASTContext();
 
-    // Try each result type and return the first one that
-    // produces a valid solution.
-    for (auto resultType : resultTypes) {
-      using namespace constraints;
+    // The generic arguments are inferred by resolving an unapplied reference
+    // to one of the builder's methods, `Builder.buildFinalResult`, as a
+    // function whose result is the return type of the attached declaration.
+    // This is the same problem as resolving
+    //
+    //   let fn: (_) -> ReturnType = Builder.buildFinalResult
+    //
+    // so ordinary overload resolution chooses between overloads of the
+    // method, and diagnoses an ambiguity if it can't.
+    //
+    // Methods are tried in order of precedence: `buildFinalResult` determines
+    // the type the builder ultimately produces, so it takes priority when
+    // present. `buildPartialBlock(first:)` and `buildBlock` produce the
+    // component type, which is the result type when there's no
+    // `buildFinalResult`. `buildBlock` is referenced with no arguments,
+    // which matches its variadic form.
+    struct BuilderMethod {
+      Identifier name;
+      std::optional<Identifier> argLabel;
+      bool hasArgument;
+    };
+
+    const BuilderMethod methods[] = {
+        {ctx.Id_buildFinalResult, std::nullopt, /*hasArgument=*/true},
+        {ctx.Id_buildPartialBlock, ctx.Id_first, /*hasArgument=*/true},
+        {ctx.Id_buildBlock, std::nullopt, /*hasArgument=*/false},
+    };
+
+    for (const auto &method : methods) {
+      SmallVector<Identifier, 1> argLabels;
+      if (method.argLabel)
+        argLabels.push_back(*method.argLabel);
+
+      if (!TypeChecker::typeSupportsBuilderOp(
+              resultBuilderDecl->getDeclaredInterfaceType(), resultBuilderDecl,
+              method.name, argLabels))
+        continue;
 
       // Avoid recording failed constraints, which are not used here.
       ConstraintSystemOptions options;
       options |= ConstraintSystemFlags::DisableRecordFailedConstraint;
 
       ConstraintSystem cs(dc, options);
+      auto *locator = cs.getConstraintLocator(unboundTyDecl);
 
-      // For each generic parameter position, either pin the fixed argument
-      // (when genericArgs supplies a non-placeholder at that index) or create a
-      // type variable to be solved.
-      llvm::SmallVector<Type, 8> typeVarReplacements;
-      for (unsigned i = 0; i < genericSig.getGenericParams().size(); ++i) {
-        if (i < genericArgs.size() && !genericArgs[i]->hasPlaceholder()) {
-          typeVarReplacements.push_back(genericArgs[i]);
-        } else {
-          auto locator = cs.getConstraintLocator(
+      // Open the unbound type, replacing its generic parameters with type
+      // variables. These type variables prefer subtype bindings, which is
+      // how the solver chooses `Int` over `Int?` when both are viable.
+      auto openedUnboundTy = cs.openUnboundGenericType(
+          unboundTyDecl, unboundTy->getParent(), locator,
+          /*isTypeResolution=*/true);
+
+      auto *openedBoundTy = openedUnboundTy->getAs<NominalType>();
+      if (!openedBoundTy || !openedBoundTy->hasGenericArgs())
+        return invalidResultBuilderType();
+
+      // Pin any explicitly-specified generic arguments, leaving only the
+      // placeholders to be solved.
+      auto openedArgs = openedBoundTy->getGenericArgs();
+      for (unsigned i = 0; i < genericArgs.size() && i < openedArgs.size();
+           ++i) {
+        auto arg = dc->mapTypeIntoEnvironment(genericArgs[i]);
+        if (arg->hasPlaceholder()) {
+          auto placeholderLocator = cs.getConstraintLocator(
               unboundTyDecl, {ConstraintLocator::GenericArgument, i});
-          auto makeTypeVar = [&] {
-            return Type(cs.createTypeVariable(locator, TVO_CanBindToHole));
-          };
-
-          if (i >= genericArgs.size()) {
-            typeVarReplacements.push_back(makeTypeVar());
-          } else {
-            typeVarReplacements.push_back(
-                genericArgs[i].transformRec([&](Type t) -> std::optional<Type> {
-                  if (t->is<PlaceholderType>()) {
-                    return makeTypeVar();
-                  } else {
-                    return std::nullopt;
-                  }
-                }));
-          }
-        }
-      }
-
-      // Replace any references to the result builder's generic params
-      // in the result type with the corresponding replacements.
-      auto subMap = SubstitutionMap::get(genericSig, typeVarReplacements,
-                                         LookUpConformanceInModule());
-
-      auto resultTypeWithTypeVars = resultType.subst(subMap);
-
-      // The result builder result type should be equal to the return type of
-      // the attached declaration.
-      cs.addConstraint(ConstraintKind::Equal, owningDeclReturnType,
-                       resultTypeWithTypeVars,
-                       /*preparedOverload:*/ nullptr);
-
-      auto solution = cs.solveSingle();
-
-      // If a solution exists, build the final replacement list by substituting
-      // all type variables with their solved bindings.
-      if (solution) {
-        llvm::SmallVector<Type, 8> solvedReplacements;
-        for (auto replacement : typeVarReplacements) {
-          solvedReplacements.push_back(
-              replacement.transformRec([&](Type t) -> std::optional<Type> {
-                if (auto *typeVar = t->getAs<TypeVariableType>()) {
-                  return solution->typeBindings[typeVar];
-                } else {
-                  return std::nullopt;
-                }
-              }));
+          arg = arg.transformRec([&](Type t) -> std::optional<Type> {
+            if (t->is<PlaceholderType>()) {
+              return Type(
+                  cs.createTypeVariable(placeholderLocator, TVO_CanBindToHole));
+            }
+            return std::nullopt;
+          });
         }
 
-        return BoundGenericType::get(unboundTyDecl, unboundTy->getParent(),
-                                     solvedReplacements);
+        cs.addConstraint(ConstraintKind::Bind, openedArgs[i], arg, locator);
       }
+
+      // The result builder type itself, which may be nested within the
+      // unbound generic type (e.g. `@Array.Builder`).
+      auto builderTy = getResultBuilderType(resultBuilderDecl, unboundTyDecl,
+                                            openedUnboundTy);
+      if (!builderTy)
+        return invalidResultBuilderType();
+
+      // $member := Builder.method, as an unapplied reference. The solver
+      // expands this into a disjunction over the method's overloads.
+      auto *memberLocator =
+          cs.getConstraintLocator(locator, ConstraintLocator::Member);
+      auto *memberTy = cs.createTypeVariable(
+          memberLocator, TVO_CanBindToLValue | TVO_CanBindToNoEscape);
+      cs.addValueMemberConstraint(MetatypeType::get(builderTy),
+                                  DeclNameRef(method.name), memberTy, dc,
+                                  FunctionRefInfo::unappliedBaseName(),
+                                  /*outerAlternatives=*/{}, memberLocator);
+
+      // $member is applicable to its argument(s) and yields the return type
+      // of the attached declaration. The argument type is unconstrained,
+      // since the body hasn't been type checked yet.
+      SmallVector<AnyFunctionType::Param, 1> params;
+      if (method.hasArgument) {
+        auto *argTy = cs.createTypeVariable(locator, TVO_CanBindToHole |
+                                                         TVO_CanBindToNoEscape);
+        params.emplace_back(argTy, method.argLabel.value_or(Identifier()));
+      }
+
+      cs.addConstraint(
+          ConstraintKind::ApplicableFunction,
+          FunctionType::get(params, /*yields=*/{}, owningDeclReturnType), memberTy,
+          cs.getConstraintLocator(locator, ConstraintLocator::ApplyFunction));
+
+      // Solve, keeping only the best solution(s) according to the usual
+      // ranking rules.
+      SmallVector<Solution, 4> solutions;
+      cs.solve(solutions);
+
+      if (solutions.empty())
+        continue;
+
+      if (solutions.size() > 1)
+        return ambiguousResultBuilderType(solutions, memberLocator);
+
+      return solutions[0].simplifyType(openedUnboundTy,
+                                       /*wantInterfaceType=*/true);
     }
 
-    // No result type produced a valid solution
+    // No builder method produced a valid solution.
     return invalidResultBuilderType();
   }
 
@@ -8331,6 +8380,57 @@ private:
         diag::result_builder_generic_inference_failed, attr);
 
     return ErrorType::get(dc->getASTContext());
+  }
+
+  Type ambiguousResultBuilderType(
+      ArrayRef<constraints::Solution> solutions,
+      constraints::ConstraintLocator *memberLocator) const {
+    auto &diags = dc->getASTContext().Diags;
+    diags.diagnose(attr->getTypeExpr()->getLoc(),
+                   diag::result_builder_generic_inference_ambiguous, attr);
+
+    for (const auto &solution : solutions) {
+      auto overload = solution.getOverloadChoiceIfAvailable(memberLocator);
+      if (!overload)
+        continue;
+
+      if (auto *decl = overload->choice.getDeclOrNull())
+        diags.diagnose(decl, diag::found_candidate);
+    }
+
+    return ErrorType::get(dc->getASTContext());
+  }
+
+  /// Builds the type of the result builder from the opened type of the
+  /// unbound generic type it's declared within, if any.
+  Type getResultBuilderType(NominalTypeDecl *resultBuilderDecl,
+                            NominalTypeDecl *unboundTyDecl,
+                            Type openedUnboundTy) const {
+    if (resultBuilderDecl == unboundTyDecl)
+      return openedUnboundTy;
+
+    // Walk from the result builder out to the unbound type, then rebuild the
+    // nesting on top of the opened type. Only non-generic intermediate types
+    // are supported, since a generic one would itself need to be opened.
+    SmallVector<NominalTypeDecl *, 2> nesting;
+    auto *decl = resultBuilderDecl;
+    while (decl && decl != unboundTyDecl) {
+      if (decl->getGenericParams())
+        return Type();
+
+      nesting.push_back(decl);
+      decl = decl->getDeclContext()->getSelfNominalTypeDecl();
+    }
+
+    if (!decl)
+      return Type();
+
+    auto &ctx = dc->getASTContext();
+    Type result = openedUnboundTy;
+    for (auto *nested : llvm::reverse(nesting))
+      result = NominalType::get(nested, result, ctx);
+
+    return result;
   }
 
   /// Retrieve the return type of the owning declaration that
@@ -8354,53 +8454,6 @@ private:
     }
 
     return owningDeclReturnType;
-  }
-
-  /// Retrieves the valid result types of the result builder
-  /// (the return types of `buildFinalResult` / `buildBlock` /
-  /// `buildPartialBlock`).
-  llvm::SmallVector<Type, 4>
-  getResultBuilderResultTypes(NominalTypeDecl *builder) const {
-    ASTContext &ctx = builder->getASTContext();
-    llvm::SmallVector<Type, 4> resultTypes;
-
-    Identifier methodIds[] = {ctx.Id_buildFinalResult, ctx.Id_buildBlock,
-                              ctx.Id_buildPartialBlock};
-
-    for (auto methodId : methodIds) {
-      SmallVector<ValueDecl *, 4> potentialMatches;
-      bool supportsMethod = TypeChecker::typeSupportsBuilderOp(
-          builder->getDeclaredInterfaceType(), builder, methodId,
-          /*argLabels=*/{}, &potentialMatches);
-
-      if (!supportsMethod)
-        continue;
-
-      for (auto decl : potentialMatches) {
-        auto func = dyn_cast<FuncDecl>(decl);
-        if (!func || !func->isStatic())
-          continue;
-
-        auto resultType = func->getResultInterfaceType();
-        if (!resultType || resultType->hasError())
-          continue;
-
-        // Add the result type if we haven't seen it before
-        bool isDuplicate = false;
-        for (auto existingType : resultTypes) {
-          if (existingType->isEqual(resultType)) {
-            isDuplicate = true;
-            break;
-          }
-        }
-
-        if (!isDuplicate) {
-          resultTypes.push_back(resultType);
-        }
-      }
-    }
-
-    return resultTypes;
   }
 };
 
@@ -8458,7 +8511,6 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
 
   return type;
 }
-
 
 Type ExplicitCaughtTypeRequest::evaluate(
     Evaluator &evaluator, ASTContext *ctxPtr, CatchNode catchNode
