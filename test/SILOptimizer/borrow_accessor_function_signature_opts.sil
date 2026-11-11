@@ -1,0 +1,79 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -function-signature-opts %s | %FileCheck %s
+
+// REQUIRES: PTRSIZE=64
+
+// FunctionSignatureOpts turns a borrow accessor into a thunk that calls the
+// specialization. A non-trivial @guaranteed result of that call is a borrow
+// scope, so the thunk returns it with a return_borrow. A trivial result has no
+// scope, so the thunk returns it with a plain return.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {}
+
+struct Container {
+  var k: Klass
+  var i: Int
+}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @borrow_k : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Klass {
+// CHECK:       bb0(%0 : $Int, %1 : @guaranteed $Container):
+// CHECK:         [[F:%.*]] = function_ref @$s8borrow_kTf4dn_n : $@convention(method) (@guaranteed Container) -> @guaranteed Klass
+// CHECK:         [[R:%.*]] = apply [[F]](%1)
+// CHECK-NEXT:    return_borrow [[R]] from_scopes ([[R]])
+// CHECK-LABEL: } // end sil function 'borrow_k'
+sil [ossa] [noinline] @borrow_k : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Klass {
+bb0(%0 : $Int, %1 : @guaranteed $Container):
+  %2 = struct_extract %1, #Container.k
+  return %2
+}
+
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @borrow_i : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Int {
+// CHECK:         [[F:%.*]] = function_ref @$s8borrow_iTf4dx_n :
+// CHECK:         [[R:%.*]] = apply [[F]](
+// CHECK-NEXT:    return [[R]]
+// CHECK-LABEL: } // end sil function 'borrow_i'
+sil [ossa] [noinline] @borrow_i : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Int {
+bb0(%0 : $Int, %1 : @guaranteed $Container):
+  %2 = struct_extract %1, #Container.i
+  return %2
+}
+
+// An owned result is returned with a plain return.
+// CHECK-LABEL: sil [signature_optimized_thunk] [heuristic_always_inline] [ossa] @owned_k : $@convention(method) (Int, @guaranteed Container) -> @owned Klass {
+// CHECK:         [[F:%.*]] = function_ref @$s7owned_kTf4dn_n :
+// CHECK:         [[R:%.*]] = apply [[F]](%1)
+// CHECK-NEXT:    return [[R]]
+// CHECK-LABEL: } // end sil function 'owned_k'
+sil [ossa] [noinline] @owned_k : $@convention(method) (Int, @guaranteed Container) -> @owned Klass {
+bb0(%0 : $Int, %1 : @guaranteed $Container):
+  %2 = struct_extract %1, #Container.k
+  %3 = copy_value %2
+  return %3
+}
+
+sil [ossa] @caller : $@convention(thin) (@guaranteed Container) -> (@owned Klass, Int) {
+bb0(%0 : @guaranteed $Container):
+  %1 = integer_literal $Builtin.Int64, 27
+  %2 = struct $Int (%1)
+  %3 = function_ref @borrow_k : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Klass
+  %4 = apply %3(%2, %0) : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Klass
+  %5 = copy_value %4
+  end_borrow %4
+  %7 = function_ref @borrow_i : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Int
+  %8 = apply %7(%2, %0) : $@convention(method) (Int, @guaranteed Container) -> @guaranteed Int
+  %9 = tuple (%5, %8)
+  return %9
+}
+
+sil [ossa] @owned_caller : $@convention(thin) (@guaranteed Container) -> @owned Klass {
+bb0(%0 : @guaranteed $Container):
+  %1 = integer_literal $Builtin.Int64, 27
+  %2 = struct $Int (%1)
+  %3 = function_ref @owned_k : $@convention(method) (Int, @guaranteed Container) -> @owned Klass
+  %4 = apply %3(%2, %0) : $@convention(method) (Int, @guaranteed Container) -> @owned Klass
+  return %4
+}

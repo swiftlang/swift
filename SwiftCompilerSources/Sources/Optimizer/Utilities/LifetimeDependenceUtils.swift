@@ -447,6 +447,13 @@ extension LifetimeDependence.Scope {
     switch beginBorrow {
     case .beginBorrow, .loadBorrow, .dereferenceBorrow:
       self = .borrowed(beginBorrow)
+    case let .borrowAccessor(apply):
+      // A value forwarded from a borrow accessor result depends on the base of the accessor.
+      if let accessorBase = guaranteedResultBase(of: apply) {
+        self.init(base: accessorBase, context)
+      } else {
+        self = .borrowed(beginBorrow)
+      }
     case let .beginApply(value):
       self = .yield(value)
     case let .functionArgument(arg):
@@ -525,6 +532,9 @@ extension LifetimeDependence.Scope {
       return LifetimeDependence.Scope(base: bb.borrowedValue, context).ignoreBorrowScope(context)
     case let .loadBorrow(lb):
       return LifetimeDependence.Scope(base: lb.address, context)
+    case .borrowAccessor:
+      // A borrow accessor without self.
+      return nil
     default:
       fatalError("Scope.borrowed must begin begin_borrow or load_borrow")
     }
@@ -1112,6 +1122,8 @@ extension LifetimeDependenceDefUseWalker {
     switch borrowInst {
     case let .beginBorrow(bbi):
       return walkDownUses(of: bbi, using: operand)
+    case let .borrowAccessor(apply):
+      return walkDownUses(of: apply, using: operand)
     case let .borrowedFrom(bfi):
       return walkDownUses(of: bfi, using: operand)
     case let .storeBorrow(sbi):

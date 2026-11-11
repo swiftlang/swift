@@ -442,3 +442,58 @@ bb8:
   %99 = tuple ()
   return %99
 }
+
+sil @borrow_pair : $@convention(method) (@guaranteed D) -> @guaranteed PairC
+sil @borrow_c_without_self : $@convention(thin) () -> @guaranteed C
+
+sil [ossa] @dependence_scope_borrow_accessor : $@convention(thin) (@guaranteed D, @owned C) -> () {
+entry(%0 : @guaranteed $D, %1 : @owned $C):
+  %f = function_ref @borrow_pair : $@convention(method) (@guaranteed D) -> @guaranteed PairC
+  %pair = apply %f(%0) : $@convention(method) (@guaranteed D) -> @guaranteed PairC
+  %first = struct_extract %pair : $PairC, #PairC.first
+  %m1 = mark_dependence [nonescaping] %1 : $C on %first : $C
+  specify_test "lifetime_dependence_scope %m1"
+// A value forwarded from a borrow accessor result depends on the base of the accessor.
+// CHECK-LABEL: dependence_scope_borrow_accessor: lifetime_dependence_scope with: %m1
+// CHECK-NEXT: Caller: %0 = argument of bb0 : $D
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %1 : $C on %{{.*}} : $C
+// CHECK-NEXT: Caller range
+// CHECK: dependence_scope_borrow_accessor: lifetime_dependence_scope with: %m1
+  %g = function_ref @borrow_c_without_self : $@convention(thin) () -> @guaranteed C
+  %c = apply %g() : $@convention(thin) () -> @guaranteed C
+  %m2 = mark_dependence [nonescaping] %m1 : $C on %c : $C
+  specify_test "lifetime_dependence_scope %m2"
+// The result of a borrow accessor without self is a borrow scope.
+// CHECK-LABEL: dependence_scope_borrow_accessor: lifetime_dependence_scope with: %m2
+// CHECK-NEXT: Borrowed:   %{{.*}} = apply %{{.*}}() : $@convention(thin) () -> @guaranteed C
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %{{.*}} : $C
+// CHECK-NEXT: begin:      %{{.*}} = apply %{{.*}}() : $@convention(thin) () -> @guaranteed C
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK: dependence_scope_borrow_accessor: lifetime_dependence_scope with: %m2
+  destroy_value %m2 : $C
+  end_borrow %c : $C
+  end_borrow %pair : $PairC
+  %99 = tuple ()
+  return %99
+}
+
+sil @borrow_ne : $@convention(method) (@guaranteed NEWrap) -> @guaranteed NE
+
+// The result of a borrow accessor with a nonescapable @guaranteed self is a use of self within the
+// scope of the result.
+// CHECK-LABEL: dependence_borrow_accessor_use: lifetime_dependence_use with: %0
+// CHECK: LifetimeDependence uses of: %0 = argument of bb0 : $NEWrap
+// CHECK-NEXT: Leaf use: operand #0 of   end_borrow %{{.*}} : $NE
+// CHECK-NEXT: Leaf use: operand #0 of   destroy_value %{{.*}} : $NE
+// CHECK-NEXT: dependence_borrow_accessor_use: lifetime_dependence_use with: %0
+sil [ossa] @dependence_borrow_accessor_use : $@convention(thin) (@guaranteed NEWrap) -> () {
+bb0(%0 : @guaranteed $NEWrap):
+  specify_test "lifetime_dependence_use %0"
+  %1 = function_ref @borrow_ne : $@convention(method) (@guaranteed NEWrap) -> @guaranteed NE
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed NEWrap) -> @guaranteed NE
+  %3 = copy_value %2 : $NE
+  end_borrow %2 : $NE
+  destroy_value %3 : $NE
+  %99 = tuple()
+  return %99 : $()
+}

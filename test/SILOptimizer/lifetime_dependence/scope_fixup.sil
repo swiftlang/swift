@@ -1011,6 +1011,7 @@ bb3:
   %7 = function_ref @getDependentHolder : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @guaranteed Holder
   %8 = apply %7(%6) : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @guaranteed Holder
   %9 = mark_dependence [unresolved] %8 on %6
+  end_borrow %8
   end_borrow %6
   dealloc_stack %5
   end_borrow %1

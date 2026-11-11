@@ -284,10 +284,20 @@ void DCE::processBorrow(BorrowedValue borrow) {
   };
   visitEnclosingDefs(*borrow, disableOuterBorrow);
 
-  // A load_borrow of a class field is nested in the borrow scope of the class
-  // reference.
+  // A load_borrow of a class field, or a borrow accessor result with an
+  // @in_guaranteed self in a class field, is nested in the borrow scope of the
+  // class reference.
+  SILValue borrowedAddress;
   if (auto *loadBorrow = dyn_cast<LoadBorrowInst>(*borrow)) {
-    auto accessBase = AccessBase::compute(loadBorrow->getOperand());
+    borrowedAddress = loadBorrow->getOperand();
+  } else if (auto *apply = dyn_cast<ApplyInst>(*borrow)) {
+    if (auto *selfOperand =
+            apply->getSelfAddressOfGuaranteedBorrowAccessorResult()) {
+      borrowedAddress = selfOperand->get();
+    }
+  }
+  if (borrowedAddress) {
+    auto accessBase = AccessBase::compute(borrowedAddress);
     if (accessBase.isReference()) {
       visitBorrowIntroducers(accessBase.getReference(), disableOuterBorrow);
     }
@@ -354,6 +364,11 @@ void DCE::markLive() {
         processBorrow(BorrowedValue(loadBorrowInst));
         break;
       }
+      case SILInstructionKind::ApplyInst:
+        if (auto borrow = BorrowedValue(cast<ApplyInst>(&I))) {
+          processBorrow(borrow);
+        }
+        LLVM_FALLTHROUGH;
       default:
         if (seemsUseful(&I))
           markInstructionLive(&I);

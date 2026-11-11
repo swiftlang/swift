@@ -865,16 +865,6 @@ void swift::findGuaranteedReferenceRoots(SILValue referenceValue,
       continue;
     }
 
-    // Special handling until borrowing apply is represented as a
-    // ForwardingOperation.
-    if (auto *apply =
-            dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction())) {
-      if (apply->hasGuaranteedResult()) {
-        worklist.pushIfNotVisited(apply->getSelfArgument());
-        continue;
-      }
-    }
-
     // Found a potential root.
     if (lookThroughNestedBorrows) {
       if (auto *bbi = dyn_cast<BeginBorrowInst>(value)) {
@@ -886,6 +876,17 @@ void swift::findGuaranteedReferenceRoots(SILValue referenceValue,
         }
         // The borrowee isn't guaranteed or we aren't looking through nested
         // borrows. Fall through to add the begin_borrow to roots.
+      }
+      // The result of a borrow accessor is a nested borrow of a @guaranteed
+      // self.
+      if (auto *apply = dyn_cast<ApplyInst>(value)) {
+        auto *selfOperand =
+            apply->getSelfObjectOfGuaranteedBorrowAccessorResult();
+        if (selfOperand && selfOperand->get()->getOwnershipKind() ==
+                               OwnershipKind::Guaranteed) {
+          worklist.pushIfNotVisited(selfOperand->get());
+          continue;
+        }
       }
     }
     roots.push_back(value);
@@ -2143,13 +2144,13 @@ visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
   if (!(visitor.*visit)(use))
     return false;
 
+  // Like a load_borrow, a borrow accessor borrows the memory location of an
+  // @in_guaranteed self over the scope of its result, including the scopes of
+  // its reborrows.
   if (auto *applyInst = dyn_cast<ApplyInst>(user)) {
-    if (applyInst->hasGuaranteedResult()) {
-      for (auto *resultUse : applyInst->getUses()) {
-        if (!(visitor.*visit)(resultUse)) {
-          return false;
-        }
-      }
+    if (use == applyInst->getSelfAddressOfGuaranteedBorrowAccessorResult()) {
+      return BorrowedValue(applyInst).visitTransitiveLifetimeEndingUses(
+          [&](Operand *endUse) { return (visitor.*visit)(endUse); });
     }
   }
   return true;
@@ -2800,6 +2801,15 @@ void swift::visitAccessedAddress(SILInstruction *I,
       if (auto *sbi = dyn_cast<StoreBorrowInst>(root)) {
         visitor(&sbi->getOperandRef(StoreInst::Dest));
         return;
+      }
+      // Like a load_borrow, a borrow accessor result borrows the memory
+      // location of an @in_guaranteed self.
+      if (auto *apply = dyn_cast<ApplyInst>(root)) {
+        if (auto *selfOperand =
+                apply->getSelfAddressOfGuaranteedBorrowAccessorResult()) {
+          visitor(selfOperand);
+          return;
+        }
       }
     }
     break;

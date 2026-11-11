@@ -494,6 +494,7 @@ bb0(%0 : $*Box<T>):
   %3 = load_borrow %1 : $*Box<T>
   %4 = apply %2<T>(%3) : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
   %5 = copy_value %4 : $T
+  end_borrow %4 : $T
   end_access %1 : $*Box<T>
   %6 = function_ref @sink : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %7 = apply %6<T>(%5) : $@convention(thin) <T> (@in_guaranteed T) -> ()
@@ -518,6 +519,7 @@ bb0(%0 : @guaranteed $Box<T>):
   %1 = function_ref @f062_borrow_accessor : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
   %2 = apply %1<T>(%0) : $@convention(method) <T> (@in_guaranteed Box<T>) -> @guaranteed_address T
   %3 = copy_value %2 : $T
+  end_borrow %2 : $T
   %4 = function_ref @sink : $@convention(thin) <T> (@in_guaranteed T) -> ()
   %5 = apply %4<T>(%3) : $@convention(thin) <T> (@in_guaranteed T) -> ()
   destroy_value %3 : $T

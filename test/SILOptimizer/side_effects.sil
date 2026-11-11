@@ -1451,6 +1451,7 @@ sil [ossa] @call_borrow_accessor_se : $@convention(thin) (@in_guaranteed Wrapper
 bb0(%0 : $*WrapperSE):
   %func = function_ref @borrow_accessor_se : $@convention(method) (@in_guaranteed WrapperSE) -> @guaranteed X
   %k = apply %func(%0) : $@convention(method) (@in_guaranteed WrapperSE) -> @guaranteed X
+  end_borrow %k
   %use = function_ref @unknown_func : $@convention(thin) () -> ()
   apply %use() : $@convention(thin) () -> ()
   %r = tuple ()
