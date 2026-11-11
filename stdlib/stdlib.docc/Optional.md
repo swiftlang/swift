@@ -5,13 +5,17 @@
 ### Creating an Optional Value
 
 - ``Swift/Optional/some(_:)``
-- ``Swift/Optional/init(_:)-46x3s``
-- ``Swift/Optional/init(_:)-1j774``
+- ``Swift/Optional/init(_:)``
+- ``Swift/Optional/init(fromCxx:)``
 
 ### Creating a Nil Value
 
 - ``Swift/Optional/none``
 - ``Swift/Optional/init(nilLiteral:)``
+
+### Taking a Value
+
+- ``Swift/Optional/take()``
 
 ### Transforming an Optional Value
 

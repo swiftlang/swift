@@ -18,7 +18,6 @@
 - ``freeCapacity``
 - ``isEmpty``
 - ``isFull``
-- ``indices``
 - ``subscript(_:)``
 - ``subscript(unchecked:)``
 
@@ -28,7 +27,6 @@
 - ``mutableBytes``
 - ``byteCount``
 - ``byteOffsets``
-- ``byteOffsets(of:)``
 
 ### Appending span contents
 

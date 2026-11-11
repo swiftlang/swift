@@ -23,7 +23,6 @@
 - ``bytes``
 - ``byteCount``
 - ``byteOffsets``
-- ``byteOffsets(of:)``
 
 ### Performing unsafe access
 

@@ -11,7 +11,7 @@
 ### Converting a Throwing Expression to a Result
 
 - <doc:preserving-the-results-of-a-throwing-expression>
-- ``Swift/Result/init(catching:)``
+- ``Swift/Result/init(catching:)-(()->Success)``
 
 ### Converting a Result to a Throwing Expression
 
