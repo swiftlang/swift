@@ -45,8 +45,8 @@ public struct ImplicitAccessors {
 public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
   public var ne: NE
 
-  public var neComputedBorrow: NE {
-    @_lifetime(borrow self)
+  public var neComputedCopy: NE {
+    @_lifetime(copy self)
     get { ne }
 
     @_lifetime(self: copy newValue)

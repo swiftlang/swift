@@ -1344,3 +1344,76 @@ bb2:
   %15 = apply %14(%13) : $@convention(thin) (A) -> ()
   unwind
 }
+
+// rdar://192215241 ([lifedep] Miscompilation due to undiagnosed escaping span assigned to an immortal property)
+//
+// A synthesized '_modify' for:
+//
+//   subscript(i: Int) -> NE {
+//     @_lifetime(borrow self) get
+//     @_lifetime(self: copy newValue) set
+//   }
+//
+// The getter's result borrows 'self', and the setter stores it back into 'self', which only copies its own
+// dependence. Do not redirect the dependence to the inout argument; keep the local access scope so that
+// LifetimeDependenceDiagnostics reports the escape.
+struct NESubscriptStorage : ~Escapable {
+  var i: Int
+}
+
+sil @NESubscriptStorage_getter : $@convention(method) (@in_guaranteed Int, @in_guaranteed NESubscriptStorage) -> @lifetime(borrow 1) @out NE
+sil @NESubscriptStorage_setter : $@convention(method) (@in NE, @in Int, @lifetime(copy 0, copy 2) @inout NESubscriptStorage) -> ()
+
+// CHECK-LABEL: sil hidden [ossa] @testBorrowStoredToCopiedInout : $@yield_once @convention(method) (@in_guaranteed Int, @lifetime(copy 1) @inout NESubscriptStorage) -> @lifetime(borrow 1) @yields @inout NE {
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unknown] %1
+// CHECK: mark_dependence_addr [unresolved] %{{.*}} on [[ACCESS]]
+// CHECK-LABEL: } // end sil function 'testBorrowStoredToCopiedInout'
+sil hidden [ossa] @testBorrowStoredToCopiedInout : $@yield_once @convention(method) (@in_guaranteed Int, @lifetime(copy 1) @inout NESubscriptStorage) -> @lifetime(borrow 1) @yields @inout NE {
+bb0(%0 : $*Int, %1 : $*NESubscriptStorage):
+  %2 = load [trivial] %0
+  %3 = begin_access [modify] [unknown] %1
+  %4 = alloc_stack $NE
+  %5 = load_borrow %3
+  %6 = alloc_stack $NESubscriptStorage
+  %7 = store_borrow %5 to %6
+  %8 = alloc_stack $Int
+  store %2 to [trivial] %8
+  %10 = function_ref @NESubscriptStorage_getter : $@convention(method) (@in_guaranteed Int, @in_guaranteed NESubscriptStorage) -> @lifetime(borrow 1) @out NE
+  %11 = apply %10(%4, %8, %7) : $@convention(method) (@in_guaranteed Int, @in_guaranteed NESubscriptStorage) -> @lifetime(borrow 1) @out NE
+  mark_dependence_addr [unresolved] %4 on %3
+  end_borrow %7
+  dealloc_stack %8
+  dealloc_stack %6
+  end_borrow %5
+  yield %4, resume bb1, unwind bb2
+
+bb1:
+  %18 = load [take] %4
+  %19 = alloc_stack $NE
+  store %18 to [init] %19
+  %21 = alloc_stack $Int
+  store %2 to [trivial] %21
+  %23 = function_ref @NESubscriptStorage_setter : $@convention(method) (@in NE, @in Int, @lifetime(copy 0, copy 2) @inout NESubscriptStorage) -> ()
+  %24 = apply %23(%19, %21, %3) : $@convention(method) (@in NE, @in Int, @lifetime(copy 0, copy 2) @inout NESubscriptStorage) -> ()
+  dealloc_stack %21
+  dealloc_stack %19
+  end_access %3
+  dealloc_stack %4
+  %29 = tuple ()
+  return %29
+
+bb2:
+  %31 = load [copy] %4
+  %32 = alloc_stack $NE
+  store %31 to [init] %32
+  %34 = alloc_stack $Int
+  store %2 to [trivial] %34
+  %36 = function_ref @NESubscriptStorage_setter : $@convention(method) (@in NE, @in Int, @lifetime(copy 0, copy 2) @inout NESubscriptStorage) -> ()
+  %37 = apply %36(%32, %34, %3) : $@convention(method) (@in NE, @in Int, @lifetime(copy 0, copy 2) @inout NESubscriptStorage) -> ()
+  dealloc_stack %34
+  dealloc_stack %32
+  destroy_addr %4
+  dealloc_stack %4
+  end_access %3
+  unwind
+}

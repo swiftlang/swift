@@ -174,8 +174,8 @@ public struct ImplicitAccessors {
 public struct NoncopyableImplicitAccessors : ~Copyable & ~Escapable {
   public var ne: NE
 
-  public var neComputedBorrow: NE {
-    @_lifetime(borrow self)
+  public var neComputedCopy: NE {
+    @_lifetime(copy self)
     get { ne }
 
     @_lifetime(self: copy newValue)
@@ -328,6 +328,23 @@ func testSpanMayThrow(buffer: inout [Int]) {
 func inoutToImmortal(_ s: inout RawSpan) {
   let tmp = RawSpan(_unsafeBytes: UnsafeRawBufferPointer(start: nil, count: 0))
   s = _overrideLifetime(tmp, borrowing: ())
+}
+
+// rdar://192215241 ([lifedep] Miscompilation due to undiagnosed escaping span assigned to an immortal property)
+//
+// 'self: copy self' does not allow 'self' to depend on a borrow of its own storage.
+@available(Span 0.1, *)
+struct InoutSelfSpanHolder: ~Escapable {
+  var view: Span<UInt8>
+  var owned: [UInt8]
+
+  @_lifetime(immortal)
+  init(owned: [UInt8]) { view = Span(); self.owned = owned }
+
+  @_lifetime(self: copy self)
+  mutating func repoint() { // expected-error{{lifetime-dependent variable 'self' escapes its scope}}
+    view = owned.span // expected-note{{it depends on this scoped access to variable 'self'}}
+  } // expected-note{{this use causes the lifetime-dependent value to escape}}
 }
 
 // =============================================================================
