@@ -15,6 +15,9 @@
 // --- Check the ptrauth fallback used by _loadWitness off arm64e ---
 // CHECK: __ptrauth_swift_protocol_witness_function_pointer(x)
 
+// --- Check the feature macro emitted before the shim include ---
+// CHECK: #define SWIFT_CXX_EXISTENTIAL_INTEROP 1
+
 // --- Check the #include of _SwiftCxxInteroperability.h ---
 // CHECK: _SwiftCxxInteroperability.h
 
