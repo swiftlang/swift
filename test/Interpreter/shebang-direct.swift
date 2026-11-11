@@ -7,3 +7,6 @@
 
 // REQUIRES: swift_interpreter
 // UNSUPPORTED: OS=linux-gnu
+// Windows doesn't support shebang lines; it would open the file in whatever
+// program is associated with .swift files instead.
+// UNSUPPORTED: OS=windows-msvc
