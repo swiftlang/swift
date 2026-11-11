@@ -1437,7 +1437,7 @@ bb0(%0 : $*WrapperSE):
 // CHECK-NEXT:  [%0: read s0.v**]
 // CHECK-NEXT:  [global: ]
 // CHECK-NEXT:  {{^[^[]}}
-sil [ossa] @mutate_accessor_se : $@convention(thin) (@inout WrapperSE) -> @inout X {
+sil [ossa] @mutate_accessor_se : $@convention(method) (@inout WrapperSE) -> @inout X {
 bb0(%0 : $*WrapperSE):
   %1 = struct_element_addr %0, #WrapperSE.x
   return %1
@@ -1461,13 +1461,54 @@ bb0(%0 : $*WrapperSE):
 // CHECK-LABEL: sil [ossa] @call_mutate_accessor_se
 // CHECK-NEXT:  [%0: read v**, write v**.v**, destroy v**.v**]
 // CHECK-NEXT:  [%1: write c*.v**, copy c*.v**]
-// CHECK-NEXT:  [global: write,copy]
+// CHECK-NEXT:  [global: write,copy,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
 sil [ossa] @call_mutate_accessor_se : $@convention(thin) (@inout WrapperSE, @owned X) -> () {
 bb0(%0 : $*WrapperSE, %1 : @owned $X):
-  %func = function_ref @mutate_accessor_se : $@convention(thin) (@inout WrapperSE) -> @inout X
-  %addr = apply %func(%0) : $@convention(thin) (@inout WrapperSE) -> @inout X
+  %func = function_ref @mutate_accessor_se : $@convention(method) (@inout WrapperSE) -> @inout X
+  %addr = apply %func(%0) : $@convention(method) (@inout WrapperSE) -> @inout X
   store %1 to [assign] %addr
   %r = tuple ()
   return %r
+}
+
+// rdar://188850214
+// FunctionSignatureOpts can delete the dead 'self' of a borrow accessor whose body never returns. The specialized
+// accessor still has an address result, but no 'self' argument to use as the base of that address.
+sil [readnone] @borrow_accessor_no_self_se : $@convention(thin) () -> @guaranteed_address Int
+sil [readnone] @borrow_accessor_no_self_live_index_se : $@convention(thin) (Int) -> @guaranteed_address Int
+
+// The thunk returns the address result of the specialized accessor.
+//
+// CHECK-LABEL: sil [ossa] @borrow_accessor_thunk_no_self_se
+// CHECK-NEXT:  [global: read,copy,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @borrow_accessor_thunk_no_self_se : $@convention(method) (Int, @guaranteed WrapperSE) -> @guaranteed_address Int {
+bb0(%0 : $Int, %1 : @guaranteed $WrapperSE):
+  %2 = function_ref @borrow_accessor_no_self_se : $@convention(thin) () -> @guaranteed_address Int
+  %3 = apply %2() : $@convention(thin) () -> @guaranteed_address Int
+  return %3
+}
+
+// Only 'self' is dead. The remaining 'index' argument must not be taken as the base of the result.
+//
+// CHECK-LABEL: sil [ossa] @borrow_accessor_thunk_no_self_live_index_se
+// CHECK-NEXT:  [global: read,copy,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @borrow_accessor_thunk_no_self_live_index_se : $@convention(method) (Int, @guaranteed WrapperSE) -> @guaranteed_address Int {
+bb0(%0 : $Int, %1 : @guaranteed $WrapperSE):
+  %2 = function_ref @borrow_accessor_no_self_live_index_se : $@convention(thin) (Int) -> @guaranteed_address Int
+  %3 = apply %2(%0) : $@convention(thin) (Int) -> @guaranteed_address Int
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @load_from_borrow_accessor_no_self_se
+// CHECK-NEXT:  [global: read,copy,deinit_barrier]
+// CHECK-NEXT:  {{^[^[]}}
+sil [ossa] @load_from_borrow_accessor_no_self_se : $@convention(thin) () -> Int {
+bb0:
+  %0 = function_ref @borrow_accessor_no_self_se : $@convention(thin) () -> @guaranteed_address Int
+  %1 = apply %0() : $@convention(thin) () -> @guaranteed_address Int
+  %2 = load [trivial] %1
+  return %2
 }
