@@ -315,9 +315,16 @@ function Write-Summary {
   $TrackedTime = [TimeSpan]::Zero
   $TrackedBusySeconds = 0
   $RootEntries = @($TimingData | Where-Object { -not $_.Parent })
-  foreach ($Entry in $RootEntries) {
-    $TrackedTime = $TrackedTime.Add($Entry."Elapsed Time")
-    $TrackedBusySeconds += $Entry.CPU * $Entry."Elapsed Time".TotalSeconds
+  # The steps can run at the same time, so count the time during which any of
+  # them runs.
+  $TrackedEnd = [TimeSpan]::Zero
+  foreach ($Entry in ($RootEntries | Sort-Object Start)) {
+    $End = $Entry.Start + $Entry."Elapsed Time"
+    if ($End -le $TrackedEnd) { continue }
+    $Start = if ($Entry.Start -gt $TrackedEnd) { $Entry.Start } else { $TrackedEnd }
+    $TrackedTime = $TrackedTime.Add($End - $Start)
+    $TrackedBusySeconds += $Entry.CPU * ($End - $Start).TotalSeconds
+    $TrackedEnd = $End
   }
 
   # Account for the time spent outside of any recorded build step.
@@ -359,25 +366,38 @@ function Write-Summary {
 
 # Writes the timing data in the Chrome Trace Event format, which can be loaded
 # in https://ui.perfetto.dev or chrome://tracing to view the build timeline.
-# The timestamps are absolute so that the traces of several scripts can merge.
-function Write-TimingTrace([string] $Path) {
-  $StartMicroseconds = [long](($BuildStartTime - [DateTime]::new(1970, 1, 1, 0, 0, 0, [DateTimeKind]::Utc)).Ticks / 10)
-  $Events = foreach ($Entry in $TimingData) {
+# With -TrackPerStep, each top-level step shows in its own track, so that the
+# steps that run at the same time do not overlap.
+function Write-TimingTrace([string] $Path, [switch] $TrackPerStep) {
+  function Get-TraceEvents([PSCustomObject] $Entry, [int] $Track) {
     [ordered]@{
       name = $Entry."Build Step"
       cat = "$($Entry.Platform) $($Entry.Arch)"
       ph = "X"
       # Timestamps are in microseconds, TimeSpan ticks are 100ns.
-      ts = $StartMicroseconds + [long]($Entry.Start.Ticks / 10)
+      ts = [long]($Entry.Start.Ticks / 10)
       dur = [long]($Entry."Elapsed Time".Ticks / 10)
       pid = 0
-      tid = 0
+      tid = $Track
       args = [ordered]@{
         Platform = $Entry.Platform
         Arch = $Entry.Arch
         CPU = [math]::Round($Entry.CPU, 2)
       }
     }
+    foreach ($Child in $Entry.Children) {
+      Get-TraceEvents $Child $Track
+    }
+  }
+
+  $Track = 0
+  $Events = foreach ($Entry in $TimingData) {
+    if ($Entry.Parent) { continue }
+    if ($TrackPerStep) {
+      $Track += 1
+      [ordered]@{ name = "thread_name"; ph = "M"; pid = 0; tid = $Track; args = @{ name = $Entry."Build Step" } }
+    }
+    Get-TraceEvents $Entry $Track
   }
 
   New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
@@ -386,8 +406,76 @@ function Write-TimingTrace([string] $Path) {
   Write-Host "Build timeline written to $Path" -ForegroundColor Cyan
 }
 
-# Prints the summary and writes the timeline of the build of a script.
+# Writes the timing data for Import-TimingData.
+function Export-TimingData([string] $Path) {
+  function ConvertTo-TimingRecord([PSCustomObject] $Entry) {
+    [ordered]@{
+      Name = $Entry."Build Step"
+      Variant = $Entry.Variant
+      Platform = $Entry.Platform
+      Arch = $Entry.Arch
+      Start = $Entry.Start.Ticks
+      Elapsed = $Entry."Elapsed Time".Ticks
+      CPU = $Entry.CPU
+      Children = @(foreach ($Child in $Entry.Children) { ConvertTo-TimingRecord $Child })
+    }
+  }
+
+  $Steps = @(foreach ($Entry in $TimingData) {
+    if (-not $Entry.Parent) { ConvertTo-TimingRecord $Entry }
+  })
+  New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
+  $Json = ConvertTo-Json -Depth 100 -InputObject ([ordered]@{ Start = $BuildStartTime.Ticks; Steps = $Steps })
+  [IO.File]::WriteAllText($Path, $Json)
+}
+
+# Adds the steps that a build script wrote with Export-TimingData under $Parent.
+function Import-TimingData([PSCustomObject] $Parent, [string] $Path) {
+  if (-not $Parent -or -not (Test-Path $Path)) { return }
+  $Data = [IO.File]::ReadAllText($Path) | ConvertFrom-Json
+  Remove-Item $Path
+  # The steps start relative to the start of the script.
+  $Offset = [TimeSpan]::FromTicks($Data.Start - $BuildStartTime.Ticks)
+
+  function Import-TimingRecord($Record, [PSCustomObject] $ParentEntry) {
+    $Entry = [PSCustomObject]@{
+      Arch = $Record.Arch
+      Platform = $Record.Platform
+      "Build Step" = $Record.Name
+      Variant = $Record.Variant
+      Start = $Offset + [TimeSpan]::FromTicks($Record.Start)
+      "Elapsed Time" = [TimeSpan]::FromTicks($Record.Elapsed)
+      CPU = $Record.CPU
+      Parent = $ParentEntry
+      Children = @()
+    }
+    $ParentEntry.Children += $Entry
+    $TimingData.Add($Entry)
+    foreach ($Child in $Record.Children) {
+      Import-TimingRecord $Child $Entry
+    }
+  }
+
+  foreach ($Record in $Data.Steps) {
+    Import-TimingRecord $Record $Parent
+  }
+}
+
+# BuildSequential.ps1 and BuildMulti.ps1 make the scripts that they run write
+# their timings to this path instead of printing them, so that the summary and
+# the timeline cover the whole build.
+$TimingDataExportPath = $env:SWIFT_BUILD_TIMINGS_PATH
+Remove-Item env:SWIFT_BUILD_TIMINGS_PATH -ErrorAction Ignore
+
+# Prints the summary and writes the timeline of the build of a script, or
+# writes its timings for the script that runs it.
 function Write-BuildTimings([string] $Name) {
+  if ($TimingDataExportPath) {
+    if ($RecordTimings) {
+      Export-TimingData $TimingDataExportPath
+    }
+    return
+  }
   if ($Summary) {
     Write-Summary
   }
@@ -1936,14 +2024,22 @@ function Get-BuildScriptArguments([string] $Script, [Hashtable] $Parameters, [Ha
   }
 }
 
-# Runs one of the build scripts in its own process.
+# Runs one of the build scripts in its own process, with the timings of its
+# steps under this step.
 function Invoke-BuildScript([string] $Name, [string] $Script, [Hashtable] $Parameters, [Hashtable] $Overrides = @{}) {
   $Arguments = @(Get-BuildScriptArguments $Script $Parameters $Overrides)
   Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] $Script $Arguments"
   Record-OperationTime $BuildPlatform $Name {
-    & $PowerShell -NoProfile -ExecutionPolicy RemoteSigned -File "$PSScriptRoot\$Script" @Arguments
-    if ($LastExitCode -ne 0) {
-      throw "$Script exited with code $LastExitCode"
+    $ScriptTimingDataPath = "$BinaryCache\BuildTimings\$Name.json"
+    Remove-Item $ScriptTimingDataPath -ErrorAction Ignore
+    Invoke-IsolatingEnvVars {
+      $env:SWIFT_BUILD_TIMINGS_PATH = $ScriptTimingDataPath
+      & $PowerShell -NoProfile -ExecutionPolicy RemoteSigned -File "$PSScriptRoot\$Script" @Arguments
+    }
+    $ExitCode = $LastExitCode
+    Import-TimingData $script:CurrentOperation $ScriptTimingDataPath
+    if ($ExitCode -ne 0) {
+      throw "$Script exited with code $ExitCode"
     }
   }
 }
@@ -1978,31 +2074,4 @@ function Remove-InstalledSDKs([Hashtable[]] $WindowsPlatforms) {
       Remove-Item -Force -Recurse (Get-WindowsRuntimeInstallRoot $_) -ErrorAction Ignore
     }
   }
-}
-
-# Merges the timelines that the build scripts wrote into one, with a process
-# for each script.
-function Merge-TimingTraces([string] $Path) {
-  $Events = @()
-  $ProcessID = 0
-  foreach ($Part in @(Get-ChildItem "$BinaryCache\build-timings-*.json" | Sort-Object LastWriteTime)) {
-    $ProcessID += 1
-    $ProcessName = $Part.BaseName -replace "^build-timings-", ""
-    $Events += [PSCustomObject]@{
-      name = "process_name"
-      ph = "M"
-      pid = $ProcessID
-      args = @{ name = $ProcessName }
-    }
-    foreach ($TraceEvent in (Get-Content -Raw $Part.FullName | ConvertFrom-Json).traceEvents) {
-      $TraceEvent.pid = $ProcessID
-      $Events += $TraceEvent
-    }
-    Remove-Item $Part.FullName
-  }
-
-  New-Item -ItemType Directory (Split-Path -Path $Path -Parent) -ErrorAction Ignore | Out-Null
-  $Json = ConvertTo-Json -Depth 4 -InputObject ([ordered]@{ traceEvents = @($Events) })
-  [IO.File]::WriteAllText($Path, $Json)
-  Write-Host "Build timeline written to $Path" -ForegroundColor Cyan
 }
