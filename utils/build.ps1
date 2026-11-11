@@ -126,6 +126,8 @@ Build the MSI installers and packaging.
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
+Use 'swift-prepare' to configure and build everything the Swift test suite needs, without running it
+(for example, so that utils\run-test.cmd can be used afterwards). It is not included in '*'.
 
 .PARAMETER IncludeDS2
 Include the ds2 remote debug server in the SDK.
@@ -1922,8 +1924,10 @@ function Get-Dependencies {
       Install-PIPIfNeeded
       Install-PythonModule "packaging"  # For building LLVM 18+
       Install-PythonModule "setuptools" # Required for SWIG support
+      if ($Test -contains "swift" -or $Test -contains "swift-prepare" -or $Test -contains "lldb" -or $Test -contains "lldb-swift") {
+        Install-PythonModule "psutil"       # Required for lit per-test timeouts, and for testing LLDB
+      }
       if ($Test -contains "lldb" -or $Test -contains "lldb-swift") {
-        Install-PythonModule "psutil"       # Required for testing LLDB
         Install-PythonModule "cryptography" # Required for testing LLDB
       }
     }
@@ -3519,7 +3523,7 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
 }
 
-function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
+function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift, [switch] $PrepareSwift) {
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
     $SwiftRuntime = Get-SDKRuntimeBin $Platform $SwiftSDK
@@ -3539,7 +3543,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
-    if ($TestSwift) {
+    if ($TestSwift -or $PrepareSwift) {
       # check-swift does not depend on SwiftCompilerPlugin, but the macro tests
       # need it, so it is built before check-swift starts.
       $Targets += @("SwiftCompilerPlugin")
@@ -3682,6 +3686,15 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
     # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
+    # Some tests run Stage2 tools with a scrubbed PATH, so cmark's DLLs can't
+    # be found via the PATH set above; put them beside the executables.
+    foreach ($DLL in @("src\cmark-gfm.dll", "extensions\cmark-gfm-extensions.dll")) {
+      $CMarkDLL = Join-Path (Get-CMarkBinaryCache $Platform) $DLL
+      if (Test-Path $CMarkDLL) {
+        Copy-Item -Force -Path $CMarkDLL -Destination $Stage2BinDir
+      }
+    }
+
     Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
     if ($Targets) {
       Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
@@ -6478,7 +6491,7 @@ if (-not $IsCrossCompiling) {
     }
   }
 
-  $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift")
+  $CompilersTests = @("clang", "lld", "lldb", "lldb-swift", "llvm", "swift", "swift-prepare")
   if ($Test | Where-Object { $CompilersTests -contains $_ }) {
     $Tests = @{
       "-TestClang" = $Test -contains "clang";
@@ -6487,6 +6500,7 @@ if (-not $IsCrossCompiling) {
       "-TestLLDBSwift" = $Test -contains "lldb-swift";
       "-TestLLVM" = $Test -contains "llvm";
       "-TestSwift" = $Test -contains "swift";
+      "-PrepareSwift" = $Test -contains "swift-prepare";
     }
     Invoke-BuildStep Test-Compilers $HostPlatform -Variant "Asserts" $Tests
   }
