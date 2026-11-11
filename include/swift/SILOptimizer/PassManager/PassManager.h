@@ -401,7 +401,7 @@ public:
   static bool disablePassesForFunction(SILFunction *function);
 
   /// Runs the verification which is implemented in the SwiftCompilerSources
-  /// (Verifier.swift). This includes ownership verification, i.e. checking
+  /// (Verification.swift). This includes ownership verification, i.e. checking
   /// that all values with ownership have a linear lifetime.
   ///
   /// In contrast to the SILVerifier (SILFunction::verify), this verification
@@ -410,6 +410,10 @@ public:
 
   /// Runs runMandatoryVerification on all functions of the module.
   void runMandatoryModuleVerification();
+
+  /// Returns false if the mandatory verification is disabled for \p f, e.g.
+  /// with `-sil-verify-none` or `-disable-swift-verification`.
+  static bool isMandatoryVerificationEnabled(SILFunction *f);
 
 private:
   void parsePassesToRunCount(StringRef countsStr);

@@ -58,16 +58,15 @@ llvm::cl::opt<bool> DisableSwiftVerification(
 //                              PassManager
 //===----------------------------------------------------------------------===//
 
+bool SILPassManager::isMandatoryVerificationEnabled(SILFunction *f) {
+  return !f->getModule().getOptions().VerifyNone &&
+         !DisableSwiftVerification &&
+         !f->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION);
+}
+
 void SILPassManager::runMandatoryVerification(SILFunction *f) {
-  if (f->getModule().getOptions().VerifyNone)
+  if (!isMandatoryVerificationEnabled(f))
     return;
-
-  if (DisableSwiftVerification)
-    return;
-
-  if (f->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
-    return;
-  }
 
   SILFunction *prevFunction = getSwiftPassInvocation()->beginVerifyFunction(f);
   BridgedVerifier::runSwiftFunctionVerification(f, getSwiftPassInvocation());
@@ -541,6 +540,10 @@ void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
       break;
   }
   invocation->setNeedFixStackNesting(false);
+}
+
+bool BridgedPassContext::enableMandatoryVerification(BridgedFunction function) const {
+  return SILPassManager::isMandatoryVerificationEnabled(function.getFunction());
 }
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {

@@ -1,4 +1,4 @@
-//===--- Verifier.swift ---------------------------------------------------===//
+//===--- Verification.swift -----------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -15,7 +15,7 @@ import SILBridging
 /// To add verification for a specific instruction, let the instruction class conform to
 /// this protocol and implement the `verify` method.
 private protocol VerifiableInstruction : Instruction {
-  func verify(_ context: VerifierContext)
+  func verify(_ context: VerificationContext)
 }
 
 private func require(_ condition: Bool, _ message: @autoclosure () -> String, atInstruction: Instruction) {
@@ -36,12 +36,14 @@ private func require(_ condition: Bool, _ message: @autoclosure () -> String, at
   }
 }
 
-struct VerifierContext: Context {
-  let _bridged: BridgedContext
+public struct VerificationContext: Context {
+  public let _bridged: BridgedContext
+
+  public init(_bridged: BridgedContext) { self._bridged = _bridged }
 }
 
 extension Function {
-  func verify(_ context: VerifierContext) {
+  public func verify(_ context: VerificationContext) {
     for block in blocks {
       for arg in block.arguments {
         arg.verify(context)
@@ -72,7 +74,7 @@ extension Function {
     }
   }
 
-  private func verifyInstructionIndices(in block: BasicBlock, _ context: VerifierContext) {
+  private func verifyInstructionIndices(in block: BasicBlock, _ context: VerificationContext) {
     var prevIndex: Int? = nil
     for inst in block.instructions {
       if let idx = inst.rawIndexInBlock {
@@ -84,7 +86,7 @@ extension Function {
     }
   }
 
-  private func verifyNoUnreachableBlocks(_ context: VerifierContext) {
+  private func verifyNoUnreachableBlocks(_ context: VerificationContext) {
     var reachableBlocks = BasicBlockWorklist(context)
     defer { reachableBlocks.deinitialize() }
     reachableBlocks.transitivelyAddBlockWithSuccessors(startingAt: entryBlock)
@@ -96,7 +98,7 @@ extension Function {
     }
   }
 
-  private func verifyNoInfiniteLoops(_ context: VerifierContext) {
+  private func verifyNoInfiniteLoops(_ context: VerificationContext) {
     var noInfiniteLoops = BasicBlockWorklist(context)
     defer { noInfiniteLoops.deinitialize() }
 
@@ -144,7 +146,7 @@ private extension Instruction {
 }
 
 private extension Argument {
-  func verify(_ context: VerifierContext) {
+  func verify(_ context: VerificationContext) {
     if let phi = Phi(self), phi.value.ownership == .guaranteed {
 
       phi.verifyBorrowedFromUse()
@@ -176,7 +178,7 @@ private extension Phi {
 }
 
 extension BorrowedFromInst : VerifiableInstruction {
-  func verify(_ context: VerifierContext) {
+  func verify(_ context: VerificationContext) {
 
     for ev in enclosingValues {
       require(ev.isValidEnclosingValueInBorrowedFrom,
@@ -227,7 +229,7 @@ private extension Value {
 }
 
 extension LoadBorrowInst : VerifiableInstruction {
-  func verify(_ context: VerifierContext) {
+  func verify(_ context: VerificationContext) {
     if isUnchecked {
       return
     }
@@ -241,7 +243,7 @@ extension LoadBorrowInst : VerifiableInstruction {
 }
 
 extension BeginAccessInst : VerifiableInstruction {
-  func verify(_ context: VerifierContext) {
+  func verify(_ context: VerificationContext) {
     // Catch violations like
     // ```
     //   %1 = begin_access [read] %0
@@ -275,7 +277,7 @@ extension BeginAccessInst : VerifiableInstruction {
 }
 
 extension VectorBaseAddrInst : VerifiableInstruction {
-  func verify(_ context: VerifierContext) {
+  func verify(_ context: VerificationContext) {
     require(vector.type.isBuiltinFixedArray,
             "vector operand of vector_element_addr must be a Builtin.FixedArray",
             atInstruction: self)
@@ -292,10 +294,10 @@ extension VectorBaseAddrInst : VerifiableInstruction {
 // Otherwise the risk would be too big for false alarms. It also means that this verification is not perfect and
 // might miss some subtle violations.
 private struct MutatingUsesWalker : AddressDefUseWalker {
-  let context: VerifierContext
+  let context: VerificationContext
   var mutatingInstructions: InstructionSet
 
-  init(_ context: VerifierContext) {
+  init(_ context: VerificationContext) {
     self.context = context
     self.mutatingInstructions = InstructionSet(context)
   }
@@ -406,7 +408,7 @@ private extension Operand {
 func registerVerifier() {
   BridgedVerifier.registerVerifier(
     { (bridgedCtxt: BridgedContext, bridgedFunction: BridgedFunction) in
-      let context = VerifierContext(_bridged: bridgedCtxt)
+      let context = VerificationContext(_bridged: bridgedCtxt)
       bridgedFunction.function.verify(context)
     }
   )

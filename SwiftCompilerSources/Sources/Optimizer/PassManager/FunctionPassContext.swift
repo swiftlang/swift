@@ -296,3 +296,9 @@ struct FunctionPassContext : MutatingContext {
     bridgedPassContext.fixStackNesting(function.bridged)
   }
 }
+
+extension VerificationContext {
+  init(_ context: FunctionPassContext) {
+    self.init(_bridged: context._bridged)
+  }
+}

@@ -1607,7 +1607,7 @@ public:
     SILFunction *F = V->getFunction();
     assert(F && "Expected value base with parent function");
     // Note that linear lifetimes of values with ownership are checked in
-    // Verifier.swift.
+    // Verification.swift.
     if (!F->hasOwnership()) {
       require(SILValue(V)->getOwnershipKind() == OwnershipKind::None,
               "Once ownership is gone, all values should have none ownership");
