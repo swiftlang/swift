@@ -72,16 +72,21 @@ void RewriteStep::dump(llvm::raw_ostream &out,
                        const RewriteSystem &system) const {
   switch (Kind) {
   case Rule: {
-    auto result = evaluator.applyRewriteRule(*this, system);
+    auto [lhs, rhs] = evaluator.applyRewriteRule(*this, system);
 
-    if (!result.prefix.empty()) {
-      out << result.prefix;
+    // Rewriting the subterm doesn't change the prefix and suffix.
+    const auto &term = evaluator.getCurrentTerm();
+    MutableTerm prefix(term.begin(), term.begin() + StartOffset);
+    MutableTerm suffix(term.end() - EndOffset, term.end());
+
+    if (!prefix.empty()) {
+      out << prefix;
       out << ".";
     }
-    out << "(" << result.lhs << " => " << result.rhs << ")";
-    if (!result.suffix.empty()) {
+    out << "(" << lhs << " => " << rhs << ")";
+    if (!suffix.empty()) {
       out << ".";
-      out << result.suffix;
+      out << suffix;
     }
 
     break;
@@ -344,51 +349,6 @@ bool RewritePath::replaceRuleWithPath(unsigned ruleID,
       });
 }
 
-SmallVector<unsigned, 1>
-RewritePath::findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
-                                                  const RewriteSystem &system) const {
-  // Rules appearing in empty context (possibly more than once).
-  llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
-  // The number of times each rule appears (with or without context).
-  llvm::SmallDenseMap<unsigned, unsigned, 2> ruleFrequency;
-
-  RewritePathEvaluator evaluator(term);
-  for (auto step : Steps) {
-    switch (step.Kind) {
-    case RewriteStep::Rule: {
-      if (!step.isInContext() && !evaluator.isInContext())
-        rulesInEmptyContext.insert(step.getRuleID());
-
-      ++ruleFrequency[step.getRuleID()];
-      break;
-    }
-
-    case RewriteStep::LeftConcreteProjection:
-    case RewriteStep::Decompose:
-    case RewriteStep::PrefixSubstitutions:
-    case RewriteStep::Shift:
-    case RewriteStep::Relation:
-    case RewriteStep::DecomposeConcrete:
-    case RewriteStep::RightConcreteProjection:
-      break;
-    }
-
-    evaluator.apply(step, system);
-  }
-
-  // Collect all rules that we saw exactly once in empty context.
-  SmallVector<unsigned, 1> rulesOnceInEmptyContext;
-  for (auto rule : rulesInEmptyContext) {
-    auto found = ruleFrequency.find(rule);
-    ASSERT(found != ruleFrequency.end());
-
-    if (found->second == 1)
-      rulesOnceInEmptyContext.push_back(rule);
-  }
-
-  return rulesOnceInEmptyContext;
-}
-
 /// Dumps a series of rewrite steps applied to \p term.
 void RewritePath::dump(llvm::raw_ostream &out,
                        MutableTerm term,
@@ -443,7 +403,57 @@ void RewriteLoop::verify(const RewriteSystem &system) const {
   }
 }
 
+void RewritePathDepthTracker::apply(const RewriteStep &step,
+                                    const RewriteSystem &system) {
+  switch (step.Kind) {
+  case RewriteStep::Rule:
+  case RewriteStep::PrefixSubstitutions:
+  case RewriteStep::Relation:
+    break;
+
+  case RewriteStep::Shift:
+    if (!step.Inverse) {
+      pop(1);
+      ++Secondary;
+    } else {
+      ASSERT(Secondary > 0);
+      --Secondary;
+      push(1);
+    }
+    break;
+
+  case RewriteStep::Decompose:
+    if (!step.Inverse)
+      push(step.Arg);
+    else
+      pop(step.Arg);
+    break;
+
+  case RewriteStep::DecomposeConcrete: {
+    const auto &difference = system.getTypeDifference(step.Arg);
+    unsigned numSubstitutions = difference.LHS.getSubstitutions().size();
+    if (!step.Inverse)
+      push(numSubstitutions);
+    else
+      pop(numSubstitutions);
+    break;
+  }
+
+  case RewriteStep::LeftConcreteProjection:
+  case RewriteStep::RightConcreteProjection:
+    if (!step.Inverse)
+      push(1);
+    else
+      pop(1);
+    break;
+  }
+}
+
 /// Recompute various cached values if needed.
+///
+/// This only needs to know whether each step is in context, so it tracks
+/// evaluator stack depths instead of evaluating the path. The full evaluation
+/// is done by verify().
 void RewriteLoop::recompute(const RewriteSystem &system) {
   if (!Dirty)
     return;
@@ -454,11 +464,21 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
   DecomposeCount = 0;
   HasConcreteTypeAliasRule = 0;
 
-  RewritePathEvaluator evaluator(Basepoint);
+  // Rules appearing in empty context (possibly more than once).
+  llvm::SmallDenseSet<unsigned, 2> rulesInEmptyContext;
+  // The number of times each rule appears (with or without context).
+  llvm::SmallDenseMap<unsigned, unsigned, 2> ruleFrequency;
+
+  RewritePathDepthTracker tracker;
   for (auto step : Path) {
     switch (step.Kind) {
     case RewriteStep::Rule: {
-      Useful |= (!step.isInContext() && !evaluator.isInContext());
+      if (!step.isInContext() && !tracker.isInContext()) {
+        Useful = 1;
+        rulesInEmptyContext.insert(step.getRuleID());
+      }
+
+      ++ruleFrequency[step.getRuleID()];
 
       const auto &rule = system.getRule(step.getRuleID());
       if (rule.isDerivedFromConcreteProtocolTypeAliasRule())
@@ -483,15 +503,21 @@ void RewriteLoop::recompute(const RewriteSystem &system) {
       break;
     }
 
-    evaluator.apply(step, system);
+    tracker.apply(step, system);
   }
 
-  RulesInEmptyContext =
-      Path.findRulesAppearingOnceInEmptyContext(Basepoint, system);
+  // A rewrite rule is redundant if it appears exactly once in a loop
+  // without context. Collect all such rules.
+  RulesInEmptyContext.clear();
+  for (auto rule : rulesInEmptyContext) {
+    auto found = ruleFrequency.find(rule);
+    ASSERT(found != ruleFrequency.end());
+
+    if (found->second == 1)
+      RulesInEmptyContext.push_back(rule);
+  }
 }
 
-/// A rewrite rule is redundant if it appears exactly once in a loop
-/// without context.
 ArrayRef<unsigned>
 RewriteLoop::findRulesAppearingOnceInEmptyContext(
     const RewriteSystem &system) const {
@@ -576,7 +602,10 @@ MutableTerm &RewritePathEvaluator::getCurrentTerm() {
   return Primary.back();
 }
 
-AppliedRewriteStep
+/// Applies a rewrite rule to the subterm of the current term at the step's
+/// offsets, and returns the rule's left and right hand sides in the direction
+/// that they were applied.
+std::pair<Term, Term>
 RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
                                        const RewriteSystem &system) {
   auto &term = getCurrentTerm();
@@ -608,14 +637,10 @@ RewritePathEvaluator::applyRewriteRule(const RewriteStep &step,
     bug("Invalid subterm");
   }
 
-  MutableTerm prefix(term.begin(), term.begin() + step.StartOffset);
-  MutableTerm suffix(term.end() - step.EndOffset, term.end());
+  term.rewriteSubTerm(term.begin() + step.StartOffset,
+                      term.begin() + step.StartOffset + lhs.size(), rhs);
 
-  term = prefix;
-  term.append(rhs);
-  term.append(suffix);
-
-  return {lhs, rhs, prefix, suffix};
+  return {lhs, rhs};
 }
 
 std::pair<MutableTerm, MutableTerm>
@@ -1010,7 +1035,7 @@ void RewritePathEvaluator::apply(const RewriteStep &step,
                                  const RewriteSystem &system) {
   switch (step.Kind) {
   case RewriteStep::Rule:
-    (void) applyRewriteRule(step, system);
+    (void)applyRewriteRule(step, system);
     break;
 
   case RewriteStep::PrefixSubstitutions:

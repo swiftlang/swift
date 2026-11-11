@@ -58,6 +58,7 @@
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <algorithm>
@@ -159,20 +160,25 @@ void RewriteSystem::computeRecursiveRules() {
 /// once in empty context. Returns a pair consisting of a loop ID and a rule ID,
 /// otherwise returns None.
 ///
-/// Minimization performs three passes over the rewrite system.
+/// Minimization calls this repeatedly from each of the four homotopy
+/// reduction passes in minimizeRewriteSystem(), which delete, in order:
 ///
-/// 1) First, rules that are not conformance rules are deleted, with
-///    \p redundantConformances equal to nullptr.
+/// 1) Simplified rules.
+/// 2) Rules with unresolved name symbols.
+/// 3) Conformance rules that are not minimal conformances, after minimal
+///    conformances are computed.
+/// 4) All other redundant rules.
 ///
-/// 2) Second, minimal conformances are computed.
+/// \p isRedundantRuleFn restricts the rules that the current pass may delete.
 ///
-/// 3) Finally, redundant conformance rules are deleted, with
-/// \p redundantConformances equal to the set of conformance rules that are
-///    not minimal conformances.
+/// Only the loops in LiveLoopIDs are visited. Deleted loops are removed from
+/// LiveLoopIDs as they are encountered, so that subsequent calls do not visit
+/// them again.
 std::optional<std::pair<unsigned, unsigned>>
 RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
   SmallVector<std::pair<unsigned, unsigned>, 2> redundancyCandidates;
-  for (unsigned loopID : indices(Loops)) {
+  unsigned numLiveLoops = 0;
+  for (unsigned loopID : LiveLoopIDs) {
     auto &loop = Loops[loopID];
     if (loop.isDeleted())
       continue;
@@ -190,10 +196,13 @@ RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
       continue;
     }
 
+    LiveLoopIDs[numLiveLoops++] = loopID;
+
     for (unsigned ruleID : loop.findRulesAppearingOnceInEmptyContext(*this)) {
       redundancyCandidates.emplace_back(loopID, ruleID);
     }
   }
+  LiveLoopIDs.resize(numLiveLoops);
 
   std::optional<std::pair<unsigned, unsigned>> found;
 
@@ -357,11 +366,31 @@ RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
 
 /// Delete a rewrite rule that is known to be redundant, replacing all
 /// occurrences of the rule in all loops with the replacement path.
-void RewriteSystem::deleteRule(unsigned ruleID,
-                               const RewritePath &replacementPath) {
+///
+/// \p loopsByRule maps each rule ID to the IDs of the loops whose paths
+/// might contain that rule. It is updated to account for the rules in the
+/// replacement path.
+void RewriteSystem::deleteRule(
+    unsigned ruleID, const RewritePath &replacementPath,
+    std::vector<llvm::SmallVector<unsigned, 1>> &loopsByRule) {
+  // The rules appearing in the replacement path.
+  llvm::SmallSetVector<unsigned, 4> replacementRuleIDs;
+  for (const auto &step : replacementPath) {
+    if (step.Kind == RewriteStep::Rule)
+      replacementRuleIDs.insert(step.getRuleID());
+  }
+
+  // The rule will never appear in a loop again once it has been replaced.
+  auto loopIDs = std::exchange(loopsByRule[ruleID], {});
+
+  // A loop might be listed more than once, since loops are listed again
+  // when they are updated. Visit them in order of increasing ID.
+  llvm::sort(loopIDs);
+  loopIDs.erase(llvm::unique(loopIDs), loopIDs.end());
+
   // Replace all occurrences of the rule with the replacement path in
   // all remaining rewrite loops.
-  for (unsigned loopID : indices(Loops)) {
+  for (unsigned loopID : loopIDs) {
     auto &loop = Loops[loopID];
     if (loop.isDeleted())
       continue;
@@ -369,6 +398,12 @@ void RewriteSystem::deleteRule(unsigned ruleID,
     bool changed = loop.Path.replaceRuleWithPath(ruleID, replacementPath);
     if (!changed)
       continue;
+
+    for (unsigned replacementRuleID : replacementRuleIDs) {
+      auto &ruleLoopIDs = loopsByRule[replacementRuleID];
+      if (ruleLoopIDs.empty() || ruleLoopIDs.back() != loopID)
+        ruleLoopIDs.push_back(loopID);
+    }
 
     if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
       loop.computeNormalForm(*this);
@@ -391,12 +426,31 @@ void RewriteSystem::deleteRule(unsigned ruleID,
 
 void RewriteSystem::performHomotopyReduction(
     EliminationPredicate isRedundantRuleFn) {
+  // Maps each rule ID to the IDs of the loops whose paths might contain that
+  // rule. Built when the first rule is deleted, since many passes delete
+  // nothing.
+  std::vector<llvm::SmallVector<unsigned, 1>> loopsByRule;
+
   while (true) {
     auto optPair = findRuleToDelete(isRedundantRuleFn);
 
     // If no redundant rules remain which can be eliminated by this pass, stop.
     if (!optPair)
       break;
+
+    if (loopsByRule.empty()) {
+      loopsByRule.resize(Rules.size());
+      for (unsigned liveLoopID : LiveLoopIDs) {
+        for (const auto &step : Loops[liveLoopID].Path) {
+          if (step.Kind != RewriteStep::Rule)
+            continue;
+
+          auto &ruleLoopIDs = loopsByRule[step.getRuleID()];
+          if (ruleLoopIDs.empty() || ruleLoopIDs.back() != liveLoopID)
+            ruleLoopIDs.push_back(liveLoopID);
+        }
+      }
+    }
 
     unsigned loopID = optPair->first;
     unsigned ruleID = optPair->second;
@@ -419,7 +473,36 @@ void RewriteSystem::performHomotopyReduction(
 
     rule.markRedundant();
 
-    deleteRule(ruleID, replacementPath);
+    deleteRule(ruleID, replacementPath, loopsByRule);
+  }
+
+  // deleteRule() only visits the loops that loopsByRule lists for the rule.
+  // Make sure this didn't miss any loops.
+  if (!loopsByRule.empty())
+    verifyRedundantRulesReplaced();
+}
+
+/// Check that no remaining loop contains a redundant rule, which means that
+/// deleteRule() replaced every occurrence of every redundant rule.
+void RewriteSystem::verifyRedundantRulesReplaced() const {
+  for (unsigned loopID : LiveLoopIDs) {
+    const auto &loop = Loops[loopID];
+    if (loop.isDeleted())
+      continue;
+
+    for (const auto &step : loop.Path) {
+      if (step.Kind != RewriteStep::Rule)
+        continue;
+
+      const auto &rule = getRule(step.getRuleID());
+      if (rule.isRedundant()) {
+        ABORT([&](auto &out) {
+          out << "Loop #" << loopID << " contains redundant rule " << rule
+              << "\n";
+          loop.dump(out, *this);
+        });
+      }
+    }
   }
 }
 
@@ -441,6 +524,10 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
   Minimized = 1;
 
   propagateExplicitBits();
+
+  ASSERT(LiveLoopIDs.empty());
+  for (unsigned loopID : indices(Loops))
+    LiveLoopIDs.push_back(loopID);
 
   if (Context.getASTContext().LangOpts.EnableRequirementMachineLoopNormalization) {
     for (auto &loop : Loops) {

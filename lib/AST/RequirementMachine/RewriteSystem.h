@@ -367,6 +367,13 @@ private:
   /// algorithms.
   std::vector<RewriteLoop> Loops;
 
+  /// The IDs of all loops that are not deleted, in increasing order, and
+  /// possibly some deleted loops that have not been removed yet.
+  ///
+  /// Populated by minimizeRewriteSystem(), and compacted by findRuleToDelete()
+  /// as homotopy reduction deletes loops.
+  std::vector<unsigned> LiveLoopIDs;
+
   /// A list of pairs where the first element is a rule number and the second
   /// element is an equivalent rewrite path in terms of non-redundant rules.
   std::vector<std::pair<unsigned, RewritePath>> RedundantRules;
@@ -397,9 +404,12 @@ private:
   std::optional<std::pair<unsigned, unsigned>>
   findRuleToDelete(EliminationPredicate isRedundantRuleFn);
 
-  void deleteRule(unsigned ruleID, const RewritePath &replacementPath);
+  void deleteRule(unsigned ruleID, const RewritePath &replacementPath,
+                  std::vector<llvm::SmallVector<unsigned, 1>> &loopsByRule);
 
   void performHomotopyReduction(EliminationPredicate isRedundantRuleFn);
+
+  void verifyRedundantRulesReplaced() const;
 
 public:
   // Utilities for minimal conformances algorithm, defined in
