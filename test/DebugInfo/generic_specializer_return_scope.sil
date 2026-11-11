@@ -1,0 +1,65 @@
+// RUN: %target-sil-opt %s -generic-specializer -enable-sil-verify-all -sil-print-debuginfo | %FileCheck %s
+
+// When the generic specializer converts an indirect result to a direct one,
+// the instructions it creates in the return block must inherit the scope of
+// the original return, not a leftover scope from the SILBuilder.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+
+// CHECK:       sil_scope [[FN_SCOPE:[0-9]+]] { loc "t.swift":1:6 parent @$s4pick{{.*}}Tg5 :
+// CHECK-NEXT:  sil_scope [[BODY_SCOPE:[0-9]+]] { loc "t.swift":1:60 parent [[FN_SCOPE]] }
+
+sil_scope 1 { loc "t.swift":1:6 parent @pick : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Builtin.Int1) -> @out T }
+sil_scope 2 { loc "t.swift":1:60 parent 1 }
+sil_scope 3 { loc "t.swift":2:10 parent 2 }
+sil_scope 4 { loc "t.swift":4:10 parent 2 }
+
+// All instructions in the terminator block keep scope 2, rather than receiving
+// the previously cloned instruction's scope (scope 4).
+
+// CHECK-LABEL: sil shared @$s4pick{{.*}}Tg5 :
+// CHECK:       bb3:
+// CHECK-NEXT:    tuple (), loc "t.swift":7:1, scope [[BODY_SCOPE]]
+// CHECK-NEXT:    [[RET:%[0-9]+]] = load {{.*}}, scope [[BODY_SCOPE]]
+// CHECK-NEXT:    dealloc_stack {{.*}}, scope [[BODY_SCOPE]]
+// CHECK-NEXT:    dealloc_stack {{.*}}, scope [[BODY_SCOPE]]
+// CHECK-NEXT:    dealloc_stack {{.*}}, scope [[BODY_SCOPE]]
+// CHECK-NEXT:    return [[RET]], loc "t.swift":7:1, scope [[BODY_SCOPE]]
+// CHECK-LABEL: } // end sil function '$s4pick{{.*}}Tg5'
+
+sil @pick : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Builtin.Int1) -> @out T {
+bb0(%0 : $*T, %1 : $*T, %2 : $*T, %3 : $Builtin.Int1):
+  cond_br %3, bb1, bb2, loc "t.swift":2:6, scope 2
+
+bb1:
+  copy_addr %1 to [init] %0 : $*T, loc "t.swift":3:5, scope 3
+  br bb3, loc "t.swift":3:5, scope 3
+
+bb2:
+  copy_addr %2 to [init] %0 : $*T, loc "t.swift":5:5, scope 4
+  br bb3, loc "t.swift":5:5, scope 4
+
+bb3:
+  %7 = tuple (), loc "t.swift":7:1, scope 2
+  return %7 : $(), loc "t.swift":7:1, scope 2
+}
+
+sil @caller : $@convention(thin) (Int64, Int64, Builtin.Int1) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.Int1):
+  %3 = alloc_stack $Int64
+  %4 = alloc_stack $Int64
+  %5 = alloc_stack $Int64
+  store %0 to %4 : $*Int64
+  store %1 to %5 : $*Int64
+  %8 = function_ref @pick : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Builtin.Int1) -> @out T
+  %9 = apply %8<Int64>(%3, %4, %5, %2) : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Builtin.Int1) -> @out T
+  %10 = load %3 : $*Int64
+  dealloc_stack %5 : $*Int64
+  dealloc_stack %4 : $*Int64
+  dealloc_stack %3 : $*Int64
+  return %10 : $Int64
+}

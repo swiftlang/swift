@@ -1097,6 +1097,10 @@ void SILCloner<ImplClass>::visitBlocksDepthFirst(SILBasicBlock *startBB) {
   for (auto *origBB : preorderBlocks) {
     // Set the insertion point to the new mapped BB
     getBuilder().setInsertionPoint(BBMap[origBB]);
+    // Use the terminator's mapped scope for any added cleanups or rewritten
+    // terminator.
+    getBuilder().setCurrentDebugScope(
+        getOpScope(origBB->getTerminator()->getDebugScope()));
     asImpl().visitTerminator(origBB);
   }
 }
