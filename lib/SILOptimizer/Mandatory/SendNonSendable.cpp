@@ -2025,15 +2025,94 @@ void SendNonSendableImpl::runDiagnosticEvaluator() {
 }
 
 //===----------------------------------------------------------------------===//
+//                 MARK: Diagnostic Emitter Base
+//===----------------------------------------------------------------------===//
+
+namespace {
+
+/// A CRTP base class for the emitters of region-based isolation errors.
+///
+/// Subclasses must provide getFunction(). They may provide
+/// getErrorLanguageMode() to change the language mode in which their error
+/// diagnostics become errors. Before that language mode, they are warnings.
+template <typename Impl>
+class RegionIsolationDiagnosticEmitter {
+protected:
+  /// Set once we emit an error diagnostic.
+  bool emittedErrorDiagnostic = false;
+
+  const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
+
+public:
+  ASTContext &getASTContext() const {
+    return asImpl().getFunction()->getASTContext();
+  }
+
+  /// The language mode in which our error diagnostics become errors.
+  LanguageMode getErrorLanguageMode() const { return LanguageMode::v6; }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
+                                   U &&...args) {
+    emittedErrorDiagnostic = true;
+    return std::move(
+        getASTContext()
+            .Diags.diagnose(loc, diag, std::forward<U>(args)...)
+            .warnUntilLanguageMode(asImpl().getErrorLanguageMode()));
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
+    return diagnoseError(op->getUser(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
+    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
+                                  U &&...args) {
+    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
+  }
+
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseNote(Operand *op, Diag<T...> diag, U &&...args) {
+    return diagnoseNote(op->getUser(), diag, std::forward<U>(args)...);
+  }
+};
+
+} // namespace
+
+//===----------------------------------------------------------------------===//
 //                MARK: UseAfterSend Diagnostic Inference
 //===----------------------------------------------------------------------===//
 
 namespace {
 
-class UseAfterSendDiagnosticEmitter {
+class UseAfterSendDiagnosticEmitter
+    : public RegionIsolationDiagnosticEmitter<UseAfterSendDiagnosticEmitter> {
   Operand *sendingOp;
   SmallVectorImpl<RequireInst> &requireInsts;
-  bool emittedErrorDiagnostic = false;
 
 public:
   UseAfterSendDiagnosticEmitter(Operand *sendingOp,
@@ -2346,42 +2425,6 @@ public:
   }
 
 private:
-  ASTContext &getASTContext() const {
-    return sendingOp->getFunction()->getASTContext();
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
-                                   U &&...args) {
-    emittedErrorDiagnostic = true;
-    return std::move(getASTContext()
-                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilLanguageMode(LanguageMode::v6));
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
-    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
   void emitRequireInstDiagnostics() {
     // Now actually emit the require notes.
     while (!requireInsts.empty()) {
@@ -2834,7 +2877,9 @@ namespace {
 ///
 /// The separation exists because the diagnostic emission logic is reusable,
 /// while the inference logic for determining the appropriate diagnostic varies.
-class SendNeverSentDiagnosticEmitterHelper {
+class SendNeverSentDiagnosticEmitterHelper
+    : public RegionIsolationDiagnosticEmitter<
+          SendNeverSentDiagnosticEmitterHelper> {
   /// The use that actually caused the send.
   Operand *sendingOperand;
 
@@ -2848,8 +2893,6 @@ class SendNeverSentDiagnosticEmitterHelper {
   /// This is equal to the merge of the IsolationRegionInfo from all elements in
   /// the never-sent value's region when the error was diagnosed.
   SILDynamicMergedIsolationInfo isolationRegionInfo;
-
-  bool emittedErrorDiagnostic = false;
 
 public:
   SendNeverSentDiagnosticEmitterHelper(
@@ -3245,49 +3288,6 @@ public:
     auto diag = diag::regionbasedisolation_named_nosend_send_into_result;
     diagnoseNote(loc, diag, isDisconnected, descriptiveKindStr, varName,
                  descriptiveKindStr, isTaskIsolated);
-  }
-
-private:
-  ASTContext &getASTContext() const {
-    return getOperand()->getFunction()->getASTContext();
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
-                                   U &&...args) {
-    emittedErrorDiagnostic = true;
-    return std::move(getASTContext()
-                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilLanguageMode(LanguageMode::v6));
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
-    return diagnoseError(op->getUser()->getLoc(), diag,
-                         std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
-    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(Operand *op, Diag<T...> diag, U &&...args) {
-    return diagnoseNote(op->getUser()->getLoc(), diag,
-                        std::forward<U>(args)...);
   }
 };
 
@@ -3768,7 +3768,9 @@ namespace {
 /// both the return value and the inout parameter reference the same value, but
 /// 'sending' implies the value could be sent to another isolation
 /// domain safely.
-class InOutSendingReturnedDiagnosticEmitter {
+class InOutSendingReturnedDiagnosticEmitter
+    : public RegionIsolationDiagnosticEmitter<
+          InOutSendingReturnedDiagnosticEmitter> {
 public:
   using Error = PartitionOpError::InOutSendingReturnedError;
 
@@ -3806,7 +3808,6 @@ private:
   std::optional<Partition> partition;
 
   bool downgradeToWarning = false;
-  bool emittedErrorDiagnostic = false;
 
 public:
   class LastValueEnum;
@@ -3837,6 +3838,12 @@ public:
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
     return inoutSendingParam->getType().getConcurrencyDiagnosticBehavior(
         getFunction());
+  }
+
+  LanguageMode getErrorLanguageMode() const {
+    if (downgradeToWarning)
+      return LanguageMode::future;
+    return RegionIsolationDiagnosticEmitter::getErrorLanguageMode();
   }
 
   void emitUnknownPatternError(bool pushToFuture = false) {
@@ -3991,38 +3998,6 @@ public:
         diag::
             regionbasedisolation_inout_sending_cannot_be_returned_note_return_value,
         declRef.getAbstractFunctionDecl(), *inoutSendingParamName);
-  }
-
-  ASTContext &getASTContext() const {
-    return functionExitingInst->getFunction()->getASTContext();
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
-                                   U &&...args) {
-    emittedErrorDiagnostic = true;
-    auto localDiag =
-        getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
-    if (downgradeToWarning)
-      return std::move(localDiag.warnUntilLanguageMode(LanguageMode::future));
-    return std::move(localDiag.warnUntilLanguageMode(LanguageMode::v6));
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
-    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
   }
 };
 
@@ -4475,7 +4450,9 @@ namespace {
 /// region at function exit. The contract requires such parameters to be
 /// "disconnected" (not associated with any actor) when the function returns,
 /// so the caller can safely send the value elsewhere.
-class InOutSendingNotDisconnectedAtExitDiagnosticEmitter {
+class InOutSendingNotDisconnectedAtExitDiagnosticEmitter
+    : public RegionIsolationDiagnosticEmitter<
+          InOutSendingNotDisconnectedAtExitDiagnosticEmitter> {
 public:
   using Error = PartitionOpError::InOutSendingNotDisconnectedAtExitError;
 
@@ -4499,8 +4476,6 @@ private:
   /// for the isolation-history notes.
   Element inoutSendingElement;
   std::optional<Partition> partition;
-
-  bool emittedErrorDiagnostic = false;
 
 public:
   InOutSendingNotDisconnectedAtExitDiagnosticEmitter(
@@ -4554,48 +4529,6 @@ public:
   }
 
   void emit();
-
-  ASTContext &getASTContext() const {
-    return functionExitingInst->getFunction()->getASTContext();
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
-                                   U &&...args) {
-    emittedErrorDiagnostic = true;
-    return std::move(getASTContext()
-                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilLanguageMode(LanguageMode::v6));
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
-    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
 };
 
 } // namespace
@@ -4645,7 +4578,9 @@ namespace {
 /// 'sending' out-parameter or result. The caller expects such results to be
 /// "disconnected" and safe to send, but the value is tied to an isolation
 /// domain and cannot be safely sent.
-class AssignNeverSendableIntoSendingResultDiagnosticEmitter {
+class AssignNeverSendableIntoSendingResultDiagnosticEmitter
+    : public RegionIsolationDiagnosticEmitter<
+          AssignNeverSendableIntoSendingResultDiagnosticEmitter> {
 public:
   using Error = PartitionOpError::AssignNeverSendableIntoSendingResultError;
 
@@ -4675,8 +4610,6 @@ private:
   /// for the isolation-history notes.
   Element neverSentElement;
   std::optional<Partition> partition;
-
-  bool emittedErrorDiagnostic = false;
 
 public:
   AssignNeverSendableIntoSendingResultDiagnosticEmitter(
@@ -4730,48 +4663,6 @@ public:
   }
 
   void emit();
-
-  ASTContext &getASTContext() const {
-    return srcOperand->getFunction()->getASTContext();
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
-                                   U &&...args) {
-    emittedErrorDiagnostic = true;
-    return std::move(getASTContext()
-                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilLanguageMode(LanguageMode::v6));
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(Operand *op, Diag<T...> diag, U &&...args) {
-    return diagnoseError(op->getUser()->getLoc(), diag,
-                         std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
-    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(Operand *op, Diag<T...> diag, U &&...args) {
-    return diagnoseNote(op->getUser()->getLoc(), diag,
-                        std::forward<U>(args)...);
-  }
 };
 
 } // namespace
@@ -4922,13 +4813,13 @@ namespace {
 /// This error occurs when a function that crosses isolation boundaries (e.g.,
 /// calling from one actor to another) returns a non-Sendable value. Since the
 /// result will cross isolation domains, it must be Sendable.
-struct NonSendableIsolationCrossingResultDiagnosticEmitter {
+struct NonSendableIsolationCrossingResultDiagnosticEmitter
+    : public RegionIsolationDiagnosticEmitter<
+          NonSendableIsolationCrossingResultDiagnosticEmitter> {
   RegionAnalysisValueMap &valueMap;
 
   using Error = PartitionOpError::NonSendableIsolationCrossingResultError;
   Error error;
-
-  bool emittedErrorDiagnostic = false;
 
   /// The value assigned as the equivalence class representative. It is
   /// guaranteed to be from the isolation crossing function since we never treat
@@ -4945,48 +4836,6 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
   }
 
   void emit();
-
-  ASTContext &getASTContext() const {
-    return error.op->getSourceInst()->getFunction()->getASTContext();
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
-                                   U &&...args) {
-    emittedErrorDiagnostic = true;
-    return std::move(getASTContext()
-                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilLanguageMode(LanguageMode::v6));
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
-    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
 
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
     return representative->getType().getConcurrencyDiagnosticBehavior(
@@ -5127,7 +4976,9 @@ namespace {
 /// This error occurs when two 'inout sending' parameters end up in the same
 /// region, making them interdependent. Since each must be independently
 /// sendable, sharing a region violates the contract.
-class InOutSendingParametersInSameRegionDiagnosticEmitter {
+class InOutSendingParametersInSameRegionDiagnosticEmitter
+    : public RegionIsolationDiagnosticEmitter<
+          InOutSendingParametersInSameRegionDiagnosticEmitter> {
   /// The function exiting inst where the 'inout sending' parameter was actor
   /// isolated.
   TermInst *functionExitingInst;
@@ -5148,8 +4999,6 @@ class InOutSendingParametersInSameRegionDiagnosticEmitter {
   Element firstElement;
   Element secondElement;
   std::optional<Partition> partition;
-
-  bool emittedErrorDiagnostic = false;
 
 public:
   InOutSendingParametersInSameRegionDiagnosticEmitter(
@@ -5216,48 +5065,6 @@ public:
   }
 
   void emit();
-
-  ASTContext &getASTContext() const {
-    return functionExitingInst->getFunction()->getASTContext();
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
-                                   U &&...args) {
-    emittedErrorDiagnostic = true;
-    return std::move(getASTContext()
-                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilLanguageMode(LanguageMode::v6));
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILLocation loc, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    return diagnoseError(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SourceLoc loc, Diag<T...> diag, U &&...args) {
-    return getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILLocation loc, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(loc.getSourceLoc(), diag, std::forward<U>(args)...);
-  }
-
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseNote(SILInstruction *inst, Diag<T...> diag,
-                                  U &&...args) {
-    return diagnoseNote(inst->getLoc(), diag, std::forward<U>(args)...);
-  }
 };
 
 } // namespace
@@ -5326,7 +5133,9 @@ public:
 //                      MARK: Incompatible Region Merge
 //===----------------------------------------------------------------------===//
 
-struct IncompatibleRegionMergeDiagnosticEmitter {
+struct IncompatibleRegionMergeDiagnosticEmitter
+    : public RegionIsolationDiagnosticEmitter<
+          IncompatibleRegionMergeDiagnosticEmitter> {
   using Error = DiagnosticEvaluator::IncompatibleRegionMergeError;
   RegionAnalysisValueMap &valueMap;
   Operand *op;
@@ -5366,6 +5175,10 @@ struct IncompatibleRegionMergeDiagnosticEmitter {
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
     return op->get()->getType().getConcurrencyDiagnosticBehavior(getFunction());
   }
+
+  // Emit incompatible-region-merge diagnostics as warnings until the future
+  // language mode.
+  LanguageMode getErrorLanguageMode() const { return LanguageMode::future; }
 
 private:
   void emitUnknownPatternError() {
@@ -5409,20 +5222,6 @@ private:
     if (auto value = regionValue.maybeGetValue())
       emitMergeRegionValueNote(value, isolationStr,
                                isolation->isTaskIsolated());
-  }
-
-  // Emit incompatible-region-merge diagnostics as warnings until the future
-  // language mode. This shadows the file-scope siloptimizer::diagnoseError
-  // (which wraps in warnUntilLanguageMode(v6)) so we do not double-wrap.
-  template <typename... T, typename... U>
-  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
-                                   U &&...args) {
-    auto &ctx = inst->getFunction()->getASTContext();
-    return std::move(
-        ctx.Diags
-            .diagnose(inst->getLoc().getSourceLoc(), diag,
-                      std::forward<U>(args)...)
-            .warnUntilLanguageMode(LanguageMode::future));
   }
 
   void emitUnknown();
