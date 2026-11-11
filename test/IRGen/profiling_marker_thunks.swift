@@ -100,7 +100,7 @@ public func test() {
 // CHECK: define {{.*}} void @"__swift_prof_thunk__generic_witness__$s1A9ConformerVyxGAA9SomeProtoA2aEP5plainyyKFTW"({{.*}}) #[[ATTR]]{{( comdat)?}} {
 // CHECK: define {{.*}} void @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC1xxvg"({{.*}}) #[[ATTR]]{{( comdat)?}} {
 
-// CHECK: attributes #[[ATTR]] = { noinline "frame-pointer"="all"
+// CHECK: attributes #[[ATTR]] = { noinline {{(uwtable(\(sync\))? )?}}"frame-pointer"="all"
 
 
 // ATTRIBUTE: define {{.*}} ptr @"__swift_prof_thunk__generic_func__1__$sypN___fun__$ss27_finalizeUninitializedArrayySayxGABnlF"({{.*}}) #[[ATTR:[0-9]+]]
@@ -113,4 +113,4 @@ public func test() {
 // ATTRIBUTE: define {{.*}} void @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC1xxvs"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: define {{.*}} ptr @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassCyACyxGxcfC"({{.*}}) #[[ATTR]]
 // ATTRIBUTE: define {{.*}} [[INT]] @"__swift_prof_thunk__generic_vtable__$s1A12GenericClassC10someMethodSiyF"({{.*}}) #[[ATTR]]
-// ATTRIBUTE: #[[ATTR]] = { noinline "frame-pointer"="all"
+// ATTRIBUTE: #[[ATTR]] = { noinline {{(uwtable(\(sync\))? )?}}"frame-pointer"="all"

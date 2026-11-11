@@ -469,7 +469,6 @@ public func test() {
 // CHECK-NOT: invoke
 // CHECK: }
 
-// CHECK: attributes #[[#SWIFTMETA]] = {
 // CHECK: attributes #[[#SWIFTUWMETA]] = {
 // CHECK-SAME: uwtable
 

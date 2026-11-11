@@ -1808,6 +1808,13 @@ void IRGenModule::constructInitialFnAttributes(
   // is okay even with C++ interop on because the landinpads are trapping.
   if (Context.LangOpts.hasFeature(Feature::Embedded)) {
     Attrs.addAttribute(llvm::Attribute::NoUnwind);
+  } else if (auto unwindTables =
+                 static_cast<ClangImporter *>(Context.getClangModuleLoader())
+                     ->getCodeGenOpts()
+                     .UnwindTables) {
+    // Mirror Clang. Without uwtable(async), the AArch64 backend emits CFI
+    // that is only valid at call sites (no epilogue rules).
+    Attrs.addUWTableAttr(llvm::UWTableKind(unwindTables));
   }
 }
 

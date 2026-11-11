@@ -153,4 +153,4 @@ func makeGenericMetatypes() {
 // CHECK:   ret %swift.metadata_response
 
 // CHECK-DAG: attributes [[NOUNWIND_READONLY]] = { nounwind memory(read) }
-// CHECK-DAG: attributes [[NOUNWIND_OPT]] = { noinline nounwind "
+// CHECK-DAG: attributes [[NOUNWIND_OPT]] = { noinline nounwind {{(uwtable(\(sync\))? )?}}"
