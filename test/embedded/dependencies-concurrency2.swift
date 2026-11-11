@@ -15,7 +15,6 @@ ___stack_chk_fail
 ___stack_chk_guard
 ___stdoutp
 __swift_concurrency_asyncMain
-__swift_concurrency_donateThreadToGlobalExecutorUntil
 __swift_concurrency_enqueueGlobal
 __swift_concurrency_enqueueMainExecutor
 __swift_concurrency_getMainExecutor

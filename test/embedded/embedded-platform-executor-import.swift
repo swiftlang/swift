@@ -90,14 +90,3 @@ func asyncMain() -> Never {
     }
   }
 }
-
-@c(_swift_concurrency_donateThreadToGlobalExecutorUntil)
-func donateThreadToGlobalExecutorUntil(
-    _ condition: @convention(c) (UnsafeMutableRawPointer?) -> Bool,
-    _ context: UnsafeMutableRawPointer?) {
-  while !condition(context) {
-    guard let job = queue else { return }
-    queue = nil
-    swift_job_runSynchronously(job, swift_executor_generic())
-  }
-}

@@ -63,15 +63,6 @@ void _swift_concurrency_enqueueMainExecutor(SwiftJob *job) {
   _swift_concurrency_enqueueGlobal(job);
 }
 
-void _swift_concurrency_donateThreadToGlobalExecutorUntil(
-    bool (*condition)(void *), void *conditionContext) {
-  while (!condition(conditionContext)) {
-    auto job = JobQueue.dequeue();
-    if (!job) return;
-    swift_job_runSynchronously(job, swift_executor_generic());
-  }
-}
-
 void _swift_concurrency_asyncMain(void) {
   while (true) {
     auto job = JobQueue.dequeue();

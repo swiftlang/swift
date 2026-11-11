@@ -35,21 +35,9 @@ void _swift_concurrency_enqueueGlobal(SwiftJob * EMBEDDED_SWIFT_NONNULL job);
  * An `async` main function calls this function after running its main task up
  * to the task's first suspension. The jobs it runs must include the ones
  * enqueued on the main executor. The main task ends the program by calling
- * `exit`.
+ * `_swift_exit`.
  */
 void _swift_concurrency_asyncMain(void) EMBEDDED_SWIFT_NORETURN;
-
-/**
- * Runs jobs from the global executor on the calling thread until
- * `condition(conditionContext)` returns `true`, or until no job is left.
- *
- * Support for this function is optional. Only
- * `swift_task_donateThreadToGlobalExecutorUntil` calls it, and an executor
- * that does not support it can define it to trap.
- */
-void _swift_concurrency_donateThreadToGlobalExecutorUntil(
-    bool (* EMBEDDED_SWIFT_NONNULL condition)(void * EMBEDDED_SWIFT_NULLABLE),
-    void * EMBEDDED_SWIFT_NULLABLE conditionContext);
 
 #if defined(__cplusplus)
 }

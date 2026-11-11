@@ -171,20 +171,3 @@ void _swift_concurrency_asyncMain(void) {
   }
 }
 
-/// Hand control of the current thread to the global executor until the
-/// condition function returns `true`.  Support for this function is optional,
-/// but you should assert or provide a dummy implementation if your executor
-/// does not support it.
-void _swift_concurrency_donateThreadToGlobalExecutorUntil(
-    bool (*condition)(void *), void *conditionContext) {
-  debug("executor: running until condition\n");
-  while (!condition(conditionContext)) {
-    SwiftJob *job = job_heap_pop();
-    if (!job)
-      return;
-    debug("executor: job %p running\n", job);
-    swift_job_runSynchronously(job, swift_executor_generic());
-  }
-  debug("executor: condition satisfied or no more jobs\n");
-}
-

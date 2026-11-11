@@ -257,8 +257,9 @@ SWIFT_CC(swift) static void
 swift_task_donateThreadToGlobalExecutorUntilOrig(bool (*condition)(void *),
                                                  void *context) {
 #if SWIFT_CONCURRENCY_EMBEDDED
-  return _swift_concurrency_donateThreadToGlobalExecutorUntil(condition,
-                                                              context);
+  swift_Concurrency_fatalError(
+      0, "swift_task_donateThreadToGlobalExecutorUntil() not supported in "
+         "Embedded Swift");
 #else
   return swift_task_donateThreadToGlobalExecutorUntilImpl(condition, context);
 #endif

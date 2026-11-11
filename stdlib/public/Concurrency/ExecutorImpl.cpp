@@ -78,12 +78,6 @@ void _swift_concurrency_asyncMain(void) {
   swift_task_asyncMainDrainQueueImpl();
 }
 
-extern "C" __attribute__((weak))
-void _swift_concurrency_donateThreadToGlobalExecutorUntil(
-    bool (*condition)(void *), void *conditionContext) {
-  swift_task_donateThreadToGlobalExecutorUntilImpl(condition, conditionContext);
-}
-
 #else
 
 extern "C" SWIFT_CC(swift) void swift_task_checkIsolatedImpl(
