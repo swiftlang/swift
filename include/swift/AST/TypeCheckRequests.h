@@ -3117,7 +3117,7 @@ public:
 class CompareDeclSpecializationRequest
     : public SimpleRequest<CompareDeclSpecializationRequest,
                            bool(DeclContext *, ValueDecl *, ValueDecl *, bool,
-                                bool, bool),
+                                bool, bool, bool),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -3128,7 +3128,7 @@ private:
   // Evaluation.
   bool evaluate(Evaluator &evaluator, DeclContext *DC, ValueDecl *VD1,
                 ValueDecl *VD2, bool dynamic, bool allowMissingConformances,
-                bool debugMode) const;
+                bool ignoreExecutionSemantics, bool debugMode) const;
 
 public:
   // Caching.
