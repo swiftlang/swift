@@ -371,12 +371,12 @@ func throwWithoutStore(array: [Int]) -> Int {
 // scope has ended.
 @available(SwiftStdlib 6.2, *)
 func spanInLogicalOr(_ s: String) -> Bool {
-  let span = s.utf8.span
+  let span = Array(s.utf8).span
   return span[0] == UInt8(ascii: "_") || span[0] == UInt8(ascii: "-")
 }
 
 @available(SwiftStdlib 6.2, *)
 func spanInLogicalAnd(_ s: String) -> Bool {
-  let span = s.utf8.span
+  let span = Array(s.utf8).span
   return span[0] == UInt8(ascii: "_") && span[1] == UInt8(ascii: "-")
 }
