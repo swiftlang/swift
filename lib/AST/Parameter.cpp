@@ -83,7 +83,17 @@ ParameterList *ParameterList::clone(const ASTContext &C,
       defaultArgKind = DefaultArgumentKind::None;
     }
 
+    auto *original = decl;
     decl = ParamDecl::cloneWithoutType(C, decl, defaultArgKind);
+
+    // A caller-side macro default is expanded from its source text, which
+    // isn't part of the clone.
+    if (defaultArgKind == DefaultArgumentKind::ExpressionMacro) {
+      SmallString<64> scratch;
+      decl->setDefaultValueStringRepresentation(C.AllocateCopy(
+          original->getDefaultValueStringRepresentation(scratch)));
+    }
+
     if (options & Implicit)
       decl->setImplicit();
 
