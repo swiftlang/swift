@@ -354,9 +354,7 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
      << TargetValueWitnessFlags<uint64_t>::IsNonInline << ")) {\n";
   os << "    vwt->destroy(reinterpret_cast<char *>(_buffer), _type);\n";
   os << "  } else {\n";
-  os << "    vwt->destroy(\n";
-  os << "        reinterpret_cast<char *>(swift_projectBox(_buffer[0])),\n";
-  os << "        _type);\n";
+  os << "    // Releasing the box destroys the value inside it.\n";
   os << "    swift_release(_buffer[0]);\n";
   os << "  }\n";
   os << "}\n\n";
