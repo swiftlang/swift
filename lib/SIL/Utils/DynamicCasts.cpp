@@ -800,6 +800,17 @@ swift::classifyDynamicCast(SILFunction *function,
       if (sourceClass->hasClangNode())
         return DynamicCastFeasibility::MaySucceed;
 
+      // The runtime bridges any Error-conforming value to NSError, so a cast to
+      // NSError succeeds if the source (or a subclass of it) conforms to Error.
+      //
+      // TODO: Cast to NSError succeeds always.
+      auto &ctx = M->getASTContext();
+      if (targetClass == ctx.getNSErrorDecl() &&
+          classifyDynamicCastToProtocol(
+              function, source, ctx.getErrorExistentialType(),
+              isWholeModuleOpts) != DynamicCastFeasibility::WillFail)
+        return DynamicCastFeasibility::MaySucceed;
+
       // As a backup, consider whether either type is a CF class type
       // with an NS bridged equivalent.
       CanType bridgedSource = getNSBridgedClassOfCFClass(source);
