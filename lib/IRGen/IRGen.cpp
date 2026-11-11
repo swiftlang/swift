@@ -430,7 +430,7 @@ void swift::performLLVMOptimizations(
                               Opts.VerifyEach, PrintPassOpts);
   SI.registerCallbacks(PIC, &MAM);
 
-  PassBuilder PB(TargetMachine, PTO, PGOOpt, &PIC, FS);
+  PassBuilder PB(Module->getContext(), TargetMachine, PTO, PGOOpt, &PIC, FS);
 
   // Attempt to load pass plugins and register their callbacks with PB.
   for (const auto &PluginFile : Opts.LLVMPassPlugins) {
