@@ -2302,12 +2302,11 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
   }
 
   // Make sure we are referring to a designated initializer.
-  auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
-                        apply->getSemanticFn());
-  if (!otherCtorRef)
+  auto *ctor = dyn_cast_or_null<ConstructorDecl>(
+      apply->getCalledValue(/*skipFunctionConversions=*/true));
+  if (!ctor)
     return false;
-  
-  auto ctor = otherCtorRef->getDecl();
+
   if (!ctor->isDesignatedInit()) {
     // A Swift subclass of a C++ FRT calls the base's imported constructor.
     // There is no designated initializer to chain to.
