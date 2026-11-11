@@ -266,6 +266,15 @@ public struct NoncopyableSelfAccessors : ~Copyable & ~Escapable {
     @_lifetime(&self)
     _modify
   }
+
+  // rdar://192215241: the compiler-generated '_modify' stores the getter's borrow of 'self' back into 'self'. It is
+  // not diagnosed in an interface, so existing interfaces with this pattern still build.
+  public var neComputedBorrowCopySetter: lifetime_depend_infer.NE {
+    @_lifetime(borrow self)
+    get
+    @_lifetime(self: copy newValue)
+    set
+  }
 }
 
 public struct NonEscapableMutableSelf : ~Swift.Escapable {
