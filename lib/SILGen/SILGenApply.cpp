@@ -28,6 +28,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
@@ -3411,12 +3412,22 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
         // that currently disrupts what the move checker expects. It would also
         // be valuable to borrow copyable global lets, but this is a targeted
         // fix to allow noncopyable globals to work properly.
+        // 
+        // rdar://192270068: Also proceed if the decl ref is to a mutable 
+        // variable.
+        // We end up with a non-LValueType DeclRef to a mutable variable 
+        // without a LoadExpr when a closure literal infers `consuming` from
+        // its type context, since the parameter specified is applied only after
+        // the closure body has been type checked.
         bool isGlobal = false;
+        bool isVar = false;
         if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
           isGlobal = vd->isGlobalStorage();
+          isVar = isa<ParamDecl>(vd)
+            && vd->getIntroducer() == VarDecl::Introducer::Var;
         }
         
-        if (!isGlobal) {
+        if (!isGlobal && !isVar) {
           return nullptr;
         }
       }
