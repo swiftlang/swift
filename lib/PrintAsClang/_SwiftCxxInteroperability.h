@@ -319,6 +319,17 @@ struct ExistentialTagTraits {
       !(... || std::is_same_v<Tags, NonCopyable>);
 };
 
+// --- Trailing witness-table storage ---
+//
+// The 0-table specialization is empty, so witness-less wrappers match Swift's
+// layout exactly (empty-base optimization contributes no size). Witness-table
+// copies go through the count-dispatched _copyWitnessTables helper on each
+// wrapper, since the 0-table base declares no member for a shared loop.
+template <size_t N> struct WitnessTableStorage {
+  const void *_Nonnull _witnessTables[N];
+};
+template <> struct WitnessTableStorage<0> {};
+
 // --- Conditional conversion to Any ---
 //
 // CRTP base for the implicit conversion to Any (SwiftExistentialType<>).
@@ -344,7 +355,10 @@ class SwiftExistentialType : public SwiftExistentialAnyConversion<
                                  SwiftExistentialType<Tags...>,
                                  (sizeof...(Tags) > 0 &&
                                      ExistentialTagTraits<Tags...>::
-                                         IsCopyable)> {
+                                         IsCopyable)>,
+                             private WitnessTableStorage<
+                                 ExistentialTagTraits<Tags...>::
+                                     NumWitnessTables> {
   using Traits = ExistentialTagTraits<Tags...>;
   static_assert((... && IsValidExistentialTag<Tags>::value),
       "SwiftExistentialType tags must be protocol tags (with a WitnessTable "
@@ -411,19 +425,35 @@ protected:
     return s->fn;
   }
 
+  // Witness-table copy through a count-dispatched helper: the 0-table
+  // storage base declares no member, so the loop cannot be shared.
+  template <size_t M = Traits::NumWitnessTables,
+            std::enable_if_t<(M > 0), int> = 0>
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _copyWitnessTables(const SwiftExistentialType &src) noexcept {
+    for (size_t i = 0; i < M; ++i)
+      this->_witnessTables[i] = src._witnessTables[i];
+  }
+  template <size_t M = Traits::NumWitnessTables,
+            std::enable_if_t<(M == 0), int> = 0>
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _copyWitnessTables(const SwiftExistentialType &) noexcept {}
+
   void *_Nonnull _buffer[3];
   void *_Nonnull _type;
-  const void *_Nonnull
-      _witnessTables[Traits::NumWitnessTables > 0 ? Traits::NumWitnessTables
-                                                  : 1];
 };
+
+static_assert(sizeof(SwiftExistentialType<>) == 4 * sizeof(void *),
+    "witness-less opaque existentials match Swift's {buffer, type} layout");
 
 // --- Class-bound existential container ---
 
 /// C++ wrapper for a Swift class-bound existential container.
 /// Layout: [class pointer][witness tables...]
 template <typename... Tags>
-class SwiftClassExistentialType {
+class SwiftClassExistentialType
+    : private WitnessTableStorage<
+          ExistentialTagTraits<Tags...>::NumWitnessTables> {
   using Traits = ExistentialTagTraits<Tags...>;
   static_assert((... && IsValidExistentialTag<Tags>::value),
       "SwiftClassExistentialType tags must be protocol tags (with a "
@@ -435,15 +465,13 @@ public:
       const SwiftClassExistentialType &other) noexcept
       : _value(other._value) {
     if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
-    for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
-      this->_witnessTables[i] = other._witnessTables[i];
+    _copyWitnessTables(other);
   }
   SWIFT_INLINE_THUNK SwiftClassExistentialType(
       SwiftClassExistentialType &&other) noexcept
       : _value(other._value) {
     other._value = nullptr;
-    for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
-      this->_witnessTables[i] = other._witnessTables[i];
+    _copyWitnessTables(other);
   }
   SWIFT_INLINE_THUNK SwiftClassExistentialType &
   operator=(const SwiftClassExistentialType &other) noexcept {
@@ -452,8 +480,7 @@ public:
       _value = other._value;
       if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
       if (old) swift_release(reinterpret_cast<void *_Nonnull>(old));
-      for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
-        this->_witnessTables[i] = other._witnessTables[i];
+      _copyWitnessTables(other);
     }
     return *this;
   }
@@ -463,8 +490,7 @@ public:
       if (_value) swift_release(reinterpret_cast<void *_Nonnull>(_value));
       _value = other._value;
       other._value = nullptr;
-      for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
-        this->_witnessTables[i] = other._witnessTables[i];
+      _copyWitnessTables(other);
     }
     return *this;
   }
@@ -484,8 +510,7 @@ protected:
   _initializeWithCopy(const SwiftClassExistentialType &src) noexcept {
     _value = src._value;
     if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
-    for (size_t i = 0; i < Traits::NumWitnessTables; ++i)
-      this->_witnessTables[i] = src._witnessTables[i];
+    _copyWitnessTables(src);
   }
 
   SWIFT_INLINE_PRIVATE_HELPER void *_Nonnull
@@ -510,11 +535,25 @@ protected:
     return s->fn;
   }
 
+  // Witness-table copy through a count-dispatched helper: the 0-table
+  // storage base declares no member, so the loop cannot be shared.
+  template <size_t M = Traits::NumWitnessTables,
+            std::enable_if_t<(M > 0), int> = 0>
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _copyWitnessTables(const SwiftClassExistentialType &src) noexcept {
+    for (size_t i = 0; i < M; ++i)
+      this->_witnessTables[i] = src._witnessTables[i];
+  }
+  template <size_t M = Traits::NumWitnessTables,
+            std::enable_if_t<(M == 0), int> = 0>
+  SWIFT_INLINE_PRIVATE_HELPER void
+  _copyWitnessTables(const SwiftClassExistentialType &) noexcept {}
+
   void *_Nullable _value;
-  const void *_Nonnull
-      _witnessTables[Traits::NumWitnessTables > 0 ? Traits::NumWitnessTables
-                                                  : 1];
 };
+
+static_assert(sizeof(SwiftClassExistentialType<>) == sizeof(void *),
+    "witness-less class existentials match Swift's single-word layout");
 
 #endif // SWIFT_CXX_EXISTENTIAL_INTEROP && __cplusplus >= 201703L
 

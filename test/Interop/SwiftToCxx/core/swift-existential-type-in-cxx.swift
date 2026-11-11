@@ -31,6 +31,7 @@
 // CHECK:     const SwiftExistentialType<Tags...> &src) noexcept {
 // CHECK:   _type = src._type;
 // CHECK:   _getVWT()->initializeBufferWithCopyOfBuffer(
+// CHECK:   _copyWitnessTables(src);
 // CHECK: }
 
 // CHECK: SwiftExistentialType<Tags...>::_initializeWithValue(
@@ -54,11 +55,13 @@
 // CHECK:     const SwiftExistentialType<Tags...> &other) noexcept
 // CHECK: static_assert(ExistentialTagTraits<Tags...>::IsCopyable,
 // CHECK:   _getVWT()->initializeBufferWithCopyOfBuffer(
+// CHECK:   _copyWitnessTables(other);
 // CHECK: }
 
 // CHECK: SwiftExistentialType<Tags...>::SwiftExistentialType(
 // CHECK:     SwiftExistentialType<Tags...> &&other) noexcept
 // CHECK:   _getVWT()->initializeBufferWithCopyOfBuffer(
+// CHECK:   _copyWitnessTables(other);
 // CHECK: }
 
 // CHECK: SwiftExistentialType<Tags...>::operator=(
@@ -66,12 +69,14 @@
 // CHECK: static_assert(ExistentialTagTraits<Tags...>::IsCopyable,
 // CHECK:     _destroyValue();
 // CHECK:     _getVWT()->initializeBufferWithCopyOfBuffer(
+// CHECK:     _copyWitnessTables(other);
 // CHECK: }
 
 // CHECK: SwiftExistentialType<Tags...>::operator=(
 // CHECK:     SwiftExistentialType<Tags...> &&other) noexcept {
 // CHECK:     _destroyValue();
 // CHECK:     _getVWT()->initializeBufferWithCopyOfBuffer(
+// CHECK:     _copyWitnessTables(other);
 // CHECK: }
 
 // CHECK: SwiftExistentialType<Tags...>::~SwiftExistentialType() noexcept {
