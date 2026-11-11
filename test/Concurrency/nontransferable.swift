@@ -302,3 +302,189 @@ func passClosureLiteralsToMainActor(nt: NonTransferable) {
   runOnMainNonisolated { [nt] in nt.use() }
   // expected-error@-1 {{capture of 'nt' with non-'Transferable' type 'NonTransferable' in a main actor-isolated closure}}
 }
+
+// A non-'Transferable' function value belongs to the isolation domain of the
+// context it's in, so a conversion can't make it run in another one.
+
+nonisolated(nonsending) func convertNonsendingToConcurrent() async {
+  let nt = NonTransferable()
+  let f: nonisolated(nonsending) @nontransferable () async -> Void = { nt.use() }
+  let g: @nontransferable @concurrent () async -> Void = f
+  // expected-error@-1 {{converting non-'Transferable' function value of type 'nonisolated(nonsending) @nontransferable () async -> Void' to '@nontransferable () async -> Void' would change its isolation}}
+  await g()
+}
+
+nonisolated(nonsending) func convertNonsendingParameterToConcurrent(
+  f: nonisolated(nonsending) @escaping @nontransferable () async -> Void
+) async {
+  let g: @nontransferable @concurrent () async -> Void = f
+  // expected-error@-1 {{converting non-'Transferable' function value of type 'nonisolated(nonsending) @nontransferable () async -> Void' to '@nontransferable () async -> Void' would change its isolation}}
+  await g()
+}
+
+func convertSynchronousToMainActor() async {
+  let nt = NonTransferable()
+  let f: @nontransferable () -> Void = { nt.use() }
+  let g: @MainActor @nontransferable () -> Void = f
+  // expected-error@-1 {{converting non-'Transferable' function value of type '@nontransferable () -> Void' to '@MainActor @nontransferable () -> Void' would change its isolation}}
+  await g()
+}
+
+@MainActor func convertNonsendingToConcurrentInMainActor() async {
+  let nt = NonTransferable()
+  let f: nonisolated(nonsending) @nontransferable () async -> Void = { nt.use() }
+  let g: @nontransferable @concurrent () async -> Void = f
+  // expected-error@-1 {{converting non-'Transferable' function value of type 'nonisolated(nonsending) @nontransferable () async -> Void' to '@nontransferable () async -> Void' would change its isolation}}
+  await g()
+}
+
+extension Storage {
+  func convertSynchronousToMainActor(f: @escaping @nontransferable () -> Void) {
+    let _: @MainActor @nontransferable () -> Void = f
+    // expected-error@-1 {{converting non-'Transferable' function value of type '@nontransferable () -> Void' to '@MainActor @nontransferable () -> Void' would change its isolation}}
+  }
+}
+
+func convertSynchronousToIsolatedAny(f: @escaping @nontransferable () -> Void) {
+  let _: @isolated(any) @nontransferable () -> Void = f
+  // expected-error@-1 {{converting non-'Transferable' function value of type '@nontransferable () -> Void' to '@isolated(any) @nontransferable () -> Void' would change its isolation}}
+}
+
+func convertNonsendingToMainActor(
+  f: nonisolated(nonsending) @escaping @nontransferable () async -> Void
+) {
+  let _: @MainActor @nontransferable () async -> Void = f
+  // expected-error@-1 {{converting non-'Transferable' function value of type 'nonisolated(nonsending) @nontransferable () async -> Void' to '@MainActor @nontransferable () async -> Void' would change its isolation}}
+}
+
+func convertInferredClosureToMainActor(nt: NonTransferable) {
+  let f = { nt.use() }
+  let _: @MainActor @nontransferable () -> Void = f
+  // expected-error@-1 {{converting non-'Transferable' function value of type '@nontransferable () -> ()' to '@MainActor @nontransferable () -> Void' would change its isolation}}
+}
+
+func convertUnappliedReferenceToMainActor(nt: NonTransferable) {
+  let _: @MainActor @nontransferable () -> Void = nt.use
+  // expected-error@-1 {{converting non-'Transferable' function value of type '@nontransferable () -> ()' to '@MainActor @nontransferable () -> Void' would change its isolation}}
+}
+
+// The conversion keeps the function in the isolation domain of its context.
+
+@MainActor func convertSynchronousToMainActorInMainActor(
+  f: @escaping @nontransferable () -> Void
+) {
+  let _: @MainActor @nontransferable () -> Void = f // Ok
+}
+
+func convertSynchronousToMainActorInMainActorClosure() {
+  _ = { @MainActor @nontransferable in
+    let nt = NonTransferable()
+    let f: @nontransferable () -> Void = { nt.use() }
+    let _: @MainActor @nontransferable () -> Void = f // Ok
+  }
+}
+
+// Closures in a main actor-isolated context are isolated to the main actor.
+@MainActor func convertInNestedClosuresOfMainActor() {
+  let outer = {
+    let inner = {
+      let nt = NonTransferable()
+      let f: @nontransferable () -> Void = { nt.use() }
+      let _: @MainActor @nontransferable () -> Void = f // Ok
+    }
+    inner()
+  }
+  outer()
+}
+
+func convertInAsyncClosureOfMainActorClosure() {
+  _ = { @MainActor in
+    let inner = { () async in
+      let nt = NonTransferable()
+      let f: @nontransferable () -> Void = { nt.use() }
+      let _: @nontransferable @concurrent () async -> Void = f
+      // expected-error@-1 {{converting non-'Transferable' function value of type '@nontransferable () -> Void' to '@nontransferable () async -> Void' would change its isolation}}
+    }
+    _ = inner
+  }
+}
+
+// A closure in an actor-isolated context is only isolated to the actor if it
+// captures 'self'.
+extension Storage {
+  func convertInAsyncClosureWithoutSelf() {
+    let outer = { () async in
+      let nt = NonTransferable()
+      let f: @nontransferable () -> Void = { nt.use() }
+      let _: @nontransferable @concurrent () async -> Void = f // Ok
+    }
+    _ = outer
+  }
+
+  func convertInAsyncClosureCapturingSelf() {
+    let outer = { () async in
+      _ = self
+      let nt = NonTransferable()
+      let f: @nontransferable () -> Void = { nt.use() }
+      let _: @nontransferable @concurrent () async -> Void = f
+      // expected-error@-1 {{converting non-'Transferable' function value of type '@nontransferable () -> Void' to '@nontransferable () async -> Void' would change its isolation}}
+    }
+    _ = outer
+  }
+
+  func convertInClosureWithoutSelfNestedInClosureCapturingSelf() {
+    let outer = { () async in
+      _ = self
+      let inner = { () async in
+        let nt = NonTransferable()
+        let f: @nontransferable () -> Void = { nt.use() }
+        let _: @nontransferable @concurrent () async -> Void = f // Ok
+      }
+      _ = inner
+    }
+    _ = outer
+  }
+
+  func convertInClosureCapturingSelfNestedInClosure() {
+    let outer = { () async in
+      let inner = { () async in
+        _ = self
+        let nt = NonTransferable()
+        let f: @nontransferable () -> Void = { nt.use() }
+        let _: @nontransferable @concurrent () async -> Void = f
+        // expected-error@-1 {{converting non-'Transferable' function value of type '@nontransferable () -> Void' to '@nontransferable () async -> Void' would change its isolation}}
+      }
+      _ = inner
+    }
+    _ = outer
+  }
+}
+
+// A nonisolated asynchronous function runs on the generic executor, like a
+// @concurrent one.
+func convertSynchronousToConcurrentInConcurrent() async {
+  let nt = NonTransferable()
+  let f: @nontransferable () -> Void = { nt.use() }
+  let g: @nontransferable @concurrent () async -> Void = f // Ok
+  await g()
+}
+
+func convertSynchronousToNonsending(f: @escaping @nontransferable () -> Void) {
+  let _: nonisolated(nonsending) @nontransferable () async -> Void = f // Ok
+}
+
+// A function with its own isolation keeps it when converted.
+
+func convertMainActorToConcurrent(
+  f: @escaping @MainActor @nontransferable () -> Void
+) async {
+  let g: @nontransferable @concurrent () async -> Void = f // Ok
+  await g()
+}
+
+@MainActor func convertConcurrentToNonsending(
+  f: @escaping @nontransferable @concurrent () async -> Void
+) async {
+  let g: nonisolated(nonsending) @nontransferable () async -> Void = f // Ok
+  await g()
+}

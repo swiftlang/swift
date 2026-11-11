@@ -6663,6 +6663,10 @@ ERROR(non_transferable_crosses_isolation,none,
 ERROR(non_transferable_isolated_capture,none,
       "capture of %1 with non-'Transferable' type %0 in a %2 closure",
       (Type, DeclName, ActorIsolation))
+ERROR(converting_non_transferable_func_changes_isolation,none,
+      "converting non-'Transferable' function value of type %0 to %1 would "
+      "change its isolation",
+      (Type, Type))
 GROUPED_ERROR(non_sendable_arg_exits_actor,NonSendableExitingActor,none,
       "non-Sendable type %0 cannot exit %2 context in call to nonisolated "
       "%kind1",

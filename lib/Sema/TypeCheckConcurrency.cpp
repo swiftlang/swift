@@ -2115,6 +2115,13 @@ static ActorIsolation getInnermostIsolatedContext(
   llvm_unreachable("covered switch");
 }
 
+/// Whether a function of type \p fnType runs in the isolation of its caller.
+static bool inheritsCallerIsolation(const AnyFunctionType *fnType) {
+  auto isolation = fnType->getIsolation();
+  return isolation.isNonisolatedNonsending() ||
+         (isolation.isNonIsolated() && !fnType->isAsync());
+}
+
 AbstractFunctionDecl *swift::enclosingUnsafeInheritsExecutor(
     const DeclContext *dc) {
   for (; dc; dc = dc->getParent()) {
@@ -2747,6 +2754,39 @@ namespace {
       return false;
     }
 
+    /// Whether converting a function value of type \p fromType that is used in
+    /// the current context to \p toType makes it run outside of the isolation
+    /// domain of this context.
+    bool conversionChangesIsolation(const FunctionType *fromType,
+                                    const FunctionType *toType) {
+      // Unless it runs in the isolation of its caller, a function keeps its
+      // isolation through a conversion.
+      if (!inheritsCallerIsolation(fromType) || inheritsCallerIsolation(toType))
+        return false;
+
+      auto *dc = getDeclContext();
+      auto contextIsolation =
+          getInnermostIsolatedContext(dc, getClosureActorIsolation);
+      auto toIsolation = toType->getIsolation();
+      switch (toIsolation.getKind()) {
+      case FunctionTypeIsolation::Kind::GlobalActor:
+        return !(contextIsolation.isGlobalActor() &&
+                 contextIsolation.getGlobalActor()->isEqual(
+                     toIsolation.getGlobalActorType()));
+
+      case FunctionTypeIsolation::Kind::NonIsolated:
+        return !isNonisolatedConcurrentContext(dc);
+
+      // Where these run is only known dynamically.
+      case FunctionTypeIsolation::Kind::Erased:
+      case FunctionTypeIsolation::Kind::Parameter:
+        return true;
+
+      case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
+        ABORT("runs in the isolation of its caller");
+      }
+    }
+
     /// Some function conversions synthesized by the constraint solver may not
     /// be correct AND the solver doesn't know, so we must emit a diagnostic.
     void checkFunctionConversion(ImplicitConversionExpr *funcConv,
@@ -2799,6 +2839,17 @@ namespace {
         if (auto toFnType = toType->getAs<FunctionType>()) {
           auto fromIsolation = fromFnType->getIsolation();
           auto toIsolation = toFnType->getIsolation();
+
+          // A non-'Transferable' function value belongs to the isolation
+          // domain of the current context.
+          if (fromFnType->isNonTransferable() &&
+              conversionChangesIsolation(fromFnType, toFnType)) {
+            ctx.Diags.diagnose(
+                funcConv->getLoc(),
+                diag::converting_non_transferable_func_changes_isolation,
+                fromType, toType);
+            return;
+          }
 
           if (auto fromActor = fromFnType->getGlobalActor()) {
             if (!toFnType->hasGlobalActor()) {
@@ -3095,6 +3146,15 @@ namespace {
       expr->setImplicitlyAsync();
     }
 
+    /// Whether code in \p dc is asynchronous and isolated neither to an actor
+    /// nor to its caller, so it runs on the generic executor.
+    bool isNonisolatedConcurrentContext(const DeclContext *dc) {
+      auto isolation = getActorIsolationOfContext(
+          const_cast<DeclContext *>(dc), getClosureActorIsolation);
+      return !isolation.isActorIsolated() &&
+             !isolation.isNonisolatedNonsending() && dc->isAsyncContext();
+    }
+
     /// Whether \p closure runs in the isolation context that it is formed in.
     bool isSameIsolationContextAsParent(AbstractClosureExpr *closure) {
       auto closureIsolation =
@@ -3113,12 +3173,8 @@ namespace {
       if (closureIsolation.isActorIsolated())
         return closureIsolation == parentIsolation;
 
-      // An asynchronous nonisolated closure runs on the generic executor, like
-      // an asynchronous function that is isolated neither to an actor nor to
-      // its caller.
-      return !parentIsolation.isActorIsolated() &&
-             !parentIsolation.isNonisolatedNonsending() &&
-             parent->isAsyncContext();
+      // An asynchronous nonisolated closure runs on the generic executor.
+      return isNonisolatedConcurrentContext(parent);
     }
 
     /// A non-'Transferable' value can't change its isolation domain, so a
