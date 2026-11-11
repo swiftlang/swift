@@ -1937,7 +1937,7 @@ SILGenFunction::emitInitializationForVarDecl(VarDecl *vd, bool forceImmutable,
     assert(SILDebugClient && "Debugger client doesn't support SIL");
     SILValue SV = SILDebugClient->emitLValueForVariable(vd, B);
 
-    VarLocs[vd] = VarLoc(SV, SILAccessEnforcement::Dynamic);
+    VarLocs[vd] = VarLoc(SV, SILAccessEnforcement::Unsafe);
     return InitializationPtr(new KnownAddressInitialization(SV));
   }
 
