@@ -879,9 +879,6 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
               getAnalysis<DominanceAnalysis>()->get(F));
     verifyAnalyses(F);
     runMandatoryVerification(F);
-  } else if (getOptions().VerifyOwnershipAll &&
-             (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
-    runMandatoryVerification(F);
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
                                                   SILVerifyAfterPass.end(),

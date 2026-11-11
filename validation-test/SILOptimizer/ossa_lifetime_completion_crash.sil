@@ -23,7 +23,7 @@ class C {}
 // CHECK: Invalid SIL provided to OSSACompleteLifetime?!
 // CHECK: Something that ran before OSSACompleteLifetime (the current pass, an earlier pass, SILGen) has introduced a leak of this value.
 // CHECK: Please rerun the crashing swift-frontend command with the following flags added and file a bug with the output:
-// CHECK: -sil-ownership-verify-all -Xllvm '-sil-print-function=leak_c' -Xllvm -sil-print-types -Xllvm -sil-print-module-on-error
+// CHECK: -sil-verify-all -Xllvm '-sil-print-function=leak_c' -Xllvm -sil-print-types -Xllvm -sil-print-module-on-error
 // CHECK: Use the -Xllvm -disable-sil-ownership-verification frontend flags to disable this check.
 // CHECK: Invalid lifetime of value whose availability boundary is being visited.
 sil [ossa] @leak_c : $@convention(thin) (@owned C) -> () {

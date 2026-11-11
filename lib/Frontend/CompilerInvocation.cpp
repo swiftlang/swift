@@ -3498,7 +3498,6 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.VerifyAll |= Args.hasArg(OPT_sil_verify_all);
   Opts.VerifyNone |= Args.hasArg(OPT_sil_verify_none);
-  Opts.VerifyOwnershipAll |= Args.hasArg(OPT_sil_ownership_verify_all);
   Opts.AbortOnUnknownRegionIsolationPatternError |=
       Args.hasArg(OPT_sil_region_isolation_assert_on_unknown_pattern);
   Opts.EmitIsolationHistory |=

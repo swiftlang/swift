@@ -362,7 +362,7 @@ void AvailabilityBoundaryVisitor::computeRegion(
                "value.\n"
             << "Please rerun the crashing swift-frontend command with the "
                "following flags added and file a bug with the output:\n"
-            << "-sil-ownership-verify-all -Xllvm '-sil-print-function="
+            << "-sil-verify-all -Xllvm '-sil-print-function="
             << block->getFunction()->getName()
             << "' -Xllvm -sil-print-types -Xllvm -sil-print-module-on-error\n";
         llvm::errs() << "Use the -Xllvm -disable-sil-ownership-verification "

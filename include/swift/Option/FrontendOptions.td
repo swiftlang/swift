@@ -1168,9 +1168,6 @@ def sil_verify_all : Flag<["-"], "sil-verify-all">,
 def sil_verify_none : Flag<["-"], "sil-verify-none">,
   HelpText<"Completely disable SIL verification">;
 
-def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
-  HelpText<"Verify ownership after each transform">;
-
 def sil_region_isolation_assert_on_unknown_pattern :
   Flag<["-"], "sil-region-isolation-assert-on-unknown-pattern">,
   HelpText<"Abort if SIL region isolation detects an unknown pattern. "
