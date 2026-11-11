@@ -20,6 +20,7 @@
 
 #include "NecessaryBindings.h"
 #include "StructLayout.h"
+#include "TypeLayout.h"
 
 namespace llvm {
   class Constant;
@@ -256,10 +257,14 @@ IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 /// The header at the start of an allocation.
 enum class HeapHeaderKind { None, Swift, ObjC };
 
+/// Compute the typed memory descriptor of an allocation laid out as
+/// `fieldTypes`, followed by a union of `tailElementTypes` if it isn't empty.
 std::optional<uint64_t>
 computeTypedMallocTypeDescriptor(IRGenModule &IGM, HeapHeaderKind header,
                                  llvm::SmallVectorImpl<SILType> &fieldTypes,
-                                 bool isArray = false);
+                                 TypedMemoryCallsiteFlags callsiteFlags =
+                                     TypedMemoryCallsiteFlags::FixedSize,
+                                 ArrayRef<SILType> tailElementTypes = {});
 
 } // end namespace irgen
 } // end namespace swift

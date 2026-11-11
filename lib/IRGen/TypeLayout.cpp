@@ -1389,6 +1389,13 @@ bool ScalarTypeLayoutEntry::computeLayoutSemantics(
     }
     break;
   case ScalarKind::Immovable:
+    // Builtin.UnsafeValueBuffer, the only fixed-size immovable type: a
+    // ValueBuffer of pointer-sized words (e.g. an exclusivity access record).
+    for (Size offset; offset < size; offset += IGM.getPointerSize())
+      layoutProperties.push_back(
+          {currentOffset + offset.getValue(), IGM.getPointerSize().getValue(),
+           TypedMemoryLayoutSemantics::AnonymousPointer});
+    break;
   case ScalarKind::BlockStorage:
     return false;
   }

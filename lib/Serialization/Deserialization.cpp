@@ -6977,6 +6977,25 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
+      case decls_block::TailAllocated_DECL_ATTR: {
+        bool isImplicit;
+        IdentifierID countsNameID;
+        DeclID countsDeclID;
+        ArrayRef<uint64_t> typeIDs;
+        serialization::decls_block::TailAllocatedDeclAttrLayout::readRecord(
+            scratch, isImplicit, countsNameID, countsDeclID, typeIDs);
+        SmallVector<Type, 3> types;
+        for (auto typeID : typeIDs) {
+          auto type = MF.getTypeChecked(typeID);
+          if (!type)
+            return type.takeError();
+          types.push_back(type.get());
+        }
+        Attr = TailAllocatedAttr::create(ctx, MF.getIdentifier(countsNameID),
+                                         types, isImplicit, &MF, countsDeclID);
+        break;
+      }
+
       case decls_block::TypeEraser_DECL_ATTR: {
         bool isImplicit;
         TypeID typeEraserID;
@@ -9783,6 +9802,11 @@ AbstractFunctionDecl *
 ModuleFile::loadReferencedFunctionDecl(const DerivativeAttr *DA,
                                        uint64_t contextData) {
   return cast<AbstractFunctionDecl>(getDecl(contextData));
+}
+
+VarDecl *ModuleFile::loadTailAllocatedCountsDecl(const TailAllocatedAttr *attr,
+                                                 uint64_t contextData) {
+  return cast<VarDecl>(getDecl(contextData));
 }
 
 ValueDecl *ModuleFile::loadTargetFunctionDecl(

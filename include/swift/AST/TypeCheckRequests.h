@@ -4042,6 +4042,48 @@ public:
   void cacheResult(Type value) const;
 };
 
+/// Resolves the element types of a `@_tailAllocated` attribute in the context
+/// of the class it is attached to.
+class ResolveTailAllocatedTypesRequest
+    : public SimpleRequest<ResolveTailAllocatedTypesRequest,
+                           ArrayRef<Type>(ClassDecl *, TailAllocatedAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Type> evaluate(Evaluator &evaluator, ClassDecl *owner,
+                          TailAllocatedAttr *attr) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<ArrayRef<Type>> getCachedResult() const;
+  void cacheResult(ArrayRef<Type> value) const;
+};
+
+/// Finds the counts property named by a `@_tailAllocated` attribute.
+class TailAllocatedCountsDeclRequest
+    : public SimpleRequest<TailAllocatedCountsDeclRequest,
+                           VarDecl *(ClassDecl *, TailAllocatedAttr *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  VarDecl *evaluate(Evaluator &evaluator, ClassDecl *owner,
+                    TailAllocatedAttr *attr) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
 /// Determines whether this is a "simple" didSet i.e one that either does not
 /// use the implicit oldValue parameter in the body or does not take an explicit
 /// parameter (ex: 'didSet(oldValue)').

@@ -127,6 +127,9 @@ internal var _emptyArrayStorage: __EmptyArrayStorage {
 }
 
 // The class that implements the storage for a ContiguousArray<Element>
+#if hasFeature(TailAllocatedAttribute)
+@_tailAllocated(counts: _tailCount, types: Element)
+#endif
 @_fixed_layout
 @usableFromInline
 internal final class _ContiguousArrayStorage<
@@ -307,6 +310,12 @@ internal final class _ContiguousArrayStorage<
   internal final var _elementPointer: UnsafeMutablePointer<Element> {
     return unsafe UnsafeMutablePointer(Builtin.projectTailElems(self, Element.self))
   }
+
+#if hasFeature(TailAllocatedAttribute)
+  /// The number of elements allocated, for typed deallocation.
+  @export(implementation)
+  internal final var _tailCount: Int { countAndCapacity.capacity }
+#endif
 }
 
 @export(implementation)

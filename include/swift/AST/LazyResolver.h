@@ -32,6 +32,7 @@ class NormalProtocolConformance;
 class ProtocolConformance;
 class ProtocolDecl;
 class ProtocolTypeAlias;
+class TailAllocatedAttr;
 class TypeDecl;
 class ValueDecl;
 class VarDecl;
@@ -154,6 +155,10 @@ public:
   /// Returns the type for a given @_typeEraser() attribute.
   virtual Type loadTypeEraserType(const TypeEraserAttr *TRA,
                                   uint64_t contextData) = 0;
+
+  /// Returns the counts property for a given @_tailAllocated attribute.
+  virtual VarDecl *loadTailAllocatedCountsDecl(const TailAllocatedAttr *attr,
+                                               uint64_t contextData) = 0;
 
   // Returns the target parameter of the `@_specialize` attribute or null.
   virtual ValueDecl *loadTargetFunctionDecl(const AbstractSpecializeAttr *attr,

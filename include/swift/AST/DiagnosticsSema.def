@@ -4638,6 +4638,26 @@ ERROR(attr_incompatible_with_attr,none,
       "%0 cannot be used with %1",
       (DeclAttribute, DeclAttribute))
 
+ERROR(attr_tail_allocated_requires_embedded,none,
+      "'@_tailAllocated' is only supported in Embedded Swift", ())
+ERROR(tail_allocated_init_allocation,none,
+      "%0 has '@_tailAllocated' and must be allocated with "
+      "'Builtin.allocWithTailElems', not an initializer", (Type))
+ERROR(attr_tail_allocated_actor,none,
+      "'@_tailAllocated' cannot be used on an actor", ())
+ERROR(attr_tail_allocated_inherited,none,
+      "'@_tailAllocated' cannot be used on %0 because its superclass %1 "
+      "already has it", (const ClassDecl *, const ClassDecl *))
+ERROR(attr_tail_allocated_counts_property,none,
+      "'@_tailAllocated' counts property %0 must be a 'final' instance property "
+      "of %1 of type %2 (one 'Int' per element type), not 'async' or 'throws'",
+      (Identifier, const ClassDecl *, Type))
+ERROR(attr_tail_allocated_counts_not_visible,none,
+      "'@_tailAllocated' counts property %0 must be %select{'public' or "
+      "'@usableFromInline'|'package', 'public' or '@usableFromInline'}2 "
+      "because %1 is %select{public|package}2",
+      (Identifier, const ClassDecl *, bool))
+
 ERROR(attr_target_empty_string,none,
       "'@_target' requires a non-empty target string", ())
 
