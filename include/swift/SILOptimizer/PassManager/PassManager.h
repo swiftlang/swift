@@ -411,6 +411,13 @@ public:
   /// Runs runMandatoryVerification on all functions of the module.
   void runMandatoryModuleVerification();
 
+  /// Runs the SILVerifier (SILFunction::verify) and runMandatoryVerification.
+  void runVerification(SILFunction *f);
+
+  /// Runs the SILVerifier on the module (SILModule::verify) and
+  /// runMandatoryModuleVerification.
+  void runModuleVerification();
+
   /// Returns false if the mandatory verification is disabled for \p f, e.g.
   /// with `-sil-verify-none` or `-disable-swift-verification`.
   static bool isMandatoryVerificationEnabled(SILFunction *f);

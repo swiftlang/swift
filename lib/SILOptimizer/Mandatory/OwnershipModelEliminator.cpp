@@ -936,14 +936,11 @@ struct OwnershipModelEliminator : SILModuleTransform {
             "Found verification error when verifying before lowering "
             "ownership. Please re-run with -sil-verify-all to identify the "
             "actual pass that introduced the verification error.");
-        f.verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache(),
-                 /*dominanceInfo=*/nullptr, /*SingleFunction=*/true,
-                 /*checkLinearLifetime=*/false);
         // The mandatory verification checks linear lifetimes and additional
         // OSSA invariants, such as borrowed-from and reborrow flags. In
         // contrast to the SIL verifier, it also runs in compilers built without
         // assertions.
-        getPassManager()->runMandatoryVerification(&f);
+        getPassManager()->runVerification(&f);
       }
 
       if (stripOwnership(f)) {
