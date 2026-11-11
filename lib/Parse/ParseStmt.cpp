@@ -462,6 +462,11 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
       else if (!allowTopLevelCode()) {
         diagnose(StartLoc, isa<Stmt *>(Result) ? diag::illegal_top_level_stmt
                                                : diag::illegal_top_level_expr);
+        // Explain where top-level code is allowed, but only once per file.
+        if (!DiagnosedTopLevelCodeMainFileNote) {
+          DiagnosedTopLevelCodeMainFileNote = true;
+          diagnose(StartLoc, diag::top_level_code_main_file);
+        }
       }
 
       if (!Result.isNull()) {

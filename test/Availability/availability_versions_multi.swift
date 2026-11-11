@@ -4,6 +4,7 @@
 func callToEnsureNotInScriptMode() { }
 // Add an expected error to express expectation that we're not in script mode
 callToEnsureNotInScriptMode() // expected-error {{expressions are not allowed at the top level}}
+// expected-note@-1 {{top-level code is only allowed in 'main.swift'}}
 
 @available(OSX, introduced: 10.9)
 var globalAvailableOn10_9: Int = 9
