@@ -1317,6 +1317,10 @@ bool diagnoseInvalidFunctionType(FunctionType *fnTy, SourceLoc loc,
                                  std::optional<FunctionTypeRepr *> repr,
                                  DeclContext *dc,
                                  std::optional<TypeResolutionStage> stage);
+
+/// Emits diagnostics if '_AnyReference' is spelled without the experimental
+/// feature 'AnyReference' enabled. Returns true if a diagnostic was emitted.
+bool diagnoseExperimentalAnyReference(SourceLoc loc, const DeclContext *dc);
 } // namespace TypeChecker
 
 /// Returns the protocol requirement kind of the given declaration.
