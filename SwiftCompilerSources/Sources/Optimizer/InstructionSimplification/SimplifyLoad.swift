@@ -60,7 +60,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
        uac.fromAddress.type.isTrivial(in: parentFunction) ==
          uac.type.isTrivial(in: parentFunction) {
 
-      operand.set(to: uac.fromAddress, context)
+      addressOperand.set(to: uac.fromAddress, context)
       let builder = Builder(before: self, context)
       let newLoad = builder.createLoad(fromAddress: uac.fromAddress, ownership: loadOwnership)
       let cast = builder.createUpcast(from: newLoad, to: type)

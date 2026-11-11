@@ -1,0 +1,40 @@
+// RUN: %target-sil-opt %s -onone-simplification -simplify-instruction=unchecked_ownership | %FileCheck %s
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=unchecked_ownership | %FileCheck %s
+
+import Swift
+import Builtin
+
+class B { }
+
+sil_global private @gobj : $B = {
+  %initval = object $B ()
+}
+
+// A `global_value` refers to a statically allocated object and therefore has "none" ownership.
+// The ownership conversion to "none" is a no-op and can be removed.
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_of_value_without_ownership :
+// CHECK:         [[G:%.*]] = global_value @gobj
+// CHECK-NOT:     unchecked_ownership
+// CHECK:         fix_lifetime [[G]]
+// CHECK:       } // end sil function 'unchecked_ownership_of_value_without_ownership'
+sil [ossa] @unchecked_ownership_of_value_without_ownership : $@convention(thin) () -> () {
+bb0:
+  %0 = global_value @gobj : $B
+  %1 = unchecked_ownership %0, forwarding: @none
+  fix_lifetime %1
+  %r = tuple ()
+  return %r
+}
+
+// The operand is owned, i.e. it needs a lifetime. The conversion must not be removed.
+// CHECK-LABEL: sil [ossa] @unchecked_ownership_of_owned_value :
+// CHECK:         unchecked_ownership %0
+// CHECK:       } // end sil function 'unchecked_ownership_of_owned_value'
+sil [ossa] @unchecked_ownership_of_owned_value : $@convention(thin) (@owned B) -> () {
+bb0(%0 : @owned $B):
+  %1 = unchecked_ownership %0, forwarding: @none
+  fix_lifetime %1
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}

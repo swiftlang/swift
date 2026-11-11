@@ -82,7 +82,7 @@ static SILValue getArrayStructPointer(ArrayCallKind K, SILValue Array) {
       return li->getOperand();
     }
     if (auto *lbi = dyn_cast<LoadBorrowInst>(a)) {
-      return lbi->getOperand();
+      return lbi->getAddress();
     }
     return Array;
   }

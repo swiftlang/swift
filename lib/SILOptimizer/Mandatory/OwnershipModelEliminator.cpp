@@ -213,6 +213,11 @@ struct OwnershipModelEliminatorVisitor
     return true;
   }
 
+  bool visitUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
+    eraseInstructionAndRAUW(uoi, uoi->getOperand());
+    return true;
+  }
+
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *urvi);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *urvi);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *uavi);
@@ -328,16 +333,20 @@ bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
 }
 
 bool OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  // Break down the load borrow into an unqualified load.
-  auto newLoad =
-      withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
-        return b.createLoad(loc, lbi->getOperand(),
-                            LoadOwnershipQualifier::Unqualified);
-      });
+  SILValue newValue;
+  if (lbi->hasValueHint()) {
+    newValue = lbi->getValueHint();
+  } else {
+    // Break down the load borrow into an unqualified load.
+    newValue = withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
+          return b.createLoad(loc, lbi->getAddress(),
+                              LoadOwnershipQualifier::Unqualified);
+        });
+  }
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
-  eraseInstructionAndRAUW(lbi, newLoad);
+  eraseInstructionAndRAUW(lbi, newValue);
   return true;
 }
 

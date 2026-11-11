@@ -507,6 +507,7 @@ isTransitiveSafeUser(SILInstruction *I) {
   case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
     return I->getResults();
   default:
     return std::nullopt;
@@ -637,6 +638,13 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
 
   if (isa<EndBorrowInst>(UseInst))
     return true;
+
+  // The value hint of a `load_borrow` (inserted by RedundantLoadElimination)
+  // is not a real use.
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(UseInst)) {
+    if (lbi->hasValueHint() && lbi->getValueHint() == ArrayVal)
+      return true;
+  }
 
   if (UseInst->isDebugInstruction())
     return true;

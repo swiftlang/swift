@@ -836,6 +836,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       }
     case let ap as ApplyInst:
       return walkUpApplyResult(apply: ap, path: path.with(knownType: nil))
+    // TODO: replace with `case let load as LoadInstruction` once we have fast-casts on the host compiler
     case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       if !followLoads(at: path) {
         // When walking up we shouldn't end up at a load where followLoads is false,
@@ -845,7 +846,7 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         //   %a = pointer_to_address %l           // the up-walk starts at %a
         return isEscaping
       }
-      return walkUp(address: (def as! UnaryInstruction).operand.value,
+      return walkUp(address: (def as! LoadInstruction).address,
                     path: path.with(followStores: true).with(knownType: nil))
     case let atp as AddressToPointerInst:
       return walkUp(address: atp.address, path: path.with(knownType: nil))

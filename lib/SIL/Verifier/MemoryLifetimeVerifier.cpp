@@ -899,7 +899,7 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           locations.clearBits(bits, sbi->getDest());
         } else if (auto *lbi = dyn_cast<LoadBorrowInst>(ebi->getOperand())) {
           if (!lbi->isUnchecked()) {
-            requireBitsSet(bits, lbi->getOperand(), &I);
+            requireBitsSet(bits, lbi->getAddress(), &I);
           }
         }
         break;

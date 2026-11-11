@@ -861,9 +861,10 @@ In OSSA the ownership kind specifies how to handle ownership:
 ### load_borrow
 
 ```
-sil-instruction ::= 'load_borrow' sil-value
+sil-instruction ::= 'load_borrow' sil-value (',' 'value_hint' sil-operand)?
 
 %1 = load_borrow %0 : $*T
+%3 = load_borrow %0 : $*T, value_hint %2 : $T
 // $T must be a loadable type
 ```
 
@@ -875,6 +876,30 @@ instruction. All [load_borrow](#load_borrow) instructions must be paired
 with exactly one [end_borrow](#end_borrow) instruction along any path
 through the program. Until [end_borrow](#end_borrow), it is illegal to
 invalidate or store to `%0`.
+
+The optional `value_hint` operand states that the loaded value is exactly
+the value of the `value_hint` operand (`%2`), i.e. memory location `%0`
+contains `%2` at the point of the `load_borrow`. Its type must match the
+result type of the `load_borrow`.
+
+This is useful if the `load_borrow` cannot be replaced by the `value_hint`
+in OSSA, because that would violate ownership rules. For example, if the
+`value_hint` is consumed (e.g. by a `store`) before the `load_borrow`:
+
+```
+store %2 to [init] %0 : $*T      // consumes %2
+...
+%3 = load_borrow %0 : $*T, value_hint %2 : $T
+```
+
+The `value_hint` operand is not an ownership use: it does not require
+`%2` to be alive at the `load_borrow` and does not extend its lifetime.
+However, `%2` must dominate the `load_borrow`.
+
+Once OSSA is lowered, the `load_borrow` is replaced by the `value_hint`
+instead of being lowered to a `load`.
+
+The `value_hint` is purely an optimization hint and can always be dropped.
 
 ### store_borrow
 
@@ -1190,13 +1215,45 @@ This is only valid in Raw SIL.
 ### unchecked_ownership
 
 ```
-sil-instruction ::= 'unchecked_ownership' sil-operand
+sil-instruction ::= 'unchecked_ownership' sil-operand (',' 'forwarding' ':' sil-value-ownership-kind)?
 
-unchecked_ownership %1 : $T
+%1 = unchecked_ownership %0 : $T
+%2 = unchecked_ownership %0 : $T, forwarding: @none
 ```
 
-unchecked_ownership disables the ownership verification of it's operand. This used in cases 
-we cannot resolve ownership until a mandatory pass runs. This is only valid in Raw SIL. 
+Produces a value `%1` which is the same value as the operand `%0` but
+"breaks" the ownership chain between the two. The operand is not an ownership
+use (it is a non-use, like a type-dependent operand), so the ownership verifier
+and OSSA utilities, like liveness computations, don't connect uses of the
+result with the operand. In particular, uses of the result are not required to
+be within the lifetime or borrow scope of the operand.
+
+The ownership of the result is the forwarding ownership kind of the
+instruction. By default it's the ownership kind of the operand. It can be set
+explicitly with the `forwarding:` attribute, e.g. `@none` to make the result
+a value without ownership, even if its type is not trivial.
+
+The instruction is only valid in OSSA.
+
+It's the responsibility of the code which creates `unchecked_ownership` to
+ensure that the program is still correct after the ownership model eliminator
+replaced the result with the operand. In particular, the result must only be
+used at places where the value is known to be alive at runtime, even if it is
+not alive in terms of OSSA (e.g. because it's still stored in memory).
+
+How `unchecked_ownership` can be used depends on the forwarding ownership:
+
+* With `@none` forwarding, the result is a value without ownership, which has
+  no lifetime or scope which OSSA utilities and optimizations have to respect.
+
+* With `@guaranteed` or `@owned` forwarding, the result has a lifetime or
+  borrow scope which is not connected with the operand. OSSA optimizations
+  cannot handle this correctly. Therefore, it's only used in raw SIL, in cases
+  where the ownership cannot be resolved until a mandatory pass runs. For
+  example, SILGen produces the result of a borrow accessor inside a local borrow
+  scope and uses `unchecked_ownership` to return it outside that scope. A
+  mandatory pass then removes the `unchecked_ownership` and introduces a
+  `return_borrow`.
 
 ### copy_addr
 

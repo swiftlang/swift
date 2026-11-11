@@ -3140,11 +3140,15 @@ public:
     require(LBI->getType().isObject(), "Result of load must be an object");
     require(LBI->getType().isLoadableOrOpaque(*LBI->getFunction()),
             "Load must have a loadable type");
-    require(LBI->getOperand()->getType().isAddress(),
+    require(LBI->getAddress()->getType().isAddress(),
             "Load operand must be an address");
-    requireSameType(LBI->getOperand()->getType().getObjectType(),
+    requireSameType(LBI->getAddress()->getType().getObjectType(),
                     LBI->getType(),
                     "Load operand type and result type mismatch");
+    if (LBI->hasValueHint()) {
+      requireSameType(LBI->getValueHint()->getType(), LBI->getType(),
+                      "Load value-hint type and result type mismatch");
+    }
     require(F.getFunctionStage() == SILStage::Raw || !LBI->isUnchecked(),
             "load_borrow's unchecked bit is on");
   }
@@ -7303,8 +7307,8 @@ public:
   }
 
   void checkUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
-    require(F.getFunctionStage() == SILStage::Raw,
-            "unchecked_ownership is valid only in raw SIL");
+    require(F.hasOwnership(),
+            "unchecked_ownership is valid only in OSSA");
   }
 
   void checkAllocPackMetadataInst(AllocPackMetadataInst *apmi) {
