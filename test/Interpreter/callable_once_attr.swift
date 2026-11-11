@@ -629,3 +629,53 @@ func makeTag() -> String { "thunk" }
 
 // CHECK-NEXT: thunk
 print(genericCallAtMostOnce(makeTag))
+
+struct Failure: Error {}
+
+@inline(never)
+func callThrowing(_ fn: @callable(once) () throws -> Void) throws {
+  try fn()
+}
+
+func testThrowingCapture(_ tag: String) {
+  let t = Tracker(tag)
+  do {
+    try callThrowing {
+      print("throwing from \(t.tag)")
+      throw Failure()
+    }
+  } catch {
+    print("caught")
+  }
+}
+
+// CHECK-NEXT: throwing from throwing capture
+// CHECK-NEXT: caught
+// CHECK-NEXT: Tracker(throwing capture) deinit
+testThrowingCapture("throwing capture")
+
+@inline(__always)
+func callThrowingInlined(_ fn: @callable(once) () throws -> Int) throws -> Int {
+  try fn()
+}
+
+@inline(never)
+func testInlinedThrowingCapture(_ shouldThrow: Bool, _ tag: String) {
+  let t = Tracker(tag)
+  do {
+    let r = try callThrowingInlined {
+      if shouldThrow { throw Failure() }
+      return t.tag.count
+    }
+    print("returned \(r)")
+  } catch {
+    print("caught")
+  }
+}
+
+// CHECK-NEXT: caught
+// CHECK-NEXT: Tracker(inlined throw) deinit
+testInlinedThrowingCapture(true, "inlined throw")
+// CHECK-NEXT: returned 14
+// CHECK-NEXT: Tracker(inlined return) deinit
+testInlinedThrowingCapture(false, "inlined return")
