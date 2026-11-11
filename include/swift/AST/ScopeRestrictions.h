@@ -18,6 +18,7 @@
 #define SWIFT_AST_SCOPERESTRICTIONS_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/RecursiveTypeProperties.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Located.h"
@@ -309,6 +310,13 @@ public:
       return forBody(ScopeDepth(getDepth().Value + by.Value));
     }
     llvm_unreachable("unhandled kind");
+  }
+
+  /// Return the recursive properties that would apply to a type
+  /// with this scope reference as a component.
+  RecursiveTypeProperties getRecursiveProperties() const {
+    // TODO
+    return {};
   }
 
   /// Prints `^depth.index`, `^depth.body`, or `immortal`.

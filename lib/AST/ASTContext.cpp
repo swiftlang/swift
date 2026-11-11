@@ -4852,6 +4852,9 @@ NominalType *NominalType::get(NominalTypeDecl *D,
   for (Type arg : genericArgs) {
     properties |= arg->getRecursiveProperties();
   }
+  for (ScopeRef arg : scopeArgs) {
+    properties |= arg.getRecursiveProperties();
+  }
 
   auto arena = getArena(properties);
 
