@@ -169,3 +169,8 @@ module LibkernOwnership {
 module CDeclFRT {
   header "cdecl.h"
 }
+
+module CFReturnsAttributesFRT {
+  header "frt-cf-returns-attributes.h"
+  requires cplusplus
+}
