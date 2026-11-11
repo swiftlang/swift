@@ -508,6 +508,9 @@ extension DependentAddressUseDefWalker: AddressUseDefWalker {
         break
       }
     }
+    if let apply = address as? ApplyInst, let selfAddress = apply.selfAddressOfBorrowMutateAccessorResult {
+      return walkUp(address: selfAddress)
+    }
     return walkUpDefault(address: address, path: UnusedWalkingPath())
   }
 

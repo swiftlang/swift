@@ -1803,6 +1803,15 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
     }
     return selfAddress
   }
+
+  /// The address-typed self of a borrow or mutate accessor with an address result.
+  public var selfAddressOfBorrowMutateAccessorResult: Value? {
+    guard functionConvention.hasAddressResult,
+          let selfAddress = selfArgument, selfAddress.type.isAddress else {
+      return nil
+    }
+    return selfAddress
+  }
 }
 
 final public class FunctionExtractIsolationInst : SingleValueInstruction {}

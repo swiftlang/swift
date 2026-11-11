@@ -497,3 +497,26 @@ bb0(%0 : @guaranteed $NEWrap):
   %99 = tuple()
   return %99 : $()
 }
+
+sil @borrowPairFirstAddressFromAddress : $@convention(method) (@in_guaranteed PairC) -> @guaranteed_address C
+
+// The address result of a borrow accessor with an address-typed 'self' is a projection of 'self', so a dependence on
+// it is scoped to the access of 'self'.
+sil [ossa] @dependence_scope_address_accessor_result_in_access : $@convention(thin) (@inout PairC, @owned C) -> () {
+entry(%0 : $*PairC, %1 : @owned $C):
+  %access = begin_access [read] [static] %0 : $*PairC
+  %f = function_ref @borrowPairFirstAddressFromAddress : $@convention(method) (@in_guaranteed PairC) -> @guaranteed_address C
+  %first = apply %f(%access) : $@convention(method) (@in_guaranteed PairC) -> @guaranteed_address C
+  %m = mark_dependence [nonescaping] %1 : $C on %first : $*C
+  specify_test "lifetime_dependence_scope %m"
+// CHECK-LABEL: dependence_scope_address_accessor_result_in_access: lifetime_dependence_scope with: %m
+// CHECK-NEXT: Access:   %{{.*}} = begin_access [read] [static] %0 : $*PairC
+// CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %1 : $C on %{{.*}} : $*C
+// CHECK-NEXT: begin:      %{{.*}} = begin_access [read] [static] %0 : $*PairC
+// CHECK-NEXT: ends:       end_access %{{.*}} : $*PairC
+// CHECK: dependence_scope_address_accessor_result_in_access: lifetime_dependence_scope with: %m
+  destroy_value %m : $C
+  end_access %access : $*PairC
+  %99 = tuple ()
+  return %99
+}

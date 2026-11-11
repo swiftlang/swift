@@ -661,6 +661,11 @@ private struct EnclosingAccessWalker : AddressUseDefWalker {
     case let md as MarkDependenceInst:
       enclosingScope = .dependence(md)
       return .continueWalk
+    case let apply as ApplyInst:
+      if let selfAddress = apply.selfAddressOfBorrowMutateAccessorResult {
+        return walkUp(address: selfAddress, path: path)
+      }
+      return walkUpDefault(address: address, path: path)
     default:
       return walkUpDefault(address: address, path: path)
     }
@@ -728,6 +733,12 @@ private struct AccessPathWalker : AddressUseDefWalker {
       return walkUpDefault(address: address, path: path)
     case let md as MarkDependenceInst:
       foundEnclosingScopes.push(.dependence(md))
+      return walkUpDefault(address: address, path: path)
+    case let apply as ApplyInst:
+      if let selfAddress = apply.selfAddressOfBorrowMutateAccessorResult {
+        // The address result of a borrow or mutate accessor is a projection of 'self' at an unknown position.
+        return walkUp(address: selfAddress, path: path.push(.anyValueFields, index: 0))
+      }
       return walkUpDefault(address: address, path: path)
     default:
       return walkUpDefault(address: address, path: path)
