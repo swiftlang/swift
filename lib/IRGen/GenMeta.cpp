@@ -8101,6 +8101,9 @@ GenericArgumentMetadata irgen::addGenericRequirements(
 
     switch (kind) {
     case RequirementKind::Layout:
+      // For now, we skip emitting metadata for ObjectReference.
+      if (requirement.getLayoutConstraint()->isObjectReference())
+        break;
       ++metadata.NumRequirements;
 
       switch (requirement.getLayoutConstraint()->getKind()) {

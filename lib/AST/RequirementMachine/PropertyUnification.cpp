@@ -218,6 +218,9 @@ void PropertyMap::addLayoutProperty(
       recordRelation(key, ruleID, oldProperty, System, debug);
     }
 
+    if (props->Layout->isObjectReference())
+      props->Layout = newLayout;
+
     props->LayoutRule = ruleID;
   } else {
     ABORT("Arbitrary intersection of layout requirements isn't supported yet");
@@ -712,9 +715,12 @@ void PropertyMap::checkConcreteTypeRequirements() {
 
       // If the concrete type does not satisfy a class layout constraint and
       // we have such a layout requirement, we have a conflict.
-      if (!concreteType.getConcreteType()->satisfiesClassConstraint() &&
-          props->LayoutRule &&
-          props->Layout->isClass()) {
+      if (props->LayoutRule &&
+          ((!concreteType.getConcreteType()->satisfiesClassConstraint() &&
+            props->Layout->isClass()) ||
+           (!concreteType.getConcreteType()
+                 ->satisfiesObjectReferenceConstraint() &&
+            props->Layout->isObjectReference()))) {
         if (checkRulePairOnce(concreteTypeRule, *props->LayoutRule))
           System.recordConflict(concreteTypeRule, *props->LayoutRule);
       }
@@ -749,6 +755,15 @@ void PropertyMap::checkConcreteTypeRequirements() {
                 layoutConstraint, Context.getASTContext());
           auto layoutSymbol = Symbol::forLayout(layout, Context);
 
+          recordRelation(props->getKey(), concreteTypeRule, layoutSymbol,
+                         System, debug);
+        } else if (concreteType.getConcreteType()
+                       ->satisfiesObjectReferenceConstraint()) {
+          // A rule (T.[concrete: C] => T) where C is a foreign reference type
+          // induces a rule (T.[layout: ObjectReference] => T).
+          auto layout = LayoutConstraint::getLayoutConstraint(
+              LayoutConstraintKind::ObjectReference, Context.getASTContext());
+          auto layoutSymbol = Symbol::forLayout(layout, Context);
           recordRelation(props->getKey(), concreteTypeRule,
                          layoutSymbol, System, debug);
         }

@@ -1136,8 +1136,13 @@ void TypeChecker::diagnoseRequirementFailure(
   }
 
   case RequirementKind::Layout:
-    diagnostic = diag::type_is_not_a_class;
-    diagnosticNote = diag::anyobject_requirement;
+    if (req.getLayoutConstraint()->isObjectReference()) {
+      diagnostic = diag::type_is_not_a_reference;
+      diagnosticNote = diag::anyreference_requirement;
+    } else {
+      diagnostic = diag::type_is_not_a_class;
+      diagnosticNote = diag::anyobject_requirement;
+    }
     break;
 
   case RequirementKind::Superclass:

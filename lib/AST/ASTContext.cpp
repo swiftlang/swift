@@ -302,6 +302,9 @@ struct ASTContext::Implementation {
   /// The AnyObject type.
   CanType AnyObjectType;
 
+  /// The AnyReference type.
+  CanType AnyReferenceType;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -1423,6 +1426,22 @@ CanType ASTContext::getAnyObjectConstraint() const {
 
 CanType ASTContext::getAnyObjectType() const {
   return ExistentialType::get(getAnyObjectConstraint())
+      ->getCanonicalType();
+}
+
+CanType ASTContext::getAnyReferenceConstraint() const {
+  if (getImpl().AnyReferenceType) {
+    return getImpl().AnyReferenceType;
+  }
+
+  getImpl().AnyReferenceType =
+      CanType(ProtocolCompositionType::theAnyReferenceType(*this));
+  return getImpl().AnyReferenceType;
+}
+
+CanType ASTContext::getAnyReferenceType() const {
+  return ExistentialType::get(
+             ProtocolCompositionType::theAnyReferenceType(*this))
       ->getCanonicalType();
 }
 

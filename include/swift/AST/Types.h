@@ -1230,6 +1230,15 @@ public:
   /// - classes
   bool satisfiesClassConstraint();
 
+  /// Determine whether this type satisfies an ObjectReference layout
+  /// constraint.
+  ///
+  /// An ObjectReference layout constraint is satisfied by:
+  /// - every class-constrained type
+  /// - C++ foreign reference types
+  /// - archetypes whose layout constraint implies ObjectReference
+  bool satisfiesObjectReferenceConstraint();
+
   /// Determine whether this type can be used as a base type for AST
   /// name lookup, which is the case for nominal types, existential types,
   /// archetypes, and tuples.

@@ -174,3 +174,8 @@ module CFReturnsAttributesFRT {
   header "frt-cf-returns-attributes.h"
   requires cplusplus
 }
+
+module AnyReferenceFRTs {
+  header "any-reference.h"
+  requires cplusplus
+}

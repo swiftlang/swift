@@ -72,7 +72,7 @@ StringRef LayoutConstraintInfo::getName(LayoutConstraintKind Kind, bool internal
   case LayoutConstraintKind::UnknownLayout:
     return "_UnknownLayout";
   case LayoutConstraintKind::ObjectReference:
-    return "_ObjectReference";
+    return internalName ? "_ObjectReference" : "_AnyReference";
   case LayoutConstraintKind::Class:
     return internalName ? "_Class" : "AnyObject";
   case LayoutConstraintKind::NativeClass:

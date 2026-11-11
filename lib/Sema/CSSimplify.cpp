@@ -16725,6 +16725,7 @@ void ConstraintSystem::addConstraint(Requirement req,
                                      bool prohibitNonisolatedConformance,
                                      PreparedOverloadBuilder *preparedOverload) {
   bool conformsToAnyObject = false;
+  bool conformsToAnyReference = false;
   std::optional<ConstraintKind> kind;
   switch (req.getKind()) {
   case RequirementKind::SameShape: {
@@ -16761,10 +16762,13 @@ void ConstraintSystem::addConstraint(Requirement req,
     kind = ConstraintKind::Bind;
     break;
   case RequirementKind::Layout:
-    // Only a class constraint can be modeled as a constraint, and only that can
-    // appear outside of a @_specialize at the moment anyway.
+    // Only class and ObjectReference constraints can be modeled as constraints,
+    // and only those can appear outside of a @_specialize at the moment anyway.
     if (req.getLayoutConstraint()->isClass()) {
       conformsToAnyObject = true;
+      break;
+    } else if (req.getLayoutConstraint()->isObjectReference()) {
+      conformsToAnyReference = true;
       break;
     } else {
       llvm_unreachable("unexpected LayoutConstraint kind");
@@ -16778,9 +16782,11 @@ void ConstraintSystem::addConstraint(Requirement req,
                   isFavored, preparedOverload);
   }
 
-  if (conformsToAnyObject) {
-    auto anyObject = getASTContext().getAnyObjectConstraint();
-    addConstraint(ConstraintKind::ConformsTo, firstType, anyObject, locator,
+  if (conformsToAnyObject || conformsToAnyReference) {
+    auto secondType = conformsToAnyObject
+                          ? getASTContext().getAnyObjectConstraint()
+                          : getASTContext().getAnyReferenceConstraint();
+    addConstraint(ConstraintKind::ConformsTo, firstType, secondType, locator,
                   /*isFavored=*/false, preparedOverload);
   }
 }
