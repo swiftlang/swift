@@ -43,6 +43,7 @@ int main() {
     takeGenericPair(x);
     // CHECK-NEXT: GenericPair<Int32, Int32>(x: -995, y: 561)
     assert(x.getComputedProp() == 42);
+    assert(x._getTypeMetadata() == 42);
     assert(x.getComputedVar() == -995);
     x.setComputedVar(-123456);
     assert(x.getComputedVar() == -123456);
