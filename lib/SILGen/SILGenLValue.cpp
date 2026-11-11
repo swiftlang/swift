@@ -5063,7 +5063,7 @@ LValue SILGenLValue::visitBindOptionalExpr(BindOptionalExpr *e,
     optPayload = ManagedValue::forLValue(optPayload.forward(SGF));
   }
   LValue valueLV;
-  // Present the payload as an addressable base.
+  // Present the wrapped value as an addressable base.
   if (optBase.getType().isAddress()
       && getBindOfAddressableOptional(SGF, e) == e) {
     valueLV.add<ValueComponent>(
