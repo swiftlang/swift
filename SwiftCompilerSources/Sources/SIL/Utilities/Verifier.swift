@@ -45,11 +45,19 @@ extension Function {
     for block in blocks {
       for arg in block.arguments {
         arg.verify(context)
+        if hasOwnership {
+          arg.verifyOwnership()
+        }
       }
       for inst in block.instructions {
 
         inst.checkForwardingConformance()
         inst.checkGuaranteedResults()
+        if hasOwnership {
+          for result in inst.results {
+            result.verifyOwnership()
+          }
+        }
 
         if let verifiableInst = inst as? VerifiableInstruction {
           verifiableInst.verify(context)
@@ -103,6 +111,13 @@ extension Function {
               "function has infinite loop",
               atInstruction: block.instructions.first!)
     }
+  }
+}
+
+private extension Value {
+  /// Checks the ownership of the value, e.g. that an owned value has a linear lifetime.
+  func verifyOwnership() {
+    BridgedVerifier.verifyOwnership(bridged)
   }
 }
 

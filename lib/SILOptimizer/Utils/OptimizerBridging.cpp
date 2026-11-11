@@ -45,7 +45,8 @@ llvm::cl::list<std::string>
 
 llvm::cl::opt<bool> DisableSwiftVerification(
     "disable-swift-verification", llvm::cl::init(false),
-    llvm::cl::desc("Disable verification which is implemented in the SwiftCompilerSources"));
+    llvm::cl::desc("Disable the mandatory verification which is implemented in "
+                   "the SwiftCompilerSources, including ownership verification"));
 
 
 #ifdef PURE_BRIDGING_MODE
@@ -57,7 +58,7 @@ llvm::cl::opt<bool> DisableSwiftVerification(
 //                              PassManager
 //===----------------------------------------------------------------------===//
 
-void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
+void SILPassManager::runMandatoryVerification(SILFunction *f) {
   if (f->getModule().getOptions().VerifyNone)
     return;
 
@@ -73,9 +74,9 @@ void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
   getSwiftPassInvocation()->endVerifyFunction(prevFunction);
 }
 
-void SILPassManager::runSwiftModuleVerification() {
+void SILPassManager::runMandatoryModuleVerification() {
   for (SILFunction &f : *Mod) {
-    runSwiftFunctionVerification(&f);
+    runMandatoryVerification(&f);
   }
 }
 

@@ -936,17 +936,14 @@ struct OwnershipModelEliminator : SILModuleTransform {
             "Found verification error when verifying before lowering "
             "ownership. Please re-run with -sil-verify-all to identify the "
             "actual pass that introduced the verification error.");
-        //
-        // Check linear lifetimes with verifyOwnership() rather than the SIL
-        // verifier because verifyOwnership() also runs in compilers built
-        // without assertions.
         f.verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache(),
                  /*dominanceInfo=*/nullptr, /*SingleFunction=*/true,
                  /*checkLinearLifetime=*/false);
-        // The Swift verifier is separate from the C++ verifier and checks
-        // additional OSSA invariants, such as borrowed-from and reborrow flags.
-        getPassManager()->runSwiftFunctionVerification(&f);
-        f.verifyOwnership();
+        // The mandatory verification checks linear lifetimes and additional
+        // OSSA invariants, such as borrowed-from and reborrow flags. In
+        // contrast to the SIL verifier, it also runs in compilers built without
+        // assertions.
+        getPassManager()->runMandatoryVerification(&f);
       }
 
       if (stripOwnership(f)) {

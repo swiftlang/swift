@@ -630,7 +630,7 @@ static void runCommandLineSelectedPasses(SILModule *Module,
     if (!options.Passes.empty())
       Module->verify();
     SILPassManager pm(Module, isMandatory, IRGenMod);
-    pm.runSwiftModuleVerification();
+    pm.runMandatoryModuleVerification();
   }
 }
 

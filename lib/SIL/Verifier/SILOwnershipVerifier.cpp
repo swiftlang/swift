@@ -957,35 +957,3 @@ void SILValue::verifyOwnership() const {
   GuaranteedPhiVerifier guaranteedPhiVerifier;
   verifySILValueHelper(f, *this, guaranteedPhiVerifier);
 }
-
-void SILModule::verifyOwnership() const {
-  if (disableOwnershipVerification(*this))
-    return;
-
-  for (const SILFunction &function : *this) {
-    function.verifyOwnership();
-  }
-}
-
-void SILFunction::verifyOwnership() const {
-  // If the given function has unqualified ownership or we have been asked by
-  // the user not to verify this function, there is nothing to verify.
-  if (!hasOwnership() || !shouldVerifyOwnership())
-    return;
-
-  if (disableOwnershipVerification(getModule()))
-    return;
-
-  GuaranteedPhiVerifier guaranteedPhiVerifier;
-  for (auto &block : *this) {
-    for (auto *arg : block.getArguments()) {
-      verifySILValueHelper(this, arg, guaranteedPhiVerifier);
-    }
-
-    for (auto &inst : block) {
-      for (auto result : inst.getResults()) {
-        verifySILValueHelper(this, result, guaranteedPhiVerifier);
-      }
-    }
-  }
-}

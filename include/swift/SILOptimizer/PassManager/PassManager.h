@@ -400,11 +400,16 @@ public:
   static bool isAnyPassDisabled();
   static bool disablePassesForFunction(SILFunction *function);
 
-  /// Runs the SIL verifier which is implemented in the SwiftCompilerSources.
-  void runSwiftFunctionVerification(SILFunction *f);
+  /// Runs the verification which is implemented in the SwiftCompilerSources
+  /// (Verifier.swift). This includes ownership verification, i.e. checking
+  /// that all values with ownership have a linear lifetime.
+  ///
+  /// In contrast to the SILVerifier (SILFunction::verify), this verification
+  /// also runs in compilers built without assertions.
+  void runMandatoryVerification(SILFunction *f);
 
-  /// Runs the SIL verifier which is implemented in the SwiftCompilerSources.
-  void runSwiftModuleVerification();
+  /// Runs runMandatoryVerification on all functions of the module.
+  void runMandatoryModuleVerification();
 
 private:
   void parsePassesToRunCount(StringRef countsStr);

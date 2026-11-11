@@ -1606,14 +1606,12 @@ public:
   void checkValueBaseOwnership(ValueBase *V) {
     SILFunction *F = V->getFunction();
     assert(F && "Expected value base with parent function");
-    // If we do not have qualified ownership, then do not verify value base
-    // ownership.
+    // Note that linear lifetimes of values with ownership are checked in
+    // Verifier.swift.
     if (!F->hasOwnership()) {
       require(SILValue(V)->getOwnershipKind() == OwnershipKind::None,
               "Once ownership is gone, all values should have none ownership");
-      return;
     }
-    SILValue(V).verifyOwnership();
   }
 
   void checkType(SILType silTy) {

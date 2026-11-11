@@ -1128,9 +1128,6 @@ public:
     verify(/*checkLinearLifetime=*/false);
   }
 
-  /// Check linear OSSA lifetimes, assuming complete OSSA.
-  void verifyOwnership() const;
-
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;
 

@@ -33,8 +33,7 @@ class VerifyOwnership : public SILFunctionTransform {
     if (!f->hasOwnership() || f->getModule().getOptions().VerifyNone)
       return;
 
-    getPassManager()->runSwiftFunctionVerification(f);
-    f->verifyOwnership();
+    getPassManager()->runMandatoryVerification(f);
   }
 };
 

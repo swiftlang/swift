@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -disable-swift-verification -sil-ownership-verifier-enable-testing %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing %s -o /dev/null 2>&1 | %FileCheck %s
 
 import Builtin
 import Swift
@@ -61,6 +61,7 @@ bb0(%0 : @guaranteed $WrapperStruct):
   br bb1(%elem : $Klass)
 
 bb1(%phi : @guaranteed $Klass):
+  %bf_phi = borrowed %phi from (%0)
   %res = tuple ()
   return %res : $()
 }
@@ -72,6 +73,7 @@ bb0(%0 : @guaranteed $WrapperStruct):
   br bb1(%elem : $Klass)
 
 bb1(%newelem : @guaranteed $Klass):
+  %bf_newelem = borrowed %newelem from (%0)
   %res = tuple ()
   return %res : $()
 }
@@ -79,8 +81,8 @@ bb1(%newelem : @guaranteed $Klass):
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'borrowed_extract_dominate_discrepency_incorrect1'
 // CHECK: Found outside of lifetime use?!
 // CHECK: Value: %7 = argument of bb1 : $WrapperStruct
-// CHECK: Consuming User:   end_borrow %7 : $WrapperStruct
-// CHECK: Non Consuming User:   %10 = apply %9(%6) : $@convention(thin) (@guaranteed Klass) -> ()
+// CHECK: Consuming User:   end_borrow %8 : $WrapperStruct
+// CHECK: Non Consuming User:   %12 = apply %11(%9) : $@convention(thin) (@guaranteed Klass) -> ()
 // CHECK: Block: bb1
 // CHECK-LABEL: Error#: 0. End Error in Function: 'borrowed_extract_dominate_discrepency_incorrect1'
 sil [ossa] @borrowed_extract_dominate_discrepency_incorrect1 : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
@@ -91,9 +93,11 @@ bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   br bb1(%elem0 : $Klass, %borrow0 : $WrapperStruct)
 
 bb1(%elem : @guaranteed $Klass, %newborrow : @guaranteed $WrapperStruct):
-  end_borrow %newborrow : $WrapperStruct
+  %bf_newborrow = borrowed %newborrow from (%copy0)
+  %bf_elem = borrowed %elem from (%newborrow)
+  end_borrow %bf_newborrow : $WrapperStruct
   %func = function_ref @blackhole_spl1 : $@convention(thin) (@guaranteed Klass) -> ()
-  %call1 = apply %func(%elem) : $@convention(thin) (@guaranteed Klass) -> ()
+  %call1 = apply %func(%bf_elem) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %copy0 : $WrapperStruct
   %ret = tuple ()
   return %ret : $()
@@ -115,8 +119,8 @@ bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
   br bb1(%elem0 : $Klass, %borrow0 : $WrapperStruct)
 
 bb1(%elem : @guaranteed $Klass, %newborrow : @reborrow $WrapperStruct):
-  %newborrowbf = borrowed %newborrow : $WrapperStruct from (%copy0 : $WrapperStruct)
-  %elembf = borrowed %elem : $Klass from (%newborrow : $WrapperStruct)
+  %newborrowbf = borrowed %newborrow from (%copy0)
+  %elembf = borrowed %elem from (%newborrow)
   %func = function_ref @blackhole_spl1 : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %copy0 : $WrapperStruct
   %call1 = apply %func(%elembf) : $@convention(thin) (@guaranteed Klass) -> ()
@@ -143,9 +147,11 @@ bb2:
   br bb3(%elem1 : $Klass, %borrow1 : $WrapperStruct, %copy1 : $WrapperStruct)
 
 bb3(%elem : @guaranteed $Klass, %newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  %bf_newborrow = borrowed %newborrow from (%newowned)
+  %bf_elem = borrowed %elem from (%newborrow)
   %func = function_ref @blackhole_spl1 : $@convention(thin) (@guaranteed Klass) -> ()
-  %call1 = apply %func(%elem) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %newborrow : $WrapperStruct
+  %call1 = apply %func(%bf_elem) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %bf_newborrow : $WrapperStruct
   destroy_value %newowned : $WrapperStruct
   %ret = tuple ()
   return %ret : $()
@@ -169,9 +175,11 @@ bb2:
   br bb3(%elem1 : $Klass, %borrow1 : $WrapperStruct, %copy1 : $WrapperStruct)
 
 bb3(%elem : @guaranteed $Klass, %newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
+  %bf_newborrow = borrowed %newborrow from (%newowned)
+  %bf_elem = borrowed %elem from (%newborrow)
   %func = function_ref @blackhole_spl1 : $@convention(thin) (@guaranteed Klass) -> ()
-  %call1 = apply %func(%elem) : $@convention(thin) (@guaranteed Klass) -> ()
-  end_borrow %newborrow : $WrapperStruct
+  %call1 = apply %func(%bf_elem) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %bf_newborrow : $WrapperStruct
   destroy_value %newowned : $WrapperStruct
   %ret = tuple ()
   return %ret : $()
@@ -197,7 +205,9 @@ bb2:
   br bb3(%elem1 : $Klass, %borrow1 : $WrapperStruct, %copy2 : $WrapperStruct)
 
 bb3(%elem : @guaranteed $Klass, %newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
-  end_borrow %newborrow : $WrapperStruct
+  %bf_newborrow = borrowed %newborrow from (%copy1, %newowned)
+  %bf_elem = borrowed %elem from (%newborrow)
+  end_borrow %bf_newborrow : $WrapperStruct
   destroy_value %newowned : $WrapperStruct
   destroy_value %copy1 : $WrapperStruct
   %ret = tuple ()
@@ -213,18 +223,20 @@ bb0(%0 : @guaranteed $WrapperStruct):
   br bb1(%elem0 : $Klass, %1a : $WrapperStruct, %1b : $WrapperStruct)
 
 bb1(%elem : @guaranteed $Klass, %2a : @guaranteed $WrapperStruct, %2b : @owned $WrapperStruct):
+  %bf_2a = borrowed %2a from (%2b)
+  %bf_elem = borrowed %elem from (%2a)
   cond_br undef, bb2, bb3
 
 bb2:
-  %3 = copy_value %2a : $WrapperStruct
+  %3 = copy_value %bf_2a : $WrapperStruct
   %3a = begin_borrow %3 : $WrapperStruct
   %elem1 = struct_extract %3a : $WrapperStruct, #WrapperStruct.cls
-  end_borrow %2a : $WrapperStruct
+  end_borrow %bf_2a : $WrapperStruct
   destroy_value %2b : $WrapperStruct
   br bb1(%elem1 : $Klass, %3a : $WrapperStruct, %3 : $WrapperStruct)
 
 bb3:
-  end_borrow %2a : $WrapperStruct
+  end_borrow %bf_2a : $WrapperStruct
   destroy_value %2b : $WrapperStruct
   %9999 = tuple()
   return %9999 : $()
