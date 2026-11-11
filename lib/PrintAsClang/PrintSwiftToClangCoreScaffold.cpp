@@ -25,6 +25,7 @@
 #include "clang/Basic/TargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 
 using namespace swift;
 
@@ -273,8 +274,8 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "// Needs the complete VWT declared above.\n\n";
 
   // Template prefix for all out-of-line definitions.
-  const char *tmplPrefix = "template <typename... Tags>\n";
-  const char *cls = "SwiftExistentialType<Tags...>";
+  llvm::StringLiteral tmplPrefix("template <typename... Tags>\n");
+  llvm::StringLiteral cls("SwiftExistentialType<Tags...>");
 
   // _getVWT
   os << tmplPrefix;
@@ -447,8 +448,8 @@ static void printSwiftExistentialTypeMethodDefs(raw_ostream &os) {
   os << "}\n\n";
 
   // SwiftClassExistentialType: implicit conversion to Any
-  const char *clsTmplPrefix = "template <typename... Tags>\n";
-  const char *clsCls = "SwiftClassExistentialType<Tags...>";
+  llvm::StringLiteral clsTmplPrefix("template <typename... Tags>\n");
+  llvm::StringLiteral clsCls("SwiftClassExistentialType<Tags...>");
   os << clsTmplPrefix;
   os << "SWIFT_INLINE_THUNK\n";
   os << clsCls << "::operator SwiftExistentialType<>() const noexcept {\n";
