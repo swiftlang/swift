@@ -17,6 +17,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SwiftNameTranslation.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -24,6 +25,7 @@
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/SILLinkage.h"
 #include "swift/SIL/SILLocation.h"
+#include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Attr.h"
@@ -1293,6 +1295,43 @@ bool SILDeclRef::declExposedToForeignLanguage(const ValueDecl *decl) {
   }
 
   return false;
+}
+
+bool SILDeclRef::declMayBePrintedInCxxHeader(const ValueDecl *decl,
+                                             const SILModule &M) {
+  const auto &options = M.getOptions();
+  if (!options.CxxHeaderMinAccess ||
+      decl->getModuleContext() != M.getSwiftModule())
+    return false;
+  return cxx_translation::mayBePrintedInCxxHeader(
+      decl, *options.CxxHeaderMinAccess, options.CxxHeaderRequiresExposeAttr);
+}
+
+bool SILDeclRef::mayBeCalledFromCxxHeader(const SILModule &M) const {
+  // Check the option first, as this is on the hot path of
+  // SILFunction::isPossiblyUsedExternally.
+  if (!M.getOptions().CxxHeaderMinAccess)
+    return false;
+  auto *decl = getDecl();
+  if (!decl || isForeign || isThunk() || isAutoDiffDerivativeFunction())
+    return false;
+
+  // The header calls methods, allocating initializers, and the getters and
+  // setters of properties and subscripts.
+  switch (kind) {
+  case Kind::Func:
+    if (auto *accessor = dyn_cast<AccessorDecl>(decl)) {
+      if (accessor->getAccessorKind() != AccessorKind::Get &&
+          accessor->getAccessorKind() != AccessorKind::Set)
+        return false;
+    }
+    break;
+  case Kind::Allocator:
+    break;
+  default:
+    return false;
+  }
+  return declMayBePrintedInCxxHeader(decl, M);
 }
 
 bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {

@@ -450,6 +450,46 @@ bool swift::cxx_translation::isVisibleToCxx(const ValueDecl *VD,
   return false;
 }
 
+/// Whether \p VD or a type that encloses it has an '@_expose' attribute of
+/// the given kind.
+static bool hasExposeAttrInContext(const ValueDecl *VD, ExposureKind kind) {
+  for (; VD; VD = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+    for (const auto *attr : VD->getAttrs().getAttributes<ExposeAttr>())
+      if (attr->getExposureKind() == kind)
+        return true;
+  }
+  return false;
+}
+
+bool swift::cxx_translation::hasExposeCxxAttr(const ValueDecl *VD) {
+  return hasExposeAttrInContext(VD, ExposureKind::Cxx);
+}
+
+bool swift::cxx_translation::hasExposeNotCxxAttr(const ValueDecl *VD) {
+  return hasExposeAttrInContext(VD, ExposureKind::NotCxx);
+}
+
+bool swift::cxx_translation::mayBePrintedInCxxHeader(
+    const ValueDecl *VD, AccessLevel minRequiredAccess,
+    bool requiresExposeAttr) {
+  // Accessors are printed together with their storage.
+  if (auto *accessor = dyn_cast<AccessorDecl>(VD))
+    VD = accessor->getStorage();
+
+  if (hasExposeNotCxxAttr(VD))
+    return false;
+  if (requiresExposeAttr && !hasExposeCxxAttr(VD))
+    return false;
+
+  // A member is only printed as part of its enclosing type.
+  for (; VD; VD = VD->getDeclContext()->getSelfNominalTypeDecl()) {
+    if (!isVisibleToCxx(VD, minRequiredAccess) ||
+        !isExposableToCxx(VD, /*layoutQueries=*/nullptr))
+      return false;
+  }
+  return true;
+}
+
 bool swift::cxx_translation::isExposableToCxx(GenericSignature genericSig) {
   // If there's no generic signature, it's fine.
   if (!genericSig)

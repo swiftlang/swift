@@ -180,8 +180,6 @@ public:
 
 bool isStringNestedType(const ValueDecl *VD, StringRef Typename);
 
-bool hasExposeNotCxxAttr(const ValueDecl *VD);
-
 } // end namespace swift
 
 #endif
