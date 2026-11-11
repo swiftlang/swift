@@ -5793,9 +5793,11 @@ sil-instruction ::= 'diagnose' '[' sil-diagnose-kind ']' sil-operand
 
 sil-diagnose-kind ::= 'unpermitted_copy'
                   ::= 'let_reinit'
+                  ::= 'missing_super_init'
 
 diagnose [unpermitted_copy] %1 : $T
 diagnose [let_reinit] %2 : $*T
+diagnose [missing_super_init] %3 : $*C
 ```
 
 Marks its operand as needing a diagnostic of the given kind, to be emitted
@@ -5817,6 +5819,11 @@ noncopyable value.
 If the kind is `let_reinit`, then the operand is the address of immutable
 storage, and the `diagnose` precedes an initialization of that storage
 which may happen after it was already initialized.
+
+If the kind is `missing_super_init`, then the operand is the address of
+`self` in a derived class initializer, and the `diagnose` precedes uses
+that may need the superclass part of `self` before `super.init`
+initializes it.
 
 ### end_formal_scope
 

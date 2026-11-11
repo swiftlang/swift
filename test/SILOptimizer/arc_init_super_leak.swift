@@ -1,4 +1,5 @@
 // RUN: %target-run-simple-swift(-O) | %FileCheck %s
+// RUN: %target-run-simple-swift(-O -Xfrontend -enable-lifetime-resolution) | %FileCheck %s
 
 // REQUIRES: executable_test
 

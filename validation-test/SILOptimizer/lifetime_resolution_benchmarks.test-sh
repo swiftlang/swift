@@ -34,43 +34,17 @@ import sys
 EXCEPTIONAL_FILES = [
     # Compiler crash in LifetimeResolution
     pathlib.Path("benchmark/single-source/ToddCoxeter.swift"),
-    pathlib.Path("benchmark/utils/DriverUtils.swift"),
-    # SIL memory lifetime verification failure
-    pathlib.Path("benchmark/single-source/Hash.swift"),
     # Spurious use-before-init / use-after-consume errors
     pathlib.Path("benchmark/single-source/DictionaryKeysContains.swift"),
     # Spurious 'copy of noncopyable typed value' errors
     pathlib.Path("benchmark/single-source/Concurrency/TaskIsCancelledCancellationScopes.swift"),
     pathlib.Path("benchmark/single-source/SpanTests.swift"),
-    # Crashes at runtime
-    pathlib.Path("benchmark/single-source/NIOChannelPipeline.swift"),
-    pathlib.Path("benchmark/single-source/ObjectAllocation.swift"),
-    # Class initializers release uninitialized stored properties at runtime
-    pathlib.Path("benchmark/single-source/ArrayInClass.swift"),
-    pathlib.Path("benchmark/single-source/ArrayOfGenericPOD.swift"),
-    pathlib.Path("benchmark/single-source/ArrayOfGenericRef.swift"),
-    pathlib.Path("benchmark/single-source/ArrayOfPOD.swift"),
-    pathlib.Path("benchmark/single-source/ArrayOfRef.swift"),
-    pathlib.Path("benchmark/single-source/COWTree.swift"),
-    pathlib.Path("benchmark/single-source/DictTest.swift"),
-    pathlib.Path("benchmark/single-source/DictTest2.swift"),
-    pathlib.Path("benchmark/single-source/DictTest3.swift"),
-    pathlib.Path("benchmark/single-source/KeyPathPerformanceTests.swift"),
-    pathlib.Path("benchmark/single-source/MirrorTest.swift"),
-    pathlib.Path("benchmark/single-source/Prims.swift"),
-    pathlib.Path("benchmark/single-source/PrimsNonStrongRef.swift"),
-    pathlib.Path("benchmark/single-source/RecursiveOwnedParameter.swift"),
-    pathlib.Path("benchmark/single-source/SortArrayInClass.swift"),
     # async let support
     pathlib.Path("benchmark/single-source/Concurrency/ChildTaskCreation.swift"),
     # Uncategorized
-    pathlib.Path("benchmark/single-source/AsyncTree.swift"),
-    pathlib.Path("benchmark/single-source/Breadcrumbs.swift"),
-    pathlib.Path("benchmark/single-source/Integrate.swift"),
     pathlib.Path("benchmark/single-source/ParameterPacks.swift"),
-    pathlib.Path("benchmark/single-source/PolymorphicCalls.swift"),
-    pathlib.Path("benchmark/single-source/SortLettersInPlace.swift"),
     pathlib.Path("benchmark/single-source/TaskRegistryStress.swift"),
+    pathlib.Path("benchmark/single-source/DictionaryBridge.swift"),
 ]
 
 # Benchmarks that are not built by the benchmark suite at all.

@@ -283,6 +283,10 @@ BridgedDeclObj BridgedDeclObj::Class_getDestructor() const {
   return {getAs<swift::ClassDecl>()->getDestructor()};
 }
 
+BridgedDeclObj BridgedDeclObj::Accessor_getStorage() const {
+  return {getAs<swift::AccessorDecl>()->getStorage()};
+}
+
 bool BridgedDeclObj::Class_isForeign() const {
   return getAs<swift::ClassDecl>()->isForeign();
 }

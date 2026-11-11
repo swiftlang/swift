@@ -1,0 +1,276 @@
+// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify -o /dev/null 2>&1 | %FileCheck %s
+
+// The elements of the dataflow state that LifetimeResolution tracks for each kind of root.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class K {}
+struct Two { var a: K; var b: K }
+struct Nested { var p: Two; var k: K }
+struct Empty {}
+struct Pair {
+  var x: K
+  let y: K
+}
+
+class Root {
+  var a: K
+  let p: Two
+  init()
+}
+
+class EmptyRoot {
+  init()
+}
+
+class Base {
+  let inherited: K
+  init()
+}
+
+class Derived : Base {
+  var a: K
+  let p: Two
+  override init()
+}
+
+class EmptyDerived : Base {
+  override init()
+}
+
+// As in DefiniteInitialization, a function named `superinit` stands in for `super.init` in SIL tests.
+sil @superinit : $@convention(method) (@owned Base) -> @owned Base
+sil @takeBase : $@convention(thin) (@owned Base) -> ()
+
+// CHECK-LABEL: begin running test {{.*}} on local_var: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 3
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field s0.s0
+// CHECK-NEXT:   1: field s0.s1
+// CHECK-NEXT:   2: field s1
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK:      instanceRange: 0..<3
+// CHECK-LABEL: end running test {{.*}} on local_var: lifetime_resolution_state_space
+sil [ossa] @local_var : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Nested, var, name "n"
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [var] %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: begin running test {{.*}} on local_let_tuple: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 2
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field 0
+// CHECK-NEXT:   1: field 1
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK-LABEL: end running test {{.*}} on local_let_tuple: lifetime_resolution_state_space
+sil [ossa] @local_let_tuple : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $(K, K), let, name "t"
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [var] %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: begin running test {{.*}} on inout_argument: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 2
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field s0
+// CHECK-NEXT:   1: field s1
+// CHECK-NEXT: initiallyInitialized: 0..<2
+// CHECK-LABEL: end running test {{.*}} on inout_argument: lifetime_resolution_state_space
+sil [ossa] @inout_argument : $@convention(thin) (@inout Two) -> () {
+bb0(%0 : $*Two):
+  specify_test "lifetime_resolution_state_space %0"
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: begin running test {{.*}} on struct_self: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 2
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field s0
+// CHECK-NEXT:   1: field s1
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK-LABEL: end running test {{.*}} on struct_self: lifetime_resolution_state_space
+sil [ossa] @struct_self : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Pair, var, name "self"
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [rootself] %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// `self` of an empty struct has nothing to initialize, so it starts initialized.
+// CHECK-LABEL: begin running test {{.*}} on empty_struct_self: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 1
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field <root>
+// CHECK-NEXT: initiallyInitialized: 0..<1
+// CHECK-LABEL: end running test {{.*}} on empty_struct_self: lifetime_resolution_state_space
+sil [ossa] @empty_struct_self : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack [lexical] [var_decl] $Empty, var, name "self"
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [rootself] %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+// CHECK-LABEL: begin running test {{.*}} on root_class_self: lifetime_resolution_state_space
+// CHECK:      mode: rootClassSelf
+// CHECK-NEXT: count: 3
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field c0
+// CHECK-NEXT:   1: field c1.s0
+// CHECK-NEXT:   2: field c1.s1
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK:      instanceRange: 0..<3
+// CHECK-LABEL: end running test {{.*}} on root_class_self: lifetime_resolution_state_space
+sil [ossa] @root_class_self : $@convention(method) (@owned Root) -> @owned Root {
+bb0(%0 : @owned $Root):
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [rootself] %0
+  return %1
+}
+
+// A class instance without stored properties has nothing to track.
+// CHECK-LABEL: begin running test {{.*}} on empty_root_class_self: lifetime_resolution_state_space
+// CHECK:      mode: rootClassSelf
+// CHECK-NEXT: count: 0
+// CHECK-NEXT: elements:
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK-LABEL: end running test {{.*}} on empty_root_class_self: lifetime_resolution_state_space
+sil [ossa] @empty_root_class_self : $@convention(method) (@owned EmptyRoot) -> @owned EmptyRoot {
+bb0(%0 : @owned $EmptyRoot):
+  specify_test "lifetime_resolution_state_space %0"
+  %1 = mark_uninitialized [rootself] %0
+  return %1
+}
+
+// The own stored properties of derived class `self`, then its superclass part and the reference held in memory.
+// CHECK-LABEL: begin running test {{.*}} on derived_class_self: lifetime_resolution_state_space
+// CHECK:      mode: derivedClassSelf
+// CHECK-NEXT: count: 5
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field c1
+// CHECK-NEXT:   1: field c2.s0
+// CHECK-NEXT:   2: field c2.s1
+// CHECK-NEXT:   3: superclass
+// CHECK-NEXT:   4: reference
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK:      instanceRange: 0..<4
+// CHECK-NEXT: immutableLeaves: [1, 2]
+// CHECK-LABEL: end running test {{.*}} on derived_class_self: lifetime_resolution_state_space
+sil [ossa] @derived_class_self : $@convention(method) (@owned Derived) -> @owned Derived {
+bb0(%0 : @owned $Derived):
+  %1 = alloc_stack [lexical] [var_decl] $Derived, let, name "self"
+  specify_test "lifetime_resolution_state_space %1"
+  %2 = mark_uninitialized [derivedself] %1
+  store %0 to [init] %2
+  %4 = load [take] %2
+  %5 = upcast %4 to $Base
+  %6 = function_ref @superinit : $@convention(method) (@owned Base) -> @owned Base
+  %7 = apply %6(%5) : $@convention(method) (@owned Base) -> @owned Base
+  %8 = unchecked_ref_cast %7 to $Derived
+  store %8 to [init] %2
+  %10 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %1
+  return %10
+}
+
+// CHECK-LABEL: begin running test {{.*}} on empty_derived_class_self: lifetime_resolution_state_space
+// CHECK:      mode: derivedClassSelf
+// CHECK-NEXT: count: 2
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: superclass
+// CHECK-NEXT:   1: reference
+// CHECK-NEXT: initiallyInitialized: 0..<0
+// CHECK:      instanceRange: 0..<1
+// CHECK-NEXT: immutableLeaves: []
+// CHECK-LABEL: end running test {{.*}} on empty_derived_class_self: lifetime_resolution_state_space
+sil [ossa] @empty_derived_class_self : $@convention(method) (@owned EmptyDerived) -> @owned EmptyDerived {
+bb0(%0 : @owned $EmptyDerived):
+  %1 = alloc_stack [lexical] [var_decl] $EmptyDerived, let, name "self"
+  specify_test "lifetime_resolution_state_space %1"
+  %2 = mark_uninitialized [derivedself] %1
+  store %0 to [init] %2
+  %4 = load [take] %2
+  %5 = upcast %4 to $Base
+  %6 = function_ref @superinit : $@convention(method) (@owned Base) -> @owned Base
+  %7 = apply %6(%5) : $@convention(method) (@owned Base) -> @owned Base
+  %8 = unchecked_ref_cast %7 to $EmptyDerived
+  store %8 to [init] %2
+  %10 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %1
+  return %10
+}
+
+// Derived class `self` in a box isn't tracked by its stored properties.
+// CHECK-LABEL: begin running test {{.*}} on derived_class_self_box: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 1
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field <root>
+// CHECK-LABEL: end running test {{.*}} on derived_class_self_box: lifetime_resolution_state_space
+sil [ossa] @derived_class_self_box : $@convention(method) (@owned Derived) -> @owned Derived {
+bb0(%0 : @owned $Derived):
+  %1 = alloc_box ${ var Derived }, let, name "self"
+  specify_test "lifetime_resolution_state_space %1"
+  %2 = mark_uninitialized [derivedself] %1
+  %3 = project_box %2, 0
+  store %0 to [init] %3
+  %5 = load [take] %3
+  %6 = upcast %5 to $Base
+  %7 = function_ref @superinit : $@convention(method) (@owned Base) -> @owned Base
+  %8 = apply %7(%6) : $@convention(method) (@owned Base) -> @owned Base
+  %9 = unchecked_ref_cast %8 to $Derived
+  store %9 to [init] %3
+  %11 = load [copy] %3
+  destroy_value %2
+  return %11
+}
+
+// Nor is derived class `self` whose memory has a use that isn't recognized.
+// CHECK-LABEL: begin running test {{.*}} on derived_class_self_unknown_take: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 1
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field <root>
+// CHECK-LABEL: end running test {{.*}} on derived_class_self_unknown_take: lifetime_resolution_state_space
+sil [ossa] @derived_class_self_unknown_take : $@convention(method) (@owned Derived) -> @owned Derived {
+bb0(%0 : @owned $Derived):
+  %1 = alloc_stack [lexical] [var_decl] $Derived, let, name "self"
+  specify_test "lifetime_resolution_state_space %1"
+  %2 = mark_uninitialized [derivedself] %1
+  store %0 to [init] %2
+  %4 = load [take] %2
+  %5 = upcast %4 to $Base
+  %6 = function_ref @takeBase : $@convention(thin) (@owned Base) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@owned Base) -> ()
+  %8 = alloc_ref $Derived
+  store %8 to [init] %2
+  %10 = load [copy] %2
+  destroy_addr %2
+  dealloc_stack %1
+  return %10
+}
