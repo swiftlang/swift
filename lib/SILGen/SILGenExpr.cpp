@@ -562,6 +562,11 @@ namespace {
     RValue
     emitFunctionCvtFromExecutionCallerToGlobalActor(FunctionConversionExpr *E,
                                                     SGFContext C);
+    /// Helper method for handling function conversion expr to a
+    /// @nontransferable function from a reference to a function declaration.
+    /// Returns an empty RValue on failure.
+    RValue emitFunctionCvtToNonTransferable(FunctionConversionExpr *E,
+                                            SGFContext C);
 
     /// Helper to emit a value of arbitrary type in an unreachable codepath.
     RValue emitUnreachableValue(SILLocation loc, CanType ty);
@@ -2169,6 +2174,60 @@ RValue RValueEmitter::emitFunctionCvtFromExecutionCallerToGlobalActor(
   return RValue(SGF, e, destType, result);
 }
 
+RValue
+RValueEmitter::emitFunctionCvtToNonTransferable(FunctionConversionExpr *e,
+                                                SGFContext C) {
+  // We are pattern matching a conversion sequence like the following:
+  //
+  // (fn_cvt_expr implicit type="@nontransferable () -> ()"
+  //    (fn_cvt_expr implicit type="@Sendable () -> ()"
+  //       (declref_expr type="() -> ()"
+  //
+  // Converting the reference to a @nontransferable function would need a
+  // thunk to give it a context of its own, but the reference can be emitted
+  // as a @nontransferable function directly instead.
+  CanAnyFunctionType destType =
+      cast<FunctionType>(e->getType()->getCanonicalType());
+  assert(destType->isNonTransferable() &&
+         "Should only call this if destType is @nontransferable");
+
+  auto *subExpr = e->getSubExpr();
+  if (auto *sendableCvt = dyn_cast<FunctionConversionExpr>(subExpr)) {
+    auto cvtType =
+        cast<FunctionType>(sendableCvt->getType()->getCanonicalType());
+    auto innerType = cast<FunctionType>(
+        sendableCvt->getSubExpr()->getType()->getCanonicalType());
+    if (cvtType->withSendable(innerType->isSendable())->isEqual(innerType))
+      subExpr = sendableCvt->getSubExpr();
+  }
+
+  auto *declRef = dyn_cast<DeclRefExpr>(subExpr);
+  if (!declRef)
+    return RValue();
+  auto *decl = dyn_cast<FuncDecl>(declRef->getDecl());
+  if (!decl)
+    return RValue();
+
+  // Make sure that destType/declRefType only differ by transferability and
+  // sendability.
+  CanAnyFunctionType declRefType =
+      cast<FunctionType>(declRef->getType()->getCanonicalType());
+  auto declRefEI = destType->getExtInfo()
+                       .intoBuilder()
+                       .withNonTransferable(false)
+                       .withSendable(declRefType->isSendable())
+                       .build();
+  if (!destType->withExtInfo(declRefEI)->isEqual(declRefType))
+    return RValue();
+
+  SILDeclRef silDeclRef(decl);
+  ASSERT(silDeclRef.getParameterListCount() == 1);
+  auto typeContext = SGF.getFunctionTypeInfo(destType);
+  ManagedValue result = SGF.emitClosureValue(
+      e, silDeclRef, typeContext, declRef->getDeclRef().getSubstitutions());
+  return RValue(SGF, e, destType, result);
+}
+
 RValue RValueEmitter::emitUnreachableValue(SILLocation loc, CanType ty) {
   ASSERT(!SGF.B.hasValidInsertionPoint() && "Must be unreachable");
 
@@ -2329,6 +2388,13 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
 
   if (destType->getIsolation().isGlobalActor()) {
     if (RValue rv = emitFunctionCvtFromExecutionCallerToGlobalActor(e, C))
+      return rv;
+  }
+
+  // Converting from a transferable function value to a `@nontransferable` one
+  // should be handled specifically to avoid a thunk.
+  if (!srcType->isNonTransferable() && destType->isNonTransferable()) {
+    if (RValue rv = emitFunctionCvtToNonTransferable(e, C))
       return rv;
   }
 
