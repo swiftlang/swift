@@ -82,7 +82,10 @@ public enum _SwiftifyInfo {
 /// 0. When `false`, the wrapper instead exposes `Span?`/`UnsafeBufferPointer?`, preserving source
 /// stability for projects that adopted the original `SafeInteropWrappers` experimental feature.
 /// Parameter refAvailability: availability of `Ref` and `Cell`/`ConstCell`, applied to wrappers
-/// returning a `Ref`.
+/// returning a `Ref`. When passed, a lifetime-dependent `std::span` or `countedBy`/
+/// `countedByOrNull` return value is exposed as `Span<Cell<T>>` (or `Span<ConstCell<T>>` for
+/// `const` elements), and this availability is applied to the wrapper. An empty string adds no
+/// availability attribute.
 #if hasFeature(Macros)
 @attached(peer, names: overloaded)
 public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo...,
