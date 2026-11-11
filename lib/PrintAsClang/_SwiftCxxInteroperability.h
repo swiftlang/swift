@@ -286,6 +286,35 @@ struct BoxPair {
 extern "C" SWIFT_CALL BoxPair swift_allocBox(void *_Nonnull type) noexcept;
 extern "C" void *_Nonnull swift_projectBox(void *_Nonnull object) noexcept;
 
+// Class-bound existentials hold unknown references: native Swift objects on
+// every platform, ObjC objects too where ObjC interop is available. Retain
+// and release them through the unknown-object entry points there.
+#if defined(__APPLE__)
+extern "C" void *_Nullable swift_unknownObjectRetain(
+    void *_Nullable value) noexcept;
+extern "C" void swift_unknownObjectRelease(void *_Nullable value) noexcept;
+#endif
+
+SWIFT_INLINE_THUNK void _retainClassValue(void *_Nullable value) noexcept {
+  if (value) {
+#if defined(__APPLE__)
+    swift_unknownObjectRetain(value);
+#else
+    swift_retain(value);
+#endif
+  }
+}
+
+SWIFT_INLINE_THUNK void _releaseClassValue(void *_Nullable value) noexcept {
+  if (value) {
+#if defined(__APPLE__)
+    swift_unknownObjectRelease(value);
+#else
+    swift_release(value);
+#endif
+  }
+}
+
 // --- Tag traits for existential type parameters ---
 //
 // A tag is a protocol tag (WitnessTable typedef), a marker tag (IsMarker
@@ -464,7 +493,7 @@ public:
   SWIFT_INLINE_THUNK SwiftClassExistentialType(
       const SwiftClassExistentialType &other) noexcept
       : _value(other._value) {
-    if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
+    _retainClassValue(_value);
     _copyWitnessTables(other);
   }
   SWIFT_INLINE_THUNK SwiftClassExistentialType(
@@ -478,8 +507,8 @@ public:
     if (this != &other) {
       auto *old = _value;
       _value = other._value;
-      if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
-      if (old) swift_release(reinterpret_cast<void *_Nonnull>(old));
+      _retainClassValue(_value);
+      _releaseClassValue(old);
       _copyWitnessTables(other);
     }
     return *this;
@@ -487,7 +516,7 @@ public:
   SWIFT_INLINE_THUNK SwiftClassExistentialType &
   operator=(SwiftClassExistentialType &&other) noexcept {
     if (this != &other) {
-      if (_value) swift_release(reinterpret_cast<void *_Nonnull>(_value));
+      _releaseClassValue(_value);
       _value = other._value;
       other._value = nullptr;
       _copyWitnessTables(other);
@@ -495,7 +524,7 @@ public:
     return *this;
   }
   SWIFT_INLINE_THUNK ~SwiftClassExistentialType() noexcept {
-    if (_value) swift_release(reinterpret_cast<void *_Nonnull>(_value));
+    _releaseClassValue(_value);
   }
 
   /// Implicit conversion to Any (repacks from class-bound to opaque layout).
@@ -509,7 +538,7 @@ protected:
   SWIFT_INLINE_PRIVATE_HELPER void
   _initializeWithCopy(const SwiftClassExistentialType &src) noexcept {
     _value = src._value;
-    if (_value) swift_retain(reinterpret_cast<void *_Nonnull>(_value));
+    _retainClassValue(_value);
     _copyWitnessTables(src);
   }
 
