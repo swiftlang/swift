@@ -35,14 +35,10 @@ bool GuaranteedPhiVerifier::verifyDependentPhiLifetime(SILPhiArgument *phi,
 
   SmallVector<Operand *, 4> phiUses(lookThroughBorrowedFromUser(phi)->getUses());
   LinearLifetimeChecker checker;
-  // newErrorBuilder is consumed at the end of the checkValue function.
-  // Copy initial state from errorBuilder everytime
-  LinearLifetimeChecker::ErrorBuilder newErrorBuilder = errorBuilder;
   // Verify whether the guaranteed phi lies within the lifetime of the base
   // value.
-  auto linearLifetimeResult = checker.checkValue(
-      baseValue, baseValConsumingUses, phiUses, newErrorBuilder);
-  return linearLifetimeResult.getFoundError();
+  return !checker.checkValue(baseValue, baseValConsumingUses, phiUses,
+                             /*printError=*/true);
 }
 
 void GuaranteedPhiVerifier::verifyGuaranteedForwardingPhis(

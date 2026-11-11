@@ -21,7 +21,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-linear-lifetime-checker"
-#include "LinearLifetimeCheckerPrivate.h"
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -29,9 +29,56 @@
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
+#include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
+
+// This is an option to put the SILOwnershipVerifier in testing mode: instead of
+// printing an error message and aborting, the verifier will print the message
+// and continue. This allows for FileCheck testing of the verifier.
+static llvm::cl::opt<bool> IsSILOwnershipVerifierTestingEnabled(
+    "sil-ownership-verifier-enable-testing",
+    llvm::cl::desc("Put the sil ownership verifier in testing mode. See "
+                   "comment in LinearLifetimeChecker.cpp above option for "
+                   "more information."));
+
+//===----------------------------------------------------------------------===//
+//                              Error Reporting
+//===----------------------------------------------------------------------===//
+
+/// If the ownership verifier is in testing mode, errors are numbered per
+/// function so that FileCheck tests can match the exact number of errors.
+static const SILFunction *errorCounterFunction = nullptr;
+static unsigned errorCounter = 0;
+
+static void printErrorCounter(const SILFunction *function) {
+  if (!IsSILOwnershipVerifierTestingEnabled)
+    return;
+  if (function != errorCounterFunction) {
+    errorCounterFunction = function;
+    errorCounter = 0;
+  }
+  llvm::errs() << "Error#: " << errorCounter << ". ";
+}
+
+bool swift::printOwnershipError(const SILFunction *function,
+                                llvm::function_ref<void()> messagePrinterFunc) {
+  printErrorCounter(function);
+  llvm::errs() << "Begin Error in Function: '" << function->getName() << "'\n";
+  messagePrinterFunc();
+  printErrorCounter(function);
+  llvm::errs() << "End Error in Function: '" << function->getName() << "'\n";
+  function->print(llvm::errs());
+
+  if (IsSILOwnershipVerifierTestingEnabled) {
+    ++errorCounter;
+    return false;
+  }
+  llvm::errs() << "Found ownership error?!\n";
+  llvm::report_fatal_error("triggering standard assertion failure routine");
+}
 
 /// Return true if \p operand can legally be consumed by another operand of the
 /// same instruction (in parallel).
@@ -64,12 +111,16 @@ struct State {
   //    defining block.
   SILInstruction *beginInst;
 
-  /// A builder object that we use to build a LinearLifetimeChecker::Error
-  /// object that describes exhaustively the set of errors that we encountered.
-  ///
-  /// It also handles any asserts/messages that need to be emitted if we are
-  /// supposed to fail hard.
-  LinearLifetimeChecker::ErrorBuilder &errorBuilder;
+  /// If true, errors are printed (and the compiler aborts, unless the
+  /// ownership verifier is in testing mode).
+  bool printError;
+
+  /// Set if any error was found.
+  bool foundError = false;
+
+  /// Set if a consuming use was found to be reachable from another consuming
+  /// use. This is a reference to the LinearLifetimeChecker's member.
+  bool &foundOverConsume;
 
   /// The blocks that we have already visited.
   BasicBlockSet visitedBlocks;
@@ -113,7 +164,7 @@ struct State {
   /// terminates.
   llvm::SmallSetVector<SILBasicBlock *, 8> successorBlocksThatMustBeVisited;
 
-  State(SILValue value, LinearLifetimeChecker::ErrorBuilder &errorBuilder,
+  State(SILValue value, bool printError, bool &foundOverConsume,
         std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         std::optional<function_ref<void(Operand *)>>
             nonConsumingUseOutsideLifetimeCallback,
@@ -121,7 +172,7 @@ struct State {
         ArrayRef<Operand *> extendLifetimeUses,
         ArrayRef<Operand *> nonConsumingUses)
       : value(value), beginInst(value->getDefiningInsertionPoint()),
-        errorBuilder(errorBuilder),
+        printError(printError), foundOverConsume(foundOverConsume),
         visitedBlocks(value->getFunction()),
         leakingBlockCallback(leakingBlockCallback),
         nonConsumingUseOutsideLifetimeCallback(
@@ -130,15 +181,15 @@ struct State {
         nonConsumingUses(nonConsumingUses),
         blocksWithConsumingUses(value->getFunction()) {}
 
-  State(SILBasicBlock *beginBlock,
-        LinearLifetimeChecker::ErrorBuilder &errorBuilder,
+  State(SILBasicBlock *beginBlock, bool printError, bool &foundOverConsume,
         std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
         std::optional<function_ref<void(Operand *)>>
             nonConsumingUseOutsideLifetimeCallback,
         ArrayRef<Operand *> consumingUses,
         ArrayRef<Operand *> extendLifetimeUses,
         ArrayRef<Operand *> nonConsumingUses)
-      : value(), beginInst(&*beginBlock->begin()), errorBuilder(errorBuilder),
+      : value(), beginInst(&*beginBlock->begin()), printError(printError),
+        foundOverConsume(foundOverConsume),
         visitedBlocks(beginBlock->getParent()),
         leakingBlockCallback(leakingBlockCallback),
         nonConsumingUseOutsideLifetimeCallback(
@@ -148,6 +199,12 @@ struct State {
         blocksWithConsumingUses(beginBlock->getParent()) {}
 
   SILBasicBlock *getBeginBlock() const { return beginInst->getParent(); }
+
+  void reportError(llvm::function_ref<void()> messagePrinterFunc) {
+    foundError = true;
+    if (printError)
+      printOwnershipError(beginInst->getFunction(), messagePrinterFunc);
+  }
 
   void initializeAllNonConsumingUses(ArrayRef<Operand *> nonConsumingUsers);
   void initializeAllExtendLifetimeUses(
@@ -240,7 +297,7 @@ void State::initializeAllNonConsumingUses(
 
     // Otherwise, we emit an error since we found a use before our def. We do
     // not bail early here since we want to gather up /all/ that we find.
-    errorBuilder.handleUseOutsideOfLifetime([&] {
+    reportError([&] {
       llvm::errs() << "Found use outside of lifetime?!\n"
                    << "Value: ";
       if (auto v = value) {
@@ -343,7 +400,8 @@ void State::initializeConsumingUse(Operand *consumingUse,
   if (blocksWithConsumingUses.insert(userBlock))
     return;
 
-  errorBuilder.handleOverConsume([&] {
+  foundOverConsume = true;
+  reportError([&] {
     llvm::errs() << "Found over consume?!\n";
     if (auto v = value) {
       llvm::errs() << "Value: " << *v;
@@ -387,7 +445,7 @@ void State::checkForSameBlockUseAfterFree(Operand *consumingUse,
 
     // NOTE: We do not exit here since we want to catch /all/ errors that we can
     // find.
-    errorBuilder.handleUseOutsideOfLifetime([&] {
+    reportError([&] {
       llvm::errs() << "Found outside of lifetime use?!\n"
                    << "Value: ";
       if (auto v = value) {
@@ -422,7 +480,8 @@ void State::checkPredsForDoubleConsume(Operand *consumingUse,
     }
   }
 
-  errorBuilder.handleOverConsume([&] {
+  foundOverConsume = true;
+  reportError([&] {
     llvm::errs() << "Found over consume?!\n"
                  << "Value: ";
     if (auto v = value) {
@@ -452,7 +511,8 @@ void State::checkPredsForDoubleConsume(SILBasicBlock *userBlock) {
     }
   }
 
-  errorBuilder.handleOverConsume([&] {
+  foundOverConsume = true;
+  reportError([&] {
     llvm::errs() << "Found over consume?!\n"
                  << "Value: ";
     if (auto v = value) {
@@ -549,7 +609,7 @@ void State::checkDataflowEndState() {
     }
 
     // If we are supposed to error on leaks, do so now.
-    errorBuilder.handleLeak([&] {
+    reportError([&] {
       llvm::errs() << "Error! Found a leak due to a consuming post-dominance "
                       "failure!\n";
       if (auto v = value) {
@@ -579,7 +639,7 @@ void State::checkDataflowEndState() {
         (*nonConsumingUseOutsideLifetimeCallback)(use);
       }
 
-      errorBuilder.handleUseOutsideOfLifetime([&] {
+      reportError([&] {
         llvm::errs() << "Found outside of lifetime use!\n"
                      << "Value: ";
         if (auto v = value) {
@@ -603,9 +663,9 @@ bool State::dominates(SILInstruction *before, SILInstruction *after) {
 //                           Top Level Entrypoints
 //===----------------------------------------------------------------------===//
 
-LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
+bool LinearLifetimeChecker::checkValueImpl(
     SILValue value, ArrayRef<Operand *> consumingUses,
-    ArrayRef<Operand *> regularUses, ErrorBuilder &errorBuilder,
+    ArrayRef<Operand *> regularUses, bool printError,
     std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
     std::optional<function_ref<void(Operand *)>>
         nonConsumingUseOutsideLifetimeCallback) {
@@ -630,7 +690,8 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
     }
   }
 
-  State state(value, errorBuilder, leakingBlockCallback,
+  foundOverConsume = false;
+  State state(value, printError, foundOverConsume, leakingBlockCallback,
               nonConsumingUseOutsideLifetimeCallback, consumingUses,
               extendLifetimeUses, nonConsumingUses);
 
@@ -674,7 +735,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
         (*nonConsumingUseOutsideLifetimeCallback)(use);
       }
 
-      state.errorBuilder.handleUseOutsideOfLifetime([&] {
+      state.reportError([&] {
         llvm::errs() << "Function: '" << value->getFunction()->getName()
                      << "'\n"
                      << "Found non consuming use outside of the lifetime being "
@@ -683,7 +744,7 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
       });
     }
 
-    return std::move(state.errorBuilder).consumeAndGetFinalError();
+    return !state.foundError;
   }
 
   // Ok, we may have multiple consuming uses. Add the user block of each of our
@@ -722,46 +783,37 @@ LinearLifetimeChecker::Error LinearLifetimeChecker::checkValueImpl(
   // ...and then check that the end state shows that we have a valid linear
   // typed value.
   state.checkDataflowEndState();
-  return std::move(state.errorBuilder).consumeAndGetFinalError();
+  return !state.foundError;
 }
 
-LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
+bool LinearLifetimeChecker::checkValue(
     SILValue value, ArrayRef<Operand *> consumingUses,
-    ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder) {
-  return checkValueImpl(value, consumingUses, nonConsumingUses, errorBuilder,
+    ArrayRef<Operand *> nonConsumingUses, bool printError) {
+  return checkValueImpl(value, consumingUses, nonConsumingUses, printError,
                         std::nullopt, std::nullopt);
 }
 
-LinearLifetimeChecker::Error LinearLifetimeChecker::checkValue(
+bool LinearLifetimeChecker::checkValue(
     SILValue value, ArrayRef<Operand *> consumingUses,
-    ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
+    ArrayRef<Operand *> nonConsumingUses, bool printError,
     function_ref<void(SILBasicBlock *)> leakingBlocksCallback) {
-  return checkValueImpl(value, consumingUses, nonConsumingUses, errorBuilder,
+  return checkValueImpl(value, consumingUses, nonConsumingUses, printError,
                         leakingBlocksCallback, std::nullopt);
 }
 
 bool LinearLifetimeChecker::completeConsumingUseSet(
     SILValue value, Operand *consumingUse,
     function_ref<void(SILBasicBlock::iterator)> visitor) {
-  ErrorBuilder errorBuilder(*value->getFunction(),
-                            ErrorBehaviorKind::ReturnFalse);
-  auto error =
-      checkValue(value, {consumingUse}, {}, errorBuilder,
-                 [&](SILBasicBlock *block) { return visitor(block->begin()); });
-
-  if (!error.getFoundError()) {
-    return false;
-  }
+  checkValue(value, {consumingUse}, {}, /*printError=*/false,
+             [&](SILBasicBlock *block) { return visitor(block->begin()); });
 
   // Return true if we found an over consume (meaning our use is in a loop).
-  return error.getFoundOverConsume();
+  return foundOverConsume;
 }
 
 bool LinearLifetimeChecker::validateLifetime(
     SILValue value, ArrayRef<Operand *> consumingUses,
     ArrayRef<Operand *> nonConsumingUses) {
-  ErrorBuilder errorBuilder(*value->getFunction(),
-                            ErrorBehaviorKind::ReturnFalse);
-  return !checkValue(value, consumingUses, nonConsumingUses, errorBuilder)
-              .getFoundError();
+  return checkValue(value, consumingUses, nonConsumingUses,
+                    /*printError=*/false);
 }

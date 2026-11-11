@@ -43,12 +43,10 @@ class SILValueOwnershipChecker;
 /// uses must not be reachable from each other and jointly post-dominate all
 /// consuming uses as well as the defining block/instruction.
 class LinearLifetimeChecker {
-public:
-  class Error;
-  struct ErrorBehaviorKind;
-  class ErrorBuilder;
+  /// Set by checkValue if a consuming use was found to be reachable from another
+  /// consuming use.
+  bool foundOverConsume = false;
 
-private:
   friend class GuaranteedPhiVerifier;
   friend class SILOwnershipVerifier;
   friend class SILValueOwnershipChecker;
@@ -72,38 +70,59 @@ public:
       function_ref<void(SILBasicBlock::iterator insertPt)> visitor);
 
 private:
-  /// Returns true if:
+  /// Checks the linear lifetime of \p value.
+  ///
+  /// Returns true if no error was found, i.e. if:
   ///
   /// 1. No consuming uses are reachable from any other consuming use, from any
   /// non-consuming uses, or from the producer instruction.
   /// 2. The consuming use set jointly post dominates producers and all non
   /// consuming uses.
   ///
-  /// Returns false otherwise.
+  /// Returns false if an error was found. This is independent of \p printError:
+  /// also if the error was printed and the ownership verifier is in testing
+  /// mode, false is returned.
+  ///
+  /// If a consuming use is reachable from another consuming use,
+  /// `foundOverConsume` is set.
   ///
   /// \p value The value whose lifetime we are checking.
   /// \p consumingUses the array of users that destroy or consume a value.
   /// \p nonConsumingUses regular uses
-  /// \p errorBehavior If we detect an error, should we return false or hard
-  /// error.
+  /// \p printError If true, errors are printed and the compiler aborts (unless
+  /// the ownership verifier is in testing mode). If false, errors are only
+  /// returned.
   /// \p leakingBlocks If non-null a list of blocks where the value was detected
   /// to leak. Can be used to insert missing destroys.
-  Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
-                   ArrayRef<Operand *> nonConsumingUses,
-                   ErrorBuilder &errorBuilder);
+  bool checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
+                  ArrayRef<Operand *> nonConsumingUses, bool printError);
 
-  Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
-                   ArrayRef<Operand *> nonConsumingUses,
-                   ErrorBuilder &errorBuilder,
-                   function_ref<void(SILBasicBlock *)> leakingBlockCallback);
+  bool checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
+                  ArrayRef<Operand *> nonConsumingUses, bool printError,
+                  function_ref<void(SILBasicBlock *)> leakingBlockCallback);
 
-  Error checkValueImpl(
+  /// The implementation of checkValue. Returns true if no error was found.
+  ///
+  /// \p nonConsumingUsesOutsideLifetimeCallback If not None, called for all
+  /// non-consuming uses which are outside of the lifetime of \p value.
+  bool checkValueImpl(
       SILValue value, ArrayRef<Operand *> consumingUses,
-      ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
+      ArrayRef<Operand *> nonConsumingUses, bool printError,
       std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
       std::optional<function_ref<void(Operand *)>>
           nonConsumingUsesOutsideLifetimeCallback);
 };
+
+/// Prints an ownership error in \p function, using \p messagePrinterFunc to
+/// print the details of the error.
+///
+/// Aborts the compiler, unless the ownership verifier is in testing mode.
+///
+/// Always returns false (if it returns at all), meaning "verification failed".
+/// This lets callers directly return the result of this function in their
+/// error path.
+bool printOwnershipError(const SILFunction *function,
+                         llvm::function_ref<void()> messagePrinterFunc);
 
 } // namespace swift
 
