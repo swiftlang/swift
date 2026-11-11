@@ -151,3 +151,30 @@ public func genericOwnedAndInoutCaptures<T>(_ c: consuming GenericResource<T>, _
 
 // Every context in the module has the same destructor, so there's only one.
 // CHECK-NOT: define internal swiftcc void @__swift_exactly_once_closure_destructor.{{[0-9]+}}
+
+// Borrowing an exactly-once function value doesn't retain, release, or destroy
+// its context.
+public func inspect(_ f: borrowing @once () -> Void) {}
+public func run(_ body: () -> Void) { body() }
+
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test15borrowedForwardyyyyXEF"(ptr %0, ptr %1)
+// CHECK-NOT: call {{.*}}@swift_retain
+// CHECK: call swiftcc void @"$s4test7inspectyyyyXEF"(ptr %0, ptr %1)
+// CHECK-NOT: call {{.*}}@swift_release
+// CHECK: ret void
+public func borrowedForward(_ f: borrowing @once () -> Void) {
+  inspect(f)
+}
+
+// An ordinary nonescaping closure that borrows the value has a context on the
+// stack, which doesn't own the value.
+// CHECK-LABEL: define{{.*}} swiftcc void @"$s4test15borrowedCaptureyyyyXEF"(ptr %0, ptr %1)
+// CHECK: [[CONTEXT:%.*]] = alloca i8, i64 32
+// CHECK-NOT: call {{.*}}@swift_allocObject
+// CHECK-NOT: call {{.*}}@swift_retain
+// CHECK: call swiftcc void @"$s4test3runyyyyXEF"(ptr @"$s4test15borrowedCaptureyyyyXEFyyXEfU_TA", ptr [[CONTEXT]])
+// CHECK-NOT: call {{.*}}@swift_release
+// CHECK: ret void
+public func borrowedCapture(_ f: borrowing @once () -> Void) {
+  run { inspect(f) }
+}

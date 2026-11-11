@@ -16,9 +16,8 @@ func testInParameterEscaping(_: @escaping @callable(once) () -> ()) {} // Ok
 func testInParameterAutoclosure(_: @autoclosure @callable(once) () -> ()) {} // Ok
 // expected-forbidden-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}}
 
-func testInParameterExplicitOwnership(_: borrowing @callable(once) () -> ()) {}
-// expected-supported-error@-1 {{'@callable(once)' cannot be used together with 'borrowing'}}
-// expected-forbidden-error@-2 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}}
+func testInParameterExplicitOwnership(_: borrowing @callable(once) () -> ()) {} // Ok
+// expected-forbidden-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}}
 
 func testInParameterExplicitOwnership(_: inout @callable(once) () -> ()) {} // Ok
 // expected-forbidden-error@-1 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}}
@@ -53,9 +52,8 @@ func testExactlyOnceInParameterEscaping(_: @escaping @once () -> ()) {} // Ok
 func testExactlyOnceInParameterAutoclosure(_: @autoclosure @once () -> ()) {} // Ok
 // expected-forbidden-error@-1 {{'@once' attribute is only valid when experimental feature OnceFunctions is enabled}}
 
-func testExactlyOnceInParameterExplicitOwnership(_: borrowing @once () -> ()) {}
-// expected-supported-error@-1 {{'@once' cannot be used together with 'borrowing'}}
-// expected-forbidden-error@-2 {{'@once' attribute is only valid when experimental feature OnceFunctions is enabled}}
+func testExactlyOnceInParameterExplicitOwnership(_: borrowing @once () -> ()) {} // Ok
+// expected-forbidden-error@-1 {{'@once' attribute is only valid when experimental feature OnceFunctions is enabled}}
 
 func testExactlyOnceInParameterExplicitOwnership(_: inout @once () -> ()) {} // Ok
 // expected-forbidden-error@-1 {{'@once' attribute is only valid when experimental feature OnceFunctions is enabled}}

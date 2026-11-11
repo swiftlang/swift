@@ -97,3 +97,61 @@ protocol RunsAtMostOnce {
 struct Runner: RunsAtMostOnce {
   func run(_ f: @escaping @once () -> Void) { f() }
 }
+
+// A borrowed exactly-once parameter is `@guaranteed`, and borrowing it doesn't
+// consume it.
+
+func inspect(_ f: borrowing @once () -> Void) {}
+func run(_ body: () -> Void) { body() }
+
+// CHECK-LABEL: sil hidden [ossa] @$s9once_attr17borrowedForwardedyyyyXEF : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> () {
+// CHECK: bb0([[F:%.*]] : @guaranteed $@noescape @once @callee_owned () -> ()):
+// CHECK:   [[COPY:%.*]] = copy_value [[F]]
+// CHECK:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign] [[COPY]]
+// CHECK:   [[BORROW:%.*]] = begin_borrow [[MARK]]
+// CHECK:   [[INSPECT:%.*]] = function_ref @$s9once_attr7inspectyyyyXEF
+// CHECK:   apply [[INSPECT]]([[BORROW]])
+// CHECK:   end_borrow [[BORROW]]
+// CHECK: } // end sil function '$s9once_attr17borrowedForwardedyyyyXEF'
+func borrowedForwarded(_ f: borrowing @once () -> Void) {
+  inspect(f)
+}
+
+// An owned value can be borrowed before it's called.
+// CHECK-LABEL: sil hidden [ossa] @$s9once_attr18borrowedThenCalledyyyyXEnF : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> () {
+// CHECK:   [[INSPECT:%.*]] = function_ref @$s9once_attr7inspectyyyyXEF
+// CHECK:   apply [[INSPECT]]({{%.*}}) : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+// CHECK:   apply {{%.*}}() : $@noescape @once @callee_owned () -> ()
+// CHECK: } // end sil function '$s9once_attr18borrowedThenCalledyyyyXEnF'
+func borrowedThenCalled(_ f: @once () -> Void) {
+  inspect(f)
+  f()
+}
+
+// An ordinary nonescaping closure can borrow a captured exactly-once value.
+// CHECK-LABEL: sil hidden [ossa] @$s9once_attr28borrowedByNonescapingClosureyyyyXEF : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> () {
+// CHECK:   [[CLOSURE:%.*]] = function_ref @$s9once_attr28borrowedByNonescapingClosureyyyyXEFyyXEfU_ : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+// CHECK:   [[CAPTURE:%.*]] = copy_value {{%.*}} : $@noescape @once @callee_owned () -> ()
+// CHECK:   partial_apply [callee_guaranteed] [[CLOSURE]]([[CAPTURE]]) : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+// CHECK: } // end sil function '$s9once_attr28borrowedByNonescapingClosureyyyyXEF'
+
+// CHECK-LABEL: sil private [ossa] @$s9once_attr28borrowedByNonescapingClosureyyyyXEFyyXEfU_ : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> () {
+// CHECK: bb0({{%.*}} : @closureCapture @guaranteed $@noescape @once @callee_owned () -> ()):
+// CHECK:   mark_unresolved_non_copyable_value [no_consume_or_assign]
+// CHECK: } // end sil function '$s9once_attr28borrowedByNonescapingClosureyyyyXEFyyXEfU_'
+func borrowedByNonescapingClosure(_ f: borrowing @once () -> Void) {
+  run { inspect(f) }
+}
+
+// The type of a function value doesn't depend on the value, and its isolation
+// is extracted from a borrow.
+// CHECK-LABEL: sil hidden [ossa] @$s9once_attr15borrowedQueriesyScA_pSgyyYAXOF : $@convention(thin) (@guaranteed @isolated(any) @once @callee_owned () -> ()) -> @owned Optional<any Actor> {
+// CHECK:   metatype $@thin (@isolated(any) @once () -> ()).Type
+// CHECK:   function_extract_isolation {{%.*}} : $@isolated(any) @once @callee_owned () -> ()
+// CHECK: } // end sil function '$s9once_attr15borrowedQueriesyScA_pSgyyYAXOF'
+func borrowedQueries(
+  _ f: borrowing @escaping @isolated(any) @once () -> Void
+) -> (any Actor)? {
+  _ = type(of: f)
+  return f.isolation
+}
