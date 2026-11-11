@@ -1793,6 +1793,17 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
       return dominates(DT, bound, preheader);
     };
 
+    // The callee of a hoisted check must be available in the preheader.
+    // FixedStorageSemanticsCall only matches calls to a plain function_ref, so
+    // if it is inside the loop, a copy is made in the preheader.
+    auto hoistCallee = [&](ApplyInst *check) {
+      auto *callee = cast<FunctionRefInst>(check->getCallee());
+      if (dominatesPreheader(callee))
+        return;
+      auto *newRef = callee->clone(check);
+      check->getCalleeOperand()->set(newRef);
+    };
+
     // If every operand is loop invariant, hoist the entire check.
     if (blockAlwaysExecutes &&
         llvm::all_of(fixedStorageSemantics->getArguments(),
@@ -1800,6 +1811,7 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
       LLVM_DEBUG(llvm::dbgs() << "  Invariant bounds check hoisted\n");
       changed = true;
       fixedStorageSemantics->moveBefore(preheader->getTerminator());
+      hoistCallee(fixedStorageSemantics.apply);
       continue;
     }
 
@@ -1864,10 +1876,12 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
                               access.second.getLastValue(insertPt));
     }
     auto *firstCheck = fixedStorageSemantics->clone(insertPt);
+    hoistCallee(cast<ApplyInst>(firstCheck));
     for (auto &value : firstValues) {
       firstCheck->setOperand(value.first, value.second);
     }
     auto *lastCheck = fixedStorageSemantics->clone(insertPt);
+    hoistCallee(cast<ApplyInst>(lastCheck));
     for (auto &value : lastValues) {
       lastCheck->setOperand(value.first, value.second);
     }
