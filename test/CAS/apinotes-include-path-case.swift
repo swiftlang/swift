@@ -1,9 +1,9 @@
-// The Windows SDK installs its headers under `...\Windows Kits\10\Include\...`,
-// and Swift puts the WinSDK module map and API notes there. `VsDevCmd.bat`
-// writes the same directory into %INCLUDE% in lowercase: `...\include\...`.
-// Under caching the API notes must still apply to the module's macros.
+// The module map and the API notes of module A are found through the include
+// directory spelled `Include`, and the headers it includes through the same
+// directory spelled `include`. Under caching on case insensitive filesystem
+// the API notes must still apply to the module's macros.
 
-// REQUIRES: OS=windows-msvc
+// REQUIRES: case-insensitive-filesystem
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
@@ -14,14 +14,13 @@
 // RUN:   -disable-implicit-concurrency-module-import \
 // RUN:   %t/main.swift -o %t/deps.json -swift-version 5 \
 // RUN:   -cache-compile-job -cas-path %t/cas \
-// RUN:   -Xcc -fmodule-map-file=%t/sdk/Include/10.0/module.modulemap \
-// RUN:   -Xcc -isystem -Xcc %t/sdk/include/10.0/um \
-// RUN:   -Xcc -isystem -Xcc %t/sdk/include/10.0/shared
+// RUN:   -Xcc -fmodule-map-file=%t/Include/module.modulemap \
+// RUN:   -I %t/include
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:SwiftShims > %t/shim.cmd
 // RUN: %swift_frontend_plain @%t/shim.cmd
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:WinBase > %t/WinBase.cmd
-// RUN: %swift_frontend_plain @%t/WinBase.cmd
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json clang:A > %t/A.cmd
+// RUN: %swift_frontend_plain @%t/A.cmd
 
 // RUN: %{python} %S/Inputs/GenerateExplicitModuleMap.py %t/deps.json > %t/map.json
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
@@ -38,25 +37,25 @@
 // RUN:   -typecheck
 
 //--- main.swift
-import WinBase
+import A
 
-func startupFlags() -> DWORD {
+func flag() -> Flags {
   // Without the API notes the macro is imported as CInt.
-  return STARTF_USESTDHANDLES
+  return FLAG
 }
 
-//--- sdk/Include/10.0/module.modulemap
-module WinBase [system] { header "um/winbase.h" export * }
+//--- include/module.modulemap
+module A { header "a.h" export * }
 
-//--- sdk/Include/10.0/WinBase.apinotes
-Name: WinBase
+//--- include/a.h
+#include <flags.h>
+#define FLAG 1
+
+//--- include/flags.h
+typedef unsigned int Flags;
+
+//--- include/A.apinotes
+Name: A
 Globals:
-  - Name: STARTF_USESTDHANDLES
-    Type: DWORD
-
-//--- sdk/Include/10.0/um/WinBase.h
-#include <minwindef.h>
-#define STARTF_USESTDHANDLES 0x00000100
-
-//--- sdk/Include/10.0/shared/minwindef.h
-typedef unsigned long DWORD;
+  - Name: FLAG
+    Type: Flags
