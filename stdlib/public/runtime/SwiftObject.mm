@@ -40,6 +40,7 @@
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
 #include "swift/Threading/Mutex.h"
+#include "swift/Threading/ThreadSanitizer.h"
 #include "swift/shims/RuntimeShims.h"
 #include "swift/shims/AssertionReporting.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
@@ -1506,7 +1507,13 @@ static bool usesNativeSwiftReferenceCounting_nonNull(
 bool swift::swift_isUniquelyReferenced_nonNull_native(const HeapObject *object){
   assert(object != nullptr);
   assert(!object->refCounts.isDeiniting());
-  return object->refCounts.isUniquelyReferenced();
+  bool unique = object->refCounts.isUniquelyReferenced();
+  // Other threads may have accessed the object, and then released their
+  // reference; by adding this acquire, TSan knows that any future access on
+  // the current thread is not racing with those.
+  if (unique)
+    tsan::acquire(object);
+  return unique;
 }
 
 bool swift::swift_isUniquelyReferenced_native(const HeapObject* object) {
