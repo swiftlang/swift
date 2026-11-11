@@ -1047,7 +1047,7 @@ void LargeValueVisitor::visitDebugValueInst(DebugValueInst *instr) {
   // Kill any operand about to be retyped if the variable cannot follow.
   // Plain debug values are retyped. Debug reconstruction block cannot have
   // an operand of a different type than its argument.
-  if (instr->getDebugReconstructionBlock() || instr->getVarInfo()->Type) {
+  if (!instr->varTypeFollowsOperand()) {
     auto funcType = pass.F->getLoweredFunctionType();
     for (Operand &operand : llvm::reverse(instr->getAllOperands())) {
       // Only a changed function signature is unfollowable.
