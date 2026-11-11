@@ -1530,9 +1530,13 @@ bb0(%0 : $*S):
   return_borrow %3 from_scopes (%3)
 }
 
+// The destroy of the @in_guaranteed self cannot be hoisted above the end of the
+// result's borrow scope.
+//
 // CHECK-LABEL: sil shared [noinline] [ossa] @test_borrow1 :
 // CHECK:         [[BORROW:%[0-9]+]] = apply {{%[0-9]+}}(%0)
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = copy_value [[BORROW]]
+// CHECK-NEXT:    end_borrow [[BORROW]]
 // CHECK-NEXT:    destroy_addr %0
 // CHECK-NEXT:    store [[COPY]] to [init] [[TMP:%[0-9]+]]
 // CHECK:         store {{%[0-9]+}} to [init] %0
@@ -1543,6 +1547,7 @@ bb0(%0 : $*S, %1 : $Int):
   %3 = function_ref @borrow_data1 : $@convention(method) (@in_guaranteed S) -> @guaranteed X
   %4 = apply %3(%0) : $@convention(method) (@in_guaranteed S) -> @guaranteed X
   %5 = copy_value %4
+  end_borrow %4
   store %5 to [init] %2
   %7 = load [take] %2
   %8 = struct $S (%7)
@@ -1550,6 +1555,31 @@ bb0(%0 : $*S, %1 : $Int):
   dealloc_stack %2
   %11 = tuple ()
   return %11
+}
+
+// The destroy of the @in_guaranteed self cannot be hoisted above the end of the
+// scope of a reborrow of the result.
+//
+// CHECK-LABEL: sil [ossa] @test_borrow_reborrow :
+// CHECK:       bb1([[P:%[0-9]+]] : @reborrow $X):
+// CHECK-NEXT:    [[B:%[0-9]+]] = borrowed [[P]] : $X from ()
+// CHECK-NEXT:    [[COPY:%[0-9]+]] = copy_value [[B]]
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_addr %0
+// CHECK-NEXT:    return [[COPY]]
+// CHECK-LABEL: } // end sil function 'test_borrow_reborrow'
+sil [ossa] @test_borrow_reborrow : $@convention(thin) (@in S) -> @owned X {
+bb0(%0 : $*S):
+  %1 = function_ref @borrow_data1 : $@convention(method) (@in_guaranteed S) -> @guaranteed X
+  %2 = apply %1(%0) : $@convention(method) (@in_guaranteed S) -> @guaranteed X
+  br bb1(%2)
+
+bb1(%4 : @reborrow $X):
+  %5 = borrowed %4 from ()
+  %6 = copy_value %5
+  end_borrow %5
+  destroy_addr %0
+  return %6
 }
 
 sil [ossa] @borrow_data2 : $@convention(method) (@in_guaranteed S) -> @guaranteed_address X {

@@ -22,6 +22,7 @@
 #include "swift/SIL/CalleeCache.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/OptimizationRemark.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -511,27 +512,85 @@ getSubstitutionsForCallee(SILModule &module, CanSILFunctionType baseCalleeType,
                                  baseCalleeSig);
 }
 
+/// Returns true if \p applySite calls a borrow accessor whose result is
+/// reborrowed by a phi. Devirtualization cannot replace such a result with a
+/// cast of the new result.
+///
+/// FIXME: Support devirtualization of borrow accessors with reborrows.
+static bool hasReborrowedBorrowAccessorResult(FullApplySite applySite) {
+  auto *ai = dyn_cast<ApplyInst>(applySite.getInstruction());
+  if (!ai) {
+    return false;
+  }
+  auto borrow = BorrowedValue(ai);
+  return borrow && borrow.hasReborrow();
+}
+
+/// Make the scope-ending uses of the borrow accessor result \p oldResult end
+/// the borrow scope of \p newAI instead. The result is a borrow scope nested in
+/// the borrow scope of self, so also end \p selfBorrow after them.
+static void replaceResultScope(SILLocation loc, BorrowedValue oldResult,
+                               ApplyInst *newAI, SILValue selfBorrow) {
+  assert(!oldResult.hasReborrow() &&
+         "canDevirtualize rejects a reborrowed borrow accessor result");
+  SmallVector<Operand *, 4> scopeEnds;
+  oldResult.visitLocalScopeEndingUses([&](Operand *use) {
+    scopeEnds.push_back(use);
+    return true;
+  });
+  for (Operand *scopeEnd : scopeEnds) {
+    scopeEnd->set(newAI);
+    if (!selfBorrow) {
+      continue;
+    }
+    auto *user = scopeEnd->getUser();
+    if (auto *returnBorrow = dyn_cast<ReturnBorrowInst>(user)) {
+      // The borrow of self encloses the result's borrow scope.
+      SmallVector<SILValue, 4> enclosingValues = {selfBorrow};
+      enclosingValues.append(returnBorrow->getEnclosingValues().begin(),
+                             returnBorrow->getEnclosingValues().end());
+      SILBuilderWithScope(returnBorrow)
+          .createReturnBorrow(returnBorrow->getLoc(),
+                              returnBorrow->getReturnValue(), enclosingValues);
+      returnBorrow->eraseFromParent();
+      continue;
+    }
+    assert(isa<EndBorrowInst>(user));
+    SILBuilderWithScope::insertAfter(user, [&](SILBuilder &builder) {
+      builder.createEndBorrow(loc, selfBorrow);
+    });
+  }
+}
+
 // Return the new apply and true if a cast required CFG modification.
 static std::pair<ApplyInst *, bool /* changedCFG */>
 replaceApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc, ApplyInst *oldAI,
                  SILValue newFn, SubstitutionMap newSubs,
-                 ArrayRef<SILValue> newArgs, ArrayRef<SILValue> newArgBorrows) {
+                 ArrayRef<SILValue> newArgs, ArrayRef<SILValue> newArgBorrows,
+                 SILValue selfBorrow) {
   auto *newAI =
       builder.createApply(loc, newFn, newSubs, newArgs,
                           oldAI->getApplyOptions());
-
-  if (!newArgBorrows.empty()) {
-    for (SILValue arg : newArgBorrows) {
+  // Only the borrow of self encloses the scope of a borrow accessor result.
+  // Other argument borrows end after the call.
+  auto resultBorrow = BorrowedValue(oldAI);
+  if (!resultBorrow) {
+    selfBorrow = SILValue();
+  }
+  for (SILValue arg : newArgBorrows) {
+    if (arg != selfBorrow) {
       builder.createEndBorrow(loc, arg);
     }
   }
 
-  // Check if any casting is required for the return value.  newAI cannot be a
-  // guaranteed value, so this cast cannot generate borrow scopes and it can be
-  // used anywhere the original oldAI was used.
+  // Check if any casting is required for the return value. A cast of a borrow
+  // accessor result is a forwarded value within the borrow scope of newAI.
   auto castRes = castValueToABICompatibleType(
       &builder, pm, loc, newAI, newAI->getType(), oldAI->getType());
 
+  if (resultBorrow) {
+    replaceResultScope(loc, resultBorrow, newAI, selfBorrow);
+  }
   oldAI->replaceAllUsesWith(castRes.first);
   return {newAI, castRes.second};
 }
@@ -672,12 +731,12 @@ static std::pair<ApplySite, bool /* changedCFG */>
 replaceApplySite(SILBuilder &builder, SILPassManager *pm, SILLocation loc, ApplySite oldAS,
                  SILValue newFn, SubstitutionMap newSubs,
                  ArrayRef<SILValue> newArgs, SILFunctionConventions conv,
-                 ArrayRef<SILValue> newArgBorrows) {
+                 ArrayRef<SILValue> newArgBorrows, SILValue selfBorrow) {
   switch (oldAS.getKind()) {
   case ApplySiteKind::ApplyInst: {
     auto *oldAI = cast<ApplyInst>(oldAS);
     return replaceApplyInst(builder, pm, loc, oldAI, newFn, newSubs, newArgs,
-                            newArgBorrows);
+                            newArgBorrows, selfBorrow);
   }
   case ApplySiteKind::TryApplyInst: {
     auto *oldTAI = cast<TryApplyInst>(oldAS);
@@ -749,6 +808,10 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
 
   LLVM_DEBUG(llvm::dbgs() << "    Trying to devirtualize : "
                           << *applySite.getInstruction());
+
+  if (hasReborrowedBorrowAccessorResult(applySite)) {
+    return false;
+  }
 
   SILModule &module = applySite.getModule();
 
@@ -878,6 +941,7 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
   // will introduce new consuming uses. In contrast, if we have an owned value,
   // we are ok due to the forwarding nature of upcasts.
   SmallVector<SILValue, 8> newArgBorrows;
+  SILValue selfBorrow;
 
   auto indirectResultArgIter = applySite.getIndirectSILResults().begin();
   for (auto resultTy : substConv.getIndirectSILResultTypes(
@@ -912,6 +976,11 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
       SILBuilderWithScope borrowBuilder(applySite.getInstruction(), builder);
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
+      // Self is the last parameter.
+      if (std::next(paramArgIter) ==
+          applySite.getArgumentsWithoutIndirectResults().end()) {
+        selfBorrow = arg;
+      }
     }
     auto argCastRes = castValueToABICompatibleType(
         &builder, pm, loc, arg, paramArgIter->getType(), paramType);
@@ -922,8 +991,9 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
   }
   ApplySite newAS;
   bool neededCFGChange;
-  std::tie(newAS, neededCFGChange) = replaceApplySite(
-      builder, pm, loc, applySite, fri, subs, newArgs, substConv, newArgBorrows);
+  std::tie(newAS, neededCFGChange) =
+      replaceApplySite(builder, pm, loc, applySite, fri, subs, newArgs,
+                       substConv, newArgBorrows, selfBorrow);
   changedCFG |= neededCFGChange;
   FullApplySite newAI = FullApplySite::isa(newAS.getInstruction());
   assert(newAI);
@@ -1163,6 +1233,7 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
   // Collect arguments from the apply instruction.
   SmallVector<SILValue, 4> arguments;
   SmallVector<SILValue, 4> borrowedArgs;
+  SILValue selfBorrow;
 
   // Iterate over the non self arguments and add them to the
   // new argument list, upcasting when required.
@@ -1185,6 +1256,11 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
                                           argBuilder);
         arg = borrowBuilder.createBeginBorrow(applySite.getLoc(), arg);
         borrowedArgs.push_back(arg);
+        // Self is the last argument.
+        if (applySite.hasSelfArgument() &&
+            substArgIdx == substConv.getNumSILArguments()) {
+          selfBorrow = arg;
+        }
       }
       auto argCastRes = castValueToABICompatibleType(
           &argBuilder, pm, applySite.getLoc(), arg, arg->getType(), paramType);
@@ -1205,7 +1281,7 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
   bool neededCFGChange = false;
   std::tie(newApplySite, neededCFGChange) =
       replaceApplySite(applyBuilder, pm, loc, applySite, fri, subMap, arguments,
-                       substConv, borrowedArgs);
+                       substConv, borrowedArgs, selfBorrow);
   changedCFG |= neededCFGChange;
 
   if (ore)
@@ -1242,6 +1318,12 @@ static bool canDevirtualizeWitnessMethod(ApplySite applySite, bool isMandatory) 
   SILWitnessTable *wt;
 
   auto *wmi = cast<WitnessMethodInst>(applySite.getCallee());
+
+  if (auto fullApply = FullApplySite::isa(applySite.getInstruction())) {
+    if (hasReborrowedBorrowAccessorResult(fullApply)) {
+      return false;
+    }
+  }
 
   // Handle vanishing tuples: don't devirtualize a call to a tuple conformance
   // if the lookup type can possibly be unwrapped after substitution.
