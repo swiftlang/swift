@@ -1115,6 +1115,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
              llvm::getPointerAuthStableSipHash("ProtocolRequirement") &&
          SpecialPointerAuthDiscriminators::ClassMethodDescriptor ==
              llvm::getPointerAuthStableSipHash("ClassMethodDescriptor"));
+  opts.ClassMethodDescriptorsAsArguments = PointerAuthSchema(
+      dataKey, /*address*/ false, Discrimination::Constant,
+      SpecialPointerAuthDiscriminators::ClassMethodDescriptor);
 
   opts.ProtocolDescriptorsAsArguments =
       PointerAuthSchema(dataKey, /*address*/ false, Discrimination::Decl);

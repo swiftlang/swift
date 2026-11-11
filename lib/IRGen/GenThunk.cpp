@@ -813,8 +813,16 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
         return;
       }
       
-      auto methodDesc = IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
-      
+      llvm::Value *methodDesc =
+          IGM.getAddrOfMethodDescriptor(method, NotForDefinition);
+      // Callers pass the method descriptor signed.
+      if (auto &schema =
+              IGM.getOptions().PointerAuth.ClassMethodDescriptorsAsArguments) {
+        auto authInfo =
+            PointerAuthInfo::emit(IGF, schema, nullptr, PointerAuthEntity());
+        methodDesc = emitPointerAuthSign(IGF, methodDesc, authInfo);
+      }
+
       auto isMethod = IGF.Builder.CreateICmpEQ(methodArg, methodDesc);
       
       auto falseBB = IGF.createBasicBlock("");
@@ -857,7 +865,14 @@ void IRGenModule::emitMethodLookupFunction(ClassDecl *classDecl) {
   LookUpNonoverriddenMethods(IGF, classDecl, method).layout();
   
   // Use the runtime to look up vtable entries.
+  llvm::Value *signedDescription = description;
+  if (auto &schema = getOptions().PointerAuth.TypeDescriptorsAsArguments) {
+    auto authInfo = PointerAuthInfo::emit(
+        IGF, schema, nullptr,
+        PointerAuthEntity::Special::TypeDescriptorAsArgument);
+    signedDescription = emitPointerAuthSign(IGF, description, authInfo);
+  }
   auto *result = IGF.Builder.CreateCall(getLookUpClassMethodFunctionPointer(),
-                                        {metadata, method, description});
+                                        {metadata, method, signedDescription});
   IGF.Builder.CreateRet(result);
 }
