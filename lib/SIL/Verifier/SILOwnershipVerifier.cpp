@@ -835,7 +835,7 @@ bool SILValueOwnershipChecker::checkUses() {
   return true;
 }
 
-bool disableOwnershipVerification(const SILModule &mod) {
+bool swift::disableOwnershipVerification(const SILModule &mod) {
   if (DisableOwnershipVerification)
     return true;
   if (mod.getASTContext().blockListConfig.hasBlockListAction(
@@ -870,10 +870,6 @@ void SILInstruction::verifyOperandOwnership(
   if (getFunction()->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
     return;
   }
-
-  // If SILOwnership is not enabled, do not perform verification.
-  if (!getModule().getOptions().VerifySILOwnership)
-    return;
 
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
@@ -972,9 +968,6 @@ void SILModule::verifyOwnership() const {
 }
 
 void SILFunction::verifyOwnership() const {
-  if (!getModule().getOptions().VerifySILOwnership)
-    return;
-
   // If the given function has unqualified ownership or we have been asked by
   // the user not to verify this function, there is nothing to verify.
   if (!hasOwnership() || !shouldVerifyOwnership())

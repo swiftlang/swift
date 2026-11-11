@@ -1258,10 +1258,6 @@ private:
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
 public:
-  bool isSILOwnershipEnabled() const {
-    return F.getModule().getOptions().VerifySILOwnership;
-  }
-
   void _require(bool condition, const Twine &complaint,
                 llvm::function_ref<void(SILPrintContext &)> extraContext
                   = nullptr) {
@@ -1608,10 +1604,6 @@ public:
   }
 
   void checkValueBaseOwnership(ValueBase *V) {
-    // If ownership is not enabled, bail.
-    if (!isSILOwnershipEnabled())
-      return;
-
     SILFunction *F = V->getFunction();
     assert(F && "Expected value base with parent function");
     // If we do not have qualified ownership, then do not verify value base
@@ -6120,7 +6112,7 @@ public:
         require(!dest->getArguments()[0]->getType().isAddress(),
                 "switch_enum destination bbarg type must not be an address");
       }
-      if (!isSILOwnershipEnabled() || !F.hasOwnership()) {
+      if (!F.hasOwnership()) {
         // In non-OSSA, the destBB can optionally ignore the payload.
         require(dest->getArguments().empty()
                     || dest->getArguments().size() == 1,
@@ -6147,7 +6139,7 @@ public:
       return;
     }
     auto *defaultBB = switchEnum->getDefaultBB();
-    if (!isSILOwnershipEnabled() || !F.hasOwnership()) {
+    if (!F.hasOwnership()) {
       require(switchEnum->getDefaultBB()->args_empty(),
               "switch_enum default destination must take no arguments");
       return;

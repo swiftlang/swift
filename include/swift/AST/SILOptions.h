@@ -250,9 +250,6 @@ public:
   /// (-sil-based-debuginfo).
   std::string SILOutputFileNameForDebugging;
 
-  /// If set to true, compile with the SIL Ownership Model enabled.
-  bool VerifySILOwnership = true;
-
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;
 

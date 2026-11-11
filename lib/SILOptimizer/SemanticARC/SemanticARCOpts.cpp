@@ -146,11 +146,6 @@ struct SemanticARCOpts : SILFunctionTransform {
         !f.hasOwnership())
       return;
 
-    // Make sure we are running with ownership verification enabled.
-    assert(f.getModule().getOptions().VerifySILOwnership &&
-           "Can not perform semantic arc optimization unless ownership "
-           "verification is enabled");
-
     auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
     SemanticARCOptVisitor visitor(f, getPassManager(), *deBlocksAnalysis->get(&f),
                                   mandatoryOptsOnly);

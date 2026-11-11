@@ -124,6 +124,10 @@ private:
 bool printOwnershipError(const SILFunction *function,
                          llvm::function_ref<void()> messagePrinterFunc);
 
+/// Returns true if ownership verification is disabled for \p mod, either with
+/// the `-disable-sil-ownership-verification` option or by the block list.
+bool disableOwnershipVerification(const SILModule &mod);
+
 } // namespace swift
 
 #endif
