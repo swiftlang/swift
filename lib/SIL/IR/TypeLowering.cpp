@@ -5609,6 +5609,13 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
        (fnTy2->isNondeinitable() && !fnTy1->isNondeinitable())))
     return ABIDifference::NeedsThunk;
 
+  // Similarly, a @nontransferable value needs a context of its own, because
+  // the context of any other value could be shared with another isolation
+  // domain.
+  if (fnTy2->isNonTransferable() && !fnTy1->isNonTransferable() &&
+      fnTy1->getExtInfo().hasContext())
+    return ABIDifference::NeedsThunk;
+
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
     return ABIDifference::NeedsThunk;
 
