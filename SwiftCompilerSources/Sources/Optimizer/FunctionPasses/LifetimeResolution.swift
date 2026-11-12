@@ -1033,7 +1033,8 @@ private struct Resolver {
 
       //   keep:    destroy_value instance
       //   dealloc: <destroy fields>; dealloc_partial_ref instance
-      let (keep, dealloc) = splitIntoDiamond(before: destroy, on: controlVar.testAll(partialLeaves, before: destroy))
+      let allInitialized = controlVar.testAll(partialLeaves, before: destroy)
+      let (keep, dealloc) = context.splitIntoDiamond(before: destroy, on: allInitialized)
       Builder(before: keep, location: destroy.location, context).createDestroyValue(operand: instance)
       deallocPoint = dealloc
 
@@ -1070,30 +1071,10 @@ private struct Resolver {
       assert(current[leaf] == .partial)
       guard let controlVar else { fatalError("missing control variable for conditional destroy") }
 
-      let (initialized, _) = splitIntoDiamond(before: inst, on: controlVar.test(leaf, before: inst))
+      let (initialized, _) = context.splitIntoDiamond(before: inst, on: controlVar.test(leaf, before: inst))
       let builder = Builder(before: initialized, location: inst.location, context)
       space.withElementAddress(forIndex: leaf, from: root.address, builder) { builder.createDestroyAddr(address: $0) }
     }
-  }
-
-  // Splits the block before `inst` into a diamond that branches on `condition`:
-  //
-  //   start:      cond_br condition, trueBlock, falseBlock
-  //   trueBlock:  br cont
-  //   falseBlock: br cont
-  //   cont:       <inst> ...
-  //
-  // Returns the branch ending each side, before which that side's code is inserted.
-  func splitIntoDiamond(before inst: Instruction, on condition: Value) -> (ifTrue: BranchInst, ifFalse: BranchInst) {
-    let start = inst.parentBlock
-    let cont = context.splitBlock(before: inst)
-    let trueBlock = context.createBlock(after: start)
-    let falseBlock = context.createBlock(after: trueBlock)
-    let ifTrue = Builder(atEndOf: trueBlock, location: inst.location, context).createBranch(to: cont)
-    let ifFalse = Builder(atEndOf: falseBlock, location: inst.location, context).createBranch(to: cont)
-    Builder(atEndOf: start, location: inst.location, context)
-      .createCondBranch(condition: condition, trueBlock: trueBlock, falseBlock: falseBlock)
-    return (ifTrue, ifFalse)
   }
 
   // Ends the lifetime of derived class `self` at a `destroy_addr` of its memory, which may no longer hold the
@@ -1111,7 +1092,7 @@ private struct Resolver {
     //   empty:  nothing
     if avail[reference] == .partial {
       guard let controlVar else { fatalError("missing control variable for conditional destroy") }
-      (deallocPoint, _) = splitIntoDiamond(before: destroy, on: controlVar.test(reference, before: destroy))
+      (deallocPoint, _) = context.splitIntoDiamond(before: destroy, on: controlVar.test(reference, before: destroy))
     }
 
     //   keep:     destroy_addr self
@@ -1124,7 +1105,7 @@ private struct Resolver {
     case .partial:
       guard let controlVar else { fatalError("missing control variable for conditional destroy") }
       let superInitialized = controlVar.test(superclass, before: deallocPoint)
-      let (keep, dealloc) = splitIntoDiamond(before: deallocPoint, on: superInitialized)
+      let (keep, dealloc) = context.splitIntoDiamond(before: deallocPoint, on: superInitialized)
       Builder(before: keep, location: destroy.location, context).createDestroyAddr(address: root.address)
       deallocPoint = dealloc
     default:
@@ -1747,28 +1728,6 @@ extension Value {
   var projectionPathFromRoot: SmallProjectionPath { accessPath.projectionPathFromRoot }
 }
 
-// Gathers the uses of values depending on `markDep`. Returns false if they can't all be found.
-private func gatherDependentUses(of markDep: MarkDependenceInstruction, into uses: inout Stack<Instruction>,
-                                 _ localReachabilityCache: LocalVariableReachabilityCache,
-                                 _ context: Context) -> Bool {
-  // The walker only tracks ~Escapable and @noescape dependents; for anything else it reports
-  // success having collected nothing.
-  guard let dependence = LifetimeDependence(markDep, context),
-        !dependence.dependentValue.mayEscape else {
-    return false
-  }
-  var dependentUses = Stack<Instruction>(context)
-  defer { dependentUses.deinitialize() }
-  var walker = LifetimeDependentUseWalker(markDep.parentFunction, localReachabilityCache, context) {
-    dependentUses.push($0)
-    return .continueWalk
-  }
-  defer { walker.deinitialize() }
-  let result = walker.walkDown(dependence: dependence)
-  uses.append(contentsOf: dependentUses)
-  return result == .continueWalk
-}
-
 // Static-single assignment values (SSA), aka objects in SIL, are defined exactly once, so we
 // use a simpler, cheaper analysis for such values instead of the storage-backed one above.
 private func resolveSingleDef(_ root: Value, _ context: FunctionPassContext) {
@@ -2191,14 +2150,6 @@ private func replaceWithCopy(_ op: Operand, _ context: FunctionPassContext) {
   op.set(to: copyValue, context)
 }
 
-extension Value {
-  /// Whether a use lets a pointer to this value escape, so that its liveness can't be derived from its uses.
-  /// An escape nested within a borrow scope is bounded by that scope instead.
-  var hasDirectPointerEscape: Bool {
-    uses.contains { $0.ownership == .pointerEscape || $0.ownership == .forwardingUnowned }
-  }
-}
-
 private extension MutableCollection {
   mutating func mutatingEach(_ body: (inout Element) -> Void) {
     var i = startIndex
@@ -2206,13 +2157,6 @@ private extension MutableCollection {
       body(&self[i])
       i = index(after: i)
     }
-  }
-}
-
-private extension Function {
-  // NOTE: This scans the entire function!
-  var exitingBlocks: LazyFilterSequence<BasicBlockList> {
-    return blocks.lazy.filter { $0.terminator.isFunctionExiting }
   }
 }
 
