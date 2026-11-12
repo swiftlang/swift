@@ -2275,8 +2275,13 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
     }
   }
 
-  bool useAddress =
-      rawElementTy->getAnyPointerElementType() && elementIsNoncopyable;
+  // A getter for a non-Escapable element returned indirectly would have to go
+  // through 'UnsafePointer.pointee', which requires an Escapable pointee. The
+  // element type may refer to the generic parameters of a templated operator.
+  bool elementIsNonEscapable =
+      !getterImpl->mapTypeIntoEnvironment(elementTy)->isEscapable();
+  bool useAddress = rawElementTy->getAnyPointerElementType() &&
+                    (elementIsNoncopyable || elementIsNonEscapable);
 
   // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
   // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
@@ -2381,12 +2386,17 @@ SwiftDeclSynthesizer::makeDereferencedPointeeProperty(FuncDecl *getter,
   const auto elementTy = rawElementTy->getAnyPointerElementType()
                              ? rawElementTy->getAnyPointerElementType()
                              : rawElementTy;
-  // Use 'address' or 'mutableAddress' accessors for non-copyable
-  // types that are returned indirectly.
-  bool isNoncopyable = dc->mapTypeIntoEnvironment(elementTy)->isNoncopyable();
-  bool isImplicit = !(isNoncopyable || resultDependsOnSelf);
-  bool useAddress =
-      rawElementTy->getAnyPointerElementType() && (isNoncopyable || resultDependsOnSelf);
+  // Use 'address' or 'mutableAddress' accessors for values returned indirectly
+  // when they are non-copyable, when they are non-Escapable (a getter would
+  // have to go through 'UnsafePointer.pointee', which requires an Escapable
+  // pointee), or when they depend on 'self'. Such accessors, and getters of
+  // non-copyable or 'self'-dependent values, are not implicit.
+  auto elementTyInContext = dc->mapTypeIntoEnvironment(elementTy);
+  bool isNoncopyable = elementTyInContext->isNoncopyable();
+  bool isNonEscapable = !elementTyInContext->isEscapable();
+  bool useAddress = rawElementTy->getAnyPointerElementType() &&
+                    (isNoncopyable || isNonEscapable || resultDependsOnSelf);
+  bool isImplicit = !(isNoncopyable || resultDependsOnSelf || useAddress);
 
   // Foreign references (e.g., FRT* or FRT&) are directly mapped to the FRT
   // class type rather than UnsafeMutablePointer<FRT>, and isn't something we
