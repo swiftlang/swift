@@ -2055,11 +2055,10 @@ llvm::Error SILDeserializer::readSILInstruction(
                                       ListOfValues.drop_front(I));
     if (!DebugVar)
       return DebugVar.takeError();
-    bool HasLoc = DebugVar.get() && DebugVar.get()->Loc.has_value();
-
+    // The location override is the instruction's own serialized location.
     ResultInst = Builder.createDebugValue(
         Loc, Operands, DebugVar.get().value_or(SILDebugVariable()),
-        UsesMoveableValDebugInfo, HasTrace, !HasLoc);
+        UsesMoveableValDebugInfo, HasTrace, /*overrideLoc=*/ false);
 
     // If the serialized debug_value has a reconstruction block, add it to
     // the worklist. The matching SIL_DEBUG_RECONSTRUCTION_BLOCK records

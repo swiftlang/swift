@@ -1179,7 +1179,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back((unsigned)op.get()->getType().getCategory());
     }
 
-    writeDebugVariable(SI, DVI->getVarInfo(), attrs, ListOfValues);
+    writeDebugVariable(SI, DVI->getVarInfo(/*includeLoc=*/ false), attrs,
+                       ListOfValues);
     break;
   }
   case SILInstructionKind::DebugStepInst:
