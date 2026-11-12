@@ -727,9 +727,17 @@ extension String {
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws(E) -> Int
   ) throws(E) {
+    func _check(_ count: Int) -> Int {
+      _precondition(
+        UInt(truncatingIfNeeded: count) <= UInt(truncatingIfNeeded: capacity),
+        "Initialized count must be in 0 ... unsafeUninitializedCapacity.")
+      return count
+    }
+    
     if _fastPath(capacity <= _SmallString.capacity) {
       let smol = try unsafe _SmallString(initializingUTF8With: { buffer throws(E) in
-        try unsafe initializer(.init(start: buffer.baseAddress, count: capacity))
+        let mutableBuffer = unsafe UnsafeMutableBufferPointer(start: buffer.baseAddress, count: capacity)
+        return try unsafe _check(initializer(mutableBuffer))
       })
       // Fast case where we fit in a _SmallString and don't need UTF8 validation
       if _fastPath(smol.isASCII) {
@@ -741,9 +749,9 @@ extension String {
       return
     }
 
-    self = try unsafe String._fromLargeUTF8Repairing(
-      uninitializedCapacity: capacity,
-      initializingWith: initializer)
+    self = try unsafe String._fromLargeUTF8Repairing(uninitializedCapacity: capacity) { (buffer) throws(E) -> Int in
+      try unsafe _check(initializer(buffer))
+    }
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
