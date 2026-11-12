@@ -6,6 +6,16 @@
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes
 
+// RUN: %if swift_feature_OnceFunctions %{ %target-swift-frontend %s -emit-sil -enable-experimental-feature OnceFunctions \
+// RUN:   -o /dev/null \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -target %target-swift-6.2-abi-triple \
+// RUN:   -module-name test \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -verify-additional-prefix once- \
+// RUN:   -D ONCE_FUNCTIONS %}
+
 // REQUIRES: swift_feature_Lifetimes
 
 struct NCInt: ~Copyable {
@@ -380,3 +390,74 @@ func spanInLogicalAnd(_ s: String) -> Bool {
   let span = s.utf8.span
   return span[0] == UInt8(ascii: "_") && span[1] == UInt8(ascii: "-")
 }
+
+#if ONCE_FUNCTIONS
+// An on-stack at-most-once or exactly-once closure consumes its captures, which is not an escape.
+func runOnce(_ body: @once () -> Void) { body() }
+func runCallableOnce(_ body: @callable(once) () -> Void) { body() }
+
+func captureSpanInOnceClosure(span: Span<Int>) -> Int {
+  var count = 0
+  runOnce { count = span.count }
+  runCallableOnce { count += span.count }
+  return count
+}
+
+func captureLocalSpanInOnceClosure(array: [Int]) -> Int {
+  let span = array.span
+  var count = 0
+  runOnce { count = span.count }
+  runCallableOnce { count += span.count }
+  return count
+}
+
+func captureNEInOnceClosure(nc: borrowing NCInt) -> Int {
+  let ne = nc.neInt
+  var value = 0
+  runOnce { value = ne.value }
+  runCallableOnce { value += ne.value }
+  return value
+}
+
+struct NCNEInt: ~Copyable, ~Escapable {
+  let value: Int
+
+  @_lifetime(borrow borrowed)
+  init(borrowed: borrowing NCInt) {
+    self.value = borrowed.value
+  }
+}
+
+func consumeNCNE(_ ne: consuming NCNEInt) -> Int { ne.value }
+
+func captureNoncopyableNEInOnceClosure(nc: borrowing NCInt) -> Int {
+  let ne = NCNEInt(borrowed: nc)
+  var value = 0
+  runOnce { value = ne.value }
+  return value
+}
+
+func consumeNoncopyableNEInOnceClosure(nc: borrowing NCInt) -> Int {
+  let ne = NCNEInt(borrowed: nc)
+  var value = 0
+  runCallableOnce { value = consumeNCNE(ne) }
+  return value
+}
+
+func captureGenericNEInOnceClosure<T: ~Escapable>(_ t: T, _ use: (borrowing T) -> Void) {
+  runOnce { use(t) }
+  runCallableOnce { use(t) }
+}
+
+// The closure still carries the dependence of the values it consumes.
+func runOnceSpan(_ body: @once () -> Span<Int>) -> Span<Int> { body() }
+
+@_lifetime(immortal)
+func testLocalSpanCaptureInOnceClosureReturnSpan() -> Span<Int> {
+  let array = [1,2,3] // expected-once-note{{it depends on the lifetime of variable 'array'}}
+  let span = array.span
+  return runOnceSpan { span }
+  // expected-once-error@-1{{lifetime-dependent value escapes its scope}}
+  // expected-once-note@-2{{this use causes the lifetime-dependent value to escape}}
+}
+#endif
