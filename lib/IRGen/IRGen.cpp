@@ -1084,8 +1084,8 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
   opts.ClassMethodDescriptors = PointerAuthSchema(
       dataKey, /*address*/ true, Discrimination::Constant,
       SpecialPointerAuthDiscriminators::ClassMethodDescriptor);
-  // The runtime in this repository does not authenticate these pointers, so
-  // check that the discriminators are the hashes of their names.
+  // The runtime that ships in the OS uses the hashes of the names, so check
+  // that the discriminators match them.
   assert(SpecialPointerAuthDiscriminators::ProtocolRequirement ==
              llvm::getPointerAuthStableSipHash("ProtocolRequirement") &&
          SpecialPointerAuthDiscriminators::ClassMethodDescriptor ==

@@ -296,6 +296,12 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_protocol_conformance_descriptor \
   __ptrauth(ptrauth_key_process_independent_data, 1, \
             SpecialPointerAuthDiscriminators::ProtocolConformanceDescriptor)
+#define __ptrauth_swift_protocol_requirement_descriptor \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ProtocolRequirement)
+#define __ptrauth_swift_class_method_descriptor \
+  __ptrauth(ptrauth_key_process_independent_data, 1, \
+            SpecialPointerAuthDiscriminators::ClassMethodDescriptor)
 #define __ptrauth_swift_value_witness_table_pointer \
   __ptrauth(ptrauth_key_process_independent_data, 1, \
             SpecialPointerAuthDiscriminators::ValueWitnessTable)
@@ -436,6 +442,8 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_heap_object_destructor
 #define __ptrauth_swift_type_descriptor
 #define __ptrauth_swift_protocol_conformance_descriptor
+#define __ptrauth_swift_protocol_requirement_descriptor
+#define __ptrauth_swift_class_method_descriptor
 #define __ptrauth_swift_nonunique_extended_existential_type_shape
 #define __ptrauth_swift_dynamic_replacement_key
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer) (__fn)
