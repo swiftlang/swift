@@ -176,3 +176,28 @@ bb0(%0 : @owned $KlassUser):
   %9999 = tuple()
   return %9999 : $()
 }
+
+// A mark_dependence [nonescaping] address is an interior pointer of an owned
+// base too.
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'mark_dependence_owned_base_use_after_destroy'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %0 = argument of bb0 : $Builtin.NativeObject
+// CHECK: Consuming User:   destroy_value %0 : $Builtin.NativeObject
+// CHECK: Non Consuming User:   %4 = load [trivial] %2 : $*Builtin.Int64
+// CHECK-LABEL: Error#: 0. End Error in Function: 'mark_dependence_owned_base_use_after_destroy'
+sil [ossa] @mark_dependence_owned_base_use_after_destroy : $@convention(thin) (@owned Builtin.NativeObject, @inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.Int64):
+  %2 = mark_dependence [nonescaping] %1 : $*Builtin.Int64 on %0 : $Builtin.NativeObject
+  destroy_value %0
+  %4 = load [trivial] %2
+  return %4
+}
+
+// CHECK-NOT: Function: 'mark_dependence_owned_base'
+sil [ossa] @mark_dependence_owned_base : $@convention(thin) (@owned Builtin.NativeObject, @inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : @owned $Builtin.NativeObject, %1 : $*Builtin.Int64):
+  %2 = mark_dependence [nonescaping] %1 : $*Builtin.Int64 on %0 : $Builtin.NativeObject
+  %3 = load [trivial] %2
+  destroy_value %0
+  return %3
+}

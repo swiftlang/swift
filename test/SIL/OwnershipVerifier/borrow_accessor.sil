@@ -268,3 +268,29 @@ bb0(%0 : $*Wrapper):
   end_borrow %2
   return %3
 }
+
+// An owned self may be passed directly to an accessor with an address result.
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_address_result_use_after_destroy_owned_self'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %0 = argument of bb0 : $Wrapper
+// CHECK: Consuming User:   destroy_value %0 : $Wrapper
+// CHECK: Non Consuming User:   %4 = load [copy] %2 : $*Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_address_result_use_after_destroy_owned_self'
+sil [ossa] @test_address_result_use_after_destroy_owned_self : $@convention(thin) (@owned Wrapper) -> @owned Klass {
+bb0(%0 : @owned $Wrapper):
+  %1 = function_ref @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  destroy_value %0
+  %4 = load [copy] %2
+  return %4
+}
+
+// CHECK-NOT: Function: 'test_address_result_owned_self'
+sil [ossa] @test_address_result_owned_self : $@convention(thin) (@owned Wrapper) -> @owned Klass {
+bb0(%0 : @owned $Wrapper):
+  %1 = function_ref @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %3 = load [copy] %2
+  destroy_value %0
+  return %3
+}

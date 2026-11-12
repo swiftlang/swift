@@ -236,6 +236,28 @@ bool SILValueOwnershipChecker::gatherNonGuaranteedUsers(
       continue;
     }
 
+    // An owned value may be the base of an interior pointer: the address result
+    // of a borrow or mutate accessor with an owned self, or a mark_dependence
+    // [nonescaping] address. Add the uses of the interior pointer as implicit
+    // regular users.
+    if (op->getOperandOwnership() == OperandOwnership::AnyInteriorPointer) {
+      auto interiorPointerOperand = InteriorPointerOperand::get(op);
+      assert(interiorPointerOperand.kind ==
+                 InteriorPointerOperandKind::BorrowMutateAccessor ||
+             interiorPointerOperand.kind ==
+                 InteriorPointerOperandKind::MarkDependenceNonEscaping);
+      SmallVector<Operand *, 8> interiorPointerUses;
+      interiorPointerOperand.findTransitiveUses(&interiorPointerUses);
+      for (auto *interiorPointerUse : interiorPointerUses) {
+        auto ownership = interiorPointerUse->getOperandOwnership();
+        if (ownership == OperandOwnership::NonUse ||
+            ownership == OperandOwnership::DebugUse) {
+          continue;
+        }
+        nonLifetimeEndingUsers.push_back(interiorPointerUse);
+      }
+    }
+
     // Otherwise, check if we have a borrow scope operand. In such a case, we
     // need to add the borrow scope operand's end scope instructions as implicit
     // regular users so we can ensure that the borrow scope operand's scope is
