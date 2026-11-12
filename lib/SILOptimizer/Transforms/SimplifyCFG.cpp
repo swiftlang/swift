@@ -1630,28 +1630,15 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // Simplify cond_br where both sides jump to the same blocks with the same
   // args.
-  auto condBrToBr = [&](ArrayRef<SILValue> branchArgs, SILBasicBlock *newDest) {
+  if (trueTrampolineDest && (trueTrampolineDest == falseTrampolineDest)) {
     LLVM_DEBUG(llvm::dbgs()
                << "replace cond_br with same dests with br: " << *BI);
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), newDest, branchArgs);
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(),
+                                         trueTrampolineDest.destBB,
+                                         trueTrampolineDest.newSourceBranchArgs);
     BI->eraseFromParent();
     addToWorklist(ThisBB);
     ++NumConstantFolded;
-  };
-  if (trueTrampolineDest.destBB == FalseSide
-      && trueTrampolineDest.newSourceBranchArgs.empty()) {
-    condBrToBr(trueTrampolineDest.newSourceBranchArgs, FalseSide);
-    removeIfDead(TrueSide);
-    return true;
-  }
-  if (falseTrampolineDest.destBB == TrueSide) {
-    condBrToBr(falseTrampolineDest.newSourceBranchArgs, TrueSide);
-    removeIfDead(FalseSide);
-    return true;
-  }
-  if (trueTrampolineDest && (trueTrampolineDest == falseTrampolineDest)) {
-    condBrToBr(trueTrampolineDest.newSourceBranchArgs,
-               trueTrampolineDest.destBB);
     removeIfDead(TrueSide);
     removeIfDead(FalseSide);
     return true;
