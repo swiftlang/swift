@@ -2284,23 +2284,35 @@ static Expr* constructCallToSuperInit(ConstructorDecl *ctor,
   return r;
 }
 
+bool TypeChecker::diagnoseForeignReferenceSuperInit(ConstructorDecl *ctor,
+                                                    SourceLoc loc,
+                                                    bool implicitlyGenerated) {
+  auto classDecl = ctor->getDeclContext()->getSelfClassDecl();
+  if (!classDecl || !classDecl->isForeignReferenceType())
+    return false;
+
+  auto &ctx = ctor->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing))
+    return false;
+
+  // Only a C++ constructor can construct the base subobject of this object. We
+  // don't currently support global-functions-as-initializers for the purpose
+  // of constructing a base subobject.
+  if (ctx.getClangModuleLoader()->getOriginalForeignReferenceConstructor(ctor))
+    return false;
+
+  ctx.Diags.diagnose(loc, diag::chain_foreign_reference_non_constructor_init,
+                     implicitlyGenerated, ctor,
+                     classDecl->getDeclaredInterfaceType());
+  ctor->diagnose(diag::decl_declared_here, ctor);
+  return true;
+}
+
 /// Check a super.init call.
 ///
 /// \returns true if an error occurred.
 static bool checkSuperInit(ConstructorDecl *fromCtor,
                            ApplyExpr *apply, bool implicitlyGenerated) {
-  // The chained initializer call may have been found before the body was
-  // type-checked, as the call of the initializer rather than its application
-  // to `super`. Look through it for a C++ foreign reference type.
-  if (auto selfApply = dyn_cast<SelfApplyExpr>(apply->getSemanticFn())) {
-    if (auto ref = dyn_cast<OtherConstructorDeclRefExpr>(
-            selfApply->getSemanticFn())) {
-      auto classDecl = ref->getDecl()->getDeclContext()->getSelfClassDecl();
-      if (classDecl && classDecl->isForeignReferenceType())
-        apply = selfApply;
-    }
-  }
-
   // Make sure we are referring to a designated initializer.
   auto otherCtorRef = dyn_cast<OtherConstructorDeclRefExpr>(
                         apply->getSemanticFn());
@@ -2315,20 +2327,10 @@ static bool checkSuperInit(ConstructorDecl *fromCtor,
       auto &ctx = fromCtor->getASTContext();
       if (ctx.LangOpts.hasFeature(Feature::ForeignReferenceTypeSubclassing) &&
           classDecl->isForeignReferenceType()) {
-        // Only a C++ constructor can construct the base subobject of this
-        // object.
-        if (ctx.getClangModuleLoader()->getOriginalForeignReferenceConstructor(
-                ctor))
+        if (!implicitlyGenerated)
           return false;
-
-        auto loc = implicitlyGenerated ? fromCtor->getLoc()
-                                       : apply->getArgs()->getLoc();
-        ctx.Diags.diagnose(loc,
-                           diag::chain_foreign_reference_non_constructor_init,
-                           implicitlyGenerated, ctor,
-                           classDecl->getDeclaredInterfaceType());
-        ctor->diagnose(diag::decl_declared_here, ctor);
-        return true;
+        return TypeChecker::diagnoseForeignReferenceSuperInit(
+            ctor, fromCtor->getLoc(), /*implicitlyGenerated=*/true);
       }
     }
     if (!implicitlyGenerated) {

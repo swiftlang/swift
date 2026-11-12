@@ -4768,7 +4768,7 @@ getSILFunctionTypeForForeignReferenceInitializer(TypeConverter &TC,
 static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
     TypeConverter &TC, TypeExpansionContext context, SILDeclRef constant,
     TypeConverter::LoweredFormalTypes bridgedTypes) {
-  if (constant.isForeignReferenceInitializer())
+  if (constant.isCXXForeignReferenceInitializer())
     return getSILFunctionTypeForForeignReferenceInitializer(TC, context,
                                                             constant);
 
@@ -4940,7 +4940,7 @@ TypeConverter::getDeclRefRepresentation(SILDeclRef c) {
       return SILFunctionTypeRepresentation::CFunctionPointer;
 
     // A C++ constructor applied to a subclass's storage takes it as `this`.
-    if (c.isForeignReferenceInitializer())
+    if (c.isCXXForeignReferenceInitializer())
       return SILFunctionTypeRepresentation::CXXMethod;
 
     if (const auto *method = getImplementedCXXMethod(c.getDecl())) {
@@ -5458,7 +5458,7 @@ getAbstractionPatternForConstant(TypeConverter &converter, ASTContext &ctx,
   // The initializing entry point of a C++ foreign reference type's constructor
   // is bridged like that constructor applied to `this`, rather than like the
   // static factory that the initializer was imported from.
-  if (constant.isForeignReferenceInitializer()) {
+  if (constant.isCXXForeignReferenceInitializer()) {
     auto cxxCtor =
         ctx.getClangModuleLoader()->getOriginalForeignReferenceConstructor(
             cast<ConstructorDecl>(bridgedFn));

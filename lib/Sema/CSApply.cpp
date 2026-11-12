@@ -3533,6 +3533,12 @@ namespace {
         }
       }
 
+      // A `super.init` call from a Swift subclass of a C++ foreign reference
+      // type must construct the base subobject.
+      if (base->isSuperExpr() && !implicit && !SuppressDiagnostics)
+        TypeChecker::diagnoseForeignReferenceSuperInit(
+            ctor, nameLoc.getBaseNameLoc(), /*implicitlyGenerated=*/false);
+
       // Build a partial application of the delegated initializer.
       auto callee = resolveConcreteDeclRef(ctor, ctorLocator);
       Expr *ctorRef = buildOtherConstructorRef(overload.adjustedOpenedFullType, callee,
