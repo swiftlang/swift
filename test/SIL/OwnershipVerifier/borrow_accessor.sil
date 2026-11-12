@@ -230,3 +230,41 @@ bb1(%6 : @guaranteed $KlassPair):
   %12 = tuple ()
   return %12
 }
+
+sil @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+sil @mutate_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @inout Klass
+
+// The address result of an accessor with an object self is an interior pointer
+// of self.
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_address_result_use_after_end_borrow'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = begin_borrow %0 : $Wrapper
+// CHECK: Consuming User:   end_borrow %2 : $Wrapper
+// CHECK: Non Consuming User:   store %1 to [assign] %4 : $*Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_address_result_use_after_end_borrow'
+sil [ossa] @test_address_result_use_after_end_borrow : $@convention(thin) (@owned Wrapper, @owned Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : @owned $Klass):
+  %2 = begin_borrow %0
+  %3 = function_ref @mutate_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @inout Klass
+  %4 = apply %3(%2) : $@convention(method) (@guaranteed Wrapper) -> @inout Klass
+  end_borrow %2
+  store %1 to [assign] %4
+  destroy_value %0
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_address_result_returned_after_end_borrow'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = load_borrow %0 : $*Wrapper
+// CHECK: Consuming User:   end_borrow %2 : $Wrapper
+// CHECK: Non Consuming User:   return %3 : $*Klass
+// CHECK-LABEL: Error#: 0. End Error in Function: 'test_address_result_returned_after_end_borrow'
+sil [ossa] @test_address_result_returned_after_end_borrow : $@convention(method) (@in_guaranteed Wrapper) -> @guaranteed_address Klass {
+bb0(%0 : $*Wrapper):
+  %1 = function_ref @borrow_address_of_object_self : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  %2 = load_borrow %0
+  %3 = apply %1(%2) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed_address Klass
+  end_borrow %2
+  return %3
+}
