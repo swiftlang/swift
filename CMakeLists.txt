@@ -1840,6 +1840,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
           -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
+          -DSwiftCore_ENABLE_SYMBOL_GRAPHS=${SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(_stdlib_needs_swift_frontend)
         add_dependencies("${stdlib_target}-core" swift-frontend libSwiftScan)
