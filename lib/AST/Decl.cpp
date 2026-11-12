@@ -6448,6 +6448,10 @@ TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeEscapable() const {
   return canConformTo(InvertibleProtocolKind::Escapable);
 }
 
+TypeDecl::CanBeInvertible::Result NominalTypeDecl::canBeTransferable() const {
+  return canConformTo(InvertibleProtocolKind::Transferable);
+}
+
 Type TypeDecl::getDeclaredInterfaceType() const {
   if (auto *NTD = dyn_cast<NominalTypeDecl>(this))
     return NTD->getDeclaredInterfaceType();

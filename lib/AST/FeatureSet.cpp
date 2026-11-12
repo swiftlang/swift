@@ -1072,8 +1072,7 @@ private:
 
     // This covers ~Transferable, including through a superclass or a
     // conditional conformance, for types from any module.
-    if (nominal->canConformTo(InvertibleProtocolKind::Transferable) !=
-        TypeDecl::CanBeInvertible::Always)
+    if (nominal->canBeTransferable() != TypeDecl::CanBeInvertible::Always)
       return true;
 
     if (inheritanceUses(nominal) ||
