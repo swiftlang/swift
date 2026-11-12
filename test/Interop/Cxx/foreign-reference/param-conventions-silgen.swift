@@ -1,5 +1,6 @@
-// A Swift function borrows a foreign reference type parameter unless it is
-// consumed, and a C++ method borrows `this`. Neither copies it on entry.
+// Swift, C and C++ functions borrow a foreign reference type parameter unless
+// it is consumed, and a C++ method borrows `this`. A Swift function does not
+// copy it on entry.
 
 // RUN: %target-swift-emit-silgen %s -I %S/Inputs -cxx-interoperability-mode=default -target %target-swift-5.8-abi-triple | %FileCheck %s
 
@@ -83,15 +84,39 @@ public func callC(_ s: Shared, _ i: Immortal) {
   takesImmortal(i)
 }
 
-// CHECK-LABEL: sil {{.*}}[clang takesPtr] @$sSo8takesPtryySo6SharedVFTo : $@convention(c) (Shared) -> ()
-// CHECK-LABEL: sil {{.*}}[clang takesNullablePtr] @$sSo16takesNullablePtryySo6SharedVSgFTo : $@convention(c) (Optional<Shared>) -> ()
-// CHECK-LABEL: sil {{.*}}[clang takesRef] @$sSo8takesRefyySo6SharedVFTo : $@convention(c) (Shared) -> ()
-// CHECK-LABEL: sil {{.*}}[clang takesConstRef] @$sSo13takesConstRefyySo6SharedVFTo : $@convention(c) (Shared) -> ()
+// CHECK-LABEL: sil {{.*}}[clang takesPtr] @$sSo8takesPtryySo6SharedVFTo : $@convention(c) (@guaranteed Shared) -> ()
+// CHECK-LABEL: sil {{.*}}[clang takesNullablePtr] @$sSo16takesNullablePtryySo6SharedVSgFTo : $@convention(c) (@guaranteed Optional<Shared>) -> ()
+// CHECK-LABEL: sil {{.*}}[clang takesRef] @$sSo8takesRefyySo6SharedVFTo : $@convention(c) (@guaranteed Shared) -> ()
+// CHECK-LABEL: sil {{.*}}[clang takesConstRef] @$sSo13takesConstRefyySo6SharedVFTo : $@convention(c) (@guaranteed Shared) -> ()
 // CHECK-LABEL: sil {{.*}}[clang consumesPtr] @$sSo11consumesPtryySo6SharedVnFTo : $@convention(c) (@owned Shared) -> ()
 // CHECK-LABEL: sil {{.*}}[clang consumesNullablePtr] @$sSo19consumesNullablePtryySo6SharedVSgnFTo : $@convention(c) (@owned Optional<Shared>) -> ()
 
+// A closure passed as a C function pointer borrows its argument too.
 // CHECK-LABEL: sil private [ossa] @$s4main5callCyySo6SharedV_So8ImmortalVtFs5Int32VADcfU_ : $@convention(thin) (@guaranteed Shared) -> Int32 {
-// CHECK-LABEL: sil private [thunk] [ossa] @$s4main5callCyySo6SharedV_So8ImmortalVtFs5Int32VADcfU_To : $@convention(c) (Shared) -> Int32 {
-// CHECK-LABEL: sil {{.*}}[clang callWith] @$sSo8callWithys5Int32VACSo6SharedVXC_AEtFTo : $@convention(c) (@convention(c) (Shared) -> Int32, Shared) -> Int32
+// CHECK-LABEL: sil private [thunk] [ossa] @$s4main5callCyySo6SharedV_So8ImmortalVtFs5Int32VADcfU_To : $@convention(c) (@guaranteed Shared) -> Int32 {
+// CHECK:       bb0(%0 : @guaranteed $Shared):
+// CHECK-LABEL: sil {{.*}}[clang callWith] @$sSo8callWithys5Int32VACSo6SharedVXC_AEtFTo : $@convention(c) (@convention(c) (@guaranteed Shared) -> Int32, @guaranteed Shared) -> Int32
 
 // CHECK-LABEL: sil {{.*}}[clang takesImmortal] @$sSo13takesImmortalyySo0B0VFTo : $@convention(c) (Immortal) -> ()
+
+// A named function or an `@c` function passed as a C function pointer borrows
+// its argument, as a closure does. An `@c` function does not copy it on entry.
+// CHECK-LABEL: sil hidden [asmname "cValue"] [ossa] @$s4main6cValueys5Int32VSo6SharedVFTo : $@convention(c) (@guaranteed Shared) -> Int32 {
+// CHECK:       bb0(%0 : @guaranteed $Shared):
+// CHECK-NOT:     copy_value
+// CHECK-LABEL: } // end sil function '$s4main6cValueys5Int32VSo6SharedVFTo'
+
+// CHECK-LABEL: sil [ossa] @$s4main9callNamedyySo6SharedVF : $@convention(thin) (@guaranteed Shared) -> () {
+// CHECK:         function_ref @$s4main10namedValueys5Int32VSo6SharedVFTo : $@convention(c) (@guaranteed Shared) -> Int32
+// CHECK:         function_ref @$s4main6cValueys5Int32VSo6SharedVFTo : $@convention(c) (@guaranteed Shared) -> Int32
+// CHECK-LABEL: } // end sil function '$s4main9callNamedyySo6SharedVF'
+
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s4main10namedValueys5Int32VSo6SharedVFTo : $@convention(c) (@guaranteed Shared) -> Int32 {
+// CHECK:       bb0(%0 : @guaranteed $Shared):
+func namedValue(_ s: Shared) -> Int32 { return s.value() }
+@c func cValue(_ s: Shared) -> Int32 { return s.value() }
+
+public func callNamed(_ s: Shared) {
+  _ = callWith(namedValue, s)
+  _ = callWith(cValue, s)
+}

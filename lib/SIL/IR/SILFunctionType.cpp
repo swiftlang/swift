@@ -4229,6 +4229,10 @@ public:
                            const TypeLowering &substTL) const override {
     if (cast<clang::FunctionProtoType>(FnType)->isParamConsumed(index))
       return ParameterConvention::Direct_Owned;
+    // A C++ caller keeps a pointer or reference argument alive for the whole
+    // call, so the callee borrows it.
+    if (substTL.getLoweredType().unwrapOptionalType().isForeignReferenceType())
+      return ParameterConvention::Direct_Guaranteed;
     auto *cml = substTL.getLoweredType()
                     .getASTType()
                     ->getASTContext()

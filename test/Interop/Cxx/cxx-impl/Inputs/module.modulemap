@@ -62,3 +62,8 @@ module Virtual {
   header "virtual.h"
   requires cplusplus
 }
+
+module ForeignReferenceFree {
+  header "foreign-reference-free.h"
+  requires cplusplus
+}
