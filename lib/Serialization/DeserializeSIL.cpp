@@ -677,6 +677,22 @@ SILDeserializer::readDebugVariable(SILFunction *Fn, SILBuilder &Builder,
                                        Expressions.element_end()));
 }
 
+llvm::Expected<std::optional<SILDebugVariable>>
+SILDeserializer::readAllocationDebugVariable(SILFunction *Fn,
+                                             SILBuilder &Builder) {
+  SmallVector<uint64_t, 16> scratch;
+  auto maybeKind = readNextRecord(scratch);
+  if (!maybeKind)
+    return maybeKind.takeError();
+  if (maybeKind.get() != SIL_DEBUG_VALUE)
+    return llvm::createStringError("Expected the allocation's debug variable");
+
+  unsigned TyCategory, Attr;
+  ArrayRef<uint64_t> ListOfValues;
+  SILDebugValueLayout::readRecord(scratch, TyCategory, Attr, ListOfValues);
+  return readDebugVariable(Fn, Builder, Attr, TyCategory, ListOfValues);
+}
+
 /// Helper function to find a SILDifferentiabilityWitness, given its mangled
 /// key.
 SILDifferentiabilityWitness *
@@ -2073,9 +2089,16 @@ llvm::Error SILDeserializer::readSILInstruction(
         UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
     auto pointerEscape = HasPointerEscape_t((Attr >> 3) & 0x1);
     auto inferredImmutable = (Attr >> 4) & 0x1;
+    std::optional<SILDebugVariable> DebugVar;
+    if ((Attr >> 5) & 0x1) {
+      auto MaybeVar = readAllocationDebugVariable(Fn, Builder);
+      if (!MaybeVar)
+        return MaybeVar.takeError();
+      DebugVar = MaybeVar.get();
+    }
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
-        std::nullopt, hasDynamicLifetime, reflection,
+        DebugVar, hasDynamicLifetime, reflection,
         usesMoveableValueDebugInfo,
         /*skipVarDeclAssert*/ false, pointerEscape, inferredImmutable);
     break;
@@ -2087,9 +2110,20 @@ llvm::Error SILDeserializer::readSILInstruction(
     auto isFromVarDecl = IsFromVarDecl_t((Attr >> 2) & 0x1);
     auto wasMoved = UsesMoveableValueDebugInfo_t((Attr >> 3) & 0x1);
     auto isNested = StackAllocationIsNested_t((Attr >> 4) & 0x1);
+    std::optional<SILDebugVariable> DebugVar;
+    if ((Attr >> 5) & 0x1) {
+      auto MaybeVar = readAllocationDebugVariable(Fn, Builder);
+      if (!MaybeVar)
+        return MaybeVar.takeError();
+      DebugVar = MaybeVar.get();
+    }
+    // createAllocStack ignores the location override for the variable.
+    // The location override contains the correct deserialized location here,
+    // so pass it through.
     auto ASI = Builder.createAllocStack(
-        Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        std::nullopt, hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
+        Builder.getCurrentDebugLocOverride().value_or(Loc),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        DebugVar, hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
     ASI->setStackAllocationIsNested(isNested);
     ResultInst = ASI;
     break;

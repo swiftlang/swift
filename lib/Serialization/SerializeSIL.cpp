@@ -1315,9 +1315,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     flags |= unsigned(ABI->usesMoveableValueDebugInfo()) << 2;
     flags |= unsigned(ABI->hasPointerEscape()) << 3;
     flags |= unsigned(ABI->isInferredImmutable()) << 4;
+    auto DebugVar = Options.SerializeDebugInfoSIL
+                        ? ABI->getVarInfo(/*complete=*/ false)
+                        : std::nullopt;
+    flags |= unsigned(DebugVar.has_value()) << 5;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
                        ABI->getType());
+    if (DebugVar) {
+      SmallVector<uint64_t, 8> ListOfValues;
+      writeDebugVariable(SI, DebugVar, 0, ListOfValues);
+    }
     break;
   }
   case SILInstructionKind::AllocRefInst:
@@ -1363,7 +1371,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     attr |= unsigned(ASI->isFromVarDecl()) << 2;
     attr |= unsigned(ASI->usesMoveableValueDebugInfo()) << 3;
     attr |= unsigned(ASI->isStackAllocationNested()) << 4;
+    auto DebugVar = Options.SerializeDebugInfoSIL
+                        ? ASI->getVarInfo(/*complete*/ false)
+                        : std::nullopt;
+    attr |= unsigned(DebugVar.has_value()) << 5;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
+    if (DebugVar) {
+      SmallVector<uint64_t, 8> ListOfValues;
+      writeDebugVariable(SI, DebugVar, 0, ListOfValues);
+    }
     break;
   }
   case SILInstructionKind::AllocPackInst: {
