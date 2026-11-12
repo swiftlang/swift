@@ -157,7 +157,7 @@ func captureInRegularClosure(
   optF: consuming (@callable(once) () -> Void)? = nil
 ) {
   _ = { [f] in f() } // expected-error {{non-'Copyable' 'f' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
-                     // expected-note@-1 {{consumed here}}
+                     // expected-note@-1 {{called here; calling a '@callable(once)' function consumes it}}
   _ = { g() } // expected-note {{consumed here}}
 
   guard let optF else { return }
@@ -382,4 +382,105 @@ func callRethrowsAtMostOnce() throws {
   rethrowsCallOptionalAtMostOnce(nil)
   rethrowsCallOptionalAtMostOnce { }
   _ = try rethrowsForwardAtMostOnce { () throws -> Int in throw RethrowsError() }
+}
+
+// A stored at-most-once function of a borrowed value can't be called, because
+// calling it consumes it.
+
+struct Callbacks: ~Copyable {
+  var onDone: @callable(once) () -> Void
+
+  func finish() {
+    // expected-error@-1 {{'self' is borrowed and cannot be consumed}}
+    onDone() // expected-note {{called here; calling a '@callable(once)' function consumes it}}
+  }
+}
+
+func testCallStoredFunction(_ c: borrowing Callbacks) {
+  // expected-error@-1 {{'c' is borrowed and cannot be consumed}}
+  c.onDone() // expected-note {{called here; calling a '@callable(once)' function consumes it}}
+}
+
+struct Payload: ~Copyable {}
+func takePayload(_ p: consuming Payload) {}
+
+struct CallbackAndPayload: ~Copyable {
+  var onDone: @callable(once) () -> Void
+  var payload: Payload
+}
+
+// Both consumes share one destructure, which isn't only for a call.
+func testCallAndConsumeFields(_ c: borrowing CallbackAndPayload) {
+  // expected-error@-1 {{'c' is borrowed and cannot be consumed}}
+  c.onDone() // expected-note {{consumed here}}
+  takePayload(c.payload)
+}
+
+// A borrowed at-most-once value can't be called either. It can be inspected
+// and borrowed again.
+
+func inspectAtMostOnce(_ f: borrowing @callable(once) () -> Void) {}
+func inspectEscapingAtMostOnce(
+  _ f: borrowing @escaping @callable(once) () -> Void
+) {}
+func run(_ body: () -> Void) { body() }
+
+func borrowedThenCalled(_ f: @callable(once) () -> Void) {
+  inspectAtMostOnce(f)
+  f()
+}
+
+func borrowedByNonescapingClosure(_ f: borrowing @callable(once) () -> Void) {
+  run { inspectAtMostOnce(f) }
+}
+
+func borrowedQueries(
+  _ f: borrowing @escaping @isolated(any) @callable(once) () -> Void
+) -> (any Actor)? {
+  _ = type(of: f)
+  return f.isolation
+}
+
+func borrowedCalled(_ f: borrowing @callable(once) (Int) -> Int) -> Int {
+  // expected-error@-1 {{'f' is borrowed and cannot be called}}
+  f(1) // expected-note {{called here; calling a '@callable(once)' function consumes it}}
+}
+
+func borrowedThrowingCalled(
+  _ f: borrowing @callable(once) () throws -> Void
+) throws {
+  // expected-error@-2 {{'f' is borrowed and cannot be called}}
+  try f() // expected-note {{called here; calling a '@callable(once)' function consumes it}}
+}
+
+func borrowedCapturedAndCalled(_ f: borrowing @callable(once) () -> Void) {
+  // expected-error@-1 {{non-'Copyable' 'f' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
+  run { f() } // expected-note {{called here; calling a '@callable(once)' function consumes it}}
+}
+
+func borrowedCalledOrConsumed(
+  _ b: Bool, _ f: borrowing @callable(once) () -> Void
+) {
+  // expected-error@-2 {{'f' is borrowed and cannot be consumed}}
+  if b {
+    f() // expected-note {{called here; calling a '@callable(once)' function consumes it}}
+  } else {
+    let _ = f // expected-note {{consumed here}}
+  }
+}
+
+func borrowedReturned(
+  _ f: borrowing @escaping @callable(once) () -> Void
+  // expected-error@-1 {{'f' is borrowed and cannot be consumed}}
+) -> @callable(once) () -> Void {
+  return f // expected-note {{consumed here}}
+}
+
+func borrowedCapturedByEscapingClosure(
+  _ f: borrowing @escaping @callable(once) () -> Void
+) {
+  // expected-error@-2 {{'f' cannot be captured by an escaping closure since it is a borrowed parameter}}
+  let g: () -> Void = { inspectEscapingAtMostOnce(f) }
+  // expected-note@-1 {{closure capturing 'f' here}}
+  g()
 }

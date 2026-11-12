@@ -47,6 +47,14 @@
 // RUN: %target-run %t/onone.out callThroughThunk | %FileCheck %s --check-prefix=CALL-callThroughThunk
 // RUN: %target-run %t/opt.out callThroughThunk | %FileCheck %s --check-prefix=CALL-callThroughThunk
 //
+// RUN: %target-run %t/onone.out callAfterBorrowing | %FileCheck %s --check-prefix=CALL-callAfterBorrowing
+// RUN: %target-run %t/opt.out callAfterBorrowing | %FileCheck %s --check-prefix=CALL-callAfterBorrowing
+// RUN: %target-run %t/onone.out callAfterClosureBorrowing | %FileCheck %s --check-prefix=CALL-callAfterClosureBorrowing
+// RUN: %target-run %t/opt.out callAfterClosureBorrowing | %FileCheck %s --check-prefix=CALL-callAfterClosureBorrowing
+// RUN: %target-run %t/onone.out callLocalAfterBorrowing | %FileCheck %s --check-prefix=CALL-callLocalAfterBorrowing
+// RUN: %target-run %t/opt.out callLocalAfterBorrowing | %FileCheck %s --check-prefix=CALL-callLocalAfterBorrowing
+// RUN: %target-run %t/onone.out borrowedIsolation | %FileCheck %s --check-prefix=CALL-borrowedIsolation
+// RUN: %target-run %t/opt.out borrowedIsolation | %FileCheck %s --check-prefix=CALL-borrowedIsolation
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out drop 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out drop 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropWithResource 2>&1 | %FileCheck %s --check-prefix=DROP
@@ -279,6 +287,52 @@ func transparentForwarded(_ f: @once () -> Void) {
   transparentRebound(f)
 }
 
+// Borrowing an exactly-once closure doesn't call it or drop it.
+@inline(never)
+func inspect(_ f: borrowing @once () -> Void) {
+  print("inspected")
+}
+
+@inline(never)
+func inspectEscaping(_ f: borrowing @escaping @once () -> Void) {
+  print("inspected")
+}
+
+func withBody(_ body: () -> Void) { body() }
+
+@inline(never)
+func borrowAndCall(_ f: @once () -> Void) {
+  inspect(f)
+  inspect(f)
+  f()
+  print("called")
+}
+
+@inline(never)
+func borrowInClosureAndCall(_ f: @once () -> Void) {
+  withBody { inspect(f) }
+  f()
+  print("called")
+}
+
+@inline(never)
+func isolation(
+  _ f: borrowing @escaping @isolated(any) @once () async -> Void
+) -> (any Actor)? {
+  f.isolation
+}
+
+@MainActor func onMainActor() { print("called on main actor") }
+
+func borrowedIsolation() async {
+  let f: @isolated(any) @once () async -> Void = { @MainActor in
+    onMainActor()
+  }
+  let actor = isolation(f)
+  print("main actor: \(actor.map { $0 === MainActor.shared } ?? false)")
+  await f()
+}
+
 @inline(never)
 func genericCall<R>(_ f: @once () -> R) -> R {
   let result = f()
@@ -314,6 +368,15 @@ func run(_ which: String, _ box: Box, _ resource: consuming Resource) {
     // A stack-promoted closure doesn't own the noncopyable value that it
     // borrows, so calling the closure must not destroy that value.
     call { print(resource.name) }
+  case "callAfterBorrowing":
+    borrowAndCall { _ = consume resource }
+  case "callAfterClosureBorrowing":
+    borrowInClosureAndCall { _ = consume resource }
+  case "callLocalAfterBorrowing":
+    let f: @once () -> Void = { _ = consume resource }
+    inspectEscaping(f)
+    f()
+    print("called")
   case "dropCaptureless":
     drop { print("never") }
   case "dropEscapingCaptureless":
@@ -363,6 +426,8 @@ case "dropGenericConsumingAndInout":
   dropGenericConsumingAndInout(1)
 case "dropMixed":
   dropMixed(Resource(name: "consumed"), Resource(name: "borrowed"))
+case "borrowedIsolation":
+  await borrowedIsolation()
 default:
   run(CommandLine.arguments[1], Box(), Resource(name: "r"))
 }
@@ -394,6 +459,25 @@ default:
 // CALL-callInlinedForwarded: Resource r deinit
 // CALL-callInlinedForwarded-NEXT: called
 // CALL-callInlinedForwarded-NOT: deinit
+
+// CALL-callAfterBorrowing: inspected
+// CALL-callAfterBorrowing-NEXT: inspected
+// CALL-callAfterBorrowing-NEXT: Resource r deinit
+// CALL-callAfterBorrowing-NEXT: called
+// CALL-callAfterBorrowing-NOT: deinit
+
+// CALL-callAfterClosureBorrowing: inspected
+// CALL-callAfterClosureBorrowing-NEXT: Resource r deinit
+// CALL-callAfterClosureBorrowing-NEXT: called
+// CALL-callAfterClosureBorrowing-NOT: deinit
+
+// CALL-callLocalAfterBorrowing: inspected
+// CALL-callLocalAfterBorrowing-NEXT: Resource r deinit
+// CALL-callLocalAfterBorrowing-NEXT: called
+// CALL-callLocalAfterBorrowing-NOT: deinit
+
+// CALL-borrowedIsolation: main actor: true
+// CALL-borrowedIsolation-NEXT: called on main actor
 
 // CALL-callThroughThunk: called
 // CALL-callThroughThunk-NEXT: hello

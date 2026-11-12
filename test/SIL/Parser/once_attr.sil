@@ -20,6 +20,22 @@ bb0(%0 : @owned $@once @callee_owned () -> ()):
   return %pa : $@once @callee_owned () -> ()
 }
 
+// An ordinary on-stack closure can borrow an exactly-once value, since it
+// doesn't own the value.
+// CHECK-LABEL: sil [ossa] @on_stack_borrows_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> () {
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%.*}}(%0) : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+// CHECK: } // end sil function 'on_stack_borrows_called_exactly_once'
+sil [ossa] @on_stack_borrows_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> () {
+bb0(%0 : @guaranteed $@noescape @once @callee_owned () -> ()):
+  %f = function_ref @borrow_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %f(%0) : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+  destroy_value %pa : $@noescape @callee_guaranteed () -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @borrow_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+
 // The on-stack form, as produced by closure stack promotion.
 // CHECK-LABEL: sil [ossa] @on_stack_called_exactly_once : $@convention(thin) () -> () {
 // CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] [called_once] {{%.*}}() : $@convention(thin) () -> ()

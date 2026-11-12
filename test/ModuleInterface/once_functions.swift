@@ -154,6 +154,28 @@ public func aliasInFunctionType(_: (FnType) -> Void) {}
 // CHECK: public func aliasConsumingInFunctionType(_: (consuming OnceFunctions::FnType) -> Swift::Void)
 public func aliasConsumingInFunctionType(_: (consuming FnType) -> Void) {}
 
+// An explicit `borrowing` is printed, and so is `borrowing` in a function type.
+
+// CHECK: #if compiler(>=5.3) && $OnceFunctions
+// CHECK: public func explicitBorrowing(_: borrowing @once () -> ())
+// CHECK: #endif
+public func explicitBorrowing(_: borrowing @once () -> ()) {}
+
+// CHECK: public func aliasBorrowing(_: borrowing OnceFunctions::FnType)
+public func aliasBorrowing(_: borrowing FnType) {}
+
+// CHECK: #if compiler(>=5.3) && $OnceFunctions
+// CHECK: public func explicitBorrowingInFunctionType(_: (borrowing @callable(once) () -> Swift::Void) -> Swift::Void)
+// CHECK: #endif
+public func explicitBorrowingInFunctionType(
+  _: (borrowing @callable(once) () -> Void) -> Void
+) {}
+
+// CHECK: #if compiler(>=5.3) && $OnceFunctions
+// CHECK: @inlinable public func inlinableBorrowing(_ x: borrowing @once () -> ()) { explicitBorrowing(x) }
+// CHECK: #endif
+@inlinable public func inlinableBorrowing(_ x: borrowing @once () -> ()) { explicitBorrowing(x) }
+
 //--- Client.swift
 
 import OnceFunctions
@@ -164,6 +186,23 @@ import OnceFunctions
 // CLIENT-DAG: function_ref @$s13OnceFunctions17explicitConsumingyyyyXEnF
 // CLIENT-DAG: function_ref @$s13OnceFunctions4TestV1fyyyyyXEnXEF
 // CLIENT-DAG: function_ref @$s13OnceFunctions31explicitConsumingInFunctionTypeyyyyyXEnXEF
+
+// A `borrowing` parameter stays borrowed.
+
+// CLIENT-DAG: function_ref @$s13OnceFunctions17explicitBorrowingyyyyXEF : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+// CLIENT-DAG: function_ref @$s13OnceFunctions14aliasBorrowingyyyyXEF : $@convention(thin) (@guaranteed @noescape @callable(once) @callee_owned () -> ()) -> ()
+// CLIENT-DAG: function_ref @$s13OnceFunctions31explicitBorrowingInFunctionTypeyyyyyXEXEF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (@guaranteed @noescape @callable(once) @callee_owned () -> ()) -> ()) -> ()
+// CLIENT-DAG: function_ref @$s13OnceFunctions18inlinableBorrowingyyyyXEF : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+
+func useBorrowingOnceFunctions(
+  _ f: @once () -> Void, _ g: @callable(once) () -> Void
+) {
+  explicitBorrowing(f)
+  inlinableBorrowing(f)
+  f()
+  aliasBorrowing(g)
+  explicitBorrowingInFunctionType { _ in }
+}
 
 func useOnceFunctions(_ t: borrowing Test) {
   test1 {}

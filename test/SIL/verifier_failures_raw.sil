@@ -1,0 +1,25 @@
+// RUN: %target-sil-opt -sil-verify-all=false -enable-sil-verify-all=false -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck '--implicit-check-not=Begin Error' %s
+
+// Verifier failures that are specific to raw SIL. See verifier_failures.sil
+// for why sil-verify-all is turned off.
+
+// REQUIRES: asserts
+
+sil_stage raw
+
+import Builtin
+
+// In raw SIL, an ordinary closure can borrow an exactly-once value only if the
+// closure is nonescaping, because ClosureLifetimeFixup then puts it on the
+// stack. An escaping closure owns its captures.
+// CHECK-LABEL: Begin Error in function escaping_closure_borrows_called_exactly_once
+// CHECK:       SIL verification failed: only a nondeinitable closure can capture a nondeinitable function value
+// CHECK-LABEL: End Error in function escaping_closure_borrows_called_exactly_once
+sil [ossa] @escaping_closure_borrows_called_exactly_once : $@convention(thin) (@owned @noescape @once @callee_owned () -> ()) -> @owned @callee_guaranteed () -> () {
+bb0(%0 : @owned $@noescape @once @callee_owned () -> ()):
+  %f = function_ref @borrow_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+  %pa = partial_apply [callee_guaranteed] %f(%0) : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+  return %pa : $@callee_guaranteed () -> ()
+}
+
+sil @borrow_called_exactly_once : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()

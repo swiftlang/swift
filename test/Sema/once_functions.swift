@@ -304,16 +304,43 @@ func exactlyOnceArgumentConversions(fn: @escaping () -> Void, exactlyOnce: @once
 }
 
 func exactlyOnceOwnership(
-  _: borrowing @once () -> Void,
-  // expected-error@-1 {{'@once' cannot be used together with 'borrowing'}}
+  _: borrowing @once () -> Void, // Ok
   _: consuming @once () -> Void, // Ok
   _: inout @once () -> Void // Ok
 ) {}
 
 func exactlyOnceTupleOwnership(
-  _: (borrowing @once () -> Void) -> Void
-  // expected-error@-1 {{'@once' cannot be used together with 'borrowing'}}
+  _: (borrowing @once () -> Void) -> Void // Ok
 ) {}
+
+func atMostOnceOwnership(
+  _: borrowing @callable(once) () -> Void, // Ok
+  _: borrowing @escaping @callable(once) () -> Void, // Ok
+  _: (borrowing @callable(once) () -> Void) -> Void // Ok
+) {}
+
+// A borrowed function value can't be called, but its type and isolation can
+// be queried, and it can be passed to another borrowing parameter.
+func borrowedQueries(
+  _ exactlyOnce: borrowing @escaping @once () -> Void,
+  _ atMostOnce: borrowing @escaping @isolated(any) @callable(once) () -> Void
+) {
+  let _: (@once () -> Void).Type = type(of: exactlyOnce)
+  let _: (@isolated(any) @callable(once) () -> Void).Type = type(of: atMostOnce)
+  let _: (any Actor)? = atMostOnce.isolation
+  let _: Int = MemoryLayout<@once () -> Void>.size
+  // expected-error@-1 {{type '@once () -> Void' does not conform to protocol 'Deinitable'}}
+  let _: Int = MemoryLayout<@callable(once) () -> Void>.size
+}
+
+func borrowedForwarding(_ f: borrowing @once () -> Void) {
+  func inspect(_: borrowing @once () -> Void) {}
+  func inspectAtMostOnce(_: borrowing @callable(once) () -> Void) {}
+
+  inspect(f) // Ok
+  inspectAtMostOnce(f)
+  // expected-error@-1 {{invalid conversion from '@once' function of type '@once () -> Void' to function type '@callable(once) () -> Void'}}
+}
 
 // exactly-once parameters are `consuming` by default.
 protocol P_ExactlyOnce {
@@ -1105,6 +1132,10 @@ func printedAndAtMostOnce(
 }
 
 func printedExplicitlyConsuming(_: consuming @once () -> Void) {}
+func printedBorrowing(_: borrowing @once () -> Void) {}
+func printedBorrowingInFunctionType(
+  _: (borrowing @callable(once) () -> Void) -> Void
+) {}
 func printedInOut(_: inout @callable(once) () -> Void) {}
 func printedExplicitlyConsumingInFunctionType(
   _: (consuming @callable(once) () -> Void) -> Void
@@ -1126,6 +1157,10 @@ func printedTypes() {
   // expected-error@-1 {{cannot convert value of type '(@once () -> Void) -> ()' to specified type 'Int'}}
   let _: Int = printedInOut
   // expected-error@-1 {{cannot convert value of type '(inout @callable(once) () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = printedBorrowing
+  // expected-error@-1 {{cannot convert value of type '(borrowing @once () -> Void) -> ()' to specified type 'Int'}}
+  let _: Int = printedBorrowingInFunctionType
+  // expected-error@-1 {{cannot convert value of type '((borrowing @callable(once) () -> Void) -> Void) -> ()' to specified type 'Int'}}
   let _: Int = printedExplicitlyConsumingInFunctionType
   // expected-error@-1 {{cannot convert value of type '((@callable(once) () -> Void) -> Void) -> ()' to specified type 'Int'}}
   let _: Int = printedAlias
