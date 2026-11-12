@@ -7,5 +7,5 @@
 # including directory and its subdirectories.
 
 add_compile_options(
-  "$<$<AND:$<PLATFORM_ID:Linux,Android>,$<COMPILE_LANGUAGE:C,CXX>>:-fno-omit-frame-pointer>"
-  "$<$<AND:$<PLATFORM_ID:Linux,Android>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xcc -fno-omit-frame-pointer>")
+  "$<$<COMPILE_LANGUAGE:C,CXX>:-fno-omit-frame-pointer>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -fno-omit-frame-pointer>")
