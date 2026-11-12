@@ -107,10 +107,7 @@ func eliminateRedundantLoads(in function: Function,
     var iter = block.instructions.reversed().first
     while let succ = iter, let inst = succ.previous {
 
-      // TODO: replace this with `if let inst as? LoadingInstruction` once the toolchain builders are
-      // upgraded to a compiler version with fast type casting (https://github.com/swiftlang/swift/pull/88270).
-      if inst is LoadInst || inst is CopyAddrInst {
-        let load = inst as! LoadingInstruction
+      if let load = inst.asLoadingInstruction {
         if !context.continueWithNextSubpassRun(for: load) {
           return changed
         }
@@ -130,6 +127,21 @@ func eliminateRedundantLoads(in function: Function,
     }
   }
   return changed
+}
+
+private extension Instruction {
+  // TODO: replace this with `self as? LoadingInstruction` once the toolchain builders are upgraded to a compiler
+  // version with fast type casting (https://github.com/swiftlang/swift/pull/88270). Until then, casting to the
+  // concrete classes avoids a slow dynamic cast to the protocol.
+  var asLoadingInstruction: LoadingInstruction? {
+    if let load = self as? LoadInst {
+      return load
+    }
+    if let copy = self as? CopyAddrInst {
+      return copy
+    }
+    return nil
+  }
 }
 
 /// Either a `load` or a `copy_addr` (which is equivalent to a load+store).
@@ -560,6 +572,7 @@ private struct InstructionScanner {
   private let accessPath: AccessPath
   private let storageDefBlock: BasicBlock?
   private let aliasAnalysis: AliasAnalysis
+  private let loadAddress: AddressWithAccessPath
 
   private(set) var potentiallyRedundantSubpath: AccessPath? = nil
   private(set) var availableValues = Array<AvailableValue>()
@@ -569,6 +582,7 @@ private struct InstructionScanner {
     self.accessPath = accessPath
     self.storageDefBlock = accessPath.base.reference?.referenceRoot.parentBlock
     self.aliasAnalysis = aliasAnalysis
+    self.loadAddress = AddressWithAccessPath(load.address)
   }
 
   enum ScanResult {
@@ -680,11 +694,11 @@ private struct InstructionScanner {
     if load.loadOwnership == .take {
       // In case of `take`, don't allow reading instructions in the liverange.
       // Otherwise we cannot shrink the memory liverange afterwards.
-      if instruction.mayReadOrWrite(address: load.address, aliasAnalysis) {
+      if instruction.mayReadOrWrite(address: loadAddress, aliasAnalysis) {
         return .overwritten
       }
     } else {
-      if instruction.mayWrite(toAddress: load.address, aliasAnalysis) {
+      if instruction.mayWrite(toAddress: loadAddress, aliasAnalysis) {
         return .overwritten
       }
     }
