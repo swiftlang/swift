@@ -9,14 +9,26 @@ extension Type {
 
 extension EnumCase {
   func enumType(in function: Function) -> Type {
-    remapType(type: self.enumElementDecl.parentEnum.declaredInterfaceType.loweredTypeWithAbstractionPattern(in: function), function: function)
+    // Preserve the queried enum's generic arguments. A specialized VJP can
+    // have an empty generic environment while its BTE declaration is generic.
+    remapBranchTracingEnumType(self.enumType, into: function)
+  }
+}
+
+extension TupleInst {
+  // CFG simplification can duplicate a constructor without changing its saved
+  // values. Accept that source shape, without equating different callable plans.
+  func hasSamePayloadValues(as other: TupleInst) -> Bool {
+    type == other.type && operands.elementsEqual(other.operands, by: { $0.value == $1.value })
   }
 }
 
 // Information required to specialize one closure stored in a payload tuple of a branch tracing enum case.
 struct ClosureInBTE : Equatable {
   let closure: SingleValueInstruction
-  let subsetThunk: PartialApplyInst?
+  // Ordered from the root closure to its stored callable: ordinary function
+  // conversions and supported reabstraction/subset thunk partial applications.
+  let adapters: [SingleValueInstruction]
   let optionalWrapper: EnumInst?
   let useInPayload: Operand
   let enumCase: EnumCase
@@ -46,14 +58,15 @@ private func getCapturedArgTypesTupleForClosure(
 //     case bbB((predecessor: _AD__$xxx_bbB__Pred__xxx, /* closure types */))
 //     case bbC((predecessor: _AD__$xxx_bbC__Pred__xxx, /* closure types */))
 //   }
-private func getBranchTracingEnumPreds(bteType: Type, in vjp: Function) -> Set<Type> {
+private func getBranchTracingEnumPreds(bteType: Type, in vjp: Function) -> Set<Type>? {
   guard let enumCases = bteType.getEnumCases(in: vjp) else {
-    return []
+    return nil
   }
 
   var btePreds = Set<Type>()
   for enumCase in enumCases {
-    guard let firstTupleElementType = enumCase.payload!.tupleElements.first else {
+    guard let payload = enumCase.payload, payload.isTuple else { return nil }
+    guard let firstTupleElementType = payload.tupleElements.first else {
       continue
     }
     if firstTupleElementType.isBranchTracingEnum(in: vjp) {
@@ -68,15 +81,20 @@ private func iterateOverBranchTracingEnumPreds(
   bteToPredsDict: inout [Type: Set<Type>],
   currentBTEType: Type,
   in vjp: Function
-) {
-  let currentBTEPreds = getBranchTracingEnumPreds(bteType: currentBTEType, in: vjp)
+) -> Bool {
+  guard let currentBTEPreds = getBranchTracingEnumPreds(bteType: currentBTEType, in: vjp) else {
+    return false
+  }
   bteToPredsDict[currentBTEType] = currentBTEPreds
   for currentBTEPred in currentBTEPreds {
     if bteToPredsDict[currentBTEPred] == nil {
-      iterateOverBranchTracingEnumPreds(
-        bteToPredsDict: &bteToPredsDict, currentBTEType: currentBTEPred, in: vjp)
+      guard iterateOverBranchTracingEnumPreds(
+        bteToPredsDict: &bteToPredsDict, currentBTEType: currentBTEPred, in: vjp) else {
+        return false
+      }
     }
   }
+  return true
 }
 
 // Get branch tracing enum type queue for further specialization. The types in the queue
@@ -103,16 +121,17 @@ private func iterateOverBranchTracingEnumPreds(
 //   enum _AD__$xxx_bbD__Pred__xxx {
 //     case bbE((/* closure types */))
 //   }
-private func getBranchTracingEnumSpecializationQueue(topBTEType: Type, in vjp: Function) -> [Type] {
+func getBranchTracingEnumSpecializationQueue(topBTEType: Type, in vjp: Function) -> [Type]? {
   var bteToPredsDict = [Type: Set<Type>]()
-  iterateOverBranchTracingEnumPreds(
+  guard iterateOverBranchTracingEnumPreds(
     bteToPredsDict: &bteToPredsDict,
     currentBTEType: topBTEType,
-    in: vjp)
+    in: vjp) else { return nil }
   var bteSpecializationQueue = [Type]()
   let bteCount = bteToPredsDict.count
 
   for _ in 0..<bteCount {
+    let previousCount = bteSpecializationQueue.count
     for (bteType, btePreds) in bteToPredsDict {
       guard btePreds.isEmpty else {
         continue
@@ -120,6 +139,7 @@ private func getBranchTracingEnumSpecializationQueue(topBTEType: Type, in vjp: F
       bteSpecializationQueue.append(bteType)
       break
     }
+    guard bteSpecializationQueue.count > previousCount else { return nil }
     bteToPredsDict.removeValue(forKey: bteSpecializationQueue.last!)
     for bteType in bteToPredsDict.keys {
       bteToPredsDict[bteType]!.remove(bteSpecializationQueue.last!)
@@ -130,26 +150,26 @@ private func getBranchTracingEnumSpecializationQueue(topBTEType: Type, in vjp: F
   return bteSpecializationQueue
 }
 
-// NOTE: this is adopted from lib/SILOptimizer/Differentiation/PullbackCloner.cpp.
-// Remap any archetypes into the current function's context.
-private func remapType(type: Type, function: Function) -> Type {
-  let silType =
-    if type.rawType.hasArchetype { type.mapOutOfEnvironment(in: function) }
-    else { type }
-  let remappedCanType = silType.rawType.getReducedType(
+// The queried type can originate in the pullback's generic environment. Map
+// its AST type directly: lowering an intermediate interface type would lose the
+// source instantiation or try to lower parameters outside any environment.
+func remapBranchTracingEnumType(_ type: Type, into function: Function) -> Type {
+  let interfaceType = type.rawType.mapOutOfEnvironment().getReducedType(
     of: function.loweredFunctionType.substitutedGenericSignatureOfFunctionType.genericSignature)
-  let remappedSILType = remappedCanType.loweredTypeWithAbstractionPattern(in: function)
-  if !function.genericSignature.isEmpty {
-    return function.mapTypeIntoEnvironment(remappedSILType)
-  }
-  return remappedSILType
+  return function.mapTypeIntoEnvironment(interfaceType.rawType).canonical
+    .loweredTypeWithAbstractionPattern(in: function)
 }
 
 private func getBranchTracingEnumLoweredType(ed: EnumDecl, vjp: Function) -> Type {
-  ed.declaredInterfaceType.canonical.loweredTypeWithAbstractionPattern(in: vjp)
+  vjp.mapTypeIntoEnvironment(ed.declaredInterfaceType).canonical.loweredTypeWithAbstractionPattern(in: vjp)
 }
 
 private func getSourceFileFor(derivative: Function) -> SourceFile {
+  // Imported VJPs have no source file of their own. Prefer the current primary
+  // file so that synthesized tape metadata is emitted in its IRGen partition.
+  if let sourceFile = SourceFile(bridged: derivative.bridged.getAssociatedSourceFile()) {
+    return sourceFile
+  }
   if let sourceFile = derivative.sourceFile {
     return sourceFile
   }
@@ -196,6 +216,7 @@ private func getSpecializedParamDeclForEnumCase(
   enumCase: EnumCase,
   closuresInBTE: [ClosureInBTE],
   newEDName: inout String,
+  newPayloadTypes: inout [AST.`Type`],
   specializedBTEDict: [Type: Type],
   topVJP: Function,
   context: FunctionPassContext
@@ -209,8 +230,17 @@ private func getSpecializedParamDeclForEnumCase(
   for (elementIndex, oldElementType) in oldPayloadTupleElementTypes.enumerated() {
     var newElementType: AST.`Type`
     let closuresInBTEForCaseAndPayloadIndex = closuresInBTEForCase.filter({ $0.indexInPayload == elementIndex })
-    assert(closuresInBTEForCaseAndPayloadIndex.count <= 1)
-    if let closureInBTE = closuresInBTEForCaseAndPayloadIndex.singleElement {
+
+    if let first = closuresInBTEForCaseAndPayloadIndex.first {
+      // Duplicated constructors must save the same ordered SSA values.
+      // Analysis rejects differing plans for the same bound case.
+      let captureTypes = first.capturedArgs.map { $0.type }
+      for info in closuresInBTEForCaseAndPayloadIndex.dropFirst() {
+        assert(first.payloadTuple.hasSamePayloadValues(as: info.payloadTuple))
+        assert(captureTypes == info.capturedArgs.map { $0.type })
+      }
+    }
+    if let closureInBTE = closuresInBTEForCaseAndPayloadIndex.first {
       nameSuffix += "_\(elementIndex)"
       newElementType = getCapturedArgTypesTupleForClosure(
         closure: closureInBTE.closure, context: context)
@@ -221,11 +251,7 @@ private func getSpecializedParamDeclForEnumCase(
     } else {
       newElementType = oldElementType.rawType
       if elementIndex == 0 && oldElementType.isBranchTracingEnum(in: topVJP) {
-        let predED = newElementType.nominal as! EnumDecl
-        let predBTEType = remapType(
-          type: getBranchTracingEnumLoweredType(ed: predED, vjp: topVJP),
-          function: topVJP)
-        newElementType = specializedBTEDict[predBTEType]!.rawType
+        newElementType = specializedBTEDict[oldElementType]!.rawType
       }
     }
     newPayloadTupleElementTypes.append((label: oldPayloadTupleElementTypes.label(at: elementIndex), type: newElementType))
@@ -238,17 +264,18 @@ private func getSpecializedParamDeclForEnumCase(
   }
 
   let newParamDecl = enumElementDecl.parameterList.singleElement!.cloneWithoutType()
-  newParamDecl.setInterfaceType(type:
-    context.getTupleType(elements: newPayloadTupleElementTypes)
-    .mapOutOfEnvironment())
+  let newPayloadType = context.getTupleType(elements: newPayloadTupleElementTypes).mapOutOfEnvironment()
+  newPayloadTypes.append(newPayloadType)
+  newParamDecl.setInterfaceType(type: newPayloadType)
 
   return newParamDecl
 }
 
 // Create a specialized EnumDecl for a given branch tracing enum. See getSpecializedParamDeclForEnumCase
 // for more info on how each enum case payload is specialized.
-// The specialized enum type contains a suffix with info on what was specialized. Consider:
-//   _AD__$xxx_bbA__Pred__xxx_spec_bbB_1_bbC_0_1
+// The specialized enum name includes the changed payload positions followed by
+// a digest of the complete canonical schema and emitting file. For example:
+//   _AD__$xxx_bbA__Pred__xxx_spec_bbB_1_bbC_0_1_<schema digest>
 // This means that for enum case bbB closure at index 1 in payload tuple was replaced with
 // its captured arguments tuple, and for enum case bbC closures at indexes 0 and 1 were
 // replaced the same way.
@@ -262,11 +289,15 @@ private func autodiffSpecializeBranchTracingEnum(
   closuresInBTE.forEach { assert($0.enumCase.enumType(in: topVJP) == bteType) }
 
   let oldED = bteType.nominal as! EnumDecl
-  let declContext = oldED.parentDeclContext!
+  // A deserialized tape belongs to the imported module. Its specialized
+  // declaration must instead be owned by the file that registers and emits it.
+  let sourceFile = getSourceFileFor(derivative: topVJP)
+  let declContext = UnknownDeclContext(bridged: sourceFile.getOrCreateSynthesizedFileContext())
   let astContext = declContext.astContext
 
   var newEDName: String = oldED.name.string + "_spec"
 
+  var newPayloadTypes = [AST.`Type`]()
   let newPLs = bteType.getEnumCases(in: topVJP)!.map{
     ParameterList.create(
       leftParenLoc: nil,
@@ -275,6 +306,7 @@ private func autodiffSpecializeBranchTracingEnum(
           enumCase: $0,
           closuresInBTE: closuresInBTE,
           newEDName: &newEDName,
+          newPayloadTypes: &newPayloadTypes,
           specializedBTEDict: specializedBTEDict,
           topVJP: topVJP,
           context: context
@@ -285,6 +317,27 @@ private func autodiffSpecializeBranchTracingEnum(
   }
 
   let canonicalGenericSig = topVJP.genericSignature.canonicalSignature
+  // Include the original instantiation even when its generic arguments do not
+  // occur in a payload. The complete ordered payload schema includes preserved
+  // closures, optional wrappers, and already-specialized predecessor enums.
+  let schema = context.getTupleType(elements:
+    [bteType.rawType.mapOutOfEnvironment()] + newPayloadTypes)
+  newEDName = newEDName._withBridgedStringRef {
+    String(taking: context.bridgedPassContext.mangleAutoDiffBranchTracingEnum(
+      $0, schema.bridged, topVJP.bridged, sourceFile))
+  }
+  // Generic specialization can produce VJP variants with the same tape layout.
+  // Share their declaration to avoid duplicating emitted enum metadata.
+  if let existing = newEDName._withBridgedStringRef({
+    context.bridgedPassContext.lookupAutoDiffSpecializedBranchTracingEnum($0, topVJP.bridged).getAs(EnumDecl.self)
+  }) {
+    let existingType = getBranchTracingEnumLoweredType(ed: existing, vjp: topVJP)
+    assert(existingType.getEnumCases(in: topVJP)!.map {
+      $0.payload!.rawType.mapOutOfEnvironment().canonical
+    } == newPayloadTypes.map { $0.canonical })
+    return existingType
+  }
+
   let genericParams =
     if canonicalGenericSig.isEmpty { GenericParameterList?(nil) }
     else { cloneGenericParameters(canonicalGenericSig: canonicalGenericSig, astContext: astContext, declContext: declContext) }
@@ -313,27 +366,28 @@ private func autodiffSpecializeBranchTracingEnum(
       equalsLoc: nil, rawValue: nil, astContext)
     newEED.setImplicit()
     newED.add(member: newEED)
+    // AST conformance inference visits case declarations, while SIL lowering
+    // visits elements. Keep both views of the enum's storage consistent.
+    let newCase = EnumCaseDecl.create(
+      declContext: newED, caseKeywordLoc: nil, elements: [newEED])
+    newCase.setImplicit()
+    newED.add(member: newCase)
   }
 
-  // TODO: we should probably copy access level from old EnumDecl, but
-  // for some reason it results in crashes for many existing tests
+  // Like the original branch-tracing enums, specialized tapes must never be
+  // resilient, even in a pullback with minimal resilience expansion.
   newED.setAccess(swift.AccessLevel.public)
-  getSourceFileFor(derivative: topVJP).addTopLevelDecl(newED.bridgedDecl)
+  newED.setFrozen()
+  sourceFile.addTopLevelDecl(newED.bridgedDecl)
 
-  let newBTEType = remapType(
-    type: getBranchTracingEnumLoweredType(ed: newED, vjp: topVJP),
-    function: topVJP)
-
-  return newBTEType
+  return getBranchTracingEnumLoweredType(ed: newED, vjp: topVJP)
 }
 
 // Specialize all branch tracing enums which store control-flow graph info in topVJP.
 func autodiffSpecializeBranchTracingEnums(
-  topVJP: Function, topBTE: Type, closuresInBTE: [ClosureInBTE],
+  topVJP: Function, bteSpecializationQueue: [Type], closuresInBTE: [ClosureInBTE],
   context: FunctionPassContext
-) -> [Type: Type] {
-  let bteSpecializationQueue: [Type] = getBranchTracingEnumSpecializationQueue(topBTEType: topBTE, in: topVJP)
-
+) -> [Type: Type]? {
   var closuresInBTEByBTE = [Type: [ClosureInBTE]]()
   for closureInBTE in closuresInBTE {
     let enumType = closureInBTE.enumCase.enumType(in: topVJP)
@@ -342,12 +396,8 @@ func autodiffSpecializeBranchTracingEnums(
 
   var specializedBTEDict = [Type: Type]()
   for bteType in bteSpecializationQueue {
-    let ed = bteType.nominal as! EnumDecl
-    let remappedBTEType = remapType(
-      type: getBranchTracingEnumLoweredType(ed: ed, vjp: topVJP), function: topVJP)
-
-    specializedBTEDict[remappedBTEType] = autodiffSpecializeBranchTracingEnum(
-      bteType: remappedBTEType, topVJP: topVJP,
+    specializedBTEDict[bteType] = autodiffSpecializeBranchTracingEnum(
+      bteType: bteType, topVJP: topVJP,
       closuresInBTE: closuresInBTEByBTE[bteType] ?? [],
       specializedBTEDict: specializedBTEDict, context: context)
   }

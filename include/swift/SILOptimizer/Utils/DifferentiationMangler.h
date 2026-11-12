@@ -21,7 +21,22 @@
 #include "swift/SIL/SILFunction.h"
 
 namespace swift {
+
+/// Whether a branch-tracing enum belongs to the primal entity of this VJP,
+/// including specialized variants of the VJP.
+bool isAutodiffBranchTracingEnumInVJP(SILType type, SILFunction *vjp);
+
 namespace Mangle {
+
+/// A deterministic name for a specialized tape layout in its generic context
+/// and emitting file.
+std::string mangleAutoDiffSpecializedBranchTracingEnum(
+    StringRef prefix, CanType schema, CanGenericSignature signature,
+    StringRef fileDiscriminator);
+
+/// Identify a rewritten pullback by its originating VJP and new tape type.
+std::string mangleAutoDiffSpecializedPullback(
+    SILFunction *pullback, SILFunction *vjp, SILType enumType, unsigned argIndex);
 
 /// A mangler for generated differentiation functions.
 class DifferentiationMangler : public ASTMangler {

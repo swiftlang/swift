@@ -15,6 +15,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
@@ -91,10 +92,17 @@ void registerBridgedDecl(BridgedStringRef bridgedClassName,
   declMetatypes[(unsigned)declKind.value()] = metatype;
 }
 
-BridgedOwnedString BridgedDeclObj::getDebugDescription() const {
+BridgedOwnedString
+BridgedDeclObj::getDebugDescription(bool explodeEnumCaseDecls) const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  unbridged()->print(os);
+  PrintOptions options;
+  options.FunctionDefinitions = true;
+  options.TypeDefinitions = true;
+  options.VarInitializers = true;
+  options.PreferTypeRepr = false;
+  options.ExplodeEnumCaseDecls = explodeEnumCaseDecls;
+  unbridged()->print(os, options);
   return BridgedOwnedString(str);
 }
 

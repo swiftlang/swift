@@ -1,0 +1,62 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o - | %FileCheck %s --implicit-check-not=_wrt_0_spec --implicit-check-not=destroy_value
+
+// Generated non-loop pullbacks consume their nontrivial tapes. This valid OSSA
+// input instead borrows its tape, so its callback and captures remain borrowed.
+// Decline specialization rather than consuming or destroying those captures.
+// No Swift source reproducer is known.
+
+// CHECK-LABEL: enum _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0 {
+// CHECK: case bb0(((Float) -> Float, Float))
+
+// CHECK-LABEL: sil private [ossa] @$s4test3fooyS2fFTJpSpSr :
+// CHECK-SAME: @guaranteed _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0
+// CHECK: bb0({{%[0-9]+}} : $Float, [[TAPE:%[0-9]+]] : @guaranteed $_AD__{{.*}}):
+// CHECK-NEXT: switch_enum [[TAPE]]
+// CHECK: bb1([[PAYLOAD:%[0-9]+]] : @guaranteed $(@callee_guaranteed (Float) -> Float, Float)):
+// CHECK-NEXT: [[CALLBACK:%[0-9]+]] = tuple_extract [[PAYLOAD]], 0
+// CHECK-NEXT: [[RESULT:%[0-9]+]] = apply [[CALLBACK]]
+// CHECK-NEXT: return [[RESULT]]
+
+// CHECK-LABEL: sil [ossa] @$s4test3fooyS2fFTJrSpSr :
+// CHECK: partial_apply [callee_guaranteed] {{%[0-9]+}}({{%[0-9]+}}) : $@convention(thin) (Float, @guaranteed String) -> Float
+// CHECK: [[PULLBACK:%[0-9]+]] = function_ref @$s4test3fooyS2fFTJpSpSr :
+// CHECK: partial_apply [callee_guaranteed] [[PULLBACK]]
+// CHECK-SAME: @guaranteed _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0
+// CHECK: return
+
+sil_stage canonical
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+
+enum _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> Float, Float))
+}
+
+sil @capture : $@convention(thin) (Float, @guaranteed String) -> Float
+
+sil private [ossa] @$s4test3fooyS2fFTJpSpSr : $@convention(thin) (Float, @guaranteed _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @guaranteed $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb1
+bb1(%payload : @guaranteed $(@callee_guaranteed (Float) -> Float, Float)):
+  %cb = tuple_extract %payload, 0
+  %result = apply %cb(%seed) : $@callee_guaranteed (Float) -> Float
+  return %result : $Float
+}
+
+sil [ossa] @$s4test3fooyS2fFTJrSpSr : $@convention(thin) (Float, @guaranteed String) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float, %str : @guaranteed $String):
+  %owned = copy_value %str : $String
+  %fn = function_ref @capture : $@convention(thin) (Float, @guaranteed String) -> Float
+  %cb = partial_apply [callee_guaranteed] %fn(%owned) : $@convention(thin) (Float, @guaranteed String) -> Float
+  %payload = tuple (%cb : $@callee_guaranteed (Float) -> Float, %x : $Float)
+  %tape = enum $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload : $(@callee_guaranteed (Float) -> Float, Float)
+  br bb1(%tape : $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0)
+bb1(%saved : @owned $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0):
+  %pbfn = function_ref @$s4test3fooyS2fFTJpSpSr : $@convention(thin) (Float, @guaranteed _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbfn(%saved) : $@convention(thin) (Float, @guaranteed _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result : $(Float, @callee_guaranteed (Float) -> Float)
+}

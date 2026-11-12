@@ -1,0 +1,207 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o - | %FileCheck %s --implicit-check-not=_wrt_0_spec
+// RUN: %target-sil-opt -enable-sil-verify-all -test-runner %s -o %t.analysis.sil 2>&1 | %FileCheck %s --check-prefix=ANALYSIS
+// RUN: %FileCheck %s --implicit-check-not=_wrt_0_spec < %t.analysis.sil
+
+// Hand-written SIL exercises unsupported pre-serialization invocations. The
+// normal Swift pipeline clears serialization flags before running ADCS, also
+// for functions deserialized later. Decline before creating specialized tapes.
+//
+// A serialized pullback must not acquire references to private callbacks from
+// its VJP. Conversely, a serialized VJP must not acquire a reference to a shared,
+// nonserialized specialized pullback. Cover both regular and package serialization.
+//
+// ANALYSIS-COUNT-16: Unsupported branch tracing enum specialization
+// ANALYSIS-NOT: Unsupported branch tracing enum specialization
+
+sil_stage canonical
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+
+sil private [ossa] @privateCapture : $@convention(thin) (Float, Float) -> Float {
+bb0(%seed : $Float, %capture : $Float):
+  return %seed
+}
+
+sil [ossa] @publicCapture : $@convention(thin) (Float, Float) -> Float {
+bb0(%seed : $Float, %capture : $Float):
+  return %seed
+}
+
+enum _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0((Float, (Float) -> Float))
+}
+
+// CHECK-LABEL: sil shared [serialized] [ossa] @$s4test3fooyS2fFTJpSpSr :
+// CHECK: switch_enum
+// CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@callee_guaranteed (Float) -> Float
+// CHECK: return
+sil shared [serialized] [ossa] @$s4test3fooyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb1
+bb1(%payload : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused, %callback) = destructure_tuple %payload
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback
+  return %result
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test3fooyS2fFTJrSpSr :
+// CHECK: [[ROOT:%[0-9]+]] = function_ref @privateCapture
+// CHECK-NEXT: [[CALLBACK:%[0-9]+]] = partial_apply [callee_guaranteed] [[ROOT]]
+// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[CALLBACK]]{{.*}})
+// CHECK-NEXT: enum $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0, {{.*}}[[PAYLOAD]]
+// CHECK: [[PB:%[0-9]+]] = function_ref @$s4test3fooyS2fFTJpSpSr :
+// CHECK-NEXT: partial_apply [callee_guaranteed] [[PB]]
+// CHECK: return
+sil hidden [ossa] @$s4test3fooyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float):
+  specify_test "autodiff_get_specialization_info"
+  specify_test "autodiff_specialize_branch_tracing_enums"
+  specify_test "autodiff_specialize_bte_arg_in_vjp_bb"
+  specify_test "autodiff_specialize_payload_arg_in_pb_bb"
+  %fn = function_ref @privateCapture : $@convention(thin) (Float, Float) -> Float
+  %callback = partial_apply [callee_guaranteed] %fn(%x) : $@convention(thin) (Float, Float) -> Float
+  %payload = tuple (%x : $Float, %callback : $@callee_guaranteed (Float) -> Float)
+  %tape = enum $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload
+  br bb1(%tape : $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0)
+bb1(%saved : @owned $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0):
+  %pbfn = function_ref @$s4test3fooyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbfn(%saved) : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result
+}
+
+enum _AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0((Float, (Float) -> Float))
+}
+
+// CHECK-LABEL: sil shared [serialized_for_package] [ossa] @$s4test3baryS2fFTJpSpSr :
+// CHECK: switch_enum
+// CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@callee_guaranteed (Float) -> Float
+// CHECK: return
+sil shared [serialized_for_package] [ossa] @$s4test3baryS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb1
+bb1(%payload : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused, %callback) = destructure_tuple %payload
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback
+  return %result
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test3baryS2fFTJrSpSr :
+// CHECK: [[ROOT:%[0-9]+]] = function_ref @privateCapture
+// CHECK-NEXT: [[CALLBACK:%[0-9]+]] = partial_apply [callee_guaranteed] [[ROOT]]
+// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[CALLBACK]]{{.*}})
+// CHECK-NEXT: enum $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0, {{.*}}[[PAYLOAD]]
+// CHECK: [[PB:%[0-9]+]] = function_ref @$s4test3baryS2fFTJpSpSr :
+// CHECK-NEXT: partial_apply [callee_guaranteed] [[PB]]
+// CHECK: return
+sil hidden [ossa] @$s4test3baryS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float):
+  specify_test "autodiff_get_specialization_info"
+  specify_test "autodiff_specialize_branch_tracing_enums"
+  specify_test "autodiff_specialize_bte_arg_in_vjp_bb"
+  specify_test "autodiff_specialize_payload_arg_in_pb_bb"
+  %fn = function_ref @privateCapture : $@convention(thin) (Float, Float) -> Float
+  %callback = partial_apply [callee_guaranteed] %fn(%x) : $@convention(thin) (Float, Float) -> Float
+  %payload = tuple (%x : $Float, %callback : $@callee_guaranteed (Float) -> Float)
+  %tape = enum $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload
+  br bb1(%tape : $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0)
+bb1(%saved : @owned $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0):
+  %pbfn = function_ref @$s4test3baryS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbfn(%saved) : $@convention(thin) (Float, @owned _AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result
+}
+
+enum _AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0((Float, (Float) -> Float))
+}
+
+// CHECK-LABEL: sil [ossa] @$s4test3bazyS2fFTJpSpSr :
+// CHECK: switch_enum
+// CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@callee_guaranteed (Float) -> Float
+// CHECK: return
+sil [ossa] @$s4test3bazyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb1
+bb1(%payload : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused, %callback) = destructure_tuple %payload
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback
+  return %result
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @$s4test3bazyS2fFTJrSpSr :
+// CHECK: [[ROOT:%[0-9]+]] = function_ref @publicCapture
+// CHECK-NEXT: [[CALLBACK:%[0-9]+]] = partial_apply [callee_guaranteed] [[ROOT]]
+// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[CALLBACK]]{{.*}})
+// CHECK-NEXT: enum $_AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0, {{.*}}[[PAYLOAD]]
+// CHECK: [[PB:%[0-9]+]] = function_ref @$s4test3bazyS2fFTJpSpSr :
+// CHECK-NEXT: partial_apply [callee_guaranteed] [[PB]]
+// CHECK: return
+sil [serialized] [ossa] @$s4test3bazyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float):
+  specify_test "autodiff_get_specialization_info"
+  specify_test "autodiff_specialize_branch_tracing_enums"
+  specify_test "autodiff_specialize_bte_arg_in_vjp_bb"
+  specify_test "autodiff_specialize_payload_arg_in_pb_bb"
+  %fn = function_ref @publicCapture : $@convention(thin) (Float, Float) -> Float
+  %callback = partial_apply [callee_guaranteed] %fn(%x) : $@convention(thin) (Float, Float) -> Float
+  %payload = tuple (%x : $Float, %callback : $@callee_guaranteed (Float) -> Float)
+  %tape = enum $_AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload
+  br bb1(%tape : $_AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0)
+bb1(%saved : @owned $_AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0):
+  %pbfn = function_ref @$s4test3bazyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbfn(%saved) : $@convention(thin) (Float, @owned _AD__$s4test3bazyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result
+}
+
+enum _AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0((Float, (Float) -> Float))
+}
+
+// CHECK-LABEL: sil [ossa] @$s4test3quxyS2fFTJpSpSr :
+// CHECK: switch_enum
+// CHECK: apply {{%[0-9]+}}({{%[0-9]+}}) : $@callee_guaranteed (Float) -> Float
+// CHECK: return
+sil [ossa] @$s4test3quxyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb1
+bb1(%payload : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused, %callback) = destructure_tuple %payload
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback
+  return %result
+}
+
+// CHECK-LABEL: sil [serialized_for_package] [ossa] @$s4test3quxyS2fFTJrSpSr :
+// CHECK: [[ROOT:%[0-9]+]] = function_ref @publicCapture
+// CHECK-NEXT: [[CALLBACK:%[0-9]+]] = partial_apply [callee_guaranteed] [[ROOT]]
+// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[CALLBACK]]{{.*}})
+// CHECK-NEXT: enum $_AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0, {{.*}}[[PAYLOAD]]
+// CHECK: [[PB:%[0-9]+]] = function_ref @$s4test3quxyS2fFTJpSpSr :
+// CHECK-NEXT: partial_apply [callee_guaranteed] [[PB]]
+// CHECK: return
+sil [serialized_for_package] [ossa] @$s4test3quxyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float):
+  specify_test "autodiff_get_specialization_info"
+  specify_test "autodiff_specialize_branch_tracing_enums"
+  specify_test "autodiff_specialize_bte_arg_in_vjp_bb"
+  specify_test "autodiff_specialize_payload_arg_in_pb_bb"
+  %fn = function_ref @publicCapture : $@convention(thin) (Float, Float) -> Float
+  %callback = partial_apply [callee_guaranteed] %fn(%x) : $@convention(thin) (Float, Float) -> Float
+  %payload = tuple (%x : $Float, %callback : $@callee_guaranteed (Float) -> Float)
+  %tape = enum $_AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload
+  br bb1(%tape : $_AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0)
+bb1(%saved : @owned $_AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0):
+  %pbfn = function_ref @$s4test3quxyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbfn(%saved) : $@convention(thin) (Float, @owned _AD__$s4test3quxyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result
+}

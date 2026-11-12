@@ -15,6 +15,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArgumentList.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -156,6 +157,11 @@ void BridgedSourceFile_addTopLevelDecl(BridgedSourceFile sf, BridgedDecl decl) {
   file.getParentModule()->clearLookupCache();
 }
 
+BridgedDeclContext
+BridgedSourceFile_getOrCreateSynthesizedFileContext(BridgedSourceFile sf) {
+  return &sf.unbridged()->getOrCreateSynthesizedFile();
+}
+
 BridgedNullableSourceFile
 BridgedFileUnit_castToSourceFile(BridgedFileUnit fileUnit) {
   return llvm::dyn_cast<swift::SourceFile>(fileUnit.unbridged());
@@ -248,6 +254,13 @@ bool BridgedDeclObj::NominalType_isGlobalActor() const {
   return getAs<swift::NominalTypeDecl>()->isGlobalActor();
 }
 
+void BridgedDeclObj::Enum_setFrozen() const {
+  auto *decl = getAs<swift::EnumDecl>();
+  if (!decl->getAttrs().hasAttribute<swift::FrozenAttr>())
+    decl->addAttribute(new (decl->getASTContext())
+                           swift::FrozenAttr(/*implicit*/ true));
+}
+
 bool BridgedDeclObj::NominalType_hasNonUniqueDefinition() const {
   return getAs<swift::NominalTypeDecl>()->hasNonUniqueDefinition();
 }
@@ -261,6 +274,10 @@ BridgedASTType BridgedDeclObj::Enum_getRawType() const {
   if (rawTy)
     return {rawTy.getPointer()};
   return {nullptr};
+}
+
+BridgedEnumElementDecl BridgedDeclObj::asEnumElementDecl() const {
+  return getAs<swift::EnumElementDecl>();
 }
 
 bool BridgedDeclObj::Enum_hasCasesUnavailableDuringLowering() const {

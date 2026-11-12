@@ -1,0 +1,72 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o - | %FileCheck %s --implicit-check-not=_wrt_0_spec
+
+// This valid OSSA form is outside ADCS's supported generated pullback patterns:
+// one path invokes the taped callback, while the other only destroys it.
+// Decline specialization rather than removing the discard path's cleanup of
+// the nontrivial String capture. No Swift source reproducer is known.
+
+// CHECK-LABEL: enum _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0 {
+// CHECK: case bb0(((Float) -> Float, Float))
+
+// CHECK-LABEL: sil private [ossa] @$s4test3fooyS2f_SbtFTJpSpSr :
+// CHECK-SAME: @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0
+// CHECK: ([[CALLBACK:%[0-9]+]], {{%[0-9]+}}) = destructure_tuple
+// CHECK: cond_br {{%[0-9]+}}, bb2, bb3
+// CHECK: bb2:
+// CHECK: apply [[CALLBACK]]
+// CHECK-NEXT: destroy_value [[CALLBACK]]
+// CHECK: bb3:
+// CHECK-NEXT: destroy_value [[CALLBACK]]
+// CHECK: return
+
+// CHECK-LABEL: sil [ossa] @$s4test3fooyS2f_SbtFTJrSpSr :
+// CHECK: [[PULLBACK:%[0-9]+]] = function_ref @$s4test3fooyS2f_SbtFTJpSpSr :
+// CHECK: partial_apply [callee_guaranteed] [[PULLBACK]]
+// CHECK-SAME: @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0
+// CHECK: return
+
+sil_stage canonical
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+
+enum _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) -> Float, Float))
+}
+
+sil @capture : $@convention(thin) (Float, @guaranteed String) -> Float
+
+sil private [ossa] @$s4test3fooyS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, Bool) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, %flag : $Bool):
+  switch_enum %tape, case #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb1
+bb1(%payload : @owned $(@callee_guaranteed (Float) -> Float, Float)):
+  (%cb, %x) = destructure_tuple %payload
+  %cond = struct_extract %flag, #Bool._value
+  cond_br %cond, bb2, bb3
+bb2:
+  %r = apply %cb(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %cb
+  br bb4(%r : $Float)
+bb3:
+  destroy_value %cb
+  br bb4(%seed : $Float)
+bb4(%result : $Float):
+  return %result : $Float
+}
+
+sil [ossa] @$s4test3fooyS2f_SbtFTJrSpSr : $@convention(thin) (Float, Bool, @guaranteed String) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float, %flag : $Bool, %str : @guaranteed $String):
+  %owned = copy_value %str : $String
+  %fn = function_ref @capture : $@convention(thin) (Float, @guaranteed String) -> Float
+  %cb = partial_apply [callee_guaranteed] %fn(%owned) : $@convention(thin) (Float, @guaranteed String) -> Float
+  %payload = tuple (%cb : $@callee_guaranteed (Float) -> Float, %x : $Float)
+  %tape = enum $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload : $(@callee_guaranteed (Float) -> Float, Float)
+  br bb1(%tape : $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0)
+bb1(%saved : @owned $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0):
+  %pbfn = function_ref @$s4test3fooyS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, Bool) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbfn(%saved, %flag) : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, Bool) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result : $(Float, @callee_guaranteed (Float) -> Float)
+}

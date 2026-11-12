@@ -132,6 +132,9 @@ public class NominalTypeDecl: GenericTypeDecl {
 }
 
 final public class EnumDecl: NominalTypeDecl {
+  /// Give a synthesized enum a fixed layout, including across module boundaries.
+  public func setFrozen() { bridged.Enum_setFrozen() }
+
   public var rawType: Type? { Type(bridgedOrNil: bridged.Enum_getRawType()) }
 
   /// True if this enum has cases which cannot be referenced in canonical SIL, but which can still
@@ -350,7 +353,17 @@ final public class MissingMemberDecl: Decl {}
 
 final public class PatternBindingDecl: Decl {}
 
-final public class EnumCaseDecl: Decl {}
+final public class EnumCaseDecl: Decl {
+  public static func create(
+    declContext: DeclContext, caseKeywordLoc: SourceLoc?, elements: [EnumElementDecl]
+  ) -> EnumCaseDecl {
+    elements.map { $0.bridged.asEnumElementDecl() }.withBridgedArrayRef {
+      BridgedEnumCaseDecl.createParsed(
+        declContext: declContext.bridgedDeclContext,
+        caseKeywordLoc: caseKeywordLoc.bridgedLocation, elements: $0)
+    }.asDecl.declObj.getAs(EnumCaseDecl.self)
+  }
+}
 
 public class OperatorDecl: Decl {}
 

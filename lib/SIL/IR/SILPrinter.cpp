@@ -4361,6 +4361,7 @@ static void printSILLinearMapTypes(SILPrintContext &Ctx,
   Options.TypeDefinitions = true;
   Options.VarInitializers = true;
   Options.ExplodePatternBindingDecls = true;
+  Options.ExplodeEnumCaseDecls = true;
   Options.SkipImplicit = false;
   Options.PrintGetSetOnRWProperties = true;
   Options.PrintInSILBody = false;

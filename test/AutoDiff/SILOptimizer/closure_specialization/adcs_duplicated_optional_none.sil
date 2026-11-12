@@ -1,0 +1,72 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o - | %FileCheck %s
+
+// A discard-only pullback supports optional capture specialization. Both
+// duplicated none constructors must receive the new optional capture type.
+// The tuples have the same SSA operands, as validated before matching.
+// CHECK-LABEL: sil [ossa] @$s4test3fooyS2f_SbtFTJrSpSr :
+// CHECK-NOT: enum $Optional<@callee_guaranteed
+// CHECK: enum $Optional<(_: Float)>, #Optional.some!enumelt,
+// CHECK-NOT: enum $Optional<@callee_guaranteed
+// CHECK: [[NONE1:%[0-9]+]] = enum $Optional<(_: Float)>, #Optional.none!enumelt
+// CHECK-NEXT: [[PAYLOAD1:%[0-9]+]] = tuple {{.*}}[[NONE1]]
+// CHECK: enum $[[TAPE:_AD__[^, ]+_spec[^, ]+]], #[[TAPE]].bb0!enumelt, [[PAYLOAD1]]
+// CHECK-NOT: enum $Optional<@callee_guaranteed
+// CHECK: [[NONE2:%[0-9]+]] = enum $Optional<(_: Float)>, #Optional.none!enumelt
+// CHECK-NEXT: [[PAYLOAD2:%[0-9]+]] = tuple {{.*}}[[NONE2]]
+// CHECK-NEXT: enum $[[TAPE]], #[[TAPE]].bb0!enumelt, [[PAYLOAD2]]
+// CHECK-NOT: enum $Optional<@callee_guaranteed
+// CHECK: function_ref @{{[^ ]+}} : $@convention(thin) (Float, @owned {{_AD__[^ )]+_spec[^ )]+}}) -> Float
+// CHECK: return
+
+sil_stage canonical
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+enum _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0 { case bb0((Float, Optional<(Float) -> Float>)) }
+enum _AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0 { case bb0((Float, Optional<(Float) -> Float>)) }
+enum _AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0 {
+  case bb1((predecessor: _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, Float))
+  case bb2((predecessor: _AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0, Float))
+}
+sil @capture : $@convention(thin) (Float, Float) -> Float
+sil private [ossa] @$s4test3fooyS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0):
+  destroy_value %tape
+  return %seed : $Float
+}
+sil [ossa] @$s4test3fooyS2f_SbtFTJrSpSr : $@convention(thin) (Float, Bool) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float, %flag : $Bool):
+  %cond = struct_extract %flag, #Bool._value
+  cond_br %cond, bb1, bb2
+bb1:
+  %fn = function_ref @capture : $@convention(thin) (Float, Float) -> Float
+  %cb = partial_apply [callee_guaranteed] %fn(%x) : $@convention(thin) (Float, Float) -> Float
+  %opt = enum $Optional<@callee_guaranteed (Float) -> Float>, #Optional.some!enumelt, %cb : $@callee_guaranteed (Float) -> Float
+  %payload = tuple (%x : $Float, %opt : $Optional<@callee_guaranteed (Float) -> Float>)
+  %some = enum $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload : $(Float, Optional<@callee_guaranteed (Float) -> Float>)
+  %somep = tuple $(predecessor: _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, Float) (%some, %x)
+  %someTop = enum $_AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb1!enumelt, %somep : $(predecessor: _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, Float)
+  br bb6(%someTop : $_AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0)
+bb2:
+  %none = enum $Optional<@callee_guaranteed (Float) -> Float>, #Optional.none!enumelt
+  %npayload = tuple (%x : $Float, %none : $Optional<@callee_guaranteed (Float) -> Float>)
+  cond_br %cond, bb3, bb4
+bb3:
+  %n1 = enum $_AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %npayload : $(Float, Optional<@callee_guaranteed (Float) -> Float>)
+  br bb5(%n1 : $_AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0)
+bb4:
+  %npayload2 = tuple (%x : $Float, %none : $Optional<@callee_guaranteed (Float) -> Float>)
+  %n2 = enum $_AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0.bb0!enumelt, %npayload2 : $(Float, Optional<@callee_guaranteed (Float) -> Float>)
+  br bb5(%n2 : $_AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0)
+bb5(%nsaved : @owned $_AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0):
+  %nonep = tuple $(predecessor: _AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0, Float) (%nsaved, %x)
+  %noneTop = enum $_AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0.bb2!enumelt, %nonep : $(predecessor: _AD__$s4test3fooyS2f_SbtF_bb2__Pred__src_0_wrt_0, Float)
+  br bb6(%noneTop : $_AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0)
+bb6(%saved : @owned $_AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0):
+  %pbfn = function_ref @$s4test3fooyS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbfn(%saved) : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb3__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result : $(Float, @callee_guaranteed (Float) -> Float)
+}

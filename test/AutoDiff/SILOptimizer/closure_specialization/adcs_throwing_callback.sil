@@ -1,0 +1,128 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o %t
+// RUN: %FileCheck %s --check-prefix=VJP < %t
+// RUN: %FileCheck %s --check-prefix=PB < %t
+
+// Generated taped pullbacks have nonthrowing function types. No Swift source
+// reproducer is known for these throwing callbacks invoked with [nothrow].
+// Keep them opaque, including a throwing outer adapter over a nonthrowing root,
+// while specializing the independent nonthrowing callback in the same payload.
+
+sil_stage canonical
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+
+enum _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) throws -> Float, (Float) -> Float))
+}
+enum _AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0 {
+  case bb0(((Float) throws -> Float, (Float) -> Float))
+}
+
+sil @throwingRoot : $@convention(thin) (Float, Float) -> (Float, @error any Error)
+sil @nonthrowingRoot : $@convention(thin) (Float) -> Float
+sil @normalRoot : $@convention(thin) (Float, Float) -> Float
+
+sil [reabstraction_thunk] [ossa] @throwingAdapter : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> (Float, @error any Error) {
+bb0(%seed : $Float, %callback : @guaranteed $@callee_guaranteed (Float) -> Float):
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  return %result
+}
+
+sil private [ossa] @$s4test3fooyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb1
+bb1(%payload : @owned $(@callee_guaranteed (Float) -> (Float, @error any Error), @callee_guaranteed (Float) -> Float)):
+  (%throwing, %normal) = destructure_tuple %payload
+  %first = apply [nothrow] %throwing(%seed) : $@callee_guaranteed (Float) -> (Float, @error any Error)
+  %result = apply %normal(%first) : $@callee_guaranteed (Float) -> Float
+  destroy_value %throwing
+  destroy_value %normal
+  return %result
+}
+
+sil hidden [ossa] @$s4test3fooyS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float):
+  %throwFn = function_ref @throwingRoot : $@convention(thin) (Float, Float) -> (Float, @error any Error)
+  %throwing = partial_apply [callee_guaranteed] %throwFn(%x) : $@convention(thin) (Float, Float) -> (Float, @error any Error)
+  %normalFn = function_ref @normalRoot : $@convention(thin) (Float, Float) -> Float
+  %normal = partial_apply [callee_guaranteed] %normalFn(%x) : $@convention(thin) (Float, Float) -> Float
+  %payload = tuple (%throwing : $@callee_guaranteed (Float) -> (Float, @error any Error), %normal : $@callee_guaranteed (Float) -> Float)
+  %tape = enum $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload
+  br bb1(%tape : $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0)
+bb1(%saved : @owned $_AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0):
+  %pbFn = function_ref @$s4test3fooyS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbFn(%saved) : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result
+}
+
+sil private [ossa] @$s4test3baryS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt: bb1
+bb1(%payload : @owned $(@callee_guaranteed (Float) -> (Float, @error any Error), @callee_guaranteed (Float) -> Float)):
+  (%throwing, %normal) = destructure_tuple %payload
+  %first = apply [nothrow] %throwing(%seed) : $@callee_guaranteed (Float) -> (Float, @error any Error)
+  %result = apply %normal(%first) : $@callee_guaranteed (Float) -> Float
+  destroy_value %throwing
+  destroy_value %normal
+  return %result
+}
+
+sil hidden [ossa] @$s4test3baryS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float):
+  %rootFn = function_ref @nonthrowingRoot : $@convention(thin) (Float) -> Float
+  %root = thin_to_thick_function %rootFn : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
+  %adapterFn = function_ref @throwingAdapter : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> (Float, @error any Error)
+  %throwing = partial_apply [callee_guaranteed] %adapterFn(%root) : $@convention(thin) (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> (Float, @error any Error)
+  %normalFn = function_ref @normalRoot : $@convention(thin) (Float, Float) -> Float
+  %normal = partial_apply [callee_guaranteed] %normalFn(%x) : $@convention(thin) (Float, Float) -> Float
+  %payload = tuple (%throwing : $@callee_guaranteed (Float) -> (Float, @error any Error), %normal : $@callee_guaranteed (Float) -> Float)
+  %tape = enum $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0.bb0!enumelt, %payload
+  br bb1(%tape : $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0)
+bb1(%saved : @owned $_AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0):
+  %pbFn = function_ref @$s4test3baryS2fFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %pb = partial_apply [callee_guaranteed] %pbFn(%saved) : $@convention(thin) (Float, @owned _AD__$s4test3baryS2fF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %pb : $@callee_guaranteed (Float) -> Float)
+  return %result
+}
+
+// VJP-LABEL: sil hidden [ossa] @$s4test3fooyS2fFTJrSpSr :
+// VJP: [[THROW_FN:%[0-9]+]] = function_ref @throwingRoot
+// VJP-NEXT: [[THROW_CB:%[0-9]+]] = partial_apply [callee_guaranteed] [[THROW_FN]]
+// VJP: [[CAPTURES:%[0-9]+]] = tuple ({{%[0-9]+}})
+// VJP-NEXT: [[PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[THROW_CB]]{{.*}}[[CAPTURES]])
+// VJP-NEXT: enum ${{_AD__[^ ]+_spec_bb0_1_[^, ]+}}, {{.*}}[[PAYLOAD]]
+// VJP: return
+
+// VJP-LABEL: sil hidden [ossa] @$s4test3baryS2fFTJrSpSr :
+// VJP: [[ROOT_FN:%[0-9]+]] = function_ref @nonthrowingRoot
+// VJP-NEXT: [[ROOT:%[0-9]+]] = thin_to_thick_function [[ROOT_FN]]
+// VJP: [[ADAPTER_FN:%[0-9]+]] = function_ref @throwingAdapter
+// VJP-NEXT: [[ADAPTED:%[0-9]+]] = partial_apply [callee_guaranteed] [[ADAPTER_FN]]([[ROOT]])
+// VJP: [[ADAPTER_CAPTURES:%[0-9]+]] = tuple ({{%[0-9]+}})
+// VJP-NEXT: [[ADAPTER_PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[ADAPTED]]{{.*}}[[ADAPTER_CAPTURES]])
+// VJP-NEXT: enum ${{_AD__[^ ]+_spec_bb0_1_[^, ]+}}, {{.*}}[[ADAPTER_PAYLOAD]]
+// VJP: return
+
+// PB-LABEL: // specialized pullback of foo(_:)
+// PB-NOT: function_ref @throwingRoot
+// PB: ([[THROWING:%[0-9]+]], {{%[0-9]+}}) = destructure_tuple
+// PB: apply [nothrow] [[THROWING]]
+// PB: [[NORMAL_FN:%[0-9]+]] = function_ref @normalRoot
+// PB-NEXT: {{.*}} = apply [[NORMAL_FN]](
+// PB: destroy_value [[THROWING]]
+// PB-NOT: function_ref @throwingRoot
+// PB: } // end sil function
+
+// PB-LABEL: // specialized pullback of bar(_:)
+// PB-NOT: function_ref @throwingAdapter
+// PB: ([[ADAPTED_CB:%[0-9]+]], {{%[0-9]+}}) = destructure_tuple
+// PB: apply [nothrow] [[ADAPTED_CB]]
+// PB: [[ADAPTER_NORMAL_FN:%[0-9]+]] = function_ref @normalRoot
+// PB-NEXT: {{.*}} = apply [[ADAPTER_NORMAL_FN]](
+// PB: destroy_value [[ADAPTED_CB]]
+// PB-NOT: function_ref @throwingAdapter
+// PB: } // end sil function

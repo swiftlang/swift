@@ -1,0 +1,168 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o %t
+// RUN: %FileCheck %s --check-prefix=FOO --implicit-check-not=bb9__Pred__src_0_wrt_0_spec < %t
+// RUN: %FileCheck %s --check-prefix=SHARED --implicit-check-not=bb9__Pred__src_0_wrt_0_spec < %t
+
+sil_stage canonical
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+
+// Only bb1 belongs to the returned pullback's tape graph. The independently
+// destroyed bb9 tape must retain its callback even while bb1 is specialized.
+// FOO-LABEL: enum _AD__$s4test3fooyS2f_SbtF_bb9__Pred__src_0_wrt_0 {
+// FOO-NEXT: case bbC((Float, (Float) -> Float))
+// FOO: enum [[FOO_TOP:_AD__[^ ]+fooy[^ ]+bb1__Pred__src_0_wrt_0_spec[^ ]+]] {
+// FOO-NEXT: case bbA((Float, (Float, Float)))
+// FOO-NEXT: case bbB((Float, (Float, Float)))
+
+// FOO-LABEL: sil hidden [ossa] @$s4test3fooyS2f_SbtFTJrSpSr :
+// FOO: [[EXCLUDED_FN:%[0-9]+]] = function_ref @rootA
+// FOO-NEXT: [[EXCLUDED_CB:%[0-9]+]] = partial_apply [callee_guaranteed] [[EXCLUDED_FN]]
+// FOO-NEXT: [[EXCLUDED_PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[EXCLUDED_CB]]{{.*}})
+// FOO-NEXT: [[EXCLUDED_ENUM:%[0-9]+]] = enum $_AD__$s4test3fooyS2f_SbtF_bb9__Pred__src_0_wrt_0, {{.*}}[[EXCLUDED_PAYLOAD]]
+// FOO-NEXT: destroy_value [[EXCLUDED_ENUM]]
+// FOO: bb1:
+// FOO-NOT: partial_apply
+// FOO: enum $[[FOO_TOP]], #{{[^ ]+}}.bbA!enumelt,
+// FOO: bb2:
+// FOO-NOT: partial_apply
+// FOO: enum $[[FOO_TOP]], #{{[^ ]+}}.bbB!enumelt,
+// FOO: [[FOO_PB:%[0-9]+]] = function_ref @{{[^ ]+}} : $@convention(thin) (Float, @owned [[FOO_TOP]]) -> Float
+// FOO-NEXT: partial_apply [callee_guaranteed] [[FOO_PB]]
+
+enum _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0 {
+  case bbA((Float, (Float) -> Float))
+  case bbB((Float, (Float) -> Float))
+}
+
+enum _AD__$s4test3fooyS2f_SbtF_bb9__Pred__src_0_wrt_0 {
+  case bbC((Float, (Float) -> Float))
+}
+
+sil @rootA : $@convention(thin) (Float, Float, Float) -> Float
+sil @rootB : $@convention(thin) (Float, Float, Float) -> Float
+sil @captureString : $@convention(thin) (Float, @guaranteed String) -> Float
+
+sil private [ossa] @$s4test3fooyS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bbA!enumelt: bb1, case #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bbB!enumelt: bb2
+bb1(%payload : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused, %callback) = destructure_tuple %payload
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback
+  br bb3(%result : $Float)
+bb2(%payload2 : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused2, %callback2) = destructure_tuple %payload2
+  %result2 = apply %callback2(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback2
+  br bb3(%result2 : $Float)
+bb3(%final : $Float):
+  return %final
+}
+
+sil hidden [ossa] @$s4test3fooyS2f_SbtFTJrSpSr : $@convention(thin) (Float, Bool) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float, %condition : $Bool):
+  %fx = function_ref @rootA : $@convention(thin) (Float, Float, Float) -> Float
+  %cx = partial_apply [callee_guaranteed] %fx(%x, %x) : $@convention(thin) (Float, Float, Float) -> Float
+  %px = tuple (%x : $Float, %cx : $@callee_guaranteed (Float) -> Float)
+  %ex = enum $_AD__$s4test3fooyS2f_SbtF_bb9__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb9__Pred__src_0_wrt_0.bbC!enumelt, %px
+  destroy_value %ex
+  %cond = struct_extract %condition, #Bool._value
+  cond_br %cond, bb1, bb2
+bb1:
+  %fa = function_ref @rootA : $@convention(thin) (Float, Float, Float) -> Float
+  %ca = partial_apply [callee_guaranteed] %fa(%x, %x) : $@convention(thin) (Float, Float, Float) -> Float
+  %pa = tuple (%x : $Float, %ca : $@callee_guaranteed (Float) -> Float)
+  %ea = enum $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bbA!enumelt, %pa
+  br bb3(%ea : $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0)
+bb2:
+  %fb = function_ref @rootB : $@convention(thin) (Float, Float, Float) -> Float
+  %cb = partial_apply [callee_guaranteed] %fb(%x, %x) : $@convention(thin) (Float, Float, Float) -> Float
+  %pb = tuple (%x : $Float, %cb : $@callee_guaranteed (Float) -> Float)
+  %eb = enum $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bbB!enumelt, %pb
+  br bb3(%eb : $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0)
+bb3(%tape : @owned $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0):
+  %fp = function_ref @$s4test3fooyS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float
+  %cp = partial_apply [callee_guaranteed] %fp(%tape) : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %cp : $@callee_guaranteed (Float) -> Float)
+  return %result
+}
+
+// The String-capturing root is used by a selected payload or an excluded one
+// on mutually exclusive paths. Preserve that root in both payloads, while an
+// independent callback in the selected graph still receives specialization.
+// SHARED-LABEL: enum _AD__$s4test3baryS2f_SbtF_bb9__Pred__src_0_wrt_0 {
+// SHARED-NEXT: case bbC((Float, (Float) -> Float))
+// SHARED: enum [[BAR_TOP:_AD__[^ ]+bary[^ ]+bb1__Pred__src_0_wrt_0_spec[^ ]+]] {
+// SHARED-NEXT: case bbA((Float, @callee_guaranteed (Float) -> Float))
+// SHARED-NEXT: case bbB((Float, (Float, Float)))
+
+// SHARED-LABEL: sil hidden [ossa] @$s4test3baryS2f_SbtFTJrSpSr :
+// SHARED: [[SHARED_FN:%[0-9]+]] = function_ref @captureString
+// SHARED-NEXT: [[SHARED_CB:%[0-9]+]] = partial_apply [callee_guaranteed] [[SHARED_FN]]
+// SHARED: bb1:
+// SHARED-NEXT: [[SELECTED_PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[SHARED_CB]]{{.*}})
+// SHARED-NEXT: enum $[[BAR_TOP]], #{{[^ ]+}}.bbA!enumelt, [[SELECTED_PAYLOAD]]
+// SHARED: bb2:
+// SHARED-NEXT: [[SHARED_EXCLUDED_PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[SHARED_CB]]{{.*}})
+// SHARED-NEXT: [[SHARED_EXCLUDED_ENUM:%[0-9]+]] = enum $_AD__$s4test3baryS2f_SbtF_bb9__Pred__src_0_wrt_0, {{.*}}[[SHARED_EXCLUDED_PAYLOAD]]
+// SHARED-NEXT: destroy_value [[SHARED_EXCLUDED_ENUM]]
+// SHARED-NOT: partial_apply
+// SHARED: enum $[[BAR_TOP]], #{{[^ ]+}}.bbB!enumelt,
+// SHARED: [[BAR_PB:%[0-9]+]] = function_ref @{{[^ ]+}} : $@convention(thin) (Float, @owned [[BAR_TOP]]) -> Float
+// SHARED-NEXT: partial_apply [callee_guaranteed] [[BAR_PB]]
+
+enum _AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0 {
+  case bbA((Float, (Float) -> Float))
+  case bbB((Float, (Float) -> Float))
+}
+
+enum _AD__$s4test3baryS2f_SbtF_bb9__Pred__src_0_wrt_0 {
+  case bbC((Float, (Float) -> Float))
+}
+
+sil private [ossa] @$s4test3baryS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0.bbA!enumelt: bb1, case #_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0.bbB!enumelt: bb2
+bb1(%payload : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused, %callback) = destructure_tuple %payload
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback
+  br bb3(%result : $Float)
+bb2(%payload2 : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused2, %callback2) = destructure_tuple %payload2
+  %result2 = apply %callback2(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback2
+  br bb3(%result2 : $Float)
+bb3(%final : $Float):
+  return %final
+}
+
+sil hidden [ossa] @$s4test3baryS2f_SbtFTJrSpSr : $@convention(thin) (Float, Bool, @guaranteed String) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float, %condition : $Bool, %str : @guaranteed $String):
+  %owned = copy_value %str : $String
+  %sharedFn = function_ref @captureString : $@convention(thin) (Float, @guaranteed String) -> Float
+  %shared = partial_apply [callee_guaranteed] %sharedFn(%owned) : $@convention(thin) (Float, @guaranteed String) -> Float
+  %cond = struct_extract %condition, #Bool._value
+  cond_br %cond, bb1, bb2
+bb1:
+  %selectedPayload = tuple (%x : $Float, %shared : $@callee_guaranteed (Float) -> Float)
+  %selected = enum $_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0.bbA!enumelt, %selectedPayload
+  br bb3(%selected : $_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0)
+bb2:
+  %excludedPayload = tuple (%x : $Float, %shared : $@callee_guaranteed (Float) -> Float)
+  %excluded = enum $_AD__$s4test3baryS2f_SbtF_bb9__Pred__src_0_wrt_0, #_AD__$s4test3baryS2f_SbtF_bb9__Pred__src_0_wrt_0.bbC!enumelt, %excludedPayload
+  destroy_value %excluded
+  %localFn = function_ref @rootA : $@convention(thin) (Float, Float, Float) -> Float
+  %local = partial_apply [callee_guaranteed] %localFn(%x, %x) : $@convention(thin) (Float, Float, Float) -> Float
+  %otherPayload = tuple (%x : $Float, %local : $@callee_guaranteed (Float) -> Float)
+  %other = enum $_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0.bbB!enumelt, %otherPayload
+  br bb3(%other : $_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0)
+bb3(%tape : @owned $_AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0):
+  %fp = function_ref @$s4test3baryS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float
+  %cp = partial_apply [callee_guaranteed] %fp(%tape) : $@convention(thin) (Float, @owned _AD__$s4test3baryS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %cp : $@callee_guaranteed (Float) -> Float)
+  return %result
+}

@@ -342,7 +342,7 @@ struct BridgedDeclObj {
 
   BridgedDeclObj(SwiftObject obj) : obj(obj) {}
   BRIDGED_INLINE BridgedDeclObj(BridgedDecl decl);
-  BridgedOwnedString getDebugDescription() const;
+  BridgedOwnedString getDebugDescription(bool explodeEnumCaseDecls = false) const;
   BRIDGED_INLINE swift::SourceLoc getLoc() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj getModuleContext() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParent() const;
@@ -366,6 +366,7 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE swift::SourceLoc Param_getConsumingSpecifierLoc() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
+  BRIDGED_INLINE void Enum_setFrozen() const;
   BRIDGED_INLINE bool NominalType_hasNonUniqueDefinition() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType
   NominalType_getDeclaredInterfaceType() const;
@@ -375,6 +376,7 @@ struct BridgedDeclObj {
           void (* _Nonnull appendFn)(void * _Nonnull resultArray, BridgedDeclObj protocol)) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj NominalType_getValueTypeDestructor() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Enum_getRawType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedEnumElementDecl asEnumElementDecl() const;
   BRIDGED_INLINE bool Enum_hasCasesUnavailableDuringLowering() const;
   BRIDGED_INLINE bool Struct_hasUnreferenceableStorage() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType Class_getSuperclass() const;
@@ -661,6 +663,10 @@ BRIDGED_INLINE bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf);
 SWIFT_NAME("BridgedSourceFile.addTopLevelDecl(self:_:)")
 BRIDGED_INLINE void BridgedSourceFile_addTopLevelDecl(BridgedSourceFile sf,
                                                       BridgedDecl decl);
+
+SWIFT_NAME("BridgedSourceFile.getOrCreateSynthesizedFileContext(self:)")
+BRIDGED_INLINE BridgedDeclContext
+BridgedSourceFile_getOrCreateSynthesizedFileContext(BridgedSourceFile sf);
 
 SWIFT_NAME("BridgedFileUnit.castToSourceFile(self:)")
 BRIDGED_INLINE BridgedNullableSourceFile

@@ -4,9 +4,10 @@
 // Mutating functions with control flow can cause assertion failure for
 // conflicting debug variable type
 
-// CHECK-LABEL: define internal swiftcc{{.*}} float @"$s4main8TestTypeV24doDifferentiableTimeStep04timeG0ySf_tFTJpSSpSrTA"
-// CHECK: [[SELF:%.*]] = alloca %T4main8TestTypeV06ManualB7TangentV
-// CHECK: #dbg_value(ptr [[SELF]]
+// CHECK-LABEL: define internal swiftcc{{.*}} float @"$s4main8TestTypeV24doDifferentiableTimeStep04timeG0ySf_tFTJpSSpSr{{[^"]*}}TA"
+// CHECK: #dbg_value(float {{.*}}, ![[SELF:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 32)
+// CHECK-DAG: ![[SELF]] = !DILocalVariable(name: "derivative of 'self'{{.*}}type: ![[TANGENT:[0-9]+]])
+// CHECK-DAG: ![[TANGENT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "ManualTestTangent"
 
 import _Differentiation
 

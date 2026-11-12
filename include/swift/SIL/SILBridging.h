@@ -588,6 +588,7 @@ struct BridgedFunction {
   SWIFT_IMPORT_UNSAFE swift::SourceLoc getBodyEndLoc() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getParentModule() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedArrayRef getFilesForModule() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedNullableSourceFile getAssociatedSourceFile() const;
   BRIDGED_INLINE bool isAccessor() const;
   BRIDGED_INLINE bool isInitializer() const;
   BRIDGED_INLINE bool isDeinitializer() const;

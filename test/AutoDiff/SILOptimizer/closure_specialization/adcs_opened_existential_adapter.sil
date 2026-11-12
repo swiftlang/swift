@@ -1,0 +1,98 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -o /dev/null
+// RUN: %target-sil-opt -enable-sil-verify-all -autodiff-closure-specialization %s -o %t
+// RUN: %FileCheck %s < %t
+
+// The root is nongeneric. Only its reabstraction thunk captures opened type
+// metadata, through a substitution rather than an explicit argument. Keep the
+// adapted callback opaque while specializing the independent callback in bbB.
+// Checking only the root closure cannot detect this adapter's dependency.
+// CHECK: enum [[TAPE:_AD__[^ ]+_spec_bbB_1_[^ ]+]] {
+// CHECK-NEXT: case bbA((Float, @callee_guaranteed (Float) -> Float))
+// CHECK-NEXT: case bbB((Float, (Float, Float)))
+
+// CHECK-LABEL: // specialized pullback of foo(_:_:)
+// CHECK-NOT: @opened
+// CHECK: apply {{.*}} : $@callee_guaranteed (Float) -> Float
+// CHECK-NOT: @opened
+// CHECK: function_ref @rootB
+// CHECK-NOT: @opened
+// CHECK: } // end sil function
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test3fooyS2f_SbtFTJrSpSr :
+// CHECK: open_existential_addr
+// CHECK: [[ROOT_FN:%[0-9]+]] = function_ref @concreteRoot
+// CHECK-NEXT: [[ROOT:%[0-9]+]] = thin_to_thick_function [[ROOT_FN]]
+// CHECK: [[ADAPTER_FN:%[0-9]+]] = function_ref @genericAdapter
+// CHECK-NEXT: [[ADAPTED:%[0-9]+]] = partial_apply [callee_guaranteed] [[ADAPTER_FN]]<@opened({{.*}}) Self>([[ROOT]])
+// CHECK-NEXT: [[PAYLOAD:%[0-9]+]] = tuple ({{.*}}[[ADAPTED]]{{.*}})
+// CHECK-NEXT: enum $[[TAPE]], #{{[^ ]+}}.bbA!enumelt, [[PAYLOAD]]
+// CHECK: bb2:
+// CHECK-NOT: partial_apply
+// CHECK: enum $[[TAPE]], #{{[^ ]+}}.bbB!enumelt,
+// CHECK: } // end sil function
+
+
+sil_stage canonical
+import Builtin
+import Swift
+import SwiftShims
+import _Differentiation
+
+protocol P {}
+
+enum _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0 {
+  case bbA((Float, (Float) -> Float))
+  case bbB((Float, (Float) -> Float))
+}
+
+sil @concreteRoot : $@convention(thin) (Float) -> Float
+sil @rootB : $@convention(thin) (Float, Float, Float) -> Float
+
+sil [reabstraction_thunk] [ossa] @genericAdapter : $@convention(thin) <T where T : P> (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float {
+bb0(%seed : $Float, %callback : @guaranteed $@callee_guaranteed (Float) -> Float):
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  return %result
+}
+
+sil private [ossa] @$s4test3fooyS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float {
+bb0(%seed : $Float, %tape : @owned $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0):
+  switch_enum %tape, case #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bbA!enumelt: bb1, case #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bbB!enumelt: bb2
+bb1(%payload : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused, %callback) = destructure_tuple %payload
+  %result = apply %callback(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback
+  br bb3(%result : $Float)
+bb2(%payload2 : @owned $(Float, @callee_guaranteed (Float) -> Float)):
+  (%unused2, %callback2) = destructure_tuple %payload2
+  %result2 = apply %callback2(%seed) : $@callee_guaranteed (Float) -> Float
+  destroy_value %callback2
+  br bb3(%result2 : $Float)
+bb3(%final : $Float):
+  return %final
+}
+
+sil hidden [ossa] @$s4test3fooyS2f_SbtFTJrSpSr : $@convention(thin) (Float, Bool, @in_guaranteed any P) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%x : $Float, %condition : $Bool, %existential : $*any P):
+  %opened = open_existential_addr immutable_access %existential : $*any P to $*@opened(1, any P) Self
+  %cond = struct_extract %condition, #Bool._value
+  cond_br %cond, bb1, bb2
+bb1:
+  %rootFn = function_ref @concreteRoot : $@convention(thin) (Float) -> Float
+  %root = thin_to_thick_function %rootFn : $@convention(thin) (Float) -> Float to $@callee_guaranteed (Float) -> Float
+  %adapterFn = function_ref @genericAdapter : $@convention(thin) <T where T : P> (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float
+  %adapted = partial_apply [callee_guaranteed] %adapterFn<@opened(1, any P) Self>(%root) : $@convention(thin) <T where T : P> (Float, @guaranteed @callee_guaranteed (Float) -> Float) -> Float
+  %pa = tuple (%x : $Float, %adapted : $@callee_guaranteed (Float) -> Float)
+  %ea = enum $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bbA!enumelt, %pa
+  br bb3(%ea : $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0)
+bb2:
+  %fb = function_ref @rootB : $@convention(thin) (Float, Float, Float) -> Float
+  %cb = partial_apply [callee_guaranteed] %fb(%x, %x) : $@convention(thin) (Float, Float, Float) -> Float
+  %pb = tuple (%x : $Float, %cb : $@callee_guaranteed (Float) -> Float)
+  %eb = enum $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0, #_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0.bbB!enumelt, %pb
+  br bb3(%eb : $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0)
+bb3(%tape : @owned $_AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0):
+  %fp = function_ref @$s4test3fooyS2f_SbtFTJpSpSr : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float
+  %cp = partial_apply [callee_guaranteed] %fp(%tape) : $@convention(thin) (Float, @owned _AD__$s4test3fooyS2f_SbtF_bb1__Pred__src_0_wrt_0) -> Float
+  %result = tuple (%x : $Float, %cp : $@callee_guaranteed (Float) -> Float)
+  return %result
+}

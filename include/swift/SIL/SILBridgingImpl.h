@@ -886,6 +886,10 @@ BridgedArrayRef BridgedFunction::getFilesForModule() const {
   return getFunction()->getModule().getSwiftModule()->getFiles();
 }
 
+BridgedNullableSourceFile BridgedFunction::getAssociatedSourceFile() const {
+  return {getFunction()->getModule().getAssociatedContext()->getParentSourceFile()};
+}
+
 bool BridgedFunction::isAccessor() const {
   if (auto *valDecl = getFunction()->getDeclRef().getDecl()) {
     return llvm::isa<swift::AccessorDecl>(valDecl);

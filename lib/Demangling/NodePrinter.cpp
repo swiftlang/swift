@@ -1215,6 +1215,7 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
     }
     case FunctionSigSpecializationParamKind::ConstantPropInteger:
     case FunctionSigSpecializationParamKind::ConstantPropFloat:
+    case FunctionSigSpecializationParamKind::AutoDiffBranchTracingEnum:
       if (Idx + 2 > End)
         return;
       Printer << "[";
@@ -2031,6 +2032,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       return nullptr;
     case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
       Printer << "Same As Argument";
+      return nullptr;
+    case FunctionSigSpecializationParamKind::AutoDiffBranchTracingEnum:
+      Printer << "AutoDiff Branch Tracing Enum Propagated";
       return nullptr;
     case FunctionSigSpecializationParamKind::ExistentialToGeneric:
     case FunctionSigSpecializationParamKind::Dead:

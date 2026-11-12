@@ -347,6 +347,10 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
 }
 
 public struct EnumCase : Equatable {
+  /// The instantiated enum type whose cases were queried. In particular, this
+  /// preserves generic arguments when the nominal declaration is generic but
+  /// the SIL function querying it has already been specialized.
+  public let enumType: Type
   public let enumElementDecl : EnumElementDecl
   public let payload: Type?
   public let index: Int
@@ -375,7 +379,7 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
         caseIterator = caseIterator.getNext()
         caseIndex += 1
       }
-      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(caseIterator).getAs(EnumElementDecl.self),
+      return EnumCase(enumType: enumType, enumElementDecl: enumType.bridged.getEnumElementDecl(caseIterator).getAs(EnumElementDecl.self),
                       payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
                       index: caseIndex)
     }
@@ -391,7 +395,7 @@ public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
       currentIndex += 1
     }
     if currentIndex == index && !enumType.bridged.isEndCaseIterator(iterator) {
-      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(iterator).getAs(EnumElementDecl.self),
+      return EnumCase(enumType: enumType, enumElementDecl: enumType.bridged.getEnumElementDecl(iterator).getAs(EnumElementDecl.self),
                       payload: enumType.bridged.getEnumCasePayload(iterator, function.bridged).typeOrNil,
                       index: index)
     }

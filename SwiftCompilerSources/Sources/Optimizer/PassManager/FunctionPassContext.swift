@@ -183,6 +183,14 @@ struct FunctionPassContext : MutatingContext {
     String(taking: bridgedPassContext.mangleWithChangedRepresentation(original.bridged))
   }
 
+  func mangle(
+    withSpecializedBranchTracingEnum enumType: Type, argIdx: Int,
+    in vjp: Function, from pullback: Function
+  ) -> String {
+    String(taking: bridgedPassContext.mangleWithAutoDiffBranchTracingEnum(
+      enumType.bridged, argIdx, vjp.bridged, pullback.bridged))
+  }
+
   func createSpecializedFunctionDeclaration(
     from original: Function, withName specializedFunctionName: String,
     withParams specializedParameters: [ParameterInfo],

@@ -22,6 +22,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
+#include "swift/SILOptimizer/Utils/DifferentiationMangler.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
@@ -563,15 +564,88 @@ static bool isTrivialVJP(SILFunction *vjp) {
   return true;
 }
 
-static bool isProfitableToInlineAutodiffVJP(FullApplySite applySiteOfVJP,
-                                            StringRef stageName) {
+static PartialApplyInst *getTopLevelPullback(SILFunction *vjp) {
+  ReturnInst *ri = nullptr;
+  for (SILBasicBlock &bb : *vjp) {
+    if (auto *retInst = dyn_cast<ReturnInst>(bb.getTerminator())) {
+      ri = retInst;
+      break;
+    }
+  }
+  if (!ri)
+    return nullptr;
+
+  auto handleConvertFunctionOrPartialApply =
+      [](SILInstruction *inst) -> PartialApplyInst * {
+    if (auto *pai = dyn_cast<PartialApplyInst>(inst)) {
+      return pai;
+    }
+    if (auto *cfi = dyn_cast<ConvertFunctionInst>(inst)) {
+      if (auto *pai = dyn_cast<PartialApplyInst>(cfi->getOperand())) {
+        return pai;
+      }
+    }
+    return nullptr;
+  };
+
+  SILInstruction *retValDefInst = ri->getOperand().getDefiningInstruction();
+  if (retValDefInst == nullptr)
+    return nullptr;
+
+  if (auto *ti = dyn_cast<TupleInst>(retValDefInst)) {
+    assert(ti->getNumOperands() > 0);
+    SILInstruction *lastElemDefInst =
+        ti->getOperand(ti->getNumOperands() - 1).getDefiningInstruction();
+    if (lastElemDefInst == nullptr)
+      return nullptr;
+    return handleConvertFunctionOrPartialApply(lastElemDefInst);
+  }
+
+  return handleConvertFunctionOrPartialApply(retValDefInst);
+}
+
+static bool vjpHasBranchTracingEnumContext(SILFunction *vjp) {
+  PartialApplyInst *topLevelPullback = getTopLevelPullback(vjp);
+  if (topLevelPullback == nullptr)
+    return false;
+
+  for (SILValue arg : topLevelPullback->getArguments())
+    if (isAutodiffBranchTracingEnumInVJP(arg->getType(), vjp))
+      return true;
+
+  return false;
+}
+
+static bool vjpHasLoopContext(SILFunction *vjp) {
+  for (SILBasicBlock &bb : *vjp)
+    for (SILInstruction &inst : bb)
+      if (auto *builtinInst = dyn_cast<BuiltinInst>(&inst))
+        if (builtinInst->getName().is("autoDiffProjectTopLevelSubcontext"))
+          return true;
+  return false;
+}
+
+namespace {
+// These facts are valid only while collecting candidates for one caller,
+// before any of the selected calls are inlined.
+struct AutoDiffInliningCallerInfo {
+  std::optional<bool> isVJP;
+  std::optional<bool> hasLoops;
+  std::optional<bool> hasBTE;
+};
+} // end anonymous namespace
+
+static bool isProfitableToInlineAutodiffVJP(
+    FullApplySite applySiteOfVJP, StringRef stageName,
+    AutoDiffInliningCallerInfo &callerInfo) {
   SILFunction *caller = applySiteOfVJP.getFunction();
   SILFunction *calleeVJP = applySiteOfVJP.getReferencedFunctionOrNull();
   assert(calleeVJP);
 
   bool isLowLevelFunctionPassPipeline = stageName == "LowLevel,Function";
-  auto isCallerVJP = isFunctionAutodiffVJP(caller);
-  auto callerHasControlFlow = caller->size() > 1;
+  if (!callerInfo.isVJP.has_value())
+    callerInfo.isVJP = isFunctionAutodiffVJP(caller);
+  bool isCallerVJP = *callerInfo.isVJP;
 
   // If the pass is being run as part of the low-level function pass pipeline,
   // the autodiff closure-spec optimization is done doing its work. Therefore,
@@ -599,18 +673,45 @@ static bool isProfitableToInlineAutodiffVJP(FullApplySite applySiteOfVJP,
     return false;
   }
 
-  if (isCallerVJP && callerHasControlFlow) {
-    // If pullback extracted from this VJP call result is only passed to
-    // top-level pullback of caller VJP, consider this callee VJP for inlining.
-    // It does not harm ADCS effectiveness since it properly handles nested
-    // inlining by running multiple specialization rounds and immediately
-    // folding partial_apply+apply pairs in the specialized caller pullback.
-    if (hasPullbackOnlyDirectUses(applySiteOfVJP))
-      return true;
+  if (!callerInfo.hasLoops.has_value())
+    callerInfo.hasLoops = vjpHasLoopContext(caller);
+  bool callerHasLoops = *callerInfo.hasLoops;
+  bool calleeHasLoops = vjpHasLoopContext(calleeVJP);
 
-    // TODO: allow inlining into VJP callers with control flow when ADCS handles
-    // this properly.
+  bool hasOnlyDirectUses = hasPullbackOnlyDirectUses(applySiteOfVJP);
+
+  bool calleeHasBTE = vjpHasBranchTracingEnumContext(calleeVJP);
+  if (!callerInfo.hasBTE.has_value())
+    callerInfo.hasBTE = vjpHasBranchTracingEnumContext(caller);
+  bool callerHasBTE = *callerInfo.hasBTE;
+
+  if (callerHasLoops) {
+    if (calleeHasLoops) {
+      // Iterative specialization does its job.
+      return hasOnlyDirectUses;
+    }
+    if (!calleeHasBTE) {
+      return hasOnlyDirectUses;
+    }
     return false;
+  }
+
+  if (calleeHasLoops) {
+    if (callerHasBTE) {
+      return false;
+    }
+    // Iterative specialization does its job.
+    return hasOnlyDirectUses;
+  }
+
+  assert(!callerHasLoops && !calleeHasLoops);
+
+  // Can only do specialization against BTE when non-inlined
+  if (calleeHasBTE)
+    return false;
+
+  if (callerHasBTE) {
+    return hasOnlyDirectUses;
   }
 
   return true;
@@ -658,11 +759,6 @@ bool SILPerformanceInliner::isProfitableToInline(
   SILFunction *Callee = AI.getReferencedFunctionOrNull();
   assert(Callee);
   bool IsGeneric = AI.hasSubstitutions();
-
-  if (isFunctionAutodiffVJP(Callee) &&
-      !isProfitableToInlineAutodiffVJP(AI, this->pm->getStageName())) {
-    return false;
-  }
 
   // Start with a base benefit.
   int BaseBenefit = isa<BeginApplyInst>(AI) ? RemovedCoroutineCallBenefit
@@ -1340,6 +1436,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   // Go through all instructions and find candidates for inlining.
   // We do this in dominance order for the constTracker.
   SmallVector<FullApplySite, 8> InitialCandidates;
+  AutoDiffInliningCallerInfo autoDiffCallerInfo;
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
     Weight BlockWeight;
@@ -1382,6 +1479,17 @@ void SILPerformanceInliner::collectAppliesToInline(
 
         // The actual weight including a possible weight correction.
         Weight W(BlockWeight, WeightCorrections.lookup(AI));
+
+        // Apply the AutoDiff policy only where decideInWarmBlock would reach
+        // the cost model. Generic calls with a definitive decision bypassed
+        // this policy there, as do the always-inline calls handled above.
+        if (isFunctionAutodiffVJP(Callee) &&
+            (!AI.hasSubstitutions() ||
+             !shouldInlineGeneric(AI, NumCallerBlocks).has_value()) &&
+            !isProfitableToInlineAutodiffVJP(
+                AI, pm->getStageName(), autoDiffCallerInfo)) {
+          continue;
+        }
 
         if (decideInWarmBlock(AI, W, constTracker, NumCallerBlocks,
                               BBToWeightMap)) {
