@@ -9321,6 +9321,39 @@ ClangImporter::getOriginalForeignReferenceConstructor(const ConstructorDecl *cto
   return Impl.foreignReferenceFactoryToOriginalConstructor.lookup(factory);
 }
 
+const clang::CXXMethodDecl *
+ClangImporter::getAssignmentOperator(const clang::CXXRecordDecl *decl,
+                                     bool isMove) {
+  if (decl->isAnonymousStructOrUnion())
+    return nullptr;
+
+  auto &sema = Impl.getClangSema();
+  auto *record = const_cast<clang::CXXRecordDecl *>(decl);
+
+  clang::CXXMethodDecl *assignOp =
+      isMove ? sema.LookupMovingAssignment(record, /*Quals=*/0,
+                                           /*RValueThis=*/false,
+                                           /*ThisQuals=*/0)
+             : sema.LookupCopyingAssignment(record, clang::Qualifiers::Const,
+                                            /*RValueThis=*/false,
+                                            /*ThisQuals=*/0);
+
+  if (!assignOp)
+    return nullptr;
+
+  if (!assignOp->isCopyAssignmentOperator() &&
+      !assignOp->isMoveAssignmentOperator())
+    return nullptr;
+
+  if (assignOp->isDeleted())
+    return nullptr;
+
+  if (assignOp->getAccess() != clang::AS_public)
+    return nullptr;
+
+  return assignOp;
+}
+
 ValueDecl *ClangImporter::getOverriddenSuperclassMember(const ValueDecl *decl) {
   const auto *classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl || !classDecl->getSuperclassDecl())

@@ -844,6 +844,9 @@ public:
   /// Classify \p decl against libkern's OSObject hierarchy.
   LibkernSubclass getLibkernSubclass(const clang::RecordDecl *decl);
 
+  const clang::CXXMethodDecl *
+  getAssignmentOperator(const clang::CXXRecordDecl *decl, bool isMove);
+
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
 
