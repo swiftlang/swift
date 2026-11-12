@@ -1744,6 +1744,29 @@ private extension PointerToAddressInst {
   }
 }
 
+/// Gathers the uses of values depending on `markDep`. Returns false if they can't all be found, in which case `uses`
+/// may hold only some of them.
+func gatherDependentUses(of markDep: MarkDependenceInstruction, into uses: inout Stack<Instruction>,
+                         _ localReachabilityCache: LocalVariableReachabilityCache,
+                         _ context: Context) -> Bool {
+  // The walker only tracks ~Escapable and @noescape dependents; for anything else it reports
+  // success having collected nothing.
+  guard let dependence = LifetimeDependence(markDep, context),
+        !dependence.dependentValue.mayEscape else {
+    return false
+  }
+  var dependentUses = Stack<Instruction>(context)
+  defer { dependentUses.deinitialize() }
+  var walker = LifetimeDependentUseWalker(markDep.parentFunction, localReachabilityCache, context) {
+    dependentUses.push($0)
+    return .continueWalk
+  }
+  defer { walker.deinitialize() }
+  let result = walker.walkDown(dependence: dependence)
+  uses.append(contentsOf: dependentUses)
+  return result == .continueWalk
+}
+
 // =============================================================================
 // Unit tests
 // =============================================================================

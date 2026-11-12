@@ -475,6 +475,12 @@ extension Value {
     let copiedValue = builder.createCopyValue(operand: self)
     return copiedValue.makeAvailable(in: destBlock, context)
   }
+
+  /// Whether a use lets a pointer to this value escape, so that its liveness can't be derived from its uses.
+  /// An escape nested within a borrow scope is bounded by that scope instead.
+  var hasDirectPointerEscape: Bool {
+    uses.contains { $0.ownership == .pointerEscape || $0.ownership == .forwardingUnowned }
+  }
 }
 
 extension Instruction {
@@ -901,6 +907,28 @@ extension FunctionPassContext {
   }
 }
 
+extension MutatingContext {
+  /// Splits the block before `inst` into a diamond that branches on `condition`:
+  /// ```
+  ///   start:      cond_br condition, trueBlock, falseBlock
+  ///   trueBlock:  br cont
+  ///   falseBlock: br cont
+  ///   cont:       <inst> ...
+  /// ```
+  /// Returns the branch ending each side, before which that side's code is inserted.
+  func splitIntoDiamond(before inst: Instruction, on condition: Value) -> (ifTrue: BranchInst, ifFalse: BranchInst) {
+    let start = inst.parentBlock
+    let cont = splitBlock(before: inst)
+    let trueBlock = createBlock(after: start)
+    let falseBlock = createBlock(after: trueBlock)
+    let ifTrue = Builder(atEndOf: trueBlock, location: inst.location, self).createBranch(to: cont)
+    let ifFalse = Builder(atEndOf: falseBlock, location: inst.location, self).createBranch(to: cont)
+    Builder(atEndOf: start, location: inst.location, self)
+      .createCondBranch(condition: condition, trueBlock: trueBlock, falseBlock: falseBlock)
+    return (ifTrue, ifFalse)
+  }
+}
+
 extension BasicBlock {
   func dropAllReferences(_ context: FunctionPassContext) {
     for arg in arguments {
@@ -1017,6 +1045,12 @@ extension Function {
       return false
     }
     return dynamicSelf.uses.contains { $0.isTypeDependent }
+  }
+
+  /// The blocks whose terminator exits the function. The CFG must not change while iterating.
+  /// NOTE: This scans the entire function!
+  var exitingBlocks: LazyFilterSequence<BasicBlockList> {
+    return blocks.lazy.filter { $0.terminator.isFunctionExiting }
   }
 }
 
