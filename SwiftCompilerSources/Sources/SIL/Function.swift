@@ -67,7 +67,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
   
   public var hasOwnershipForTrivialValues: Bool {
-    bridged.hasOwnership()
+    bridged.hasOwnershipForTrivialValues()
   }
   public func set(hasOwnershipForTrivialValues: Bool, _ context: some MutatingContext) {
     bridged.setOwnershipForTrivialValues(hasOwnershipForTrivialValues)
