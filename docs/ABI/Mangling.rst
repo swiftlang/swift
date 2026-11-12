@@ -269,6 +269,7 @@ types where the metadata itself has unknown layout.)
   global ::= global 'Tm'                 // merged function
   global ::= entity                      // some identifiable thing
   global ::= type type generic-signature? 'TR'  // reabstraction thunk
+  global ::= type type generic-signature? 'TTv' // value conversion thunk
   global ::= impl-function-type type generic-signature? 'Tz' index?    // objc-to-swift-async completion handler block implementation
   global ::= impl-function-type type generic-signature? 'TZ' index?    // objc-to-swift-async completion handler block implementation predefined by runtime
   global ::= type type type generic-signature? 'Ty'  // reabstraction thunk with dynamic 'Self' capture

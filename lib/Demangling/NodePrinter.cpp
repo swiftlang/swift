@@ -502,6 +502,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ReabstractionThunkHelper:
   case Node::Kind::ReabstractionThunkHelperWithSelf:
   case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
+  case Node::Kind::ValueConversionThunk:
   case Node::Kind::ReadAccessor:
   case Node::Kind::YieldingBorrowAccessor:
   case Node::Kind::RelatedEntityDeclName:
@@ -2246,6 +2247,26 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     Printer << "reabstraction thunk ";
     if (Node->getKind() == Node::Kind::ReabstractionThunkHelper)
       Printer << "helper ";
+    unsigned idx = 0;
+    if (Node->getNumChildren() == 3) {
+      auto generics = Node->getChild(0);
+      idx = 1;
+      print(generics, depth + 1);
+      Printer << " ";
+    }
+    Printer << "from ";
+    print(Node->getChild(idx + 1), depth + 1);
+    Printer << " to ";
+    print(Node->getChild(idx), depth + 1);
+    return nullptr;
+  }
+  case Node::Kind::ValueConversionThunk: {
+    if (Options.ShortenThunk) {
+      Printer << "thunk for ";
+      print(Node->getChild(Node->getNumChildren() - 1), depth + 1);
+      return nullptr;
+    }
+    Printer << "value conversion thunk ";
     unsigned idx = 0;
     if (Node->getNumChildren() == 3) {
       auto generics = Node->getChild(0);
