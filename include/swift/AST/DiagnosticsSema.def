@@ -9940,7 +9940,12 @@ ERROR(attr_semantics_unknown_osversion_kind,none,
 ERROR(attr_inline_always_experimental,none,
       "'@inline(always)' is an experimental feature", ())
 ERROR(attr_inline_always_no_usable_from_inline,none,
-      "'@inline(always)' implies '@usableFromInline'; do not use both", ())
+      "'@inline(always)' cannot be combined with '@usableFromInline'; use "
+      "'@inlinable' to allow the function body to be inlined "
+      "into other modules", ())
+NOTE(attr_inline_always_mark_inlinable,none,
+     "%kind0 is marked '@inline(always)'; mark it '@inlinable' to make it "
+     "usable from other '@inlinable' code", (const ValueDecl *))
 ERROR(attr_inline_always_requires_final_method,none,
       "'@inline(always)' on class %select{methods|vars}1 requires %0 to be "
       "marked 'final'", (DeclName, bool))
