@@ -14,8 +14,8 @@ __attribute__((swift_attr("release:releaseShared"))) Shared {
   void onRValue() &&;
 };
 
-// A C or C++ function takes a pointer or reference argument at +1 only if the
-// parameter is consumed.
+// The caller keeps a pointer or reference argument alive for the call, unless
+// the parameter is consumed.
 void takesPtr(Shared *_Nonnull s);
 void takesNullablePtr(Shared *_Nullable s);
 void takesRef(Shared &s);
