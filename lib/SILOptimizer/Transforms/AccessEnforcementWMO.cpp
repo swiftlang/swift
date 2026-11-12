@@ -93,6 +93,7 @@ getDisjointAccessLocation(AccessStorageWithBase storageAndBase) {
   case AccessStorage::Tail:
   case AccessStorage::Argument:
   case AccessStorage::Yield:
+  case AccessStorage::BorrowMutateAccessor:
   case AccessStorage::Unidentified:
     return nullptr;
   case AccessStorage::Nested:

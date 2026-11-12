@@ -100,3 +100,44 @@ bb0(%0 : $*MyArray<MyStruct>):
   return %t : $()
 }
 
+
+struct AccessorS {
+  var i: Builtin.Int64
+  var k: Klass
+}
+
+sil @mutate_accessor : $@convention(method) (@inout AccessorS) -> @inout Builtin.Int64
+sil @borrow_accessor : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Klass
+sil @use_accessor_s : $@convention(thin) (@guaranteed AccessorS) -> ()
+
+// CHECK: Begin Error in function test_write_through_mutate_accessor_result
+// CHECK: SIL verification failed: read-only scope invalidated by a local write
+// CHECK: End Error in function test_write_through_mutate_accessor_result
+sil [ossa] @test_write_through_mutate_accessor_result : $@convention(thin) (@inout AccessorS, Builtin.Int64) -> () {
+bb0(%0 : $*AccessorS, %1 : $Builtin.Int64):
+  %2 = load_borrow %0 : $*AccessorS
+  %3 = function_ref @mutate_accessor : $@convention(method) (@inout AccessorS) -> @inout Builtin.Int64
+  %4 = apply %3(%0) : $@convention(method) (@inout AccessorS) -> @inout Builtin.Int64
+  store %1 to [trivial] %4 : $*Builtin.Int64
+  %6 = function_ref @use_accessor_s : $@convention(thin) (@guaranteed AccessorS) -> ()
+  %7 = apply %6(%2) : $@convention(thin) (@guaranteed AccessorS) -> ()
+  end_borrow %2 : $AccessorS
+  %9 = tuple ()
+  return %9 : $()
+}
+
+// CHECK: Begin Error in function test_take_through_borrow_accessor_result
+// CHECK: SIL verification failed: read-only scope invalidated by a local write
+// CHECK: End Error in function test_take_through_borrow_accessor_result
+sil [ossa] @test_take_through_borrow_accessor_result : $@convention(thin) (@inout AccessorS, @owned Klass) -> @owned Klass {
+bb0(%0 : $*AccessorS, %1 : @owned $Klass):
+  %2 = load_borrow %0 : $*AccessorS
+  %3 = function_ref @borrow_accessor : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Klass
+  %4 = apply %3(%0) : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Klass
+  %5 = load [take] %4 : $*Klass
+  store %1 to [init] %4 : $*Klass
+  %7 = function_ref @use_accessor_s : $@convention(thin) (@guaranteed AccessorS) -> ()
+  %8 = apply %7(%2) : $@convention(thin) (@guaranteed AccessorS) -> ()
+  end_borrow %2 : $AccessorS
+  return %5 : $Klass
+}

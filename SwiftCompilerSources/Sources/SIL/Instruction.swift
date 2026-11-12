@@ -304,7 +304,7 @@ private struct FindPointerOrGlobalWalker : AddressUseDefWalker {
     switch accessBase {
     case .box, .stack, .class, .tail, .argument, .yield, .storeBorrow, .index:
       return .continueWalk
-    case .global, .pointer, .unidentified:
+    case .global, .pointer, .borrowMutateAccessor, .unidentified:
       return .abortWalk
     }
   }
@@ -1803,6 +1803,24 @@ final public class ApplyInst : SingleValueInstruction, FullApplySite {
       return nil
     }
     return selfAddress
+  }
+
+  /// The address-typed self of a borrow or mutate accessor with an address result.
+  public var selfAddressOfBorrowMutateAccessorResult: Value? {
+    guard functionConvention.hasAddressResult,
+          let selfAddress = selfArgument, selfAddress.type.isAddress else {
+      return nil
+    }
+    return selfAddress
+  }
+
+  /// The object-typed self of a borrow or mutate accessor with an address result.
+  public var selfObjectOfBorrowMutateAccessorResult: Value? {
+    guard functionConvention.hasAddressResult,
+          let selfObject = selfArgument, !selfObject.type.isAddress else {
+      return nil
+    }
+    return selfObject
   }
 }
 

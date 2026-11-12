@@ -154,6 +154,13 @@ public struct FunctionConvention : CustomStringConvertible {
     return resultsWithError[0].convention == .inout
   }
 
+  public var hasInoutResult: Bool {
+    if resultsWithError.count != 1 {
+      return false
+    }
+    return resultsWithError[0].convention == .inout
+  }
+
   public var description: String {
     var str = functionType.description
     for paramIdx in 0..<parameters.count {

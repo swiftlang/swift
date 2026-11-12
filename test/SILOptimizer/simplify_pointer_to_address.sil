@@ -378,3 +378,33 @@ bb0(%0 : $Unmanaged<C>):
   end_borrow %3
   return %7
 }
+
+struct AccessorS {
+  var i: Int
+  var j: Int
+}
+
+class AccessorK {
+  var s: AccessorS
+}
+
+sil [readonly] @borrowAccessorAddr : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+
+// The load through the borrow accessor result is after the end_borrow. Removing the pair would make it a use
+// outside of the borrow scope.
+// CHECK-LABEL: sil [ossa] @borrow_accessor_result_used_after_end_borrow :
+// CHECK:         address_to_pointer
+// CHECK:         pointer_to_address
+// CHECK:       } // end sil function 'borrow_accessor_result_used_after_end_borrow'
+sil [ossa] @borrow_accessor_result_used_after_end_borrow : $@convention(thin) (@guaranteed AccessorK) -> Int {
+bb0(%0 : @guaranteed $AccessorK):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr %1, #AccessorK.s
+  %3 = address_to_pointer %2 to $Builtin.RawPointer
+  %4 = pointer_to_address %3 to [strict] $*AccessorS
+  %5 = function_ref @borrowAccessorAddr : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  %6 = apply %5(%4) : $@convention(method) (@in_guaranteed AccessorS) -> @guaranteed_address Int
+  end_borrow %1
+  %8 = load [trivial] %6
+  return %8
+}

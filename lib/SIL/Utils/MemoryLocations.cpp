@@ -342,7 +342,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         break;
       case SILInstructionKind::ApplyInst: {
         auto *apply = cast<ApplyInst>(user);
-        if (apply->hasAddressResult()) {
+        if (use == apply->getAddressSelfOfAddressBorrowMutateAccessorResult()) {
           if (!analyzeAddrProjection(apply, locIdx, 0, collectedVals,
                                      subLocationMap))
             return false;

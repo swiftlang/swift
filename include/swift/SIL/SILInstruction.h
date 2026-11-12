@@ -3428,6 +3428,19 @@ public:
     return getSubstCalleeConv().hasAddressResult();
   }
 
+  /// If this is a borrow or mutate accessor with an address result and an
+  /// address-typed self, return the self operand. Otherwise return nullptr.
+  Operand *getAddressSelfOfAddressBorrowMutateAccessorResult() {
+    if (!hasAddressResult() || !hasSelfArgument()) {
+      return nullptr;
+    }
+    Operand &selfOperand = getSelfArgumentOperand();
+    if (!selfOperand.get()->getType().isAddress()) {
+      return nullptr;
+    }
+    return &selfOperand;
+  }
+
   bool hasInoutResult() const { return getSubstCalleeConv().hasInoutResult(); }
 };
 

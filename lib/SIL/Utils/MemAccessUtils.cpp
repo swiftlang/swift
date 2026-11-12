@@ -452,6 +452,8 @@ const char *AccessRepresentation::getKindName(AccessStorage::Kind k) {
     return "Argument";
   case Yield:
     return "Yield";
+  case BorrowMutateAccessor:
+    return "BorrowMutateAccessor";
   case Global:
     return "Global";
   case Class:
@@ -483,6 +485,9 @@ AccessRepresentation::AccessRepresentation(SILValue base, Kind kind) : value() {
   case Yield:
     assert(isa<BeginApplyInst>(
              cast<MultipleValueInstructionResult>(base)->getParent()));
+    break;
+  case BorrowMutateAccessor:
+    assert(isa<ApplyInst>(base));
     break;
   case Unidentified:
     break;
@@ -560,6 +565,7 @@ void AccessRepresentation::print(raw_ostream &os) const {
   case Stack:
   case Nested:
   case Yield:
+  case BorrowMutateAccessor:
   case Unidentified:
   case Tail:
     os << value;
@@ -597,6 +603,7 @@ getReferenceFromBase(SILValue base, AccessRepresentation::Kind kind) {
   case AccessBase::Stack:
   case AccessBase::Nested:
   case AccessBase::Yield:
+  case AccessBase::BorrowMutateAccessor:
   case AccessBase::Unidentified:
   case AccessBase::Argument:
   case AccessBase::Global:
@@ -652,6 +659,9 @@ getNonRefNonGlobalDecl(SILValue base, AccessRepresentation::Kind kind) {
   case AccessBase::Yield:
     return nullptr;
 
+  case AccessBase::BorrowMutateAccessor:
+    return nullptr;
+
   case AccessBase::Nested:
     return nullptr;
 
@@ -696,6 +706,8 @@ bool AccessBase::hasLocalOwnershipLifetime() const {
     // Yielded values have a local apply scope, but they never have the same
     // storage as yielded values from a different scope, so there is no need to
     // consider their local scope during substitution.
+    return false;
+  case AccessBase::BorrowMutateAccessor:
     return false;
   case AccessBase::Box:
   case AccessBase::Class:
@@ -1352,6 +1364,8 @@ public:
                                       : AccessPath::UnknownOffset);
     } else if (isa<TailAddrInst>(projectedAddr)) {
       addPathOffset(AccessPath::UnknownOffset);
+    } else if (isAddressReturn(projectedAddr)) {
+      addPathOffset(AccessPath::UnknownOffset);
     } else if (projIdx.isValid()) {
       if (pendingOffset) {
         LLVM_DEBUG(llvm::dbgs() << "Subobject projection with offset index: "
@@ -1379,8 +1393,7 @@ public:
              // copyable_to_moveonlywrapper_addr, we just look through it when
              // we see it
              || isa<MoveOnlyWrapperToCopyableAddrInst>(projectedAddr) ||
-             isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr) ||
-             isAddressReturn(projectedAddr));
+             isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr));
     }
     return sourceAddr->get();
   }
@@ -1995,8 +2008,11 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
         && visitSingleValueUser(svi, dfs) == IgnoredUse) {
       return true;
     }
-    if (isAddressReturn(svi)) {
-      pushUsers(svi, dfs);
+  }
+  if (auto *apply = dyn_cast<ApplyInst>(use->getUser())) {
+    if (use == apply->getAddressSelfOfAddressBorrowMutateAccessorResult()) {
+      pushUsers(apply, DFSEntry(use, /*isRef*/ false, /*pathCursor*/ 0,
+                                AccessPath::UnknownOffset));
     }
   }
   if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser())) {
@@ -2152,8 +2168,6 @@ visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
     }
     return true;
   }
-  if (!(visitor.*visit)(use))
-    return false;
 
   // Like a load_borrow, a borrow accessor borrows the memory location of an
   // @in_guaranteed self over the scope of its result, including the scopes of
@@ -2164,6 +2178,9 @@ visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
           [&](Operand *endUse) { return (visitor.*visit)(endUse); });
     }
   }
+
+  if (!(visitor.*visit)(use))
+    return false;
   return true;
 }
 
@@ -2481,6 +2498,9 @@ bool swift::isPossibleFormalAccessStorage(const AccessStorage &storage,
 
   case AccessStorage::Yield:
     // Yields are accessed by the caller.
+    return false;
+  case AccessStorage::BorrowMutateAccessor:
+    // Accessor results are accessed within the access of the accessor's self.
     return false;
   case AccessStorage::Argument:
     // Function arguments are accessed by the caller.

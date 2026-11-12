@@ -1146,3 +1146,37 @@ bb0(%0 : @guaranteed $Outer):
   %ret = tuple ()
   return %ret : $()
 }
+
+sil @mutate_xandint_i : $@convention(method) (@inout XandInt) -> @inout Int {
+[%0: read s1.v**]
+[global: ]
+bb0(%0 : $*XandInt):
+  %1 = struct_element_addr %0 : $*XandInt, #XandInt.i
+  return %1 : $*Int
+}
+
+sil @write_through_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
+
+// The address result of the mutate accessor escapes.
+//
+// CHECK-LABEL: Address escape information for test_mutate_accessor_result_escape:
+// CHECK:       value:  %1 = alloc_stack $XandInt
+// CHECK-NEXT:    ==>   %5 = apply %4(%1) : $@convention(method) (@inout XandInt) -> @inout Int
+// CHECK-NEXT:    ==>   %8 = apply %7(%6) : $@convention(thin) (Builtin.RawPointer) -> ()
+// CHECK:       End function test_mutate_accessor_result_escape
+sil @test_mutate_accessor_result_escape : $@convention(thin) (@owned XandInt) -> () {
+bb0(%0 : $XandInt):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $XandInt
+  store %0 to %1 : $*XandInt
+  fix_lifetime %1 : $*XandInt
+  %4 = function_ref @mutate_xandint_i : $@convention(method) (@inout XandInt) -> @inout Int
+  %5 = apply %4(%1) : $@convention(method) (@inout XandInt) -> @inout Int
+  %6 = address_to_pointer %5 : $*Int to $Builtin.RawPointer
+  %7 = function_ref @write_through_pointer : $@convention(thin) (Builtin.RawPointer) -> ()
+  %8 = apply %7(%6) : $@convention(thin) (Builtin.RawPointer) -> ()
+  destroy_addr %1 : $*XandInt
+  dealloc_stack %1 : $*XandInt
+  %11 = tuple ()
+  return %11 : $()
+}
