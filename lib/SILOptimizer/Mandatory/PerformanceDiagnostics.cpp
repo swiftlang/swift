@@ -243,6 +243,37 @@ bool PerformanceDiagnostics::checkClosureArguments(ApplySite as,
   return false;
 }
 
+/// If \p value is loaded from a stack slot that holds nothing but the value
+/// that a single `store` initializes it with, returns the stored value.
+static SILValue getStoredValueOfLoadedStackSlot(SILValue value) {
+  auto *load = dyn_cast<LoadInst>(value);
+  if (!load)
+    return SILValue();
+  SILValue address = load->getOperand();
+  if (auto *access = dyn_cast<BeginAccessInst>(address))
+    address = access->getSource();
+  auto *slot = dyn_cast<AllocStackInst>(address);
+  if (!slot)
+    return SILValue();
+
+  StoreInst *singleStore = nullptr;
+  SmallVector<Operand *, 8> worklist(slot->getUses());
+  while (!worklist.empty()) {
+    SILInstruction *user = worklist.pop_back_val()->getUser();
+    if (auto *access = dyn_cast<BeginAccessInst>(user)) {
+      worklist.append(access->getUses().begin(), access->getUses().end());
+    } else if (auto *store = dyn_cast<StoreInst>(user)) {
+      if (singleStore)
+        return SILValue();
+      singleStore = store;
+    } else if (!isa<LoadInst, EndAccessInst, DestroyAddrInst, DeallocStackInst,
+                    DebugValueInst>(user)) {
+      return SILValue();
+    }
+  }
+  return singleStore ? singleStore->getSrc() : SILValue();
+}
+
 bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
                                             bool acceptFunctionArgs,
                                             SILInstruction *callInst,
@@ -273,6 +304,12 @@ bool PerformanceDiagnostics::checkClosureValue(SILValue closure,
       closure = cv->getOperand();
     } else if (auto *md = dyn_cast<MarkDependenceInst>(closure)) {
       closure = md->getValue();
+    } else if (auto *mv = dyn_cast<MoveValueInst>(closure)) {
+      closure = mv->getOperand();
+    } else if (SILValue stored = getStoredValueOfLoadedStackSlot(closure)) {
+      // A noncopyable closure that's passed to a `consuming` parameter lives
+      // in the parameter's stack slot.
+      closure = stored;
     } else if (acceptFunctionArgs && isa<SILFunctionArgument>(closure)) {
       // We can assume that a function closure argument is already checked at
       // the call site.
