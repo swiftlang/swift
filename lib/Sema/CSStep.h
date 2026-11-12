@@ -278,6 +278,7 @@ class ComponentStep final : public SolverStep {
 
     SetVector<TypeVariableType *> TypeVars;
     unsigned prevPartialSolutionFixes = 0;
+    std::optional<unsigned> prevPartialSolutionTrailStart;
 
     // The component this scope is associated with.
     ComponentStep &Component;
@@ -291,6 +292,7 @@ class ComponentStep final : public SolverStep {
     ~Scope() {
       SolverScope.reset(); // rewind back all of the changes.
       CS.solverState->numPartialSolutionFixes = prevPartialSolutionFixes;
+      CS.solverState->partialSolutionTrailStart = prevPartialSolutionTrailStart;
 
       // return all of the saved type variables back to the system.
       CS.TypeVariables = std::move(TypeVars);
