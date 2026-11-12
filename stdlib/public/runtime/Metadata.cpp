@@ -4103,12 +4103,16 @@ static uint32_t getLog2AlignmentFromMask(size_t alignMask) {
   return log2;
 }
 
+// The class_ro pointer of a class object that the compiler emits is signed on
+// arm64e, so strip the signature as well as the flag bits.
 static inline ClassROData *getROData(ClassMetadata *theClass) {
-  return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
+  return (ClassROData *)(swift_strip_data(theClass->Data) &
+                         ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
 static inline ClassROData *getROData(ObjCClass *theClass) {
-  return (ClassROData*)(theClass->RODataAndFlags & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
+  return (ClassROData *)(swift_strip_data(theClass->RODataAndFlags) &
+                         ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 // This gets called if we fail during copyGenericClassObjcName().  Its job is
 // to generate a unique name, even though the name won't be very helpful if
