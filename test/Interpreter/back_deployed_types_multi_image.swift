@@ -143,4 +143,21 @@ same("NeedsTransformer<Box<Int>>", [A.Client.needsTransformerBox(),
                                     B.Client.needsTransformerBox(),
                                     needsTransformer(Box<Int>.self),
                                     needsTransformerDynamic(B.Client.makeBox())])
+// Conformances that this image declares for the types. The runtime finds them
+// from the metadata of the types, which comes from MyKit when it provides the
+// types, and from one of the copies otherwise.
+protocol Tagged { var tag: String { get } }
+extension Point: Tagged { var tag: String { "Point" } }
+extension Box: Tagged { var tag: String { "Box" } }
+extension Point: @retroactive CustomStringConvertible {
+  public var description: String { "P(\(x), \(y))" }
+}
+// CHECK-NEXT: PASS conformances declared by the client
+check("conformances declared by the client",
+      (A.Client.makePoint() as? Tagged)?.tag == "Point" &&
+      (B.Client.makeBox() as? Tagged)?.tag == "Box" &&
+      (A.Client.makePoint() as? CustomStringConvertible)?.description ==
+        "P(1, 2)" &&
+      "\(A.Client.makePoint())" == "P(1, 2)")
+
 // CHECK-NOT: FAIL

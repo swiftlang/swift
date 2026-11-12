@@ -454,6 +454,9 @@ $s21back_deploy_attribute0A12DeployedFuncyyFTwB ---> back deployment fallback fo
 $s5MyKit5PointVMaTwa ---> back deployment copy of type metadata accessor for MyKit.Point
 $s5MyKit3BoxVMaTwa ---> back deployment copy of type metadata accessor for MyKit.Box
 $s5MyKit5OuterV5InnerVMaTwa ---> back deployment copy of type metadata accessor for MyKit.Outer.Inner
+$s5MyKit5PointVMnTwa ---> back deployment copy of nominal type descriptor for MyKit.Point
+$s5MyKit3BoxVMnTwa ---> back deployment copy of nominal type descriptor for MyKit.Box
+$s5MyKit5OuterV5InnerVMnTwa ---> back deployment copy of nominal type descriptor for MyKit.Outer.Inner
 $s4test3fooyyAA1P_px1TRts_XPlF ---> test.foo<A>(any test.P<Self.T == A>) -> ()
 $s4test3fooyyAA1P_pSS1TAaCPRts_Si1UAERtsXPF ---> test.foo(any test.P<Self.test.P.T == Swift.String, Self.test.P.U == Swift.Int>) -> ()
 $s4test3FooVAAyyAA1P_pF ---> test.Foo.test(test.P) -> ()

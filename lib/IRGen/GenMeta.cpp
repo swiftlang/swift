@@ -7579,9 +7579,10 @@ irgen::getDefiningModuleTypeMetadataAccessFunction(IRGenModule &IGM,
 /// imported C type uses, so it cannot collide with a real foreign type.
 static llvm::Constant *getBackDeploymentCopyAnchor(IRGenModule &IGM,
                                               NominalTypeDecl *decl) {
+  // Name the helpers after the defining module's descriptor, which is the
+  // same in every image.
   auto descriptorName =
-      LinkEntity::forNominalTypeDescriptor(decl).mangleAsString(
-          IGM.Context);
+      IRGenMangler(IGM.Context).mangleNominalTypeDescriptor(decl);
   auto anchorName = "__swift_back_deployment_anchor_" + descriptorName;
   if (auto existing = IGM.Module.getNamedGlobal(anchorName))
     return llvm::ConstantExpr::getInBoundsGetElementPtr(
@@ -7651,9 +7652,10 @@ llvm::Value *irgen::emitCanonicalBackDeploymentCopyDescriptor(IRGenFunction &IGF
                                                          NominalTypeDecl *decl) {
   assert(decl->isBackDeployedIntoClient());
   auto &IGM = IGF.IGM;
+  // Name the helpers after the defining module's descriptor, which is the
+  // same in every image.
   auto descriptorName =
-      LinkEntity::forNominalTypeDescriptor(decl).mangleAsString(
-          IGM.Context);
+      IRGenMangler(IGM.Context).mangleNominalTypeDescriptor(decl);
   auto helper = IGM.getOrCreateHelperFunction(
       "__swift_back_deployment_canonical_descriptor_" + descriptorName,
       IGM.TypeContextDescriptorPtrTy, {},
