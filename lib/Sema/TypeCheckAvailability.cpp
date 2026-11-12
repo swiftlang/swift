@@ -1944,7 +1944,13 @@ static bool checkInverseGenericsCastingAvailability(Type srcType,
   bool fromExistential = false;
   if (auto boundTy = dyn_cast<NominalType>(type);
       boundTy && boundTy->hasGenericArgs()) {
-    for (auto arg : boundTy->getGenericArgs()) {
+    auto *params = boundTy->getDecl()->getGenericParams();
+    for (auto [param, arg] :
+         llvm::zip_equal(params->getParams(), boundTy->getGenericArgs())) {
+      // A value isn't a type, so it can't suppress a conformance.
+      if (param->isValue())
+        continue;
+
       for (auto ip : InvertibleProtocolSet::allKnown()) {
         if (lacksInvertibleConformance(arg, ip))
           missing.insert(ip);
