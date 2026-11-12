@@ -1,0 +1,64 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+// Check that SILCombine propagates the concrete type of an existential which is loaded with a
+// `load_borrow` whose value hint is the `init_existential_ref`.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol P : AnyObject {
+  func foo() -> Int
+}
+
+final class C : P {
+  func foo() -> Int
+}
+
+final class Box {
+  var e: any P
+}
+
+sil @C_foo : $@convention(witness_method: P) (@guaranteed C) -> Int
+
+// CHECK-LABEL: sil [ossa] @test_value_hint :
+// CHECK:         [[L:%.*]] = load_borrow
+// CHECK:         [[O:%.*]] = open_existential_ref [[L]]
+// CHECK:         [[C:%.*]] = unchecked_ref_cast [[O]] : $@opened({{[0-9]+}}, any P) Self to $C
+// CHECK:         [[F:%.*]] = function_ref @C_foo
+// CHECK:         apply [[F]]([[C]])
+// CHECK:       } // end sil function 'test_value_hint'
+sil [ossa] @test_value_hint : $@convention(thin) (@owned C, @guaranteed Box) -> Int {
+bb0(%0 : @owned $C, %1 : @guaranteed $Box):
+  %2 = init_existential_ref %0 : $C : $C, $any P
+  %3 = unchecked_ownership %2, forwarding: @none
+  %4 = ref_element_addr %1, #Box.e
+  store %2 to [assign] %4
+  %6 = load_borrow %4, value_hint %3
+  %7 = open_existential_ref %6 to $@opened(1, any P) Self
+  %8 = witness_method $@opened(1, any P) Self, #P.foo, %7 : $@opened(1, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  %9 = apply %8<@opened(1, any P) Self>(%7) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  end_borrow %6
+  return %9
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_value_hint :
+// CHECK:         [[W:%.*]] = witness_method $@opened
+// CHECK:       } // end sil function 'test_no_value_hint'
+sil [ossa] @test_no_value_hint : $@convention(thin) (@owned C, @guaranteed Box) -> Int {
+bb0(%0 : @owned $C, %1 : @guaranteed $Box):
+  %2 = init_existential_ref %0 : $C : $C, $any P
+  %4 = ref_element_addr %1, #Box.e
+  store %2 to [assign] %4
+  %6 = load_borrow %4
+  %7 = open_existential_ref %6 to $@opened(2, any P) Self
+  %8 = witness_method $@opened(2, any P) Self, #P.foo, %7 : $@opened(2, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  %9 = apply %8<@opened(2, any P) Self>(%7) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  end_borrow %6
+  return %9
+}
+
+sil_witness_table C : P module test {
+  method #P.foo: <Self where Self : P> (Self) -> () -> Int : @C_foo
+}

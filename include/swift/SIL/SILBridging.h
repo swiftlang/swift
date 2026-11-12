@@ -663,6 +663,7 @@ struct BridgedFunction {
   bool isAutodiffVJP() const;
   bool isAutodiffSubsetParametersThunk() const;
   SwiftInt specializationLevel() const;
+  SwiftInt closureSpecializationLevel() const;
   SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedSubstitutionMap contextSubs,
                                                                     BridgedCanType selfType) const;
   BRIDGED_INLINE OptionalSourceFileKind getSourceFileKind() const;

@@ -1229,3 +1229,61 @@ bb0:
   %9 = tuple ()
   return %9 : $()
 }
+
+// Check that a closure is specialized even if it is wrapped in a `begin_borrow` before it is
+// passed as a `@guaranteed` argument to an apply.
+// This is also the shape which the closure specializer itself creates when it re-materializes an
+// owned closure in a specialized function. Therefore not looking through the `begin_borrow` also
+// prevented the recursive specialization of nested closure users, like
+// `borrowed_closure_forward` -> `borrowed_closure_apply` below.
+
+sil @borrowed_closure_fn : $@convention(thin) (Int, Int) -> Int
+
+// The closure is re-created in the specialized function and the `apply` of it is folded into a
+// direct call of the closure function.
+// CHECK-LABEL: sil shared [ossa] @$s22borrowed_closure_apply0a1_B3_fnSiTf1nE_n : $@convention(thin) (Int, Int) -> Int {
+// CHECK:         [[FN:%.*]] = function_ref @borrowed_closure_fn
+// CHECK:         apply [[FN]](%0, %1)
+// CHECK:       } // end sil function '$s22borrowed_closure_apply0a1_B3_fnSiTf1nE_n'
+
+// Applies its `@guaranteed` closure argument.
+sil [ossa] @borrowed_closure_apply : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $@callee_guaranteed (Int) -> Int):
+  %2 = apply %1(%0) : $@callee_guaranteed (Int) -> Int
+  return %2 : $Int
+}
+
+// The recursive specialization round must specialize `borrowed_closure_apply` as well, although
+// the closure is passed to it via a `begin_borrow`.
+// CHECK-LABEL: sil shared [ossa] @$s24borrowed_closure_forward0a1_B3_fnSiTf1nE_n : $@convention(thin) (Int, Int) -> Int {
+// CHECK:         [[SPEC:%.*]] = function_ref @$s22borrowed_closure_apply0a1_B3_fnSiTf1nE_n
+// CHECK-NEXT:    apply [[SPEC]](%0, %1)
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function '$s24borrowed_closure_forward0a1_B3_fnSiTf1nE_n'
+
+// Passes its `@guaranteed` closure argument down to `borrowed_closure_apply`.
+sil [ossa] @borrowed_closure_forward : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int {
+bb0(%0 : $Int, %1 : @guaranteed $@callee_guaranteed (Int) -> Int):
+  %2 = function_ref @borrowed_closure_apply : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int
+  %3 = apply %2(%0, %1) : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int
+  return %3 : $Int
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_closure_caller : $@convention(thin) (Int, Int) -> Int {
+// CHECK-NOT:     partial_apply
+// CHECK-NOT:     begin_borrow
+// CHECK:         [[SPEC:%.*]] = function_ref @$s24borrowed_closure_forward0a1_B3_fnSiTf1nE_n
+// CHECK-NEXT:    apply [[SPEC]](%0, %1)
+// CHECK-NEXT:    return
+// CHECK-NEXT:  } // end sil function 'borrowed_closure_caller'
+sil [ossa] @borrowed_closure_caller : $@convention(thin) (Int, Int) -> Int {
+bb0(%0 : $Int, %1 : $Int):
+  %2 = function_ref @borrowed_closure_fn : $@convention(thin) (Int, Int) -> Int
+  %3 = partial_apply [callee_guaranteed] %2(%1) : $@convention(thin) (Int, Int) -> Int
+  %4 = begin_borrow %3 : $@callee_guaranteed (Int) -> Int
+  %5 = function_ref @borrowed_closure_forward : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int
+  %6 = apply %5(%0, %4) : $@convention(thin) (Int, @guaranteed @callee_guaranteed (Int) -> Int) -> Int
+  end_borrow %4 : $@callee_guaranteed (Int) -> Int
+  destroy_value %3 : $@callee_guaranteed (Int) -> Int
+  return %6 : $Int
+}

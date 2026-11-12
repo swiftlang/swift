@@ -1274,7 +1274,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   SILDynamicCastInst dynamicCast(Inst);
 
-  auto Op = dynamicCast.getSource();
+  auto Op = lookThroughOwnershipInsts(dynamicCast.getSource());
 
   // Try to simplify checked_cond_br instructions using existential
   // metatypes by propagating a concrete type whenever it can be
@@ -1297,7 +1297,7 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
 
   if (auto *EMI = dyn_cast<ExistentialMetatypeInst>(Op)) {
     // Operand of the existential_metatype instruction.
-    auto Op = EMI->getOperand();
+    auto Op = lookThroughOwnershipInsts(EMI->getOperand());
     auto EmiTy = EMI->getType();
 
     // %0 = alloc_stack $T
@@ -1365,10 +1365,10 @@ CastOptimizer::optimizeCheckedCastBranchInst(CheckedCastBranchInst *Inst) {
     // %1 = metatype $A.Type
     // checked_cast_br %1, ....
     if (auto *FoundIERI = dyn_cast<InitExistentialRefInst>(Op)) {
-      SILValue op = FoundIERI->getOperand();
+      SILValue op = lookThroughOwnershipInsts(FoundIERI->getOperand());
       if (auto *eir = dyn_cast<EndInitLetRefInst>(op))
         op = eir->getOperand();
-      if (!isa<AllocRefInst>(op))
+      if (!isa<AllocRefInst>(lookThroughOwnershipInsts(op)))
         return nullptr;
 
       // Get the type used to initialize the existential.
