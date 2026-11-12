@@ -644,12 +644,22 @@ IRGenModule::getAddrOfAsyncFunctionPointer(SILFunction *function) {
       LinkEntity::forSILFunction(function));
 }
 
+/// Put an async or coroutine function pointer record in true-const memory,
+/// except on ELF. The record can't be marked constant, because CoroSplit
+/// updates its context size, and on ELF a mutable global makes the .rodata
+/// section it is placed in writable.
+static void setFunctionPointerRecordTrueConst(IRGenModule &IGM,
+                                              llvm::GlobalVariable *var) {
+  if (IGM.TargetInfo.OutputObjectFormat != llvm::Triple::ELF)
+    IGM.setTrueConstGlobal(var);
+}
+
 llvm::Constant *IRGenModule::defineAsyncFunctionPointer(LinkEntity entity,
                                                         ConstantInit init) {
   auto asyncEntity = LinkEntity::forAsyncFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(asyncEntity, init, DebugTypeInfo()));
-  setTrueConstGlobal(var);
+  setFunctionPointerRecordTrueConst(*this, var);
   return var;
 }
 
@@ -712,7 +722,7 @@ llvm::Constant *IRGenModule::defineCoroFunctionPointer(LinkEntity entity,
   auto coroEntity = LinkEntity::forCoroFunctionPointer(entity);
   auto *var = cast<llvm::GlobalVariable>(
       getAddrOfLLVMVariable(coroEntity, init, DebugTypeInfo()));
-  setTrueConstGlobal(var);
+  setFunctionPointerRecordTrueConst(*this, var);
   return var;
 }
 

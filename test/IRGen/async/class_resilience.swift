@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module  -target %target-swift-5.1-abi-triple -enable-library-evolution -emit-module-path=%t/resilient_class.swiftmodule -module-name=resilient_class %S/Inputs/resilient_class.swift
-// RUN: %target-swift-frontend -I %t -emit-ir  -target %target-swift-5.1-abi-triple -enable-library-evolution %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-cpu -check-prefix CHECK-%target-import-type %s
+// RUN: %target-swift-frontend -I %t -emit-ir  -target %target-swift-5.1-abi-triple -enable-library-evolution %s | %FileCheck -check-prefix CHECK -check-prefix CHECK-%target-cpu -check-prefix CHECK-%target-import-type -check-prefix CHECK-%target-object-format %s
 // REQUIRES: concurrency
 
 import resilient_class
@@ -34,7 +34,8 @@ open class MyBaseClass<T> {
 }
 
 // CHECK-LABEL: @"$s16class_resilience11MyBaseClassC4waitxyYaFTjTu" = {{(dllexport )?}}{{(protected )?}}global %swift.async_func_pointer
-// CHECK-SAME: section "{{(__TEXT,__const|\.rodata|\.rdata)}}"
+// CHECK-macho-SAME: section "__TEXT,__const"
+// CHECK-coff-SAME: section ".rdata"
 
 // CHECK-LABEL: @"$s16class_resilience11MyBaseClassCMn" = {{(dllexport )?}}{{(protected )?}}constant
 // CHECK-SAME: ptr @"$s16class_resilience11MyBaseClassC4waitxyYaFTu"
