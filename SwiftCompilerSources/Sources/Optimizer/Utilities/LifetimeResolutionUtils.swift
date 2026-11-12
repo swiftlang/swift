@@ -100,24 +100,21 @@ struct StateIndexSpace: CustomStringConvertible {
     }
   }
 
-  func range(of element: Element) -> IndexRange? {
-    let index: Int?
+  func index(of element: Element) -> Int? {
     switch element {
-    case .field(let leaf): index = fieldRange.contains(leaf) ? leaf : nil
-    case .superclass: index = superclassIndex
-    case .reference: index = referenceIndex
+    case .field(let leaf): fieldRange.contains(leaf) ? leaf : nil
+    case .superclass: superclassIndex
+    case .reference: referenceIndex
     }
-    return index.map { $0..<($0 + 1) }
+  }
+
+  func range(of element: Element) -> IndexRange? {
+    index(of: element).map { $0..<($0 + 1) }
   }
 
   /// The fields selected by a projection path from the root.
   func range(ofFieldPath path: SmallProjectionPath) -> IndexRange {
     fields.range(of: path)
-  }
-
-  /// The fields within `range`.
-  func fieldLeaves(in range: IndexRange) -> IndexRange {
-    range.clamped(to: fieldRange)
   }
 
   /// Whether the element at `index` is a part of the storage that has an address.
@@ -274,6 +271,7 @@ let lifetimeResolutionStateSpaceTest = FunctionTest("lifetime_resolution_state_s
   assert(space.wholeRange == 0..<space.count)
   assert(space.fieldRange.lowerBound == 0 && space.fieldRange.upperBound <= space.count)
   for index in space.wholeRange {
+    assert(space.index(of: space.element(at: index)) == index)
     assert(space.range(of: space.element(at: index)) == index..<(index + 1))
   }
   assert(space.initialRanges.map { $0.range.count }.reduce(0, +) == space.count)

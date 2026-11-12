@@ -1,4 +1,4 @@
-//===--- LifetimeResolutionDiagnose.swift ---------------------------------==//
+//===--- LifetimeResolutionDiagnose.swift ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -870,7 +870,7 @@ private struct Diagnoser {
   /// A use of `self` in a derived class initializer before `super.init`, or before its own stored properties
   /// are initialized.
   private mutating func emitUseBeforeInit(ofDerivedSelf storage: Storage, at use: OffendingUse?, _ leaves: Set<Int>) {
-    let superclass = storage.space.range(of: .superclass)!.lowerBound
+    let superclass = storage.space.index(of: .superclass)!
     guard leaves.contains(superclass) else {
       guard let use, use.kind == .superInit else {
         emitUseBeforeStoredPropertiesInit(of: storage, at: use, leaves)

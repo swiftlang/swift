@@ -1,4 +1,4 @@
-//===--- LifetimeResolution.swift -----------------------------------------==//
+//===--- LifetimeResolution.swift -----------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -32,7 +32,7 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
   // resolved before the value itself.
   for block in function.postOrderBlocks(context) {
     for inst in block.instructions.reversed() {
-      // Ignore `mark_uninitialized` this pass is driven by the storage itself.
+      // Ignore `mark_uninitialized`; this pass is driven by the storage itself.
       if inst is MarkUninitializedInst { continue }
 
       for result in inst.results {
@@ -64,7 +64,6 @@ extension Resolver {
     }
   }
 }
-
 
 /// Identifies a resolvable storage root.
 struct ResolvableRoot {
@@ -189,11 +188,11 @@ struct ResolvableRoot {
       if let mu = markUninitialized {
         address = mu
 
-        let indicies = indexCache.fieldIndices(for: storage.type.objectType)
+        let indices = indexCache.fieldIndices(for: storage.type.objectType)
 
         // If this is the 'self' for an empty type in its initializer, we don't have any fields to initialize.
         // So, treat the storage as being born initialized
-        startsInitialized = mu.kind == .rootSelf && !indicies.hasFields
+        startsInitialized = mu.kind == .rootSelf && !indices.hasFields
 
         let isResolvableDerivedSelf = mu.kind == .derivedSelf && Self.findInitialStoreOfDerivedSelf(mu) != nil
         mode = isResolvableDerivedSelf ? .derivedClassSelf : .storage
@@ -223,7 +222,6 @@ struct ResolvableRoot {
       box.uses.endingLifetime.forEach { extraUses.append(.boxLifetimeEnd($0.instruction)) }
       // TODO: add copies of the box too
 
-
     case let arg as FunctionArgument where arg.type.isAddress:
       storage = arg
       address = arg
@@ -243,12 +241,9 @@ struct ResolvableRoot {
         // For an inout parameter, all function exit terminators are considered uses.
         function.exitingBlocks.forEach { extraUses.append(.functionExit($0.terminator)) }
 
-
       default:
         return nil   // unimplemented convention
       }
-
-      break
 
     case _ where val.type.isClass && val.ownership == .owned:
       // `self` in a root class initializer, whose instance's stored properties start uninitialized.
@@ -367,7 +362,7 @@ private struct Resolver {
     self.state = [:]
   }
 
-  // - Returns: true iff legalization was successful
+  /// - Returns: true iff `value` is a resolvable root, which is then resolved.
   mutating func run(on value: Value, _ indexCache: inout FieldIndexTrieCache) -> Bool {
     guard let root = ResolvableRoot(value, &indexCache, context) else {
       return false
@@ -426,7 +421,7 @@ private struct Resolver {
 
     logState("\n** final state **")
 
-    log("\n** Demand Analysis Phase finished **")
+    log("\n** Resolution finished **")
     return true
   }
 
@@ -548,7 +543,6 @@ private struct Resolver {
     // TODO: for Copyable types, we should have a conservative check to see if we're in a nested mutating access
     //       for this memory. If not, then it's proven safe to transform into a load_borrow (rdar://186687340)
 
-
     case .use(_, .borrow) where noDemand:
       // No users need ownership of the value, and there is no demand after this use.
       // We could either take or borrow; either way, we should avoid a copy if possible.
@@ -561,11 +555,11 @@ private struct Resolver {
       // Unsatisfied demand reaching the root means there exists a use-before-init of those leaves.
       let demanded = event.range.filter { current[$0] != .nothing }
       initializeWithUndef(leaves: demanded.filter { space.fieldRange.contains($0) }, of: root, space)
-      if let superclass = space.range(of: .superclass), demanded.contains(superclass.lowerBound) {
+      if let superclass = space.index(of: .superclass), demanded.contains(superclass) {
         Builder(after: root.markerInsertionPoint, context)
           .createDiagnose(operand: root.address, kind: .missingSuperInit)
       }
-      assert(space.range(of: .reference).map { !demanded.contains($0.lowerBound) } ?? true,
+      assert(space.index(of: .reference).map { !demanded.contains($0) } ?? true,
              "the reference is defined right after the root")
 
     default:
@@ -881,8 +875,8 @@ private struct Resolver {
           }
 
         case let .end(op) where root.mode == .derivedClassSelf:
-          let holdsReference = current[space.range(of: .reference)!.lowerBound]
-          let superInitialized = current[space.range(of: .superclass)!.lowerBound]
+          let holdsReference = current[space.index(of: .reference)!]
+          let superInitialized = current[space.index(of: .superclass)!]
           if holdsReference == .no {
             // A failed `super.init` already released the instance.
             context.erase(instruction: op.instruction)
@@ -903,7 +897,7 @@ private struct Resolver {
             break
           }
 
-          // If completely unavailable (consumed), it's lifetime ended earlier, so delete this one.
+          // If completely unavailable (consumed), its lifetime ended earlier, so delete this one.
           // A class instance must still be deallocated, though.
           if summary == .no && !root.isInstanceReference {
             context.erase(instruction: op.instruction)
@@ -1108,8 +1102,8 @@ private struct Resolver {
   // deallocated without running its deinit, as `super.init` initializes the parts the deinit needs.
   func endDerivedSelfLifetime(at destroy: Instruction, _ avail: [Availability], _ root: ResolvableRoot,
                               _ space: StateIndexSpace, _ controlVar: ControlVariable?) {
-    let reference = space.range(of: .reference)!.lowerBound
-    let superclass = space.range(of: .superclass)!.lowerBound
+    let reference = space.index(of: .reference)!
+    let superclass = space.index(of: .superclass)!
     var deallocPoint = destroy
 
     // The `super.init` bit is set before the call, so whether it failed is only known from the reference.
@@ -1146,7 +1140,7 @@ private struct Resolver {
   }
 
   // Classifies every use of the root's address, following projections and access scopes, into the events of each block.
-  private struct UseCollector : AddressDefUseWalker, AddressUseVisitor, ClassInstanceUseWalker {
+  private struct UseCollector: AddressDefUseWalker, AddressUseVisitor, ClassInstanceUseWalker {
     private(set) var uses: Dictionary<BasicBlock, EventList> = [:]
     private let space: StateIndexSpace
     private let function: Function
@@ -1159,7 +1153,7 @@ private struct Resolver {
       self.context = context
     }
 
-    mutating func addUse(_ k:  EventList.Kind, _ range: EventList.IndexRange) {
+    mutating func addUse(_ k: EventList.Kind, _ range: EventList.IndexRange) {
       log("\taddUse of \(range) as \(k)")
       switch k {
       case .def, .take, .use:
@@ -1184,7 +1178,7 @@ private struct Resolver {
       let address = root.address
       log("** starting collectUses on \(address) **")
 
-      // Add the root use to do detect uninitialized paths.
+      // Add the root use to detect uninitialized paths.
       for (range, initialized) in space.initialRanges {
         addUse(.root(root, initialized: initialized), range)
       }
@@ -1608,7 +1602,7 @@ private struct Resolver {
       // What prior availability does this event overwrite?
       var availKill: Availability {
         switch self {
-        case .def, .superInit, .root, .take, .end: .partial    // Overwites all availability.
+        case .def, .superInit, .root, .take, .end: .partial    // Overwrites all availability.
         case .use, .liveness: .unknown
         }
       }
@@ -1650,7 +1644,7 @@ private struct Resolver {
     init(_ demand: Array<BlockDemand>, _ avail: Array<BlockAvailability>, _ useList: EventList? = nil) {
       assert(!demand.isEmpty)
       if let provided = useList {
-        assert(!provided.list.isEmpty, "You should pass nil if there are no uses.")
+        assert(!provided.list.isEmpty, "You should pass nil if there are no events.")
       }
 
       self.events = useList
@@ -1660,7 +1654,7 @@ private struct Resolver {
 
     mutating func initialDemand() {
       guard let events else { return }
-      assert(events.finalized, "AccessList needs to be finalized!")
+      assert(events.finalized, "EventList needs to be finalized!")
 
       // Scan backwards over the uses within this block to compute its 'gen' bits, so that entry = gen ∪ (exit \ kill).
       for (use, range) in events.list.reversed() {
@@ -1675,7 +1669,7 @@ private struct Resolver {
 
     mutating func initialAvailability() {
       guard let events else { return }
-      assert(events.finalized, "AccessList needs to be finalized!")
+      assert(events.finalized, "EventList needs to be finalized!")
 
       // Scan forwards so that exit = gen ∪ (entry \ kill).
       for (event, range) in events.list {
@@ -1853,7 +1847,7 @@ private struct PartitionedUses: CustomStringConvertible {
 
   var description: String {
     return """
-           PartitionedUses of: \(root)) [
+           PartitionedUses of: \(root) [
              uses = \(uses)
              consumes = \(consumes)
              indirectUses = \(indirectUses)
@@ -1966,7 +1960,7 @@ private struct PartitionedUses: CustomStringConvertible {
     liverange.insert(contentsOf: uses.users)
     liverange.insert(contentsOf: indirectUses)  // Deinit barriers must be treated as uses.
     if hasUnboundedUse {
-      // Liveness past an unbounded use is unknown, so the extend liveness to scope-ends.
+      // Liveness past an unbounded use is unknown, so extend liveness to scope-ends.
       liverange.insert(contentsOf: lifetimeLimits)
     }
     return liverange
@@ -2098,7 +2092,6 @@ private struct PartitionedUses: CustomStringConvertible {
   }
 }
 
-
 fileprivate extension InstructionRange {
   func alongBoundary(_ context: FunctionPassContext, insertFunc: (Builder) -> ()) {
     for endInst in ends {
@@ -2110,8 +2103,6 @@ fileprivate extension InstructionRange {
     }
   }
 }
-
-
 
 // Collects all deinit barriers that exist on any path from the given lifetimeLimits towards the
 // definition, stopping at the boundary of `liverange`.
