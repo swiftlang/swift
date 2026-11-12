@@ -8,6 +8,7 @@ set(LLVM_ENABLE_PROJECTS
 set(LLVM_TARGETS_TO_BUILD AArch64 ARM WebAssembly X86 CACHE STRING "")
 
 set(LLVM_TOOLCHAIN_TOOLS
+      LLVM
       llvm-ar
       llvm-ranlib
     CACHE STRING "")
