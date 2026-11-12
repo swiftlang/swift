@@ -65,7 +65,7 @@ class ConfigRestartTestCase(scheme_mock.SchemeMockTestCase):
             self.after_update[index]()
         return [], []
 
-    def _run_main(self, **patches):
+    def _run_main(self, extra_args=(), **patches):
         output = StringIO()
         with contextlib.ExitStack() as stack:
             stack.enter_context(
@@ -78,7 +78,8 @@ class ConfigRestartTestCase(scheme_mock.SchemeMockTestCase):
                 patch(
                     "sys.argv",
                     ["update-checkout", "--config", self.config_path]
-                    + ["--source-root", self.source_root],
+                    + ["--source-root", self.source_root]
+                    + list(extra_args),
                 )
             )
             for target, replacement in patches.items():
@@ -175,6 +176,52 @@ class ConfigRestartTestCase(scheme_mock.SchemeMockTestCase):
 
         self.assertEqual(restarted, [True])
         self.assertEqual(len(self.calls), 1)
+
+    def _changed_script_run(self, mode):
+        script = os.path.join(self.workspace, "fake_script.py")
+        with open(script, "w") as f:
+            f.write("# v1\n")
+
+        def modify_script():
+            with open(script, "w") as f:
+                f.write("# v2\n")
+
+        self.after_update = [modify_script]
+        restarted = []
+        output = self._run_main(
+            extra_args=["--restart", mode],
+            script_file_paths=lambda: [Path(script)],
+            restart_script=lambda: restarted.append(True),
+        )
+        return restarted, output
+
+    def test_restart_config_ignores_script_changes(self):
+        restarted, output = self._changed_script_run("config")
+
+        self.assertEqual(restarted, [])
+        self.assertEqual(len(self.calls), 1)
+        self.assertIn("re-run it", output)
+
+    def test_restart_never_ignores_script_changes(self):
+        restarted, output = self._changed_script_run("never")
+
+        self.assertEqual(restarted, [])
+        self.assertIn("re-run it", output)
+
+    def test_restart_never_does_not_restart_for_config(self):
+        self.after_update = [self._retarget_repo1("release")]
+
+        output = self._run_main(extra_args=["--restart", "never"])
+
+        self.assertEqual(self._repo1_branches(), ["main"])
+        self.assertIn("re-run update-checkout", output)
+
+    def test_restart_config_restarts_for_config(self):
+        self.after_update = [self._retarget_repo1("release")]
+
+        self._run_main(extra_args=["--restart", "config"])
+
+        self.assertEqual(self._repo1_branches(), ["main", "release"])
 
 
 if __name__ == "__main__":

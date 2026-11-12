@@ -1280,7 +1280,7 @@ def main() -> int:
 
     @exponential_retry(max_retries=args.max_retries)
     def do_checkout() -> int:
-        nonlocal config, scheme_map
+        nonlocal config, scheme_map, script_hashes
         clone_results = None
         skip_repo_list = []
         if args.clone or args.clone_with_ssh:
@@ -1344,11 +1344,27 @@ def main() -> int:
             )
 
             if hash_files(script_file_paths()) != script_hashes:
-                restart_script()
+                if args.restart == "all":
+                    restart_script()
+                print(
+                    "update-checkout has been updated; re-run it to use the"
+                    " new version.",
+                    flush=True,
+                )
+                # Don't repeat the message on later passes.
+                script_hashes = hash_files(script_file_paths())
 
             new_config = load_config(args.configs)
             new_config_hash = hash_config(new_config)
             if new_config_hash == config_hash:
+                break
+
+            if args.restart == "never":
+                print(
+                    "Configuration changed; re-run update-checkout to apply"
+                    " the changes.",
+                    flush=True,
+                )
                 break
 
             if restarts >= max_config_restarts:
