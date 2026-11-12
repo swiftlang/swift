@@ -4328,9 +4328,10 @@ enum class CustomAttrTypeKind {
   /// Global actors are represented as custom type attributes. They don't
   /// have any particularly interesting semantics.
   GlobalActor,
-  
-  /// Result builder types can have their generics arguments
-  /// inferred from the attached declaration.
+
+  /// Result builder types can omit their generic arguments, or use
+  /// placeholders, which are inferred when the result builder transform is
+  /// applied.
   ResultBuilder,
 };
 

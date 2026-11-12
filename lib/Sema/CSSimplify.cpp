@@ -12348,8 +12348,24 @@ static Type getOpenedResultBuilderTypeFor(ConstraintSystem &cs,
     // parameters.
     auto substitutions = cs.getOpenedTypes(calleeLocator);
     if (!substitutions.empty()) {
-      builderType = cs.openType(builderType, substitutions, locator,
-                                /*preparedOverload=*/nullptr);
+      if (builderType->hasUnboundGenericType()) {
+        // `openType` doesn't support unbound generic types, which are opened
+        // later by `matchResultBuilder`. Only substitute the callee's type
+        // parameters here.
+        builderType =
+            builderType.transformRec([&](Type type) -> std::optional<Type> {
+              if (auto *param = type->getAs<GenericTypeParamType>()) {
+                for (auto pair : substitutions) {
+                  if (pair.first->isEqual(param))
+                    return pair.second;
+                }
+              }
+              return std::nullopt;
+            });
+      } else {
+        builderType = cs.openType(builderType, substitutions, locator,
+                                  /*preparedOverload=*/nullptr);
+      }
     }
 
     assert(!builderType->hasTypeParameter());

@@ -9068,6 +9068,13 @@ Expected<Type> DESERIALIZE_TYPE(SIL_PACK_TYPE)(
                           elementTypes);
 }
 
+Expected<Type> DESERIALIZE_TYPE(PLACEHOLDER_TYPE)(
+    ModuleFile &MF, SmallVectorImpl<uint64_t> &scratch, StringRef blobData) {
+  // The record has no fields; the original `PlaceholderTypeRepr` isn't
+  // serialized.
+  return PlaceholderType::get(MF.getContext(), /*repr=*/nullptr);
+}
+
 Expected<Type> DESERIALIZE_TYPE(ERROR_TYPE)(ModuleFile &MF,
                                             SmallVectorImpl<uint64_t> &scratch,
                                             StringRef blobData) {

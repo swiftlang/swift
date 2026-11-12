@@ -1105,6 +1105,13 @@ ConstraintSystem::matchResultBuilder(AnyFunctionRef fn, Type builderType,
                                      ConstraintKind bodyResultConstraintKind,
                                      Type contextualType,
                                      ConstraintLocatorBuilder locator) {
+  // The result builder attribute may omit some or all of the builder's generic
+  // arguments (e.g. `@Builder` or `@Builder<_>` where `Builder` is generic).
+  // Open them into type variables so that they're inferred from the `build*`
+  // calls in the transformed body, like any other generic arguments.
+  if (builderType->hasUnboundGenericType() || builderType->hasPlaceholder())
+    builderType = replaceInferableTypesWithTypeVars(builderType, locator);
+
   builderType = simplifyType(builderType);
   auto builder = builderType->getAnyNominal();
   assert(builder && "Bad result builder type");

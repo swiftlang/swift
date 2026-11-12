@@ -57,7 +57,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1042; // User module sub-build version
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1043; // PlaceholderType
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1343,6 +1343,12 @@ namespace decls_block {
   TYPE_LAYOUT(ErrorTypeLayout,
     ERROR_TYPE,
     TypeIDField // original type (if any)
+  );
+
+  /// A placeholder type (`_`), e.g. in a result builder attribute whose
+  /// generic arguments are inferred.
+  TYPE_LAYOUT(PlaceholderTypeLayout,
+    PLACEHOLDER_TYPE
   );
 
   TYPE_LAYOUT(BuiltinAliasTypeLayout,

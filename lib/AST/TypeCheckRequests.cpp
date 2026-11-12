@@ -1969,7 +1969,7 @@ void swift::simple_display(llvm::raw_ostream &out, CustomAttrTypeKind value) {
   case CustomAttrTypeKind::GlobalActor:
     out << "global-actor";
     return;
-      
+
   case CustomAttrTypeKind::ResultBuilder:
     out << "result-builder";
     return;
