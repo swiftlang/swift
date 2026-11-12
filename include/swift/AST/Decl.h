@@ -5137,6 +5137,16 @@ public:
   /// Type if it `isEscapable` instead of using this.
   CanBeInvertible::Result canBeEscapable() const;
 
+  /// "Does a conformance for Transferable exist for this type declaration?"
+  ///
+  /// This doesn't mean that all instance of this type are Transferable,
+  /// because if a conditional conformance to Transferable exists, this method
+  /// will return true.
+  ///
+  /// If you need a more precise answer, ask this Decl's corresponding
+  /// Type if it `isTransferable` instead of using this.
+  CanBeInvertible::Result canBeTransferable() const;
+
   bool suppressesConformance(KnownProtocolKind kp) const;
 
   // Implement isa/cast/dyncast/etc.
