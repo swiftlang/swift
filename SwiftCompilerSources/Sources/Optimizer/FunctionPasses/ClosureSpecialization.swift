@@ -389,7 +389,21 @@ private func isCalleeSpecializable(of apply: ApplySite) -> Bool {
      !callee.mayBindDynamicSelf,
 
      // Don't support self-recursive functions because that would result in duplicate mapping of values when cloning.
-     callee != apply.parentFunction
+     callee != apply.parentFunction,
+
+     // Avoid an infinite specialization loop: if a closure is called and also captured in another
+     // closure which is passed to a recursive call, each specialization of the callee contains a call
+     // which can be specialized again, with even more propagated closures. E.g.
+     //
+     //   func foo(_ c: @escaping () -> ()) {
+     //     c()
+     //     foo({ c() })
+     //   }
+     //
+     // Note that specializing nested closures in multiple rounds legitimately creates closure
+     // specializations of closure specializations, e.g. three levels in closure_specialization_nested.sil.
+     // A limit of 2 for the callee is good enough and will not be exceeded in "regular" optimization scenarios.
+     callee.closureSpecializationLevel <= 2
   {
     return true
   }
@@ -462,7 +476,11 @@ private func findSpecializableClosure(of value: Value, _ visited: inout ValueSet
   case is ConvertFunctionInst,
        is ConvertEscapeToNoEscapeInst,
        is MoveValueInst,
-       is CopyValueInst:
+       is CopyValueInst,
+       // In OSSA a closure can be wrapped in a `begin_borrow` before it is passed as a `@guaranteed`
+       // argument to an apply. This is e.g. the case for a closure which is re-created in a
+       // previously specialized function.
+       is BeginBorrowInst:
     return findSpecializableClosure(of: (value as! UnaryInstruction).operand.value, &visited, &capturedDependencies)
 
   case let mdi as MarkDependenceInst:
@@ -1054,12 +1072,7 @@ private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ c
   defer { needDestroy.deinitialize() }
 
   for clonedArg in clonedArguments {
-    if let beginBorrow = clonedArg as? BeginBorrowInst {
-      Builder.insertCleanupAtFunctionExits(of: beginBorrow.parentFunction, context) { builder in
-        builder.createEndBorrow(of: beginBorrow)
-      }
-      completeLifetime(of: beginBorrow, context)
-    }
+    addMissingEndBorrowsRecursively(value: clonedArg, context)
     findValuesWhichNeedDestroyRecursively(value: clonedArg, needDestroy: &needDestroy)
   }
 
@@ -1068,6 +1081,33 @@ private func addMissingDestroysAtFunctionExits(for clonedArguments: [Value], _ c
       builder.createDestroyValue(operand: valueToDestroy)
     }
     completeLifetime(of: valueToDestroy, context)
+  }
+}
+
+/// Adds end_borrows for the begin_borrow which is created for an owned closure argument, but also
+/// for begin_borrows inside the cloned closure value chain. The latter can come from a previous
+/// round of closure specialization, e.g.
+/// ```
+///   %1 = partial_apply %closure
+///   %2 = begin_borrow %1           // created by the previous specialization round
+///   %3 = convert_function %2
+///   apply %function(%3) : (@guaranteed () -> ()) -> ()
+/// ```
+/// The cloner only clones the value chain and not the end_borrows of the begin_borrow.
+///
+/// Inner borrow scopes are visited first so that their end_borrows are inserted before the end_borrows
+/// of outer scopes.
+private func addMissingEndBorrowsRecursively(value: Value, _ context: FunctionPassContext) {
+  if let beginBorrow = value as? BeginBorrowInst, beginBorrow.scopeEndingOperands.isEmpty {
+    Builder.insertCleanupAtFunctionExits(of: beginBorrow.parentFunction, context) { builder in
+      builder.createEndBorrow(of: beginBorrow)
+    }
+    completeLifetime(of: beginBorrow, context)
+  }
+  if let svi = value as? SingleValueInstruction {
+    for op in svi.operands {
+      addMissingEndBorrowsRecursively(value: op.value, context)
+    }
   }
 }
 

@@ -15,6 +15,7 @@
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/BasicBlockUtils.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 using namespace swift;
@@ -196,8 +197,10 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
       if (auto *store = dyn_cast<StoreInst>(initI))
         openedVal = store->getSrc();
     }
-  } else if (auto *sb = dyn_cast<StoreBorrowInst>(openedVal)) {
-    openedVal = sb->getSrc();
+  }
+  // Handle a store_borrow, either used directly or copied to the alloc_stack.
+  if (auto *sbi = dyn_cast<StoreBorrowInst>(openedVal)) {
+    openedVal = sbi->getSrc();
   }
   if (auto *Open = dyn_cast<OpenExistentialAddrInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
@@ -208,7 +211,36 @@ OpenedArchetypeInfo::OpenedArchetypeInfo(Operand &use) {
   if (auto *Open = dyn_cast<OpenExistentialRefInst>(openedVal)) {
     OpenedArchetype = Open->getType().castTo<ExistentialArchetypeType>();
     OpenedArchetypeValue = Open;
-    ExistentialValue = Open->getOperand();
+    // In OSSA the existential reference may be wrapped in ownership
+    // instructions (e.g. begin_borrow or copy_value) before it is opened. Look
+    // through them so that the underlying init_existential_ref can be found by
+    // ConcreteExistentialInfo.
+    ExistentialValue = lookThroughOwnershipInsts(Open->getOperand());
+
+    // A `load_borrow` which RLE could not eliminate records the loaded value in
+    // its value hint, e.g.
+    //   %e = init_existential_ref %c : $C : $C, $P
+    //   %h = unchecked_ownership %e, forwarding: @none
+    //   store %e to [init] %a
+    //   %l = load_borrow %a, value_hint %h
+    //   %o = open_existential_ref %l
+    // Follow the value hint to find the init_existential_ref.
+    SILValue hinted = ExistentialValue;
+    while (true) {
+      if (auto *lbi = dyn_cast<LoadBorrowInst>(hinted)) {
+        if (!lbi->hasValueHint())
+          break;
+        hinted = lookThroughOwnershipInsts(lbi->getValueHint());
+      } else if (auto *uoi = dyn_cast<UncheckedOwnershipInst>(hinted)) {
+        hinted = lookThroughOwnershipInsts(uoi->getOperand());
+      } else {
+        break;
+      }
+    }
+    if (hinted != ExistentialValue && isa<InitExistentialRefInst>(hinted)) {
+      ExistentialValue = hinted;
+      isExistentialValueFromValueHint = true;
+    }
     return;
   }
   if (auto *Open = dyn_cast<OpenExistentialMetatypeInst>(openedVal)) {

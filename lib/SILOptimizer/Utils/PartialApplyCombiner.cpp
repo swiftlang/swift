@@ -255,6 +255,25 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
   });
 }
 
+/// Adds the uses of all struct_extracts of field `fieldIdx` of `si` to
+/// `worklist`, looking through ownership instructions.
+static void collectStructExtractUses(StructInst *si, unsigned fieldIdx,
+                                     SmallVectorImpl<Operand *> &worklist) {
+  SmallVector<SILValue, 4> structValues;
+  structValues.push_back(si);
+  while (!structValues.empty()) {
+    for (Operand *use : structValues.pop_back_val()->getUses()) {
+      SILInstruction *user = use->getUser();
+      if (isa<UncheckedOwnershipInst>(user) || isa<BeginBorrowInst>(user)) {
+        structValues.push_back(cast<SingleValueInstruction>(user));
+      } else if (auto *sei = dyn_cast<StructExtractInst>(user)) {
+        if (sei->getFieldIndex() == fieldIdx)
+          llvm::copy(sei->getUses(), std::back_inserter(worklist));
+      }
+    }
+  }
+}
+
 /// Perform the apply{partial_apply(x,y)}(z) -> apply(z,x,y) peephole
 /// by iterating over all uses of the partial_apply and searching
 /// for the pattern to transform.
@@ -316,6 +335,26 @@ bool PartialApplyCombiner::combine() {
       }
       continue;
     }
+
+    // Look through a struct which wraps the closure if the closure is extracted
+    // from the struct again, e.g. via a value hint chain created by RLE:
+    //   %s = struct $S (%pai)
+    //   %u = unchecked_ownership %s, forwarding: @none
+    //   %e = struct_extract %u, #S.closure
+    //   %l = load_borrow %addr, value_hint %e
+    //   apply %l()
+    if (auto *si = dyn_cast<StructInst>(user)) {
+      collectStructExtractUses(si, use->getOperandNumber(), worklist);
+      continue;
+    }
+
+    // The value hint of a load_borrow is the loaded value.
+    if (auto *lbi = dyn_cast<LoadBorrowInst>(user)) {
+      if (use->getOperandNumber() == 1)
+        llvm::copy(lbi->getUses(), std::back_inserter(worklist));
+      continue;
+    }
+
     // If this use of a partial_apply is not
     // an apply which uses it as a callee, bail.
     auto ai = FullApplySite::isa(user);

@@ -1,0 +1,69 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
+
+// Check that end_borrows are inserted for a begin_borrow which is inside the cloned closure value
+// chain. Such a begin_borrow is e.g. created by a previous round of closure specialization.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil [ossa] @closure : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int) -> @out Int {
+bb0(%0 : $*Int, %1 : $*Int, %2 : $*Int):
+  %3 = load [trivial] %1
+  store %3 to [trivial] %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil shared [noinline] [ossa] @{{.*}}callee{{.*}} : $@convention(thin) (@in_guaranteed Int) -> (@out Int, @error any Error) {
+// CHECK:         [[F:%.*]] = function_ref @closure
+// CHECK:         [[T:%.*]] = thin_to_thick_function [[F]]
+// CHECK:         [[C:%.*]] = convert_function [[T]]
+// CHECK:         [[B:%.*]] = begin_borrow [[C]]
+// CHECK:         convert_function [[B]]
+// CHECK:       bb1(
+// CHECK:         end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    return
+// CHECK:       bb2(
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [[C]]
+// CHECK-NEXT:    throw
+// CHECK:       } // end sil function '{{.*}}callee{{.*}}'
+sil [noinline] [ossa] @callee : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_2, @error any Error) for <Int, Int, Int>) -> (@out Int, @error any Error) {
+bb0(%0 : $*Int, %1 : $*Int, %2 : @guaranteed $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_2, @error any Error) for <Int, Int, Int>):
+  try_apply %2(%0, %1, %1) : $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_2, @error any Error) for <Int, Int, Int>, normal bb1, error bb2
+
+bb1(%4 : $()):
+  %r = tuple ()
+  return %r
+
+bb2(%6 : @owned $any Error):
+  throw %6
+}
+
+// CHECK-LABEL: sil [ossa] @caller :
+// CHECK:         function_ref @{{.*}}callee{{.*}} : $@convention(thin) (@in_guaranteed Int) -> (@out Int, @error any Error)
+// CHECK:       } // end sil function 'caller'
+sil [ossa] @caller : $@convention(thin) (@in_guaranteed Int) -> (@out Int, @error any Error) {
+bb0(%0 : $*Int, %1 : $*Int):
+  %2 = function_ref @closure : $@convention(thin) (@in_guaranteed Int, @in_guaranteed Int) -> @out Int
+  %3 = thin_to_thick_function %2 to $@noescape @callee_guaranteed (@in_guaranteed Int, @in_guaranteed Int) -> @out Int
+  %4 = convert_function %3 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> @out τ_0_2 for <Int, Int, Int>, forwarding: @owned
+  %5 = begin_borrow %4
+  %6 = convert_function %5 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_2, @error any Error) for <Int, Int, Int>
+  %7 = function_ref @callee : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_2, @error any Error) for <Int, Int, Int>) -> (@out Int, @error any Error)
+  try_apply %7(%0, %1, %6) : $@convention(thin) (@in_guaranteed Int, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0, @in_guaranteed τ_0_1) -> (@out τ_0_2, @error any Error) for <Int, Int, Int>) -> (@out Int, @error any Error), normal bb1, error bb2
+
+bb1(%9 : $()):
+  end_borrow %5
+  destroy_value %4
+  %r = tuple ()
+  return %r
+
+bb2(%12 : @owned $any Error):
+  end_borrow %5
+  destroy_value %4
+  throw %12
+}

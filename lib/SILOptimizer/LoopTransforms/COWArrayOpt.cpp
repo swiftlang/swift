@@ -458,8 +458,9 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       continue;
     }
 
-    if (isa<DeallocStackInst>(UseInst)) {
+    if (isa<DeallocStackInst>(UseInst) || isa<DestroyAddrInst>(UseInst)) {
       // Handle destruction of a local array.
+      // A `destroy_addr` is equivalent to a `load [take]` + `destroy_value`.
       continue;
     }
 

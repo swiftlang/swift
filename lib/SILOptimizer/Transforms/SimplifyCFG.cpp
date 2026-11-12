@@ -689,7 +689,7 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
     return nullptr;
 
   // Handle the obvious case.
-  if (auto *EI = dyn_cast<EnumInst>(Val))
+  if (auto *EI = dyn_cast<EnumInst>(lookThroughOwnershipInsts(Val)))
     return EI->getElement();
 
   // Check if the value is dominated by a switch_enum, e.g.
