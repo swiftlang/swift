@@ -95,14 +95,14 @@ public:
                                           ArrayRef<SILType> tailTypes) const;
 
   void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
-                         Atomicity atomicity) const override {
+                         Atomicity defaultAtomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
       auto releaseFn = getCustomRefCountingOperations().second;
       IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
       return;
     }
 
-    HeapTypeInfo::emitScalarRelease(IGF, value, atomicity);
+    HeapTypeInfo::emitScalarRelease(IGF, value, defaultAtomicity);
   }
 
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
@@ -112,14 +112,14 @@ public:
   }
 
   void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
-                        Atomicity atomicity) const override {
+                        Atomicity defaultAtomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
       auto retainFn = getCustomRefCountingOperations().first;
       IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value);
       return;
     }
 
-    HeapTypeInfo::emitScalarRetain(IGF, value, atomicity);
+    HeapTypeInfo::emitScalarRetain(IGF, value, defaultAtomicity);
   }
 
   void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
@@ -136,13 +136,13 @@ public:
   // Implement the primary retain/release operations of ReferenceTypeInfo
   // using basic reference counting.
   void strongRetain(IRGenFunction &IGF, Explosion &e,
-                    Atomicity atomicity) const override {
+                    Atomicity defaultAtomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
       strongCustomRetain(IGF, e, /*needsNullCheck*/ false);
       return;
     }
 
-    HeapTypeInfo::strongRetain(IGF, e, atomicity);
+    HeapTypeInfo::strongRetain(IGF, e, defaultAtomicity);
   }
 
   void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
@@ -157,13 +157,13 @@ public:
   }
 
   void strongRelease(IRGenFunction &IGF, Explosion &e,
-                     Atomicity atomicity) const override {
+                     Atomicity defaultAtomicity) const override {
     if (getReferenceCounting() == ReferenceCounting::Custom) {
       strongCustomRelease(IGF, e, /*needsNullCheck*/ false);
       return;
     }
 
-    HeapTypeInfo::strongRelease(IGF, e, atomicity);
+    HeapTypeInfo::strongRelease(IGF, e, defaultAtomicity);
   }
 };
 
