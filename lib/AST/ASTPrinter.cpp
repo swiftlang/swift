@@ -3750,6 +3750,13 @@ suppressingFeatureAlwaysUnsafeAttribute(PrintOptions &options,
   action();
 }
 
+static void
+suppressingFeatureAvailabilityOSVersionQueryKind(
+    PrintOptions &options, llvm::function_ref<void()> action) {
+  llvm::SaveAndRestore<bool> scope(options.SuppressOSVersionQueryKind, true);
+  action();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(const PrintOptions &_options, Feature feature,
                                llvm::function_ref<void()> action) {

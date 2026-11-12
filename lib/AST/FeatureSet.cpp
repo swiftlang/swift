@@ -13,6 +13,7 @@
 #include "FeatureSet.h"
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
@@ -668,6 +669,14 @@ static bool usesFeatureInlineAlways(Decl *decl) {
 static bool usesFeatureAlwaysUnsafeAttribute(Decl *decl) {
   if (auto *unsafeAttr = decl->getAttrs().getAttribute<UnsafeAttr>()) {
     return unsafeAttr->isAlways();
+  }
+  return false;
+}
+
+static bool usesFeatureAvailabilityOSVersionQueryKind(Decl *decl) {
+  for (auto *attr : decl->getAttrs().getAttributes<SemanticsAttr>()) {
+    if (parseOSVersionQuerySemanticsAttr(attr->Value))
+      return true;
   }
   return false;
 }

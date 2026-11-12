@@ -27,6 +27,8 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/AvailabilityQuery.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -207,7 +209,6 @@ public:
   IGNORED_ATTR(RawDocComment)
   IGNORED_ATTR(RequiresStoredPropertyInits)
   IGNORED_ATTR(RestatedObjCConformance)
-  IGNORED_ATTR(Semantics)
   IGNORED_ATTR(NoLocks)
   IGNORED_ATTR(NoAllocation)
   IGNORED_ATTR(NoRuntime)
@@ -479,6 +480,7 @@ public:
   void visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr);
   void diagnoseNeverEmittedIntoClientInBackDeployedType(DeclAttribute *attr);
   void visitExportAttr(ExportAttr *attr);
+  void visitSemanticsAttr(SemanticsAttr *attr);
 
   void visitDiscardableResultAttr(DiscardableResultAttr *attr);
   void visitDynamicReplacementAttr(DynamicReplacementAttr *attr);
@@ -4319,6 +4321,38 @@ void AttributeChecker::visitExclusivityAttr(ExclusivityAttr *attr) {
   }
   diagnoseAndRemoveAttr(attr, diag::exclusivity_on_wrong_decl);
   attr->setInvalid();
+}
+
+void AttributeChecker::visitSemanticsAttr(SemanticsAttr *attr) {
+  StringRef value = attr->Value;
+  if (!value.starts_with(semantics::AVAILABILITY_OSVERSION))
+    return;
+
+  // An explicit kind must be one that we know about.
+  if (value.size() > semantics::AVAILABILITY_OSVERSION.size()) {
+    if (!parseOSVersionQuerySemanticsAttr(value)) {
+      StringRef kind = value.drop_front(
+          semantics::AVAILABILITY_OSVERSION.size());
+      kind.consume_front("(");
+      kind.consume_back(")");
+      diagnose(attr->getLocation(),
+               diag::attr_semantics_unknown_osversion_kind, kind);
+    }
+    return;
+  }
+
+  // Infer the kind of query function and add it to the attribute so that
+  // later stages need not look up the standard library's declarations to find
+  // it. Leave the attribute without a kind if there is no kind to infer.
+  auto *func = dyn_cast<FuncDecl>(D);
+  if (!func)
+    return;
+
+  auto kind = inferOSVersionQueryKind(func);
+  if (!kind)
+    return;
+
+  attr->Value = Ctx.AllocateCopy(getOSVersionQuerySemanticsAttr(*kind));
 }
 
 void AttributeChecker::visitExportAttr(ExportAttr *attr) {
