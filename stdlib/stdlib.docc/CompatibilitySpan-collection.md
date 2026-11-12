@@ -3,17 +3,17 @@
 
 ## Topics
 
-### Immutable spans
+### Immutable Spans
 
 - ``CompatibilitySpan/Span``
 - ``CompatibilitySpan/RawSpan``
 
-### Mutable spans
+### Mutable Spans
 
 - ``CompatibilitySpan/MutableSpan``
 - ``CompatibilitySpan/MutableRawSpan``
 
-### Output spans
+### Output Spans
 
 - ``CompatibilitySpan/OutputSpan``
 - ``CompatibilitySpan/OutputRawSpan``

@@ -8,7 +8,7 @@
 - ``init(ofOne:)``
 - ``init(viewing:)``
 
-### Accessing span elements
+### Accessing Span Elements
 
 - ``count``
 - ``isEmpty``
@@ -17,23 +17,23 @@
 - ``subscript(unchecked:)``
 - ``Index``
 
-### Comparing span relationships
+### Comparing Span Relationships
 
 - ``isIdentical(to:)``
 - ``isTriviallyIdentical(to:)``
 - ``indices(of:)``
 
-### Accessing bytes
+### Accessing Bytes
 
 - ``bytes-6qp42`` <!-- @export(implementation) @unsafe var bytes: RawSpan { get } -->
 - ``bytes-8rxg``  <!-- @export(implementation) var bytes: RawSpan { get } -->
 
-### Performing unsafe access
+### Performing Unsafe Access
 
 - ``withUnsafeBufferPointer(_:)``
 - ``withUnsafeBytes(_:)``
 
-### Extracting span contents
+### Extracting Span Contents
 
 - ``extracting(_:)-(Range<Index>)``               <!-- @_lifetime(copy self) @export(implementation) func extracting(_ bounds: Range<Index>) -> Span<Element> -->
 - ``extracting(_:)-(RangeExpression<Index>)``     <!-- @_lifetime(copy self) @export(implementation) func extracting(_ bounds: some RangeExpression<Index>) -> Span<Element> -->

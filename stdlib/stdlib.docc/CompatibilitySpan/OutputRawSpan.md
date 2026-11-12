@@ -4,13 +4,13 @@
 
 ## Topics
 
-### Creating a span
+### Creating a Span
 
 - ``init()``
 - ``init(buffer:initializedCount:)-(UnsafeMutableRawBufferPointer,_)``        <!-- @_lifetime(borrow buffer) @unsafe @export(implementation) init(buffer: UnsafeMutableRawBufferPointer, initializedCount: Int) -->
 - ``init(buffer:initializedCount:)-(Slice<UnsafeMutableRawBufferPointer>,_)`` <!-- @_lifetime(borrow buffer) @unsafe @export(implementation) init(buffer: borrowing Slice<UnsafeMutableRawBufferPointer>, initializedCount: Int) -->
 
-### Accessing span elements
+### Accessing Span Elements
 
 - ``byteCount``
 - ``bytes``
@@ -21,14 +21,14 @@
 - ``subscript(_:)``
 - ``subscript(unchecked:)``
 
-### Working with bytes
+### Working with Bytes
 
 - ``bytes``
 - ``mutableBytes``
 - ``byteCount``
 - ``byteOffsets``
 
-### Appending span contents
+### Appending Span Contents
 
 - ``append(_:)``
 - ``append(_:as:)-63w17``                                   <!-- @_lifetime(self: copy self) @export(implementation) @unsafe mutating func append<T>(_ value: T, as type: T.Type) where T : BitwiseCopyable -->
@@ -38,18 +38,18 @@
 - ``append(repeating:count:as:)-3z0bf``                     <!-- @_lifetime(self: copy self) @export(implementation) mutating func append<T>(repeating repeatedValue: T, count: Int, as type: T.Type) where T : BitwiseCopyable, T : ConvertibleToBytes -->
 - ``append(repeating:count:as:_:)``
 
-### Removing span contents
+### Removing Span Contents
 
 - ``removeAll()``
 - ``removeLast()``
 - ``removeLast(_:)``
 
-### Retrieving initialized memory
+### Retrieving Initialized Memory
 
 - ``finalize(for:)-(Slice<UnsafeMutableRawBufferPointer>)`` <!-- @unsafe @export(implementation) consuming func finalize(for buffer: Slice<UnsafeMutableRawBufferPointer>) -> Int -->
 - ``finalize(for:)-(UnsafeMutableRawBufferPointer)``        <!-- @unsafe @export(implementation) consuming func finalize(for buffer: UnsafeMutableRawBufferPointer) -> Int -->
 
-### Performing unsafe access
+### Performing Unsafe Access
 
 - ``withUnsafeMutableBytes(_:)``
 

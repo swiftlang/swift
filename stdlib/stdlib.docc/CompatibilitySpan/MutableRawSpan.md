@@ -18,18 +18,18 @@
 - ``subscript(_:)``
 - ``subscript(unchecked:)``
 
-### Working with bytes
+### Working with Bytes
 
 - ``bytes``
 - ``byteCount``
 - ``byteOffsets``
 
-### Performing unsafe access
+### Performing Unsafe Access
 
 - ``withUnsafeBytes(_:)``
 - ``withUnsafeMutableBytes(_:)``
 
-### Loading contents into types
+### Loading Contents into Types
 
 - ``load(fromByteOffset:as:)``
 - ``load(fromByteOffset:as:_:)``
@@ -38,7 +38,7 @@
 - ``unsafeLoadUnaligned(fromByteOffset:as:)``
 - ``unsafeLoadUnaligned(fromUncheckedByteOffset:as:)``
 
-### Storing types into spans
+### Storing Types into Spans
 
 - ``storeBytes(of:toByteOffset:as:_:)``
 - ``storeBytes(of:toByteOffset:as:)-1afju``            <!-- @_lifetime(self: copy self) @export(implementation) mutating func storeBytes<T>(of value: T, toByteOffset offset: Int, as type: T.Type) where T : BitwiseCopyable, T : ConvertibleToBytes -->

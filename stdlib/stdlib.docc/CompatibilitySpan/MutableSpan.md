@@ -10,7 +10,7 @@
 - ``init(mutating:)``
 - ``init(ofOne:)``
 
-### Accessing span elements
+### Accessing Span Elements
 
 - ``count``
 - ``isEmpty``
@@ -19,7 +19,7 @@
 - ``subscript(unchecked:)``
 - ``Index``
 
-### Accessing bytes
+### AccessingBytes
 
 - ``bytes-478ye``        <!-- @export(implementation) var bytes: RawSpan { borrowing get } -->
 - ``bytes-61tq``         <!-- @export(implementation) @unsafe var bytes: RawSpan { borrowing get } -->
@@ -27,19 +27,19 @@
 - ``mutableBytes-9ha97`` <!-- @export(implementation) var mutableBytes: MutableRawSpan { mutating get } -->
 - ``span``
 
-### Performing unsafe access
+### Performing Unsafe Access
 
 - ``withUnsafeBytes(_:)``
 - ``withUnsafeMutableBytes(_:)``
 - ``withUnsafeBufferPointer(_:)``
 - ``withUnsafeMutableBufferPointer(_:)``
 
-### Swapping span contents
+### Swapping Span Contents
 
 - ``swapAt(_:_:)``
 - ``swapAt(unchecked:unchecked:)``
 
-### Performing bulk updates
+### Performing Bulk Updates
 
 - ``update(repeating:)``
 

@@ -8,11 +8,11 @@ A stored value that you can read and modify through a shared reference, even whe
 
 ## Topics
 
-### Creating a cell
+### Creating a Cell
 
 - ``init(_:)``
 
-### Accessing cell contents
+### Accessing Cell Contents
 
 - ``value``
 - ``set(_:)``

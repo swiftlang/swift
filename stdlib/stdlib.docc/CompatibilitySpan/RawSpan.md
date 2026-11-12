@@ -3,36 +3,36 @@
 
 ## Topics
 
-### Creating a raw span
+### Creating a Raw Span
 
 - ``init()``
 - ``init(bytesOf:)``
 - ``init(elements:)``
 - ``init(unsafeElements:)``
 
-### Accessing span elements
+### Accessing Span Elements
 
 - ``byteCount``
 - ``isEmpty``
 - ``subscript(_:)``
 - ``subscript(unchecked:)``
 
-### Working with bytes
+### Working with Bytes
 
 - ``byteCount``
 - ``byteOffsets``
 - ``byteOffsets(of:)``
 
-### Comparing span relationships
+### Comparing Span Relationships
 
 - ``isIdentical(to:)``
 - ``isTriviallyIdentical(to:)``
 
-### Performing unsafe access
+### Performing Unsafe Access
 
 - ``withUnsafeBytes(_:)``
 
-### Extracting span contents
+### Extracting Span Contents
 
 - ``extracting(_:)-(Range<Int>)``                      <!-- @_lifetime(copy self) @export(implementation) func extracting(_ bounds: Range<Int>) -> RawSpan -->
 - ``extracting(_:)-(RangeExpression<Int>)``            <!-- @_lifetime(copy self) @export(implementation) func extracting(_ bounds: some RangeExpression<Int>) -> RawSpan -->
@@ -44,7 +44,7 @@
 - ``extracting(droppingFirst:)``
 - ``extracting(droppingLast:)``
 
-### Loading contents into types
+### Loading Contents into Types
 
 - ``load(fromByteOffset:as:)``
 - ``load(fromByteOffset:as:_:)``

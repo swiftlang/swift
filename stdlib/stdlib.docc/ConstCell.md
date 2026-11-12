@@ -7,11 +7,11 @@ A stored value that Swift code can read but not modify, because code outside Swi
 
 ## Topics
 
-### Creating a cell
+### Creating a Cell
 
 - ``init(_:)``
 
-### Accessing cell contents
+### Accessing Cell Contents
 
 - ``value``
 - ``withUnsafePointer(_:)``
