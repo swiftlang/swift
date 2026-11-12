@@ -301,9 +301,7 @@ public:
   /// Emit a dbg.declare at the current insertion point in Builder.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
-                               DebugTypeInfo Ty, const SILDebugScope *DS,
-                               std::optional<SILLocation> VarLoc,
-                               SILDebugVariable VarInfo,
+                               DebugTypeInfo Ty, SILDebugVariable VarInfo,
                                bool InCoroContext = false,
                                ArtificialKind = RealValue,
                                AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
@@ -4032,9 +4030,9 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
 
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
-    const SILDebugScope *DS, std::optional<SILLocation> DbgInstLoc,
     SILDebugVariable VarInfo, bool InCoroContext,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstrKind) {
+  const SILDebugScope *DS = VarInfo.Scope;
   assert(DS && "variable has no scope");
 
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
@@ -4046,7 +4044,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   auto *Scope = dyn_cast_or_null<llvm::DILocalScope>(getOrCreateScope(DS));
   assert(Scope && "variable has no local scope");
-  auto DInstLoc = getStartLocation(DbgInstLoc);
+  auto VarLoc = getStartLocation(VarInfo.Loc);
 
   // FIXME: this should be the scope of the type's declaration.
   // If this is an argument, attach it to the current function scope.
@@ -4062,41 +4060,20 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (VarInfo.Constant)
     DITy = DBuilder.createQualifiedType(llvm::dwarf::DW_TAG_const_type, DITy);
 
-  unsigned DInstLine = DInstLoc.Line;
-
   // Self is always an artificial argument, so are variables without location.
-  if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
+  if (!VarLoc.Line ||
+      (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
 
-  // Create the descriptor for the variable.
-  unsigned DVarLine = DInstLine;
-  uint16_t DVarCol = DInstLoc.Column;
-  auto VarInfoLoc = VarInfo.Loc ? VarInfo.Loc : DbgInstLoc;
-  if (VarInfoLoc) {
-    auto VarLoc = VarInfoLoc->strippedForDebugVariable();
-    if (VarLoc != DbgInstLoc) {
-      auto DVarLoc = getStartLocation(VarLoc);
-      DVarLine = DVarLoc.Line;
-      DVarCol = DVarLoc.Column;
-    }
-  }
-  llvm::DIScope *VarScope = Scope;
-  if (ArgNo == 0 && VarInfo.Scope) {
-    if (auto *VS = dyn_cast_or_null<llvm::DILocalScope>(
-            getOrCreateScope(VarInfo.Scope))) {
-      VarScope = VS;
-    }
-  }
-
   // Get or create the DILocalVariable.
   llvm::DILocalVariable *Var;
   // VarInfo.Name points into tail-allocated storage in debug_value insns.
   llvm::StringRef UniqueName = VarNames.insert(VarInfo.Name).first->getKey();
-  VarID Key(VarScope, UniqueName, DVarLine, DVarCol);
+  VarID Key(Scope, UniqueName, VarLoc.Line, VarLoc.Column);
   auto CachedVar = LocalVarCache.find(Key);
   if (CachedVar != LocalVarCache.end()) {
     Var = cast<llvm::DILocalVariable>(CachedVar->second);
@@ -4107,9 +4084,9 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     bool Preserve = true;
     if (ArgNo > 0)
       Var = DBuilder.createParameterVariable(
-          VarScope, VarInfo.Name, ArgNo, Unit, DVarLine, DITy, Preserve, Flags);
+          Scope, VarInfo.Name, ArgNo, Unit, VarLoc.Line, DITy, Preserve, Flags);
     else
-      Var = DBuilder.createAutoVariable(VarScope, VarInfo.Name, Unit, DVarLine,
+      Var = DBuilder.createAutoVariable(Scope, VarInfo.Name, Unit, VarLoc.Line,
                                         DITy, Preserve, Flags);
     LocalVarCache.insert({Key, llvm::TrackingMDNodeRef(Var)});
   }
@@ -4198,7 +4175,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     DIExpr = appendDIExpression(DIExpr, Fragment, IsFirstAndOnlyPiece);
     if (DIExpr)
       emitDbgIntrinsic(
-          Builder, Piece, Var, DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
+          Builder, Piece, Var, DIExpr, VarLoc.Line, VarLoc.Column, Scope, DS,
           InCoroContext, AddrDInstrKind);
   }
 
@@ -4208,7 +4185,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (auto *DIExpr =
             appendDIExpression(DBuilder.createExpression(), NoFragment, false))
       emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
-                       DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
+                       DIExpr, VarLoc.Line, VarLoc.Column, Scope, DS,
                        InCoroContext, AddrDInstrKind);
   }
 }
@@ -4504,8 +4481,8 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
       Size(PtrWidthInBits / 8),
       Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
-  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          {}, {OS.str().str(), 0, false},
+  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy,
+                          {OS.str().str(), 0, false, {}, {}, DS},
                           /*InCoroContext=*/IGF.isAsync(),
                           ArtificialValue);
 }
@@ -4525,9 +4502,9 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
                                        IGM.getSwiftModule()->getASTContext());
   auto &TI = IGM.getTypeInfoForUnlowered(IntTy);
   auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
-  emitVariableDeclaration(
-      IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {}, VarInfo,
-      /*InCoroContext=*/IGF.isAsync(), ArtificialValue);
+  VarInfo.Scope = DS;
+  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, VarInfo,
+                          /*InCoroContext=*/IGF.isAsync(), ArtificialValue);
 }
 
 } // anonymous namespace
@@ -4618,11 +4595,10 @@ void IRGenDebugInfo::emitOutlinedFunction(IRBuilder &Builder,
 }
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
-    const SILDebugScope *DS, std::optional<SILLocation> VarLoc,
     SILDebugVariable VarInfo, bool InCoroContext,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstKind) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext, Artificial,
+      Builder, Storage, Ty, VarInfo, InCoroContext, Artificial,
       AddrDInstKind);
 }
 
