@@ -43,6 +43,8 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
       resolver.run(on: argument, &indexCache)
     }
   }
+
+  function.set(hasUnresolvedLifetimes: false, context)
 }
 
 private struct Resolver {
@@ -1498,4 +1500,8 @@ let lifetimeResolutionResolveTest = FunctionTest("lifetime_resolution_resolve") 
   var indexCache = FieldIndexTrieCache(for: function)
   let root = arguments.takeValue()
   resolver.run(on: root, &indexCache)
+
+  // Assume the whole function has been resolved otherwise.
+  // This ensures we get extra verification for unit tests.
+  function.set(hasUnresolvedLifetimes: false, context)
 }

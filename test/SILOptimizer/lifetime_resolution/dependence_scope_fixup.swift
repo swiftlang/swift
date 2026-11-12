@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -verify \
 // RUN:   -enable-experimental-feature Lifetimes -target %target-swift-6.2-abi-triple %s -o /dev/null
 
 // REQUIRES: swift_feature_Lifetimes

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner | %FileCheck %s
 
 sil_stage raw
 
@@ -33,7 +33,7 @@ sil @useNoEscape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed 
 // CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
 // CHECK-NEXT: destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_copy_before_interior_consume : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_copy_before_interior_consume : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -56,7 +56,7 @@ bb0:
 // CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed NC) -> ()
 // CHECK-NEXT: destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_copy_before_interior_consume_noncopyable : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_copy_before_interior_consume_noncopyable : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
   %useFn = function_ref @useNC : $@convention(thin) (@guaranteed NC) -> ()
@@ -78,7 +78,7 @@ bb0:
 // CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
 // CHECK-NOT:  destroy_value
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_use_before_final_consume : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_use_before_final_consume : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -108,7 +108,7 @@ bb0:
 
 // CHECK-NOT:  destroy_value
 // CHECK: } // end sil function
-sil [ossa] @test_hoist_destroy_across_branch : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_hoist_destroy_across_branch : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -150,7 +150,7 @@ bb3:
 
 // CHECK-NOT: destroy_value
 // CHECK: } // end sil function
-sil [ossa] @test_copy_and_hoist_across_branch : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_copy_and_hoist_across_branch : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -192,7 +192,7 @@ bb3:
 
 // CHECK-NOT:  destroy_value
 // CHECK: } // end sil function
-sil [ossa] @test_hoist_into_dead_end : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_hoist_into_dead_end : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -232,7 +232,7 @@ bb3:
 // CHECK: bb3:
 // CHECK-NEXT: destroy_value [[V]]
 // CHECK: } // end sil function
-sil [ossa] @test_consume_inside_loop : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_consume_inside_loop : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
@@ -264,7 +264,7 @@ bb3:
 // CHECK-NEXT: destroy_value [[V]]
 // CHECK-NEXT: destroy_addr [[ADDR]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_copy_before_assign : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_copy_before_assign : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -298,7 +298,7 @@ bb0:
 // CHECK: bb3:
 // CHECK-NOT:  destroy_value
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_hoist_destroy_across_assign_branch : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_hoist_destroy_across_assign_branch : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -335,7 +335,7 @@ bb3:
 // CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
 // CHECK-NEXT: destroy_value [[LEX]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_deinit_barrier_forces_boundary_consume_copy : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_deinit_barrier_forces_boundary_consume_copy : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %consumeFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
@@ -361,7 +361,7 @@ bb0:
 // CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
 // CHECK-NEXT: destroy_value [[LEX]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_lexical_no_hoist_across_barrier : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_lexical_no_hoist_across_barrier : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -384,7 +384,7 @@ bb0:
 // CHECK:      apply {{%.*}}() : $@convention(thin) () -> ()
 // CHECK-NEXT: destroy_value [[LEX]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_dead_def_lexical_barrier : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_dead_def_lexical_barrier : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
@@ -409,7 +409,7 @@ bb0:
 // CHECK-NEXT: destroy_value [[LEX]]
 // CHECK-NEXT: tuple ()
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_lexical_hoist_without_barrier : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_lexical_hoist_without_barrier : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -446,7 +446,7 @@ bb0:
 // CHECK: bb3:
 // CHECK-NOT: destroy_value
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_lexical_hoist_across_branch_with_barrier : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_lexical_hoist_across_branch_with_barrier : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -492,7 +492,7 @@ bb3:
 // CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
 // CHECK-NEXT: destroy_value [[LEX]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_lexical_hoist_join_point_barrier : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_lexical_hoist_join_point_barrier : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -533,7 +533,7 @@ bb3:
 // CHECK-NEXT: br bb3
 // CHECK-NOT:  destroy_value
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_use_before_branch_consume : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_use_before_branch_consume : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -561,7 +561,7 @@ bb3:
 // CHECK:      [[V:%.*]] = mark_uninitialized [rootself] %0
 // CHECK-NEXT: return [[V]]
 // CHECK-NEXT: } // end sil function
-sil [ossa] @test_interior_destroy : $@convention(method) (@owned Kl) -> @owned Kl {
+sil [ossa] [unresolved] @test_interior_destroy : $@convention(method) (@owned Kl) -> @owned Kl {
 bb0(%0 : @owned $Kl):
   debug_value %0, let, name "self", argno 1
   %2 = mark_uninitialized [rootself] %0
@@ -581,7 +581,7 @@ bb0(%0 : @owned $Kl):
 // CHECK-NEXT: end_borrow [[B]]
 // CHECK-NEXT: destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_borrow_scope : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_borrow_scope : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -605,7 +605,7 @@ bb0:
 // CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
 // CHECK-NOT:  destroy_value
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_borrow_scope_then_consume : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_borrow_scope_then_consume : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -640,7 +640,7 @@ bb0:
 // CHECK: bb3:
 // CHECK-NOT:  destroy_value
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_consume_one_path_no_use : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_consume_one_path_no_use : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %consFn = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
@@ -672,7 +672,7 @@ bb3:
 // CHECK-NEXT: destroy_value [[W]]
 // CHECK-NOT:  destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_forwarding_consume_only : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_forwarding_consume_only : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
@@ -695,7 +695,7 @@ bb0:
 // CHECK-NEXT: destroy_value [[LEX]]
 // CHECK-NOT:  destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_lexical_barrier_below_consume : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_lexical_barrier_below_consume : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -728,7 +728,7 @@ bb0:
 // CHECK: bb3:
 // CHECK-NOT:  destroy_value
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_lexical_barrier_below_consume_branch : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_lexical_barrier_below_consume_branch : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
@@ -759,7 +759,7 @@ bb3:
 // CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
 // CHECK-NEXT: destroy_value [[V]]
 // CHECK: } // end sil function
-sil [ossa] @test_no_use_destroy : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_no_use_destroy : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
@@ -773,7 +773,7 @@ bb0:
 // CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
 // CHECK:      destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_dead_def_distant_destroy : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_dead_def_distant_destroy : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
@@ -791,7 +791,7 @@ bb0:
 // CHECK: bb2([[V:%.*]] : @owned $Kl):
 // CHECK:      destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_dead_def_block_arg : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_dead_def_block_arg : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %0 = apply %getFn() : $@convention(thin) () -> @owned Kl
@@ -820,7 +820,7 @@ bb3:
 // CHECK-NEXT: apply {{%.*}}() : $@convention(thin) () -> ()
 // CHECK-NEXT: destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_owned_block_arg : $@convention(thin) (@owned Kl) -> () {
+sil [ossa] [unresolved] @test_owned_block_arg : $@convention(thin) (@owned Kl) -> () {
 bb0(%0 : @owned $Kl):
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
   %barrierFn = function_ref @barrierK : $@convention(thin) () -> ()
@@ -837,7 +837,7 @@ bb0(%0 : @owned $Kl):
 // CHECK:      integer_literal $Builtin.Int64, 0
 // CHECK-NEXT: tuple ()
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_trivial_root : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_trivial_root : $@convention(thin) () -> () {
 bb0:
   %0 = integer_literal $Builtin.Int64, 0
   specify_test "lifetime_resolution_resolve %0"
@@ -856,7 +856,7 @@ bb0:
 // CHECK-NEXT: destroy_value [[NE]]
 // CHECK-NEXT: destroy_value [[C]]
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_convert_escape_to_noescape : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_convert_escape_to_noescape : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getClosure : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
   %useFn = function_ref @useNoEscape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()

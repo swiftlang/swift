@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -verify %s -o /dev/null
 
 // The stored properties of `self` in a class initializer may be consumed, after which
 // they must be reinitialized before `self` is used as a whole.

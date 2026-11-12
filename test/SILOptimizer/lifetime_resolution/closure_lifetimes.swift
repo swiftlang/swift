@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -module-name test %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -module-name test %s | %FileCheck %s
 
 // An escaping closure must outlive the uses of its conversion to a non-escaping closure.
 

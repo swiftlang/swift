@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -sil-verify-none | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner | %FileCheck %s
 
 // XFAIL: *
 
@@ -27,7 +27,7 @@ sil @barrierK : $@convention(thin) () -> ()
 // CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
 // CHECK-NEXT: apply {{%.*}}({{.*}}[[COPY]]{{.*}}) : $@convention(thin) (@owned Kl, @owned Kl) -> ()
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_two_consumes_one_instruction : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_two_consumes_one_instruction : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %consTwoFn = function_ref @consumeTwoK : $@convention(thin) (@owned Kl, @owned Kl) -> ()

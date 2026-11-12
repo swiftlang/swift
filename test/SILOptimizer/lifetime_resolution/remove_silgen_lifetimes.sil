@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -parse-incomplete-ossa -sil-verify-none -remove-silgen-lifetimes | %FileCheck %s
+// RUN: %target-sil-opt %s -parse-incomplete-ossa -remove-silgen-lifetimes | %FileCheck %s
 
 // Unit tests for the RemoveSILGenLifetimes pass.
 
@@ -16,7 +16,7 @@ sil @consumeK : $@convention(thin) (@owned Kl) -> ()
 sil @getClosure : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
 sil @useNoEscape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
 
-// CHECK-LABEL: sil [ossa] @test_move_value_load_copy_nonlexical :
+// CHECK-LABEL: sil [ossa] [unresolved] @test_move_value_load_copy_nonlexical : $@convention(thin) () -> () {
 // CHECK:      [[V:%.*]] = load [take] {{%.*}}
 // CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
 // CHECK-NEXT: destroy_value [[V]]
@@ -24,18 +24,22 @@ sil @useNoEscape : $@convention(thin) (@guaranteed @noescape @callee_guaranteed 
 // CHECK-LABEL: } // end sil function
 sil [ossa] @test_move_value_load_copy_nonlexical : $@convention(thin) () -> () {
 bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
   %stack = alloc_stack $Kl
+  %k = apply %getFn() : $@convention(thin) () -> @owned Kl
+  store %k to [init] %stack : $*Kl
   %v = load [copy] %stack : $*Kl
   %m = move_value [allows_diagnostics] %v : $Kl
   apply %useFn(%m) : $@convention(thin) (@guaranteed Kl) -> ()
   destroy_value %m : $Kl
+  destroy_addr %stack : $*Kl
   dealloc_stack %stack : $*Kl
   %t = tuple ()
   return %t : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_move_value_load_copy_lexical :
+// CHECK-LABEL: sil [ossa] [unresolved] @test_move_value_load_copy_lexical :
 // CHECK:      [[V:%.*]] = load [take] {{%.*}}
 // CHECK-NEXT: [[M:%.*]] = move_value [allows_diagnostics] [lexical] [[V]]
 // CHECK-NEXT: apply {{%.*}}([[M]]) : $@convention(thin) (@guaranteed Kl) -> ()
@@ -43,27 +47,36 @@ bb0:
 // CHECK-LABEL: } // end sil function
 sil [ossa] @test_move_value_load_copy_lexical : $@convention(thin) () -> () {
 bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %useFn = function_ref @useK : $@convention(thin) (@guaranteed Kl) -> ()
   %stack = alloc_stack $Kl
+  %k = apply %getFn() : $@convention(thin) () -> @owned Kl
+  store %k to [init] %stack : $*Kl
   %v = load [copy] %stack : $*Kl
   %m = move_value [lexical] [allows_diagnostics] %v : $Kl
   apply %useFn(%m) : $@convention(thin) (@guaranteed Kl) -> ()
   destroy_value %m : $Kl
+  destroy_addr %stack : $*Kl
   dealloc_stack %stack : $*Kl
   %t = tuple ()
   return %t : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_strip_move_checker_marker :
+// CHECK-LABEL: sil [ossa] [unresolved] @test_strip_move_checker_marker :
 // CHECK:      [[S:%.*]] = alloc_stack $NC
+// CHECK-NEXT: store {{%.*}} to [init] [[S]]
 // CHECK-NEXT: [[V:%.*]] = load [take] [[S]]
 // CHECK-NOT:  mark_unresolved_non_copyable_value
 // CHECK:      destroy_value [[V]]
 // CHECK-LABEL: } // end sil function
 sil [ossa] @test_strip_move_checker_marker : $@convention(thin) () -> () {
 bb0:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
+  %k = apply %getFn() : $@convention(thin) () -> @owned Kl
+  %nc = struct $NC (%k : $Kl)
   %stack = alloc_stack $NC
   %m = mark_unresolved_non_copyable_value [consumable_and_assignable] %stack : $*NC
+  store %nc to [init] %m : $*NC
   %v = load [take] %m : $*NC
   destroy_value %v : $NC
   dealloc_stack %stack : $*NC
@@ -71,7 +84,7 @@ bb0:
   return %t : $()
 }
 
-// CHECK-LABEL: sil [ossa] @test_forward_copy_of_owned_value :
+// CHECK-LABEL: sil [ossa] [unresolved] @test_forward_copy_of_owned_value :
 // CHECK:      [[V:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned Kl
 // CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@guaranteed Kl) -> ()
 // CHECK-NEXT: apply {{%.*}}([[V]]) : $@convention(thin) (@owned Kl) -> ()
@@ -95,7 +108,7 @@ bb0:
 // A copy with a pointer escape isn't merged into its original, since LifetimeResolution keeps
 // the destroys of such values.
 
-// CHECK-LABEL: sil [ossa] @test_keep_copy_with_pointer_escape :
+// CHECK-LABEL: sil [ossa] [unresolved] @test_keep_copy_with_pointer_escape :
 // CHECK:      [[C:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
 // CHECK-NEXT: [[COPY:%.*]] = copy_value [[C]]
 // CHECK-NEXT: [[NE:%.*]] = convert_escape_to_noescape [[COPY]]
@@ -119,7 +132,7 @@ bb0:
   return %t
 }
 
-// CHECK-LABEL: sil [ossa] @test_keep_copy_of_pointer_escaping_original :
+// CHECK-LABEL: sil [ossa] [unresolved] @test_keep_copy_of_pointer_escaping_original :
 // CHECK:      [[C:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
 // CHECK-NEXT: [[NE:%.*]] = convert_escape_to_noescape [[C]]
 // CHECK-NEXT: [[COPY:%.*]] = copy_value [[C]]
@@ -143,7 +156,7 @@ bb0:
 
 // A pointer escape within a borrow scope is bounded by that scope, so the copy is still merged.
 
-// CHECK-LABEL: sil [ossa] @test_forward_copy_with_borrowed_pointer_escape :
+// CHECK-LABEL: sil [ossa] [unresolved] @test_forward_copy_with_borrowed_pointer_escape :
 // CHECK:      [[C:%.*]] = apply {{%.*}}() : $@convention(thin) () -> @owned @callee_guaranteed () -> ()
 // CHECK-NEXT: [[B:%.*]] = begin_borrow [[C]]
 // CHECK-NEXT: [[NE:%.*]] = convert_escape_to_noescape [[B]]
