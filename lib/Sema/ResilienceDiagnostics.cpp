@@ -175,6 +175,20 @@ bool TypeChecker::diagnoseInlinableDeclRefAccess(SourceLoc loc,
 
   Context.Diags.diagnose(D, diag::resilience_decl_declared_here, D);
 
+  // An internal '@inline(always)' declaration can't be '@usableFromInline'
+  // (SE-0496); point at '@inlinable' instead, which is what's needed.
+  if (D->getFormalAccess() == AccessLevel::Internal &&
+      D->getModuleContext() == DC->getParentModule()) {
+    auto *inlineAttr = D->getAttrs().getAttribute<InlineAttr>();
+    if (inlineAttr && inlineAttr->getKind() == InlineKind::Always) {
+      auto note =
+          Context.Diags.diagnose(D, diag::attr_inline_always_mark_inlinable, D);
+      SourceLoc insertLoc = D->getAttributeInsertionLoc(/*forModifier=*/false);
+      if (insertLoc.isValid())
+        note.fixItInsert(insertLoc, "@inlinable ");
+    }
+  }
+
   ImportAccessLevel problematicImport = D->getImportAccessFrom(DC);
   if (problematicImport.has_value() &&
       problematicImport->accessLevel < D->getFormalAccess()) {
