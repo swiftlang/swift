@@ -17,6 +17,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_embedded_platform
 
 @_silgen_name("swift_get_time")
 func swift_get_time(

@@ -154,6 +154,8 @@ if(("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "${SWIFT_PRIMARY_VARIANT_SDK}") AND
     ${SWIFT_SOURCE_DIR}/stdlib/include)
   target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
     ${SWIFT_SOURCE_DIR}/stdlib/public)
+  target_include_directories(SwiftRuntimeTests BEFORE PRIVATE
+    ${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift)
 
   # `stdlib/include/llvm/Support` headers, a subset of
   # `llvm-project/llvm/include/llvm/Support`, are not compatible with the

@@ -12,19 +12,9 @@
 ///
 /// The implementation of the global executor when using Dispatch.
 ///
-/// This file is included into GlobalExecutor.cpp only when Dispatch
-/// integration is enabled.  It is expected to define the following
-/// functions:
-///   swift_task_asyncMainDrainQueueImpl
-///   swift_task_checkIsolatedImpl
-///   swift_task_donateThreadToGlobalExecutorUntilImpl
-///   swift_task_enqueueGlobalImpl
-///   swift_task_enqueueGlobalWithDeadlineImpl
-///   swift_task_enqueueGlobalWithDelayImpl
-///   swift_task_enqueueMainExecutorImpl
-///   swift_task_getMainExecutorImpl
-///   swift_task_isMainExecutorImpl
-/// as well as any Dispatch-specific functions for the runtime.
+/// It defines the Dispatch-specific functions for the runtime and, in
+/// Embedded builds, the executor entrypoints declared in
+/// EmbeddedPlatform+Concurrency.h and ExecutorImpl.h.
 ///
 ///===------------------------------------------------------------------===///
 
@@ -61,6 +51,10 @@ extern "C" void dispatch_async_swift_job(dispatch_queue_t queue, void *obj,
 #include "Error.h"
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
+
+#if SWIFT_CONCURRENCY_EMBEDDED
+#include "swift/EmbeddedPlatform+Concurrency.h"
+#endif
 
 #ifndef NSEC_PER_SEC
 #define NSEC_PER_SEC 1000000000ull
@@ -410,24 +404,7 @@ void swift::swift_task_enqueueOnDispatchQueue(Job *job,
 
 #if SWIFT_CONCURRENCY_EMBEDDED
 
-static char embeddedMainQueueSpecificKey;
-static dispatch_once_t embeddedMainQueueSpecificOnce;
-
-static void installEmbeddedMainQueueSpecific(void *) {
-  dispatch_queue_set_specific(dispatch_get_main_queue(),
-                              &embeddedMainQueueSpecificKey,
-                              &embeddedMainQueueSpecificKey, nullptr);
-}
-
-static bool isOnEmbeddedMainQueue() {
-  dispatch_once_f(&embeddedMainQueueSpecificOnce, nullptr,
-                  installEmbeddedMainQueueSpecific);
-  return dispatch_get_specific(&embeddedMainQueueSpecificKey) ==
-         &embeddedMainQueueSpecificKey;
-}
-
-extern "C" SWIFT_CC(swift)
-void swift_task_enqueueGlobalImpl(SwiftJob *job) {
+void _swift_concurrency_enqueueGlobal(SwiftJob *job) {
   swift_dispatchEnqueueGlobal(job);
 }
 
@@ -444,51 +421,18 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec, long long nsec,
   swift_dispatchEnqueueWithDeadline(true, sec, nsec, tsec, tnsec, clock, job);
 }
 
-extern "C" SWIFT_CC(swift)
-void swift_task_enqueueMainExecutorImpl(SwiftJob *job) {
+void _swift_concurrency_enqueueMainExecutor(SwiftJob *job) {
   swift_dispatchEnqueueMain(job);
 }
 
-extern "C" SWIFT_CC(swift)
-void swift_task_checkIsolatedImpl(SwiftExecutorRef executor) {
-  if (isEmbeddedMainExecutor(executor)) {
-    dispatch_assert_queue(dispatch_get_main_queue());
-    return;
-  }
-
-  if (swift_executor_invokeSwiftCheckIsolated(executor))
-    return;
-
-  swift_Concurrency_fatalError(0, "Incorrect actor executor assumption");
-}
-
-extern "C" SWIFT_CC(swift)
-int8_t swift_task_isIsolatingCurrentContextImpl(SwiftExecutorRef executor) {
-  if (isEmbeddedMainExecutor(executor))
-    return isOnEmbeddedMainQueue() ? 1 : 0;
-
-  return swift_executor_invokeSwiftIsIsolatingCurrentContext(executor);
-}
-
-extern "C" SWIFT_CC(swift)
-SwiftExecutorRef swift_task_getMainExecutorImpl() {
+SwiftExecutorRef _swift_concurrency_getMainExecutor(void) {
   return embeddedMainExecutor();
 }
 
-extern "C" SWIFT_CC(swift)
-bool swift_task_isMainExecutorImpl(SwiftExecutorRef executor) {
+bool _swift_concurrency_isMainExecutor(SwiftExecutorRef executor) {
   return isEmbeddedMainExecutor(executor);
 }
 
-extern "C" SWIFT_CC(swift)
-void swift_task_donateThreadToGlobalExecutorUntilImpl(
-    bool (*condition)(void *), void *conditionContext) {
-  swift_Concurrency_fatalError(0, "Not supported for Dispatch executor");
-}
-
-extern "C" SWIFT_RUNTIME_ATTRIBUTE_NORETURN SWIFT_CC(swift)
-void swift_task_asyncMainDrainQueueImpl() {
-  dispatch_main();
-}
+void _swift_concurrency_asyncMain(void) { dispatch_main(); }
 
 #endif // SWIFT_CONCURRENCY_EMBEDDED
