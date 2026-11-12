@@ -81,11 +81,29 @@ public struct Holder {
   }
 }
 
+// HEADER-LABEL: SWIFT_INLINE_THUNK int32_t consumeDerived(DerivedFRT *_Nonnull d) noexcept
+// HEADER-NEXT:    DerivedFRT *_Nonnull consumedParamCopy_d = d;
+// HEADER-NEXT:    ::retainShared(consumedParamCopy_d);
+// HEADER-NEXT:    return UseCxx::_impl::$s6UseCxx14consumeDerived{{[^(]*}}(consumedParamCopy_d);
+// HEADER-NEXT:  }
+
+// HEADER-LABEL: SWIFT_INLINE_THUNK int32_t consumeMember(MemberFRT *_Nonnull m) noexcept
+// HEADER-NEXT:    MemberFRT *_Nonnull consumedParamCopy_m = m;
+// HEADER-NEXT:    consumedParamCopy_m->retain();
+// HEADER-NEXT:    return UseCxx::_impl::$s6UseCxx13consumeMember{{[^(]*}}(consumedParamCopy_m);
+// HEADER-NEXT:  }
+
 // HEADER-LABEL: SWIFT_INLINE_THUNK int32_t consumeOptionalShared(SharedFRT *_Nullable s) noexcept
 // HEADER-NEXT:    SharedFRT *_Nullable consumedParamCopy_s = s;
 // HEADER-NEXT:    if (consumedParamCopy_s)
 // HEADER-NEXT:      ::retainShared(consumedParamCopy_s);
 // HEADER-NEXT:    return UseCxx::_impl::$s6UseCxx21consumeOptionalShared{{[^(]*}}(consumedParamCopy_s);
+// HEADER-NEXT:  }
+
+// HEADER-LABEL: SWIFT_INLINE_THUNK int32_t consumeShared(SharedFRT *_Nonnull s) noexcept
+// HEADER-NEXT:    SharedFRT *_Nonnull consumedParamCopy_s = s;
+// HEADER-NEXT:    ::retainShared(consumedParamCopy_s);
+// HEADER-NEXT:    return UseCxx::_impl::$s6UseCxx13consumeShared{{[^(]*}}(consumedParamCopy_s);
 // HEADER-NEXT:  }
 
 // A parameter that Swift does not consume is passed as is.
@@ -124,10 +142,11 @@ int main() {
   printf("consumeDerived=%d refs=%d\n", consumedDerived, d.refs);
   // CHECK-NEXT: consumeDerived=7 refs=1
 
+  // Swift sees the reference the thunk retained.
   MemberFRT m;
   int consumedMember = UseCxx::consumeMember(&m);
   printf("consumeMember=%d refs=%d\n", consumedMember, m.refs);
-  // CHECK-NEXT: consumeMember={{[0-9]+}} refs=1
+  // CHECK-NEXT: consumeMember=2 refs=1
 
   {
     auto holder = UseCxx::Holder::init(&s, &s);

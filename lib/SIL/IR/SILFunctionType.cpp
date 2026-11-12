@@ -1535,6 +1535,18 @@ public:
           return getDirectSelfParameter(type);
         return getDirectParameter(index, type, substTL);
       }
+      // The importer makes an rvalue `this` of a foreign reference type
+      // `consuming`, but a C++ method never releases it. Take a foreign
+      // reference at +1 only where the C conventions say so, e.g. `cf_consumed`.
+      if ((kind == ConventionsKind::CFunction ||
+           kind == ConventionsKind::CFunctionType ||
+           kind == ConventionsKind::CXXMethod) &&
+          substTL.getLoweredType().unwrapOptionalType()
+              .isForeignReferenceType()) {
+        if (forSelf)
+          return getDirectSelfParameter(type);
+        return getDirectParameter(index, type, substTL);
+      }
       return ParameterConvention::Direct_Owned;
     }
     llvm_unreachable("unhandled ownership");
@@ -2201,10 +2213,7 @@ private:
       convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
                                      origType, substTLConv);
       assert(isIndirectFormalParameter(convention));
-    } else if (substTL.isTrivial() ||
-               // Foreign reference types are passed trivially.
-               (substType->getClassDecl() &&
-                substType->isForeignReferenceType())) {
+    } else if (substTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       // If we are no implicit copy, our ownership is always Owned.
@@ -4371,6 +4380,22 @@ public:
       return getIndirectSelfParameter(type);
     }
     return super::getIndirectParameter(index, type, substTL);
+  }
+
+  ParameterConvention
+  getDirectSelfParameter(const AbstractionPattern &type) const override {
+    // Only a foreign reference type passes `this` directly. The caller keeps
+    // it alive for the whole call, like a pointer argument.
+    return ParameterConvention::Direct_Guaranteed;
+  }
+
+  ParameterConvention
+  getDirectParameter(unsigned int index, const AbstractionPattern &type,
+                     const TypeLowering &substTL) const override {
+    // `self` is the last parameter.
+    if (index == TheDecl->getNumParams())
+      return getDirectSelfParameter(type);
+    return super::getDirectParameter(index, type, substTL);
   }
   ResultConvention getResult(const TypeLowering &resultTL) const override {
     if (isa<clang::CXXConstructorDecl>(TheDecl)) {
