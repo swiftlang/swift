@@ -77,8 +77,12 @@ endfunction()
 function(get_test_dependencies SDK result_var_name)
   set(deps)
 
-  if(SWIFT_BUILD_STDLIB)
+  if(SWIFT_BUILD_STDLIB OR SWIFT_TEST_SDK)
     list(APPEND deps SwiftUnitTests)
+  endif()
+
+  if(SWIFT_TEST_SDK)
+    list(APPEND deps swift-test-sdk-stdlib)
   endif()
 
   if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
@@ -186,6 +190,19 @@ endfunction()
 set(LIT "${LLVM_MAIN_SRC_DIR}/utils/lit/lit.py")
 
 set(SWIFT_LIT_ARGS "" CACHE STRING "Arguments to pass to lit")
+
+set(SWIFT_TEST_SDK "" CACHE PATH
+  "Swift SDK whose standard library the tests use when it is not built in this tree")
+set(SWIFT_TEST_SDK_RUNTIME_DIR "" CACHE PATH
+  "Directory with the runtime libraries of SWIFT_TEST_SDK")
+set(SWIFT_TEST_SUPPORT_DIR "" CACHE PATH
+  "Installation of the test support libraries built against SWIFT_TEST_SDK")
+if(SWIFT_BUILD_STDLIB AND SWIFT_TEST_SDK)
+  message(FATAL_ERROR "SWIFT_TEST_SDK requires the standard library not to be built")
+endif()
+foreach(path_var SWIFT_TEST_SDK SWIFT_TEST_SDK_RUNTIME_DIR SWIFT_TEST_SUPPORT_DIR)
+  file(TO_CMAKE_PATH "${${path_var}}" ${path_var})
+endforeach()
 
 set(SWIFT_LIT_ENVIRONMENT "" CACHE STRING "Environment to use for lit invocations")
 
@@ -301,7 +318,8 @@ function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_ov
 
   list(APPEND swift_lit_args_result "--xunit-xml-output=${test_results_dir}/lit-tests.xml")
 
-  if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD)
+  if(NOT SWIFT_BUILD_STDLIB AND NOT SWIFT_PATH_TO_EXTERNAL_STDLIB_BUILD AND
+     NOT SWIFT_TEST_SDK)
     list(APPEND swift_lit_args_result
         "--param" "test_sdk_overlay_dir=${SWIFTLIB_DIR}/${SWIFT_SDK_${tested_sdk}_LIB_SUBDIR}")
   endif()
@@ -363,6 +381,74 @@ if(WINDOWS IN_LIST SWIFT_SDKS)
   file(TO_CMAKE_PATH
        "${WindowsSdkDir}/Include/${WindowsSDKVersion}/module.modulemap"
        SWIFT_WINDOWS_MODULE_MAP)
+
+  # The standard library build generates this overlay otherwise.
+  if(NOT SWIFT_BUILD_STDLIB)
+    function(swift_test_generate_windows_vfs_overlay)
+      set(PROJECT_SOURCE_DIR "${SWIFT_SOURCE_DIR}/stdlib")
+      file(TO_CMAKE_PATH ${VCToolsInstallDir} VCToolsInstallDir)
+      file(TO_CMAKE_PATH ${UniversalCRTSdkDir} UniversalCRTSdkDir)
+      file(TO_CMAKE_PATH ${WindowsSdkDir} WindowsSdkDir)
+      string(REGEX REPLACE "[/\\\\]+$" "" WindowsSDKVersion
+             "${WindowsSDKVersion}")
+      configure_file("${SWIFT_SOURCE_DIR}/stdlib/cmake/WindowsVFS.yaml.in"
+                     "${SWIFT_BINARY_DIR}/stdlib/windows-vfs-overlay.yaml"
+                     @ONLY)
+    endfunction()
+    swift_test_generate_windows_vfs_overlay()
+  endif()
+endif()
+
+# Copy the standard library of SWIFT_TEST_SDK and the test support libraries
+# into the resource directory, where the tools look for them. Dispatch and
+# Foundation are not part of the standard library.
+if(SWIFT_TEST_SDK)
+  set(copy_test_sdk_commands
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+      "${SWIFT_TEST_SDK}/usr/lib/swift/shims" "${SWIFTLIB_DIR}/shims"
+    COMMAND "${CMAKE_COMMAND}" -E copy_directory
+      "${SWIFT_TEST_SDK}/usr/lib/swift/apinotes" "${SWIFTLIB_DIR}/apinotes")
+  foreach(SDK ${SWIFT_SDKS})
+    set(lib_subdir "${SWIFT_SDK_${SDK}_LIB_SUBDIR}")
+    file(GLOB sdk_entries LIST_DIRECTORIES true RELATIVE
+      "${SWIFT_TEST_SDK}/usr/lib/swift/${lib_subdir}"
+      "${SWIFT_TEST_SDK}/usr/lib/swift/${lib_subdir}/*")
+    list(FILTER sdk_entries EXCLUDE REGEX
+      "^(Dispatch|_?Foundation[A-Za-z]*)\\.swiftmodule$")
+    list(APPEND copy_test_sdk_commands
+      COMMAND "${CMAKE_COMMAND}" -E make_directory "${SWIFTLIB_DIR}/${lib_subdir}")
+    foreach(entry ${sdk_entries})
+      if(IS_DIRECTORY "${SWIFT_TEST_SDK}/usr/lib/swift/${lib_subdir}/${entry}")
+        set(copy copy_directory)
+      else()
+        set(copy copy)
+      endif()
+      list(APPEND copy_test_sdk_commands
+        COMMAND "${CMAKE_COMMAND}" -E ${copy}
+          "${SWIFT_TEST_SDK}/usr/lib/swift/${lib_subdir}/${entry}"
+          "${SWIFTLIB_DIR}/${lib_subdir}/${entry}")
+    endforeach()
+    if(SWIFT_TEST_SUPPORT_DIR)
+      list(APPEND copy_test_sdk_commands
+        COMMAND "${CMAKE_COMMAND}" -E copy_directory
+          "${SWIFT_TEST_SUPPORT_DIR}/lib/swift/${lib_subdir}"
+          "${SWIFTLIB_DIR}/${lib_subdir}")
+    endif()
+    # The interpreter loads the runtime from the resource directory.
+    if(SWIFT_TEST_SDK_RUNTIME_DIR)
+      file(GLOB sdk_runtime_libraries
+        "${SWIFT_TEST_SDK_RUNTIME_DIR}/swift*${CMAKE_SHARED_LIBRARY_SUFFIX}")
+      list(FILTER sdk_runtime_libraries EXCLUDE REGEX "/swiftDispatch[^/]*$")
+      if(sdk_runtime_libraries)
+        list(APPEND copy_test_sdk_commands
+          COMMAND "${CMAKE_COMMAND}" -E copy ${sdk_runtime_libraries}
+            "${SWIFTLIB_DIR}/${lib_subdir}")
+      endif()
+    endif()
+  endforeach()
+  add_custom_target(swift-test-sdk-stdlib
+    ${copy_test_sdk_commands}
+    COMMENT "Copying the standard library of ${SWIFT_TEST_SDK}")
 endif()
 
 set(profdata_merge_worker
@@ -422,6 +508,19 @@ foreach(SDK ${SWIFT_SDKS})
 
       set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
       set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)
+
+      # A Swift SDK has textual interfaces only with library evolution.
+      if(SWIFT_TEST_SDK)
+        if(EXISTS "${SWIFT_TEST_SDK}/usr/lib/swift/${SWIFT_SDK_${SDK}_LIB_SUBDIR}/Swift.swiftmodule/${VARIANT_MODULE_TRIPLE}.swiftinterface")
+          set(SWIFT_TEST_STDLIB_LIBRARY_EVOLUTION TRUE)
+        else()
+          set(SWIFT_TEST_STDLIB_LIBRARY_EVOLUTION FALSE)
+        endif()
+      elseif(SWIFT_STDLIB_STABLE_ABI AND NOT SDK STREQUAL "LINUX_STATIC")
+        set(SWIFT_TEST_STDLIB_LIBRARY_EVOLUTION TRUE)
+      else()
+        set(SWIFT_TEST_STDLIB_LIBRARY_EVOLUTION FALSE)
+      endif()
 
       # Wasm-hosted SDKs have their own embedded-stdlib lit config; disable
       # the embedded features on the non-embedded lit config so the same
