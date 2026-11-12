@@ -474,6 +474,13 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   return maybeKind;
 }
 
+SILLocation::FilenameAndLocation *
+SILDeserializer::decodeLoc(unsigned Row, unsigned Column,
+                           IdentifierID FNameID) {
+  return SILLocation::FilenameAndLocation::alloc(
+      Row, Column, MF->getIdentifierText(FNameID), SILMod);
+}
+
 llvm::Expected<std::optional<SILLocation>>
 SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
   unsigned LocationKind, Implicit = 0;
@@ -494,8 +501,7 @@ SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
     SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind,
                                 Implicit);
 
-    FNameLoc = SILLocation::FilenameAndLocation::alloc(
-        Row, Col, MF->getIdentifierText(FNameID), SILMod);
+    FNameLoc = decodeLoc(Row, Col, FNameID);
 
     ParsedLocs.push_back(FNameLoc);
   }
@@ -550,8 +556,7 @@ SILDeserializer::readDebugScopes(SILFunction *F,
     if (!Row && !Column && !FName)
       Loc = SILLocation::invalid();
     else
-      Loc = RegularLocation(SILLocation::FilenameAndLocation::alloc(
-          Row, Column, MF->getIdentifierText(FName), SILMod));
+      Loc = RegularLocation(decodeLoc(Row, Column, FName));
 
     if (isFuncParent) {
       Parent = getFuncForReference(MF->getIdentifierText(ParentID), true);
@@ -1982,8 +1987,6 @@ llvm::Error SILDeserializer::readSILInstruction(
       auto VarName = MF->getIdentifierText(ListOfValues[I++]);
       auto ArgNo = ListOfValues[I++];
       std::optional<SILType> Type;
-      unsigned Row, Col;
-      StringRef FileName;
       std::optional<SILLocation> Loc;
       if (HasType) {
         Type = getSILType(MF->getType(ListOfValues[I++]),
@@ -1991,11 +1994,9 @@ llvm::Error SILDeserializer::readSILInstruction(
       }
 
       if (HasLoc) {
-        Row = ListOfValues[I++];
-        Col = ListOfValues[I++];
-        FileName = MF->getIdentifierText(ListOfValues[I++]);
-        Loc = RegularLocation(SILLocation::FilenameAndLocation::alloc(
-            Row, Col, FileName, Fn->getModule()));
+        Loc = RegularLocation(decodeLoc(ListOfValues[I], ListOfValues[I + 1],
+                                        ListOfValues[I + 2]));
+        I += 3;
       }
 
       SILDebugInfoExpression Expressions;
