@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600" role="img" aria-label="Three tasks, A, B, and C, call criticalWork(_:) on the same AsyncMutex. A acquires the lock immediately. B and C arrive while A holds it and wait, in that order. When A releases the lock, B gets it. When B releases it, C gets it." font-family="Helvetica, Arial, sans-serif">
+<defs>
+<pattern id="hatch-c1" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#F78461" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#D84005" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c2" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#85D0EA" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#0070C9" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-c3" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#58C9AF" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#00867D" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<pattern id="hatch-neutral" width="10" height="10" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="10" height="10" fill="#B2B2B2" fill-opacity="0.18"/><line x1="0" y1="0" x2="0" y2="10" stroke="#666666" stroke-opacity="0.45" stroke-width="3"/></pattern>
+<marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto"><path d="M0,0 L10,5 L0,10 Z" fill="#666666"/></marker>
+</defs>
+<text x="24" y="182.7" font-size="18" font-weight="bold" fill="#D84005">A</text>
+<rect x="200" y="135.0" width="570" height="83.33333333333333" rx="6" fill="#E5E5E5"/>
+<rect x="200.0" y="135.0" width="179.1" height="83.33333333333333" rx="6" fill="#F78461"/>
+<text x="289.6" y="182.7" text-anchor="middle" font-size="16" font-weight="bold" fill="#333333">holds lock</text>
+<text x="24" y="306.0" font-size="18" font-weight="bold" fill="#0070C9">B</text>
+<rect x="200" y="258.3333333333333" width="570" height="83.33333333333333" rx="6" fill="#E5E5E5"/>
+<rect x="241.7" y="259.3333333333333" width="136.4" height="81.33333333333333" rx="6" fill="none" stroke="#0070C9" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="309.9" y="306.0" text-anchor="middle" font-size="16" font-weight="normal" fill="#333333">waits</text>
+<rect x="379.1" y="258.3333333333333" width="179.1" height="83.33333333333333" rx="6" fill="#85D0EA"/>
+<text x="468.7" y="306.0" text-anchor="middle" font-size="16" font-weight="bold" fill="#333333">holds lock</text>
+<text x="24" y="429.3" font-size="18" font-weight="bold" fill="#00867D">C</text>
+<rect x="200" y="381.66666666666663" width="570" height="83.33333333333333" rx="6" fill="#E5E5E5"/>
+<rect x="274.3" y="382.66666666666663" width="283.0" height="81.33333333333333" rx="6" fill="none" stroke="#00867D" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="415.8" y="429.3" text-anchor="middle" font-size="16" font-weight="normal" fill="#333333">waits</text>
+<rect x="558.3" y="381.66666666666663" width="179.1" height="83.33333333333333" rx="6" fill="#58C9AF"/>
+<text x="647.9" y="429.3" text-anchor="middle" font-size="16" font-weight="bold" fill="#333333">holds lock</text>
+<line x1="379.1" y1="117.0" x2="379.1" y2="465.0" stroke="#666666" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="379.1" y="109.0" text-anchor="middle" font-size="18" font-weight="bold" fill="#666666">A releases</text>
+<line x1="558.3" y1="117.0" x2="558.3" y2="465.0" stroke="#666666" stroke-width="2" stroke-dasharray="6 5"/>
+<text x="558.3" y="109.0" text-anchor="middle" font-size="18" font-weight="bold" fill="#666666">B releases</text>
+<line x1="200" y1="495.0" x2="770" y2="495.0" stroke="#666666" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="770" y="519.0" text-anchor="end" font-size="16" fill="#666666">time</text>
+<rect x="24" y="551" width="28" height="20" rx="4" fill="#B2B2B2"/>
+<text x="62" y="566" font-size="16" fill="#666666">Running on the actor</text>
+<rect x="278.20000000000005" y="552" width="26" height="18" rx="4" fill="none" stroke="#B2B2B2" stroke-width="2" stroke-dasharray="5 4"/>
+<text x="315.20000000000005" y="566" font-size="16" fill="#666666">Waiting for the lock</text>
+</svg>
