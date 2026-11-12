@@ -4,7 +4,7 @@
     @DocumentationExtension(mergeBehavior: override)
 }
 
-A contiguous region of possibly-aliased memory that contains instances of a given type and is writable from Swift.
+A stored value that you can read and modify through a shared reference, even when other code might alias its memory.
 
 ## Topics
 

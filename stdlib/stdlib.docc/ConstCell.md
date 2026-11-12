@@ -3,7 +3,7 @@
     @DocumentationExtension(mergeBehavior: override)
 }
 
-A contiguous region of possibly-aliased memory that contains instances of a given type and is writeable outside of Swift.
+A stored value that Swift code can read but not modify, because code outside Swift might change its memory.
 
 ## Topics
 

@@ -13,6 +13,7 @@
 ### Accessing span elements
 
 - ``byteCount``
+- ``isEmpty``
 - ``subscript(_:)``
 - ``subscript(unchecked:)``
 
