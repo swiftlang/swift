@@ -831,7 +831,10 @@ public:
   : SemanticsAttr(Value, SourceLoc(), SourceRange(), Implicit) {}
 
   /// The semantics tag value.
-  const StringRef Value;
+  ///
+  /// The type checker can refine this, e.g., by adding the inferred kind of an
+  /// OS version query function.
+  StringRef Value;
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Semantics;

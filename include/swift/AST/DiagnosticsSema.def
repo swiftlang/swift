@@ -9937,6 +9937,8 @@ NOTE(file_default_invalid_attribute_note,none,
 //===----------------------------------------------------------------------===//
 // MARK: `@inline(always)` attribute
 //===----------------------------------------------------------------------===//
+ERROR(attr_semantics_unknown_osversion_kind,none,
+      "unknown OS version query kind '%0' in '@_semantics' attribute", (StringRef))
 ERROR(attr_inline_always_experimental,none,
       "'@inline(always)' is an experimental feature", ())
 ERROR(attr_inline_always_no_usable_from_inline,none,

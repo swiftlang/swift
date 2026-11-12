@@ -1562,38 +1562,18 @@ static bool isApplyOfBuiltin(SILInstruction &I, BuiltinValueKind kind) {
 /// Returns the kind of OS version query function that `callee` is, or
 /// `std::nullopt` if `callee` is not one of those functions.
 ///
-/// Every OS version query function that the standard library declares carries
-/// the `availability.osversion` semantics attribute, and every one of them is
-/// matched here. A function that carries the attribute and matches none of
-/// them is a query function that this list is missing, so this aborts rather
-/// than silently treat it as one of the functions it does know.
+/// The type checker adds the kind to the `availability.osversion` semantics
+/// attribute of the standard library's query functions, e.g.,
+/// `availability.osversion(isOSVersionAtLeast)`. Because the kind is part of
+/// the attribute, it is also found on clones and specializations of those
+/// functions.
 static std::optional<OSVersionQueryKind>
 getOSVersionQueryKind(SILFunction *callee) {
-  if (!callee->hasSemanticsAttr(semantics::AVAILABILITY_OSVERSION))
-    return std::nullopt;
-
-  auto &module = callee->getModule();
-  auto &ctx = module.getASTContext();
-  auto isCallee = [&module, callee](FuncDecl *decl) {
-    return decl && module.lookUpFunction(SILDeclRef(decl)) == callee;
-  };
-
-  // On iOS `_stdlib_isOSVersionAtLeast()` is `@_transparent` and does not carry
-  // the semantics attribute, so a query there reaches this pass as a call to
-  // `_stdlib_isOSVersionAtLeast_AEIC()` instead.
-  if (isCallee(ctx.getIsOSVersionAtLeastDecl()) ||
-      isCallee(ctx.getIsOSVersionAtLeastAEICDecl()))
-    return OSVersionQueryKind::IsOSVersionAtLeast;
-
-  if (isCallee(ctx.getIsVariantOSVersionAtLeastDecl()))
-    return OSVersionQueryKind::IsVariantOSVersionAtLeast;
-
-  if (isCallee(ctx.getIsOSVersionAtLeastOrVariantVersionAtLeast()))
-    return OSVersionQueryKind::IsOSVersionAtLeastOrVariantVersionAtLeast;
-
-  ABORT([callee](auto &out) {
-    out << "unrecognized OS version query function: " << callee->getName();
-  });
+  for (const auto &attr : callee->getSemanticsAttrs()) {
+    if (auto kind = parseOSVersionQuerySemanticsAttr(attr))
+      return kind;
+  }
+  return std::nullopt;
 }
 
 static bool isApplyOfKnownAvailability(SILInstruction &I) {

@@ -467,6 +467,10 @@ public:
   /// Suppress the argument of @unsafe(always) and emit @unsafe instead.
   bool SuppressUnsafeAlways = false;
 
+  /// Suppress the kind in `@_semantics("availability.osversion(<kind>)")` and
+  /// emit `@_semantics("availability.osversion")` instead.
+  bool SuppressOSVersionQueryKind = false;
+
   /// Suppress printing of ~Sendable in inheritance and requirement lists.
   bool SuppressTildeSendable = false;
 
