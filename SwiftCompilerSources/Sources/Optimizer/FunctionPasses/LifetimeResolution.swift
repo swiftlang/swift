@@ -210,7 +210,7 @@ private struct MultiDefResolver {
   // Legalization
   //===--------------------------------------------------------------------===//
 
-  // Legalize the SIL from the solved demand, leaving markers behind for LifetimeResolutionDiagnose
+  // Legalize the SIL from the solved demand, leaving markers behind for DiagnoseResolvedLifetimes
   // to turn into user-facing diagnostics for any misuses that were corrected by this phase.
   mutating func legalizeDemand() {
     for block in function.blocks {
