@@ -370,6 +370,11 @@ namespace {
     /// Encode \p Loc's position, or std::nullopt if it has none.
     std::optional<EncodedLoc> encodeLoc(SILLocation Loc,
                                         const SourceManager &SM);
+    /// Write a SIL_DEBUG_VALUE record: \p ListOfValues followed by \p Var.
+    void writeDebugVariable(const SILInstruction &SI,
+                            std::optional<SILDebugVariable> Var,
+                            unsigned attrs,
+                            SmallVectorImpl<uint64_t> &ListOfValues);
     void writeSourceLoc(SILLocation SLoc, const SourceManager &SM);
     void writeApplyArgLocs(ApplySite AS, const SourceManager &SM);
 
@@ -1158,12 +1163,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     auto operands = DVI->getAllOperands();
 
-    unsigned DebugVarTypeCategory = 0;
-    auto DebugVar = DVI->getVarInfo();
-    const SILDebugScope *ScopeToWrite = nullptr;
-
-    auto &SM = SI.getFunction()->getModule().getSourceManager();
-
     SmallVector<uint64_t, 8> ListOfValues;
 
     // Encode operand count only when there's a reconstruction block
@@ -1180,74 +1179,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back((unsigned)op.get()->getType().getCategory());
     }
 
-    if (DebugVar) {
-      // Is a DebugVariable being serialized.
-      attrs |= 1 << 3;
-      attrs |= DebugVar->isLet() << 4;
-
-      // isDenseMapSingleton needs two bits.
-      attrs |= DebugVar->isDenseMapSingleton << 5;
-
-      ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
-      ListOfValues.push_back(DebugVar->ArgNo);
-
-      if (DebugVar->Type.has_value()) {
-        attrs |= 1 << 7;
-        ListOfValues.push_back(S.addTypeRef(DebugVar->Type->getRawASTType()));
-        DebugVarTypeCategory = (unsigned)DebugVar->Type->getCategory();
-      }
-
-      if (DebugVar->Scope) {
-        attrs |= 1 << 8;
-        ScopeToWrite = DebugVar->Scope;
-      }
-
-      if (DebugVar->Loc) {
-        if (auto Encoded = encodeLoc(*DebugVar->Loc, SM)) {
-          attrs |= 1 << 9;
-          ListOfValues.push_back(Encoded->Row);
-          ListOfValues.push_back(Encoded->Column);
-          ListOfValues.push_back(Encoded->FNameID);
-        }
-      }
-
-      for (auto &Expr : DebugVar->DIExpr.elements()) {
-        attrs |= 1 << 10;
-        ListOfValues.push_back(Expr.getKind());
-        switch (Expr.getKind()) {
-        case SILDIExprElement::Kind::OperatorKind:
-          ListOfValues.push_back((unsigned)Expr.getAsOperator());
-          break;
-        case SILDIExprElement::Kind::DeclKind:
-          ListOfValues.push_back(S.addDeclRef(Expr.getAsDecl()));
-          break;
-        case SILDIExprElement::Kind::ConstIntKind: {
-          llvm::SmallString<10> Str;
-          APInt(64, Expr.getAsConstInt().value()).toStringUnsigned(Str);
-          ListOfValues.push_back(S.addUniquedStringRef(Str));
-          break;
-        }
-        case SILDIExprElement::Kind::TypeKind:
-          ListOfValues.push_back(S.addTypeRef(Expr.getAsType()));
-        }
-      }
-    }
-    SILDebugValueLayout::emitRecord(
-        Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
-        DebugVarTypeCategory, attrs,
-    ListOfValues);
-
-    if (ScopeToWrite) {
-      assert(DebugVar->Scope->getInlinedFunction() == DVI->getDebugScope()->getInlinedFunction());
-      writeDebugScopes(ScopeToWrite, SM);
-      // Add a delimiter record since debug scope records are read by the
-      // deserializer in a loop until the first non debug scope record is
-      // found. As a result, the deserializer might read debug scopes of
-      // subsequent instructions while deserializing scopes for the current
-      // DebugValue instruction.
-      // TODO: Maybe add a bit to the debug scope layout to mark the ending.
-      DebugValueDelimiterLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[DebugValueDelimiterLayout::Code]);
-    }
+    writeDebugVariable(SI, DVI->getVarInfo(), attrs, ListOfValues);
     break;
   }
   case SILInstructionKind::DebugStepInst:
@@ -3664,6 +3596,85 @@ void SILSerializer::writeExtraStringIfNonEmpty(
   SILExtraStringLayout::emitRecord(
       Out, ScratchRecord, SILAbbrCodes[SILExtraStringLayout::Code],
       static_cast<uint8_t>(flavor), string);
+}
+
+void SILSerializer::writeDebugVariable(const SILInstruction &SI,
+                                       std::optional<SILDebugVariable> DebugVar,
+                                       unsigned attrs,
+                                       SmallVectorImpl<uint64_t> &ListOfValues) {
+  unsigned DebugVarTypeCategory = 0;
+  const SILDebugScope *ScopeToWrite = nullptr;
+  auto &SM = SI.getFunction()->getModule().getSourceManager();
+
+  if (DebugVar) {
+    // Is a DebugVariable being serialized.
+    attrs |= 1 << 3;
+    attrs |= DebugVar->isLet() << 4;
+
+    // isDenseMapSingleton needs two bits.
+    attrs |= DebugVar->isDenseMapSingleton << 5;
+
+    ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
+    ListOfValues.push_back(DebugVar->ArgNo);
+
+    if (DebugVar->Type.has_value()) {
+      attrs |= 1 << 7;
+      ListOfValues.push_back(S.addTypeRef(DebugVar->Type->getRawASTType()));
+      DebugVarTypeCategory = (unsigned)DebugVar->Type->getCategory();
+    }
+
+    if (DebugVar->Scope) {
+      attrs |= 1 << 8;
+      ScopeToWrite = DebugVar->Scope;
+    }
+
+    if (DebugVar->Loc) {
+      if (auto Encoded = encodeLoc(*DebugVar->Loc, SM)) {
+        attrs |= 1 << 9;
+        ListOfValues.push_back(Encoded->Row);
+        ListOfValues.push_back(Encoded->Column);
+        ListOfValues.push_back(Encoded->FNameID);
+      }
+    }
+
+    for (auto &Expr : DebugVar->DIExpr.elements()) {
+      attrs |= 1 << 10;
+      ListOfValues.push_back(Expr.getKind());
+      switch (Expr.getKind()) {
+      case SILDIExprElement::Kind::OperatorKind:
+        ListOfValues.push_back((unsigned)Expr.getAsOperator());
+        break;
+      case SILDIExprElement::Kind::DeclKind:
+        ListOfValues.push_back(S.addDeclRef(Expr.getAsDecl()));
+        break;
+      case SILDIExprElement::Kind::ConstIntKind: {
+        llvm::SmallString<10> Str;
+        APInt(64, Expr.getAsConstInt().value()).toStringUnsigned(Str);
+        ListOfValues.push_back(S.addUniquedStringRef(Str));
+        break;
+      }
+      case SILDIExprElement::Kind::TypeKind:
+        ListOfValues.push_back(S.addTypeRef(Expr.getAsType()));
+      }
+    }
+  }
+  SILDebugValueLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
+      DebugVarTypeCategory, attrs, ListOfValues);
+
+  if (ScopeToWrite) {
+    assert(ScopeToWrite->getInlinedFunction() ==
+           SI.getDebugScope()->getInlinedFunction());
+    writeDebugScopes(ScopeToWrite, SM);
+    // Add a delimiter record since debug scope records are read by the
+    // deserializer in a loop until the first non debug scope record is
+    // found. As a result, the deserializer might read debug scopes of
+    // subsequent instructions while deserializing scopes for the current
+    // instruction.
+    // TODO: Maybe add a bit to the debug scope layout to mark the ending.
+    DebugValueDelimiterLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[DebugValueDelimiterLayout::Code]);
+  }
 }
 
 void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
