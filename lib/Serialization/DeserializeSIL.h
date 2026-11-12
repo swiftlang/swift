@@ -195,6 +195,11 @@ namespace swift {
     SILLocation::FilenameAndLocation *
     decodeLoc(unsigned Row, unsigned Column,
               serialization::IdentifierID FNameID);
+    /// Read the debug variable in \p ListOfValues, the values of a
+    /// SIL_DEBUG_VALUE record after its operands.
+    llvm::Expected<std::optional<SILDebugVariable>>
+    readDebugVariable(SILFunction *Fn, SILBuilder &Builder, unsigned Attr,
+                      unsigned TyCategory, ArrayRef<uint64_t> ListOfValues);
 
     llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
     llvm::SmallVector<SILLocation::FilenameAndLocation *> ParsedLocs;
