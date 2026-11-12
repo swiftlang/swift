@@ -2760,6 +2760,24 @@ llvm::Value *emitIndirectCoroFunctionPointer(IRGenFunction &IGF,
 }
 }
 
+/// Load the function from an async or coroutine function pointer record
+/// signed with \p authInfo and sign it with the corresponding code key, in one
+/// operation. The call branches to that address, which is computed from the
+/// record, so it shouldn't be left unsigned. Returns null if the record isn't
+/// signed or isn't referenced directly, or if the function reference in it is
+/// absolute.
+static llvm::Value *
+emitSignedLoadOfFunctionFromRecord(IRGenFunction &IGF, llvm::Value *record,
+                                   const PointerAuthInfo &authInfo,
+                                   bool isIndirect) {
+  if (!authInfo || isIndirect ||
+      IGF.IGM.getOptions().CompactAbsoluteFunctionPointer)
+    return nullptr;
+  // The function is referenced by the first field of the record.
+  return emitPointerAuthResignLoadRelative(
+      IGF, record, authInfo, authInfo.getCorrespondingCodeAuthInfo());
+}
+
 std::pair<llvm::Value *, llvm::Value *>
 irgen::getAsyncFunctionAndSize(IRGenFunction &IGF,
                                FunctionPointer functionPointer,
@@ -2795,6 +2813,8 @@ irgen::getAsyncFunctionAndSize(IRGenFunction &IGF,
 
   llvm::Value *fn = nullptr;
   if (emitFunction) {
+    bool isSigned = false;
+
     // If the FP is not an async FP, then we just have the direct
     // address of the async function.  This only happens for special
     // async functions right now.
@@ -2806,6 +2826,15 @@ irgen::getAsyncFunctionAndSize(IRGenFunction &IGF,
     // function, always prefer that.
     } else if (auto *function = functionPointer.getRawAsyncFunction()) {
       fn = function;
+
+    // If the async FP structure is signed, load the function pointer from it
+    // signed. This authenticates the structure separately from getAFPPtr().
+    } else if (auto *signedFn = emitSignedLoadOfFunctionFromRecord(
+                   IGF, functionPointer.getRawPointer(),
+                   functionPointer.getAuthInfo(),
+                   IGF.IGM.getOptions().IndirectAsyncFunctionPointer)) {
+      fn = signedFn;
+      isSigned = true;
 
     // Otherwise, extract the function pointer from the async FP structure.
     } else {
@@ -2819,7 +2848,8 @@ irgen::getAsyncFunctionAndSize(IRGenFunction &IGF,
     }
 
     if (auto authInfo =
-            functionPointer.getAuthInfo().getCorrespondingCodeAuthInfo()) {
+            functionPointer.getAuthInfo().getCorrespondingCodeAuthInfo();
+        authInfo && !isSigned) {
       fn = emitPointerAuthSign(IGF, fn, authInfo);
     }
   }
@@ -2869,10 +2899,21 @@ irgen::getCoroFunctionValues(IRGenFunction &IGF,
 
   llvm::Value *fn = nullptr;
   if (emitFunction) {
+    bool isSigned = false;
+
     if (auto *function = functionPointer.getRawCoroFunction()) {
       // If we've opportunistically also emitted the direct address of the
       // function, always prefer that.
       fn = function;
+
+    } else if (auto *signedFn = emitSignedLoadOfFunctionFromRecord(
+                   IGF, functionPointer.getRawPointer(),
+                   functionPointer.getAuthInfo(),
+                   IGF.IGM.getOptions().IndirectCoroFunctionPointer)) {
+      // If the coro FP structure is signed, load the function pointer from it
+      // signed. This authenticates the structure separately from getCoroPtr().
+      fn = signedFn;
+      isSigned = true;
 
     } else {
       // Otherwise, extract the function pointer from the coro FP structure.
@@ -2886,7 +2927,8 @@ irgen::getCoroFunctionValues(IRGenFunction &IGF,
     }
 
     if (auto authInfo =
-            functionPointer.getAuthInfo().getCorrespondingCodeAuthInfo()) {
+            functionPointer.getAuthInfo().getCorrespondingCodeAuthInfo();
+        authInfo && !isSigned) {
       fn = emitPointerAuthSign(IGF, fn, authInfo);
     }
   }
@@ -6704,6 +6746,10 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
                           "for which the raw function is known");
       return rawFunction;
     }
+    if (auto *signedFn = emitSignedLoadOfFunctionFromRecord(
+            IGF, Value, AuthInfo,
+            IGF.IGM.getOptions().IndirectAsyncFunctionPointer))
+      return signedFn;
     auto *fnPtr = Value;
     if (auto authInfo = AuthInfo) {
       fnPtr = emitPointerAuthAuth(IGF, fnPtr, authInfo);
@@ -6733,6 +6779,10 @@ llvm::Value *FunctionPointer::getPointer(IRGenFunction &IGF) const {
                           "for which the raw function is known");
       return rawFunction;
     }
+    if (auto *signedFn = emitSignedLoadOfFunctionFromRecord(
+            IGF, Value, AuthInfo,
+            IGF.IGM.getOptions().IndirectCoroFunctionPointer))
+      return signedFn;
     auto *fnPtr = Value;
     if (auto authInfo = AuthInfo) {
       fnPtr = emitPointerAuthAuth(IGF, fnPtr, authInfo);

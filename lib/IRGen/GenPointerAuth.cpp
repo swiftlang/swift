@@ -103,6 +103,27 @@ llvm::Value *irgen::emitPointerAuthResign(IRGenFunction &IGF,
   return IGF.Builder.CreateIntToPtr(fnPtr, origTy);
 }
 
+llvm::Value *
+irgen::emitPointerAuthResignLoadRelative(IRGenFunction &IGF, llvm::Value *ptr,
+                                         const PointerAuthInfo &oldAuthInfo,
+                                         const PointerAuthInfo &newAuthInfo) {
+  assert(oldAuthInfo.isSigned() && newAuthInfo.isSigned());
+  auto oldPair = getPointerAuthPair(IGF, oldAuthInfo);
+  auto newPair = getPointerAuthPair(IGF, newAuthInfo);
+
+  // The relative reference is at the address the pointer refers to.
+  auto *offset = llvm::ConstantInt::get(IGF.IGM.Int64Ty, 0);
+  llvm::Value *args[] = {IGF.Builder.CreatePtrToInt(ptr, IGF.IGM.Int64Ty),
+                         oldPair.first,
+                         oldPair.second,
+                         newPair.first,
+                         newPair.second,
+                         offset};
+  auto *result = IGF.Builder.CreateIntrinsicCall(
+      llvm::Intrinsic::ptrauth_resign_load_relative, args);
+  return IGF.Builder.CreateIntToPtr(result, IGF.IGM.PtrTy);
+}
+
 llvm::Value *irgen::emitPointerAuthAuth(IRGenFunction &IGF, llvm::Value *fnPtr,
                                         const PointerAuthInfo &oldAuthInfo) {
   auto origTy = fnPtr->getType();
