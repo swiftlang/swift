@@ -557,7 +557,8 @@ Type ASTBuilder::createFunctionType(
                               .withSending(flags.isSending());
 
     hasIsolatedParameter |= flags.isIsolated();
-    funcParams.push_back(AnyFunctionType::Param(type, label, parameterFlags));
+    funcParams.push_back(
+        AnyFunctionType::Param::bodyAccess(type, label, parameterFlags));
   }
 
   FunctionTypeRepresentation representation;

@@ -770,7 +770,8 @@ namespace {
                       bool isSending = false) {
       Type gTyIface = generator.build(*this);
       auto flags = ParameterTypeFlags().withOwnershipSpecifier(ownership);
-      auto p = AnyFunctionType::Param(gTyIface, Identifier(), flags);
+      auto p =
+          AnyFunctionType::Param::bodyAccess(gTyIface, Identifier(), flags);
       if (isSending) {
         p = p.withFlags(p.getParameterFlags().withSending(true));
       }
@@ -1495,7 +1496,8 @@ getAutoDiffApplyDerivativeFunction(ASTContext &Context, Identifier Id,
                 .build();
         SmallVector<FunctionType::Param, 2> params;
         for (auto &paramGen : fnParamGens)
-          params.push_back(FunctionType::Param(paramGen.build(builder)));
+          params.push_back(
+              FunctionType::Param::bodyAccess(paramGen.build(builder)));
         return FunctionType::get(params, /* yields */ {},
                                  fnResultGen.build(builder), extInfo);
       }};
@@ -1569,7 +1571,8 @@ static ValueDecl *getAutoDiffApplyTransposeFunction(ASTContext &Context,
               .build();
       SmallVector<FunctionType::Param, 2> params;
       for (auto &paramGen : linearFnParamGens)
-        params.push_back(FunctionType::Param(paramGen.build(builder)));
+        params.push_back(
+            FunctionType::Param::bodyAccess(paramGen.build(builder)));
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       FunctionType::ExtInfo info;
       auto innerFunction = FunctionType::get(
@@ -2288,7 +2291,7 @@ static ValueDecl *getOnceOperation(ASTContext &Context,
   auto VoidTy = Context.TheEmptyTupleType;
   SmallVector<AnyFunctionType::Param, 1> CFuncParams;
   swift::CanType ContextTy = Context.TheRawPointerType;
-  auto ContextArg = FunctionType::Param(ContextTy);
+  auto ContextArg = FunctionType::Param::bodyAccess(ContextTy);
   CFuncParams.push_back(ContextArg);
   auto Rep = FunctionTypeRepresentation::CFunctionPointer;
   auto ClangType = Context.getClangFunctionType(CFuncParams, VoidTy, Rep);
@@ -2326,7 +2329,7 @@ static ValueDecl *getWithUnsafeContinuation(ASTContext &ctx,
 
   auto contTy = ctx.TheRawUnsafeContinuationType;
   SmallVector<AnyFunctionType::Param, 1> params;
-  params.emplace_back(contTy);
+  params.push_back(AnyFunctionType::Param::bodyAccess(contTy));
 
   auto voidTy = ctx.TheEmptyTupleType;
   auto extInfo = FunctionType::ExtInfoBuilder().withNoEscape().build();
@@ -2445,7 +2448,7 @@ static ValueDecl *getEmplace(ASTContext &ctx, Identifier id) {
       .build();
 
   auto fnParamTy =
-      FunctionType::get(FunctionType::Param(ctx.TheRawPointerType),
+      FunctionType::get(FunctionType::Param::bodyAccess(ctx.TheRawPointerType),
                         /* yields */ {}, ctx.TheEmptyTupleType, extInfo);
 
   builder.addParameter(makeConcrete(fnParamTy), ParamSpecifier::Borrowing);
@@ -2476,9 +2479,8 @@ static ValueDecl *getApplyActorIsolatedUnchecked(ASTContext &ctx, Identifier id)
       .withIsolation(FunctionTypeIsolation::forParameter())
       .build();
 
-  auto isolatedParam =
-      FunctionType::Param(A.build(builder), Identifier(),
-                          ParameterTypeFlags().withIsolated(true));
+  auto isolatedParam = FunctionType::Param::bodyAccess(
+      A.build(builder), Identifier(), ParameterTypeFlags().withIsolated(true));
   auto fnParamTy = FunctionType::get({isolatedParam}, /* yields */ {},
                                      T.build(builder), extInfo);
 
@@ -2548,7 +2550,7 @@ static ValueDecl *getTaskAddCancellationHandlerWithReason(ASTContext &ctx,
                                                            Identifier id) {
   // (UInt8) -> ()
   std::array<AnyFunctionType::Param, 1> params = {
-      AnyFunctionType::Param(ctx.getUInt8Type()),
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
   };
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();
   auto *functionType = FunctionType::get(params, /* yields */ {},
@@ -2561,8 +2563,8 @@ static ValueDecl *getTaskAddCancellationHandlerWithReason(ASTContext &ctx,
 static ValueDecl *getTaskAddPriorityEscalationHandler(ASTContext &ctx,
                                                       Identifier id) {
   std::array<AnyFunctionType::Param, 2> params = {
-      AnyFunctionType::Param(ctx.getUInt8Type()),
-      AnyFunctionType::Param(ctx.getUInt8Type()),
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
+      AnyFunctionType::Param::bodyAccess(ctx.getUInt8Type()),
   };
   // (UInt8, UInt8) -> ()
   auto extInfo = ASTExtInfoBuilder().withNoEscape().build();

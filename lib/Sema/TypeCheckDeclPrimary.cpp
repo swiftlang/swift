@@ -4016,6 +4016,8 @@ public:
       TypeChecker::checkYieldList(FD->getYields(), FD);
     }
 
+    checkScopedSignature(FD);
+
     checkDeclCommon(FD);
 
     TypeChecker::checkDeclAttributes(FD);
@@ -4469,6 +4471,7 @@ public:
 
     TypeChecker::checkDeclAttributes(CD);
     TypeChecker::checkParameterList(CD->getParameters(), CD);
+    checkScopedSignature(CD);
 
     checkEmbeddedRestrictionsInSignature(CD);
 

@@ -821,7 +821,8 @@ namespace {
         // FIXME(https://github.com/apple/swift/issues/45134): If we were walking TypeLocs, we could actually get parameter names.
         // The probably doesn't matter outside of a FuncDecl, which we'll have
         // to special-case, but it's an interesting bit of data loss.
-        params.emplace_back(swiftParamTy, Identifier(), flags);
+        params.push_back(AnyFunctionType::Param::bodyAccess(
+            swiftParamTy, Identifier(), flags));
       }
 
       // Mark any `sending` result types if need be.

@@ -2988,7 +2988,7 @@ public:
                                          AbstractionPattern yieldPattern) {
     SmallVector<FunctionType::Param, 4> newParams;
     auto addParam = [&](ParameterTypeFlags oldFlags, CanType newType) {
-      newParams.push_back(FunctionType::Param(
+      newParams.push_back(FunctionType::Param::bodyAccess(
           newType, /*label*/ Identifier(), oldFlags.withVariadic(false),
           /*internal label*/ Identifier()));
     };

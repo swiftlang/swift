@@ -98,15 +98,19 @@ class EqualUpToClangTypes
     : public CanTypeDifferenceVisitor<EqualUpToClangTypes> {
 public:
   bool visitDifferentTypeStructure(CanType t1, CanType t2) {
-#define COMPARE_UPTO_CLANG_TYPE(CLASS)                                         \
-  if (auto f1 = dyn_cast<CLASS>(t1)) {                                         \
-    auto f2 = cast<CLASS>(t2);                                                 \
-    return !f1->getExtInfo().isEqualTo(f2->getExtInfo(),                       \
-                                       /*useClangTypes*/ false);               \
-  }
-    COMPARE_UPTO_CLANG_TYPE(FunctionType);
-    COMPARE_UPTO_CLANG_TYPE(SILFunctionType);
-#undef COMPARE_UPTO_CLANG_TYPE
+    if (auto f1 = dyn_cast<FunctionType>(t1)) {
+      // Scopes aren't mangled.
+      auto extInfo1 = f1->getExtInfo().withScopeSignature(ScopeSignature());
+      auto extInfo2 =
+          cast<FunctionType>(t2)->getExtInfo().withScopeSignature(
+              ScopeSignature());
+      return !extInfo1.isEqualTo(extInfo2, /*useClangTypes*/ false);
+    }
+    if (auto f1 = dyn_cast<SILFunctionType>(t1)) {
+      auto f2 = cast<SILFunctionType>(t2);
+      return !f1->getExtInfo().isEqualTo(f2->getExtInfo(),
+                                         /*useClangTypes*/ false);
+    }
     return true;
   }
   bool check(Type t1, Type t2) {

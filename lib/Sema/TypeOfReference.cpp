@@ -948,7 +948,7 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs,
     auto paramType = paramTypes[i].getParameterType();
     auto paramLabel = paramTypes[i].getLabel();
     auto paramInternalLabel = paramTypes[i].getInternalLabel();
-    adjustedParamTypes.push_back(AnyFunctionType::Param(
+    adjustedParamTypes.push_back(AnyFunctionType::Param::bodyAccess(
         wrappedType, paramLabel, ParameterTypeFlags(), paramInternalLabel));
     cs.applyPropertyWrapperToParameter(
         paramType, wrappedType, paramDecl, argLabel, ConstraintKind::Equal,
@@ -1554,7 +1554,7 @@ Type ConstraintSystem::getTypeOfMemberTypeReference(
     memberTy = MetatypeType::get(memberTy);
   }
 
-  FunctionType::Param baseObjParam(baseObjTy);
+  auto baseObjParam = FunctionType::Param::bodyAccess(baseObjTy);
   return FunctionType::get({baseObjParam}, /* yields */ {}, memberTy);
 }
 
@@ -1623,7 +1623,8 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
                                preparedOverload);
   }
 
-  FunctionType::Param selfParam(selfTy, Identifier(), selfFlags);
+  auto selfParam =
+      FunctionType::Param::bodyAccess(selfTy, Identifier(), selfFlags);
 
   FunctionType::ExtInfo info;
   return std::make_pair(
@@ -2389,9 +2390,9 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       recordArgumentList(argLoc, argList);
     }
 
-    auto *callerTy =
-        FunctionType::get({FunctionType::Param(argTy, ctx.Id_dynamicMember)},
-                          /* yields */ {}, resultTy);
+    auto *callerTy = FunctionType::get(
+        {FunctionType::Param::bodyAccess(argTy, ctx.Id_dynamicMember)},
+        /* yields */ {}, resultTy);
 
     ConstraintLocatorBuilder builder(callLoc);
     addApplicationConstraint(
@@ -2739,8 +2740,8 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         CS.getConstraintLocator(locator, ConstraintLocator::FunctionResult),
         TVO_CanBindToNoEscape, preparedOverload);
 
-    FunctionType::Param inputArg(input,
-                                 CS.getASTContext().getIdentifier("of"));
+    auto inputArg = FunctionType::Param::bodyAccess(
+        input, CS.getASTContext().getIdentifier("of"));
 
     CS.addConstraint(
         ConstraintKind::DynamicTypeOf, output, input,
@@ -2769,7 +2770,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto thrownError = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
         0, preparedOverload);
-    FunctionType::Param arg(escapeClosure);
+    auto arg = FunctionType::Param::bodyAccess(escapeClosure);
 
     auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
 
@@ -2781,8 +2782,9 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                              .withThrows(true, thrownError)
                                              .build());
     FunctionType::Param args[] = {
-      FunctionType::Param(noescapeClosure),
-      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
+      FunctionType::Param::bodyAccess(noescapeClosure),
+      FunctionType::Param::bodyAccess(bodyClosure,
+                                      CS.getASTContext().getIdentifier("do")),
     };
 
     auto withoutEscapingIsolation = getDefaultFunctionTypeIsolation(CS);
@@ -2816,7 +2818,8 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
         preparedOverload);
     auto consuming =
         ParameterTypeFlags().withOwnershipSpecifier(ParamSpecifier::Consuming);
-    FunctionType::Param arg(atMostOnceClosure, Identifier(), consuming);
+    auto arg = FunctionType::Param::bodyAccess(atMostOnceClosure, Identifier(),
+                                               consuming);
 
     auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
 
@@ -2828,9 +2831,10 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                              .withThrows(true, thrownError)
                                              .build());
     FunctionType::Param args[] = {
-        FunctionType::Param(exactlyOnceClosure, Identifier(), consuming),
-        FunctionType::Param(bodyClosure,
-                            CS.getASTContext().getIdentifier("do")),
+        FunctionType::Param::bodyAccess(exactlyOnceClosure, Identifier(),
+                                        consuming),
+        FunctionType::Param::bodyAccess(bodyClosure,
+                                        CS.getASTContext().getIdentifier("do")),
     };
 
     auto withoutDeinitingIsolation = getDefaultFunctionTypeIsolation(CS);
@@ -2861,7 +2865,8 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto thrownError = CS.createTypeVariable(
         CS.getConstraintLocator(locator, ConstraintLocator::ThrownErrorType),
         0, preparedOverload);
-    FunctionType::Param bodyArgs[] = {FunctionType::Param(openedTy)};
+    FunctionType::Param bodyArgs[] = {
+        FunctionType::Param::bodyAccess(openedTy)};
 
     auto bodyParamIsolation = getDefaultFunctionTypeIsolation(CS);
 
@@ -2873,8 +2878,9 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
                                              .withAsync(true)
                                              .build());
     FunctionType::Param args[] = {
-      FunctionType::Param(existentialTy),
-      FunctionType::Param(bodyClosure, CS.getASTContext().getIdentifier("do")),
+      FunctionType::Param::bodyAccess(existentialTy),
+      FunctionType::Param::bodyAccess(bodyClosure,
+                                      CS.getASTContext().getIdentifier("do")),
     };
 
     auto openExistentialIsolation = getDefaultFunctionTypeIsolation(CS);
@@ -3122,14 +3128,15 @@ void ConstraintSystem::resolveOverload(OverloadChoice choice, DeclContext *useDC
                   keyPathIndexTy, choice.getBaseType(), elementTy, locator);
 
     FunctionType::Param indices[] = {
-      FunctionType::Param(keyPathIndexTy, getASTContext().Id_keyPath),
+      FunctionType::Param::bodyAccess(keyPathIndexTy,
+                                      getASTContext().Id_keyPath),
     };
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo subscriptInfo;
     auto subscriptTy =
         FunctionType::get(indices, /* yields */ {}, elementTy, subscriptInfo);
 
-    FunctionType::Param baseParam(choice.getBaseType());
+    auto baseParam = FunctionType::Param::bodyAccess(choice.getBaseType());
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     FunctionType::ExtInfo fullInfo;
     auto fullTy =

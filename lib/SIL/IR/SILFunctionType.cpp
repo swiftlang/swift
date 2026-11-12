@@ -5255,12 +5255,11 @@ static CanType copyOptionalityFromDerivedToBase(TypeConverter &tc,
             baseDecl,
             baseParam.getParameterFlags().getOwnershipSpecifier(),
             derivedParam.getParameterFlags().getOwnershipSpecifier()));
-        params.emplace_back(
+        params.push_back(baseParam.getWithoutLabels().withType(
             copyOptionalityFromDerivedToBase(tc,
                                              nullptr,
                                              derivedParam.getPlainType(),
-                                             baseParam.getPlainType()),
-            Identifier(), baseParam.getParameterFlags());
+                                             baseParam.getPlainType())));
       }
 
       SmallVector<FunctionType::Yield, 1> yields;
@@ -5672,6 +5671,8 @@ TypeConverter::getLoweredFormalTypes(SILDeclRef constant,
   if (innerExtInfo.hasSendingResult())
     extInfo = extInfo.withSendingResult();
 
+  // FIXME: Bring the scopes bound by the curried function types, like
+  // `self`'s access, into the uncurried one.
   auto uncurried = CanAnyFunctionType::get(
       genericSig, llvm::ArrayRef(bridgedParams), llvm::ArrayRef(bridgedYields),
       bridgedResultType, extInfo);

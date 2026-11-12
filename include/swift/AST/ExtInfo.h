@@ -24,6 +24,7 @@
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/LifetimeDependence.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/TypeAlignments.h"
 #include "llvm/ADT/PointerIntPair.h"
 #include "llvm/Support/raw_ostream.h"
@@ -668,6 +669,8 @@ class ASTExtInfoBuilder {
 
   unsigned bits; // Naturally sized for speed.
 
+  ScopeSignature scopeSignature;
+
   ClangTypeInfo clangTypeInfo;
 
   Type globalActor;
@@ -698,8 +701,10 @@ private:
   ASTExtInfoBuilder(unsigned bits, ClangTypeInfo clangTypeInfo,
                     Type globalActor, Type thrownError,
                     ArrayRef<TypeDependency> typeDependencies,
-                    ArrayRef<LifetimeDependenceInfo> lifetimeDependencies)
-      : bits(bits), clangTypeInfo(clangTypeInfo), globalActor(globalActor),
+                    ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
+                    ScopeSignature scopeSignature)
+      : bits(bits), scopeSignature(scopeSignature),
+        clangTypeInfo(clangTypeInfo), globalActor(globalActor),
         thrownError(thrownError), typeDependencies(typeDependencies),
         lifetimeDependencies(lifetimeDependencies) {
     assert(isThrowing() || !thrownError);
@@ -743,7 +748,7 @@ public:
             (encodeExecutionSemantics(executionSemantics)
              << ExecutionSemanticsMaskOffset),
             ClangTypeInfo(type), isolation.getOpaqueType(), thrownError,
-            /*typeDependencies*/ {}, lifetimeDependencies) {}
+            /*typeDependencies*/ {}, lifetimeDependencies, ScopeSignature()) {}
 
   void checkInvariants() const;
 
@@ -844,6 +849,8 @@ public:
     return typeDependencies;
   }
 
+  ScopeSignature getScopeSignature() const { return scopeSignature; }
+
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     return lifetimeDependencies;
   }
@@ -904,34 +911,37 @@ public:
     return ASTExtInfoBuilder(
         (bits & ~RepresentationMask) | (unsigned)rep,
         shouldStoreClangType(rep) ? clangTypeInfo : ClangTypeInfo(),
-        globalActor, thrownError, typeDependencies, lifetimeDependencies);
+        globalActor, thrownError, typeDependencies, lifetimeDependencies,
+        scopeSignature);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withNoEscape(bool noEscape = true) const {
     return ASTExtInfoBuilder(
         noEscape ? (bits | NoEscapeMask) : (bits & ~NoEscapeMask),
         clangTypeInfo, globalActor, thrownError, typeDependencies,
-        lifetimeDependencies);
+        lifetimeDependencies, scopeSignature);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withSendable(bool concurrent = true) const {
     return ASTExtInfoBuilder(
         concurrent ? (bits | SendableMask) : (bits & ~SendableMask),
         clangTypeInfo, globalActor, thrownError, typeDependencies,
-        lifetimeDependencies);
+        lifetimeDependencies, scopeSignature);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withAsync(bool async = true) const {
     return ASTExtInfoBuilder(
         async ? (bits | AsyncMask) : (bits & ~AsyncMask), clangTypeInfo,
-        globalActor, thrownError, typeDependencies, lifetimeDependencies);
+        globalActor, thrownError, typeDependencies, lifetimeDependencies,
+        scopeSignature);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withThrows(bool throws, Type thrownError) const {
     assert(throws || !thrownError);
     return ASTExtInfoBuilder(
         throws ? (bits | ThrowsMask) : (bits & ~ThrowsMask), clangTypeInfo,
-        globalActor, thrownError, typeDependencies, lifetimeDependencies);
+        globalActor, thrownError, typeDependencies, lifetimeDependencies,
+        scopeSignature);
   }
 
   /// Sets the type that \p kind depends on, or removes the dependence if
@@ -948,7 +958,7 @@ public:
     return ASTExtInfoBuilder(
         sending ? (bits | SendingResultMask) : (bits & ~SendingResultMask),
         clangTypeInfo, globalActor, thrownError, typeDependencies,
-        lifetimeDependencies);
+        lifetimeDependencies, scopeSignature);
   }
 
   [[nodiscard]]
@@ -956,7 +966,7 @@ public:
     return ASTExtInfoBuilder(
         coroutine ? (bits | CoroutineMask) : (bits & ~CoroutineMask),
         clangTypeInfo, globalActor, thrownError, typeDependencies,
-        lifetimeDependencies);
+        lifetimeDependencies, scopeSignature);
   }
 
   [[nodiscard]]
@@ -966,13 +976,13 @@ public:
         (bits & ~DifferentiabilityMask) |
             ((unsigned)differentiability << DifferentiabilityMaskOffset),
         clangTypeInfo, globalActor, thrownError, typeDependencies,
-        lifetimeDependencies);
+        lifetimeDependencies, scopeSignature);
   }
   [[nodiscard]]
   ASTExtInfoBuilder withClangFunctionType(const clang::Type *type) const {
     return ASTExtInfoBuilder(bits, ClangTypeInfo(type), globalActor,
                              thrownError, typeDependencies,
-                             lifetimeDependencies);
+                             lifetimeDependencies, scopeSignature);
   }
 
   /// Put a SIL representation in the ExtInfo.
@@ -986,7 +996,8 @@ public:
     return ASTExtInfoBuilder(
         (bits & ~RepresentationMask) | (unsigned)rep,
         shouldStoreClangType(rep) ? clangTypeInfo : ClangTypeInfo(),
-        globalActor, thrownError, typeDependencies, lifetimeDependencies);
+        globalActor, thrownError, typeDependencies, lifetimeDependencies,
+        scopeSignature);
   }
 
   /// \p lifetimeDependencies should be arena allocated and not a temporary
@@ -996,7 +1007,7 @@ public:
       llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependencies) const {
     return ASTExtInfoBuilder(
         bits, clangTypeInfo, globalActor, thrownError, typeDependencies,
-        lifetimeDependencies);
+        lifetimeDependencies, scopeSignature);
   }
 
   [[nodiscard]] ASTExtInfoBuilder withLifetimeDependencies(
@@ -1010,13 +1021,13 @@ public:
             (unsigned(isolation.getKind()) << IsolationMaskOffset),
         clangTypeInfo, isolation.getOpaqueType(), thrownError,
         typeDependencies,
-        lifetimeDependencies);
+        lifetimeDependencies, scopeSignature);
   }
 
   [[nodiscard]] ASTExtInfoBuilder withHasInOutResult() const {
     return ASTExtInfoBuilder((bits | InOutResultMask), clangTypeInfo,
                              globalActor, thrownError, typeDependencies,
-                             lifetimeDependencies);
+                             lifetimeDependencies, scopeSignature);
   }
 
   [[nodiscard]] ASTExtInfoBuilder withExecutionSemantics(
@@ -1026,7 +1037,14 @@ public:
             (encodeExecutionSemantics(executionSemantics)
              << ExecutionSemanticsMaskOffset),
         clangTypeInfo, globalActor, thrownError, typeDependencies,
-        lifetimeDependencies);
+        lifetimeDependencies, scopeSignature);
+  }
+
+  [[nodiscard]] ASTExtInfoBuilder
+  withScopeSignature(ScopeSignature scopeSignature) const {
+    return ASTExtInfoBuilder(bits, clangTypeInfo, globalActor, thrownError,
+                             typeDependencies, lifetimeDependencies,
+                             scopeSignature);
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
@@ -1041,6 +1059,7 @@ public:
     for (auto info : lifetimeDependencies) {
       info.Profile(ID);
     }
+    scopeSignature.Profile(ID);
   }
 
   bool isEqualTo(ASTExtInfoBuilder other, bool useClangTypes) const {
@@ -1048,7 +1067,8 @@ public:
            (useClangTypes ? (clangTypeInfo == other.clangTypeInfo) : true) &&
            globalActor.getPointer() == other.globalActor.getPointer() &&
            thrownError.getPointer() == other.thrownError.getPointer() &&
-           lifetimeDependencies == other.lifetimeDependencies;
+           lifetimeDependencies == other.lifetimeDependencies &&
+           scopeSignature == other.scopeSignature;
   }
 }; // end ASTExtInfoBuilder
 
@@ -1072,9 +1092,10 @@ class ASTExtInfo {
   ASTExtInfo(unsigned bits, ClangTypeInfo clangTypeInfo, Type globalActor,
              Type thrownError,
              ArrayRef<ASTExtInfoBuilder::TypeDependency> typeDependencies,
-             llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo)
+             llvm::ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo,
+             ScopeSignature scopeSignature)
       : builder(bits, clangTypeInfo, globalActor, thrownError, typeDependencies,
-                lifetimeDependenceInfo) {
+                lifetimeDependenceInfo, scopeSignature) {
     builder.checkInvariants();
   };
 
@@ -1138,6 +1159,10 @@ public:
 
   ArrayRef<LifetimeDependenceInfo> getLifetimeDependencies() const {
     return builder.getLifetimeDependencies();
+  }
+
+  ScopeSignature getScopeSignature() const {
+    return builder.getScopeSignature();
   }
 
   FunctionTypeIsolation getIsolation() const { return builder.getIsolation(); }
@@ -1267,6 +1292,11 @@ public:
   [[nodiscard]] ASTExtInfo withExecutionSemantics(
       std::optional<ExecutionSemantics> executionSemantics) const {
     return builder.withExecutionSemantics(executionSemantics).build();
+  }
+
+  [[nodiscard]] ASTExtInfo
+  withScopeSignature(ScopeSignature scopeSignature) const {
+    return builder.withScopeSignature(scopeSignature).build();
   }
 
   void Profile(llvm::FoldingSetNodeID &ID) const { builder.Profile(ID); }

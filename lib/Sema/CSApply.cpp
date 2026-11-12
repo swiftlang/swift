@@ -2586,7 +2586,8 @@ namespace {
         if (!selfTy->hasReferenceSemantics())
           flags = flags.withInOut(true);
 
-        auto selfParam = AnyFunctionType::Param(selfTy, Identifier(), flags);
+        auto selfParam =
+            AnyFunctionType::Param::bodyAccess(selfTy, Identifier(), flags);
         return FunctionType::get({selfParam}, /* yields */ {},
                                  resultTy->getResult(), resultTy->getExtInfo());
       };
@@ -5386,7 +5387,7 @@ namespace {
 
       FunctionType::ExtInfo closureInfo;
       auto closureTy =
-          FunctionType::get({FunctionType::Param(baseTy)},
+          FunctionType::get({FunctionType::Param::bodyAccess(baseTy)},
                             /* yields */ {}, kpResultTy, closureInfo);
       auto closure = new (ctx)
           AutoClosureExpr(/*set body later*/nullptr, kpResultTy, dc);

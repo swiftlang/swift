@@ -15,8 +15,10 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/QuotedString.h"
+#include "swift/Basic/Range.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "clang/AST/Decl.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
@@ -139,10 +141,29 @@ class ASTPrinter {
   TypeOrExtensionDecl SynthesizeTarget;
   llvm::SmallPtrSet<const clang::Decl *, 8> printedClangDecl;
 
+  /// Scopes are stored by de Bruijn (depth, index), but printed as unique names
+  /// for readability. Tracks the names of the scope parameters at each depth,
+  /// to print relative `ScopeRef`s with absolute, non-shadowed names.
+  ///
+  /// TODO: Make names unique across the whole printed type once a type other
+  /// than a function type can contain scope parameters, like a tuple of
+  /// closures.
+  SmallVector<IntRange<unsigned>> EnclosingScopeParamNames;
+  unsigned NextScopeParamName = 0;
+
   void printTextImpl(StringRef Text);
 
 public:
   virtual ~ASTPrinter() {}
+
+  /// Reserves names for \p numScopeParams scope parameters of a function type
+  /// being printed, returning them.
+  IntRange<unsigned> pushScopeParams(unsigned numScopeParams);
+  void popScopeParams();
+
+  /// The name of the scope parameter a reference refers to, unless its binder
+  /// isn't being printed or doesn't bind it.
+  std::optional<unsigned> getScopeParamName(ScopeRef scope) const;
 
   virtual void printText(StringRef Text) = 0;
 
