@@ -1142,6 +1142,8 @@ void importer::checkRetainReleaseFunctions(
     }
   }
   Impl.setForeignReferenceTypeOperations(recordDecl, retainFn, releaseFn);
+  if (retainFn && retainOp)
+    Impl.FRTAnnotatedRetainFunctions[recordDecl] = baseClangFn(retainOp);
 }
 
 bool importer::isOverrideOfRetainReleaseMethod(
