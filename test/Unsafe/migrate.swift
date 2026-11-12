@@ -12,6 +12,15 @@ func g() {
   // expected-note@-1{{reference to unsafe global function 'f()'}}
 }
 
+// Migration sees the code that builds once strict memory safety is enabled.
+#if hasFeature(StrictMemorySafety)
+func onlyWithStrictMemorySafety() {
+  f()
+  // expected-warning@-1:3 {{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
+  // expected-note@-2:3 {{reference to unsafe global function 'f()'}}
+}
+#endif
+
 protocol P {
   func f()
 }
