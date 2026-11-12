@@ -301,6 +301,13 @@ public:
                                // set during SIL type lowering
                                nullptr, nullptr, flags) {}
 
+  /// An immortal dependence: the value at \p targetIndex depends on nothing.
+  static LifetimeDependenceInfo
+  getImmortal(unsigned targetIndex, LifetimeFlags flags = LifetimeFlags()) {
+    return LifetimeDependenceInfo(nullptr, nullptr, targetIndex,
+                                  flags.withImmortalSpecifier());
+  }
+
   operator bool() const { return !empty(); }
 
   bool empty() const {

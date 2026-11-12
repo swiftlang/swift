@@ -252,14 +252,11 @@ static bool findLifetimeAttr(Decl *decl, bool findUnderscored) {
     return !decl->getAttrs().getAttribute<LifetimeAttr>()->isUnderscored();
   };
 
-  switch (decl->getKind()) {
-  case DeclKind::Var: {
-    auto *var = cast<VarDecl>(decl);
-    return llvm::any_of(var->getAllAccessors(), hasLifetimeAttr);
-  }
-  default:
-    return hasLifetimeAttr(decl);
-  }
+  // A property or subscript may carry the attribute on its accessors.
+  if (auto *storage = dyn_cast<AbstractStorageDecl>(decl))
+    return hasLifetimeAttr(storage) ||
+           llvm::any_of(storage->getAllAccessors(), hasLifetimeAttr);
+  return hasLifetimeAttr(decl);
 }
 
 static bool usesFeatureLifetimeDependence(Decl *decl) {

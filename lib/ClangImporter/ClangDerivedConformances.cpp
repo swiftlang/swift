@@ -18,9 +18,11 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/LayoutConstraint.h"
+#include "swift/AST/LifetimeDependence.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
@@ -1211,6 +1213,69 @@ bool swift::isUnsafeStdMethod(const clang::CXXMethodDecl *methodDecl) {
         .Default(false);
   }
   return false;
+}
+
+bool swift::inferStdOptionalConstructorDependence(
+    ClangImporter::Implementation &Impl, const clang::FunctionDecl *decl,
+    AbstractFunctionDecl *result, size_t returnIdx) {
+  const auto *ctor = dyn_cast<clang::CXXConstructorDecl>(decl);
+  if (!ctor)
+    return false;
+  // Standard libraries build 'std::optional' on base classes that inherit
+  // their constructors with a using-declaration, sometimes through layers that
+  // are not specific to 'std::optional', e.g. the MSVC STL's
+  // '_Non_trivial_copy'. Name the class that declares the constructor.
+  const auto *declaringCtor = ctor;
+  while (declaringCtor->isInheritingConstructor())
+    declaringCtor = declaringCtor->getInheritedConstructor().getConstructor();
+  const auto *declaringRecord = declaringCtor->getParent();
+  if (!declaringRecord->isInStdNamespace() ||
+      !declaringRecord->getIdentifier())
+    return false;
+  StringRef name = declaringRecord->getName();
+  if (name != "optional" &&
+      !name.starts_with("__optional_") && // libc++
+      !name.starts_with("_Optional_"))    // libstdc++, MSVC STL
+    return false;
+
+  const auto *record = ctor->getParent();
+
+  auto isNonEscapableType = [&](clang::QualType type) {
+    return importer::isNonEscapable(Impl.SwiftContext.evaluator,
+                                    type.getNonReferenceType().getTypePtr(),
+                                    &Impl);
+  };
+  if (!isNonEscapableType(
+          Impl.getClangASTContext().getCanonicalTagType(record)))
+    return false;
+
+  auto isTag = [](clang::QualType type) {
+    const auto *tag = type.getNonReferenceType()->getAsCXXRecordDecl();
+    return tag && tag->isInStdNamespace() && tag->getIdentifier() &&
+           (tag->getName() == "nullopt_t" || tag->getName() == "in_place_t");
+  };
+  SmallBitVector inheritIndices(returnIdx);
+  for (auto [idx, param] : llvm::enumerate(ctor->parameters())) {
+    if (isTag(param->getType()))
+      continue;
+    // An argument that is not the value itself, e.g. one forwarded to a
+    // constructor of the value, needs a dependence we cannot know.
+    if (!isNonEscapableType(param->getType()))
+      return false;
+    inheritIndices[idx] = true;
+  }
+
+  auto flags = LifetimeFlags().withAnnotated();
+  auto dependence =
+      inheritIndices.any()
+          ? LifetimeDependenceInfo(
+                IndexSubset::get(Impl.SwiftContext, inheritIndices), nullptr,
+                returnIdx, flags)
+          : LifetimeDependenceInfo::getImmortal(returnIdx, flags);
+  Impl.SwiftContext.evaluator.cacheOutput(
+      LifetimeDependenceInfoRequest{result},
+      Impl.SwiftContext.AllocateCopy(ArrayRef(dependence)));
+  return true;
 }
 
 /// Look up the `insert(const value_type&)` overload on a C++ container.

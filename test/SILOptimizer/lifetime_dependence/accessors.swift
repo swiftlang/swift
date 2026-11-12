@@ -79,3 +79,23 @@ struct NCNEHolder : ~Copyable, ~Escapable {
     }
   }
 }
+
+protocol NEProjecting: ~Escapable {
+  associatedtype Projected: ~Escapable
+
+  var projected: Projected {
+    @_lifetime(borrow self)
+    get
+  }
+}
+
+// The getter synthesized for an 'unsafeAddress' accessor loads from an address
+// projected out of the borrowed 'self', so it borrows 'self'.
+struct NEAddressed: ~Escapable, NEProjecting {
+  let _p: UnsafeRawPointer
+
+  var projected: NE {
+    // CHECK-LABEL: sil hidden [transparent] @$s9accessors11NEAddressedV9projectedAA2NEVvg : $@convention(method) (@guaranteed NEAddressed) -> @lifetime(borrow 0) @owned NE {
+    unsafeAddress { fatalError() }
+  }
+}
