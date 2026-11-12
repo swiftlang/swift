@@ -655,20 +655,28 @@ public:
 
 template<typename Runtime> struct TargetMethodDescriptor;
 
+/// A method descriptor in another module is referenced through a GOT
+/// equivalent, which is signed.
 template<typename Runtime>
 using TargetRelativeMethodDescriptorPointer =
   RelativeIndirectablePointer<const TargetMethodDescriptor<Runtime>,
-                              /*nullable*/ true>;
+                              /*nullable*/ true, int32_t,
+                              const TargetMethodDescriptor<Runtime> *
+                                  __ptrauth_swift_class_method_descriptor>;
 
 using RelativeMethodDescriptorPointer =
   TargetRelativeMethodDescriptorPointer<InProcess>;
 
 template<typename Runtime> struct TargetProtocolRequirement;
 
+/// A requirement descriptor in another module is referenced through a GOT
+/// equivalent, which is signed.
 template<typename Runtime>
 using TargetRelativeProtocolRequirementPointer =
-  RelativeIndirectablePointer<const TargetProtocolRequirement<Runtime>,
-                              /*nullable*/ true>;
+  RelativeIndirectablePointer<
+      const TargetProtocolRequirement<Runtime>, /*nullable*/ true, int32_t,
+      const TargetProtocolRequirement<Runtime> *
+          __ptrauth_swift_protocol_requirement_descriptor>;
 
 using RelativeProtocolRequirementPointer =
   TargetRelativeProtocolRequirementPointer<InProcess>;
@@ -3818,8 +3826,12 @@ struct TargetGenericValueMetadataPattern final :
   using TargetGenericMetadataPattern<Runtime>::PatternFlags;
 
   /// The value-witness table.  Indirectable so that we can re-use tables
-  /// from other libraries if that seems wise.
-  TargetRelativeIndirectablePointer<Runtime, const TargetValueWitnessTable<Runtime>>
+  /// from other libraries if that seems wise. A table in another library is
+  /// referenced through a GOT equivalent, which is signed.
+  RelativeIndirectablePointer<const TargetValueWitnessTable<Runtime>,
+                              /*nullable*/ true, int32_t,
+                              const TargetValueWitnessTable<Runtime> *
+                                  __ptrauth_swift_value_witness_table_pointer>
     ValueWitnesses;
 
   const TargetValueWitnessTable<Runtime> *getValueWitnessesPattern() const {
