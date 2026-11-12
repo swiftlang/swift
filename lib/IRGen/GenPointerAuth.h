@@ -205,6 +205,14 @@ llvm::Value *emitPointerAuthResign(IRGenFunction &IGF,
                                    const PointerAuthInfo &oldAuth,
                                    const PointerAuthInfo &newAuth);
 
+/// Authenticate a signed pointer to a relative reference, load the reference
+/// and sign the address it refers to, in one operation that doesn't expose the
+/// unsigned address. Both auth infos must be signed.
+llvm::Value *emitPointerAuthResignLoadRelative(IRGenFunction &IGF,
+                                               llvm::Value *ptr,
+                                               const PointerAuthInfo &oldAuth,
+                                               const PointerAuthInfo &newAuth);
+
 /// The (non-ABI) discriminator used for non-constant captures of
 /// partial apply functions.
 const uint16_t PointerAuthDiscriminator_PartialApplyCapture = 7185;
