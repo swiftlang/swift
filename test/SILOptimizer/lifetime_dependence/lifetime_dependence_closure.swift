@@ -460,4 +460,119 @@ func testLocalSpanCaptureInOnceClosureReturnSpan() -> Span<Int> {
   // expected-once-error@-1{{lifetime-dependent value escapes its scope}}
   // expected-once-note@-2{{this use causes the lifetime-dependent value to escape}}
 }
+
+// Mutating the source of a captured dependent value inside the closure is an exclusivity violation.
+func mutateArrayInOnceClosureCapturingSpan(array: inout [Int], i: Int) {
+  let span = array.span // expected-once-note{{conflicting access is here}}
+  runOnce { array[i] = 42; _ = span }
+  // expected-once-error@-1{{overlapping accesses to 'array', but modification requires exclusive access; consider copying to a local variable}}
+}
+
+func mutateArrayInCallableOnceClosureCapturingSpan(array: inout [Int], i: Int) {
+  let span = array.span // expected-once-note{{conflicting access is here}}
+  runCallableOnce { array[i] = 42; _ = span }
+  // expected-once-error@-1{{overlapping accesses to 'array', but modification requires exclusive access; consider copying to a local variable}}
+}
+
+func mutateLocalArrayInOnceClosureCapturingSpan(i: Int) {
+  var array = [1, 2, 3]
+  let span = array.span // expected-once-note{{conflicting access is here}}
+  runOnce { array[i] = 42; _ = span }
+  // expected-once-error@-1{{overlapping accesses to 'array', but modification requires exclusive access; consider copying to a local variable}}
+}
+
+// An escaping once closure that captures a dependent value outlives what the value depends on.
+func storeOnce(_ body: @escaping @once () -> Void) { body() }
+
+func returnOnceClosureCapturingSpan(array: [Int]) -> @once () -> Int { // expected-once-note{{it depends on the lifetime of argument 'array'}}
+  let span = array.span // expected-once-error{{lifetime-dependent variable 'span' escapes its scope}}
+  return { span.count } // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+func returnCallableOnceClosureCapturingSpan(array: [Int]) -> @callable(once) () -> Int { // expected-once-note{{it depends on the lifetime of argument 'array'}}
+  let span = array.span // expected-once-error{{lifetime-dependent variable 'span' escapes its scope}}
+  return { span.count } // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+func returnStoredOnceClosureCapturingSpan(array: [Int]) -> @once () -> Int { // expected-once-note{{it depends on the lifetime of argument 'array'}}
+  let span = array.span // expected-once-error{{lifetime-dependent variable 'span' escapes its scope}}
+  let body: @once () -> Int = { span.count } // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+  return body
+}
+
+func passEscapingOnceClosureCapturingSpan(array: [Int]) { // expected-once-note{{it depends on the lifetime of argument 'array'}}
+  let span = array.span // expected-once-error{{lifetime-dependent variable 'span' escapes its scope}}
+  storeOnce { _ = span } // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+func returnOnceClosureConsumingNoncopyableNE(nc: borrowing NCInt) -> @once () -> Int { // expected-once-note{{it depends on the lifetime of argument 'nc'}}
+  let ne = NCNEInt(borrowed: nc) // expected-once-error{{lifetime-dependent variable 'ne' escapes its scope}}
+  return { consumeNCNE(ne) } // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// A once closure stored in a property of a ~Copyable type is an escaping closure.
+struct CallableOnceHolder: ~Copyable {
+  var body: @callable(once) () -> Int
+
+  consuming func run() -> Int { body() }
+}
+
+struct NonescapableCallableOnceHolder: ~Copyable, ~Escapable {
+  var body: @callable(once) () -> Int
+  var span: Span<Int>
+
+  @_lifetime(copy span)
+  init(span: Span<Int>, body: @escaping @callable(once) () -> Int) {
+    self.span = span
+    self.body = body
+  }
+}
+
+func returnHolderOfCallableOnceClosureNotCapturingSpan(array: [Int]) -> CallableOnceHolder {
+  let count = array.count
+  return CallableOnceHolder(body: { count })
+}
+
+func returnHolderOfCallableOnceClosureCapturingSpan(array: [Int]) -> CallableOnceHolder { // expected-once-note{{it depends on the lifetime of argument 'array'}}
+  let span = array.span // expected-once-error{{lifetime-dependent variable 'span' escapes its scope}}
+  return CallableOnceHolder(body: { span.count }) // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+func assignCallableOnceClosureCapturingSpanToInoutHolder(_ holder: inout CallableOnceHolder, array: [Int]) { // expected-once-note{{it depends on the lifetime of argument 'array'}}
+  let span = array.span // expected-once-error{{lifetime-dependent variable 'span' escapes its scope}}
+  holder.body = { span.count } // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+}
+
+// The holder depends on the span, but the closure in its property is Escapable and can outlive the holder.
+@_lifetime(copy span)
+func returnNonescapableHolderOfCallableOnceClosureCapturingSpan(span: Span<Int>) -> NonescapableCallableOnceHolder {
+  // expected-once-error@-1{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-once-note@-2{{it depends on the lifetime of argument 'span'}}
+  return NonescapableCallableOnceHolder(span: span, body: { span.count })
+  // expected-once-note@-1{{this use causes the lifetime-dependent value to escape}}
+}
+
+// The holder's initializer takes an escaping closure and can store it anywhere, so even a local holder that is consumed
+// in scope does not keep the closure from outliving the span.
+func storeCallableOnceClosureCapturingSpanInLocalHolder(array: [Int]) -> Int { // expected-once-note{{it depends on the lifetime of argument 'array'}}
+  let span = array.span // expected-once-error{{lifetime-dependent variable 'span' escapes its scope}}
+  let holder = CallableOnceHolder(body: { span.count }) // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+  return holder.run()
+}
+
+func callCallableOnceClosureCapturingSpanInLocalHolder(span: Span<Int>) -> Int {
+  // expected-once-error@-1{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-once-note@-2{{it depends on the lifetime of argument 'span'}}
+  let holder = CallableOnceHolder(body: { span.count }) // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+  return holder.body()
+}
+
+// FIXME: A once closure stored in a local is an escaping closure, so it is not on the stack. Lifetime dependence
+// diagnostics treat any capture of a dependent value by an escaping closure as an escape, even though here the
+// closure never leaves the function and is consumed by the call before the value's scope ends.
+func storeOnceClosureCapturingSpanInLocal(array: [Int]) { // expected-once-note{{it depends on the lifetime of argument 'array'}}
+  let span = array.span // expected-once-error{{lifetime-dependent variable 'span' escapes its scope}}
+  let body: @once () -> Void = { _ = span } // expected-once-note{{this use causes the lifetime-dependent value to escape}}
+  body()
+}
 #endif
