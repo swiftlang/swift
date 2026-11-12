@@ -2053,7 +2053,8 @@ SILGenFunction::emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
           ->getCanonicalType();
 
   using Param = FunctionType::Param;
-  PreparedArguments args({Param(flagsType), Param(functionType)});
+  PreparedArguments args(
+      {Param::bodyAccess(flagsType), Param::bodyAccess(functionType)});
   args.add(loc, RValue(*this, loc, flagsType, flags));
   args.add(loc, RValue(*this, loc, functionType, mainFunctionRef));
   return emitCreateAsyncTask(*this, loc, subs, std::move(args), {});

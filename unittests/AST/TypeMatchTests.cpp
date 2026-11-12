@@ -40,8 +40,8 @@ TEST(TypeMatch, IdenticalTypes) {
   Type structTy = someStruct->getDeclaredInterfaceType();
   EXPECT_TRUE(check(structTy));
 
-  Type structToStructFn =
-      FunctionType::get({FunctionType::Param(structTy)}, {}, structTy);
+  Type structToStructFn = FunctionType::get(
+      {FunctionType::Param::bodyAccess(structTy)}, {}, structTy);
   EXPECT_TRUE(check(structToStructFn));
 }
 
@@ -73,8 +73,8 @@ TEST(TypeMatch, UnrelatedTypes) {
   EXPECT_FALSE(check(structTy, voidToVoidFn));
   EXPECT_FALSE(check(voidToVoidFn, structTy));
 
-  Type structToStructFn =
-      FunctionType::get(FunctionType::Param(structTy), {}, structTy, info);
+  Type structToStructFn = FunctionType::get(
+      FunctionType::Param::bodyAccess(structTy), {}, structTy, info);
   EXPECT_FALSE(check(structToStructFn, structTy));
   EXPECT_FALSE(check(structTy, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, voidToVoidFn));
@@ -85,12 +85,13 @@ TEST(TypeMatch, UnrelatedTypes) {
   EXPECT_FALSE(check(structTy, anotherStructTy));
   EXPECT_FALSE(check(anotherStructTy, structTy));
 
-  Type anotherStructToAnotherStructFn = FunctionType::get(
-      FunctionType::Param(anotherStructTy), {}, anotherStructTy, info);
+  Type anotherStructToAnotherStructFn =
+      FunctionType::get(FunctionType::Param::bodyAccess(anotherStructTy), {},
+                        anotherStructTy, info);
   EXPECT_FALSE(check(anotherStructToAnotherStructFn, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, anotherStructToAnotherStructFn));
 
-  Type S2ASFn = FunctionType::get(FunctionType::Param(structTy), {},
+  Type S2ASFn = FunctionType::get(FunctionType::Param::bodyAccess(structTy), {},
                                   anotherStructTy, info);
   EXPECT_FALSE(check(S2ASFn, structToStructFn));
   EXPECT_FALSE(check(structToStructFn, S2ASFn));
@@ -125,9 +126,9 @@ TEST(TypeMatch, Classes) {
   EXPECT_FALSE(check(otherTy, subTy));
   EXPECT_FALSE(check(subTy, otherTy));
 
-  Type baseToVoid = FunctionType::get(FunctionType::Param(baseTy), {},
-                                      C.Ctx.TheEmptyTupleType, info);
-  Type subToVoid = FunctionType::get(FunctionType::Param(subTy), {},
+  Type baseToVoid = FunctionType::get(FunctionType::Param::bodyAccess(baseTy),
+                                      {}, C.Ctx.TheEmptyTupleType, info);
+  Type subToVoid = FunctionType::get(FunctionType::Param::bodyAccess(subTy), {},
                                      C.Ctx.TheEmptyTupleType, info);
   EXPECT_FALSE(check(baseToVoid, subToVoid));
   EXPECT_TRUE(check(subToVoid, baseToVoid));
@@ -137,10 +138,10 @@ TEST(TypeMatch, Classes) {
   EXPECT_FALSE(check(voidToSub, voidToBase));
   EXPECT_TRUE(check(voidToBase, voidToSub));
 
-  Type baseToBase =
-      FunctionType::get(FunctionType::Param(baseTy), {}, baseTy, info);
-  Type subToSub =
-      FunctionType::get(FunctionType::Param(subTy), {}, subTy, info);
+  Type baseToBase = FunctionType::get(FunctionType::Param::bodyAccess(baseTy),
+                                      {}, baseTy, info);
+  Type subToSub = FunctionType::get(FunctionType::Param::bodyAccess(subTy), {},
+                                    subTy, info);
   EXPECT_FALSE(check(baseToBase, subToSub));
   EXPECT_FALSE(check(subToSub, baseToBase));
 }
@@ -162,9 +163,9 @@ TEST(TypeMatch, Optionals) {
   EXPECT_FALSE(check(baseTy, optTy));
   EXPECT_TRUE(check(optTy, baseTy));
 
-  Type baseToVoid = FunctionType::get(FunctionType::Param(baseTy), {},
-                                      C.Ctx.TheEmptyTupleType, info);
-  Type optToVoid = FunctionType::get(FunctionType::Param(optTy), {},
+  Type baseToVoid = FunctionType::get(FunctionType::Param::bodyAccess(baseTy),
+                                      {}, C.Ctx.TheEmptyTupleType, info);
+  Type optToVoid = FunctionType::get(FunctionType::Param::bodyAccess(optTy), {},
                                      C.Ctx.TheEmptyTupleType, info);
   EXPECT_TRUE(check(baseToVoid, optToVoid));
   EXPECT_FALSE(check(optToVoid, baseToVoid));
@@ -174,10 +175,10 @@ TEST(TypeMatch, Optionals) {
   EXPECT_FALSE(check(voidToBase, voidToOpt));
   EXPECT_TRUE(check(voidToOpt, voidToBase));
 
-  Type baseToBase =
-      FunctionType::get(FunctionType::Param(baseTy), {}, baseTy, info);
-  Type optToOpt =
-      FunctionType::get(FunctionType::Param(optTy), {}, optTy, info);
+  Type baseToBase = FunctionType::get(FunctionType::Param::bodyAccess(baseTy),
+                                      {}, baseTy, info);
+  Type optToOpt = FunctionType::get(FunctionType::Param::bodyAccess(optTy), {},
+                                    optTy, info);
   EXPECT_FALSE(check(baseToBase, optToOpt));
   EXPECT_FALSE(check(optToOpt, baseToBase));
 }
@@ -205,9 +206,9 @@ TEST(TypeMatch, OptionalMismatch) {
   Type baseTy = baseClass->getDeclaredInterfaceType();
   Type optTy = OptionalType::get(baseTy);
 
-  Type baseToVoid = FunctionType::get(FunctionType::Param(baseTy), {},
-                                      C.Ctx.TheEmptyTupleType, info);
-  Type optToVoid = FunctionType::get(FunctionType::Param(optTy), {},
+  Type baseToVoid = FunctionType::get(FunctionType::Param::bodyAccess(baseTy),
+                                      {}, C.Ctx.TheEmptyTupleType, info);
+  Type optToVoid = FunctionType::get(FunctionType::Param::bodyAccess(optTy), {},
                                      C.Ctx.TheEmptyTupleType, info);
   EXPECT_TRUE(check(baseToVoid, optToVoid));
   EXPECT_TRUE(checkOpt(baseToVoid, optToVoid));
@@ -225,10 +226,10 @@ TEST(TypeMatch, OptionalMismatch) {
   EXPECT_TRUE(checkOpt(voidToOpt, voidToBase));
   EXPECT_TRUE(checkOptOverride(voidToOpt, voidToBase));
 
-  Type baseToBase =
-      FunctionType::get(FunctionType::Param(baseTy), {}, baseTy, info);
-  Type optToOpt =
-      FunctionType::get(FunctionType::Param(optTy), {}, optTy, info);
+  Type baseToBase = FunctionType::get(FunctionType::Param::bodyAccess(baseTy),
+                                      {}, baseTy, info);
+  Type optToOpt = FunctionType::get(FunctionType::Param::bodyAccess(optTy), {},
+                                    optTy, info);
   EXPECT_FALSE(check(baseToBase, optToOpt));
   EXPECT_TRUE(checkOpt(baseToBase, optToOpt));
   EXPECT_TRUE(checkOptOverride(baseToBase, optToOpt));

@@ -2600,7 +2600,8 @@ static RValue emitBoolLiteral(SILGenFunction &SGF, SILLocation loc,
                     ManagedValue::forObjectRValueWithoutOwnership(builtinBool),
                     builtinArgType);
 
-  PreparedArguments builtinArgs((AnyFunctionType::Param(builtinArgType)));
+  PreparedArguments builtinArgs(
+      (AnyFunctionType::Param::bodyAccess(builtinArgType)));
   builtinArgs.add(loc, std::move(builtinArg));
 
   auto result =
@@ -3008,8 +3009,8 @@ RValue RValueEmitter::visitDynamicSubscriptExpr(
   Expr *IndexExpr = E->getArgs()->getUnaryExpr();
   assert(IndexExpr);
 
-  PreparedArguments IndexArgs(
-      FunctionType::Param(IndexExpr->getType()->getCanonicalType()));
+  PreparedArguments IndexArgs(FunctionType::Param::bodyAccess(
+      IndexExpr->getType()->getCanonicalType()));
   IndexArgs.add(E, SGF.emitRValue(IndexExpr));
 
   return SGF.emitDynamicSubscriptGetterApply(
@@ -3614,8 +3615,8 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
       RValue interpolationCount =
           visit(E->getInterpolationCountExpr(), SGFContext());
       builderInitArgs.emplace(
-          {AnyFunctionType::Param(literalCapacity.getType()),
-           AnyFunctionType::Param(interpolationCount.getType())});
+          {AnyFunctionType::Param::bodyAccess(literalCapacity.getType()),
+           AnyFunctionType::Param::bodyAccess(interpolationCount.getType())});
       builderInitArgs.add(E, std::move(literalCapacity));
       builderInitArgs.add(E, std::move(interpolationCount));
       RValue subexpr_result = SGF.emitApplyAllocatingInitializer(
@@ -3640,7 +3641,8 @@ visitInterpolatedStringLiteralExpr(InterpolatedStringLiteralExpr *E,
   }
 
   PreparedArguments resultInitArgs;
-  resultInitArgs.emplace(AnyFunctionType::Param(interpolation.getType()));
+  resultInitArgs.emplace(
+      AnyFunctionType::Param::bodyAccess(interpolation.getType()));
   resultInitArgs.add(E, std::move(interpolation));
 
   return SGF.emitApplyAllocatingInitializer(
@@ -3802,7 +3804,8 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
   SmallVector<AnyFunctionType::Param, 8> indexParams;
   for (auto &elt : indexes) {
     // FIXME: Varargs?
-    indexParams.emplace_back(SGF.F.mapTypeIntoEnvironment(elt.first));
+    indexParams.push_back(AnyFunctionType::Param::bodyAccess(
+        SGF.F.mapTypeIntoEnvironment(elt.first)));
   }
   
   PreparedArguments indexValues(indexParams);
@@ -5600,7 +5603,7 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     return array;
 
   // Call the builtin initializer.
-  PreparedArguments args(AnyFunctionType::Param(E->getType()));
+  PreparedArguments args(AnyFunctionType::Param::bodyAccess(E->getType()));
   args.add(E, std::move(array));
 
   return SGF.emitApplyAllocatingInitializer(

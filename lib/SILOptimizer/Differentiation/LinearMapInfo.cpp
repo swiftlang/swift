@@ -303,8 +303,8 @@ Type LinearMapInfo::getLinearMapType(ADContext &context, FullApplySite fai) {
     if (param.isAutoDiffSemanticResult())
       flags = flags.withInOut(true);
 
-    params.push_back(
-        AnyFunctionType::Param(param.getInterfaceType(), Identifier(), flags));
+    params.push_back(AnyFunctionType::Param::bodyAccess(
+        param.getInterfaceType(), Identifier(), flags));
   }
 
   AnyFunctionType *astFnTy;

@@ -396,38 +396,38 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM,
 
   // decoder
   auto decoderType = Context.TheSelfType;
-  parameters.push_back(GenericFunctionType::Param(
+  parameters.push_back(GenericFunctionType::Param::bodyAccess(
       decoderType,
       /*label=*/Identifier(),
       /*flags=*/ParameterTypeFlags().withInOut(true)));
 
   // argument type buffer
-  parameters.push_back(
-      GenericFunctionType::Param(Context.getUnsafeRawPointerType()));
+  parameters.push_back(GenericFunctionType::Param::bodyAccess(
+      Context.getUnsafeRawPointerType()));
 
   // result buffer
-  parameters.push_back(
-      GenericFunctionType::Param(Context.getUnsafeRawPointerType()));
+  parameters.push_back(GenericFunctionType::Param::bodyAccess(
+      Context.getUnsafeRawPointerType()));
 
   // generic parameter substitutions
-  parameters.push_back(
-      GenericFunctionType::Param(Context.getUnsafeRawPointerType()));
+  parameters.push_back(GenericFunctionType::Param::bodyAccess(
+      Context.getUnsafeRawPointerType()));
 
   // witness tables
-  parameters.push_back(
-      GenericFunctionType::Param(Context.getUnsafeRawPointerType()));
+  parameters.push_back(GenericFunctionType::Param::bodyAccess(
+      Context.getUnsafeRawPointerType()));
 
   // number of witness tables
-  parameters.push_back(GenericFunctionType::Param(Context.getUIntType()));
+  parameters.push_back(
+      GenericFunctionType::Param::bodyAccess(Context.getUIntType()));
 
   // actor (DistributedActor)
   auto actorTypeParam = Context.getAnyObjectType();
-    parameters.push_back(
-        GenericFunctionType::Param(actorTypeParam));
+  parameters.push_back(GenericFunctionType::Param::bodyAccess(actorTypeParam));
 
   // isolated actor (same as `actor` but typed as `isolated (any Actor)?`)
   if (hasIsolatedActorParameter) {
-    parameters.push_back(GenericFunctionType::Param(
+    parameters.push_back(GenericFunctionType::Param::bodyAccess(
         SILType::getOpaqueIsolationType(Context).getASTType(),
         /*label=*/Identifier(),
         /*flags=*/ParameterTypeFlags().withIsolated(true)));

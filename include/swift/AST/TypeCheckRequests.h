@@ -30,6 +30,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/ScopeRestrictions.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
@@ -5531,6 +5532,45 @@ public:
   getCachedResult() const;
   void cacheResult(
       std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> value) const;
+};
+
+/// Intermediate representation of the scopes of the accesses of a function's
+/// parameters and `self`, before being written into `Param`s.
+struct ParamAccessScopes {
+  /// For each parameter index, what access scope should it have relative to
+  /// the declaration's type, or `nullopt` for a parameter whose
+  /// `@_accessScope` was diagnosed.
+  ArrayRef<std::optional<ScopeRef>> Params;
+  /// Whether something refers to the access of `self`, requiring the outer
+  /// function type to have a scope parameter.
+  bool IsSelfReferenced = false;
+  /// The declared `@_scopeParams`, plus the accesses that are referenced
+  /// without being bound by `@_accessScope`.
+  ScopeSignature Signature;
+};
+
+/// Resolves the scopes of the accesses of the parameters and `self` of a
+/// function that supports scopes.
+///
+/// DISCUSSION: Each parameter's access scope depends on the whole signature,
+/// like which other accesses something refers to, so they're computed together
+/// syntactically. Since each type depends on access scope numbering, depending
+/// on the type of parameters would be cyclic.
+class ParamAccessScopesRequest
+    : public SimpleRequest<ParamAccessScopesRequest,
+                           ParamAccessScopes(AbstractFunctionDecl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ParamAccessScopes evaluate(Evaluator &evaluator,
+                             AbstractFunctionDecl *fn) const;
+
+public:
+  bool isCached() const { return true; }
 };
 
 class CaptureInfoRequest :

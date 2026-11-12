@@ -1903,9 +1903,9 @@ public:
       auto substSelfType = dynamicMemberRef->getBase()->getType()->getCanonicalType();
       // FIXME: Verify ExtInfo state is correct, not working by accident.
       CanFunctionType::ExtInfo info;
-      substFormalType =
-          CanFunctionType::get({AnyFunctionType::Param(substSelfType)},
-                               /* yields */ {}, substFormalType, info);
+      substFormalType = CanFunctionType::get(
+          {AnyFunctionType::Param::bodyAccess(substSelfType)},
+          /* yields */ {}, substFormalType, info);
 
       setCallee(Callee::forDynamic(SGF, member,
                                    memberRef.getSubstitutions(),
@@ -1946,7 +1946,7 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
         SGF.B.createIntegerLiteral(E, Int32Ty,
                                    unicode::extractFirstUnicodeScalar(Str));
 
-    AnyFunctionType::Param param(Int32Ty.getASTType());
+    auto param = AnyFunctionType::Param::bodyAccess(Int32Ty.getASTType());
     PreparedArguments args(llvm::ArrayRef<AnyFunctionType::Param>{param});
     args.add(E, RValue(SGF, E, Int32Ty.getASTType(),
                        ManagedValue::forObjectRValueWithoutOwnership(
@@ -1972,9 +1972,9 @@ static PreparedArguments emitStringLiteralArgs(SILGenFunction &SGF, SILLocation 
       ManagedValue::forObjectRValueWithoutOwnership(isASCIIInst)};
 
   AnyFunctionType::Param TypeEltsArray[] = {
-    AnyFunctionType::Param(EltsArray[0].getType().getASTType()),
-    AnyFunctionType::Param(EltsArray[1].getType().getASTType()),
-    AnyFunctionType::Param(EltsArray[2].getType().getASTType())
+    AnyFunctionType::Param::bodyAccess(EltsArray[0].getType().getASTType()),
+    AnyFunctionType::Param::bodyAccess(EltsArray[1].getType().getASTType()),
+    AnyFunctionType::Param::bodyAccess(EltsArray[2].getType().getASTType())
   };
 
   ArrayRef<ManagedValue> Elts;
@@ -2253,7 +2253,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         NilLiteralExpr *nilLiteral) {
   CanType ty = SGF.getASTContext().TheEmptyTupleType;
   PreparedArguments builtinLiteralArgs;
-  builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+  builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
   builtinLiteralArgs.add(nilLiteral, RValue(SGF, {}, ty));
   return builtinLiteralArgs;
 }
@@ -2268,7 +2268,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   ManagedValue boolManaged =
       ManagedValue::forObjectRValueWithoutOwnership(boolValue);
   CanType ty = boolManaged.getType().getASTType()->getCanonicalType();
-  builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+  builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
   builtinLiteralArgs.add(booleanLiteral, RValue(SGF, {boolManaged}, ty));
   return builtinLiteralArgs;
 }
@@ -2283,7 +2283,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
           SILType::getBuiltinIntegerLiteralType(SGF.getASTContext()),
           integerLiteral->getRawValue()));
   CanType ty = integerManaged.getType().getASTType();
-  builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+  builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
   builtinLiteralArgs.add(integerLiteral, RValue(SGF, {integerManaged}, ty));
   return builtinLiteralArgs;
 }
@@ -2300,7 +2300,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
           floatLiteral->getValue()));
 
   CanType ty = floatManaged.getType().getASTType();
-  builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+  builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
   builtinLiteralArgs.add(floatLiteral, RValue(SGF, {floatManaged}, ty));
   return builtinLiteralArgs;
 }
@@ -2329,7 +2329,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
 
   using Param = AnyFunctionType::Param;
   auto builtinIntTy = versionIntLiteral.getType().getASTType();
-  PreparedArguments versionIntBuiltinArgs(ArrayRef<Param>{Param(builtinIntTy)});
+  PreparedArguments versionIntBuiltinArgs(
+      ArrayRef<Param>{Param::bodyAccess(builtinIntTy)});
   versionIntBuiltinArgs.add(
       expr, RValue(SGF, {versionIntLiteral}, builtinIntTy));
 
@@ -2340,8 +2341,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
       expr, intLiteralInit, std::move(versionIntBuiltinArgs),
       /*overriddenSelfType*/ Type(), SGFContext());
 
-  PreparedArguments args(ArrayRef<Param>{Param(ctx.getStringType()),
-                                         Param(ctx.getIntType())});
+  PreparedArguments args(ArrayRef<Param>{Param::bodyAccess(ctx.getStringType()),
+                                         Param::bodyAccess(ctx.getIntType())});
   args.add(expr, std::move(string));
   args.add(expr, std::move(versionInt));
   return args;
@@ -2415,7 +2416,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
     ManagedValue integerManaged =
         ManagedValue::forObjectRValueWithoutOwnership(integer);
     PreparedArguments builtinLiteralArgs;
-    builtinLiteralArgs.emplace(AnyFunctionType::Param(ty));
+    builtinLiteralArgs.emplace(AnyFunctionType::Param::bodyAccess(ty));
     builtinLiteralArgs.add(magicLiteral, RValue(SGF, {integerManaged}, ty));
     return builtinLiteralArgs;
   }
@@ -6346,8 +6347,8 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
         newFlags = newFlags.withShared(true);
     }
 
-    AnyFunctionType::Param selfParam(apply.selfParam.getSubstRValueType(),
-                                     Identifier(), newFlags);
+    auto selfParam = AnyFunctionType::Param::bodyAccess(
+        apply.selfParam.getSubstRValueType(), Identifier(), newFlags);
     emission.addSelfParam(e, std::move(apply.selfParam), selfParam);
   }
 
@@ -7550,7 +7551,7 @@ RValue SILGenFunction::emitLiteral(LiteralExpr *literal, SGFContext C) {
 
   // Otherwise, perform the second initialization step.
   auto ty = builtinResult.getType();
-  PreparedArguments args((AnyFunctionType::Param(ty)));
+  PreparedArguments args((AnyFunctionType::Param::bodyAccess(ty)));
   args.add(literal, std::move(builtinResult));
 
   RValue result = emitApplyAllocatingInitializer(literal, init,
@@ -8759,7 +8760,7 @@ RValue SILGenFunction::emitDynamicMemberRef(SILLocation loc, SILValue operand,
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo info;
-    FunctionType::Param arg(operand->getType().getASTType());
+    auto arg = FunctionType::Param::bodyAccess(operand->getType().getASTType());
     auto memberFnTy =
         CanFunctionType::get({arg}, /* yields */ {}, methodTy, info);
 
@@ -8859,7 +8860,8 @@ SILGenFunction::emitDynamicSubscriptGetterApply(SILLocation loc,
 
     // FIXME: Verify ExtInfo state is correct, not working by accident.
     CanFunctionType::ExtInfo functionInfo;
-    FunctionType::Param baseArg(operand->getType().getASTType());
+    auto baseArg =
+        FunctionType::Param::bodyAccess(operand->getType().getASTType());
     auto functionTy = CanFunctionType::get({baseArg}, /* yields */ {}, methodTy,
                                            functionInfo);
     auto loweredMethodTy = getDynamicMethodLoweredType(SGM.M, member,

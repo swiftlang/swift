@@ -642,6 +642,28 @@ void ASTPrinter::printIndent() {
   printText(Str);
 }
 
+IntRange<unsigned> ASTPrinter::pushScopeParams(unsigned numScopeParams) {
+  if (EnclosingScopeParamNames.empty())
+    NextScopeParamName = 0;
+  auto names = range(NextScopeParamName, NextScopeParamName + numScopeParams);
+  EnclosingScopeParamNames.push_back(names);
+  NextScopeParamName += numScopeParams;
+  return names;
+}
+
+void ASTPrinter::popScopeParams() {
+  EnclosingScopeParamNames.pop_back();
+}
+
+std::optional<unsigned> ASTPrinter::getScopeParamName(ScopeRef scope) const {
+  if (scope.getKind() != ScopeRef::Kind::Param)
+    return std::nullopt;
+  auto *names = scope.getDepth().lookUpIn(EnclosingScopeParamNames);
+  if (!names || scope.getIndex() >= names->size())
+    return std::nullopt;
+  return (*names)[scope.getIndex()];
+}
+
 void ASTPrinter::printTextImpl(StringRef Text) {
   forceNewlines();
   printText(Text);
@@ -6844,22 +6866,52 @@ public:
     printTypeDeclName(Ty, NameContext);
   }
 
-  // FIXME: This prints elided scopes as `^depth.index` in module interfaces and
-  // diagnostics, which can't be parsed.
+  void printScopeParamName(unsigned name) { Printer << "σ_" << name; }
+
+  // FIXME: This prints scopes whose binder isn't being printed, like those of
+  // parameters in module interfaces, as `^depth.index`, which can't be parsed.
+  void printScope(ScopeRef scope) {
+    if (auto name = Printer.getScopeParamName(scope)) {
+      printScopeParamName(*name);
+      return;
+    }
+    llvm::SmallString<16> buffer;
+    llvm::raw_svector_ostream os(buffer);
+    scope.print(os);
+    Printer << buffer;
+  }
+
   void printScopeArgs(NominalType *Ty) {
     if (!Ty->hasScopeArgs())
       return;
     Printer.printAttrName("@_scoped");
     Printer << "(";
     interleave(
-        Ty->getScopeArgs(),
-        [&](ScopeRef scope) {
-          llvm::SmallString<16> buffer;
-          llvm::raw_svector_ostream os(buffer);
-          scope.print(os);
-          Printer << buffer;
-        },
+        Ty->getScopeArgs(), [&](ScopeRef scope) { printScope(scope); },
         [&] { Printer << ", "; });
+    Printer << ") ";
+  }
+
+  /// Reserves unique names for the scope parameters of \p T until
+  /// `popScopeParams` is called, and prints them as `@_scopeParams(σ_0, ...)`.
+  void printScopeParams(AnyFunctionType *T) {
+    auto names = Printer.pushScopeParams(T->getScopeSignature().getNumParams());
+    if (!names.empty()) {
+      Printer.printAttrName("@_scopeParams");
+      Printer << "(";
+      llvm::interleave(
+          names, [&](unsigned name) { printScopeParamName(name); },
+          [&] { Printer << ", "; });
+      Printer << ") ";
+    }
+  }
+
+  void printAccessScope(const AnyFunctionType::Param &param) {
+    if (param.hasBodyAccess())
+      return;
+    Printer.printAttrName("@_accessScope");
+    Printer << "(";
+    printScope(param.getAccessScope());
     Printer << ") ";
   }
 
@@ -7624,11 +7676,13 @@ public:
 
       auto type = Param.getPlainType();
       if (Param.isVariadic()) {
+        printAccessScope(Param);
         visit(type);
         Printer << "...";
       } else {
         printParameterFlags(Printer, Options, nullptr,
                             Param.getParameterFlags(), type, isEscaping(type));
+        printAccessScope(Param);
         visit(type);
       }
     }
@@ -7666,6 +7720,8 @@ public:
     };
 
     printFunctionExtInfo(T, nrOptions);
+    printScopeParams(T);
+    SWIFT_DEFER { Printer.popScopeParams(); };
 
     // If we're stripping argument labels from types, do it when printing.
     visitAnyFunctionTypeParams(T->getParams(),
@@ -7739,6 +7795,8 @@ public:
     };
 
     printFunctionExtInfo(T, nrOptions);
+    printScopeParams(T);
+    SWIFT_DEFER { Printer.popScopeParams(); };
     printGenericSignature(T->getGenericSignature(),
                           PrintAST::PrintParams |
                           PrintAST::defaultGenericRequirementFlags(Options));

@@ -377,7 +377,8 @@ namespace {
         if (arg.isCompileTimeLiteral()) {
           flags = flags.withCompileTimeLiteral(true);
         }
-        result.emplace_back(ty, arg.getLabel(), flags);
+        result.push_back(
+            AnyFunctionType::Param::bodyAccess(ty, arg.getLabel(), flags));
       }
     }
 
@@ -389,11 +390,12 @@ namespace {
       case TypeKind::Tuple: {
         auto tupleTy = cast<TupleType>(ty.getPointer());
         for (auto &elt : tupleTy->getElements())
-          result.emplace_back(elt.getType(), elt.getName());
+          result.push_back(
+              AnyFunctionType::Param::bodyAccess(elt.getType(), elt.getName()));
         return;
       }
       default:
-        result.emplace_back(ty, Identifier());
+        result.push_back(AnyFunctionType::Param::bodyAccess(ty, Identifier()));
       }
     }
 
