@@ -3298,6 +3298,44 @@ public:
       }
     }
 
+    // Reject accessors incompatible with 'sending' subscript result type.
+    // Only get/set can transfer ownership; yielding, address, and
+    // borrow/mutate accessors cannot properly enforce region isolation.
+    if (isa_and_nonnull<SendingTypeRepr>(SD->getElementTypeRepr())) {
+      for (auto *accessor : SD->getAllAccessors()) {
+        if (accessor->isImplicit())
+          continue;
+        switch (accessor->getAccessorKind()) {
+        case AccessorKind::Get:
+        case AccessorKind::DistributedGet:
+        case AccessorKind::Set:
+        case AccessorKind::Init:
+          break;
+        // Yielding accessors fail to diagnose attempts to yield a value
+        // in a non-disconnected region.
+        case AccessorKind::Read:
+        case AccessorKind::YieldingBorrow:
+        case AccessorKind::Modify:
+        case AccessorKind::YieldingMutate:
+        // Address accessors cannot work with 'sending' result type
+        // because 'sending' cannot be part of the pointee type.
+        case AccessorKind::Address:
+        case AccessorKind::MutableAddress:
+        // There is no practical way to implement an accessor returning a
+        // 'sending' value using storage inside the containing value.
+        case AccessorKind::Borrow:
+        case AccessorKind::Mutate:
+          accessor->diagnose(
+              diag::sending_subscript_with_incompatible_accessor,
+              getAccessorLabel(accessor->getAccessorKind()));
+          break;
+        case AccessorKind::WillSet:
+        case AccessorKind::DidSet:
+          break;
+        }
+      }
+    }
+
     // A `consuming` index is consumed by whichever accessor runs, so it is only
     // legal when a single accessor performs a whole access.
     if (SD->getImplInfo().getReadWriteImpl() ==
