@@ -193,8 +193,11 @@ struct ResolvableRoot {
   /// Whether the storage corresponds to a `@noImplicitCopy` parameter.
   let isNoImplicitCopy: Bool
 
-  // Does this address start fully initialized?
-  private let startsInitialized: Bool
+  /// The elements of the dataflow state tracked for this storage.
+  let space: StateIndexSpace
+
+  /// For derived class `self`, the store of the initializer's `self` argument into its memory.
+  private let initialStoreOfDerivedSelf: StoreInst?
 
   /// An instruction requiring the whole root to be initialized, which is not found by walking uses of the address.
   enum ExtraLivenessUse {
@@ -211,41 +214,30 @@ struct ResolvableRoot {
     }
   }
 
-  // Extra instructions to consider as full liveness uses of this root, that are not captured by walking uses of
-  // the address.
+  /// Extra instructions to consider as full liveness uses of this root, that are not captured by walking uses of
+  /// the address.
   let extraLivenessUses: [ExtraLivenessUse]
 
-  // Either the instruction defining this root, or the very first instruction
-  // after which it is defined.
+  /// Either the instruction defining this root, or the very first instruction
+  /// after which it is defined.
   var startInstruction: Instruction {
-      if let inst = address.definingInstruction {
-          return inst
-      }
-      return address.nextInstruction
+    if let inst = address.definingInstruction {
+      return inst
+    }
+    return address.nextInstruction
   }
 
   /// The instruction after which markers for uses before initialization are inserted. For derived class `self`,
   /// it is the initial store of `self`, after which its stored properties can be projected.
-  var markerInsertionPoint: Instruction {
-    if mode == .derivedClassSelf, let initialStore = Self.findInitialStoreOfDerivedSelf(markUninitialized!) {
-      return initialStore
-    }
-    return startInstruction
-  }
+  var markerInsertionPoint: Instruction { initialStoreOfDerivedSelf ?? startInstruction }
 
   /// Whether the storage is a class instance whose stored properties are tracked: `self` in a class initializer.
   var isClassInstance: Bool { mode != .storage }
 
-  /// Whether the storage is the instance referenced by `address`, i.e., `self` in a root class initializer.
-  var isInstanceReference: Bool { mode == .rootClassSelf }
-
-  /// `self` in an initializer whose stored properties are tracked individually.
-  var tracksStoredProperties: Bool { isRootSelf || mode == .derivedClassSelf }
-
   /// Whether the binding is a `let` (vs a `var`), which may only be initialized once.
   var isLet: Bool { !(storage is FunctionArgument) && (varDecl?.isLet ?? false) }
 
-  /// `self` in a struct or enum initializer that initializes the stored properties itself.
+  /// `self` in a struct, enum, or root class initializer that initializes the stored properties itself.
   var isRootSelf: Bool {
     switch markUninitialized?.kind {
     case .rootSelf?, .crossModuleRootSelf?: true
@@ -253,10 +245,21 @@ struct ResolvableRoot {
     }
   }
 
+  /// The initializer's `self`, if this is `self` within an initializer.
+  var initSelfKind: MarkUninitializedInst.Kind? {
+    switch markUninitialized?.kind {
+    case .variable, .indirectResult, nil: nil
+    case let kind?: kind
+    }
+  }
+
+  /// `self` of a method or initializer.
+  var isSelf: Bool { initSelfKind != nil || ((storage as? FunctionArgument)?.isSelf ?? false) }
+
   /// The elements of the storage that may only be initialized once: all of a `let` binding,
   /// or the `let` stored properties of `self` in a struct or class initializer.
-  func immutableLeaves(_ space: StateIndexSpace) -> Set<Int> {
-    if tracksStoredProperties {
+  func immutableLeaves() -> Set<Int> {
+    if isRootSelf || mode == .derivedClassSelf {
       let function = address.parentFunction
       let type = address.type.objectType
       guard let fields = type.getNominalFields(in: function) else {
@@ -279,11 +282,14 @@ struct ResolvableRoot {
     }
   }
 
-  /// Build from a storage allocation (`alloc_box` / `alloc_stack`). Callers holding only
-  /// an address must first walk up to the allocation, e.g. with `allocation(backing:)`.
-  init?(_ val: Value, _ indexCache: inout FieldIndexTrieCache, _ context: FunctionPassContext) {
+  /// Build from a storage allocation (`alloc_box` / `alloc_stack`), an address argument, or the `self` argument of a
+  /// root class initializer. Callers holding only an address must first walk up to the allocation, e.g. with
+  /// `allocation(backing:)`.
+  init?(_ val: Value, _ indexCache: inout FieldIndexTrieCache) {
     let function = val.parentFunction
     var extraUses: [ExtraLivenessUse] = []
+    var initialStore: StoreInst? = nil
+    let startsInitialized: Bool
 
     switch val {
     case let allocStack as AllocStackInst:
@@ -299,8 +305,10 @@ struct ResolvableRoot {
         // So, treat the storage as being born initialized
         startsInitialized = mu.kind == .rootSelf && !indices.hasFields
 
-        let isResolvableDerivedSelf = mu.kind == .derivedSelf && Self.findInitialStoreOfDerivedSelf(mu) != nil
-        mode = isResolvableDerivedSelf ? .derivedClassSelf : .storage
+        if mu.kind == .derivedSelf {
+          initialStore = Self.findInitialStoreOfDerivedSelf(mu)
+        }
+        mode = initialStore != nil ? .derivedClassSelf : .storage
       } else {
         address = storage
         startsInitialized = false
@@ -368,6 +376,12 @@ struct ResolvableRoot {
     }
 
     extraLivenessUses = extraUses
+    initialStoreOfDerivedSelf = initialStore
+
+    let fields = mode != .storage ? indexCache.fieldIndices(forClassInstance: address.type.objectType)
+                                  : indexCache.fieldIndices(for: address.type)
+    space = StateIndexSpace(mode, fields: fields, instanceType: address.type.objectType,
+                            initiallyInitialized: startsInitialized)
 
     if let arg = storage as? FunctionArgument {
       isNoImplicitCopy = arg.isNoImplicitCopy
@@ -405,15 +419,7 @@ struct ResolvableRoot {
     }
   }
 
-  /// The elements of the dataflow state tracked for this storage.
-  func stateIndexSpace(_ indexCache: inout FieldIndexTrieCache) -> StateIndexSpace {
-    let fields = isClassInstance ? indexCache.fieldIndices(forClassInstance: address.type.objectType)
-                                 : indexCache.fieldIndices(for: address.type)
-    return StateIndexSpace(mode, fields: fields, instanceType: address.type.objectType,
-                           initiallyInitialized: startsInitialized)
-  }
-
-  // Change the storage such that it indicates a dynamic lifetime.
+  /// Change the storage such that it indicates a dynamic lifetime.
   func convertToDynamic(_ context: MutatingContext) {
     if let allocStack = storage as? AllocStackInst {
       allocStack.setDynamicLifetime(context)
@@ -463,12 +469,9 @@ struct ResolvableRoot {
     return initialStore
   }
 
-  // A stack-backed local `let` or `var`; its `mark_uninitialized [var]` is the address.
+  /// The `mark_uninitialized` of an allocation or of the `self` argument, if it has exactly one.
   private static func findMarkUninitialized(_ value: Value) -> MarkUninitializedInst? {
-    if let mu = value.uses.singleUser(ofType: MarkUninitializedInst.self) {
-      return mu
-    }
-    return nil
+    value.uses.singleUser(ofType: MarkUninitializedInst.self)
   }
 }
 
@@ -625,14 +628,14 @@ let lifetimeResolutionStateSpaceTest = FunctionTest("lifetime_resolution_state_s
   function, arguments, context in
   var indexCache = FieldIndexTrieCache(for: function)
   let value = arguments.takeValue()
-  guard let root = ResolvableRoot(value, &indexCache, context) else {
+  guard let root = ResolvableRoot(value, &indexCache) else {
     print("not a resolvable root: \(value)")
     return
   }
-  let space = root.stateIndexSpace(&indexCache)
+  let space = root.space
   print(space)
   print("instanceRange: \(space.instanceRange)")
-  print("immutableLeaves: \(root.immutableLeaves(space).sorted())")
+  print("immutableLeaves: \(root.immutableLeaves().sorted())")
 
   assert(space.wholeRange == 0..<space.count)
   assert(space.fieldRange.lowerBound == 0 && space.fieldRange.upperBound <= space.count)

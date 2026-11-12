@@ -82,25 +82,14 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
 /// A storage location that LifetimeResolution resolved, with helpers to describe it to the user.
 private struct Storage {
   let root: ResolvableRoot
-  let space: StateIndexSpace
 
+  var space: StateIndexSpace { root.space }
   var allocation: Value { root.storage }
   var function: Function { root.address.parentFunction }
   var type: Type { root.address.type.objectType }
 
-  /// The initializer's `self`, if this is `self` within an initializer.
-  var initSelfKind: MarkUninitializedInst.Kind? {
-    switch root.markUninitialized?.kind {
-    case .variable, .indirectResult, nil: nil
-    case let kind?: kind
-    }
-  }
-
-  /// `self` of a method or initializer.
-  var isSelf: Bool { initSelfKind != nil || ((allocation as? FunctionArgument)?.isSelf ?? false) }
-
   var rootName: String {
-    if isSelf {
+    if root.isSelf {
       return "self"
     }
     return root.varDecl?.userFacingName.string ?? ""
@@ -151,7 +140,7 @@ private struct Storage {
   /// over all of `self`.
   func firstPath(of leaves: Set<Int>) -> SmallProjectionPath {
     var firstPath: SmallProjectionPath? = nil
-    space.fields.forEachCoveringSubtree(of: fieldLeaves(leaves), excludingRoot: root.tracksStoredProperties) { path in
+    space.fields.forEachCoveringSubtree(of: fieldLeaves(leaves), excludingRoot: root.isSelf) { path in
       if firstPath == nil { firstPath = path }
     }
     return firstPath ?? SmallProjectionPath()
@@ -660,10 +649,10 @@ private struct Diagnoser {
     if let storage = storages[allocation.hashable] {
       return storage
     }
-    guard let root = ResolvableRoot(allocation, &indexCache, context) else {
+    guard let root = ResolvableRoot(allocation, &indexCache) else {
       return nil
     }
-    let storage = Storage(root: root, space: root.stateIndexSpace(&indexCache))
+    let storage = Storage(root: root)
     storages[allocation.hashable] = storage
     return storage
   }
@@ -673,7 +662,8 @@ private struct Diagnoser {
     if let uses = useMaps[storage.allocation.hashable] {
       return uses
     }
-    var classifier = AddressUseClassifier(demotedConsumes: demotedConsumes, isInitSelf: storage.initSelfKind != nil)
+    var classifier = AddressUseClassifier(demotedConsumes: demotedConsumes,
+                                          isInitSelf: storage.root.initSelfKind != nil)
     switch storage.root.mode {
     case .storage:
       _ = classifier.walkDownUses(ofAddress: storage.root.address, path: UnusedWalkingPath())
@@ -800,7 +790,7 @@ private struct Diagnoser {
 
     guard shouldEmitError(for: storage.allocation, at: useLocation) else { return }
 
-    if storage.initSelfKind != nil {
+    if storage.root.initSelfKind != nil {
       // `self` of a delegating initializer, which must be initialized by `self.init` or assignment.
       if isReturn {
         diagnostics.diagnose(.superselfinit_not_called_before_return, 1, at: useLocation)
@@ -954,7 +944,7 @@ private struct Diagnoser {
       guard shouldEmitError(for: storage.allocation, at: marker.location) else { continue }
       diagnostics.diagnose(.immutable_property_already_initialized, storage.name(of: path), at: marker.location)
 
-      let decl = storage.root.tracksStoredProperties ? storage.storedProperty(at: path) : storage.root.varDecl
+      let decl = storage.root.isSelf ? storage.storedProperty(at: path) : storage.root.varDecl
       if let decl {
         if decl.hasInitialValue {
           diagnostics.diagnose(.initial_value_provided_in_let_decl, at: decl.nameLoc)
@@ -1067,7 +1057,8 @@ private struct Diagnoser {
       } else {
         name = storage.name(of: consumedPath!.projectionPathFromRoot)
       }
-      declaration = storage.isSelf ? nil : storage.root.varDecl.map { (storage.rootName, storage.type, $0.nameLoc) }
+      declaration = storage.root.isSelf ? nil
+                                        : storage.root.varDecl.map { (storage.rootName, storage.type, $0.nameLoc) }
     } else {
       let varDecl = storageValue.findVarDecl()
       name = varDecl?.userFacingName.string ?? ""

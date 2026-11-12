@@ -85,7 +85,7 @@ private struct Resolver {
 
   /// - Returns: true iff `value` is a resolvable root, which is then resolved.
   mutating func run(on value: Value, _ indexCache: inout FieldIndexTrieCache) -> Bool {
-    guard let root = ResolvableRoot(value, &indexCache, context) else {
+    guard let root = ResolvableRoot(value, &indexCache) else {
       return false
     }
 
@@ -100,11 +100,11 @@ private struct Resolver {
 
     log("\n** Demand Analysis start **")
 
-    let space = root.stateIndexSpace(&indexCache)
+    let space = root.space
     log("StateIndexSpace of \(root.address.type): \n\(space)")
 
     // The reference to a class instance is itself an SSA value, whose copies and destroys are resolved first.
-    if root.isInstanceReference {
+    if root.mode == .rootClassSelf {
       resolveSingleDef(root.address, context)
     }
 
@@ -537,7 +537,7 @@ private struct Resolver {
     typealias PartialAvailability = (inst: Instruction, avail: [Availability], range: StateIndexSpace.IndexRange)
     var partialDestroys: [PartialAvailability] = []
     var destroysBeforeInit: [PartialAvailability] = []
-    let immutableLeaves = root.immutableLeaves(space)
+    let immutableLeaves = root.immutableLeaves()
 
     // Do a first pass over blocks, collecting any needed partial destroys for a second step.
     for block in function.blocks {
@@ -620,7 +620,7 @@ private struct Resolver {
 
           // If completely unavailable (consumed), its lifetime ended earlier, so delete this one.
           // A class instance must still be deallocated, though.
-          if summary == .no && !root.isInstanceReference {
+          if summary == .no && root.mode != .rootClassSelf {
             context.erase(instruction: op.instruction)
             didDelete = true
             break
@@ -665,19 +665,18 @@ private struct Resolver {
     }
 
     for (destroy, avail, range) in partialDestroys {
-      if root.isInstanceReference {
+      switch root.mode {
+      case .rootClassSelf:
         endInstanceLifetime(at: destroy, avail, root, space, controlVar)
-        continue
-      }
-      if root.mode == .derivedClassSelf {
+      case .derivedClassSelf:
         endDerivedSelfLifetime(at: destroy, avail, root, space, controlVar)
-        continue
-      }
-      destroyAvailableElements(avail, range, before: destroy, root, space, controlVar)
+      case .storage:
+        destroyAvailableElements(avail, range, before: destroy, root, space, controlVar)
 
-      // Everything in range is now uninitialized.
-      controlVar?.update(range, initialized: false, before: destroy)
-      context.erase(instruction: destroy)
+        // Everything in range is now uninitialized.
+        controlVar?.update(range, initialized: false, before: destroy)
+        context.erase(instruction: destroy)
+      }
     }
 
     for (def, avail, range) in destroysBeforeInit {
@@ -1250,7 +1249,7 @@ private struct Resolver {
     }
 
     enum Kind: CustomStringConvertible {
-      case root(ResolvableRoot, initialized: Bool)  // Whether the elements in range are initialized at the start.
+      indirect case root(ResolvableRoot, initialized: Bool)  // Whether the elements in range are initialized at the start.
       case use(Operand, Demand)         // The demand summarizes the kinds of users of this operand's instruction.
       case take(Operand, Demand)        // The demand summarizes the kinds of users of this operand's instruction.
       case def(Operand)
