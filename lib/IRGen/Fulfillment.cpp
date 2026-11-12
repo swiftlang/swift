@@ -159,6 +159,11 @@ bool FulfillmentMap::searchTypeMetadata(IRGenModule &IGM, CanType type,
                                         unsigned source, MetadataPath &&path,
                                         const InterestingKeysCallback &keys) {
 
+  // Dynamic Self has no metadata of its own, so it can't fulfill anything.
+  // It can appear as a generic argument, e.g. in the metadata for S<Self>.
+  if (isa<DynamicSelfType>(type))
+    return false;
+
   // If this is an exact source, and it's an interesting type, add this
   // as a fulfillment.
   if (isExact && keys.isInterestingType(type)) {
