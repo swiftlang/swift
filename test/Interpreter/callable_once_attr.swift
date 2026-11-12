@@ -679,3 +679,42 @@ testInlinedThrowingCapture(true, "inlined throw")
 // CHECK-NEXT: returned 14
 // CHECK-NEXT: Tracker(inlined return) deinit
 testInlinedThrowingCapture(false, "inlined return")
+
+// A borrowed at-most-once value can be inspected, and its owner can drop it
+// without a call.
+func inspectAtMostOnce(_ fn: borrowing @escaping @callable(once) () -> Void) {
+  print("inspected")
+}
+
+func runBody(_ body: () -> Void) { body() }
+
+@inline(never)
+func testDropAfterBorrowing(_ tag: String) {
+  let r = Resource(tag)
+  let fn: @callable(once) () -> Void = { r.use() }
+  runBody { inspectAtMostOnce(fn) }
+}
+
+// CHECK-NEXT: inspected
+// CHECK-NEXT: Resource(borrowed) deinit
+testDropAfterBorrowing("borrowed")
+
+// The type of a borrowed function value is its static type.
+@inline(never)
+func dynamicType(
+  _ fn: borrowing @escaping @callable(once) () -> Void
+) -> ObjectIdentifier {
+  ObjectIdentifier(type(of: fn))
+}
+
+// CHECK-NEXT: type: true
+// CHECK-NEXT: type is not plain: true
+do {
+  let fn: @callable(once) () -> Void = { }
+  print("type: \(dynamicType(fn) == ObjectIdentifier((@callable(once) () -> Void).self))")
+  print("type is not plain: \(dynamicType(fn) != ObjectIdentifier((() -> Void).self))")
+}
+
+// An at-most-once function has the layout of an ordinary function.
+// CHECK-NEXT: layout: true
+print("layout: \(MemoryLayout<@callable(once) () -> Void>.size == MemoryLayout<() -> Void>.size && MemoryLayout<@callable(once) () -> Void>.alignment == MemoryLayout<() -> Void>.alignment)")

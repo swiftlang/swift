@@ -2715,8 +2715,6 @@ WARNING(spi_preferred_over_spi_available,none,
         "'@_spi' instead", ())
 
 // @once and @callable(once)
-ERROR(execution_semantics_attr_cannot_be_used_with_borrowing,none,
-      "'%0' cannot be used together with 'borrowing'", (StringRef))
 ERROR(execution_semantics_function_type_mismatch,none,
       "invalid conversion from '%0' function of type %1 "
       "to function type %2", (StringRef, Type, Type))

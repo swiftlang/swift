@@ -2629,12 +2629,30 @@ public:
       // Only a nondeinitable closure can capture a nondeinitable function
       // value. The move checker diagnoses consumption of a value that is
       // captured by address instead.
+      //
+      // A closure that only borrows its capture doesn't take ownership of
+      // it either. That is an on-stack closure with a guaranteed capture, or,
+      // in raw SIL, a nonescaping closure with a guaranteed capture, which
+      // ClosureLifetimeFixup usually turns into an on-stack closure. When it
+      // can't, the move checker rejects the closure as an escaping capture of
+      // a borrowed value, and this check applies again in canonical SIL.
       if (auto argFnTy = p.value()->getType().getAs<SILFunctionType>()) {
-        require(p.value()->getType().isAddress() ||
-                    !argFnTy->isNondeinitable() ||
-                    PAI->getFunctionType()->isNondeinitable(),
-                "only a nondeinitable closure can capture a nondeinitable "
-                "function value");
+        auto isNonEscapingInRawSIL = [&] {
+          if (F.getFunctionStage() != SILStage::Raw)
+            return false;
+          return llvm::all_of(PAI->getUses(), [](Operand *use) {
+            return isa<ConvertEscapeToNoEscapeInst, DestroyValueInst,
+                       DebugValueInst>(use->getUser());
+          });
+        };
+        bool isBorrowedCapture = substConv.getSILArgumentConvention(argIdx)
+                                     .isGuaranteedConventionInCaller() &&
+                                 (PAI->isOnStack() || isNonEscapingInRawSIL());
+        require(
+            p.value()->getType().isAddress() || !argFnTy->isNondeinitable() ||
+                PAI->getFunctionType()->isNondeinitable() || isBorrowedCapture,
+            "only a nondeinitable closure can capture a nondeinitable "
+            "function value");
       }
       if (PAI->isOnStack()) {
         // A noncopyable closure is allowed to have consuming captures
