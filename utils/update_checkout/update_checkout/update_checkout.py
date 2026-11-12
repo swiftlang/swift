@@ -9,6 +9,7 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 
 import difflib
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -1148,6 +1149,43 @@ def load_config(configs: List[str]) -> Dict[str, Any]:
     return config
 
 
+def hash_files(paths: List[Path]) -> Dict[Path, Optional[str]]:
+    """Map each path to a digest of its contents (None if unreadable)."""
+    result: Dict[Path, Optional[str]] = {}
+    for path in paths:
+        try:
+            result[path] = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:
+            result[path] = None
+    return result
+
+
+def hash_config(config: Dict[str, Any]) -> str:
+    """A digest of the contents of a loaded configuration."""
+    return hashlib.sha256(
+        json.dumps(config, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+
+
+def script_file_paths() -> List[Path]:
+    """The files that make up update-checkout itself."""
+    paths = sorted(SCRIPT_DIR.rglob("*.py"))
+    paths.append(SCRIPT_DIR.parent.parent.joinpath("update-checkout"))
+    return paths
+
+
+def restart_script():
+    """Re-exec update-checkout so that it picks up its updated sources."""
+    print("update-checkout has been updated; restarting.", flush=True)
+    sys.stdout.flush()
+    sys.stderr.flush()
+    argv = [sys.executable] + sys.argv
+    if sys.platform == "win32":
+        # os.execv doesn't behave like a real exec on Windows.
+        sys.exit(subprocess.call(argv))
+    os.execv(sys.executable, argv)
+
+
 def full_target_name(repo_path: Path, remote: str, target: str) -> str:
     branch, _, _ = Git.run(repo_path, ["branch", "--list", target], fatal=True)
     branch = branch.replace("* ", "")
@@ -1236,9 +1274,13 @@ def main() -> int:
 
     scheme_map = get_scheme_map_or_exit(config, scheme_name)
 
+    # Updating the swift repository can change update-checkout itself or its
+    # configuration, so remember what they looked like when we started.
+    script_hashes = hash_files(script_file_paths())
+
     @exponential_retry(max_retries=args.max_retries)
     def do_checkout() -> int:
-        nonlocal config, scheme_map
+        nonlocal config, scheme_map, script_hashes
         clone_results = None
         skip_repo_list = []
         if args.clone or args.clone_with_ssh:
@@ -1289,9 +1331,53 @@ def main() -> int:
                 "Call this script with --clone to get them."
             )
 
-        skipped_repositories, update_results = update_all_repositories(
-            args, config, scheme_name, scheme_map, cross_repos_pr
-        )
+        # If updating changes the configuration, the set of repositories and
+        # the branches/tags we want may be different, so start the update again
+        # with the new configuration.  A change to update-checkout itself means
+        # we need to restart the whole script to pick up the new code.
+        max_config_restarts = 3
+        restarts = 0
+        config_hash = hash_config(config)
+        while True:
+            skipped_repositories, update_results = update_all_repositories(
+                args, config, scheme_name, scheme_map, cross_repos_pr
+            )
+
+            if hash_files(script_file_paths()) != script_hashes:
+                if args.restart == "all":
+                    restart_script()
+                print(
+                    "update-checkout has been updated; re-run it to use the"
+                    " new version.",
+                    flush=True,
+                )
+                # Don't repeat the message on later passes.
+                script_hashes = hash_files(script_file_paths())
+
+            new_config = load_config(args.configs)
+            new_config_hash = hash_config(new_config)
+            if new_config_hash == config_hash:
+                break
+
+            if args.restart == "never":
+                print(
+                    "Configuration changed; re-run update-checkout to apply"
+                    " the changes.",
+                    flush=True,
+                )
+                break
+
+            if restarts >= max_config_restarts:
+                print(
+                    "update-checkout: configuration keeps changing; "
+                    "giving up on restarting the update."
+                )
+                break
+            restarts += 1
+            print("Configuration changed; restarting update.", flush=True)
+            config = new_config
+            config_hash = new_config_hash
+            scheme_map = get_scheme_map_or_exit(config, scheme_name)
         SkippedReason.print_skipped_repositories(skipped_repositories, "update")
 
         fail_count = 0
