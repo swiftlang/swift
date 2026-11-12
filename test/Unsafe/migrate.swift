@@ -3,6 +3,7 @@
 // REQUIRES: concurrency
 
 @preconcurrency import _Concurrency
+// expected-warning@-1:24 {{'@preconcurrency' import is not memory-safe because it can silently introduce data races; add '@unsafe' to indicate that this is unsafe}}{{1-1=@unsafe }}
 
 @unsafe func f() { }
 

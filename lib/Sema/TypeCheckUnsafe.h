@@ -26,17 +26,11 @@ class Witness;
 /// Diagnose the given unsafe use right now.
 void diagnoseUnsafeUse(const UnsafeUse &use);
 
-/// Narrow a set of unsafe uses down to those that must be diagnosed here.
+/// Narrow a set of uncovered unsafe uses down to those to describe in a
+/// diagnostic: the always-unsafe uses if there are any, otherwise all of them.
 ///
-/// Always-unsafe uses must always be acknowledged with 'unsafe'; merely unsafe
-/// ones only when \c includeMerelyUnsafe. This removes from \c unsafeUses
-/// everything that should not be diagnosed, leaving it empty when there is
-/// nothing to diagnose at all.
-///
-/// \returns whatever remains should be described with the always-unsafe
-/// flavor of the diagnostic.
-bool retainUnsafeUsesToDiagnose(SmallVectorImpl<UnsafeUse> &unsafeUses,
-                                bool includeMerelyUnsafe);
+/// \returns whether the remaining uses are always-unsafe.
+bool retainUnsafeUsesToDiagnose(SmallVectorImpl<UnsafeUse> &unsafeUses);
 
 /// Enumerate all of the unsafe uses that occur within this declaration
 ///

@@ -5565,7 +5565,8 @@ void PrintAST::visitAwaitExpr(AwaitExpr *expr) {
 }
 
 void PrintAST::visitUnsafeExpr(UnsafeExpr *expr) {
-  Printer << "unsafe ";
+  if (!expr->isImplicit() || Options.PrintImplicitUnsafe)
+    Printer << "unsafe ";
   visit(expr->getSubExpr());
 }
 

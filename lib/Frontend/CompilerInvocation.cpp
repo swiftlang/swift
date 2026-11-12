@@ -2993,6 +2993,11 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
                                                DiagGroupID::HeapAllocation);
   }
 
+  // Enabled before processing warning flags so `-warnings-as-errors` applies.
+  if (Args.hasArg(OPT_strict_memory_safety, OPT_strict_memory_safety_migrate))
+    Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsWarning,
+                                               DiagGroupID::StrictMemorySafety);
+
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
   Opts.SuppressRemarks |= Args.hasArg(OPT_suppress_remarks);
