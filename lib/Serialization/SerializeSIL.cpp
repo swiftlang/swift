@@ -3612,26 +3612,23 @@ void SILSerializer::writeDebugVariable(const SILInstruction &SI,
     attrs |= 1 << 3;
     attrs |= DebugVar->isLet() << 4;
 
-    // isDenseMapSingleton needs two bits.
-    attrs |= DebugVar->isDenseMapSingleton << 5;
-
     ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
     ListOfValues.push_back(DebugVar->ArgNo);
 
     if (DebugVar->Type.has_value()) {
-      attrs |= 1 << 7;
+      attrs |= 1 << 5;
       ListOfValues.push_back(S.addTypeRef(DebugVar->Type->getRawASTType()));
       DebugVarTypeCategory = (unsigned)DebugVar->Type->getCategory();
     }
 
     if (DebugVar->Scope) {
-      attrs |= 1 << 8;
+      attrs |= 1 << 6;
       ScopeToWrite = DebugVar->Scope;
     }
 
     if (DebugVar->Loc) {
       if (auto Encoded = encodeLoc(*DebugVar->Loc, SM)) {
-        attrs |= 1 << 9;
+        attrs |= 1 << 7;
         ListOfValues.push_back(Encoded->Row);
         ListOfValues.push_back(Encoded->Column);
         ListOfValues.push_back(Encoded->FNameID);
@@ -3639,7 +3636,7 @@ void SILSerializer::writeDebugVariable(const SILInstruction &SI,
     }
 
     for (auto &Expr : DebugVar->DIExpr.elements()) {
-      attrs |= 1 << 10;
+      attrs |= 1 << 8;
       ListOfValues.push_back(Expr.getKind());
       switch (Expr.getKind()) {
       case SILDIExprElement::Kind::OperatorKind:

@@ -380,9 +380,8 @@ namespace sil_block {
     SIL_DEBUG_VALUE,
 
     SILTypeCategoryField, /// debug var type category
-    BCFixed<11>,          /// hasReconstructionBlock, movableValueDebuginfo,
-                          /// trace, hasDebugVar, isLet,
-                          /// isDenseMapSingleton(two bits), hasType,
+    BCFixed<9>,           /// hasReconstructionBlock, movableValueDebuginfo,
+                          /// trace, hasDebugVar, isLet, hasType,
                           /// hasScope, hasLoc, hasExpr
     BCArray<ValueIDField> /// operand info: operand, type, debug var info:
                           /// name, argno, optional stuff: typeid
