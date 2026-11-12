@@ -107,6 +107,7 @@ target_include_directories(swiftBasic PRIVATE
 target_link_libraries(swiftBasic PUBLIC
   swiftDemangling)
 target_link_libraries(swiftBasic PRIVATE
+  clangBasic
   ${UUID_LIBRARIES})
 
 include(${CMAKE_CURRENT_LIST_DIR}/../../cmake/SwiftVersion.cmake)
