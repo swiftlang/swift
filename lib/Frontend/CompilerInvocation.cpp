@@ -4628,19 +4628,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (!mainExecutablePath.empty()) {
-    setMainExecutablePath(mainExecutablePath);
-  }
-
-  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs, Diags);
-  SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
-
-  if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {
-    return true;
-  }
-
-  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
-                    FrontendOpts)) {
+  if (parseModuleLoadingArgs(ParsedArgs, Diags, workingDirectory,
+                             mainExecutablePath)) {
     return true;
   }
 
@@ -4648,18 +4637,7 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
-                             workingDirectory, LangOpts, FrontendOpts,
-                             CASOpts)) {
-    return true;
-  }
-
   ParseSymbolGraphArgs(SymbolGraphOpts, ParsedArgs, Diags, LangOpts);
-
-  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
-                          CASOpts, FrontendOpts, workingDirectory)) {
-    return true;
-  }
 
   if (ParseSILArgs(SILOpts, ParsedArgs, IRGenOpts, FrontendOpts,
                    TypeCheckerOpts, Diags, LangOpts, ClangImporterOpts)) {
@@ -4681,18 +4659,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  SDKInfo = parseSDKSettings(*llvm::vfs::createPhysicalFileSystem(), LangOpts,
-                             SearchPathOpts, Diags);
-
-  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
-  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
-  setDefaultPrebuiltCacheIfNecessary();
-  setDefaultInProcessPluginServerPathIfNecessary();
-
   // Now that we've parsed everything, setup some inter-option-dependent state.
   setIRGenOutputOptsFromFrontendOptions(IRGenOpts, FrontendOpts);
-  setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
-  computeCXXStdlibOptions();
   computeAArch64TBIOptions();
 
   if (LangOpts.hasFeature(Feature::Embedded)) {
@@ -4727,10 +4695,146 @@ bool CompilerInvocation::parseArgs(
                        OPT_disable_aggressive_reg2mem,
                        SILOpts.UseAggressiveReg2MemForCodeSize);
 
+  return false;
+}
+
+bool CompilerInvocation::parseModuleLoadingArgs(
+    llvm::opt::ArgList &ParsedArgs, DiagnosticEngine &Diags,
+    StringRef workingDirectory, StringRef mainExecutablePath) {
+  using namespace options;
+
+  ArgsToFrontendOptionsConverter converter(Diags, ParsedArgs, FrontendOpts);
+  if (converter.convertModuleLoadingOptions()) {
+    return true;
+  }
+
+  if (!mainExecutablePath.empty()) {
+    setMainExecutablePath(mainExecutablePath);
+  }
+
+  ParseModuleInterfaceArgs(ModuleInterfaceOpts, ParsedArgs, Diags);
+  SaveModuleInterfaceArgs(ModuleInterfaceOpts, FrontendOpts, ParsedArgs, Diags);
+
+  if (ParseCASArgs(CASOpts, ParsedArgs, Diags, FrontendOpts)) {
+    return true;
+  }
+
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
+                    FrontendOpts)) {
+    return true;
+  }
+
+  if (ParseClangImporterArgs(ClangImporterOpts, ParsedArgs, Diags,
+                             workingDirectory, LangOpts, FrontendOpts,
+                             CASOpts)) {
+    return true;
+  }
+
+  if (ParseSearchPathArgs(SearchPathOpts, ParsedArgs, Diags,
+                          CASOpts, FrontendOpts, workingDirectory)) {
+    return true;
+  }
+
+  SDKInfo = parseSDKSettings(*llvm::vfs::createPhysicalFileSystem(), LangOpts,
+                             SearchPathOpts, Diags);
+
+  updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
+  updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
+  setDefaultPrebuiltCacheIfNecessary();
+  setDefaultInProcessPluginServerPathIfNecessary();
+
+  setBridgingHeaderFromFrontendOptions(ClangImporterOpts, FrontendOpts);
+  computeCXXStdlibOptions();
+
+  if (FrontendOpts.RequestedAction == FrontendOptions::ActionType::NoneAction &&
+      LangOpts.hasFeature(Feature::Embedded)) {
+    setCommonEmbeddedSwiftOptions(
+        EmbeddedSwiftContext::FullCompilation,
+        ParsedArgs.hasArg(OPT_enforce_exclusivity_EQ));
+  }
+
   // With Swift 6, enable @_spiOnly by default. This also enables proper error
   // reporting of ioi references from spi decls.
   if (LangOpts.EffectiveLanguageVersion.isVersionAtLeast(6)) {
     LangOpts.EnableSPIOnlyImports = true;
+  }
+
+  return false;
+}
+
+bool CompilerInvocation::parseDriverToolArgs(
+    llvm::opt::OptTable &Table, ArrayRef<const char *> Args,
+    llvm::opt::InputArgList &ParsedArgs, unsigned FlagsToInclude,
+    DiagnosticEngine &Diags) {
+  using namespace options;
+
+  unsigned MissingIndex;
+  unsigned MissingCount;
+  ParsedArgs =
+      Table.ParseArgs(Args, MissingIndex, MissingCount, FlagsToInclude);
+  if (MissingCount) {
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   ParsedArgs.getArgString(MissingIndex), MissingCount);
+    return true;
+  }
+
+  if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(ParsedArgs));
+    }
+    return true;
+  }
+
+  if (!ParsedArgs.hasArg(OPT_Xfrontend))
+    return false;
+
+  // Validate that the arguments passed via -Xfrontend are valid FrontendOptions.
+  SmallVector<const char *, 16> XFrontendArgs;
+  llvm::SmallDenseSet<unsigned, 16> XFrontendTokenIndices;
+  for (const Arg *A : ParsedArgs.filtered(OPT_Xfrontend)) {
+    XFrontendArgs.push_back(A->getValue());
+    XFrontendTokenIndices.insert(A->getIndex());
+  }
+
+  llvm::opt::InputArgList ValidatedXFrontendArgs = Table.ParseArgs(
+      XFrontendArgs, MissingIndex, MissingCount, FrontendOption);
+  if (MissingCount) {
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   ValidatedXFrontendArgs.getArgString(MissingIndex),
+                   MissingCount);
+    return true;
+  }
+  if (ValidatedXFrontendArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : ValidatedXFrontendArgs.filtered(OPT_UNKNOWN)) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(ValidatedXFrontendArgs));
+    }
+    return true;
+  }
+
+  // Re-parse the full argument list with -Xfrontend tokens stripped so relative
+  // argument ordering is preserved.
+  SmallVector<const char *, 64> ExpandedArgs;
+  ExpandedArgs.reserve(Args.size());
+  for (unsigned i = 0, n = Args.size(); i != n; ++i) {
+    if (!XFrontendTokenIndices.contains(i))
+      ExpandedArgs.push_back(Args[i]);
+  }
+
+  ParsedArgs = Table.ParseArgs(ExpandedArgs, MissingIndex, MissingCount,
+                               FlagsToInclude | FrontendOption);
+  if (MissingCount) {
+    Diags.diagnose(SourceLoc(), diag::error_missing_arg_value,
+                   ParsedArgs.getArgString(MissingIndex), MissingCount);
+    return true;
+  }
+  if (ParsedArgs.hasArg(OPT_UNKNOWN)) {
+    for (const Arg *A : ParsedArgs.filtered(OPT_UNKNOWN)) {
+      Diags.diagnose(SourceLoc(), diag::error_unknown_arg,
+                     A->getAsString(ParsedArgs));
+    }
+    return true;
   }
 
   return false;

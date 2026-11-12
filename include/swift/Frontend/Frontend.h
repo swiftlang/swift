@@ -158,6 +158,31 @@ public:
                  StringRef workingDirectory = {},
                  StringRef mainExecutablePath = {});
 
+  /// Initializes the module-loading, target, language, Clang importer,
+  /// search path, diagnostic, and CAS options of the compiler invocation
+  /// from an already-parsed \p Args list.
+  ///
+  /// Shared by \c parseArgs and standalone driver tools such as
+  /// \c swift-symbolgraph-extract and \c swift-synthesize-interface.
+  ///
+  /// \returns true if there was an error, false on success.
+  bool parseModuleLoadingArgs(llvm::opt::ArgList &Args,
+                              DiagnosticEngine &Diags,
+                              StringRef workingDirectory = {},
+                              StringRef mainExecutablePath = {});
+
+  /// Parses command-line arguments for a standalone driver tool using \p Table
+  /// and \p FlagsToInclude, unwrapping any `-Xfrontend <arg>` flags into
+  /// \p ParsedArgs after validating that the unwrapped arguments are valid
+  /// frontend options.
+  ///
+  /// \returns true if there was an error, false on success.
+  static bool parseDriverToolArgs(llvm::opt::OptTable &Table,
+                                  ArrayRef<const char *> Args,
+                                  llvm::opt::InputArgList &ParsedArgs,
+                                  unsigned FlagsToInclude,
+                                  DiagnosticEngine &Diags);
+
   /// Sets specific options based on the given serialized Swift binary data.
   ///
   /// This is additive, i.e. options are not reset to their default values given
