@@ -1898,12 +1898,19 @@ template <typename Runtime>
 class TargetWitnessTable {
   /// The protocol conformance descriptor from which this witness table
   /// was generated.
-  ConstTargetMetadataPointer<Runtime, TargetProtocolConformanceDescriptor>
+  TargetSignedPointer<Runtime,
+                      const TargetProtocolConformanceDescriptor<Runtime> *
+                          __ptrauth_swift_protocol_conformance_descriptor>
     Description;
 
 public:
   const TargetProtocolConformanceDescriptor<Runtime> *getDescription() const {
     return Description;
+  }
+
+  void setDescription(
+      const TargetProtocolConformanceDescriptor<Runtime> *description) {
+    Description = description;
   }
 };
 

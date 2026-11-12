@@ -321,9 +321,9 @@ static const WitnessTable *getNSErrorConformanceToError() {
          "Foundation overlay not loaded, or 'CFError : Error' conformance "
          "not available");
 #endif
-  return swift_getWitnessTable(conformance,
-                               conformance->getCanonicalTypeMetadata(),
-                               nullptr);
+  return _getWitnessTable(conformance,
+                          conformance->getCanonicalTypeMetadata(),
+                          nullptr);
 }
 
 static const HashableWitnessTable *getNSErrorConformanceToHashable() {
@@ -340,7 +340,7 @@ static const HashableWitnessTable *getNSErrorConformanceToHashable() {
          "ObjectiveC overlay not loaded, or 'NSObject : Hashable' conformance "
          "not available");
 #endif
-  return (const HashableWitnessTable *)swift_getWitnessTable(
+  return (const HashableWitnessTable *)_getWitnessTable(
            conformance,
            conformance->getCanonicalTypeMetadata(),
            nullptr);

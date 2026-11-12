@@ -782,6 +782,20 @@ public:
                                 const ProtocolDescriptor *protocol,
                                 StringRef module);
 
+  /// Like swift_getWitnessTable, but takes an unsigned conformance
+  /// descriptor.
+  const WitnessTable *
+  _getWitnessTable(const ProtocolConformanceDescriptor *conformance,
+                   const Metadata *type,
+                   const void * const *instantiationArgs);
+
+  /// Like swift_getWitnessTableRelative, but takes an unsigned conformance
+  /// descriptor.
+  const RelativeWitnessTable *
+  _getWitnessTableRelative(const ProtocolConformanceDescriptor *conformance,
+                           const Metadata *type,
+                           const void * const *instantiationArgs);
+
   /// Retrieve an associated type witness from the given witness table.
   ///
   /// \param wtable The witness table.
