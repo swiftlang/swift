@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -disable-swift-verification -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
-// REQUIRES: asserts
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing %s -o /dev/null 2>&1 | %FileCheck %s
 
 import Builtin
 import Swift
@@ -213,7 +212,8 @@ bb2:
   br bb3(%borrow1 : $WrapperStruct, %cast1 : $WrapperStruct)
 
 bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
-  end_borrow %newborrow : $WrapperStruct
+  %bf_newborrow = borrowed %newborrow from (%newowned)
+  end_borrow %bf_newborrow : $WrapperStruct
   destroy_value %newowned : $WrapperStruct
   %ret = tuple ()
   return %ret : $()
@@ -238,7 +238,8 @@ bb2:
   br bb3(%borrow1 : $WrapperStruct, %cast2 : $WrapperStruct)
 
 bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
-  end_borrow %newborrow : $WrapperStruct
+  %bf_newborrow = borrowed %newborrow from (%newowned)
+  end_borrow %bf_newborrow : $WrapperStruct
   destroy_value %newowned : $WrapperStruct
   destroy_value %copy1 : $Optional<WrapperStruct>
   %ret = tuple ()
@@ -254,17 +255,18 @@ bb0(%0 : @guaranteed $Optional<WrapperStruct>):
   br bb1(%1a : $WrapperStruct, %cast0 : $WrapperStruct)
 
 bb1(%2a : @guaranteed $WrapperStruct, %2b : @owned $WrapperStruct):
+  %bf_2a = borrowed %2a from (%2b)
   cond_br undef, bb2, bb3
 
 bb2:
-  %3 = copy_value %2a : $WrapperStruct
+  %3 = copy_value %bf_2a : $WrapperStruct
   %3a = begin_borrow %3 : $WrapperStruct
-  end_borrow %2a : $WrapperStruct
+  end_borrow %bf_2a : $WrapperStruct
   destroy_value %2b : $WrapperStruct
   br bb1(%3a : $WrapperStruct, %3 : $WrapperStruct)
 
 bb3:
-  end_borrow %2a : $WrapperStruct
+  end_borrow %bf_2a : $WrapperStruct
   destroy_value %2b : $WrapperStruct
   %9999 = tuple()
   return %9999 : $()

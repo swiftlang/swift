@@ -135,6 +135,7 @@ private func registerSwiftPasses() {
   registerPass(packSpecialization, { packSpecialization.run($0) })
   registerPass(trivialOwnershipElimination, { trivialOwnershipElimination.run($0) })
   registerPass(lowerAddressInstructions, { lowerAddressInstructions.run($0) })
+  registerPass(verifierPass, { verifierPass.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })

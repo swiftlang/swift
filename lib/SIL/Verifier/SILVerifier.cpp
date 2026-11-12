@@ -1219,15 +1219,11 @@ private:
   VerifierErrorEmitter ErrorEmitter;
   std::unique_ptr<DominanceInfo> LocalDominance = nullptr;
 
-  /// TODO: LifetimeCompletion: Remove.
-  std::shared_ptr<DeadEndBlocks> DEBlocks;
-
   /// Blocks without function exiting paths.
   ///
   /// Used to verify extend_lifetime instructions.
   ///
-  /// TODO: LifetimeCompletion: shared_ptr -> unique_ptr
-  std::shared_ptr<DeadEndBlocks> deadEndBlocks;
+  std::unique_ptr<DeadEndBlocks> deadEndBlocks;
 
   /// A cache of the isOperandInValueUse check. When we process an operand, we
   /// fix this for each of its uses.
@@ -1262,10 +1258,6 @@ private:
   SILVerifier(const SILVerifier&) = delete;
   void operator=(const SILVerifier&) = delete;
 public:
-  bool isSILOwnershipEnabled() const {
-    return F.getModule().getOptions().VerifySILOwnership;
-  }
-
   void _require(bool condition, const Twine &complaint,
                 llvm::function_ref<void(SILPrintContext &)> extraContext
                   = nullptr) {
@@ -1415,11 +1407,9 @@ public:
   }
 
   DeadEndBlocks &getDeadEndBlocks() {
-    if (DEBlocks) {
-      deadEndBlocks = DEBlocks;
-    } else {
+    if (!deadEndBlocks) {
       deadEndBlocks =
-          std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
+          std::make_unique<DeadEndBlocks>(const_cast<SILFunction *>(&F));
     }
     return *deadEndBlocks;
   }
@@ -1614,20 +1604,14 @@ public:
   }
 
   void checkValueBaseOwnership(ValueBase *V) {
-    // If ownership is not enabled, bail.
-    if (!isSILOwnershipEnabled())
-      return;
-
     SILFunction *F = V->getFunction();
     assert(F && "Expected value base with parent function");
-    // If we do not have qualified ownership, then do not verify value base
-    // ownership.
+    // Note that linear lifetimes of values with ownership are checked in
+    // Verification.swift.
     if (!F->hasOwnership()) {
       require(SILValue(V)->getOwnershipKind() == OwnershipKind::None,
               "Once ownership is gone, all values should have none ownership");
-      return;
     }
-    SILValue(V).verifyOwnership(DEBlocks.get());
   }
 
   void checkType(SILType silTy) {
@@ -6144,7 +6128,7 @@ public:
         require(!dest->getArguments()[0]->getType().isAddress(),
                 "switch_enum destination bbarg type must not be an address");
       }
-      if (!isSILOwnershipEnabled() || !F.hasOwnership()) {
+      if (!F.hasOwnership()) {
         // In non-OSSA, the destBB can optionally ignore the payload.
         require(dest->getArguments().empty()
                     || dest->getArguments().size() == 1,
@@ -6171,7 +6155,7 @@ public:
       return;
     }
     auto *defaultBB = switchEnum->getDefaultBB();
-    if (!isSILOwnershipEnabled() || !F.hasOwnership()) {
+    if (!F.hasOwnership()) {
       require(switchEnum->getDefaultBB()->args_empty(),
               "switch_enum default destination must take no arguments");
       return;
@@ -7812,10 +7796,7 @@ public:
       verifyReducibleLoops(F);
   }
 
-  void verify(bool isCompleteOSSA) {
-    if (!isCompleteOSSA) {
-      DEBlocks = std::make_shared<DeadEndBlocks>(const_cast<SILFunction *>(&F));
-    }
+  void verify() {
     visitSILFunction(const_cast<SILFunction*>(&F));
   }
 
@@ -7875,7 +7856,7 @@ static bool verificationEnabled(const SILModule &M) {
 /// verify - Run the SIL verifier to make sure that the SILFunction follows
 /// invariants.
 void SILFunction::verify(CalleeCache *calleeCache, DominanceInfo *dominanceInfo,
-                         bool SingleFunction, bool isCompleteOSSA,
+                         bool SingleFunction,
                          bool checkLinearLifetime) const {
   if (!verificationEnabled(getModule()))
     return;
@@ -7889,7 +7870,7 @@ void SILFunction::verify(CalleeCache *calleeCache, DominanceInfo *dominanceInfo,
   // back trace when the verifier crashes.
   SILVerifier verifier(*this, calleeCache, dominanceInfo, SingleFunction,
                        checkLinearLifetime);
-  verifier.verify(isCompleteOSSA);
+  verifier.verify();
 }
 
 void SILFunction::verifyCriticalEdges() const {
@@ -8257,14 +8238,14 @@ void SILGlobalVariable::verify() const {
   }
 }
 
-void SILModule::verify(bool isCompleteOSSA, bool checkLinearLifetime) const {
+void SILModule::verify(bool checkLinearLifetime) const {
   CalleeCache calleeCache(*const_cast<SILModule *>(this));
-  verify(&calleeCache, isCompleteOSSA, checkLinearLifetime);
+  verify(&calleeCache, checkLinearLifetime);
 }
 
 /// Verify the module.
 void SILModule::verify(CalleeCache *calleeCache,
-                       bool isCompleteOSSA, bool checkLinearLifetime) const {
+                       bool checkLinearLifetime) const {
   if (!verificationEnabled(*this))
     return;
 
@@ -8278,7 +8259,7 @@ void SILModule::verify(CalleeCache *calleeCache,
       assert(false && "triggering standard assertion failure routine");
     }
     f.verify(calleeCache, /*dominanceInfo=*/nullptr, /*singleFunction*/ false,
-             isCompleteOSSA, checkLinearLifetime);
+             checkLinearLifetime);
   }
 
   // Check all globals.

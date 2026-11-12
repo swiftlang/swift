@@ -1136,3 +1136,7 @@ void BridgedVerifier::verifierError(BridgedStringRef message,
   verificationFailure(message.unbridged(), SILValue(atValue.getSILValue()),
                       /*extraContext=*/nullptr);
 }
+
+void BridgedVerifier::verifyOwnership(BridgedValue value) {
+  SILValue(value.getSILValue()).verifyOwnership();
+}

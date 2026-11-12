@@ -669,7 +669,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
 
-  P.addVerifyOwnership();
+  // Add verification checkpoints within the pipeline. This is especially
+  // important to verify OSSA ownership within the pipeline and not only
+  // at the end of the OSSA pipeline (in OwnershipModelEliminator).
+  P.addVerifier();
 }
 
 static void addPerfDebugSerializationPipeline(SILPassPipelinePlan &P) {

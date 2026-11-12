@@ -1506,8 +1506,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
         invalidatedStackNesting = false;
       }
 
-      Caller->verify();
-      pm->runSwiftFunctionVerification(Caller);
+      pm->runVerification(Caller);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -1525,8 +1524,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // find into it, do so now. This makes it easier to catch verification bugs in
   // the inliner without running the entire inliner.
   if (EnableVerifyAfterInlining) {
-    Caller->verify();
-    pm->runSwiftFunctionVerification(Caller);
+    pm->runVerification(Caller);
   }
 
   return true;
