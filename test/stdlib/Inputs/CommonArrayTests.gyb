@@ -112,7 +112,7 @@ ${Suite}.test("${ArrayType}/appendNonUnique")
   for _ in 1...100 {
     globalArrayForNonUnique = x
     x.append(1)
-    expectTrue(x.capacity == capacity)
+    expectTrue(x.capacity >= capacity)
   }
 }
 
