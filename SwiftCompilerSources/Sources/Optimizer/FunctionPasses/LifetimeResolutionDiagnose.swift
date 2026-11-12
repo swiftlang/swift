@@ -163,29 +163,6 @@ private struct Storage {
   }
 }
 
-/// The storage allocation (`alloc_box`, `alloc_stack`, or argument) backing `address`, via its access path,
-/// or the reference to the class instance whose stored property it is. For derived class `self`, that is the
-/// memory holding the reference.
-private func allocation(backing address: Value) -> Value? {
-  switch address.accessPath.base {
-  case .box(let projectBox):
-    return projectBox.box.referenceRoot
-  case .stack(let allocStack):
-    return allocStack
-  case .argument(let argument):
-    return argument
-  case .class(let projection):
-    let reference = projection.instance.referenceRoot
-    if let load = reference as? LoadInstruction, let markUninitialized = load.address as? MarkUninitializedInst,
-       markUninitialized.kind == .derivedSelf {
-      return allocation(backing: markUninitialized)
-    }
-    return (reference as? MarkUninitializedInst)?.operand.value ?? reference
-  default:
-    return nil
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                               Use classification
 //===----------------------------------------------------------------------===//
@@ -677,7 +654,7 @@ private struct Diagnoser {
   }
 
   mutating func storage(backing address: Value) -> Storage? {
-    guard let allocation = allocation(backing: address) else {
+    guard let allocation = ResolvableRoot.allocation(backing: address) else {
       return nil
     }
     if let storage = storages[allocation.hashable] {
