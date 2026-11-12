@@ -1,7 +1,9 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/a.swiftmodule -module-name a %s
+// RUN: %target-swift-frontend -emit-module-path %t/a.swiftmodule -module-name a %s -enable-experimental-feature AlwaysUnsafeAttribute
 // RUN: %llvm-bcanalyzer -dump %t/a.swiftmodule | %FileCheck --check-prefix BC-CHECK --implicit-check-not UnknownCode %s
 // RUN: %target-swift-ide-test -print-module -module-to-print a -source-filename x -I %t | %FileCheck --check-prefix MODULE-CHECK %s
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // BC-CHECK: <Unsafe_DECL_ATTR
 

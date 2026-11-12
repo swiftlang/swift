@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature AlwaysUnsafeAttribute
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // Parsing and placement of the '@unsafe(always)' attribute.
 

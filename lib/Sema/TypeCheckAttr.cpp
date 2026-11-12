@@ -9767,6 +9767,16 @@ AttributeChecker::visitAddressableForDependenciesAttr(
 }
 
 void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
+  // The Clang importer adds '@unsafe(always)' itself, so only spelled-out uses
+  // require the feature.
+  if (attr->isAlways() && !attr->isImplicit() &&
+      !Ctx.LangOpts.hasFeature(Feature::AlwaysUnsafeAttribute) &&
+      !Ctx.SourceMgr.isImportMacroGeneratedLoc(attr->getLocation())) {
+    diagnose(attr->getLocation(), diag::requires_experimental_feature,
+             "unsafe(always)", false,
+             Feature::AlwaysUnsafeAttribute.getName());
+  }
+
   if (auto safeAttr = D->getAttrs().getAttribute<SafeAttr>()) {
     D->diagnose(diag::safe_and_unsafe_attr, D)
         .highlight(attr->getRangeWithAt())
