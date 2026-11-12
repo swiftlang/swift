@@ -9364,6 +9364,11 @@ ClangImporter::getForeignReferenceTypeOperations(
   return Impl.getForeignReferenceTypeOperations(decl);
 }
 
+const clang::FunctionDecl *ClangImporter::getForeignReferenceTypeAnnotatedRetain(
+    const clang::RecordDecl *decl) {
+  return Impl.FRTAnnotatedRetainFunctions.lookup(decl);
+}
+
 LibkernSubclass
 ClangImporter::getLibkernSubclass(const clang::RecordDecl *decl) {
   if (auto *cxxRecord = dyn_cast<clang::CXXRecordDecl>(decl))
