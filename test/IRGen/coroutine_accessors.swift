@@ -2,7 +2,7 @@
 // RUN:     %s                                                              \
 // RUN:     -enable-callee-allocated-coro-abi                               \
 // RUN:     -enable-experimental-feature CoroutineAccessors                 \
-// RUN: | %IRGenFileCheck %s
+// RUN: | %IRGenFileCheck %s -check-prefix CHECK-%target-object-format
 
 // REQUIRES: swift_feature_CoroutineAccessors
 
@@ -15,7 +15,8 @@
 //           :    )
 // CHECK-SAME:    i32 0
 // CHECK-SAME:  }>
-// CHECK-SAME:  section "{{(__TEXT,__const|\.rodata|\.rdata)}}"
+// CHECK-macho-SAME:  section "__TEXT,__const"
+// CHECK-coff-SAME:   section ".rdata"
 // CHECK-LABEL: @"$s19coroutine_accessors1SV3irmSivxTwc" = {{.*}}global{{.*}} %swift.coro_func_pointer <{
 //           :    sub (
 // CHECK-SAME:      $s19coroutine_accessors1SV3irmSivx
@@ -23,7 +24,8 @@
 //           :    ),
 // CHECK-SAME:    i32 0
 // CHECK-SAME:  }>
-// CHECK-SAME:  section "{{(__TEXT,__const|\.rodata|\.rdata)}}"
+// CHECK-macho-SAME:  section "__TEXT,__const"
+// CHECK-coff-SAME:   section ".rdata"
 
 // CHECK-arm64e-LABEL: _swift_coro_malloc.ptrauth = private constant {
 // CHECK-arm64e-SAME:    ptr @_swift_coro_malloc,
