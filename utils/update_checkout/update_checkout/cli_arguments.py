@@ -32,6 +32,7 @@ class CliArguments(argparse.Namespace):
     # Class-level default so partially-populated namespaces (e.g. built by
     # add-worktree) still resolve max_retries; parse_args overrides it.
     max_retries: int = 3
+    restart: str = "all"
 
     @staticmethod
     def parse_args() -> "CliArguments":
@@ -150,6 +151,16 @@ repositories.
             " unlimited retries.",
             type=int,
             default=CliArguments.max_retries,
+        )
+        parser.add_argument(
+            "--restart",
+            help="What to do if updating changes update-checkout's"
+            " configuration or the script itself: 'never' prints a message"
+            " but never restarts; 'config' restarts the update when the"
+            " configuration changes, but keeps running the current script;"
+            " 'all' also restarts the whole script when it changes.",
+            choices=["never", "config", "all"],
+            default=CliArguments.restart,
         )
         parser.add_argument(
             "-j",
