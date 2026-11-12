@@ -514,6 +514,34 @@ extension ClassInstanceUseWalker {
   }
 }
 
+/// Walks every use of a resolvable root, whatever its mode.
+protocol ResolvableRootUseWalker: AddressDefUseWalker, ClassInstanceUseWalker where Path == UnusedWalkingPath {
+  /// A use of the memory holding `self` in a derived class initializer.
+  mutating func derivedSelfUse(_ use: DerivedSelfUse, of operand: Operand) -> WalkResult
+}
+
+extension ResolvableRootUseWalker {
+  mutating func walkDownUses(of root: ResolvableRoot) -> WalkResult {
+    switch root.mode {
+    case .storage:
+      return walkDownUses(ofAddress: root.address, path: Path())
+    case .rootClassSelf:
+      return walkDownUses(ofClassInstance: root.address)
+    case .derivedClassSelf:
+      for use in root.address.uses {
+        if derivedSelfUse(DerivedSelfUse(use), of: use) == .abortWalk {
+          return .abortWalk
+        }
+      }
+      return .continueWalk
+    }
+  }
+
+  mutating func storedPropertyUse(_ projection: RefElementAddrInst) -> WalkResult {
+    walkDownUses(ofAddress: projection, path: Path())
+  }
+}
+
 //===----------------------------------------------------------------------===//
 //                            Derived Class Self
 //===----------------------------------------------------------------------===//
@@ -546,6 +574,14 @@ enum DerivedSelfUse {
 
   case unknown
 
+  /// The call to `super.init`, if this loads `self` to pass to it.
+  var superInitCall: FullApplySite? {
+    if case .superInit(_, let apply) = self {
+      return apply
+    }
+    return nil
+  }
+
   init(_ use: Operand) {
     switch use.instruction {
     case let store as StoreInst where use == store.destinationOperand:
@@ -557,7 +593,7 @@ enum DerivedSelfUse {
     case let loadBorrow as LoadBorrowInst:
       self = .borrow(loadBorrow)
     case let load as LoadInst:
-      if let apply = superInitCall(passingSelfLoadedBy: load) {
+      if let apply = findSuperInitCall(passingSelfLoadedBy: load) {
         self = .superInit(load, apply)
       } else if load.loadOwnership == .copy {
         self = .copy(load)
@@ -578,7 +614,7 @@ enum DerivedSelfUse {
 }
 
 /// The call to `super.init` that takes `self` as loaded by `load`, if any.
-func superInitCall(passingSelfLoadedBy load: LoadInst) -> FullApplySite? {
+private func findSuperInitCall(passingSelfLoadedBy load: LoadInst) -> FullApplySite? {
   guard let upcast = load.uses.ignoreDebugUses.ignore(usersOfType: DiagnoseInst.self).singleUse?.instruction
                        as? UpcastInst else {
     return nil

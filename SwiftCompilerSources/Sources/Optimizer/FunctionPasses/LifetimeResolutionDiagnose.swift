@@ -219,36 +219,30 @@ private struct UseMap {
 }
 
 /// Classifies the uses of some storage.
-private struct AddressUseClassifier: AddressDefUseWalker, ClassInstanceUseWalker {
-  typealias Path = UnusedWalkingPath
+private struct AddressUseClassifier: ResolvableRootUseWalker {
   let demotedConsumes: Set<Instruction>
   let isInitSelf: Bool
   var uses = UseMap()
 
-  mutating func storedPropertyUse(_ projection: RefElementAddrInst) -> WalkResult {
-    return walkDownUses(ofAddress: projection, path: UnusedWalkingPath())
-  }
-
-  /// Classifies the uses of the memory holding `self` in a derived class initializer.
-  mutating func walkDownUses(ofDerivedSelf address: Value) {
-    for use in address.uses {
-      switch DerivedSelfUse(use) {
-      case .borrow(let loadBorrow):
-        _ = walkDownUses(ofClassInstance: loadBorrow)
-      case .copy(let load):
-        _ = walkDownUses(ofClassInstance: load)
-      case .superInit(_, let apply):
-        uses.record(apply, .superInit)
-      case .storeBack(let store):
-        uses.kill(store, address.accessPath)
-      case .destroy(let destroy):
-        uses.kill(destroy, address.accessPath)
-      case .deallocate(let load):
-        uses.kill(load, address.accessPath)
-      case .initialStore, .ignored, .unknown:
-        break
-      }
+  /// Classifies a use of the memory holding `self` in a derived class initializer.
+  mutating func derivedSelfUse(_ use: DerivedSelfUse, of operand: Operand) -> WalkResult {
+    switch use {
+    case .borrow(let loadBorrow):
+      _ = walkDownUses(ofClassInstance: loadBorrow)
+    case .copy(let load):
+      _ = walkDownUses(ofClassInstance: load)
+    case .superInit(_, let apply):
+      uses.record(apply, .superInit)
+    case .storeBack(let store):
+      uses.kill(store, operand.value.accessPath)
+    case .destroy(let destroy):
+      uses.kill(destroy, operand.value.accessPath)
+    case .deallocate(let load):
+      uses.kill(load, operand.value.accessPath)
+    case .initialStore, .ignored, .unknown:
+      break
     }
+    return .continueWalk
   }
 
   mutating func instanceUse(_ use: Operand) -> WalkResult {
@@ -664,14 +658,7 @@ private struct Diagnoser {
     }
     var classifier = AddressUseClassifier(demotedConsumes: demotedConsumes,
                                           isInitSelf: storage.root.initSelfKind != nil)
-    switch storage.root.mode {
-    case .storage:
-      _ = classifier.walkDownUses(ofAddress: storage.root.address, path: UnusedWalkingPath())
-    case .rootClassSelf:
-      _ = classifier.walkDownUses(ofClassInstance: storage.root.address)
-    case .derivedClassSelf:
-      classifier.walkDownUses(ofDerivedSelf: storage.root.address)
-    }
+    _ = classifier.walkDownUses(of: storage.root)
     var uses = classifier.uses
 
     // A box captured by a closure, rather than its projected address.
@@ -934,7 +921,7 @@ private struct Diagnoser {
 
       // The superclass part of derived class `self`, initialized by a second `super.init`.
       if storage.root.mode == .derivedClassSelf && path.isEmpty {
-        let superInit = (marker.next as? LoadInst).flatMap { superInitCall(passingSelfLoadedBy: $0) }
+        let superInit = (marker.next as? LoadInst).flatMap { DerivedSelfUse($0.addressOperand).superInitCall }
         let location = superInit?.location ?? marker.location
         guard shouldEmitError(for: storage.allocation, at: location) else { continue }
         diagnostics.diagnose(.selfinit_multiple_times, 0, at: location)
@@ -1017,8 +1004,8 @@ private struct Diagnoser {
     }
 
     // A failed `super.init` already released `self`, which the memory then no longer holds.
-    if let load = consume.instruction as? LoadInst, let superInit = superInitCall(passingSelfLoadedBy: load),
-       let storage, storage.root.mode == .derivedClassSelf {
+    if let storage, storage.root.mode == .derivedClassSelf, let load = consume.instruction as? LoadInst,
+       let superInit = DerivedSelfUse(load.addressOperand).superInitCall {
       let use = findOffendingUse(of: .path(nil), in: uses, after: superInit, context)
       return UseAfterConsume(violation: use != nil ? .usedAfterFailedSuperInit : .unknownUse, use: use,
                              name: storage.rootName, storage: storageValue, consumedType: consumedType,

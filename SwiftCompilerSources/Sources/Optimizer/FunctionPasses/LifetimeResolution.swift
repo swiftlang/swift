@@ -841,7 +841,7 @@ private struct Resolver {
   }
 
   // Classifies every use of the root's address, following projections and access scopes, into the events of each block.
-  private struct UseCollector: AddressDefUseWalker, AddressUseVisitor, ClassInstanceUseWalker {
+  private struct UseCollector: ResolvableRootUseWalker, AddressUseVisitor {
     private(set) var uses: Dictionary<BasicBlock, EventList> = [:]
     private let space: StateIndexSpace
     private let function: Function
@@ -884,13 +884,7 @@ private struct Resolver {
         addUse(.root(root, initialized: initialized), range)
       }
 
-      let result: WalkResult
-      switch root.mode {
-      case .storage: result = walkDownUses(ofAddress: address, path: Path())
-      case .rootClassSelf: result = walkDownUses(ofClassInstance: address)
-      case .derivedClassSelf: result = walkDownUses(ofDerivedSelf: address)
-      }
-      if result == .abortWalk {
+      if walkDownUses(of: root) == .abortWalk {
         return false
       }
 
@@ -923,46 +917,37 @@ private struct Resolver {
       }
     }
 
-    // The uses of the memory holding `self` in a derived class initializer.
-    mutating func walkDownUses(ofDerivedSelf address: Value) -> WalkResult {
+    // Implement ResolvableRootUseWalker
+
+    mutating func derivedSelfUse(_ use: DerivedSelfUse, of operand: Operand) -> WalkResult {
       let superclass = space.range(of: .superclass)!
       let reference = space.range(of: .reference)!
-      for use in address.uses {
-        switch DerivedSelfUse(use) {
-        case .initialStore, .storeBack:
-          addUse(.def(use), reference)
-        case .borrow(let loadBorrow):
-          addUse(.liveness(loadBorrow), reference)
-          for end in loadBorrow.uses.users(ofType: EndBorrowInst.self) {
-            addUse(.liveness(end), reference)
-          }
-          if walkDownUses(ofClassInstance: loadBorrow) == .abortWalk {
-            return .abortWalk
-          }
-        case .copy(let load):
-          addUse(.liveness(load), space.wholeRange)
-        case .superInit(let load, _):
-          // `super.init` needs the own stored properties, but only takes the reference to the instance.
-          if !space.fieldRange.isEmpty {
-            addUse(.liveness(load), space.fieldRange)
-          }
-          addUse(.superInit(use), superclass)
-          addUse(.take(use, .own), reference)
-        case .destroy, .deallocate:
-          addUse(.end(use), space.wholeRange)
-        case .ignored:
-          break
-        case .unknown:
-          return .abortWalk
+      switch use {
+      case .initialStore, .storeBack:
+        addUse(.def(operand), reference)
+      case .borrow(let loadBorrow):
+        addUse(.liveness(loadBorrow), reference)
+        for end in loadBorrow.uses.users(ofType: EndBorrowInst.self) {
+          addUse(.liveness(end), reference)
         }
+        return walkDownUses(ofClassInstance: loadBorrow)
+      case .copy(let load):
+        addUse(.liveness(load), space.wholeRange)
+      case .superInit(let load, _):
+        // `super.init` needs the own stored properties, but only takes the reference to the instance.
+        if !space.fieldRange.isEmpty {
+          addUse(.liveness(load), space.fieldRange)
+        }
+        addUse(.superInit(operand), superclass)
+        addUse(.take(operand, .own), reference)
+      case .destroy, .deallocate:
+        addUse(.end(operand), space.wholeRange)
+      case .ignored:
+        break
+      case .unknown:
+        return .abortWalk
       }
       return .continueWalk
-    }
-
-    // Implement ClassInstanceUseWalker
-
-    mutating func storedPropertyUse(_ projection: RefElementAddrInst) -> WalkResult {
-      return walkDownUses(ofAddress: projection, path: Path())
     }
 
     mutating func instanceUse(_ use: Operand) -> WalkResult {
