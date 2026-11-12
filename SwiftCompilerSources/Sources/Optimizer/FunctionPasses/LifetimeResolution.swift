@@ -275,10 +275,10 @@ private struct Resolver {
     case .root(_, initialized: false) where someDemand:
       // Unsatisfied demand reaching the root means there exists a use-before-init of those leaves.
       let demanded = event.range.filter { current[$0] != .nothing }
-      initializeWithUndef(leaves: demanded.filter { space.fieldRange.contains($0) }, of: root, space)
+      let uninitializedFields = demanded.filter { space.fieldRange.contains($0) }
+      LifetimeResolutionMarker.markUsesBeforeInit(of: uninitializedFields, in: root, context)
       if let superclass = space.index(of: .superclass), demanded.contains(superclass) {
-        Builder(after: root.markerInsertionPoint, context)
-          .createDiagnose(operand: root.address, kind: .missingSuperInit)
+        LifetimeResolutionMarker.markMissingSuperInit(of: root, context)
       }
       assert(space.index(of: .reference).map { !demanded.contains($0) } ?? true,
              "the reference is defined right after the root")
@@ -359,15 +359,15 @@ private struct Resolver {
       // Copy the value into a temporary alloc_stack and pass that to the apply, i.e,
       //    %alloc = alloc_stack
       //    copy_addr %op to [init] %alloc
-      //    diagnose %op [unpermitted_copy]
+      //    diagnose [unpermitted_copy] %op
       //    apply(%alloc) : (@in) -> ...
       //    dealloc_stack %alloc
       let type = op.value.type.objectType
       let allocBuilder = Builder(before: apply, context)
       let alloc = allocBuilder.createAllocStack(type)
-      allocBuilder.createCopyAddr(from: op.value, to: alloc, takeSource: false, initializeDest: true)
+      let copyAddr = allocBuilder.createCopyAddr(from: op.value, to: alloc, takeSource: false, initializeDest: true)
       if isUnpermittedCopy(of: op.value.type) {
-        allocBuilder.createDiagnose(operand: op.value, kind: .unpermittedCopy)
+        LifetimeResolutionMarker.markUnpermittedCopy(copyAddr, context)
       }
       op.set(to: alloc, context)
       Builder(after: apply, context).createDeallocStack(alloc)
@@ -385,7 +385,7 @@ private struct Resolver {
       copyAddr.set(isTakeOfSource: !becomesCopy, context)
 
       if becomesCopy && isUnpermittedCopy(of: copyAddr.type) {
-        Builder(after: copyAddr, context).createDiagnose(operand: op.value, kind: .unpermittedCopy)
+        LifetimeResolutionMarker.markUnpermittedCopy(copyAddr, context)
       }
 
       if !becomesCopy {
@@ -401,7 +401,7 @@ private struct Resolver {
         load.set(ownership: newOwnership, context)
 
         if newOwnership == .copy && isUnpermittedCopy(of: load.type) {
-          Builder(after: load, context).createDiagnose(operand: load, kind: .unpermittedCopy)
+          LifetimeResolutionMarker.markUnpermittedCopy(load, context)
         }
 
         if newOwnership == .take {
@@ -471,17 +471,6 @@ private struct Resolver {
       beginAccess.set(accessKind: .modify, context: context)
     default:
       break
-    }
-  }
-
-  // Emit an `assign undef to [init]` of each given leaf of the root, right after the root's definition.
-  func initializeWithUndef(leaves: [Int], of root: ResolvableRoot, _ space: StateIndexSpace) {
-    let builder = Builder(after: root.markerInsertionPoint, context)
-    for leaf in leaves {
-      space.withElementAddress(forIndex: leaf, from: root.address, builder) { address in
-        let undef = Undef.get(type: address.type.objectType, context)
-        builder.createAssign(source: undef, destination: address, ownership: .initialize)
-      }
     }
   }
 
@@ -565,7 +554,7 @@ private struct Resolver {
           let assignsWholeSelf = root.isRootSelf && op.value.projectionPathFromRoot.isEmpty
           if !assignsWholeSelf,
              range.contains(where: { immutableLeaves.contains($0) && current[$0].contains(.yes) }) {
-            Builder(before: op.instruction, context).createDiagnose(operand: op.value, kind: .letReinit)
+            LifetimeResolutionMarker.markLetReinit(of: op.value, before: op.instruction, context)
           }
 
           let nontrivial = range.filter { space.hasAddress($0) && !space.leafType($0).isTrivial(in: function) }
@@ -592,7 +581,7 @@ private struct Resolver {
         case let .superInit(op):
           // FIXME: what about `.partial` availability? Suppose they did `if c { super.init }; super.init`.
           if current[range].contains(where: { $0.contains(.yes) }) {
-            Builder(before: op.instruction, context).createDiagnose(operand: op.value, kind: .letReinit)
+            LifetimeResolutionMarker.markLetReinit(of: op.value, before: op.instruction, context)
           }
 
         case let .end(op) where root.mode == .derivedClassSelf:

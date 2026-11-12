@@ -417,10 +417,10 @@ private func replaceWithCopy(_ op: Operand, _ context: FunctionPassContext) {
   // If we're creating a copy of a noncopyable type, or forced to provide a copy
   // to a `move_value [allows_diagnostics]`, then it must be diagnosed.
   if op.value.type.isMoveOnly {
-    builder.createDiagnose(operand: copyValue, kind: .unpermittedCopy)
+    LifetimeResolutionMarker.markUnpermittedCopy(copyValue, context)
   } else if let move = op.instruction as? MoveValueInst,
             move.allowsDiagnostics {
-    builder.createDiagnose(operand: copyValue, kind: .unpermittedCopy)
+    LifetimeResolutionMarker.markUnpermittedCopy(copyValue, context)
   }
 
   op.set(to: copyValue, context)

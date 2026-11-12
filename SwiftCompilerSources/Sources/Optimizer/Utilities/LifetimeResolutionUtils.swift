@@ -637,6 +637,104 @@ private func findSuperInitCall(passingSelfLoadedBy load: LoadInst) -> FullApplyS
 }
 
 //===----------------------------------------------------------------------===//
+//                                  Markers
+//===----------------------------------------------------------------------===//
+
+/// A marker that LifetimeResolution leaves where it corrected a misuse, which LifetimeResolutionDiagnose turns into
+/// a user-facing diagnostic.
+enum LifetimeResolutionMarker {
+  /// `assign undef to [init] %leaf`, after the root's `markerInsertionPoint`: the leaf is read before being
+  /// initialized.
+  case useBeforeInit(AssignInst)
+
+  /// `diagnose [let_reinit] %addr`, right before the def: immutable storage at `%addr` may already be initialized.
+  case letReinit(DiagnoseInst)
+
+  /// `diagnose [missing_super_init] %self`, after the root's `markerInsertionPoint`: derived class `self` is used
+  /// before `super.init`.
+  case missingSuperInit(DiagnoseInst)
+
+  /// `diagnose [unpermitted_copy] %x`, right after the `load`, `copy_value`, or `copy_addr` that copies: the copy
+  /// is not permitted, e.g. a consume demoted because the value is used afterwards.
+  case unpermittedCopy(DiagnoseInst)
+
+  init?(_ inst: Instruction) {
+    switch inst {
+    case let diagnose as DiagnoseInst:
+      switch diagnose.kind {
+      case .unpermittedCopy: self = .unpermittedCopy(diagnose)
+      case .letReinit: self = .letReinit(diagnose)
+      case .missingSuperInit: self = .missingSuperInit(diagnose)
+      case .invalid: return nil
+      }
+    case let assign as AssignInst where assign.assignOwnership == .initialize && assign.source is Undef:
+      self = .useBeforeInit(assign)
+    default:
+      return nil
+    }
+  }
+
+  /// The `diagnose` instruction of the marker, unless it is a `useBeforeInit`, whose `assign` is a real
+  /// initialization.
+  var diagnose: DiagnoseInst? {
+    switch self {
+    case .letReinit(let diagnose), .missingSuperInit(let diagnose), .unpermittedCopy(let diagnose): diagnose
+    case .useBeforeInit: nil
+    }
+  }
+
+  static func markUsesBeforeInit(of leaves: [Int], in root: ResolvableRoot, _ context: some MutatingContext) {
+    let builder = Builder(after: root.markerInsertionPoint, context)
+    for leaf in leaves {
+      root.space.withElementAddress(forIndex: leaf, from: root.address, builder) { address in
+        let undef = Undef.get(type: address.type.objectType, context)
+        builder.createAssign(source: undef, destination: address, ownership: .initialize)
+      }
+    }
+  }
+
+  static func markLetReinit(of address: Value, before def: Instruction, _ context: some MutatingContext) {
+    Builder(before: def, context).createDiagnose(operand: address, kind: .letReinit)
+  }
+
+  static func markMissingSuperInit(of root: ResolvableRoot, _ context: some MutatingContext) {
+    Builder(after: root.markerInsertionPoint, context).createDiagnose(operand: root.address, kind: .missingSuperInit)
+  }
+
+  static func markUnpermittedCopy(_ load: LoadInst, _ context: some MutatingContext) {
+    Builder(after: load, context).createDiagnose(operand: load, kind: .unpermittedCopy)
+  }
+
+  static func markUnpermittedCopy(_ copy: CopyValueInst, _ context: some MutatingContext) {
+    Builder(after: copy, context).createDiagnose(operand: copy, kind: .unpermittedCopy)
+  }
+
+  static func markUnpermittedCopy(_ copyAddr: CopyAddrInst, _ context: some MutatingContext) {
+    Builder(after: copyAddr, context).createDiagnose(operand: copyAddr.source, kind: .unpermittedCopy)
+  }
+
+  /// The `load`, `copy_value`, or `copy_addr` that an `unpermitted_copy` marker is placed after.
+  var copy: Instruction? {
+    guard case .unpermittedCopy(let marker) = self else {
+      return nil
+    }
+    switch marker.operand.value {
+    case let load as LoadInst:
+      return load
+    case let copy as CopyValueInst:
+      return copy
+    case let address where address.type.isAddress:
+      guard let copyAddr = marker.previous as? CopyAddrInst, copyAddr.source == address else {
+        return nil
+      }
+      return copyAddr
+    default:
+      return nil
+    }
+  }
+}
+
+//===----------------------------------------------------------------------===//
 //                              Projection Paths
 //===----------------------------------------------------------------------===//
 

@@ -13,11 +13,7 @@
 import AST
 import SIL
 
-// Recognizes the markers left behind by LifetimeResolution's `legalize` and emits the user-facing diagnostics:
-//   - `assign undef to [init]`        -> use-before-init
-//   - `diagnose [let_reinit]`         -> second initialization of immutable storage
-//   - `diagnose [missing_super_init]` -> use of derived class `self` before `super.init`
-//   - `diagnose [unpermitted_copy]`   -> use-after-consume
+// Turns each LifetimeResolutionMarker left behind by LifetimeResolution into a user-facing diagnostic.
 let lifetimeResolutionDiagnosePass = FunctionPass(name: "lifetime-resolution-diagnose") {
   (function: Function, context: FunctionPassContext) in
 
@@ -27,23 +23,14 @@ let lifetimeResolutionDiagnosePass = FunctionPass(name: "lifetime-resolution-dia
 }
 
 private func diagnoseLifetimeViolations(_ function: Function, _ context: FunctionPassContext) {
-  // The `diagnose` markers are erased last, as they identify which copies were demoted consumes.
-  var unpermittedCopies: [DiagnoseInst] = []
-  var letReinits: [DiagnoseInst] = []
-  var missingSuperInits: [DiagnoseInst] = []
-  var undefInits: [AssignInst] = []
+  var markers: [LifetimeResolutionMarker] = []
   for inst in function.instructions {
-    switch inst {
-    case let diagnose as DiagnoseInst:
-      switch diagnose.kind {
-      case .unpermittedCopy: unpermittedCopies.append(diagnose)
-      case .letReinit: letReinits.append(diagnose)
-      case .missingSuperInit: missingSuperInits.append(diagnose)
-      case .invalid: break
-      }
-    case let assign as AssignInst where assign.assignOwnership == .initialize && assign.source is Undef:
-      undefInits.append(assign)
+    if let marker = LifetimeResolutionMarker(inst) {
+      markers.append(marker)
+      continue
+    }
 
+    switch inst {
     // Borrows of memory have now been checked by LifetimeResolution, so the `load_borrow` invariants can be enforced.
     case let loadBorrow as LoadBorrowInst where loadBorrow.isUnchecked:
       loadBorrow.set(isUnchecked: false, context)
@@ -55,16 +42,17 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
     }
   }
 
-  var diagnoser = Diagnoser(function, unpermittedCopies: unpermittedCopies, context)
-  diagnoser.diagnoseUsesBeforeInit(undefInits, missingSuperInits)
-  diagnoser.diagnoseLetReinits(letReinits)
+  var diagnoser = Diagnoser(function, markers, context)
+  diagnoser.diagnoseUsesBeforeInit(markers)
+  diagnoser.diagnoseLetReinits(markers)
   diagnoser.diagnoseUsesAfterConsume()
 
-  for marker in unpermittedCopies + letReinits + missingSuperInits {
-    context.erase(instruction: marker)
+  // The `diagnose` markers are erased last, as they identify which copies were demoted consumes.
+  for case let diagnose? in markers.map({ $0.diagnose }) {
+    context.erase(instruction: diagnose)
   }
 
-  if !unpermittedCopies.isEmpty || !letReinits.isEmpty || !missingSuperInits.isEmpty || !undefInits.isEmpty {
+  if !markers.isEmpty {
     // Ensure we actually did emit an error.
     guard context.hadError else {
       fatalError("LifetimeResolutionDiagnose didn't emit an error when it should have! \n\(function)")
@@ -504,18 +492,14 @@ private struct ConsumeSite {
 
   init?(_ marker: DiagnoseInst) {
     self.marker = marker
-    switch marker.operand.value {
+    switch LifetimeResolutionMarker.unpermittedCopy(marker).copy {
     case let load as LoadInst:
       instruction = load
       consumer = singleUse(of: load)
     case let copy as CopyValueInst:
       instruction = copy
       consumer = singleUse(of: copy)
-    case let address where address.type.isAddress:
-      // `copy_addr` immediately precedes its marker.
-      guard let copyAddr = marker.previous as? CopyAddrInst, copyAddr.source == address else {
-        return nil
-      }
+    case let copyAddr as CopyAddrInst:
       instruction = copyAddr
       consumer = callReceivingTemporary(copyAddr.destination)
     default:
@@ -603,14 +587,14 @@ private struct Diagnoser {
   private var explainedStorage: [Value] = []
   private var suggestedParameters: Set<ParamDecl> = []
 
-  init(_ function: Function, unpermittedCopies: [DiagnoseInst], _ context: FunctionPassContext) {
+  init(_ function: Function, _ markers: [LifetimeResolutionMarker], _ context: FunctionPassContext) {
     self.function = function
     self.context = context
     self.indexCache = FieldIndexTrieCache(for: function)
 
     var consumes: [ConsumeSite] = []
     var unrecognizedConsumes: [DiagnoseInst] = []
-    for marker in unpermittedCopies {
+    for case .unpermittedCopy(let marker) in markers {
       if let consume = ConsumeSite(marker) {
         consumes.append(consume)
       } else {
@@ -706,9 +690,8 @@ private struct Diagnoser {
   //                             Use before init
   //===--------------------------------------------------------------------===//
 
-  /// `assign undef to [init] %leaf`: the leaf is read before being initialized.
-  /// `diagnose [missing_super_init] %self`: derived class `self` is used before `super.init`.
-  mutating func diagnoseUsesBeforeInit(_ undefInits: [AssignInst], _ missingSuperInits: [DiagnoseInst]) {
+  /// Diagnoses the `useBeforeInit` and `missingSuperInit` markers.
+  mutating func diagnoseUsesBeforeInit(_ markers: [LifetimeResolutionMarker]) {
     // Group the uninitialized elements of each storage by the use that first observes them.
     var reports: [(storage: Storage, use: OffendingUse?, leaves: Set<Int>)] = []
     func report(_ storage: Storage, _ use: OffendingUse?, _ leaves: StateIndexSpace.IndexRange) {
@@ -720,7 +703,7 @@ private struct Diagnoser {
       }
     }
 
-    for marker in undefInits {
+    for case .useBeforeInit(let marker) in markers {
       guard let storage = storage(backing: marker.destination) else {
         diagnostics.diagnose(.definite_init_bug_unknown_storage, at: marker.location)
         continue
@@ -729,7 +712,7 @@ private struct Diagnoser {
       report(storage, findOffendingUse(of: .path(marker.destination.accessPath), in: uses(of: storage),
                                        after: marker, context), leaves)
     }
-    for marker in missingSuperInits {
+    for case .missingSuperInit(let marker) in markers {
       guard let storage = storage(backing: marker.operand.value),
             let superclass = storage.space.range(of: .superclass) else {
         diagnostics.diagnose(.definite_init_bug_unknown_storage, at: marker.location)
@@ -909,9 +892,9 @@ private struct Diagnoser {
   //                              Let re-init
   //===--------------------------------------------------------------------===//
 
-  /// `diagnose [let_reinit] %addr`: immutable storage at `%addr` may already be initialized.
-  mutating func diagnoseLetReinits(_ markers: [DiagnoseInst]) {
-    for marker in markers {
+  /// Diagnoses the `letReinit` markers.
+  mutating func diagnoseLetReinits(_ markers: [LifetimeResolutionMarker]) {
+    for case .letReinit(let marker) in markers {
       let address = marker.operand.value
       guard let storage = storage(backing: address) else {
         diagnostics.diagnose(.definite_init_bug_unknown_storage, at: marker.location)
@@ -955,7 +938,7 @@ private struct Diagnoser {
     var consumes: [ConsumeSite]
   }
 
-  /// `diagnose [unpermitted_copy] %x`: a consume was demoted to a copy, because the value is used afterwards.
+  /// Diagnoses the `unpermittedCopy` markers.
   mutating func diagnoseUsesAfterConsume() {
     for marker in unrecognizedConsumes {
       diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: marker.location)
