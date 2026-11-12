@@ -899,6 +899,9 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   if (!Opts.ClangIncludeTree.empty() || !Opts.ClangIncludeTreeFileList.empty())
     Opts.HasImmutableFileSystem = true;
 
+  for (const auto &Mapping : FrontendOpts.CacheReplayPrefixMap)
+    Opts.ScannerMappedPrefixes.push_back(Mapping.first);
+
   Opts.CASFSInputOverlay |= Args.hasArg(OPT_cas_fs_input_overlay);
   if (Opts.CASFSInputOverlay && Opts.EnableCaching) {
     // The content of the input files is read from disk, so it no longer
