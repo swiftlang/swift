@@ -32,6 +32,11 @@ struct Options {
     _bridged.enableSimplificationFor(inst.bridged)
   }
 
+  /// False if the mandatory verification is disabled for `function`, e.g. with `-sil-verify-none`.
+  func enableMandatoryVerification(for function: Function) -> Bool {
+    _bridged.enableMandatoryVerification(function.bridged)
+  }
+
   var noAllocations: Bool {
     _bridged.noAllocations()
   }

@@ -333,6 +333,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
+  bool enableMandatoryVerification(BridgedFunction function) const;
   BRIDGED_INLINE bool enableWMORequiredDiagnostics() const;
   BRIDGED_INLINE bool noAllocations() const;
 

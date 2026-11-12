@@ -1115,23 +1115,18 @@ public:
   /// fetched in the given module?
   bool isTypeMetadataForLayoutAccessible(SILType type);
 
-  void verify(bool isCompleteOSSA = true,
-              bool checkLinearLifetime = true) const;
+  void verify(bool checkLinearLifetime = true) const;
 
   /// Run the SIL verifier to make sure that all Functions follow
   /// invariants.
   void verify(CalleeCache *calleeCache,
-              bool isCompleteOSSA = true,
               bool checkLinearLifetime = true) const;
 
-  /// Run the SIL verifier without assuming OSSA lifetimes end at dead end
-  /// blocks.
+  /// Run the SIL verifier on SIL with incomplete OSSA lifetimes, e.g. before
+  /// SILGenCleanup. Linear lifetimes are not checked.
   void verifyIncompleteOSSA() const {
-    verify(/*isCompleteOSSA=*/false);
+    verify(/*checkLinearLifetime=*/false);
   }
-
-  /// Check linear OSSA lifetimes, assuming complete OSSA.
-  void verifyOwnership() const;
 
   /// Pretty-print the module.
   void dump(bool Verbose = false) const;

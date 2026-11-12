@@ -13,15 +13,12 @@
 #ifndef SWIFT_SIL_GUARANTEEDPHIVERIFIER_H
 #define SWIFT_SIL_GUARANTEEDPHIVERIFIER_H
 
-#include "LinearLifetimeCheckerPrivate.h"
-
+#include "swift/SIL/LinearLifetimeChecker.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILValue.h"
 
 namespace swift {
-
-class DeadEndBlocks;
 
 /// GuaranteedPhiVerifier validates the lifetime of the Reborrow or
 /// GuaranteedForwardingPhi lies within the lifetime of its base value. It uses
@@ -83,12 +80,6 @@ class DeadEndBlocks;
 /// path.
 ///
 class GuaranteedPhiVerifier {
-  /// A cache of dead-end basic blocks that we use to determine if we can
-  /// ignore "leaks".
-  DeadEndBlocks *deadEndBlocks = nullptr;
-  /// The builder that the checker uses to emit error messages, crash if asked
-  /// for, or supply back interesting info to the caller.
-  LinearLifetimeChecker::ErrorBuilder errorBuilder;
   /// A map of reborrow phi/guaranteed forwarding phi to its base values.
   /// Note that a reborrow phi arg can have different base values based on
   /// different control flow paths.
@@ -96,16 +87,16 @@ class GuaranteedPhiVerifier {
       dependentPhiToBaseValueMap;
 
 public:
-  GuaranteedPhiVerifier(const SILFunction *func, DeadEndBlocks *deadEndBlocks,
-                        LinearLifetimeChecker::ErrorBuilder errorBuilder)
-      : deadEndBlocks(deadEndBlocks), errorBuilder(errorBuilder) {}
-
   /// Verify whether the GuaranteedForwardingPhi uses of \p borrow are within
   /// its lifetime.
   void verifyGuaranteedForwardingPhis(BorrowedValue borrow);
 
 private:
-  /// Verifies whether the \p phi's lifetime lies within the \p baseValue
+  /// Verifies whether the \p phi's lifetime lies within the \p baseValue.
+  ///
+  /// Returns true if an error was found, i.e. the \p phi's lifetime is not
+  /// within the \p baseValue's lifetime. Returns false if no error was found or
+  /// if the (phi, baseValue) pair was already verified before.
   bool verifyDependentPhiLifetime(SILPhiArgument *phi, SILValue baseValue);
 };
 

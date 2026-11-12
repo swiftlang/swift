@@ -1849,6 +1849,7 @@ struct BridgedVerifier {
                             BridgedArgument atArgument);
   static void verifierError(BridgedStringRef message,
                             BridgedValue atValue);
+  static void verifyOwnership(BridgedValue value);
 };
 
 struct BridgedUtilities {

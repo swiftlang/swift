@@ -138,7 +138,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
 
   // If SIL parsing succeeded, verify the generated SIL.
   if (!parser.Diags.hadAnyError() && !DisableInputVerify) {
-    silMod->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
+    silMod->verify(/*checkLinearLifetime=*/!ParseIncompleteOSSA);
   }
 
   return silMod;

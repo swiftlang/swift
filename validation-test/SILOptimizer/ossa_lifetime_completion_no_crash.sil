@@ -1,9 +1,9 @@
-// RUN: %target-sil-opt -sil-print-types    \
-// RUN:     -test-runner                    \
-// RUN:     %s                              \
-// RUN:     -sil-disable-input-verify       \
-// RUN:     -disable-sil-ownership-verifier \
-// RUN:     -o /dev/null                    \
+// RUN: %target-sil-opt -sil-print-types        \
+// RUN:     -test-runner                        \
+// RUN:     %s                                  \
+// RUN:     -sil-disable-input-verify           \
+// RUN:     -disable-sil-ownership-verification \
+// RUN:     -o /dev/null                        \
 // RUN: 2>&1 | %FileCheck %s
 
 class C {}
