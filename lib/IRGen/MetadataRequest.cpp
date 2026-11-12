@@ -3276,6 +3276,18 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     llvm::Value *isNull = subIGF.Builder.CreateICmpEQ(
         load, llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
 
+    // We need to disambiguate between a cache that was populated by an abstract
+    // or complete metadata as we can't serve abstract metadata to a concrete
+    // request.
+    if (!request.isStaticallyAbstract()) {
+      auto ptrVal = subIGF.Builder.CreatePtrToInt(load, IGM.SizeTy);
+      llvm::Value *checkAbstractBitSet = subIGF.Builder.CreateAnd(
+          ptrVal, llvm::ConstantInt::get(IGM.SizeTy, 1));
+      checkAbstractBitSet = subIGF.Builder.CreateICmpEQ(
+          checkAbstractBitSet, llvm::ConstantInt::get(IGM.SizeTy, 1));
+      isNull = subIGF.Builder.CreateOr(checkAbstractBitSet, isNull);
+    }
+
     subIGF.Builder.CreateCondBr(isNull, isUnfilledBB, contBB);
     auto loadBB = subIGF.Builder.GetInsertBlock();
 
@@ -3347,12 +3359,22 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     call->setOnlyReadsMemory();
     call->setCallingConv(IGM.SwiftCC);
 
+    llvm::Value *resultWord = call;
+    // Mark the stored value as statically abstract so we can dis-ambiguate
+    // between abstract (in-complete) and complete metadata.
+    if (request.isStaticallyAbstract()) {
+      auto ptrVal = subIGF.Builder.CreatePtrToInt(resultWord, IGM.SizeTy);
+      resultWord = subIGF.Builder.CreateOr(
+          ptrVal, llvm::ConstantInt::get(IGM.SizeTy, 1));
+      resultWord =
+          subIGF.Builder.CreateIntToPtr(resultWord, IGM.TypeMetadataPtrTy);
+    }
+
     // Store the result back to the cache. Metadata instantiation should
     // already have emitted the necessary barriers to publish the instantiated
     // metadata to other threads, so we only need to expose the pointer.
     // Worst case, another thread might race with us and reinstantiate the
     // exact same metadata pointer.
-    auto resultWord = call;
     auto store = subIGF.Builder.CreateStore(resultWord, cacheWordAddr,
                                             Alignment(IGM.getPointerAlignment()));
     store->setOrdering(llvm::AtomicOrdering::Monotonic);
@@ -3364,7 +3386,18 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     phi->addIncoming(load, loadBB);
     phi->addIncoming(resultWord, isUnfilledBB);
 
-    subIGF.Builder.CreateRet(phi);
+    // Mask of the marking bit we used to mark the inline cache entry as
+    // abstract.
+    llvm::Value *resultVal = phi;
+    if (request.isStaticallyAbstract()) {
+      resultVal = subIGF.Builder.CreatePtrToInt(resultVal, IGM.SizeTy);
+      resultVal = subIGF.Builder.CreateAnd(
+          resultVal, llvm::ConstantInt::getSigned(IGM.SizeTy, -2));
+      resultVal =
+          subIGF.Builder.CreateIntToPtr(resultVal, IGM.TypeMetadataPtrTy);
+    }
+
+    subIGF.Builder.CreateRet(resultVal);
   };
   auto instantiationFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
       instantiationFnName, IGF.IGM.TypeMetadataPtrTy,
