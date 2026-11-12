@@ -426,9 +426,9 @@ ProtocolConformanceDescriptor::getWitnessTable(
   }
 #if SWIFT_STDLIB_USE_RELATIVE_PROTOCOL_WITNESS_TABLES
   auto wtable = (const WitnessTable *)
-    swift_getWitnessTableRelative(this, type, conditionalArgs.data());
+    _getWitnessTableRelative(this, type, conditionalArgs.data());
 #else
-  auto wtable = swift_getWitnessTable(this, type, conditionalArgs.data());
+  auto wtable = _getWitnessTable(this, type, conditionalArgs.data());
 #endif
 
   if (!wtable)
