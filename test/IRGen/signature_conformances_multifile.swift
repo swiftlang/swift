@@ -6,7 +6,7 @@
 // CHECK-LABEL: define hidden swiftcc void @"$s32signature_conformances_multifile5passQyyF"()
 func passQ() {
   // CHECK: call swiftcc void @"$s32signature_conformances_multifile12AlsoConformsVACyxGycfC"(ptr @"$sSiN")
-  // CHECK: %0 = call {{.*}} @"$s32signature_conformances_multifile12AlsoConformsVySiGMD"
+  // CHECK: %0 = call {{.*}} @"$s32signature_conformances_multifile12AlsoConformsVySiGMd"
   // CHECK: %1 = call ptr @"$s32signature_conformances_multifile12AlsoConformsVySiGACyxGAA1QAAWl"()
   // CHECK: call swiftcc void @"$s32signature_conformances_multifile6takesQyyxAA1QRzlF"(ptr noalias undef, ptr %0, ptr %1)
   takesQ(AlsoConforms<Int>())
@@ -17,7 +17,7 @@ func passQ() {
 // CHECK-LABEL: define hidden swiftcc void @"$s32signature_conformances_multifile5passPyyF"()
 func passP() {
   // CHECK: call swiftcc void @"$s32signature_conformances_multifile8ConformsVACyxq_GycfC"(ptr @"$sSiN", ptr @"$sSSN")
-  // CHECK: %0 = call {{.*}} @"$s32signature_conformances_multifile8ConformsVySiSSGMD"
+  // CHECK: %0 = call {{.*}} @"$s32signature_conformances_multifile8ConformsVySiSSGMd"
   // CHECK: %1 = call ptr @"$s32signature_conformances_multifile8ConformsVySiSSGACyxq_GAA1PAAWl"()
   // CHECK: call swiftcc void @"$s32signature_conformances_multifile6takesPyyxAA1PRzlF"(ptr noalias undef, ptr %0, ptr %1)
   takesP(Conforms<Int, String>())

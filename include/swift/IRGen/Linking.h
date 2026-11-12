@@ -471,6 +471,10 @@ class LinkEntity {
     /// The pointer is a canonical TypeBase*.
     TypeMetadataDemanglingCacheVariable,
 
+    /// Pair of a relative pointer to and size of the mangled name of a
+    /// type metadata.
+    TypeMetadataMangledNameRef,
+
     /// A reflection metadata descriptor for a builtin or imported type.
     ReflectionBuiltinDescriptor,
 
@@ -956,6 +960,12 @@ public:
   static LinkEntity forTypeMetadataDemanglingCacheVariable(CanType type) {
     LinkEntity entity;
     entity.setForType(Kind::TypeMetadataDemanglingCacheVariable, type);
+    return entity;
+  }
+
+  static LinkEntity forTypeMetadataMangledNameRef(CanType type) {
+    LinkEntity entity;
+    entity.setForType(Kind::TypeMetadataMangledNameRef, type);
     return entity;
   }
 

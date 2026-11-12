@@ -35,7 +35,7 @@ func useGenericMetatype(_: any (~Copyable & ~Escapable).Type) { }
 // CHECK-LABEL: define hidden swiftcc void @"$s20backward_deploy_span11testSpanIntyyF"()
 func testSpanInt() {
   // CHECK-ACCESSOR: call swiftcc %swift.metadata_response @"$ss4SpanVySiGMa"
-  // CHECK-DEMANGLE: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$ss4SpanVySiGMD")
+  // CHECK-DEMANGLE: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$ss4SpanVySiGMd", ptr @"$ss4SpanVySiGMR")
   // CHECK: call swiftcc void @"$s20backward_deploy_span18useGenericMetatypeyyypRi_s_Ri0_sXPXpF"
   useGenericMetatype(Span<Int>.self)
 }
@@ -48,7 +48,7 @@ func testSpanInt() {
 // CHECK-LABEL: define hidden swiftcc void @"$s20backward_deploy_span18testMutableSpanIntyyF"()
 func testMutableSpanInt() {
   // CHECK-ACCESSOR: call swiftcc %swift.metadata_response @"$ss11MutableSpanVySiGMa"
-  // CHECK-DEMANGLE: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$ss11MutableSpanVySiGMD")
+  // CHECK-DEMANGLE: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$ss11MutableSpanVySiGMd", ptr @"$ss11MutableSpanVySiGMR")
   // CHECK: call swiftcc void @"$s20backward_deploy_span18useGenericMetatypeyyypRi_s_Ri0_sXPXpF"
   useGenericMetatype(MutableSpan<Int>.self)
 }
@@ -61,7 +61,7 @@ func testMutableSpanInt() {
 // CHECK-LABEL: define hidden swiftcc void @"$s20backward_deploy_span17testOutputSpanIntyyF"()
 func testOutputSpanInt() {
   // CHECK-ACCESSOR: call swiftcc %swift.metadata_response @"$ss10OutputSpanVySiGMa"
-  // CHECK-DEMANGLE: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$ss10OutputSpanVySiGMD")
+  // CHECK-DEMANGLE: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$ss10OutputSpanVySiGMd", ptr @"$ss10OutputSpanVySiGMR")
   // CHECK: call swiftcc void @"$s20backward_deploy_span18useGenericMetatypeyyypRi_s_Ri0_sXPXpF"
   useGenericMetatype(OutputSpan<Int>.self)
 }

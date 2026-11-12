@@ -2582,7 +2582,10 @@ NodePointer Demangler::demangleMetatype() {
                              Ty->getChild(0));
     }
     case 'D':
+    case 'd':
       return createWithPoppedType(Node::Kind::TypeMetadataDemanglingCache);
+    case 'R':
+      return createWithPoppedType(Node::Kind::TypeMetadataMangledNameRef);
     case 'f':
       return createWithPoppedType(Node::Kind::FullTypeMetadata);
     case 'F':

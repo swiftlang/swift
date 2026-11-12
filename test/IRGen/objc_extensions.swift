@@ -224,12 +224,12 @@ class SwiftSubGizmo : SwiftBaseGizmo {
 extension FungingArray {
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsEyAByxGxcfC"
   // CHECK-SAME: (ptr %0, ptr swiftself %1)
-  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}@"$sSo9NSFunging_pMd"{{.*}}!dbg
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsEyAByxGxcfc"
   // CHECK-SAME: (ptr %0, ptr swiftself %1)
   // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
-  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}@"$sSo9NSFunging_pMd"{{.*}}!dbg
   // CHECK: {{%[^, =]+}} = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
   // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
   // CHECK: [[BUFPTR:%[^, =]+]] = {{.*}} [[ANYBUF]]
@@ -242,12 +242,12 @@ extension FungingArray {
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsE7pinningAByxGxm_tcfC"
   // CHECK-SAME: (ptr %0, ptr swiftself %1)
-  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}@"$sSo9NSFunging_pMd"{{.*}}!dbg
 
   // CHECK-LABEL: define {{.*}} @"$sSo12FungingArrayC15objc_extensionsE7pinningAByxGxm_tcfc"
   // CHECK-SAME: (ptr %0, ptr swiftself %1)
   // CHECK: [[ALLOCA:%[^, =]+]] = alloca %Any, align 8
-  // CHECK: @__swift_instantiateConcreteTypeFromMangledName{{.*}}@"$sSo9NSFunging_pMD"{{.*}}!dbg
+  // CHECK: @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}@"$sSo9NSFunging_pMd"{{.*}}!dbg
   // CHECK: [[OBJC_CLASS:%[^, =]+]] = call ptr @swift_getObjCClassFromMetadata(ptr %0)
   // CHECK: {{%[^, =]+}} = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0
   // CHECK: [[ANYBUF:%[^, =]+]] = getelementptr inbounds{{.*}} %Any, ptr [[ALLOCA]], i32 0, i32 0

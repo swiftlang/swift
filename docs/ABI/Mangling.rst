@@ -136,6 +136,9 @@ Globals
   global ::= type 'MP'                   // type metadata pattern
   global ::= type 'Ma'                   // type metadata access function
   global ::= type 'ML'                   // type metadata lazy cache variable
+  global ::= type 'MD'                   // type metadata demangling cache variable (old)
+  global ::= type 'Md'                   // type metadata demangling cache variable
+  global ::= type 'MR'                   // type metadata mangled name ref
   global ::= nominal-type 'Mr'           // generic type completion function
   global ::= nominal-type 'Mi'           // generic type instantiation function
   global ::= nominal-type 'MI'           // generic type instantiation cache

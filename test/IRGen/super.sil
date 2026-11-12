@@ -206,7 +206,7 @@ sil_vtable Derived {
 }
 
 // CHECK-LABEL: define{{.*}} @test_super_method_of_generic_base
-// CHECK: [[METADATA:%.*]] = call {{.*}}@"$s5super4BaseCyAA3StrVGMD"
+// CHECK: [[METADATA:%.*]] = call {{.*}}@"$s5super4BaseCyAA3StrVGMd"
 // CHECK: [[GEP:%.*]] = getelementptr inbounds ptr, ptr [[METADATA]]
 // CHECK: [[SUPERMT:%.*]] = load ptr, ptr [[GEP]]
 // CHECK: ret void

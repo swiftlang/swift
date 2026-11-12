@@ -62,25 +62,25 @@ assert(assocIsolated(MyStruct.self) == ActorIsolatedFn.self)
 // NEW-NOT: define linkonce_odr hidden swiftcc %swift.metadata_response @"$syyScMYccMa"
 
 // OLD: call swiftcc %swift.metadata_response @"$syyYbcMa"
-// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYbcMD")
+// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$syyYbcMd", ptr @"$syyYbcMR")
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$syyYbcMa"
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYbcMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$syyYbcMd", ptr @"$syyYbcMR")
 
 // OLD: call swiftcc %swift.metadata_response @"$syyYacMa"
-// OLD-NOT: ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYacMD")
+// OLD-NOT: ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$syyYacMd", ptr @"$syyYacMR")
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$syyYacMa"
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyYacMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$syyYacMd", ptr @"$syyYacMR")
 
 // OLD: call swiftcc %swift.metadata_response @"$syyScMYccMa"
-// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyScMYccMD")
+// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$syyScMYccMd", ptr @"$syyScMYccMR")
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$syyScMYccMa"
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$syyScMYccMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$syyScMYccMd", ptr @"$syyScMYccMR")
 
 // OLD: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0)
-// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSS4main7MyActorCYicMD")
+// OLD-NOT: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$sSS4main7MyActorCYicMd", ptr @"$sSS4main7MyActorCYicMR")
 
 // NEW-NOT: call swiftcc %swift.metadata_response @"$sSS4main7MyActorCYicMa"(i64 0)
-// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSS4main7MyActorCYicMD")
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$sSS4main7MyActorCYicMd", ptr @"$sSS4main7MyActorCYicMR")
