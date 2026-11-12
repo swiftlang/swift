@@ -26,7 +26,7 @@ struct Value<T> {
 }
 
 // CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-// CHECK:   [[TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main5ValueVySo12NSDictionaryCGMD")
+// CHECK:   [[TYPE:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s4main5ValueVySo12NSDictionaryCGMd", ptr @"$s4main5ValueVySo12NSDictionaryCGMR")
 // CHECK:      call swiftcc void @"$s4main7consumeyyxlF"(
 // CHECK-SAME:   ptr noalias {{%.*}}, 
 // CHECK-SAME:   ptr [[TYPE]])

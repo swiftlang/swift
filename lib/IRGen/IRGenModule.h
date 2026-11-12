@@ -1973,6 +1973,8 @@ public:
   llvm::Constant *getAddrOfTypeMetadataLazyCacheVariable(CanType type);
   llvm::Constant *getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
                                                        ConstantInit definition);
+  llvm::Constant *getAddrOfTypeMetadataMangledNameRef(CanType type,
+                                                      ConstantInit definition);
   llvm::Constant *getAddrOfCanonicalPrespecializedGenericTypeCachingOnceToken(
       NominalTypeDecl *decl);
   llvm::Constant *getAddrOfNoncanonicalSpecializedGenericTypeMetadataCacheVariable(CanType type);
