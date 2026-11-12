@@ -663,6 +663,7 @@ struct BridgedFunction {
   bool isAutodiffVJP() const;
   bool isAutodiffSubsetParametersThunk() const;
   SwiftInt specializationLevel() const;
+  SwiftInt closureSpecializationLevel() const;
   SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap getMethodSubstitutions(BridgedSubstitutionMap contextSubs,
                                                                     BridgedCanType selfType) const;
   BRIDGED_INLINE OptionalSourceFileKind getSourceFileKind() const;
@@ -873,6 +874,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE SwiftInt LoadInst_getLoadOwnership() const ;
   BRIDGED_INLINE bool LoadBorrowInst_isUnchecked() const ;
   BRIDGED_INLINE void LoadBorrowInst_setUnchecked(bool unchecked) const;
+  BRIDGED_INLINE void LoadBorrow_setValueHint(BridgedValue v) const;
   BRIDGED_INLINE BuiltinValueKind BuiltinInst_getID() const;
   BRIDGED_INLINE IntrinsicID BuiltinInst_getIntrinsicID() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef BuiltinInst_getName() const;
@@ -1848,6 +1850,7 @@ struct BridgedVerifier {
                             BridgedArgument atArgument);
   static void verifierError(BridgedStringRef message,
                             BridgedValue atValue);
+  static void verifyOwnership(BridgedValue value);
 };
 
 struct BridgedUtilities {

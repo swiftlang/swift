@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -disable-swift-verification -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
-// REQUIRES: asserts
+// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing %s -o /dev/null 2>&1 | %FileCheck %s
 
 class Klass {}
 
@@ -98,36 +97,6 @@ bb3(%9 : @reborrow $Klass):
   destroy_value %0
   %14 = tuple ()
   return %14
-}
-
-// CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_forwarding_phi_of_result'
-// CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
-// CHECK: Value:   %4 = apply %3(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
-// CHECK-LABEL: Error#: 0. End Error in Function: 'test_forwarding_phi_of_result'
-// CHECK-LABEL: Error#: 1. Begin Error in Function: 'test_forwarding_phi_of_result'
-// CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
-// CHECK: Value:   %7 = begin_borrow %6 : $Klass
-// CHECK-LABEL: Error#: 1. End Error in Function: 'test_forwarding_phi_of_result'
-sil [ossa] @test_forwarding_phi_of_result : $@convention(thin) (@owned Wrapper) -> () {
-bb0(%0 : @owned $Wrapper):
-  %1 = begin_borrow %0
-  cond_br undef, bb1, bb2
-
-bb1:
-  %3 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
-  %4 = apply %3(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
-  br bb3(%4)
-
-bb2:
-  %6 = struct_extract %1, #Wrapper._k
-  %7 = begin_borrow %6
-  br bb3(%7)
-
-bb3(%9 : @guaranteed $Klass):
-  end_borrow %1
-  destroy_value %0
-  %12 = tuple ()
-  return %12
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'test_use_after_free_owned_self'
@@ -241,7 +210,7 @@ bb0(%0 : @owned $WrapperBox):
 // CHECK: Found outside of lifetime use?!
 // CHECK: Value:   %3 = apply %2(%1) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
 // CHECK: Consuming User:   end_borrow %3 : $Klass
-// CHECK: Non Consuming User:   %9 = apply %8(%6) : $@convention(thin) (@guaranteed KlassPair) -> ()
+// CHECK: Non Consuming User:   %10 = apply %9(%7) : $@convention(thin) (@guaranteed KlassPair) -> ()
 // CHECK-LABEL: Error#: 0. End Error in Function: 'test_forwarded_result_phi_outlives_result'
 sil [ossa] @test_forwarded_result_phi_outlives_result : $@convention(thin) (@owned Wrapper) -> () {
 bb0(%0 : @owned $Wrapper):
@@ -252,9 +221,10 @@ bb0(%0 : @owned $Wrapper):
   br bb1(%4)
 
 bb1(%6 : @guaranteed $KlassPair):
+  %7 = borrowed %6 from (%3)
   end_borrow %3
   %8 = function_ref @use_klass_pair : $@convention(thin) (@guaranteed KlassPair) -> ()
-  %9 = apply %8(%6) : $@convention(thin) (@guaranteed KlassPair) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@guaranteed KlassPair) -> ()
   end_borrow %1
   destroy_value %0
   %12 = tuple ()

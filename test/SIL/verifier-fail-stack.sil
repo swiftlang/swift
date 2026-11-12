@@ -35,7 +35,6 @@ bb3:
 
 //   Same as above, just with the branches switched around.
 // CHECK-LABEL: Begin Error in function require_match_2
-// CHECK-LABEL: Begin Error in function require_match_2
 // CHECK:       SIL verification failed: inconsistent stack states entering basic block
 // CHECK-NEXT:  Entering basic block bb3
 // CHECK-NEXT:  Current stack state: [

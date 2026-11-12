@@ -519,7 +519,7 @@ func testConsumingLetCapturedByAtMostOnceClosure() {
 func testCallingLetCapturedByEscapingClosure() {
   let g = { @callable(once) in } // expected-error {{non-'Copyable' 'g' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
   escaping {
-    calledAtMostOnce { g() } // expected-note {{consumed here}}
+    calledAtMostOnce { g() } // expected-note {{called here; calling a '@callable(once)' function consumes it}}
   }
 }
 
@@ -528,7 +528,7 @@ func testCallingLetCapturedByEscapingClosure() {
 func testCallingLetCapturedByLocalFunction() {
   let g = { @callable(once) in } // expected-error {{non-'Copyable' 'g' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type}}
   func local() {
-    calledAtMostOnce { g() } // expected-note {{consumed here}}
+    calledAtMostOnce { g() } // expected-note {{called here; calling a '@callable(once)' function consumes it}}
   }
   local()
   local()

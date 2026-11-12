@@ -104,7 +104,12 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isAddressor: Bool { bridged.isAddressor() }
 
+  /// The nesting level of constant-capture-propagation specializations (see ConstantCapturePropagation).
   public var specializationLevel: Int { bridged.specializationLevel() }
+
+  /// The number of closure specializations (see ClosureSpecialization) which are applied on top of
+  /// each other to create this function, e.g. 2 for a closure specialization of a closure specialization.
+  public var closureSpecializationLevel: Int { bridged.closureSpecializationLevel() }
 
   public var isSpecialization: Bool { bridged.isSpecialization() }
 

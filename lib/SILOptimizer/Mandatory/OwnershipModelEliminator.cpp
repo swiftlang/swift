@@ -213,6 +213,11 @@ struct OwnershipModelEliminatorVisitor
     return true;
   }
 
+  bool visitUncheckedOwnershipInst(UncheckedOwnershipInst *uoi) {
+    eraseInstructionAndRAUW(uoi, uoi->getOperand());
+    return true;
+  }
+
   bool visitUnmanagedRetainValueInst(UnmanagedRetainValueInst *urvi);
   bool visitUnmanagedReleaseValueInst(UnmanagedReleaseValueInst *urvi);
   bool visitUnmanagedAutoreleaseValueInst(UnmanagedAutoreleaseValueInst *uavi);
@@ -328,16 +333,20 @@ bool OwnershipModelEliminatorVisitor::visitStoreBorrowInst(
 }
 
 bool OwnershipModelEliminatorVisitor::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  // Break down the load borrow into an unqualified load.
-  auto newLoad =
-      withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
-        return b.createLoad(loc, lbi->getOperand(),
-                            LoadOwnershipQualifier::Unqualified);
-      });
+  SILValue newValue;
+  if (lbi->hasValueHint()) {
+    newValue = lbi->getValueHint();
+  } else {
+    // Break down the load borrow into an unqualified load.
+    newValue = withBuilder<SILValue>(lbi, [&](SILBuilder &b, SILLocation loc) {
+          return b.createLoad(loc, lbi->getAddress(),
+                              LoadOwnershipQualifier::Unqualified);
+        });
+  }
 
   // Then remove the qualified load and use the unqualified load as the def of
   // all of LI's uses.
-  eraseInstructionAndRAUW(lbi, newLoad);
+  eraseInstructionAndRAUW(lbi, newValue);
   return true;
 }
 
@@ -927,17 +936,11 @@ struct OwnershipModelEliminator : SILModuleTransform {
             "Found verification error when verifying before lowering "
             "ownership. Please re-run with -sil-verify-all to identify the "
             "actual pass that introduced the verification error.");
-        //
-        // Check linear lifetimes with verifyOwnership() rather than the SIL
-        // verifier because verifyOwnership() also runs in compilers built
-        // without assertions.
-        f.verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache(),
-                 /*dominanceInfo=*/nullptr, /*SingleFunction=*/true,
-                 /*isCompleteOSSA=*/true, /*checkLinearLifetime=*/false);
-        // The Swift verifier is separate from the C++ verifier and checks
-        // additional OSSA invariants, such as borrowed-from and reborrow flags.
-        getPassManager()->runSwiftFunctionVerification(&f);
-        f.verifyOwnership();
+        // The mandatory verification checks linear lifetimes and additional
+        // OSSA invariants, such as borrowed-from and reborrow flags. In
+        // contrast to the SIL verifier, it also runs in compilers built without
+        // assertions.
+        getPassManager()->runVerification(&f);
       }
 
       if (stripOwnership(f)) {

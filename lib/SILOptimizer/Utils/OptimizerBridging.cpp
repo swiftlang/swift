@@ -45,7 +45,8 @@ llvm::cl::list<std::string>
 
 llvm::cl::opt<bool> DisableSwiftVerification(
     "disable-swift-verification", llvm::cl::init(false),
-    llvm::cl::desc("Disable verification which is implemented in the SwiftCompilerSources"));
+    llvm::cl::desc("Disable the mandatory verification which is implemented in "
+                   "the SwiftCompilerSources, including ownership verification"));
 
 
 #ifdef PURE_BRIDGING_MODE
@@ -57,25 +58,24 @@ llvm::cl::opt<bool> DisableSwiftVerification(
 //                              PassManager
 //===----------------------------------------------------------------------===//
 
-void SILPassManager::runSwiftFunctionVerification(SILFunction *f) {
-  if (f->getModule().getOptions().VerifyNone)
-    return;
+bool SILPassManager::isMandatoryVerificationEnabled(SILFunction *f) {
+  return !f->getModule().getOptions().VerifyNone &&
+         !DisableSwiftVerification &&
+         !f->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION);
+}
 
-  if (DisableSwiftVerification)
+void SILPassManager::runMandatoryVerification(SILFunction *f) {
+  if (!isMandatoryVerificationEnabled(f))
     return;
-
-  if (f->hasSemanticsAttr(semantics::NO_SIL_VERIFICATION)) {
-    return;
-  }
 
   SILFunction *prevFunction = getSwiftPassInvocation()->beginVerifyFunction(f);
   BridgedVerifier::runSwiftFunctionVerification(f, getSwiftPassInvocation());
   getSwiftPassInvocation()->endVerifyFunction(prevFunction);
 }
 
-void SILPassManager::runSwiftModuleVerification() {
+void SILPassManager::runMandatoryModuleVerification() {
   for (SILFunction &f : *Mod) {
-    runSwiftFunctionVerification(&f);
+    runMandatoryVerification(&f);
   }
 }
 
@@ -540,6 +540,10 @@ void BridgedPassContext::fixStackNesting(BridgedFunction function) const {
       break;
   }
   invocation->setNeedFixStackNesting(false);
+}
+
+bool BridgedPassContext::enableMandatoryVerification(BridgedFunction function) const {
+  return SILPassManager::isMandatoryVerificationEnabled(function.getFunction());
 }
 
 bool BridgedPassContext::enableSimplificationFor(BridgedInstruction inst) const {

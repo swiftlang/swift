@@ -941,7 +941,7 @@ public:
     auto &diffBuilder = getDifferentialBuilder();
     auto *bb = lbi->getParent();
     auto loc = lbi->getLoc();
-    auto tanBuf = getTangentBuffer(bb, lbi->getOperand());
+    auto tanBuf = getTangentBuffer(bb, lbi->getAddress());
     auto tanVal = diffBuilder.emitLoadBorrowOperation(loc, tanBuf);
     setTangentValue(bb, lbi, makeConcreteTangentValue(tanVal));
   }

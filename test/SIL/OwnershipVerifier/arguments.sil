@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -disable-swift-verification -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
-// REQUIRES: asserts
+// RUN: %target-sil-opt -module-name Swift -sil-ownership-verifier-enable-testing %s -o /dev/null 2>&1 | %FileCheck %s
 
 // This is a test that verifies ownership behavior around arguments that should
 // be flagged as failures.
@@ -32,6 +31,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%0 : $Builtin.NativeObject)
 
 bb1(%1 : @guaranteed $Builtin.NativeObject):
+  %bf_1 = borrowed %1 from (%0)
   %9999 = tuple()
   return %9999 : $()
 }
@@ -48,6 +48,7 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%1 : $Builtin.NativeObject)
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
+  %bf_2 = borrowed %2 from (%1)
   %9999 = tuple()
   return %9999 : $()
 }
@@ -66,10 +67,11 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%1 : $Builtin.NativeObject)
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
+  %bf_2 = borrowed %2 from (%0)
   cond_br undef, bb2, bb3
 
 bb2:
-  end_borrow %2 : $Builtin.NativeObject
+  end_borrow %bf_2 : $Builtin.NativeObject
   br bb4
 
 bb3:
@@ -85,7 +87,7 @@ bb4:
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'leak_along_subarg_path'
 // CHECK: Error! Found a leak due to a consuming post-dominance failure!
-// CHECK: Value: %7 = argument of bb3 : $Builtin.NativeObject
+// CHECK: Value: %8 = argument of bb3 : $Builtin.NativeObject
 // CHECK: Post Dominating Failure Blocks:
 // CHECK: bb6
 // CHECK: Error#: 0. End Error in Function: 'leak_along_subarg_path'
@@ -97,17 +99,19 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%1 : $Builtin.NativeObject)
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
+  %bf_2 = borrowed %2 from (%0)
   cond_br undef, bb2, bb5
 
 bb2:
-  %2a = begin_borrow %2 : $Builtin.NativeObject
+  %2a = begin_borrow %bf_2 : $Builtin.NativeObject
   br bb3(%2a : $Builtin.NativeObject)
 
 bb3(%3 : @guaranteed $Builtin.NativeObject):
+  %bf_3 = borrowed %3 from (%2)
   cond_br undef, bb4, bb6
 
 bb4:
-  end_borrow %3 : $Builtin.NativeObject
+  end_borrow %bf_3 : $Builtin.NativeObject
   br bb7
 
 bb5:
@@ -117,7 +121,7 @@ bb6:
   br bb7
   
 bb7:
-  end_borrow %2 : $Builtin.NativeObject
+  end_borrow %bf_2 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }
@@ -132,7 +136,8 @@ bb1:
   br bb2(%1 : $Builtin.NativeObject)
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow %2 : $Builtin.NativeObject
+  %bf_2 = borrowed %2 from (%0)
+  end_borrow %bf_2 : $Builtin.NativeObject
   cond_br undef, bb3, bb6
 
 bb3:
@@ -162,7 +167,8 @@ bb1:
   br bb2(%1a : $Builtin.NativeObject)
 
 bb2(%2 : @guaranteed $Builtin.NativeObject):
-  end_borrow %2 : $Builtin.NativeObject
+  %bf_2 = borrowed %2 from (%1)
+  end_borrow %bf_2 : $Builtin.NativeObject
   end_borrow %1 : $Builtin.NativeObject
   cond_br undef, bb3, bb6
 
@@ -203,7 +209,7 @@ bb1:
   br bb2(%1a : $Builtin.NativeObject)
 
 bb2(%2 : @reborrow $Builtin.NativeObject):
-  %2bf = borrowed %2 : $Builtin.NativeObject from (%1 : $Builtin.NativeObject)
+  %2bf = borrowed %2 from (%1)
   end_borrow %1 : $Builtin.NativeObject
   end_borrow %2bf : $Builtin.NativeObject
   cond_br undef, bb3, bb6
@@ -226,35 +232,35 @@ bb6:
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Found outside of lifetime use?!
-// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %20, %15, %7, %6, %3
+// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %21, %16, %7, %6, %3
 // CHECK: Consuming User:   end_borrow %1 : $Builtin.NativeObject           // id: %7
 // CHECK: Non Consuming User:   end_borrow %6 : $Builtin.NativeObject           // id: %8
 // CHECK: Block: bb2
 // CHECK: Error#: 0. End Error in Function: 'bad_order_add_a_level'
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Found over consume?!
-// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %20, %15, %7, %6, %3
-// CHECK: User:   end_borrow %1 : $Builtin.NativeObject           // id: %15
+// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %21, %16, %7, %6, %3
+// CHECK: User:   end_borrow %1 : $Builtin.NativeObject           // id: %16
 // CHECK: Block: bb2
 // CHECK: Consuming Users:
 // CHECK:   end_borrow %1 : $Builtin.NativeObject           // id: %7
-// CHECK:   end_borrow %1 : $Builtin.NativeObject           // id: %15
-// CHECK:   end_borrow %1 : $Builtin.NativeObject           // id: %20
+// CHECK:   end_borrow %1 : $Builtin.NativeObject           // id: %16
+// CHECK:   end_borrow %1 : $Builtin.NativeObject           // id: %21
 // CHECK: Error#: 1. End Error in Function: 'bad_order_add_a_level'
 // CHECK-LABEL: Error#: 2. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Error! Found a leak due to a consuming post-dominance failure!
-// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %20, %15, %7, %6, %3
+// CHECK: Value:   %1 = begin_borrow %0 : $Builtin.NativeObject    // users: %21, %16, %7, %6, %3
 // CHECK: Post Dominating Failure Blocks:
 // CHECK:  bb3
 // CHECK: Error#: 2. End Error in Function: 'bad_order_add_a_level'
 // CHECK-LABEL: Error#: 3. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Found over consume?!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // user: %6
-// CHECK: User:   end_borrow %6 : $Builtin.NativeObject           // id: %14
+// CHECK: User:   end_borrow %6 : $Builtin.NativeObject           // id: %15
 // CHECK: Block: bb2
 // CHECK: Consuming Users:
 // CHECK:   end_borrow %6 : $Builtin.NativeObject           // id: %8
-// CHECK:   end_borrow %6 : $Builtin.NativeObject           // id: %14
+// CHECK:   end_borrow %6 : $Builtin.NativeObject           // id: %15
 // CHECK: Error#: 3. End Error in Function: 'bad_order_add_a_level'
 // CHECK-LABEL: Error#: 4. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Error! Found a leak due to a consuming post-dominance failure!
@@ -265,18 +271,18 @@ bb6:
 // CHECK-LABEL: Error#: 5. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Found outside of lifetime use!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // user: %6
-// CHECK: User:  %10 = begin_borrow %6 : $Builtin.NativeObject   // user: %11
+// CHECK: User:  %10 = begin_borrow %6 : $Builtin.NativeObject   // users: %13, %11
 // CHECK: Block: bb3
 // CHECK: Error#: 5. End Error in Function: 'bad_order_add_a_level'
 // CHECK-LABEL: Error#: 6. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Found outside of lifetime use!
 // CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // user: %6
-// CHECK: User:  %10 = begin_borrow %6 : $Builtin.NativeObject   // user: %11
+// CHECK: User:  %10 = begin_borrow %6 : $Builtin.NativeObject   // users: %13, %11
 // CHECK: Block: bb3
 // CHECK: Error#: 6. End Error in Function: 'bad_order_add_a_level'
 // CHECK-LABEL: Error#: 7. Begin Error in Function: 'bad_order_add_a_level'
 // CHECK: Non trivial values, non address values, and non guaranteed function args must have at least one lifetime ending use?!
-// CHECK: Value:   %10 = begin_borrow %6 : $Builtin.NativeObject   // user: %11
+// CHECK: Value:   %10 = begin_borrow %6 : $Builtin.NativeObject   // users: %13, %11
 // CHECK: Error#: 7. End Error in Function: 'bad_order_add_a_level'
 sil [ossa] @bad_order_add_a_level : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
@@ -288,7 +294,7 @@ bb1:
   br bb2(%2 : $Builtin.NativeObject)
 
 bb2(%4 : @reborrow $Builtin.NativeObject):
-  %4bf = borrowed %4 : $Builtin.NativeObject from (%1 : $Builtin.NativeObject)
+  %4bf = borrowed %4 from (%1)
   end_borrow %1 : $Builtin.NativeObject
   end_borrow %4bf : $Builtin.NativeObject
   cond_br undef, bb3, bb5
@@ -298,6 +304,7 @@ bb3:
   br bb4(%4a : $Builtin.NativeObject)
 
 bb4(%9 : @guaranteed $Builtin.NativeObject):
+  %bf_9 = borrowed %9 from (%4a)
   br bb6
 
 bb5:
@@ -365,14 +372,14 @@ bb7:
 // CHECK: Error#: 4. End Error in Function: 'bad_order_add_a_level_2'
 // CHECK-LABEL: Error#: 5. Begin Error in Function: 'bad_order_add_a_level_2'
 // CHECK: Found outside of lifetime use?!
-// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // user: %6
+// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %6
 // CHECK: Consuming User:   end_borrow %6 : $Builtin.NativeObject           // id: %15
 // CHECK: Non Consuming User:   end_borrow %13 : $Builtin.NativeObject          // id: %16
 // CHECK: Block: bb4
 // CHECK: Error#: 5. End Error in Function: 'bad_order_add_a_level_2'
 // CHECK-LABEL: Error#: 6. Begin Error in Function: 'bad_order_add_a_level_2'
 // CHECK: Found over consume?!
-// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // user: %6
+// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %6
 // CHECK: User:   end_borrow %6 : $Builtin.NativeObject           // id: %19
 // CHECK: Block: bb2
 // CHECK: Consuming Users:
@@ -382,7 +389,7 @@ bb7:
 // CHECK: Error#: 6. End Error in Function: 'bad_order_add_a_level_2'
 // CHECK-LABEL: Error#: 7. Begin Error in Function: 'bad_order_add_a_level_2'
 // CHECK: Found over consume?!
-// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // user: %6
+// CHECK: Value: %5 = argument of bb2 : $Builtin.NativeObject      // users: %13, %6
 // CHECK: Block: bb2
 // CHECK: Consuming Users:
 // CHECK:   end_borrow %6 : $Builtin.NativeObject           // id: %8
@@ -402,7 +409,7 @@ bb1:
   br bb2(%1a : $Builtin.NativeObject)
 
 bb2(%4 : @reborrow $Builtin.NativeObject):
-  %4bf = borrowed %4 : $Builtin.NativeObject from (%1 : $Builtin.NativeObject)
+  %4bf = borrowed %4 from (%1)
   end_borrow %1 : $Builtin.NativeObject
   end_borrow %4bf : $Builtin.NativeObject
   cond_br undef, bb3, bb5
@@ -412,7 +419,7 @@ bb3:
   br bb4(%4a : $Builtin.NativeObject)
 
 bb4(%9 : @reborrow $Builtin.NativeObject):
-  %9bf = borrowed %9 : $Builtin.NativeObject from (%4bf : $Builtin.NativeObject)
+  %9bf = borrowed %9 from (%4)
   end_borrow %1 : $Builtin.NativeObject
   end_borrow %4bf : $Builtin.NativeObject
   end_borrow %9bf : $Builtin.NativeObject
@@ -497,7 +504,9 @@ bb2:
   br bb3(%6 : $Builtin.NativeObject, %5 : $NativeObjectPair)
 
 bb3(%7 : @guaranteed $Builtin.NativeObject, %8 : @guaranteed $NativeObjectPair):
-  end_borrow %8 : $NativeObjectPair
+  %bf_8 = borrowed %8 from (%1)
+  %bf_7 = borrowed %7 from (%8)
+  end_borrow %bf_8 : $NativeObjectPair
   %9999 = tuple()
   return %9999 : $()
 }
@@ -508,18 +517,19 @@ bb0(%0 : @owned $Builtin.NativeObject):
   br bb1(%1 : $Builtin.NativeObject)
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
+  %bf_2 = borrowed %2 from (%0)
   cond_br undef, bb2, bb3
 
 bb2:
   br bb2a
 
 bb2a:
-  br bb1(%2 : $Builtin.NativeObject)
+  br bb1(%bf_2 : $Builtin.NativeObject)
 
 bb3:
   // Should error b/c destroy_value before end_borrow.
   destroy_value %0 : $Builtin.NativeObject
-  end_borrow %2 : $Builtin.NativeObject
+  end_borrow %bf_2 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }
@@ -531,20 +541,21 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%1a : $Builtin.NativeObject, %1b : $Builtin.NativeObject)
 
 bb1(%2a : @guaranteed $Builtin.NativeObject, %2b : @owned $Builtin.NativeObject):
+  %bf_2a = borrowed %2a from (%2b, %0)
   cond_br undef, bb2, bb3
 
 bb2:
   br bb2a
 
 bb2a:
-  %3 = copy_value %2a : $Builtin.NativeObject
+  %3 = copy_value %bf_2a : $Builtin.NativeObject
   %3a = begin_borrow %3 : $Builtin.NativeObject
-  end_borrow %2a : $Builtin.NativeObject
+  end_borrow %bf_2a : $Builtin.NativeObject
   destroy_value %2b : $Builtin.NativeObject
   br bb1(%3a : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
 
 bb3:
-  end_borrow %2a : $Builtin.NativeObject
+  end_borrow %bf_2a : $Builtin.NativeObject
   destroy_value %2b : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -563,9 +574,9 @@ bb3:
 // CHECK: Error#: 0. End Error in Function: 'simple_loop_carry_over_consume'
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'simple_loop_carry_over_consume'
 // CHECK: Found outside of lifetime use?!
-// CHECK: Value: %4 = argument of bb2 : $Builtin.NativeObject      // users: %7, %6
-// CHECK: Consuming User:   end_borrow %6 : $Builtin.NativeObject           // id: %11
-// CHECK: Non Consuming User:   br bb2(%7 : $Builtin.NativeObject, %10 : $Builtin.NativeObject) // id: %12
+// CHECK: Value: %4 = argument of bb2 : $Builtin.NativeObject      // users: %7, %7, %6
+// CHECK: Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %11
+// CHECK: Non Consuming User:   br bb2(%6 : $Builtin.NativeObject, %10 : $Builtin.NativeObject) // id: %12
 // CHECK: Block: bb4
 // CHECK: Error#: 1. End Error in Function: 'simple_loop_carry_over_consume'
 // Some more errors are emitted
@@ -578,8 +589,8 @@ bb0a:
   br bb1(%1 : $Builtin.NativeObject, %1 : $Builtin.NativeObject)
 
 bb1(%2 : @reborrow $Builtin.NativeObject, %2a : @reborrow $Builtin.NativeObject):
-  %2bf = borrowed %2 : $Builtin.NativeObject from (%0 : $Builtin.NativeObject)
-  %2abf = borrowed %2a : $Builtin.NativeObject from (%0 : $Builtin.NativeObject, %2 : $Builtin.NativeObject)
+  %2abf = borrowed %2a from (%2, %0)
+  %2bf = borrowed %2 from (%0, %2)
   cond_br undef, bb2, bb3
 
 bb2:
@@ -604,25 +615,26 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%1 : $Builtin.NativeObject)
 
 bb1(%2 : @guaranteed $Builtin.NativeObject):
+  %bf_2 = borrowed %2 from (%0)
   cond_br undef, bb2, bb3
 
 bb2:
   br bb2a
 
 bb2a:
-  br bb1(%2 : $Builtin.NativeObject)
+  br bb1(%bf_2 : $Builtin.NativeObject)
 
 bb3:
-  end_borrow %2 : $Builtin.NativeObject
+  end_borrow %bf_2 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
 // CHECK: Found outside of lifetime use?!
-// CHECK: Value: %4 = argument of bb1 : $Builtin.NativeObject      // users: %7, %6
-// CHECK: Consuming User:   end_borrow %6 : $Builtin.NativeObject           // id: %11
-// CHECK: Non Consuming User:   br bb1(%7 : $Builtin.NativeObject, %10 : $Builtin.NativeObject) // id: %12
+// CHECK: Value: %4 = argument of bb1 : $Builtin.NativeObject      // users: %7, %7, %6
+// CHECK: Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %11
+// CHECK: Non Consuming User:   br bb1(%6 : $Builtin.NativeObject, %10 : $Builtin.NativeObject) // id: %12
 // CHECK: Block: bb3
 // CHECK: Error#: 0. End Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry'
 sil [ossa] @simple_loop_carry_borrows_do_not_loop_carry : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
@@ -632,8 +644,8 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%1 : $Builtin.NativeObject, %1a : $Builtin.NativeObject)
 
 bb1(%2 : @reborrow $Builtin.NativeObject, %2a : @reborrow $Builtin.NativeObject):
-  %2bf = borrowed %2 : $Builtin.NativeObject from (%0 : $Builtin.NativeObject)
-  %2abf = borrowed %2a : $Builtin.NativeObject from (%0 : $Builtin.NativeObject, %2 : $Builtin.NativeObject)
+  %2abf = borrowed %2a from (%2, %0)
+  %2bf = borrowed %2 from (%0, %2)
   cond_br undef, bb2, bb3
 
 bb2:
@@ -653,18 +665,32 @@ bb3:
 
 // CHECK-LABEL: Error#: 0. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry2'
 // CHECK: Found outside of lifetime use?!
-// CHECK: Value: %4 = argument of bb1 : $Builtin.NativeObject      // users: %7, %6
-// CHECK: Consuming User:   end_borrow %6 : $Builtin.NativeObject           // id: %11
-// CHECK: Non Consuming User:   br bb1(%7 : $Builtin.NativeObject, %10 : $Builtin.NativeObject) // id: %12
+// CHECK: Value: %4 = argument of bb1 : $Builtin.NativeObject      // users: %7, %7, %6
+// CHECK: Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %11
+// CHECK: Non Consuming User:   br bb1(%6 : $Builtin.NativeObject, %10 : $Builtin.NativeObject) // id: %12
 // CHECK: Block: bb3
 // CHECK: Error#: 0. End Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry2'
 // CHECK-LABEL: Error#: 1. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry2'
 // CHECK: Found outside of lifetime use?!
-// CHECK: Value: %4 = argument of bb1 : $Builtin.NativeObject      // users: %7, %6
-// CHECK: Consuming User:   end_borrow %6 : $Builtin.NativeObject           // id: %13
-// CHECK: Non Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %14
-// CHECK: Block: bb4
+// CHECK: Value: %4 = argument of bb1 : $Builtin.NativeObject      // users: %7, %7, %6
+// CHECK: Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %11
+// CHECK: Non Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %11
+// CHECK: Block: bb3
 // CHECK: Error#: 1. End Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry2'
+// CHECK-LABEL: Error#: 2. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %4 = argument of bb1 : $Builtin.NativeObject      // users: %7, %7, %6
+// CHECK: Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %13
+// CHECK: Non Consuming User:   end_borrow %6 : $Builtin.NativeObject           // id: %14
+// CHECK: Block: bb4
+// CHECK: Error#: 2. End Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry2'
+// CHECK-LABEL: Error#: 3. Begin Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value: %4 = argument of bb1 : $Builtin.NativeObject      // users: %7, %7, %6
+// CHECK: Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %13
+// CHECK: Non Consuming User:   end_borrow %7 : $Builtin.NativeObject           // id: %13
+// CHECK: Block: bb4
+// CHECK: Error#: 3. End Error in Function: 'simple_loop_carry_borrows_do_not_loop_carry2'
 sil [ossa] @simple_loop_carry_borrows_do_not_loop_carry2 : $@convention(thin) (@guaranteed Builtin.NativeObject) -> () {
 bb0(%0 : @guaranteed $Builtin.NativeObject):
   %1 = begin_borrow %0 : $Builtin.NativeObject
@@ -672,8 +698,8 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%1 : $Builtin.NativeObject, %1a : $Builtin.NativeObject)
 
 bb1(%2 : @reborrow $Builtin.NativeObject, %2a : @reborrow $Builtin.NativeObject):
-  %2bf = borrowed %2 : $Builtin.NativeObject from (%0 : $Builtin.NativeObject)
-  %2abf = borrowed %2a : $Builtin.NativeObject from (%0 : $Builtin.NativeObject, %2 : $Builtin.NativeObject)
+  %2abf = borrowed %2a from (%2, %0)
+  %2bf = borrowed %2 from (%0, %2)
   cond_br undef, bb2, bb3
 
 bb2:
@@ -700,17 +726,19 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
 
 bb1(%4 : @guaranteed $Builtin.NativeObject, %5 : @guaranteed $Builtin.NativeObject):
+  %bf_5 = borrowed %5 from (%1)
+  %bf_4 = borrowed %4 from (%1)
   cond_br undef, bb2, bb3
 
 bb2:
   br bb2a
 
 bb2a:
-  br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  br bb1(%bf_5 : $Builtin.NativeObject, %bf_4 : $Builtin.NativeObject)
 
 bb3:
-  end_borrow %4 : $Builtin.NativeObject
-  end_borrow %5 : $Builtin.NativeObject
+  end_borrow %bf_4 : $Builtin.NativeObject
+  end_borrow %bf_5 : $Builtin.NativeObject
   end_borrow %1 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
@@ -724,17 +752,19 @@ bb0(%0 : @guaranteed $Builtin.NativeObject):
   br bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
 
 bb1(%4 : @guaranteed $Builtin.NativeObject, %5 : @guaranteed $Builtin.NativeObject):
+  %bf_5 = borrowed %5 from (%0)
+  %bf_4 = borrowed %4 from (%0)
   cond_br undef, bb2, bb3
 
 bb2:
   br bb2a
 
 bb2a:
-  br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  br bb1(%bf_5 : $Builtin.NativeObject, %bf_4 : $Builtin.NativeObject)
 
 bb3:
-  end_borrow %4 : $Builtin.NativeObject
-  end_borrow %5 : $Builtin.NativeObject
+  end_borrow %bf_4 : $Builtin.NativeObject
+  end_borrow %bf_5 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()
 }
@@ -747,17 +777,19 @@ bb0(%0 : @owned $Builtin.NativeObject):
   br bb1(%2 : $Builtin.NativeObject, %3 : $Builtin.NativeObject)
 
 bb1(%4 : @guaranteed $Builtin.NativeObject, %5 : @guaranteed $Builtin.NativeObject):
+  %bf_5 = borrowed %5 from (%0)
+  %bf_4 = borrowed %4 from (%0)
   cond_br undef, bb2, bb3
 
 bb2:
   br bb2a
 
 bb2a:
-  br bb1(%5 : $Builtin.NativeObject, %4 : $Builtin.NativeObject)
+  br bb1(%bf_5 : $Builtin.NativeObject, %bf_4 : $Builtin.NativeObject)
 
 bb3:
-  end_borrow %4 : $Builtin.NativeObject
-  end_borrow %5 : $Builtin.NativeObject
+  end_borrow %bf_4 : $Builtin.NativeObject
+  end_borrow %bf_5 : $Builtin.NativeObject
   destroy_value %0 : $Builtin.NativeObject
   %9999 = tuple()
   return %9999 : $()

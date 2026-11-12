@@ -863,10 +863,10 @@ bool SILPerformanceInliner::isProfitableToInline(
                      FAI.getInstruction()->dumpInContext());
           BlockW.updateBenefit(Benefit, GenericSpecializationBenefit);
         }
-      } else if (auto *LI = dyn_cast<LoadInst>(&I)) {
+      } else if (isa<LoadInst>(&I) || isa<LoadBorrowInst>(&I)) {
         // Check if it's a load from a stack location in the caller. Such a load
         // might be optimized away if inlined.
-        if (constTracker.isStackAddrInCaller(LI->getOperand()))
+        if (constTracker.isStackAddrInCaller(I.getOperand(0)))
           BlockW.updateBenefit(Benefit, RemovedLoadBenefit);
       } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
         // Check if it's a store to a stack location in the caller. Such a load
@@ -1506,8 +1506,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
         invalidatedStackNesting = false;
       }
 
-      Caller->verify();
-      pm->runSwiftFunctionVerification(Caller);
+      pm->runVerification(Caller);
     }
   }
   deleter.cleanupDeadInstructions();
@@ -1525,8 +1524,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   // find into it, do so now. This makes it easier to catch verification bugs in
   // the inliner without running the entire inliner.
   if (EnableVerifyAfterInlining) {
-    Caller->verify();
-    pm->runSwiftFunctionVerification(Caller);
+    pm->runVerification(Caller);
   }
 
   return true;

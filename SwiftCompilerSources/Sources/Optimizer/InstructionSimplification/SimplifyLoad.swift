@@ -60,7 +60,7 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
        uac.fromAddress.type.isTrivial(in: parentFunction) ==
          uac.type.isTrivial(in: parentFunction) {
 
-      operand.set(to: uac.fromAddress, context)
+      addressOperand.set(to: uac.fromAddress, context)
       let builder = Builder(before: self, context)
       let newLoad = builder.createLoad(fromAddress: uac.fromAddress, ownership: loadOwnership)
       let cast = builder.createUpcast(from: newLoad, to: type)
@@ -248,8 +248,40 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     }
     var addr = address
 
+    // The `struct_extract`s which are not matched with a `struct`, yet.
+    var structExtractPath = SmallProjectionPath()
+
     // Find the root object of the load-address.
     while true {
+      switch addr {
+      case let loadBorrow as LoadBorrowInst:
+        // The loaded value is the same as the value hint, e.g.
+        //   store %1 to [init] %0
+        //   %2 = load_borrow %0, value_hint %1
+        guard let valueHint = loadBorrow.valueHint else {
+          return false
+        }
+        addr = valueHint
+        continue
+      case let uo as UncheckedOwnershipInst:
+        addr = uo.operand.value
+        continue
+      case let se as StructExtractInst:
+        structExtractPath = structExtractPath.push(.structField, index: se.fieldIndex)
+        addr = se.struct
+        continue
+      case let si as StructInst:
+        guard let (fieldIndex, remainingPath) = structExtractPath.pop(kind: .structField) else {
+          return false
+        }
+        structExtractPath = remainingPath
+        addr = si.operands[fieldIndex].value
+        continue
+      default:
+        if !structExtractPath.isEmpty {
+          return false
+        }
+      }
       switch addr {
       case let ga as GlobalAddrInst:
         switch ga.global.name {

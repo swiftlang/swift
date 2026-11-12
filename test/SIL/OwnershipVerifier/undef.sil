@@ -1,7 +1,5 @@
 // RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all=0 -module-name Swift -ownership-dumper -o /dev/null %s | %FileCheck %s
 
-// REQUIRES: asserts
-
 sil_stage raw
 
 import Builtin

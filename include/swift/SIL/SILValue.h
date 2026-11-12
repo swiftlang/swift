@@ -733,9 +733,7 @@ public:
   }
 
   /// Verify that this SILValue and its uses respects ownership invariants.
-  ///
-  /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
-  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+  void verifyOwnership() const;
 
   SWIFT_DEBUG_DUMP;
 };
@@ -1114,7 +1112,8 @@ public:
   Operand(SILInstruction *owner, SILValue theValue)
       : TheValue(theValue), Owner(owner),
         customBits(0), lastInitializedBitfieldID(0) {
-    insertIntoCurrent();
+    if (theValue)
+      insertIntoCurrent();
   }
 
   /// Operands are not copyable.

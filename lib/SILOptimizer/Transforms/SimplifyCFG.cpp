@@ -689,7 +689,7 @@ getEnumCaseRecursive(SILValue Val, SILBasicBlock *UsedInBB, int RecursionDepth,
     return nullptr;
 
   // Handle the obvious case.
-  if (auto *EI = dyn_cast<EnumInst>(Val))
+  if (auto *EI = dyn_cast<EnumInst>(lookThroughOwnershipInsts(Val)))
     return EI->getElement();
 
   // Check if the value is dominated by a switch_enum, e.g.
@@ -1204,6 +1204,15 @@ TrampolineDest::TrampolineDest(SILBasicBlock *sourceBB,
   destBB = destBlock;
 }
 
+/// Clones the debug_values of a bypassed \p trampolineBB before \p insertPt.
+static void forwardTrampolineDebugValues(SILBasicBlock *trampolineBB,
+                                         SILInstruction *insertPt) {
+  for (SILInstruction &inst : *trampolineBB) {
+    if (isa<DebugValueInst>(inst))
+      inst.clone(insertPt);
+  }
+}
+
 #ifndef NDEBUG
 /// Is the block reachable from the entry.
 static bool isReachable(SILBasicBlock *Block) {
@@ -1354,6 +1363,8 @@ bool SimplifyCFG::simplifyBranchBlock(BranchInst *BI) {
     LLVM_DEBUG(llvm::dbgs()
                << "jump to trampoline from bb" << BB->getDebugID() << " to bb"
                << trampolineDest.destBB->getDebugID() << '\n');
+    // Debug values from the bypassed trampoline are forwarded before the `br`.
+    forwardTrampolineDebugValues(DestBB, BI);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(), trampolineDest.destBB,
                                          trampolineDest.newSourceBranchArgs);
     // Eliminating the trampoline can expose opportunities to improve the
@@ -1578,6 +1589,10 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                << trueTrampolineDest.destBB->getDebugID() << '\n');
 
     eraseTrampolineDestArgs(trueTrampolineDest);
+    // Debug values from the bypassed trampoline are forwarded to its
+    // destination, as the destination has exactly one predecessor.
+    forwardTrampolineDebugValues(TrueSide,
+                                 &*trueTrampolineDest.destBB->begin());
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), trueTrampolineDest.destBB,
         FalseSide, BI->getTrueBBCount(), BI->getFalseBBCount());
@@ -1599,6 +1614,8 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
                << falseTrampolineDest.destBB->getDebugID() << '\n');
 
     eraseTrampolineDestArgs(falseTrampolineDest);
+    forwardTrampolineDebugValues(FalseSide,
+                                 &*falseTrampolineDest.destBB->begin());
     SILBuilderWithScope(BI).createCondBranch(
         BI->getLoc(), BI->getCondition(), TrueSide,
         falseTrampolineDest.destBB, BI->getTrueBBCount(),
@@ -1613,28 +1630,15 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
 
   // Simplify cond_br where both sides jump to the same blocks with the same
   // args.
-  auto condBrToBr = [&](ArrayRef<SILValue> branchArgs, SILBasicBlock *newDest) {
+  if (trueTrampolineDest && (trueTrampolineDest == falseTrampolineDest)) {
     LLVM_DEBUG(llvm::dbgs()
                << "replace cond_br with same dests with br: " << *BI);
-    SILBuilderWithScope(BI).createBranch(BI->getLoc(), newDest, branchArgs);
+    SILBuilderWithScope(BI).createBranch(BI->getLoc(),
+                                         trueTrampolineDest.destBB,
+                                         trueTrampolineDest.newSourceBranchArgs);
     BI->eraseFromParent();
     addToWorklist(ThisBB);
     ++NumConstantFolded;
-  };
-  if (trueTrampolineDest.destBB == FalseSide
-      && trueTrampolineDest.newSourceBranchArgs.empty()) {
-    condBrToBr(trueTrampolineDest.newSourceBranchArgs, FalseSide);
-    removeIfDead(TrueSide);
-    return true;
-  }
-  if (falseTrampolineDest.destBB == TrueSide) {
-    condBrToBr(falseTrampolineDest.newSourceBranchArgs, TrueSide);
-    removeIfDead(FalseSide);
-    return true;
-  }
-  if (trueTrampolineDest && (trueTrampolineDest == falseTrampolineDest)) {
-    condBrToBr(trueTrampolineDest.newSourceBranchArgs,
-               trueTrampolineDest.destBB);
     removeIfDead(TrueSide);
     removeIfDead(FalseSide);
     return true;

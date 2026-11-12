@@ -90,7 +90,6 @@ namespace {
 
 /// Utility class for rewiring control-flow of inlined begin_apply functions.
 class BeginApplySite {
-  SILLocation Loc;
   SILBuilder *Builder;
   BeginApplyInst *BeginApply;
   bool HasYield = false;
@@ -112,16 +111,15 @@ class BeginApplySite {
   SmallVector<BeginBorrowInst *, 2> guaranteedYields;
 
 public:
-  BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
-                 SILBuilder *Builder)
-      : Loc(Loc), Builder(Builder), BeginApply(BeginApply) {}
+  BeginApplySite(BeginApplyInst *BeginApply, SILBuilder *Builder)
+      : Builder(Builder), BeginApply(BeginApply) {}
 
-  static std::optional<BeginApplySite> get(FullApplySite AI, SILLocation Loc,
+  static std::optional<BeginApplySite> get(FullApplySite AI,
                                            SILBuilder *Builder) {
     auto *BeginApply = dyn_cast<BeginApplyInst>(AI);
     if (!BeginApply)
       return std::nullopt;
-    return BeginApplySite(BeginApply, Loc, Builder);
+    return BeginApplySite(BeginApply, Builder);
   }
 
   bool needCompleteValues() const { return !EndBorrows.empty(); }
@@ -190,10 +188,11 @@ public:
   }
 
   /// Perform special processing for the given terminator if necessary.
+  /// \p termLoc is the terminator's location, remapped into the caller.
   ///
   /// \return false to use the normal inlining logic
   bool processTerminator(
-      TermInst *terminator, SILBasicBlock *returnToBB,
+      TermInst *terminator, SILLocation termLoc, SILBasicBlock *returnToBB,
       llvm::function_ref<SILBasicBlock *(SILBasicBlock *)> remapBlock,
       llvm::function_ref<SILValue(SILValue)> getMappedValue) {
     // A yield branches to the begin_apply return block passing the yielded
@@ -219,30 +218,33 @@ public:
         if (calleeYields[i]->getOwnershipKind() == OwnershipKind::Owned &&
             !yield->getOperandRef(i).isConsuming() &&
             Builder->getFunction().hasOwnership()) {
-          auto *bbi = Builder->createBeginBorrow(Loc, remappedYield);
+          auto *bbi = Builder->createBeginBorrow(termLoc, remappedYield);
           guaranteedYields.push_back(bbi);
           remappedYield = bbi;
         }
         callerYields[i]->replaceAllUsesWith(remappedYield);
       }
-      Builder->createBranch(Loc, returnToBB);
+      Builder->createBranch(termLoc, returnToBB);
 
       // Add branches at the resumption sites to the resume/unwind block.
+      // These take the location and scope of the instruction they replace.
       if (EndApply) {
-        SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
+        SILBuilder endBuilder(EndApplyBB, Builder->getBuilderContext(),
+                              EndApply->getDebugScope());
         auto resumeBB = remapBlock(yield->getResumeBB());
         for (auto *bbi : guaranteedYields) {
-          Builder->createEndBorrow(EndApply->getLoc(), bbi);
+          endBuilder.createEndBorrow(EndApply->getLoc(), bbi);
         }
-        Builder->createBranch(EndApply->getLoc(), resumeBB);
+        endBuilder.createBranch(EndApply->getLoc(), resumeBB);
       }
       if (AbortApply) {
-        SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
+        SILBuilder abortBuilder(AbortApplyBB, Builder->getBuilderContext(),
+                                AbortApply->getDebugScope());
         auto unwindBB = remapBlock(yield->getUnwindBB());
         for (auto *bbi : guaranteedYields) {
-          Builder->createEndBorrow(EndApply->getLoc(), bbi);
+          abortBuilder.createEndBorrow(AbortApply->getLoc(), bbi);
         }
-        Builder->createBranch(AbortApply->getLoc(), unwindBB);
+        abortBuilder.createBranch(AbortApply->getLoc(), unwindBB);
       }
       return true;
     }
@@ -258,9 +260,9 @@ public:
       if (retInst && EndApply)
         EndApply->replaceAllUsesWith(getMappedValue(retInst->getOperand()));
       if (returnBB) {
-        Builder->createBranch(Loc, returnBB);
+        Builder->createBranch(termLoc, returnBB);
       } else {
-        Builder->createUnreachable(Loc);
+        Builder->createUnreachable(termLoc);
       }
 
       return true;
@@ -284,12 +286,14 @@ public:
     if (!HasYield) {
       // Make sure the split resumption blocks have terminators.
       if (EndApplyBB) {
-        SavedInsertionPointRAII savedIP(*Builder, EndApplyBB);
-        Builder->createUnreachable(Loc);
+        SILBuilder(EndApplyBB, Builder->getBuilderContext(),
+                   EndApply->getDebugScope())
+            .createUnreachable(EndApply->getLoc());
       }
       if (AbortApplyBB) {
-        SavedInsertionPointRAII savedIP(*Builder, AbortApplyBB);
-        Builder->createUnreachable(Loc);
+        SILBuilder(AbortApplyBB, Builder->getBuilderContext(),
+                   AbortApply->getDebugScope())
+            .createUnreachable(AbortApply->getLoc());
       }
 
       // Replace all the yielded values in the callee with undef.
@@ -543,7 +547,7 @@ SILInlineCloner::SILInlineCloner(
   assert(CallSiteScope->getParentFunction() == &F);
 
   // Set up the coroutine-specific inliner if applicable.
-  BeginApply = BeginApplySite::get(apply, Loc, &getBuilder());
+  BeginApply = BeginApplySite::get(apply, &getBuilder());
 }
 
 // Clone the entire callee function into the caller function at the apply site.
@@ -736,7 +740,7 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   // Coroutine terminators need special handling.
   if (BeginApply) {
     if (BeginApply->processTerminator(
-            Terminator, ReturnToBB,
+            Terminator, getOpLocation(Terminator->getLoc()), ReturnToBB,
             [=](SILBasicBlock *Block) -> SILBasicBlock * {
               return this->remapBasicBlock(Block);
             },
@@ -747,9 +751,7 @@ void SILInlineCloner::visitTerminator(SILBasicBlock *BB) {
   }
 
   // Modify return terminators to branch to the return-to BB, rather
-  // than trying to clone the ReturnInst.  Because of that, the scope
-  // needs to be remapped manually.
-  getBuilder().setCurrentDebugScope(getOpScope(Terminator->getDebugScope()));
+  // than trying to clone the ReturnInst.
   if (auto *RI = dyn_cast<ReturnInst>(Terminator)) {
     auto returnedValue = getMappedValue(RI->getOperand());
     getBuilder().createBranch(getOpLocation(RI->getLoc()), ReturnToBB,
@@ -1083,6 +1085,21 @@ static InlineCost getEnforcementCost(SILAccessEnforcement enforcement) {
 /// instruction. This is of course very much so not true.
 InlineCost swift::instructionInlineCost(SILInstruction &I) {
   switch (I.getKind()) {
+  case SILInstructionKind::DestroyValueInst: {
+    auto *dvi = cast<DestroyValueInst>(&I);
+    // Neither a destroy in a dead-end block nor the destroy of a non-escaping
+    // closure (which is not reference counted) generates code.
+    if (dvi->isDeadEnd() ||
+        isa<ConvertEscapeToNoEscapeInst>(dvi->getOperand()))
+      return InlineCost::Free;
+    return InlineCost::Expensive;
+  }
+  case SILInstructionKind::LoadBorrowInst:
+    // A `load_borrow` with a value hint is replaced by the hinted value when
+    // lowering ownership.
+    if (cast<LoadBorrowInst>(&I)->hasValueHint())
+      return InlineCost::Free;
+    return InlineCost::Expensive;
   case SILInstructionKind::IntegerLiteralInst:
   case SILInstructionKind::FloatLiteralInst:
   case SILInstructionKind::DebugValueInst:
@@ -1259,8 +1276,13 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
     return InlineCost::Free;
 
   // Unconditional branch is free in empty blocks.
+  // `end_borrow`s don't generate any code. Therefore a block which only
+  // contains `end_borrow`s is considered as empty.
   case SILInstructionKind::BranchInst:
-    return (I.getIterator() == I.getParent()->begin())
+    return std::all_of(I.getParent()->begin(), I.getIterator(),
+                       [](SILInstruction &inst) {
+                         return isa<EndBorrowInst>(&inst);
+                       })
       ? InlineCost::Free : InlineCost::Expensive;
 
   case SILInstructionKind::AbortApplyInst:
@@ -1313,7 +1335,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::ReleaseValueInst:
   case SILInstructionKind::ReleaseValueAddrInst:
   case SILInstructionKind::UnmanagedReleaseValueInst:
-  case SILInstructionKind::DestroyValueInst:
   case SILInstructionKind::AutoreleaseValueInst:
   case SILInstructionKind::UnmanagedAutoreleaseValueInst:
   case SILInstructionKind::DynamicMethodBranchInst:
@@ -1329,7 +1350,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::InitExistentialRefInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::LoadInst:
-  case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::OpenExistentialBoxInst:
   case SILInstructionKind::OpenExistentialBoxValueInst:

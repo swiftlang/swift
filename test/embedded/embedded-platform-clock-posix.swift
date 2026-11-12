@@ -7,6 +7,7 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=wasip1
 // REQUIRES: swift_feature_Embedded
+// REQUIRES: swift_embedded_platform
 
 typealias ClockRead = (UnsafeMutablePointer<Int64>, UnsafeMutablePointer<Int64>) -> Void
 

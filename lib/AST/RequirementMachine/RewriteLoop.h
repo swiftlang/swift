@@ -412,10 +412,6 @@ public:
 
   bool replaceRuleWithPath(unsigned ruleID, const RewritePath &path);
 
-  llvm::SmallVector<unsigned, 1>
-  findRulesAppearingOnceInEmptyContext(const MutableTerm &term,
-                                       const RewriteSystem &system) const;
-
   void invert();
 
   bool computeFreelyReducedForm();
@@ -517,7 +513,7 @@ public:
   void dump(llvm::raw_ostream &out, const RewriteSystem &system) const;
 };
 
-/// Return value of RewritePathEvaluator::applyRewriteRule();
+/// Return value of RewritePathEvaluator::applyRelation().
 struct AppliedRewriteStep {
   Term lhs;
   Term rhs;
@@ -537,6 +533,10 @@ struct AppliedRewriteStep {
 ///
 /// - All other rewrite step kinds manipulate the term at the top of the primary
 ///   stack.
+///
+/// RewritePathDepthTracker models the effect of each kind of rewrite step on
+/// these stacks, so any change to how a step pushes, pops or shifts terms must
+/// also be made there.
 ///
 struct RewritePathEvaluator {
   /// The primary stack. Most rewrite steps operate on the top of this stack.
@@ -565,8 +565,8 @@ struct RewritePathEvaluator {
   void apply(const RewriteStep &step,
              const RewriteSystem &system);
 
-  AppliedRewriteStep applyRewriteRule(const RewriteStep &step,
-                                      const RewriteSystem &system);
+  std::pair<Term, Term> applyRewriteRule(const RewriteStep &step,
+                                         const RewriteSystem &system);
 
   std::pair<MutableTerm, MutableTerm>
   applyPrefixSubstitutions(const RewriteStep &step,
@@ -592,6 +592,31 @@ struct RewritePathEvaluator {
                                     const RewriteSystem &system);
 
   void dump(llvm::raw_ostream &out) const;
+};
+
+/// Tracks the depths of the primary and secondary stacks of a
+/// RewritePathEvaluator without materializing the terms on them, which is
+/// sufficient to answer isInContext() cheaply.
+///
+/// This must model the effect of each kind of rewrite step on the evaluator's
+/// stacks, so any change to how RewritePathEvaluator pushes, pops or shifts
+/// terms must also be made here.
+struct RewritePathDepthTracker {
+  unsigned Primary = 1;
+  unsigned Secondary = 0;
+
+  bool isInContext() const { return (Primary > 1 || Secondary > 0); }
+
+  void push(unsigned count) { Primary += count; }
+
+  /// At least one term must remain on the primary stack.
+  void pop(unsigned count) {
+    ASSERT(Primary > count);
+    Primary -= count;
+  }
+
+  /// Updates the stack depths to reflect the application of \p step.
+  void apply(const RewriteStep &step, const RewriteSystem &system);
 };
 
 } // end namespace rewriting

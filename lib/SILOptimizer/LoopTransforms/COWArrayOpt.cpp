@@ -458,8 +458,9 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       continue;
     }
 
-    if (isa<DeallocStackInst>(UseInst)) {
+    if (isa<DeallocStackInst>(UseInst) || isa<DestroyAddrInst>(UseInst)) {
       // Handle destruction of a local array.
+      // A `destroy_addr` is equivalent to a `load [take]` + `destroy_value`.
       continue;
     }
 
@@ -507,6 +508,7 @@ isTransitiveSafeUser(SILInstruction *I) {
   case SILInstructionKind::UncheckedRefCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::BeginBorrowInst:
+  case SILInstructionKind::UncheckedOwnershipInst:
     return I->getResults();
   default:
     return std::nullopt;
@@ -637,6 +639,13 @@ bool COWArrayOpt::checkSafeArrayElementUse(SILInstruction *UseInst,
 
   if (isa<EndBorrowInst>(UseInst))
     return true;
+
+  // The value hint of a `load_borrow` (inserted by RedundantLoadElimination)
+  // is not a real use.
+  if (auto *lbi = dyn_cast<LoadBorrowInst>(UseInst)) {
+    if (lbi->hasValueHint() && lbi->getValueHint() == ArrayVal)
+      return true;
+  }
 
   if (UseInst->isDebugInstruction())
     return true;

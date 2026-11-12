@@ -65,6 +65,10 @@ public:
     asImpl().writeUInt64(uint64_t(value.toInternalRepresentation()));
   }
 
+  void writeDynAllocKind(clang::DynAllocKind value) {
+    asImpl().writeUInt64(uint64_t(llvm::to_underlying(value)));
+  }
+
   void writeSelector(clang::Selector selector) {
     if (selector.isNull()) {
       asImpl().writeUInt64(0);

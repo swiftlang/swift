@@ -138,7 +138,7 @@ ParseSILModuleRequest::evaluate(Evaluator &evaluator,
 
   // If SIL parsing succeeded, verify the generated SIL.
   if (!parser.Diags.hadAnyError() && !DisableInputVerify) {
-    silMod->verify(/*SingleFunction=*/true, !ParseIncompleteOSSA);
+    silMod->verify(/*checkLinearLifetime=*/!ParseIncompleteOSSA);
   }
 
   return silMod;
@@ -4198,9 +4198,12 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
   case SILInstructionKind::UncheckedOwnershipInst: {
     if (parseTypedValueRef(Val, B))
       return true;
+    ValueOwnershipKind forwardingOwnership = Val->getOwnershipKind();
+    if (parseForwardingOwnershipKind(forwardingOwnership))
+      return true;
     if (parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createUncheckedOwnership(InstLoc, Val);
+    ResultVal = B.createUncheckedOwnership(InstLoc, Val, forwardingOwnership);
     break;
   }
 
@@ -4242,11 +4245,22 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
     }
 
-    if (parseTypedValueRef(Val, AddrLoc, B) ||
-        parseSILDebugLocation(InstLoc, B))
+    if (parseTypedValueRef(Val, AddrLoc, B))
       return true;
 
-    auto LB = B.createLoadBorrow(InstLoc, Val);
+    SILValue valueHint;
+    if (P.Tok.is(tok::comma) && !peekSILDebugLocation(P)) {
+      P.consumeToken(tok::comma);
+      if (parseVerbatim("value_hint") ||
+          parseTypedValueRef(valueHint, AddrLoc, B)) {
+        return true;
+      }
+    }
+
+    if (parseSILDebugLocation(InstLoc, B))
+      return true;
+
+    auto LB = B.createLoadBorrow(InstLoc, Val, valueHint);
     LB->setUnchecked(IsUnchecked);
     ResultVal = LB;
     break;

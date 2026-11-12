@@ -299,7 +299,7 @@ static bool canHoistArrayArgument(ApplyInst *SemanticsCall, SILValue Arr,
   if (auto* lbi = dyn_cast<LoadBorrowInst>(SelfVal)) {
     // Are we loading a value from an address in a struct defined at a point
     // dominating the hoist point.
-    auto Val = lbi->getOperand();
+    auto Val = lbi->getAddress();
     bool DoesNotDominate;
     StructElementAddrInst *SEI;
     while ((DoesNotDominate = !DT->dominates(Val->getParentBlock(),
@@ -393,7 +393,7 @@ static SILValue copySelfValue(SILValue ArrayStructValue,
   }
 
   if (auto *lbi = dyn_cast<LoadBorrowInst>(ArrayStructValue)) {
-    SILValue Val = lbi->getOperand();
+    SILValue Val = lbi->getAddress();
     auto *InsertPt = InsertBefore;
     while (!DT->dominates(Val->getParentBlock(), InsertBefore->getParent())) {
       auto *Inst = cast<StructElementAddrInst>(Val);
@@ -401,7 +401,7 @@ static SILValue copySelfValue(SILValue ArrayStructValue,
       Val = Inst->getOperand();
       InsertPt = Inst;
     }
-    return SILBuilderWithScope(InsertPt).createLoadBorrow(InsertPt->getLoc(), lbi->getOperand());
+    return SILBuilderWithScope(InsertPt).createLoadBorrow(InsertPt->getLoc(), lbi->getAddress());
   }
 
   assert(!func->hasOwnership() ||

@@ -135,6 +135,7 @@ private func registerSwiftPasses() {
   registerPass(packSpecialization, { packSpecialization.run($0) })
   registerPass(trivialOwnershipElimination, { trivialOwnershipElimination.run($0) })
   registerPass(lowerAddressInstructions, { lowerAddressInstructions.run($0) })
+  registerPass(verifierPass, { verifierPass.run($0) })
 
   // Instruction passes
   registerForSILCombine(BeginBorrowInst.self,      { run(BeginBorrowInst.self, $0) })
@@ -173,6 +174,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(PointerToAddressInst.self,  { run(PointerToAddressInst.self, $0) })
   registerForSILCombine(RawPointerToRefInst.self,   { run(RawPointerToRefInst.self, $0) })
   registerForSILCombine(UncheckedEnumDataInst.self, { run(UncheckedEnumDataInst.self, $0) })
+  registerForSILCombine(UncheckedOwnershipInst.self, { run(UncheckedOwnershipInst.self, $0) })
   registerForSILCombine(WitnessMethodInst.self,     { run(WitnessMethodInst.self, $0) })
   registerForSILCombine(UncheckedAddrCastInst.self, { run(UncheckedAddrCastInst.self, $0) })
   registerForSILCombine(UnconditionalCheckedCastInst.self, { run(UnconditionalCheckedCastInst.self, $0) })

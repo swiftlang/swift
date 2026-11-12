@@ -312,3 +312,142 @@ func callRethrowsOnce() throws -> Int {
   let e = try rethrowsForwardOnce { () throws -> Int in throw SomeError() }
   return a + b + c + d + e
 }
+
+// MARK: - Borrowed values
+
+// A borrowed exactly-once value can't be called, because calling it consumes
+// it. It can be inspected and borrowed again.
+
+func inspect(_ f: borrowing @once () -> Void) {}
+func inspectEscaping(_ f: borrowing @escaping @once () -> Void) {}
+func run(_ body: () -> Void) { body() }
+
+func borrowedForwarded(_ f: borrowing @once () -> Void) {
+  inspect(f)
+  inspect(f)
+}
+
+func borrowedEscapingForwarded(_ f: borrowing @escaping @once () -> Void) {
+  inspectEscaping(f)
+}
+
+func borrowedThenCalled(_ f: @once () -> Void) {
+  inspect(f)
+  f()
+}
+
+func localBorrowedThenCalled(_ x: Int) {
+  let f: @once () -> Void = { print(x) }
+  inspectEscaping(f)
+  f()
+}
+
+func borrowedByNonescapingClosure(_ f: borrowing @once () -> Void) {
+  run { inspect(f) }
+}
+
+func borrowedQueries(
+  _ f: borrowing @escaping @isolated(any) @once () -> Void
+) -> (any Actor)? {
+  _ = type(of: f)
+  return f.isolation
+}
+
+func borrowedCalled(_ f: borrowing @once () -> Void) {
+  // expected-error@-1 {{'f' is borrowed and cannot be called}}
+  f() // expected-note {{called here; calling a '@once' function consumes it}}
+}
+
+func borrowedEscapingCalled(_ f: borrowing @escaping @once () -> Void) {
+  // expected-error@-1 {{'f' is borrowed and cannot be called}}
+  f() // expected-note {{called here; calling a '@once' function consumes it}}
+}
+
+func borrowedAsyncCalled(_ f: borrowing @once () async -> Void) async {
+  // expected-error@-1 {{'f' is borrowed and cannot be called}}
+  await f() // expected-note {{called here; calling a '@once' function consumes it}}
+}
+
+func borrowedCalledInBothBranches(_ b: Bool, _ f: borrowing @once () -> Void) {
+  // expected-error@-1 {{'f' is borrowed and cannot be called}}
+  if b {
+    f() // expected-note {{called here; calling a '@once' function consumes it}}
+  } else {
+    f() // expected-note {{called here; calling a '@once' function consumes it}}
+  }
+}
+
+func borrowedClosureParameterCalled() {
+  let _: (borrowing @once () -> Void) -> Void = { f in
+    // expected-error@-1 {{'f' is borrowed and cannot be called}}
+    f() // expected-note {{called here; calling a '@once' function consumes it}}
+  }
+}
+
+func legacySharedCalled(_ f: __shared @once () -> Void) {
+  // expected-error@-1 {{'f' is borrowed and cannot be called}}
+  f() // expected-note {{called here; calling a '@once' function consumes it}}
+}
+
+func borrowedPassedToCall(
+  _ f: borrowing @once () -> Void,
+  _ g: @once (consuming @once () -> Void) -> Void
+) {
+  // expected-error@-3 {{'f' is borrowed and cannot be consumed}}
+  g(f) // expected-note {{consumed here}}
+}
+
+func borrowedBound(_ f: borrowing @once () -> Void) {
+  // expected-error@-1 {{'f' is borrowed and cannot be consumed}}
+  let g = f // expected-note {{consumed here}}
+  g()
+}
+
+func borrowedPassedConsuming(_ f: borrowing @once () -> Void) {
+  // expected-error@-1 {{'f' is borrowed and cannot be consumed}}
+  func take(_ f: @once () -> Void) { f() }
+  take(f) // expected-note {{consumed here}}
+}
+
+// FIXME: Converting an escaping value to a nonescaping one consumes it, so a
+// borrowed escaping value or a local can't be passed to a nonescaping
+// borrowing parameter yet.
+func borrowedEscapingToNonescaping(_ f: borrowing @escaping @once () -> Void) {
+  // expected-error@-1 {{'f' is borrowed and cannot be consumed}}
+  inspect(f) // expected-note {{consumed here}}
+}
+
+func localToNonescaping(_ x: Int) {
+  let f: @once () -> Void = { print(x) } // expected-error {{'f' consumed more than once}}
+  inspect(f) // expected-note {{consumed here}}
+  f() // expected-note {{consumed again here}}
+}
+
+// FIXME: A closure that a coroutine uses isn't promoted to the stack, so it
+// can't borrow a borrowed value yet.
+struct ReadsWithBody {
+  subscript(body: () -> Void) -> Int {
+    _read {
+      body()
+      yield 0
+    }
+  }
+}
+
+func borrowedByCoroutineClosure(
+  _ r: ReadsWithBody, _ f: borrowing @once () -> Void
+) -> Int {
+  // expected-error@-2 {{'f' cannot be captured by an escaping closure since it is a borrowed parameter}}
+  return r[{ inspect(f) }] // expected-note {{closure capturing 'f' here}}
+}
+
+// Borrowing a value doesn't call it.
+func localDroppedAfterBorrow(_ x: Int) {
+  let f: @once () -> Void = { print(x) } // expected-error {{'f' is not called on all paths}}
+  inspectEscaping(f)
+} // expected-note {{path exits here without a call}}
+
+func temporaryDroppedAfterBorrow(_ x: Int) {
+  inspect({ print(x) }) // expected-error {{'@once' function is not called on all paths}}
+  // expected-note@-1 {{path exits here without a call}}
+}

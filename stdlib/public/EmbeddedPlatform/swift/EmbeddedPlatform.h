@@ -26,6 +26,10 @@
 #ifndef EMBEDDED_SWIFT_PLATFORM_H
 #define EMBEDDED_SWIFT_PLATFORM_H
 
+#if !defined(__has_feature)
+#define __has_feature(x) 0
+#endif
+
 #if defined(__SIZE_TYPE__) && defined(__PTRDIFF_TYPE__)
 typedef __SIZE_TYPE__ __swift_size_t;
 typedef __PTRDIFF_TYPE__ __swift_ptrdiff_t;

@@ -687,12 +687,12 @@ private extension AnalyzedInstructions {
         return false
       }
 
-      guard !loadInst.isDeleted, loadInst.operand.value.accessPath.contains(accessPath) else {
+      guard !loadInst.isDeleted, loadInst.address.accessPath.contains(accessPath) else {
         newLoads.push(loadInst)
         continue
       }
 
-      guard let projectionPath =  loadInst.operand.value.accessPath.getProjection(to: accessPath),
+      guard let projectionPath =  loadInst.address.accessPath.getProjection(to: accessPath),
             let splitLoads = loadInst.trySplit(alongPath: projectionPath, context) else {
         newLoads.push(loadInst)
         return false
@@ -905,7 +905,7 @@ private extension MovableInstructions {
       // If we didn't see a store in this block yet, get the current value from the ssaUpdater.
       let rootVal = currentVal ?? ssaUpdater.getValue(atBeginOf: block)
 
-      if loadInst.operand.value.accessPath == accessPath {
+      if loadInst.address.accessPath == accessPath {
         if loadInst.loadOwnership == .copy {
           let builder = Builder(before: loadInst, context)
           let copy = builder.createCopyValue(operand: rootVal)
@@ -917,7 +917,7 @@ private extension MovableInstructions {
         continue
       }
       
-      guard let projectionPath = accessPath.getProjection(to: loadInst.operand.value.accessPath) else {
+      guard let projectionPath = accessPath.getProjection(to: loadInst.address.accessPath) else {
         continue
       }
     
@@ -1096,7 +1096,7 @@ private extension Instruction {
     case let storeInst as StoreInst:
       return mayReadOrWrite(address: storeInst.destinationOperand.value, aliasAnalysis)
     case let loadInst as LoadInst:
-      return mayWrite(toAddress: loadInst.operand.value, aliasAnalysis)
+      return mayWrite(toAddress: loadInst.address, aliasAnalysis)
     case is CondFailInst:
       return false
     default:
@@ -1138,7 +1138,7 @@ private extension LoadInst {
   }
   
   func overlaps(accessPath: AccessPath) -> Bool {
-    if let path = accessPath.getProjection(to: self.operand.value.accessPath),
+    if let path = accessPath.getProjection(to: self.address.accessPath),
        // If the accessPath is wider than load, it needs to be materializable.
        // Otherwise we won't be able to project it.
        path.isMaterializable {
@@ -1146,7 +1146,7 @@ private extension LoadInst {
       return true
     }
     
-    if self.operand.value.accessPath.isEqualOrContains(accessPath) {
+    if self.address.accessPath.isEqualOrContains(accessPath) {
       // The load is wider than the access path.
       return true
     }

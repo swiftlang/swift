@@ -643,7 +643,7 @@ void ClosureCloner::visitEndBorrowInst(EndBorrowInst *inst) {
   SILValue operand = inst->getOperand();
 
   if (auto *lbi = dyn_cast<LoadBorrowInst>(operand)) {
-    SILValue op = lbi->getOperand();
+    SILValue op = lbi->getAddress();
     // When we check if we can do this, we only need to look through a single
     // struct_element_addr since when checking if this is safe, we only look
     // through a single struct_element_addr.
@@ -705,7 +705,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
   getBuilder().setCurrentDebugScope(getOpScope(lbi->getDebugScope()));
   assert(lbi->getFunction()->hasOwnership() &&
          "We should only see a load borrow in ownership qualified SIL");
-  if (SILValue value = getProjectBoxMappedVal(lbi->getOperand())) {
+  if (SILValue value = getProjectBoxMappedVal(lbi->getAddress())) {
     // Loads of the address argument get eliminated completely; the uses of
     // the loads get mapped to uses of the new object type argument.
     //
@@ -717,7 +717,7 @@ void ClosureCloner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
     return;
   }
 
-  auto *seai = dyn_cast<StructElementAddrInst>(lbi->getOperand());
+  auto *seai = dyn_cast<StructElementAddrInst>(lbi->getAddress());
   if (!seai) {
     SILCloner<ClosureCloner>::visitLoadBorrowInst(lbi);
     return;

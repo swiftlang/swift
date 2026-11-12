@@ -4102,7 +4102,13 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
     }
   }
   
-  if (getASTContext().LangOpts.hasFeature(Feature::AddressableParameters)) {
+  // Like @_lifetime, @_addressable is allowed in safe interop wrappers without
+  // the feature: they need it to keep references into borrowed values valid.
+  auto *pendingAddressableAttr = getWithoutClaiming<AddressableTypeAttr>(attrs);
+  if (getASTContext().LangOpts.hasFeature(Feature::AddressableParameters) ||
+      (pendingAddressableAttr &&
+       getASTContext().SourceMgr.isImportMacroGeneratedLoc(
+           pendingAddressableAttr->getStartLoc()))) {
     if (auto addressableAttr = claim<AddressableTypeAttr>(attrs)) {
       if (options.is(TypeResolverContext::VariadicFunctionInput) &&
           !options.hasBase(TypeResolverContext::EnumElementDecl)) {
@@ -4415,31 +4421,12 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
       }
     }
 
+    // An at-most-once function parameter is consuming by default, and we don't
+    // require that to be written explicitly. An explicit 'borrowing', 'inout',
+    // or 'consuming' specifier is still honored.
     if (auto *fnTy = ty->getAs<AnyFunctionType>()) {
-      if (fnTy->isCallConsuming()) {
-        switch (ownership) {
-        case ParamSpecifier::Borrowing:
-        case ParamSpecifier::LegacyShared:
-          diagnose(eltTypeRepr->getLoc(),
-                   diag::execution_semantics_attr_cannot_be_used_with_borrowing,
-                   getExecutionSemanticsAttrSpelling(
-                       *fnTy->getExecutionSemantics()));
-          elements.emplace_back(ErrorType::get(getASTContext()));
-          continue;
-
-        case ParamSpecifier::InOut:
-        case ParamSpecifier::Consuming:
-        case ParamSpecifier::LegacyOwned:
-        // used by `sending`
-        case ParamSpecifier::ImplicitlyCopyableConsuming:
-          break;
-        // at-most-once is consuming by default and we don't
-        // require it be to written explicitly.
-        case ParamSpecifier::Default:
-          ownership = ParamSpecifier::Consuming;
-          break;
-        }
-      }
+      if (fnTy->isCallConsuming() && ownership == ParamSpecifier::Default)
+        ownership = ParamSpecifier::Consuming;
     }
 
     // Validate the presence of ownership for a noncopyable parameter.

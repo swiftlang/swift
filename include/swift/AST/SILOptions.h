@@ -161,9 +161,6 @@ public:
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
 
-  /// Verify ownership after every pass.
-  bool VerifyOwnershipAll = false;
-
   /// If true, no SIL verification is done at all.
   bool VerifyNone = false;
 
@@ -249,9 +246,6 @@ public:
   /// The name of the SIL outputfile if compiled with SIL debugging
   /// (-sil-based-debuginfo).
   std::string SILOutputFileNameForDebugging;
-
-  /// If set to true, compile with the SIL Ownership Model enabled.
-  bool VerifySILOwnership = true;
 
   /// Assume that code will be executed in a single-threaded environment.
   bool AssumeSingleThreaded = false;

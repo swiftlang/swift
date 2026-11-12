@@ -6,7 +6,4 @@
 // RUN: %t.shebang.swift a b c | %FileCheck -check-prefix=THREE-ARGS %S/shebang-env.swift
 
 // REQUIRES: swift_interpreter
-// UNSUPPORTED: OS=linux-gnu
-// Windows doesn't support shebang lines; it would open the file in whatever
-// program is associated with .swift files instead.
-// UNSUPPORTED: OS=windows-msvc
+// UNSUPPORTED: OS=linux-gnu || OS=windows-msvc

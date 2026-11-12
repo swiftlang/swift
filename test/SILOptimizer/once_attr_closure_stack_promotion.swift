@@ -187,3 +187,21 @@ func transparentForwarded(_ fn: @once () -> Int) -> Int {
 func testInlinedForwarding(_ x: Int) -> Int {
   transparentForwarded { x + 1 }
 }
+
+// An ordinary nonescaping closure that borrows an exactly-once value is
+// promoted to the stack, and doesn't own or copy the value.
+func inspect(_ fn: borrowing @once () -> Void) {}
+func run(_ body: () -> Void) { body() }
+
+// CHECK-LABEL: sil hidden @$s33once_attr_closure_stack_promotion23testBorrowedOnceCaptureyyyyXEF : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> () {
+// CHECK: bb0([[FN:%.*]] : $@noescape @once @callee_owned () -> ()):
+// CHECK-NOT: copy_value
+// CHECK:   [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] {{%.*}}([[FN]]) : $@convention(thin) (@guaranteed @noescape @once @callee_owned () -> ()) -> ()
+// CHECK:   [[DEP:%.*]] = mark_dependence [[PA]] on [[FN]]
+// CHECK:   apply {{%.*}}([[DEP]])
+// CHECK:   dealloc_stack [[PA]]
+// CHECK-NOT: destroy_value
+// CHECK: } // end sil function '$s33once_attr_closure_stack_promotion23testBorrowedOnceCaptureyyyyXEF'
+func testBorrowedOnceCapture(_ fn: borrowing @once () -> Void) {
+  run { inspect(fn) }
+}

@@ -1002,7 +1002,8 @@ private:
       // We don't need to mark_uninitialized since we immediately initialize.
       auto mutableBox =
           SGF.emitLocalVariableWithCleanup(pd,
-                                           /*uninitialized kind*/ std::nullopt);
+                                           /*uninitialized kind*/ std::nullopt,
+                                           ArgNo);
       argrv.ensurePlusOne(SGF, loc).forwardInto(SGF, loc, mutableBox.get());
       return;
     }
@@ -1477,6 +1478,18 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     fArg->setClosureCapture(true);
     arg = SILValue(fArg);
     
+    // With opaque values the capture is an object. A noncopyable one must not
+    // be consumed, since the closure can be invoked more than once.
+    if (!arg->getType().isAddress() && arg->getType().isMoveOnly()) {
+      auto val = ManagedValue::forBorrowedRValue(arg).ensurePlusOne(SGF, Loc);
+      arg = SGF.B
+                .createMarkUnresolvedNonCopyableValueInst(
+                    Loc, val,
+                    MarkUnresolvedNonCopyableValueInst::CheckKind::
+                        NoConsumeOrAssign)
+                .getValue();
+    }
+
     if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
       if (fnConv.isSILIndirect(paramInfo)) {
         arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(Loc, arg);

@@ -2554,30 +2554,12 @@ static Type validateParameterType(ParamDecl *decl) {
     return ErrorType::get(ctx);
   }
 
+  // An at-most-once function parameter is consuming by default, and we don't
+  // require that to be written explicitly. An explicit 'borrowing', 'inout',
+  // or 'consuming' specifier is still honored.
   if (auto *F = Ty->getAs<AnyFunctionType>()) {
-    if (F->isCallConsuming()) {
-      switch (ownership) {
-      case ParamSpecifier::Borrowing:
-      case ParamSpecifier::LegacyShared:
-        ctx.Diags.diagnose(
-            decl->getTypeRepr()->getLoc(),
-            diag::execution_semantics_attr_cannot_be_used_with_borrowing,
-            getExecutionSemanticsAttrSpelling(*F->getExecutionSemantics()));
-        return ErrorType::get(ctx);
-
-      case ParamSpecifier::InOut:
-      case ParamSpecifier::Consuming:
-      case ParamSpecifier::LegacyOwned:
-      // used by `sending`
-      case ParamSpecifier::ImplicitlyCopyableConsuming:
-        break;
-      // at-most-once is consuming by default and we don't
-      // require it be to written explicitly.
-      case ParamSpecifier::Default:
-        ownership = ParamSpecifier::Consuming;
-        break;
-      }
-    }
+    if (F->isCallConsuming() && ownership == ParamSpecifier::Default)
+      ownership = ParamSpecifier::Consuming;
   }
 
   // Validate the presence of ownership for a parameter with an inverse applied.

@@ -965,6 +965,11 @@ extension LifetimeDependenceDefUseWalker {
     if let phi = Phi(using: operand), phi.isReturnValue {
       return returnedDependence(result: operand)
     }
+    // An on-stack closure that consumes a capture, such as an at-most-once closure, carries the capture's dependence. Unlike
+    // a borrowed capture, OSSA does not keep the consumed capture's source alive while the closure is live.
+    if let pa = operand.instruction as? PartialApplyInst, pa.isOnStack {
+      return dependentUse(of: operand, dependentValue: pa)
+    }
     // Delegate ownership forwarding operations to the ForwardingDefUseWalker.
     return walkDownDefault(forwarding: operand)
   }
@@ -1737,6 +1742,29 @@ private extension PointerToAddressInst {
     }
     return nil
   }
+}
+
+/// Gathers the uses of values depending on `markDep`. Returns false if they can't all be found, in which case `uses`
+/// may hold only some of them.
+func gatherDependentUses(of markDep: MarkDependenceInstruction, into uses: inout Stack<Instruction>,
+                         _ localReachabilityCache: LocalVariableReachabilityCache,
+                         _ context: Context) -> Bool {
+  // The walker only tracks ~Escapable and @noescape dependents; for anything else it reports
+  // success having collected nothing.
+  guard let dependence = LifetimeDependence(markDep, context),
+        !dependence.dependentValue.mayEscape else {
+    return false
+  }
+  var dependentUses = Stack<Instruction>(context)
+  defer { dependentUses.deinitialize() }
+  var walker = LifetimeDependentUseWalker(markDep.parentFunction, localReachabilityCache, context) {
+    dependentUses.push($0)
+    return .continueWalk
+  }
+  defer { walker.deinitialize() }
+  let result = walker.walkDown(dependence: dependence)
+  uses.append(contentsOf: dependentUses)
+  return result == .continueWalk
 }
 
 // =============================================================================

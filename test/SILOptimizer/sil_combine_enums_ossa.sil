@@ -725,3 +725,106 @@ bb3:
   return %r : $()
 }
 
+
+// CHECK-LABEL: sil [ossa] @inject_enum_addr_with_copy_addr_take :
+// CHECK:         [[L:%.*]] = load [take] %0
+// CHECK:         [[E:%.*]] = enum $Optional<Klass>, #Optional.some!enumelt, [[L]]
+// CHECK-NOT:     copy_addr
+// CHECK-NOT:     inject_enum_addr
+// CHECK:       } // end sil function 'inject_enum_addr_with_copy_addr_take'
+sil [ossa] @inject_enum_addr_with_copy_addr_take : $@convention(thin) (@in Klass) -> @owned Optional<Klass> {
+bb0(%0 : $*Klass):
+  %2 = alloc_stack $Optional<Klass>
+  %3 = init_enum_data_addr %2, #Optional.some!enumelt
+  copy_addr [take] %0 to [init] %3
+  inject_enum_addr %2, #Optional.some!enumelt
+  %5 = load [take] %2
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @inject_enum_addr_with_copy_addr_copy :
+// CHECK:         [[L:%.*]] = load [copy] %0
+// CHECK:         [[E:%.*]] = enum $Optional<Klass>, #Optional.some!enumelt, [[L]]
+// CHECK-NOT:     copy_addr
+// CHECK-NOT:     inject_enum_addr
+// CHECK:       } // end sil function 'inject_enum_addr_with_copy_addr_copy'
+sil [ossa] @inject_enum_addr_with_copy_addr_copy : $@convention(thin) (@in_guaranteed Klass) -> @owned Optional<Klass> {
+bb0(%0 : $*Klass):
+  %2 = alloc_stack $Optional<Klass>
+  %3 = init_enum_data_addr %2, #Optional.some!enumelt
+  copy_addr %0 to [init] %3
+  inject_enum_addr %2, #Optional.some!enumelt
+  %5 = load [take] %2
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @inject_enum_addr_with_copy_addr_trivial :
+// CHECK:         [[L:%.*]] = load [trivial] %0
+// CHECK:         [[E:%.*]] = enum $Optional<Int>, #Optional.some!enumelt, [[L]]
+// CHECK-NOT:     copy_addr
+// CHECK-NOT:     inject_enum_addr
+// CHECK:       } // end sil function 'inject_enum_addr_with_copy_addr_trivial'
+sil [ossa] @inject_enum_addr_with_copy_addr_trivial : $@convention(thin) (@in_guaranteed Int) -> Optional<Int> {
+bb0(%0 : $*Int):
+  %2 = alloc_stack $Optional<Int>
+  %3 = init_enum_data_addr %2, #Optional.some!enumelt
+  copy_addr %0 to [init] %3
+  inject_enum_addr %2, #Optional.some!enumelt
+  %5 = load [trivial] %2
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @inject_enum_addr_with_copy_addr_in_tuple :
+// CHECK:         [[L:%.*]] = load [take] %0
+// CHECK:         [[T:%.*]] = tuple ([[L]] : $Klass, %1 : $Int)
+// CHECK:         [[E:%.*]] = enum $Optional<(Klass, Int)>, #Optional.some!enumelt, [[T]]
+// CHECK-NOT:     copy_addr
+// CHECK-NOT:     inject_enum_addr
+// CHECK:       } // end sil function 'inject_enum_addr_with_copy_addr_in_tuple'
+sil [ossa] @inject_enum_addr_with_copy_addr_in_tuple : $@convention(thin) (@in Klass, Int) -> @owned Optional<(Klass, Int)> {
+bb0(%0 : $*Klass, %1 : $Int):
+  %2 = alloc_stack $Optional<(Klass, Int)>
+  %3 = init_enum_data_addr %2, #Optional.some!enumelt
+  %4 = tuple_element_addr %3, 0
+  %5 = tuple_element_addr %3, 1
+  copy_addr [take] %0 to [init] %4
+  store %1 to [trivial] %5
+  inject_enum_addr %2, #Optional.some!enumelt
+  %8 = load [take] %2
+  dealloc_stack %2
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @inject_enum_addr_with_copy_addr_address_only :
+// CHECK:         copy_addr
+// CHECK:         inject_enum_addr
+// CHECK:       } // end sil function 'inject_enum_addr_with_copy_addr_address_only'
+sil [ossa] @inject_enum_addr_with_copy_addr_address_only : $@convention(thin) <T> (@in T) -> @out Optional<T> {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %2 = alloc_stack $Optional<T>
+  %3 = init_enum_data_addr %2, #Optional.some!enumelt
+  copy_addr [take] %1 to [init] %3
+  inject_enum_addr %2, #Optional.some!enumelt
+  copy_addr [take] %2 to [init] %0
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @inject_enum_addr_with_copy_addr_non_ossa :
+// CHECK:         copy_addr
+// CHECK:         inject_enum_addr
+// CHECK:       } // end sil function 'inject_enum_addr_with_copy_addr_non_ossa'
+sil @inject_enum_addr_with_copy_addr_non_ossa : $@convention(thin) (@in Klass) -> @owned Optional<Klass> {
+bb0(%1 : $*Klass):
+  %2 = alloc_stack $Optional<Klass>
+  %3 = init_enum_data_addr %2, #Optional.some!enumelt
+  copy_addr [take] %1 to [init] %3
+  inject_enum_addr %2, #Optional.some!enumelt
+  %5 = load %2
+  dealloc_stack %2
+  return %5
+}

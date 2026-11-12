@@ -43,35 +43,15 @@ class SILValueOwnershipChecker;
 /// uses must not be reachable from each other and jointly post-dominate all
 /// consuming uses as well as the defining block/instruction.
 class LinearLifetimeChecker {
-public:
-  class Error;
-  struct ErrorBehaviorKind;
-  class ErrorBuilder;
+  /// Set by checkValue if a consuming use was found to be reachable from another
+  /// consuming use.
+  bool foundOverConsume = false;
 
-private:
   friend class GuaranteedPhiVerifier;
   friend class SILOwnershipVerifier;
   friend class SILValueOwnershipChecker;
 
-  // TODO: migrate away from using dead end blocks for OSSA values. end_borrow
-  // or destroy_value should ideally exist on all paths. However, deadEndBlocks
-  // may still be useful for checking memory lifetime for address uses.
-  DeadEndBlocks *deadEndBlocks;
-
 public:
-  /// \p deadEndBlocks should be provided for lifetimes that do not require
-  /// consuming uses on dead-end paths, which end in an unreachable terminator.
-  /// OSSA values require consumes on all paths, so \p deadEndBlocks are *not*
-  /// required for OSSA lifetimes. Memory lifetimes and access scopes only
-  /// require destroys on non-dead-end paths.
-  ///
-  /// TODO: The verifier currently requires OSSA borrow scopes to end on all
-  /// paths. Owned OSSA lifetimes may still be missing destroys on dead-end
-  /// paths. Once owned values are fully enforced, the same invariant will hold
-  /// for all OSSA values.
-  LinearLifetimeChecker(DeadEndBlocks *deadEndBlocks)
-      : deadEndBlocks(deadEndBlocks) {}
-
   /// Returns true that \p value forms a linear lifetime with consuming uses \p
   /// consumingUses, non consuming uses \p nonConsumingUses. Returns false
   /// otherwise.
@@ -89,47 +69,64 @@ public:
       SILValue value, Operand *consumingUse,
       function_ref<void(SILBasicBlock::iterator insertPt)> visitor);
 
-  /// Given a linear lifetime defined by \p value and \p consumingUses, return
-  /// true if all uses in \p usesToTest are strictly not contained within the
-  /// region where the Linear Lifetime defined by \p value and \p consumingUses
-  /// is live. Otherwise, returns false.
-  bool usesNotContainedWithinLifetime(SILValue value,
-                                      ArrayRef<Operand *> consumingUses,
-                                      ArrayRef<Operand *> usesToTest);
-
 private:
-  /// Returns true if:
+  /// Checks the linear lifetime of \p value.
+  ///
+  /// Returns true if no error was found, i.e. if:
   ///
   /// 1. No consuming uses are reachable from any other consuming use, from any
   /// non-consuming uses, or from the producer instruction.
   /// 2. The consuming use set jointly post dominates producers and all non
   /// consuming uses.
   ///
-  /// Returns false otherwise.
+  /// Returns false if an error was found. This is independent of \p printError:
+  /// also if the error was printed and the ownership verifier is in testing
+  /// mode, false is returned.
+  ///
+  /// If a consuming use is reachable from another consuming use,
+  /// `foundOverConsume` is set.
   ///
   /// \p value The value whose lifetime we are checking.
   /// \p consumingUses the array of users that destroy or consume a value.
   /// \p nonConsumingUses regular uses
-  /// \p errorBehavior If we detect an error, should we return false or hard
-  /// error.
+  /// \p printError If true, errors are printed and the compiler aborts (unless
+  /// the ownership verifier is in testing mode). If false, errors are only
+  /// returned.
   /// \p leakingBlocks If non-null a list of blocks where the value was detected
   /// to leak. Can be used to insert missing destroys.
-  Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
-                   ArrayRef<Operand *> nonConsumingUses,
-                   ErrorBuilder &errorBuilder);
+  bool checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
+                  ArrayRef<Operand *> nonConsumingUses, bool printError);
 
-  Error checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
-                   ArrayRef<Operand *> nonConsumingUses,
-                   ErrorBuilder &errorBuilder,
-                   function_ref<void(SILBasicBlock *)> leakingBlockCallback);
+  bool checkValue(SILValue value, ArrayRef<Operand *> consumingUses,
+                  ArrayRef<Operand *> nonConsumingUses, bool printError,
+                  function_ref<void(SILBasicBlock *)> leakingBlockCallback);
 
-  Error checkValueImpl(
+  /// The implementation of checkValue. Returns true if no error was found.
+  ///
+  /// \p nonConsumingUsesOutsideLifetimeCallback If not None, called for all
+  /// non-consuming uses which are outside of the lifetime of \p value.
+  bool checkValueImpl(
       SILValue value, ArrayRef<Operand *> consumingUses,
-      ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
+      ArrayRef<Operand *> nonConsumingUses, bool printError,
       std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
       std::optional<function_ref<void(Operand *)>>
           nonConsumingUsesOutsideLifetimeCallback);
 };
+
+/// Prints an ownership error in \p function, using \p messagePrinterFunc to
+/// print the details of the error.
+///
+/// Aborts the compiler, unless the ownership verifier is in testing mode.
+///
+/// Always returns false (if it returns at all), meaning "verification failed".
+/// This lets callers directly return the result of this function in their
+/// error path.
+bool printOwnershipError(const SILFunction *function,
+                         llvm::function_ref<void()> messagePrinterFunc);
+
+/// Returns true if ownership verification is disabled for \p mod, either with
+/// the `-disable-sil-ownership-verification` option or by the block list.
+bool disableOwnershipVerification(const SILModule &mod);
 
 } // namespace swift
 

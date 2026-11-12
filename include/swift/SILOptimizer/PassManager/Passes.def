@@ -185,6 +185,8 @@ PASS(ClosureSpecialization, "closure-specialization",
      "Specialize functions with closure arguments")
 PASS(AutodiffClosureSpecialization, "autodiff-closure-specialization",
      "Autodiff specific closure-specialization pass")
+PASS(Verifier, "verifier",
+     "Run the mandatory verification on all OSSA functions, even without assertions")
 
 MODULE_PASS(MandatoryAllocBoxToStack, "mandatory-allocbox-to-stack",
      "Mandatory stack promotion of box objects")
@@ -449,10 +451,6 @@ LEGACY_PASS(UsePrespecialized, "use-prespecialized",
      "Use Pre-Specialized Functions")
 LEGACY_PASS(OwnershipDumper, "ownership-dumper",
      "Print Ownership information for Testing")
-LEGACY_PASS(OwnershipVerifierTextualErrorDumper, "ownership-verifier-textual-error-dumper",
-     "Run ownership verification on all functions, emitting FileCheck-able textual errors instead of asserting")
-LEGACY_PASS(VerifyOwnership, "verify-ownership",
-     "Run ownership verification on all functions, even without assertions")
 LEGACY_PASS(SemanticARCOpts, "semantic-arc-opts",
      "Semantic ARC Optimization")
 LEGACY_PASS(SerializeSILPass, "serialize-sil",

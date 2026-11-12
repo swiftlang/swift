@@ -14,9 +14,11 @@
 
 #include "MoveOnlyDiagnostics.h"
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Stmt.h"
+#include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/FieldSensitivePrunedLiveness.h"
@@ -77,6 +79,80 @@ static void diagnose(ASTContext &context, SourceLoc loc, Diag<T...> diag,
     return;
 
   context.Diags.diagnose(loc, diag, std::forward<U>(args)...);
+}
+
+/// If \p value is only used as the callee of a call, return that call.
+static FullApplySite getCallOfCallee(SILValue value) {
+  auto *user = getSingleNonDebugUser(value);
+  if (!user)
+    return FullApplySite();
+  auto apply = FullApplySite::isa(user);
+  if (!apply || apply.getCallee() != value)
+    return FullApplySite();
+  return apply;
+}
+
+/// If \p user consumes a function value by calling it, return the type of the
+/// function that it calls. Looks through a copy or a load whose only use is the
+/// callee of the call, and through a destructure, which the object checker
+/// forms to call a stored function value of a borrowed aggregate.
+static CanSILFunctionType getConsumingCalleeType(SILInstruction *user) {
+  FullApplySite apply;
+  if (isa<CopyValueInst, LoadInst>(user)) {
+    apply = getCallOfCallee(cast<SingleValueInstruction>(user));
+  } else if (isa<DestructureStructInst, DestructureTupleInst>(user)) {
+    // Every other element must only be destroyed, so that the call is the
+    // only reason for the destructure.
+    for (auto result : user->getResults()) {
+      if (auto call = getCallOfCallee(result)) {
+        if (apply)
+          return CanSILFunctionType();
+        apply = call;
+        continue;
+      }
+      if (!result->getType().isTrivial(*user->getFunction()) &&
+          !llvm::all_of(getNonDebugUses(result), [](Operand *use) {
+            return isa<DestroyValueInst>(use->getUser());
+          }))
+        return CanSILFunctionType();
+    }
+  } else if ((apply = FullApplySite::isa(user))) {
+    // The consumed value must be the callee, which it is only if no argument
+    // is consumed.
+    for (auto &op : apply.getArgumentOperands()) {
+      if (apply.getArgumentConvention(op).isOwnedConventionInCaller())
+        return CanSILFunctionType();
+    }
+  }
+  if (!apply)
+    return CanSILFunctionType();
+
+  auto calleeTy = apply.getCallee()->getType().getAs<SILFunctionType>();
+  if (!calleeTy || !calleeTy->isCallConsuming())
+    return CanSILFunctionType();
+  return calleeTy;
+}
+
+/// Emit a note at \p user, which consumes a value that it isn't allowed to.
+static void diagnoseConsumingUse(ASTContext &context, SILInstruction *user) {
+  if (auto calleeTy = getConsumingCalleeType(user)) {
+    diagnose(
+        context, user, diag::sil_movechecking_consumed_by_call_here,
+        getExecutionSemanticsAttrSpelling(*calleeTy->getExecutionSemantics()));
+    return;
+  }
+  diagnose(context, user, diag::sil_movechecking_consuming_use_here);
+}
+
+/// Returns true if \p user consumes \p markedValue itself by calling it, as
+/// opposed to consuming a value that is projected from it.
+static bool isCallOfMarkedValue(MarkUnresolvedNonCopyableValueInst *markedValue,
+                                SILInstruction *user) {
+  auto calleeTy = getConsumingCalleeType(user);
+  if (!calleeTy)
+    return false;
+  auto markedTy = markedValue->getType().getObjectType();
+  return markedTy.getASTType() == calleeTy;
 }
 
 static void getVariableNameForValue(MarkUnresolvedNonCopyableValueInst *mmci,
@@ -289,8 +365,19 @@ void DiagnosticEmitter::emitObjectGuaranteedDiagnostic(
     }
   }
 
-  diagnose(astContext, markedValue,
-           diag::sil_movechecking_guaranteed_value_consumed, varName);
+  // If every consume is a call of the borrowed function value, say so.
+  auto isCall = [&](SILInstruction *user) {
+    return OSSACanonicalizer::isPartialApplyUser(user) ||
+           isCallOfMarkedValue(markedValue, user);
+  };
+  if (llvm::all_of(getCanonicalizer().consumingUsesNeedingCopy, isCall) &&
+      llvm::all_of(getCanonicalizer().consumingBoundaryUsers, isCall)) {
+    diagnose(astContext, markedValue,
+             diag::sil_movechecking_guaranteed_value_called, varName);
+  } else {
+    diagnose(astContext, markedValue,
+             diag::sil_movechecking_guaranteed_value_consumed, varName);
+  }
 
   emitObjectDiagnosticsForGuaranteedUses(true /*ignore partial apply uses*/);
 }
@@ -427,15 +514,14 @@ void DiagnosticEmitter::emitObjectDiagnosticsForGuaranteedUses(
     if (ignorePartialApplyUses &&
         OSSACanonicalizer::isPartialApplyUser(consumingUser))
       continue;
-    diagnose(astContext, consumingUser,
-             diag::sil_movechecking_consuming_use_here);
+    diagnoseConsumingUse(astContext, consumingUser);
   }
 
   for (auto *user : getCanonicalizer().consumingBoundaryUsers) {
     if (ignorePartialApplyUses && OSSACanonicalizer::isPartialApplyUser(user))
       continue;
 
-    diagnose(astContext, user, diag::sil_movechecking_consuming_use_here);
+    diagnoseConsumingUse(astContext, user);
   }
 }
 
@@ -644,9 +730,11 @@ void DiagnosticEmitter::emitAddressDiagnosticNoCopy(
   // Otherwise, we need to do no implicit copy semantics. If our last use was
   // consuming message:
   diagnose(astContext, markedValue,
-           diag::sil_movechecking_guaranteed_value_consumed, varName);
-  diagnose(astContext, consumingUser,
-           diag::sil_movechecking_consuming_use_here);
+           isCallOfMarkedValue(markedValue, consumingUser)
+               ? diag::sil_movechecking_guaranteed_value_called
+               : diag::sil_movechecking_guaranteed_value_consumed,
+           varName);
+  diagnoseConsumingUse(astContext, consumingUser);
   registerDiagnosticEmitted(markedValue);
 }
 

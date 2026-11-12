@@ -1,0 +1,51 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+
+// Check that SILCombine doesn't use an owned concrete value, which is consumed
+// by an `init_existential_ref`, when propagating the concrete type to an apply
+// of a borrowed opened existential.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+protocol P : AnyObject {
+  func foo() -> Int
+}
+
+sil @consume_p : $@convention(thin) (@owned any P) -> ()
+
+// CHECK-LABEL: sil [ossa] @borrowed_owned_init_existential :
+// CHECK:         [[B:%.*]] = begin_borrow [lexical] %1
+// CHECK:         [[O:%.*]] = open_existential_ref [[B]]
+// CHECK:         [[W:%.*]] = witness_method $T, #P.foo
+// CHECK:         [[C:%.*]] = unchecked_ref_cast [[O]] to $T
+// CHECK:         apply [[W]]<T>([[C]])
+// CHECK:       } // end sil function 'borrowed_owned_init_existential'
+sil [ossa] @borrowed_owned_init_existential : $@convention(thin) <T where T : P> (@owned T) -> Int {
+bb0(%0 : @owned $T):
+  %1 = init_existential_ref %0 : $T : $T, $any P
+  %2 = begin_borrow [lexical] %1
+  %3 = open_existential_ref %2 to $@opened(1, any P) Self
+  %4 = witness_method $@opened(1, any P) Self, #P.foo, %3 : $@opened(1, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  %5 = apply %4<@opened(1, any P) Self>(%3) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  end_borrow %2
+  %7 = function_ref @consume_p : $@convention(thin) (@owned any P) -> ()
+  %8 = apply %7(%1) : $@convention(thin) (@owned any P) -> ()
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_guaranteed_init_existential :
+// CHECK:         [[W:%.*]] = witness_method $T, #P.foo
+// CHECK:         apply [[W]]<T>(%0)
+// CHECK:       } // end sil function 'borrowed_guaranteed_init_existential'
+sil [ossa] @borrowed_guaranteed_init_existential : $@convention(thin) <T where T : P> (@guaranteed T) -> Int {
+bb0(%0 : @guaranteed $T):
+  %1 = init_existential_ref %0 : $T : $T, $any P
+  %2 = begin_borrow %1
+  %3 = open_existential_ref %2 to $@opened(2, any P) Self
+  %4 = witness_method $@opened(2, any P) Self, #P.foo, %3 : $@opened(2, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  %5 = apply %4<@opened(2, any P) Self>(%3) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  end_borrow %2
+  return %5
+}

@@ -1286,7 +1286,7 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
         let (base, size): (ImageSource.Address, ImageSource.Address)
 
         if image.source.isMappedImage {
-          (base, size) = (ImageSource.Address(ph.p_vaddr),
+          (base, size) = (ImageSource.Address(ph.p_vaddr) &- image.imageBase,
                           ImageSource.Address(ph.p_memsz))
         } else {
           (base, size) = (ImageSource.Address(ph.p_offset),
@@ -1453,7 +1453,8 @@ final class ElfImage<SomeElfTraits: ElfTraits> : DwarfSource {
       if phdr.p_type == .PT_GNU_EH_FRAME {
         var ehFrameHdrRange: Range
         if source.isMappedImage {
-          ehFrameHdrRange = Range(base: ImageSource.Address(phdr.p_vaddr),
+          ehFrameHdrRange = Range(base: ImageSource.Address(phdr.p_vaddr)
+                                          &- imageBase,
                                   size: ImageSource.Size(phdr.p_memsz))
         } else {
           ehFrameHdrRange = Range(base: ImageSource.Address(phdr.p_offset),
@@ -1860,13 +1861,40 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
   if phOverflow {
     return nil
   }
+
+  // Segment addresses are relative to the lowest PT_LOAD address, which is
+  // zero for PIE/shared objects but the (absolute) load address for
+  // fixed-address executables.
+  var imageBase = ImageSource.Address(0)
+  do {
+    var scanAddr = firstPhAddr
+    var minVaddr: ImageSource.Address? = nil
+    for _ in 0..<header.e_phnum {
+      let phdr = maybeSwap(try reader.fetch(from: scanAddr,
+                                            as: Traits.Phdr.self))
+      if phdr.p_type == .PT_LOAD {
+        let vaddr = ImageSource.Address(phdr.p_vaddr)
+        minVaddr = minVaddr.map { min($0, vaddr) } ?? vaddr
+      }
+      let (nextAddr, overflow)
+        = scanAddr.addingReportingOverflow(ImageSource.Address(header.e_phentsize))
+      if overflow {
+        break
+      }
+      scanAddr = nextAddr
+    }
+    imageBase = minVaddr ?? 0
+  }
+
   var phAddr = firstPhAddr
   for _ in 0..<header.e_phnum {
     let phdr = maybeSwap(try reader.fetch(from: phAddr, as: Traits.Phdr.self))
 
     // Ignore segments whose extent can't be represented
-    let (segStart, startOverflow)
-      = address.addingReportingOverflow(ImageSource.Address(phdr.p_vaddr))
+    let vaddr = ImageSource.Address(phdr.p_vaddr)
+    let (segStart, startOverflow) = vaddr < imageBase
+      ? (address, true)
+      : address.addingReportingOverflow(vaddr - imageBase)
     let (segEnd, endOverflow)
       = segStart.addingReportingOverflow(ImageSource.Size(phdr.p_memsz))
 
@@ -2115,6 +2143,7 @@ public func testElfImage(bytes: [UInt8]) -> String {
     let base = UInt64(UInt(bitPattern: buf.baseAddress))
     if let info = getElfImageInfo(at: base, using: UnsafeLocalMemoryReader()) {
       result.append("info: endOfText=base+\(info.endOfText - base)")
+      result.append("info-uuid: \(info.uuid.map { hex($0) } ?? "none")")
     } else {
       result.append("info: none")
     }
