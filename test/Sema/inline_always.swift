@@ -57,9 +57,35 @@ func internalUsingInternal() {
 @inline(always) // okay
 package func packageFunc() {}
 
-@inline(always) // expected-error{{'@inline(always)' implies '@usableFromInline'; do not use both}}
+@inline(always) // expected-error{{'@inline(always)' cannot be combined with '@usableFromInline'; use '@inlinable' to allow the function body to be inlined into other modules}} {{+1:1-+1:18=@inlinable}}
 @usableFromInline
 func internalUFI() {}
+
+// An internal '@inline(always)' helper called from a public '@inline(always)'
+// function must be '@inlinable', not '@usableFromInline'.
+@inline(always)
+internal func hotHelper(_ x: Int) -> Int { x &+ 1 }
+// expected-note@-1 2{{global function 'hotHelper' is not '@usableFromInline' or public}}
+// expected-note@-2 2{{global function 'hotHelper' is marked '@inline(always)'; mark it '@inlinable' to make it usable from other '@inlinable' code}} {{-1:1-1=@inlinable }}
+
+@inline(always)
+public func exposedUsingHotHelper(_ x: Int) -> Int {
+  hotHelper(x) // expected-error{{global function 'hotHelper' is internal and cannot be referenced from an '@inlinable' function}}
+}
+
+@inline(always)
+@inlinable
+internal func hotHelperInlinable(_ x: Int) -> Int { x &+ 1 }
+
+@inline(always)
+public func exposedUsingHotHelperInlinable(_ x: Int) -> Int {
+  hotHelperInlinable(x) // okay
+}
+
+@inlinable
+public func inlinableUsingHotHelper(_ x: Int) -> Int {
+  hotHelper(x) // expected-error{{global function 'hotHelper' is internal and cannot be referenced from an '@inlinable' function}}
+}
 
 func internalFunc4() {} //expected-note{{global function 'internalFunc4()' is not '@usableFromInline' or public}}
 

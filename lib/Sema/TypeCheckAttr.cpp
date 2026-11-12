@@ -4202,10 +4202,17 @@ void AttributeChecker::visitInlineAttr(InlineAttr *attr) {
   if (attr->getKind() != InlineKind::Always)
     return;
 
-  // Can't have @inline(always) on @usableFromInline.
+  // Can't have @inline(always) on @usableFromInline: @usableFromInline
+  // exposes an entry point but not the body, so a caller in another module
+  // could not inline the function (SE-0496). Suggest @inlinable instead,
+  // rather than offering to remove @inline(always).
   auto *VD = cast<ValueDecl>(D);
-  if (VD->getAttrs().hasAttribute<UsableFromInlineAttr>()) {
-    diagnoseAndRemoveAttr(attr, diag::attr_inline_always_no_usable_from_inline);
+  if (auto *ufi = VD->getAttrs().getAttribute<UsableFromInlineAttr>()) {
+    attr->setInvalid();
+    auto diag = diagnose(attr->getLocation(),
+                         diag::attr_inline_always_no_usable_from_inline);
+    if (ufi->getLocation().isValid() && !ufi->isImplicit())
+      diag.fixItReplace(ufi->getRangeWithAt(), "@inlinable");
     return;
   }
   // Check that @inline(always) is only used on statically dispatched methods
