@@ -1,12 +1,12 @@
 // Coverage for LifetimeResolution when functions are not [opaque], i.e., address-only types are lowered to addresses.
 // For code that only works when opaque values is enabled, see sibling file without `lowered_addrs` in its name.
 
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -disable-sil-opaque-values -verify \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -disable-sil-opaque-values -verify \
 // RUN:   -Xllvm -sil-print-after=diagnose-resolved-lifetimes -o /dev/null \
 // RUN:   -enable-experimental-feature LifetimeDependence %s 2>&1 | %FileCheck %s
 
 // For extra coverage, compile with opaque values, but skip FileCheck.
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -enable-sil-opaque-values -verify \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -enable-sil-opaque-values -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence %s -o /dev/null
 
 // REQUIRES: swift_feature_LifetimeDependence

@@ -1184,6 +1184,14 @@ bool BridgedFunction::hasOwnershipForTrivialValues() const {
 void BridgedFunction::setOwnershipForTrivialValues(bool hotv) const {
   getFunction()->setOwnershipForTrivialValues(hotv);
 }
+
+bool BridgedFunction::hasUnresolvedLifetimes() const {
+  return getFunction()->hasUnresolvedLifetimes();
+}
+
+void BridgedFunction::setHasUnresolvedLifetimes(bool unresolved) const {
+  getFunction()->setHasUnresolvedLifetimes(unresolved);
+}
   
 
 BridgedLinkage BridgedFunction::getLinkage() const {

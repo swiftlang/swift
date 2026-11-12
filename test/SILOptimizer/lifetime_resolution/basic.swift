@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -verify \
 // RUN:   -enable-experimental-feature LifetimeDependence %s
 
 // REQUIRES: swift_feature_LifetimeDependence

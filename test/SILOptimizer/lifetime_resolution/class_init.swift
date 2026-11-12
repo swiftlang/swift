@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -module-name test -verify %s \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -module-name test -verify %s \
 // RUN:   -Xllvm -sil-print-after=raw-sil-inst-lowering -o /dev/null 2>&1 | %FileCheck %s
 
 // For extra coverage, compile without opaque values, but skip FileCheck.
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -disable-sil-opaque-values -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -disable-sil-opaque-values -verify %s -o /dev/null
 
 // The stored properties of `self` in a root class initializer are initialized by their first
 // assignment, and reassigned afterwards. When the initializer fails before all of them are

@@ -19,6 +19,29 @@ sil-function-attribute ::= '[ossa]'
 
 The function is in OSSA (ownership SSA) form.
 
+### Unresolved lifetimes
+
+```
+sil-function-attribute ::= '[unresolved]'
+```
+
+The OSSA function's lifetimes are unresolved. This means the initialization, 
+destruction, and copies of values and storage may be missing or invalid.
+For example,
+
+- A value may be consumed more than once, or not at all. 
+- Memory locations may be taken more than once or destroyed multiple times.
+- Assigns and stores may not have the correct `[init]` or `[assign]` qualifier.
+- Conditionally initialized storage may be destroyed unconditionally.
+- Partially initialized memory may be completely destroyed.
+
+The SILVerifier's ownership checking is relaxed when this attribute is present
+on a function, checking only for correct operand ownership.
+
+LifetimeResolution turns an unresolved function into one that is resolved through
+dataflow analysis that _legalizes_ the SIL. It is not legal for this attribute to
+appear on a function outside of Raw SIL.
+
 ### Transparent functions
 
 ```

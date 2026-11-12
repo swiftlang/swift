@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -test-runner -sil-disable-input-verify %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
 
 // Unit tests for Type.subelementCount(in:) and FieldIndexTrie. Each function builds the trie from
 // the type of the specified value, prints the leaf count and every node's leaf range, and probes a
