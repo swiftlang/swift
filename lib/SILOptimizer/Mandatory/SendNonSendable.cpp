@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -5047,6 +5048,35 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
 
 } // namespace
 
+/// Collect the types whose missing 'Sendable' conformance makes \p type
+/// non-Sendable.
+///
+/// For a type such as 'Optional<NonSendableClass>', the generic type itself
+/// conforms to 'Sendable' conditionally and the conformance that is actually
+/// missing is the one for 'NonSendableClass'. Notes should point there rather
+/// than at 'Optional'.
+static void collectTypesMissingSendable(Type type,
+                                        SmallVectorImpl<Type> &result) {
+  auto &ctx = type->getASTContext();
+  auto *proto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  if (!proto)
+    return;
+
+  auto conformance = lookupConformance(type->getCanonicalType(), proto,
+                                       /*allowMissing=*/true);
+  if (conformance.isInvalid())
+    return;
+
+  conformance.forEachMissingConformance(
+      [&](BuiltinProtocolConformance *missing) {
+        Type missingType = missing->getType();
+        if (llvm::none_of(result,
+                          [&](Type t) { return t->isEqual(missingType); }))
+          result.push_back(missingType);
+        return false;
+      });
+}
+
 void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
   auto isolationCrossing = getIsolationCrossing();
   if (!isolationCrossing)
@@ -5076,30 +5106,47 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
   }
 
   auto *moduleDecl = error.op->getSourceInst()->getModule().getSwiftModule();
-  if (auto *nominal = type->getNominalDecl()) {
-    // If the nominal type is in the current module, suggest adding `Sendable`
-    // if it makes sense.
-    if (nominal->getParentModule() == moduleDecl &&
-        (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))) {
-      auto note = nominal->diagnose(diag::rbi_add_nominal_sendable_conformance,
-                                    nominal);
-      addSendableFixIt(nominal, note, /*unchecked*/ false);
-    } else {
-      nominal->diagnose(diag::rbi_non_sendable_nominal, nominal);
-    }
-    return;
-  }
 
-  if (auto genericArchetype = type->getAs<ArchetypeType>()) {
-    auto interfaceType = genericArchetype->getInterfaceType();
-    if (auto genericParamType = interfaceType->getAs<GenericTypeParamType>()) {
-      auto *genericParamTypeDecl = genericParamType->getDecl();
-      if (genericParamTypeDecl &&
-          genericParamTypeDecl->getModuleContext() == moduleDecl) {
-        auto diag = genericParamTypeDecl->diagnose(
-            diag::rbi_add_generic_parameter_sendable_conformance, type);
-        addSendableFixIt(genericParamTypeDecl, diag);
-        return;
+  // Find the types that are actually missing a 'Sendable' conformance. For
+  // 'Optional<NonSendableClass>' that is 'NonSendableClass', not 'Optional'.
+  // If we cannot tell, fall back to the result type itself.
+  SmallVector<Type, 2> typesToNote;
+  collectTypesMissingSendable(type, typesToNote);
+  if (typesToNote.empty())
+    typesToNote.push_back(type);
+
+  for (Type noteType : typesToNote) {
+    if (noteType->is<FunctionType>()) {
+      diagnoseNote(error.op->getSourceInst(),
+                   diag::rbi_nonsendable_function_type);
+      continue;
+    }
+
+    if (auto *nominal = noteType->getNominalDecl()) {
+      // If the nominal type is in the current module, suggest adding
+      // `Sendable` if it makes sense.
+      if (nominal->getParentModule() == moduleDecl &&
+          (isa<StructDecl>(nominal) || isa<EnumDecl>(nominal))) {
+        auto note = nominal->diagnose(
+            diag::rbi_add_nominal_sendable_conformance, nominal);
+        addSendableFixIt(nominal, note, /*unchecked*/ false);
+      } else {
+        nominal->diagnose(diag::rbi_non_sendable_nominal, nominal);
+      }
+      continue;
+    }
+
+    if (auto genericArchetype = noteType->getAs<ArchetypeType>()) {
+      auto interfaceType = genericArchetype->getInterfaceType();
+      if (auto genericParamType =
+              interfaceType->getAs<GenericTypeParamType>()) {
+        auto *genericParamTypeDecl = genericParamType->getDecl();
+        if (genericParamTypeDecl &&
+            genericParamTypeDecl->getModuleContext() == moduleDecl) {
+          auto diag = genericParamTypeDecl->diagnose(
+              diag::rbi_add_generic_parameter_sendable_conformance, noteType);
+          addSendableFixIt(genericParamTypeDecl, diag);
+        }
       }
     }
   }
