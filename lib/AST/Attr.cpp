@@ -18,6 +18,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityQuery.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -1362,7 +1364,15 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
   switch (getKind()) {
   case DeclAttrKind::Semantics:
     Printer.printAttrName("@_semantics");
-    Printer << "(\"" << cast<SemanticsAttr>(this)->Value << "\")";
+    {
+      StringRef value = cast<SemanticsAttr>(this)->Value;
+      // Older compilers don't understand the kind of an OS version query
+      // function.
+      if (Options.SuppressOSVersionQueryKind &&
+          parseOSVersionQuerySemanticsAttr(value))
+        value = semantics::AVAILABILITY_OSVERSION;
+      Printer << "(\"" << value << "\")";
+    }
     break;
 
   case DeclAttrKind::Alignment:

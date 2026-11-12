@@ -21,6 +21,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
@@ -35,6 +36,26 @@ enum class OSVersionQueryKind : uint8_t {
   IsVariantOSVersionAtLeast,
   IsOSVersionAtLeastOrVariantVersionAtLeast,
 };
+
+/// Returns the spelling of `kind` in the argument of the
+/// `availability.osversion` semantics attribute, e.g.,
+/// `@_semantics("availability.osversion(isOSVersionAtLeast)")`.
+llvm::StringRef getOSVersionQueryKindName(OSVersionQueryKind kind);
+
+/// Returns the full spelling of the semantics attribute that identifies a
+/// function as an OS version query function of kind `kind`.
+std::string getOSVersionQuerySemanticsAttr(OSVersionQueryKind kind);
+
+/// Given the value of a semantics attribute, returns the kind of OS version
+/// query function that it identifies. Returns `std::nullopt` if `attr` is not
+/// of the form `availability.osversion(<kind>)` for a known kind.
+std::optional<OSVersionQueryKind>
+parseOSVersionQuerySemanticsAttr(llvm::StringRef attr);
+
+/// Infers the kind of OS version query function that `decl`, which carries the
+/// `availability.osversion` semantics attribute without an explicit kind, is.
+/// Only the functions that the standard library declares are recognized.
+std::optional<OSVersionQueryKind> inferOSVersionQueryKind(const FuncDecl *decl);
 
 /// Represents the information needed to evaluate an `#if available` query
 /// (either at runtime or compile-time).

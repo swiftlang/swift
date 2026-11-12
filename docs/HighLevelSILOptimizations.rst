@@ -483,3 +483,12 @@ The availability attribute supports the following tags:
 availability.osversion(major: Builtin.Word, minor: Builtin.Word, patch: Builtin.Word) -> Builtin.Int1
 
   Returns true if the OS version matches the parameters.
+
+  The tag may carry the kind of query function in parentheses, e.g.,
+  ``availability.osversion(isOSVersionAtLeast)``. The kinds are
+  ``isOSVersionAtLeast``, ``isVariantOSVersionAtLeast``, and
+  ``isOSVersionAtLeastOrVariantVersionAtLeast``. When the kind is omitted, the
+  type checker infers it for the standard library's query functions and adds it
+  as an additional, implicit ``availability.osversion(<kind>)`` tag. Functions
+  with neither an explicit nor an inferred kind are not treated as queries by
+  the optimizer.
