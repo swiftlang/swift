@@ -14,7 +14,8 @@ extension Int: P { }
 extension Array: P where Element: P { }
 
 // No mention of the marker protocol for runtime type instantiation.
-// CHECK-LABEL: @"$sSS_15marker_protocol1P_ptMD" =
+// CHECK: @"$sSS_15marker_protocol1P_ptMd" = linkonce_odr hidden global { ptr } zeroinitializer,{{( comdat,)?}} align 8
+// CHECK-LABEL: @"$sSS_15marker_protocol1P_ptMR"
 // CHECK-SAME: @"symbolic SS_ypt"
 
 // CHECK-LABEL: @"$s15marker_protocol1QMp" = {{(dllexport |protected )?}}constant
@@ -47,7 +48,7 @@ struct HasMarkers {
 
 // Note: no mention of marker protocols when forming a dictionary.
 // CHECK-LABEL: define{{.*}}@"$s15marker_protocol0A12InDictionaryypyF"
-// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSS_15marker_protocol1P_ptMD")
+// CHECK: call ptr @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$sSS_15marker_protocol1P_ptMd", ptr @"$sSS_15marker_protocol1P_ptMR")
 public func markerInDictionary() -> Any {
   let dict: [String: P] = ["answer" : 42]
   return dict
@@ -63,7 +64,7 @@ public struct GenericType<T: Hashable & P> { }
 public func testGeneric(i: Int, array: [Int]) {
   generic(i)
   generic(array)
-  // CHECK: __swift_instantiateConcreteTypeFromMangledName{{.*}}$s15marker_protocol11GenericTypeVySaySiGGmMD
+  // CHECK: __swift_instantiateConcreteTypeFromMangledNameV2{{.*}}$s15marker_protocol11GenericTypeVySaySiGGmMd
   print(GenericType<[Int]>.self)
 }
 
@@ -92,7 +93,7 @@ let v1 = (any C & P).self
 let v2 = C.self
 
 // CHECK-LABEL: define hidden swiftcc void @"$s15marker_protocol23testProtocolCompositionyyF"()
-// CHECK: [[V1:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s15marker_protocol1P_AA1CCXcMD")
+// CHECK: [[V1:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s15marker_protocol1P_AA1CCXcMd", ptr @"$s15marker_protocol1P_AA1CCXcMR")
 // CHECK: [[V2:%.*]] = load ptr, ptr @"$s15marker_protocol2v2AA1CCmvp"
 func testProtocolComposition() {
   print(v1 == v2)

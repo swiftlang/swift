@@ -11,7 +11,7 @@
 // CHECK-LABEL: define hidden swiftcc void @"$s39signature_conformances_multifile_future5passQyyF"()
 func passQ() {
   // CHECK: call swiftcc void @"$s39signature_conformances_multifile_future12AlsoConformsVACyxGycfC"(ptr @"$sSiN")
-  // CHECK: [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s39signature_conformances_multifile_future12AlsoConformsVySiGMD")
+  // CHECK: [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s39signature_conformances_multifile_future12AlsoConformsVySiGMd", ptr @"$s39signature_conformances_multifile_future12AlsoConformsVySiGMR")
   // CHECK: [[WITNESS_TABLE:%[0-9]+]] = call ptr @"$s39signature_conformances_multifile_future12AlsoConformsVySiGACyxGAA1QAAWl"()
   // CHECK: call swiftcc void @"$s39signature_conformances_multifile_future6takesQyyxAA1QRzlF"(
   // CHECK-SAME:   ptr noalias undef, 
@@ -26,7 +26,7 @@ func passQ() {
 // CHECK-LABEL: define hidden swiftcc void @"$s39signature_conformances_multifile_future5passPyyF"()
 func passP() {
   // CHECK: call swiftcc void @"$s39signature_conformances_multifile_future8ConformsVACyxq_GycfC"(ptr @"$sSiN", ptr @"$sSSN")
-  // CHECK: [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s39signature_conformances_multifile_future8ConformsVySiSSGMD")
+  // CHECK: [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s39signature_conformances_multifile_future8ConformsVySiSSGMd", ptr @"$s39signature_conformances_multifile_future8ConformsVySiSSGMR")
   // CHECK: [[WITNESS_TABLE:%[0-9]+]] = call ptr @"$s39signature_conformances_multifile_future8ConformsVySiSSGACyxq_GAA1PAAWl"()
   // CHECK: call swiftcc void @"$s39signature_conformances_multifile_future6takesPyyxAA1PRzlF"(
   // CHECK-SAME:   ptr noalias undef, 

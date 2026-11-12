@@ -193,7 +193,7 @@ public func useFoo(x: String, y: C) {
 // CHECK-LABEL: define {{.*}} @"$s18opaque_result_type6useFoo1x1yySS_AA1CCtF"
 // CHECK: [[OPAQUE:%.*]] = call {{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOMg"
 // CHECK: [[CONFORMANCE:%.*]] = call swiftcc ptr @swift_getOpaqueTypeConformance{{2?}}(ptr {{.*}}, ptr [[OPAQUE]], [[WORD:i32|i64]] 1)
-// CHECK: [[TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_MD")
+// CHECK: [[TYPE:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}({{.*}} @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_Md", ptr @"$s18opaque_result_type3baz1zQrx_tAA1PRzAA1QRzlFQOyAA1CCQo_MR")
 // CHECK: call swiftcc ptr @swift_getAssociatedConformanceWitness(ptr [[CONFORMANCE]], ptr [[TYPE]]
 
 // Make sure we can mangle named opaque result types

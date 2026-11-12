@@ -186,7 +186,7 @@ public func concrete_concrete() {
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @"$s34conditional_conformance_with_assoc09concrete_E0yyF"()
 // CHECK-NEXT:  entry:
-// CHECK-NEXT:    [[X:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMD")
+// CHECK-NEXT:    [[X:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMd", ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMR")
 // CHECK-NEXT:    [[Z:%.*]] = call ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGACyxq_GAA2P1A2A0I0R_AA0H03AT2RpzAakM_AmaLP3AT3RPzrlWl"()
 // CHECK-NEXT:    call swiftcc void @"$s34conditional_conformance_with_assoc8takes_p1yyxmAA2P1RzlF"(ptr [[X]], ptr [[X]], ptr [[Z]])
 // CHECK-NEXT:    ret void
@@ -205,7 +205,7 @@ public func concrete_concrete() {
 // CHECK-STABLE-ABI-FALSE-NEXT:   [[T0:%.*]] = call swiftcc %swift.metadata_response @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMa"(i64 255)
 // CHECK-STABLE-ABI-FALSE-NEXT:   [[Double_TYPE:%.*]] = extractvalue %swift.metadata_response [[T0]], 0
 // CHECK-STABLE-ABI-FALSE-NEXT:   extractvalue %swift.metadata_response [[T0]], 1
-// CHECK-STABLE-ABI-TRUE-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMD")
+// CHECK-STABLE-ABI-TRUE-NEXT:    [[T0:%.*]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMd", ptr @"$s34conditional_conformance_with_assoc6DoubleVyAA8IsAlsoP2VAA0F2P3VGMR")
 // CHECK-NEXT:    [[CONDITIONAL_REQUIREMENTS:%.*]] = getelementptr inbounds{{.*}} [3 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-NEXT:    [[C_P3_PTR:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQUIREMENTS]], i32 0
 // CHECK-NEXT:    store ptr @"$s34conditional_conformance_with_assoc4IsP3VAA0F0AAWP", ptr [[C_P3_PTR]], align 8

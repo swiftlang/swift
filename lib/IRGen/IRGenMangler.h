@@ -153,7 +153,11 @@ public:
   }
 
   std::string mangleTypeMetadataDemanglingCacheVariable(Type type) {
-    return mangleTypeSymbol(type, "MD");
+    return mangleTypeSymbol(type, "Md");
+  }
+
+  std::string mangleTypeMetadataMangledNameRef(Type type) {
+    return mangleTypeSymbol(type, "MR");
   }
 
   std::string mangleTypeFullMetadataFull(Type type) {

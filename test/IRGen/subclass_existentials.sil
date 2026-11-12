@@ -41,7 +41,7 @@ sil @takesMetadata : $@convention(thin) <T> (@thick T.Type) -> ()
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc void @checkMetadata()
 // CHECK-NEXT: entry:
-// CHECK-NEXT:   [[TYPE:%.*]] = call {{.*}}@"$s21subclass_existentials1P_AA1CCXcMD"
+// CHECK-NEXT:   [[TYPE:%.*]] = call {{.*}}@"$s21subclass_existentials1P_AA1CCXcMd"
 // CHECK-NEXT:   call swiftcc void @takesMetadata(ptr [[TYPE]], ptr [[TYPE]])
 // CHECK-NEXT:   ret void
 
