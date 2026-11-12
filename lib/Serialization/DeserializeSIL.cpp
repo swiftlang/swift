@@ -612,10 +612,9 @@ SILDeserializer::readDebugVariable(SILFunction *Fn, SILBuilder &Builder,
   assert(ListOfValues.size() >= 2 &&
          "Unexpected number of values for debug variable info");
   bool IsLet = (Attr >> 4) & 0x1;
-  unsigned IsDenseMapSingleton = (Attr >> 5) & 0x3;
-  bool HasType = (Attr >> 7) & 0x1;
-  bool HasScope = (Attr >> 8) & 0x1;
-  bool HasLoc = (Attr >> 9) & 0x1;
+  bool HasType = (Attr >> 5) & 0x1;
+  bool HasScope = (Attr >> 6) & 0x1;
+  bool HasLoc = (Attr >> 7) & 0x1;
 
   auto VarName = MF->getIdentifierText(ListOfValues[I++]);
   auto ArgNo = ListOfValues[I++];
@@ -672,12 +671,10 @@ SILDeserializer::readDebugVariable(SILFunction *Fn, SILBuilder &Builder,
     Scope = maybeScope.get();
   }
 
-  SILDebugVariable DebugVar(
+  return SILDebugVariable(
       VarName, IsLet, ArgNo, Type, Loc, Scope,
       llvm::ArrayRef<SILDIExprElement>(Expressions.element_begin(),
                                        Expressions.element_end()));
-  DebugVar.isDenseMapSingleton = IsDenseMapSingleton;
-  return DebugVar;
 }
 
 /// Helper function to find a SILDifferentiabilityWitness, given its mangled
