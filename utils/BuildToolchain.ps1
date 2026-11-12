@@ -14,7 +14,8 @@ cache, where BuildSDK.ps1 and the toolchain build find them.
 Otherwise, builds the toolchain with the Stage1 compilers, against the Windows
 SDK that BuildSDK.ps1 built for the host: the compilers, their runtimes for the
 SDK architectures, the macros and the developer tools. It installs them in the
-image and binds the executables to the Swift runtime.
+image, binds the executables to the Swift runtime, and patches the compilers to
+use mimalloc.
 
 The two modes configure the compilers with different CMake caches,
 cmake\caches\Windows-Bootstrap-Stage1-<arch>.cmake and
@@ -710,6 +711,116 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
   }
 
   Write-Host "Set-WindowsSxSToolchainRuntimePerDLL: bound $BoundEXECount EXE(s); skipped $SkippedCount EXE(s) with no runtime imports"
+}
+
+# Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
+function Build-mimalloc() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [hashtable]$Platform
+  )
+
+  $MimallocBinaryCache = "$BinaryCache\$($Platform.Triple)\mimalloc"
+  # Match the architecture baselines in mimalloc's Visual Studio projects.
+  # MI_OPT_ARCH may select a newer ARM architecture as mimalloc evolves.
+  $MimallocArchitectureFlag = switch ($Platform.Architecture.ShortName) {
+    "x64" { "/arch:AVX2" }
+    "arm64" { "/arch:armv8.2" }
+    default { throw "Unsupported mimalloc architecture '$($Platform.Architecture.ShortName)'" }
+  }
+
+  $ToolchainRoots = @($Platform.ToolchainInstallRoot)
+  if ($IncludeNoAsserts) {
+    $ToolchainRoots += $Platform.NoAssertsToolchainInstallRoot
+  }
+
+  foreach ($ToolchainRoot in $ToolchainRoots) {
+    Build-CMakeProject `
+      -Src "$SourceCache\mimalloc" `
+      -Bin $MimallocBinaryCache `
+      -InstallTo "$ToolchainRoot\usr" `
+      -Platform $Platform `
+      -CCompiler $Compilers.MSVC.C `
+      -CXXCompiler $Compilers.MSVC.CXX `
+      -Defines @{
+        CMAKE_CXX_FLAGS = @($MimallocArchitectureFlag);
+        MI_BUILD_OBJECT = "NO";
+        MI_BUILD_SHARED = "YES";
+        MI_BUILD_STATIC = "NO";
+        MI_BUILD_TESTS = "NO";
+        MI_NO_OPT_ARCH = "YES";
+      }
+  }
+}
+
+function Patch-mimalloc() {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [hashtable]$Platform
+  )
+
+  $BuildSuffix = if ($BuildPlatform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
+
+  $Tools = @(
+    "swift.exe",
+    "swiftc.exe",
+    "swift-api-digester.exe",
+    "swift-autolink-extract.exe",
+    "swift-driver.exe",
+    "swift-frontend.exe",
+    "swift-symbolgraph-extract.exe",
+    "swift-synthesize-interface.exe",
+    "clang.exe",
+    "clang++.exe",
+    "clang-cache.exe",
+    "clang-cl.exe",
+    "clang-cpp.exe",
+    "lld.exe",
+    "lld-link.exe",
+    "ld.lld.exe",
+    "ld64.lld.exe",
+    "wasm-ld.exe"
+  )
+  $Binaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.ToolchainInstallRoot, "usr", "bin", $_)}
+  if ($IncludeNoAsserts) {
+    $NoAssertBinaries = $Tools | ForEach-Object {[IO.Path]::Combine($Platform.NoAssertsToolchainInstallRoot, "usr", "bin", $_)}
+    $Binaries = $Binaries + $NoAssertBinaries
+  }
+
+  $minject = "$SourceCache\mimalloc\bin\minject$BuildSuffix"
+  # minject creates an intermediate path by extending the input filename.
+  # Stage the input under a short name to avoid its pathname-length bug.
+  $PatchBinary = [IO.Path]::Combine([IO.Path]::GetDirectoryName($minject), "binary.exe")
+
+  try {
+    foreach ($Binary in $Binaries) {
+      $Name = [IO.Path]::GetFileName($Binary)
+
+      Copy-Item -Force -LiteralPath $Binary -Destination $PatchBinary
+      Invoke-Program $minject "-f" "-i" "$PatchBinary"
+      Copy-Item -Force -LiteralPath $PatchBinary -Destination $Binary
+
+      # Log the import table
+      $LogFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name.txt"
+      $ErrorFile = "$BinaryCache\$($Platform.Triple)\mimalloc\minject-log-$Name-error.txt"
+      Invoke-Program "$minject" "-l" "$Binary" -OutFile $LogFile -ErrorFile $ErrorFile
+
+      # Verify patching
+      $Found = Select-String -Path $LogFile -Pattern "mimalloc"
+      if (-not $Found) {
+        Get-Content $ErrorFile
+        throw "Failed to patch mimalloc for $Name"
+      }
+    }
+  } finally {
+    if (Test-Path -LiteralPath $PatchBinary) {
+      Remove-Item -Force -LiteralPath $PatchBinary
+    }
+  }
 }
 
 function Build-CompilerRuntime([Hashtable] $Platform,
@@ -1800,6 +1911,11 @@ if ($Mode -eq "Bootstrap") {
       }
     }
   }
+
+  # Patching rewrites the compilers, so it comes after the last step that
+  # writes them.
+  Invoke-BuildStep Build-mimalloc $HostPlatform
+  Invoke-BuildStep Patch-mimalloc $HostPlatform
 }
 
 } catch {
