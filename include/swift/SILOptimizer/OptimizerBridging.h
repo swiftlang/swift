@@ -267,7 +267,7 @@ struct BridgedPassContext {
       BridgedFunction applySiteCallee) const;
   BridgedOwnedString mangleWithChangedRepresentation(BridgedFunction applySiteCallee) const;
 
-  void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
+  bool inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   void eraseFunction(BridgedFunction function) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;

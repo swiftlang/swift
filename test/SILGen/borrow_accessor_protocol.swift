@@ -3,6 +3,7 @@
 // RUN:%target-swift-frontend -emit-silgen %s | %FileCheck %s
 // RUN:%target-swift-frontend -c %s -Xllvm -sil-print-after=SILGenCleanup 2>&1 | %FileCheck %s --check-prefixes=CHECK-SIL
 // RUN:%target-swift-frontend -emit-silgen %s -enable-library-evolution | %FileCheck %s --check-prefixes=CHECK-EVO
+// RUN:%target-swift-frontend -c %s -enable-library-evolution -Xllvm -sil-print-after=SILGenCleanup 2>&1 | %FileCheck %s --check-prefixes=CHECK-EVO-SIL
 
 
 public protocol P {
@@ -407,10 +408,20 @@ public class K4 : S {
 // CHECK-EVO: bb0([[REG0:%.*]] : $*K1):
 // CHECK-EVO:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-EVO:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K1C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K1) -> @guaranteed_address NonTrivial
-// CHECK-EVO:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K1) -> @guaranteed_address NonTrivial
+// CHECK-EVO:   [[UNCHECKED:%.*]] = unchecked_ownership [[REG1]]
+// CHECK-EVO:   [[REG3:%.*]] = apply [[REG2]]([[UNCHECKED]]) : $@convention(method) (@guaranteed K1) -> @guaranteed_address NonTrivial
 // CHECK-EVO:   end_borrow [[REG1]]
 // CHECK-EVO:   return [[REG3]]
 // CHECK-EVO: }
+
+// SILGenCleanup returns the address result from the borrow scope of self.
+// CHECK-EVO-SIL: sil private [transparent] [thunk] [ossa] @$s24borrow_accessor_protocol2K1CAA1RA2aDP2idAA10NonTrivialVvbTW : $@convention(witness_method: R) (@in_guaranteed K1) -> @guaranteed_address NonTrivial {
+// CHECK-EVO-SIL: bb0([[REG0:%.*]] : $*K1):
+// CHECK-EVO-SIL:   [[REG1:%.*]] = load_borrow [[REG0]]
+// CHECK-EVO-SIL:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K1C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K1) -> @guaranteed_address NonTrivial
+// CHECK-EVO-SIL:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K1) -> @guaranteed_address NonTrivial
+// CHECK-EVO-SIL-NEXT:   return_borrow [[REG3]] from_scopes ([[REG1]])
+// CHECK-EVO-SIL: }
 
 // CHECK-EVO: sil shared [ossa] @$s24borrow_accessor_protocol2K1C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K1) -> @guaranteed_address NonTrivial {
 // CHECK-EVO: bb0([[REG0:%.*]] : @guaranteed $K1):
@@ -431,7 +442,8 @@ public class K4 : S {
 // CHECK-EVO: bb0([[REG0:%.*]] : $*K2):
 // CHECK-EVO:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-EVO:   [[REG2:%.*]] = class_method [[REG1]], #K2.id!borrow : (K2) -> () -> NonTrivial, $@convention(method) (@guaranteed K2) -> @guaranteed_address NonTrivial
-// CHECK-EVO:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K2) -> @guaranteed_address NonTrivial
+// CHECK-EVO:   [[UNCHECKED:%.*]] = unchecked_ownership [[REG1]]
+// CHECK-EVO:   [[REG3:%.*]] = apply [[REG2]]([[UNCHECKED]]) : $@convention(method) (@guaranteed K2) -> @guaranteed_address NonTrivial
 // CHECK-EVO:   end_borrow [[REG1]]
 // CHECK-EVO:   return [[REG3]]
 // CHECK-EVO: }
@@ -440,7 +452,8 @@ public class K4 : S {
 // CHECK-EVO: bb0([[REG0:%.*]] : $*K3):
 // CHECK-EVO:   [[REG1:%.*]] = load_borrow [[REG0]]
 // CHECK-EVO:   [[REG2:%.*]] = function_ref @$s24borrow_accessor_protocol2K3C2idAA10NonTrivialVvb : $@convention(method) (@guaranteed K3) -> @guaranteed_address NonTrivial
-// CHECK-EVO:   [[REG3:%.*]] = apply [[REG2]]([[REG1]]) : $@convention(method) (@guaranteed K3) -> @guaranteed_address NonTrivial
+// CHECK-EVO:   [[UNCHECKED:%.*]] = unchecked_ownership [[REG1]]
+// CHECK-EVO:   [[REG3:%.*]] = apply [[REG2]]([[UNCHECKED]]) : $@convention(method) (@guaranteed K3) -> @guaranteed_address NonTrivial
 // CHECK-EVO:   end_borrow [[REG1]]
 // CHECK-EVO:   return [[REG3]]
 // CHECK-EVO: }

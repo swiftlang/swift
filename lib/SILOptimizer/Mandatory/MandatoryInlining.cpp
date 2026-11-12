@@ -1014,6 +1014,10 @@ runOnFunctionRecursively(SILOptFunctionBuilder &FuncBuilder, SwiftPassInvocation
       // nextBB will point to the last inlined block
       SILBasicBlock *lastBB =
           Inliner.inlineFunction(CalleeFunction, InnerAI, FullArgs);
+      if (!lastBB) {
+        ASSERT(!PAI || PAI->isOnStack());
+        continue;
+      }
 
       // When inlining an OSSA function into a non-OSSA function, ownership of
       // nonescaping closures is lowered.  At that point, they are recognized

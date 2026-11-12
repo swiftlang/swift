@@ -108,7 +108,9 @@ extension MutatingContext {
     return false
   }
 
-  func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {
+  /// Returns false if the apply isn't inlined.
+  @discardableResult
+  func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) -> Bool {
     // This is only a best-effort attempt to notify the new cloned instructions as changed.
     // TODO: get a list of cloned instructions from the `inlineFunction`
     let instBeforeInlining = apply.previous
@@ -125,7 +127,9 @@ extension MutatingContext {
       instAfterInlining = nil
     }
 
-    bridgedPassContext.inlineFunction(apply.bridged, mandatoryInline)
+    if !bridgedPassContext.inlineFunction(apply.bridged, mandatoryInline) {
+      return false
+    }
 
     if let instBeforeInlining = instBeforeInlining?.next,
        let instAfterInlining = instAfterInlining,
@@ -134,6 +138,7 @@ extension MutatingContext {
     }
     notifyInstructionsChanged()
     notifyBranchesChanged()
+    return true
   }
 
   func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
