@@ -2995,10 +2995,8 @@ namespace {
 
       if (frtInfo.isReference()) {
         // Swift classes are always Escapable.
-        if (evaluateOrDefault(
-                Impl.SwiftContext.evaluator,
-                ClangTypeEscapability({declTy, &Impl}),
-                CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+        if (importer::isNonEscapable(Impl.SwiftContext.evaluator, declTy,
+                                     &Impl)) {
           Impl.diagnose(HeaderLoc(decl->getLocation()),
                         diag::nonescapable_foreign_reference_type, decl);
           return nullptr;
@@ -3040,10 +3038,8 @@ namespace {
       }
 
       bool isNonEscapable = false;
-      if (evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({declTy, &Impl}),
-              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+      if (importer::isNonEscapable(Impl.SwiftContext.evaluator, declTy,
+                                   &Impl)) {
         result->addAttribute(new (Impl.SwiftContext)
                                  NonEscapableAttr(/*Implicit=*/true));
         addSuppressedProtocol(result, KnownProtocolKind::Escapable);
@@ -3061,11 +3057,9 @@ namespace {
             }
 
             if (!isNonEscapable) {
-              if (evaluateOrDefault(Impl.SwiftContext.evaluator,
-                                    ClangTypeEscapability(
-                                        {base.getType().getTypePtr(), &Impl}),
-                                    CxxEscapability::Unknown) ==
-                  CxxEscapability::NonEscapable) {
+              if (importer::isNonEscapable(Impl.SwiftContext.evaluator,
+                                           base.getType().getTypePtr(),
+                                           &Impl)) {
                 Impl.addImportDiagnostic(
                     decl,
                     Diagnostic(diag::nonescapable_member_of_escapable, true,
@@ -3224,11 +3218,8 @@ namespace {
 
         if (!isNonEscapable && !decl->isAnonymousStructOrUnion()) {
           if (const auto *fd = getFieldDecl(nd)) {
-            if (evaluateOrDefault(
-                    Impl.SwiftContext.evaluator,
-                    ClangTypeEscapability({fd->getType().getTypePtr(), &Impl}),
-                    CxxEscapability::Unknown) ==
-                CxxEscapability::NonEscapable) {
+            if (importer::isNonEscapable(Impl.SwiftContext.evaluator,
+                                         fd->getType().getTypePtr(), &Impl)) {
               Impl.addImportDiagnostic(
                   decl,
                   Diagnostic(diag::nonescapable_member_of_escapable, false,
@@ -4889,12 +4880,7 @@ namespace {
       const auto *method = dyn_cast<clang::CXXMethodDecl>(decl);
       if (!method)
         return false;
-      const auto *enclosing = method->getParent();
-      if (enclosing->isInStdNamespace() &&
-          (enclosing->getName() == "unique_ptr" ||
-           enclosing->getName() == "shared_ptr") &&
-          method->isOverloadedOperator() &&
-          method->getOverloadedOperator() == clang::OO_Star) {
+      if (isSmartPointerDereference(method)) {
         SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
         SmallBitVector dependenciesOfRet(returnIdx);
         dependenciesOfRet[result->getSelfIndex()] = true;
@@ -4954,10 +4940,8 @@ namespace {
                           param ? param->getName() : StringRef());
       };
       auto isEscapable = [this](clang::QualType ty) {
-        return evaluateOrDefault(
-                   Impl.SwiftContext.evaluator,
-                   ClangTypeEscapability({ty.getTypePtr(), &Impl}),
-                   CxxEscapability::Unknown) != CxxEscapability::NonEscapable;
+        return !isNonEscapable(Impl.SwiftContext.evaluator, ty.getTypePtr(),
+                               &Impl);
       };
       auto importedAsClass = [this](clang::QualType ty, bool forSelf) {
         if (!forSelf) {

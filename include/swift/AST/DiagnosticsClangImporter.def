@@ -502,8 +502,9 @@ NOTE(bridged_pointer_type_not_found,none,
      (unsigned))
 
 NOTE(ptr_to_nonescapable,none,
-     "pointer to non-'Escapable' type %0 cannot be imported",
-     (const clang::Type*))
+     "%select{pointer|reference}1 to non-'Escapable' type %0 cannot be "
+     "imported",
+     (const clang::Type*, bool))
 
 NOTE(nonescapable_member_of_escapable, none,
      "'Escapable' record %1 cannot have non-'Escapable' %select{field|base}0 '%2'",

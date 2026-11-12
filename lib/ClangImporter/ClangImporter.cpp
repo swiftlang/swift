@@ -9548,6 +9548,21 @@ bool importer::hasEscapableAttr(const clang::RecordDecl *decl) {
   return hasSwiftAttribute(decl, {"Escapable"});
 }
 
+bool importer::isNonEscapable(Evaluator &evaluator, const clang::Type *type,
+                              ClangImporter::Implementation *impl) {
+  return evaluateOrDefault(evaluator, ClangTypeEscapability({type, impl}),
+                           CxxEscapability::Unknown) ==
+         CxxEscapability::NonEscapable;
+}
+
+bool importer::isSmartPointerDereference(const clang::CXXMethodDecl *method) {
+  const auto *enclosing = method->getParent();
+  return enclosing->isInStdNamespace() && enclosing->getIdentifier() &&
+         (enclosing->getName() == "unique_ptr" ||
+          enclosing->getName() == "shared_ptr") &&
+         method->getOverloadedOperator() == clang::OO_Star;
+}
+
 CxxValueSemanticsKind
 importer::getCxxValueSemanticsKind(const clang::Type *type,
                                    ClangImporter::Implementation &Impl) {

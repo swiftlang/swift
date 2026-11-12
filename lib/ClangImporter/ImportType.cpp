@@ -543,12 +543,11 @@ namespace {
 
       // FIXME: remove workaround once Unsafe*Pointer supports
       //        nonescapable pointees.
-      if (evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({pointeeQualType.getTypePtr(), nullptr}),
-              CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
+      if (isNonEscapable(Impl.SwiftContext.evaluator,
+                         pointeeQualType.getTypePtr(), nullptr)) {
         addImportDiagnostic(Diagnostic(diag::ptr_to_nonescapable,
-                                       pointeeQualType.getTypePtr()));
+                                       pointeeQualType.getTypePtr(),
+                                       /*isReference=*/false));
         return Type();
       }
 
@@ -661,6 +660,22 @@ namespace {
     ImportResult VisitReferenceType(const clang::ReferenceType *type) {
       auto pointeeQualType = type->getPointeeType();
       auto quals = pointeeQualType.getQualifiers();
+
+      // A reference is imported as an 'Unsafe(Mutable)Pointer', which cannot
+      // have a non-Escapable pointee. Most reference parameters are imported as
+      // their pointee type and do not get here; mutable reference parameters
+      // of function pointers do, and the function pointer then falls back to
+      // 'OpaquePointer'.
+      // FIXME: remove workaround once Unsafe*Pointer supports
+      //        nonescapable pointees.
+      if (isNonEscapable(Impl.SwiftContext.evaluator,
+                         pointeeQualType.getTypePtr(), nullptr)) {
+        addImportDiagnostic(Diagnostic(diag::ptr_to_nonescapable,
+                                       pointeeQualType.getTypePtr(),
+                                       /*isReference=*/true));
+        return Type();
+      }
+
       Type pointeeType =
           Impl.importTypeIgnoreIUO(pointeeQualType, ImportTypeKind::Value,
                                    addImportDiagnostic,
@@ -2367,14 +2382,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
      clangDecl->hasAttr<clang::CFReturnsRetainedAttr>() ||
      clangDecl->hasAttr<clang::CFReturnsNotRetainedAttr>());
 
-  // C++ operators +=, -=, *=, /= may return a reference to self. This is not
-  // idiomatic in Swift, let's drop these return values.
-  clang::OverloadedOperatorKind op = clangDecl->getOverloadedOperator();
-  if ((op == clang::OverloadedOperatorKind::OO_PlusEqual ||
-       op == clang::OverloadedOperatorKind::OO_MinusEqual ||
-       op == clang::OverloadedOperatorKind::OO_StarEqual ||
-       op == clang::OverloadedOperatorKind::OO_SlashEqual) &&
-      clangDecl->getReturnType()->isReferenceType()) {
+  auto voidResult = [&]() -> ImportedType {
     auto voidTy = SwiftContext.getVoidType();
     if (!voidTy)
       addImportDiagnostic(clangDecl,
@@ -2382,6 +2390,50 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                                      "Void", "Swift"),
                           clangDecl->getLocation());
     return {voidTy, false};
+  };
+
+  // C++ operators +=, -=, *=, /= may return a reference to self. This is not
+  // idiomatic in Swift, let's drop these return values.
+  clang::OverloadedOperatorKind op = clangDecl->getOverloadedOperator();
+  if ((op == clang::OverloadedOperatorKind::OO_PlusEqual ||
+       op == clang::OverloadedOperatorKind::OO_MinusEqual ||
+       op == clang::OverloadedOperatorKind::OO_StarEqual ||
+       op == clang::OverloadedOperatorKind::OO_SlashEqual) &&
+      clangDecl->getReturnType()->isReferenceType())
+    return voidResult();
+
+  // A reference to a non-Escapable type cannot be imported (see
+  // VisitReferenceType). Some operators that return one are still useful.
+  const auto *method = dyn_cast<clang::CXXMethodDecl>(clangDecl);
+  if (method && method->getNumExplicitParams() == 0 &&
+      clangDecl->getReturnType()->isReferenceType() &&
+      isNonEscapable(SwiftContext.evaluator,
+                     clangDecl->getReturnType()->getPointeeType().getTypePtr(),
+                     nullptr)) {
+    // A prefix ++ or -- returns a reference to self, and is only called for its
+    // side effect, e.g. by the synthesized 'successor()'. Drop its result.
+    if (op == clang::OO_PlusPlus || op == clang::OO_MinusMinus)
+      return voidResult();
+
+    // A dereference operator whose result depends on 'self' backs a 'pointee'
+    // property with an 'unsafeAddress' accessor, which never dereferences the
+    // 'Unsafe(Mutable)Pointer'. Import the reference as one.
+    if (op == clang::OO_Star &&
+        (getFirstImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(
+             clangDecl) ||
+         isSmartPointerDereference(method))) {
+      auto pointeeQualType = clangDecl->getReturnType()->getPointeeType();
+      Type pointeeType = importTypeIgnoreIUO(
+          pointeeQualType, ImportTypeKind::Value,
+          ImportDiagnosticAdder(*this, clangDecl, clangDecl->getLocation()),
+          allowNSUIntegerAsInt, Bridgeability::None, ImportTypeAttrs());
+      if (!pointeeType)
+        return {Type(), false};
+      return {pointeeType->wrapInPointer(pointeeQualType.isConstQualified()
+                                             ? PTK_UnsafePointer
+                                             : PTK_UnsafeMutablePointer),
+              false};
+    }
   }
 
   // Fix up optionality.
