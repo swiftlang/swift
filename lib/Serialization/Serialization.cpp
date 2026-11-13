@@ -5941,12 +5941,14 @@ public:
   }
 
   void visitPlaceholderType(const PlaceholderType *) {
-    // Placeholders can appear in result builder attributes, e.g.
-    // `@Builder<_>`, whose generic arguments are inferred when the result
-    // builder transform is applied.
-    using namespace decls_block;
-    unsigned abbrCode = S.DeclTypeAbbrCodes[PlaceholderTypeLayout::Code];
-    PlaceholderTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode);
+    // If for some reason we have a placeholder type while compiling with
+    // errors, just serialize an ErrorType and continue.
+    if (S.getASTContext().LangOpts.AllowModuleWithCompilerErrors) {
+      visitErrorType(
+          cast<ErrorType>(ErrorType::get(S.getASTContext()).getPointer()));
+      return;
+    }
+    ABORT("should not serialize a PlaceholderType");
   }
 
 #define UNSUPPORTED_TYPE(type)                                                  \
@@ -7020,7 +7022,6 @@ void Serializer::writeAllDeclsAndTypes() {
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
   registerDeclTypeAbbr<ErrorTypeLayout>();
-  registerDeclTypeAbbr<PlaceholderTypeLayout>();
   registerDeclTypeAbbr<ABIOnlyCounterpartLayout>();
   registerDeclTypeAbbr<DeclNameRefLayout>();
 
