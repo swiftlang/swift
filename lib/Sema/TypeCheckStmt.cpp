@@ -305,15 +305,8 @@ namespace {
           }
         }
 
-        // We need to walk into closure bodies with a new sequence.
-        SetLocalDiscriminators innerVisitor;
-        if (auto params = CE->getParameters()) {
-          for (auto *param : *params) {
-            innerVisitor.setLocalDiscriminator(param);
-          }
-        }
-        CE->getBody()->walk(innerVisitor);
-
+        // Walk the parameter and body in a new sequence.
+        CE->assignLocalDiscriminators();
         return Action::SkipNode(E);
       }
 
