@@ -15,4 +15,18 @@ ClosureTestSuite.test("Pass FRT to function pointer") {
   cppGo({N in })
 }
 
+func takeNonTrivial(_ n: NonTrivial) {}
+@available(SwiftStdlib 5.8, *)
+func takeSharedRef(_ x: SharedRef) {}
+
+ClosureTestSuite.test("ConvertNamedFunctionToFunctionPointer") {
+  cfunc2(takeNonTrivial)
+}
+
+ClosureTestSuite.test("Pass FRT to named function pointer") {
+  if #available(SwiftStdlib 5.8, *) {
+    cppGo(takeSharedRef)
+  }
+}
+
 runAllTests()
