@@ -130,21 +130,6 @@ static void createConjunction(ConstraintSystem &cs, DeclContext *dc,
     isIsolated = true;
   }
 
-  // Similarly, if the result builder applied to the body of a function (e.g.
-  // `@Builder var body: T { ... }`) has generic arguments that are inferred
-  // from the body, the conjunction needs to reference the type variables
-  // representing them. Like closures, the body is then solved in isolation so
-  // that each element doesn't need to resolve those type variables on its own.
-  if (auto *func = getAsDecl<AbstractFunctionDecl>(locator->getAnchor());
-      func && locator->getPath().empty()) {
-    if (auto builder = cs.getAppliedResultBuilderTransform(func)) {
-      if (builder->builderType->hasTypeVariable()) {
-        builder->builderType->getTypeVariables(referencedVars);
-        isIsolated = true;
-      }
-    }
-  }
-
   if (locator->isForSingleValueStmtConjunction()) {
     auto *SVE = castToExpr<SingleValueStmtExpr>(locator->getAnchor());
     referencedVars.insert(cs.getType(SVE)->castTo<TypeVariableType>());

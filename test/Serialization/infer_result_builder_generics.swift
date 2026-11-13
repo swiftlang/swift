@@ -3,17 +3,18 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=InferResultBuilderGenerics -I %t -source-filename=%s | %FileCheck %s --check-prefix=PRINT
 // RUN: %target-swift-frontend -typecheck -I %t %s
 
-// Check that result builder attributes with omitted generic arguments or
-// placeholder types are serialized, and that clients infer the generic
-// arguments when applying the result builder transform.
+// Check that the generic arguments inferred for result builder attributes are
+// serialized, and that clients can use these declarations.
 
 // PRINT-LABEL: struct Invocation {
-// PRINT:   @ArrayBuilder var arguments: () -> [String]
-// PRINT:   init(@ArrayBuilder arguments: @escaping () -> [String])
+// PRINT:   @ArrayBuilder<String> var arguments: () -> [String]
+// PRINT:   init(@ArrayBuilder<String> arguments: @escaping () -> [String])
 // PRINT: }
-// PRINT: func makeArray(@ArrayBuilder _ build: () -> [String]) -> [String]
-// PRINT: func makeDictionary(@DictionaryBuilder<String, <<placeholder>>> _ build: () -> [String : Int]) -> [String : Int]
-// PRINT: func makeNestedArray(@Array<<<placeholder>>>.Builder _ build: () -> [Int]) -> [Int]
+// PRINT: func makeArray(@ArrayBuilder<String> _ build: () -> [String]) -> [String]
+// PRINT: func makeDictionary(@DictionaryBuilder<String, Int> _ build: () -> [String : Int]) -> [String : Int]
+// PRINT: func makeNestedArray(@Array<Int>.Builder _ build: () -> [Int]) -> [Int]
+// PRINT: @ArrayBuilder<String> func makeOpaqueArray() -> some Collection<String>
+// PRINT: @DictionaryBuilder<String, Int> func makeOpaqueDictionary() -> some Collection<(key: String, value: Int)>
 
 import InferResultBuilderGenerics
 

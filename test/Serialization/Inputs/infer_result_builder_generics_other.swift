@@ -46,3 +46,16 @@ public struct Invocation {
     self.arguments = arguments
   }
 }
+
+// The generic arguments are inferred from the requirements of an opaque
+// result type.
+@ArrayBuilder
+public func makeOpaqueArray() -> some Collection<String> {
+  "format"
+  "--in-place"
+}
+
+@DictionaryBuilder<String, _>
+public func makeOpaqueDictionary() -> some Collection<(key: String, value: Int)> {
+  ("format", 1)
+}

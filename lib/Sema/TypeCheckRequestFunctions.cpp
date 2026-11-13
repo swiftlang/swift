@@ -484,6 +484,16 @@ Type ResultBuilderTypeRequest::evaluate(Evaluator &evaluator,
     }
   }
 
+  // Omitted generic arguments are inferred when resolving the attribute's type.
+  // If they couldn't be, because the declaration has no result type to infer
+  // them from, the attribute is invalid.
+  if (type->hasUnboundGenericType() || type->hasPlaceholder()) {
+    ctx.Diags.diagnose(attr->getLocation(),
+                       diag::result_builder_generic_inference_failed, attr);
+    mutableAttr->setInvalid();
+    return Type();
+  }
+
   return type->mapTypeOutOfEnvironment();
 }
 

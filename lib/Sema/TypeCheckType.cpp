@@ -62,7 +62,9 @@
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SILTypeResolutionContext.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/DeclTemplate.h"
 #include "llvm/ADT/APInt.h"
@@ -8160,6 +8162,199 @@ void TypeChecker::checkExistentialTypes(
   checker.checkRequirements(genericParams->getRequirements());
 }
 
+/// Returns the type produced by the result builder transform for the
+/// declaration that the given result builder attribute is attached to.
+static Type getResultBuilderAttrResultType(CustomAttr *attr) {
+  auto *owner = attr->getOwner().getAsDecl();
+  if (!owner)
+    return Type();
+
+  if (auto *func = dyn_cast<FuncDecl>(owner))
+    return func->getResultInterfaceType();
+
+  if (auto *subscript = dyn_cast<SubscriptDecl>(owner))
+    return subscript->getElementInterfaceType();
+
+  if (auto *var = dyn_cast<VarDecl>(owner)) {
+    auto type = var->getInterfaceType();
+    if (!type || type->hasError())
+      return Type();
+
+    // The result builder applies to the getter of a computed property.
+    if (!isa<ParamDecl>(var) && var->getParsedAccessor(AccessorKind::Get))
+      return type;
+
+    // Otherwise it applies to a closure: either the closure passed for a
+    // parameter, or the closure passed for a stored property to the memberwise
+    // initializer. A stored property that isn't of function type is
+    // initialized by a closure returning its type.
+    if (auto *fnType =
+            type->lookThroughAllOptionalTypes()->getAs<AnyFunctionType>())
+      return fnType->getResult();
+
+    return isa<ParamDecl>(var) ? Type() : type;
+  }
+
+  return Type();
+}
+
+/// Infers the generic arguments omitted from a result builder attribute, e.g.
+/// `@Builder` or `@Builder<_>`, from the result type of the declaration it's
+/// attached to.
+///
+/// The generic arguments are inferred with standard type inference, by type
+/// checking an unapplied reference to the result builder method that produces
+/// the final result of the transform, with a function type returning the
+/// declaration's result type as its contextual type:
+///
+///   let _: (_) -> Result = Builder.buildFinalResult
+///   let _: (_) -> Result = Builder.buildPartialBlock(first:)
+///   let _: (_...) -> Result = Builder.buildBlock
+///
+/// Only one of these methods is referenced, chosen in the same order of
+/// precedence that the transform uses to produce its final result:
+/// `buildFinalResult` if the builder has one (since it determines the type the
+/// transform ultimately produces), otherwise `buildPartialBlock(first:)` if the
+/// builder supports both `buildPartialBlock(first:)` and
+/// `buildPartialBlock(accumulated:next:)`, otherwise `buildBlock`. The result
+/// types of the other methods aren't considered, even if they could produce
+/// the declaration's result type.
+///
+/// All overloads of the chosen method are candidates, and are resolved with
+/// the standard overload resolution rules. The reference is type checked by
+/// building it as an expression (e.g. `Builder.buildFinalResult` with the
+/// contextual type `(_) -> Result`), and then solving it using
+/// `ConstraintSystem::solve`. If there's a single best solution, its generic
+/// arguments are used. If there are several, the generic arguments are
+/// ambiguous, and if there are none, they can't be inferred.
+///
+/// `buildBlock` is usually variadic, so it's referenced as `(_...) -> Result`.
+/// If that has no solution, it's referenced as `(_) -> Result`, which matches
+/// overloads taking a single component.
+///
+/// The inferred arguments are then used exactly as if they had been written
+/// explicitly in the attribute.
+///
+/// An opaque result type is opened like the type of an opaque variable
+/// (`let _: some Collection<String> = ...`), so its requirements can determine
+/// the generic arguments.
+///
+/// \returns The inferred result builder type, or an \c ErrorType after
+/// diagnosing why the generic arguments couldn't be inferred. Returns
+/// \c std::nullopt if the attached declaration doesn't have a result type,
+/// which is diagnosed separately.
+static std::optional<Type>
+inferResultBuilderGenericArguments(CustomAttr *attr, DeclContext *dc,
+                                   Type builderType) {
+  using namespace constraints;
+  auto &ctx = dc->getASTContext();
+
+  auto loc = attr->getTypeExpr()->getLoc();
+  auto failed = [&]() -> Type {
+    ctx.Diags.diagnose(loc, diag::result_builder_generic_inference_failed,
+                       attr);
+    return ErrorType::get(ctx);
+  };
+
+  auto *builderDecl = builderType->getAnyNominal();
+  if (!builderDecl)
+    return failed();
+
+  auto resultType = getResultBuilderAttrResultType(attr);
+  if (!resultType)
+    return std::nullopt;
+  if (resultType->hasError())
+    return ErrorType::get(ctx);
+  resultType = dc->mapTypeIntoEnvironment(resultType);
+
+  auto supports = [&](Identifier name, ArrayRef<Identifier> labels = {}) {
+    return TypeChecker::typeSupportsBuilderOp(
+        builderDecl->getDeclaredInterfaceType(), builderDecl, name, labels);
+  };
+
+  // The method producing the final result of the transform, and the shapes of
+  // the contextual function type to try (whether its parameter is variadic).
+  DeclNameRef methodName;
+  SmallVector<bool, 2> variadicShapes;
+  if (supports(ctx.Id_buildFinalResult)) {
+    methodName = DeclNameRef(ctx.Id_buildFinalResult);
+    variadicShapes = {false};
+  } else if (supports(ctx.Id_buildPartialBlock, {ctx.Id_first}) &&
+             supports(ctx.Id_buildPartialBlock,
+                      {ctx.Id_accumulated, ctx.Id_next})) {
+    methodName =
+        DeclNameRef(DeclName(ctx, ctx.Id_buildPartialBlock, {ctx.Id_first}));
+    variadicShapes = {false};
+  } else if (supports(ctx.Id_buildBlock)) {
+    methodName = DeclNameRef(ctx.Id_buildBlock);
+    variadicShapes = {true, false};
+  } else {
+    return failed();
+  }
+
+  for (bool variadic : variadicShapes) {
+    // `Builder.method`, where `Builder` is the result builder type as written,
+    // including any unbound generic types or placeholders.
+    auto *typeExpr = TypeExpr::createImplicitHack(loc, builderType, ctx);
+    auto *memberRef = new (ctx) UnresolvedDotExpr(
+        typeExpr, loc, methodName, DeclNameLoc(loc), /*implicit=*/true);
+    memberRef->setFunctionRefInfo(methodName.isCompoundName()
+                                      ? FunctionRefInfo::unappliedCompoundName()
+                                      : FunctionRefInfo::unappliedBaseName());
+
+    ConstraintSystem cs(dc, ConstraintSystemOptions());
+    auto *expr = cs.generateConstraints(memberRef, dc);
+    if (!expr)
+      continue;
+
+    // The reference converts to `(_) -> Result` (or `(_...) -> Result`), where
+    // an opaque result type is opened like the type of an opaque variable.
+    auto *locator = cs.getConstraintLocator(expr);
+    auto openedResultType = cs.openOpaqueType(
+        resultType, CTP_Initialization, locator, attr->getOwner().getAsDecl());
+    auto *paramType = cs.createTypeVariable(locator, TVO_CanBindToNoEscape);
+    AnyFunctionType::Param param(paramType, Identifier(),
+                                 ParameterTypeFlags().withVariadic(variadic));
+    auto contextualType = FunctionType::get(
+        {param}, /*yields=*/{}, openedResultType, FunctionType::ExtInfo());
+    cs.addConstraint(ConstraintKind::Conversion, cs.getType(expr),
+                     contextualType, locator);
+
+    SmallVector<Solution, 4> solutions;
+    if (cs.solve(solutions) || solutions.empty())
+      continue;
+
+    if (solutions.size() > 1) {
+      ctx.Diags.diagnose(loc, diag::result_builder_generic_inference_ambiguous,
+                         attr);
+      // Note each candidate method chosen by one of the solutions.
+      llvm::SmallSetVector<ValueDecl *, 4> candidates;
+      for (const auto &solution : solutions) {
+        for (const auto &overload : solution.overloadChoices) {
+          auto *decl = overload.second.choice.getDeclOrNull();
+          if (decl && decl->getBaseName() == methodName.getBaseName())
+            candidates.insert(decl);
+        }
+      }
+      for (auto *decl : candidates)
+        decl->diagnose(diag::found_candidate);
+      return ErrorType::get(ctx);
+    }
+
+    auto inferred = solutions.front()
+                        .simplifyType(cs.getType(typeExpr))
+                        ->getMetatypeInstanceType();
+    if (inferred->hasTypeVariable() || inferred->hasPlaceholder() ||
+        inferred->hasUnboundGenericType() || inferred->hasError())
+      continue;
+
+    // Like the type resolved for the attribute, this is a contextual type.
+    return inferred;
+  }
+
+  return failed();
+}
+
 Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
                                      DeclContext *dc,
                                      CustomAttrTypeKind typeKind) const {
@@ -8173,15 +8368,13 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
   if (typeKind == CustomAttrTypeKind::PropertyWrapper) {
     unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
   } else if (typeKind == CustomAttrTypeKind::ResultBuilder) {
-    // Result builders also allow placeholders. Any unbound generic types and
-    // placeholders are left in the resolved type, and are opened into type
-    // variables when the result builder transform is applied, so that the
-    // generic arguments are inferred from the transformed body.
+    // Result builders also allow placeholders. Omitted generic arguments are
+    // inferred from the result type of the attached declaration below.
     unboundTyOpener = TypeResolution::defaultUnboundTypeOpener;
     placeholderHandler = PlaceholderType::get;
   }
 
-  const auto type = TypeResolution::resolveContextualType(
+  auto type = TypeResolution::resolveContextualType(
       attr->getTypeRepr(), dc, options, unboundTyOpener, placeholderHandler,
       /*packElementOpener*/ nullptr);
 
@@ -8204,6 +8397,14 @@ Type CustomAttrTypeRequest::evaluate(Evaluator &eval, CustomAttr *attr,
     ASTContext &ctx = dc->getASTContext();
     assert(ctx.Diags.hadAnyError());
     return ErrorType::get(ctx);
+  }
+
+  // Infer any omitted generic arguments of a result builder from the result
+  // type of the attached declaration.
+  if (typeKind == CustomAttrTypeKind::ResultBuilder &&
+      (type->hasUnboundGenericType() || type->hasPlaceholder())) {
+    if (auto inferred = inferResultBuilderGenericArguments(attr, dc, type))
+      return *inferred;
   }
 
   return type;

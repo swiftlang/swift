@@ -3,8 +3,13 @@
 // REQUIRES: executable_test
 
 // Generic arguments of result builder attributes that are omitted or written
-// as placeholders are inferred from the body when the result builder transform
-// is applied.
+// as placeholders are inferred from the result type of the attached
+// declaration, using standard type inference for an unapplied reference to the
+// builder method that produces the final result, e.g.
+//
+//   let _: (_) -> Result = Builder.buildFinalResult
+//
+// If the result type doesn't determine them, they must be written explicitly.
 
 @resultBuilder
 enum ArrayBuilder<Element> {
@@ -90,8 +95,7 @@ enum OptionalArrayBuilder<Element> {
 }
 
 // The same overloads as `OptionalArrayBuilder`, declared in the opposite
-// order. Which overload is selected is determined by type inference on the
-// transformed body, so doesn't depend on declaration order.
+// order. Overload resolution doesn't depend on declaration order.
 @resultBuilder
 enum ReversedOptionalArrayBuilder<Element> {
   static func buildBlock(_ elements: Element...) -> [Element] {
@@ -110,19 +114,14 @@ enum ReversedOptionalArrayBuilder<Element> {
 }
 
 @resultBuilder
-enum PairBuilder<Element> {
-  static func buildBlock(_ elements: Element...) -> [Element] {
-    elements
+enum ReportingBuilder<Element> {
+  static func buildExpression(_ element: Element) -> [Element] {
+    [element]
   }
 
-  static func buildFinalResult(_ elements: [Element]) -> (Element, Double) {
-    print("(Element, Double) overload")
-    return (elements[0], 0)
-  }
-
-  static func buildFinalResult(_ elements: [Element]) -> (Int, Element) {
-    print("(Int, Element) overload")
-    return (0, elements[0])
+  static func buildBlock(_ components: [Element]...) -> [Element] {
+    print("ReportingBuilder<\(Element.self)>")
+    return components.flatMap { $0 }
   }
 }
 
@@ -210,14 +209,12 @@ var optionalValues2: [Int?] {
   2
 }
 
-// When the generic arguments are inferred, the overload is selected using the
-// standard type inference rules applied to the transformed body:
+// When the generic arguments are inferred, they're the same as for
 //
-//   OptionalArrayBuilder.buildFinalResult(OptionalArrayBuilder.buildBlock(1, 2))
+//   let _: (_) -> [Int?] = OptionalArrayBuilder.buildFinalResult
 //
-// The integer literals prefer `Int`, so this is `@OptionalArrayBuilder<Int>`
-// and uses the `[Element?]` overload, even though the `[Element]` overload is
-// declared first.
+// which is `OptionalArrayBuilder<Int>`, using the `[Element?]` overload, even
+// though the `[Element]` overload is declared first.
 @OptionalArrayBuilder
 var optionalValues3: [Int?] {
   1
@@ -228,20 +225,6 @@ var optionalValues3: [Int?] {
 @ReversedOptionalArrayBuilder
 var reversedOptionalValues: [Int?] {
   1
-  2
-}
-
-// Elements of type `Int?` infer `@OptionalArrayBuilder<Int?>` instead, which
-// uses the `[Element]` overload.
-@OptionalArrayBuilder
-var optionalElements: [Int?] {
-  Optional(1)
-  Optional(2)
-}
-
-@OptionalArrayBuilder
-var optionalElementCoercion: [Int?] {
-  1 as Int?
   2
 }
 
@@ -262,19 +245,75 @@ func reversedOptionalValues(
   build()
 }
 
-// `(Int, Double)` could be produced by `@PairBuilder<Int>` using the
-// `(Element, Double)` overload, or `@PairBuilder<Double>` using the
-// `(Int, Element)` overload. The elements in the body determine which.
-@PairBuilder
-var intPair: (Int, Double) {
-  1
-  2
+// The result type determines `Element`, even when it differs from the type of
+// the first element.
+@ReportingBuilder
+var stringProtocols: [any StringProtocol] {
+  "format"
+  "--in-place".dropFirst(2)
 }
 
-@PairBuilder
-var doublePair: (Int, Double) {
-  1.5
-  2.5
+@ReportingBuilder
+var collections: [any Collection<String>] {
+  ["format"]
+  Set(["--in-place"])
+}
+
+@ReportingBuilder
+var doubles: [Double] {
+  1
+}
+
+@ReportingBuilder
+var optionalStrings: [String?] {
+  "format"
+  nil
+}
+
+// `String` would also be valid here, but standard type inference picks
+// `String?`, like `let _: (_...) -> [String?] = ReportingBuilder.buildBlock`.
+@ReportingBuilder
+var nonNilOptionalStrings: [String?] {
+  "format"
+  "--in-place"
+}
+
+// An opaque result type's requirements determine `Element`, like
+// `let _: some Collection<String> = ReportingBuilder.buildBlock()`.
+@ReportingBuilder
+var opaqueStrings: some Collection<String> {
+  "format"
+  "--in-place"
+}
+
+struct Subscripted {
+  @ReportingBuilder
+  subscript(index: Int) -> [String] {
+    "a"
+    "b"
+  }
+}
+
+protocol HasItems {
+  @ReportingBuilder var items: [String] { get }
+}
+
+// Inherits `@ReportingBuilder` from the protocol requirement.
+struct Items: HasItems {
+  var items: [String] {
+    "x"
+    "y"
+  }
+}
+
+// Generic contexts: inferred as `ReportingBuilder<Result>` and
+// `ReportingBuilder<Arg>`, and then specialized at each use.
+func build<Result>(@ReportingBuilder _ body: () -> [Result]) -> [Result] {
+  body()
+}
+
+struct GenericInvocation<Arg> {
+  @ReportingBuilder let args: [Arg]
 }
 
 // CHECK: ["format", "--in-place", "--recursive", "a.swift", "b.swift"]
@@ -329,14 +368,6 @@ print(optionalValues3)
 // CHECK-NEXT: [Optional(1), Optional(2), nil]
 print(reversedOptionalValues)
 
-// CHECK-NEXT: [Element] overload
-// CHECK-NEXT: [Optional(1), Optional(2)]
-print(optionalElements)
-
-// CHECK-NEXT: [Element] overload
-// CHECK-NEXT: [Optional(1), Optional(2)]
-print(optionalElementCoercion)
-
 // CHECK-NEXT: [Element?] overload
 // CHECK-NEXT: [Optional(1), Optional(2), nil]
 print(makeOptionalValues())
@@ -355,17 +386,46 @@ print(reversedOptionalValues {
   2
 })
 
-// CHECK-NEXT: [Element] overload
-// CHECK-NEXT: [Optional(1), Optional(2)]
-print(optionalValues {
-  Optional(1)
-  Optional(2)
-})
+// CHECK-NEXT: ReportingBuilder<StringProtocol>
+// CHECK-NEXT: ["format", "in-place"]
+print(stringProtocols.map { String($0) })
 
-// CHECK-NEXT: (Element, Double) overload
-// CHECK-NEXT: (1, 0.0)
-print(intPair)
+// CHECK-NEXT: ReportingBuilder<any Collection<Self.Collection.Element == String>>
+// CHECK-NEXT: 2
+print(collections.count)
 
-// CHECK-NEXT: (Int, Element) overload
-// CHECK-NEXT: (0, 1.5)
-print(doublePair)
+// CHECK-NEXT: ReportingBuilder<Double>
+// CHECK-NEXT: [1.0]
+print(doubles)
+
+// CHECK-NEXT: ReportingBuilder<Optional<String>>
+// CHECK-NEXT: [Optional("format"), nil]
+print(optionalStrings)
+
+// CHECK-NEXT: ReportingBuilder<Optional<String>>
+// CHECK-NEXT: [Optional("format"), Optional("--in-place")]
+print(nonNilOptionalStrings)
+
+// CHECK-NEXT: ReportingBuilder<String>
+// CHECK-NEXT: ["format", "--in-place"]
+print(Array(opaqueStrings))
+
+// CHECK-NEXT: ReportingBuilder<String>
+// CHECK-NEXT: ["a", "b"]
+print(Subscripted()[0])
+
+// CHECK-NEXT: ReportingBuilder<String>
+// CHECK-NEXT: ["x", "y"]
+print(Items().items)
+
+// CHECK-NEXT: ReportingBuilder<String>
+// CHECK-NEXT: ["format", "--in-place"]
+print(build { "format"; "--in-place" })
+
+// CHECK-NEXT: ReportingBuilder<Int>
+// CHECK-NEXT: [1, 2]
+print(build { 1; 2 })
+
+// CHECK-NEXT: ReportingBuilder<String>
+// CHECK-NEXT: ["format", "--recursive"]
+print(GenericInvocation(args: { "format"; "--recursive" }).args)
