@@ -2671,7 +2671,7 @@ unsigned ASTContext::getNextMacroDiscriminator(
 unsigned ASTContext::getNextDiscriminator(const DeclContext *dc) {
   // Top-level code declarations don't have their own discriminators.
   if (auto tlcd = dyn_cast<TopLevelCodeDecl>(dc))
-    dc = tlcd->getParent();
+    dc = tlcd->getParentModule();
 
   return getImpl().NextDiscriminator[dc];
 }
@@ -2681,7 +2681,7 @@ void ASTContext::setMaxAssignedDiscriminator(
     const DeclContext *dc, unsigned discriminator) {
   // Top-level code declarations don't have their own discriminators.
   if (auto tlcd = dyn_cast<TopLevelCodeDecl>(dc))
-    dc = tlcd->getParent();
+    dc = tlcd->getParentModule();
 
   assert(discriminator >= getImpl().NextDiscriminator[dc]);
   getImpl().NextDiscriminator[dc] = discriminator;

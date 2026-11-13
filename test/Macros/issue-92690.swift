@@ -32,6 +32,13 @@ public struct IdentityMacro: ExpressionMacro {
 @freestanding(expression)
 macro id<T>(_ x: T) -> T = #externalMacro(module: "MacroDefinition", type: "IdentityMacro")
 
+_ = #id({1}) // CHECK-SIL: sil private @$s4mainSiycfU0_ : $@convention(thin) () -> Int {
+let y = {2} // CHECK-SIL: sil private @$s4mainSiycfU1_ : $@convention(thin) () -> Int {
+print("top1:", y()) // CHECK: top1: 2
+_ = #id({3}) // CHECK-SIL: sil private @$s4mainSiycfU3_ : $@convention(thin) () -> Int {
+let z = {4} // CHECK-SIL: sil private @$s4mainSiycfU4_ : $@convention(thin) () -> Int {
+print("top2:", z()) // CHECK: top2: 4
+
 func foo() {
   let x = 0
   _ = #id({1}) // CHECK-SIL: sil private @$s4main3fooyyFSiycfU3_ : $@convention(thin) () -> Int {
