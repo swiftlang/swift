@@ -3298,6 +3298,16 @@ static llvm::Function *getDestroyBoxedOpaqueExistentialBufferFunction(
         {
           ConditionalDominanceScope domScope(IGF);
 
+          // Embedded Swift with -no-allocations never allocates a box, so this
+          // can't be reached, and must not refer to the box release functions,
+          // which are not available in this mode.
+          if (IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+              IGM.getSILModule().getOptions().NoAllocations) {
+            IGF.emitTrap("destroying a boxed existential with -no-allocations",
+                         /*EmitUnreachable*/ true);
+            return;
+          }
+
           // swift_release(buffer[0])
           auto *referenceAddr =
               Builder.CreateBitCast(buffer.getAddress(), IGM.PtrTy);

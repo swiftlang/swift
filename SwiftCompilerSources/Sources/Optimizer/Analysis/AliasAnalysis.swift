@@ -34,7 +34,24 @@ extension Instruction {
       // Take a shortcut for indirect-in arguments.
       return false
     }
+    if neverWritesToAliasedMemory {
+      // Avoid a potentially expensive alias query if the result would be thrown away anyway.
+      return false
+    }
     return aliasAnalysis.getMemoryEffect(of: self, on: toAddress).write
+  }
+
+  /// True if `AliasAnalysis.getMemoryEffect` never returns a write effect for this instruction,
+  /// regardless of the queried address.
+  private var neverWritesToAliasedMemory: Bool {
+    switch self {
+    case is MarkDependenceInst, is LoadBorrowInst, is DebugValueInst:
+      return true
+    case let load as LoadInst:
+      return load.loadOwnership != .take
+    default:
+      return false
+    }
   }
 
   func mayReadOrWrite(address: Value, _ aliasAnalysis: AliasAnalysis) -> Bool {

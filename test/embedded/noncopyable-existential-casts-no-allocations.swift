@@ -1,6 +1,17 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -enable-experimental-feature NoncopyableCasting -no-allocations -parse-as-library -wmo %target-embedded-posix-shim) | %FileCheck %s
 // RUN: %target-run-simple-swift(-enable-experimental-feature Embedded -enable-experimental-feature NoncopyableCasting -no-allocations -parse-as-library -wmo %target-embedded-posix-shim -O) | %FileCheck %s
 
+// The existential box helpers must not refer to any box deallocation runtime
+// function, which is not linked in -no-allocations mode.
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature NoncopyableCasting -no-allocations -module-name main -parse-as-library -wmo -emit-ir %s -Onone \
+// RUN:   | %FileCheck %s --check-prefix=IR --implicit-check-not=swift_releaseBox --implicit-check-not=swift_deallocBox --implicit-check-not=swift_deallocObject --implicit-check-not=swift_deallocUninitializedObject --implicit-check-not=swift_slowDealloc
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -enable-experimental-feature NoncopyableCasting -no-allocations -module-name main -parse-as-library -wmo -emit-ir %s -O \
+// RUN:   | %FileCheck %s --check-prefix=IR --implicit-check-not=swift_releaseBox --implicit-check-not=swift_deallocBox --implicit-check-not=swift_deallocObject --implicit-check-not=swift_deallocUninitializedObject --implicit-check-not=swift_slowDealloc
+
+// IR-LABEL: define {{.*}} @__swift_destroy_boxed_opaque_existential_1(
+// IR:       call void @llvm.trap()
+// IR-NEXT:  unreachable
+
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
