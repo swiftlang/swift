@@ -102,8 +102,11 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
   var liverange = Liverange(context)
   defer { liverange.deinitialize() }
 
+  var projectionsToMove = Stack<SingleValueInstruction>(context)
+  defer { projectionsToMove.deinitialize() }
+
   guard liverange.compute(for: copy, users: allocStackUses.users),
-        liverange.areAllUsersInLiverange(of: allocStack),
+        liverange.collectProjectionsToMove(of: allocStack, into: &projectionsToMove),
         liverange.canExtendAccessScopes()
   else {
     return
@@ -114,6 +117,12 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
 
   if !copy.isTakeOfSource {
     removeDestroys(users: allocStackUses.users, context)
+  }
+
+  // Must happen before the `DeadProjectionDeleter`, which can erase some of the `projectionsToMove`.
+  let insertionPoint = copy.loadingInstruction.next!
+  for projection in projectionsToMove {
+    projection.move(before: insertionPoint, context)
   }
 
   // Dead projection instructions can appear outside of the liverange in case they were only
@@ -426,10 +435,12 @@ private struct Liverange {
     return true
   }
 
-  /// Returns true if all users of `alloc_stack` are in the computed liverange.
-  /// This might not be the case if there are any users before the copy instruction.
+  /// Appends the address projections of `allocStack` which are located before the copy to `projections`,
+  /// each before its own users.
+  /// Returns false if any other user is outside the computed liverange, e.g. before the copy.
   /// Ignore `debug_value` because we can move this instruction easily.
-  func areAllUsersInLiverange(of allocStack: AllocStackInst) -> Bool {
+  func collectProjectionsToMove(of allocStack: AllocStackInst,
+                                into projections: inout Stack<SingleValueInstruction>) -> Bool {
     for user in allocStack.users {
       if !liverange.hasBeenPushed(user) {
         switch user {
@@ -438,6 +449,29 @@ private struct Liverange {
         case is DeallocStackInst, is DestroyAddrInst, is CopyAddrInst, is DebugValueInst:
           break
         default:
+          if !collectMovableProjection(user, into: &projections) {
+            return false
+          }
+        }
+      }
+    }
+    return true
+  }
+
+  private func collectMovableProjection(_ inst: Instruction,
+                                        into projections: inout Stack<SingleValueInstruction>) -> Bool {
+    guard let projection = inst as? SingleValueInstruction,
+          projection is StructElementAddrInst || projection is TupleElementAddrInst
+    else {
+      return false
+    }
+    projections.append(projection)
+    for user in projection.users where !liverange.hasBeenPushed(user) {
+      switch user {
+      case is DestroyAddrInst, is DebugValueInst:
+        break
+      default:
+        if !collectMovableProjection(user, into: &projections) {
           return false
         }
       }

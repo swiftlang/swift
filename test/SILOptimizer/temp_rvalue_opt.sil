@@ -790,6 +790,34 @@ bb3:
   return %r : $()
 }
 
+// CHECK-LABEL: sil @projection_hoisted_out_of_loop :
+// CHECK-NOT:     alloc_stack
+// CHECK:       bb1:
+// CHECK-NEXT:    [[A:%.*]] = struct_element_addr %0 : $*GS<B>, #GS._value
+// CHECK-NEXT:    load [[A]]
+// CHECK-LABEL: } // end sil function 'projection_hoisted_out_of_loop'
+sil @projection_hoisted_out_of_loop : $@convention(thin) <B> (@in_guaranteed GS<B>) -> () {
+bb0(%0 : $*GS<B>):
+  %1 = alloc_stack $GS<B>
+  %2 = struct_element_addr %1 : $*GS<B>, #GS._value
+  br bb1
+
+bb1:
+  copy_addr %0 to [init] %1 : $*GS<B>
+  %4 = load %2 : $*Builtin.Int64
+  %5 = builtin "cmp_slt_Int64"(%4 : $Builtin.Int64, %4 : $Builtin.Int64) : $Builtin.Int1
+  destroy_addr %1 : $*GS<B>
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  dealloc_stack %1 : $*GS<B>
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil @eliminate_fix_lifetime_on_dest_copyaddr : $@convention(thin) (@inout Klass) -> () {
 // CHECK-NOT: alloc_stack
 // CHECK: fix_lifetime %0
