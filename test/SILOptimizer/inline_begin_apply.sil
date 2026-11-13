@@ -890,3 +890,52 @@ bb2:
   unwind
 }
 
+
+sil [transparent] [ossa] @yield_nested_reborrow_phis : $@yield_once @convention(thin) (@in_guaranteed SomeClass) -> @yields @guaranteed SomeClass {
+bb0(%0 : $*SomeClass):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = load_borrow %0
+  %2 = begin_borrow %1
+  br bb3(%1, %2)
+
+bb2:
+  %3 = load_borrow %0
+  %4 = begin_borrow %3
+  br bb3(%3, %4)
+
+bb3(%5 : @reborrow $SomeClass, %6 : @reborrow $SomeClass):
+  %7 = borrowed %6 from (%5)
+  %8 = borrowed %5 from ()
+  yield %7, resume bb4, unwind bb5
+
+bb4:
+  end_borrow %7
+  end_borrow %8
+  %r = tuple ()
+  return %r
+
+bb5:
+  end_borrow %7
+  end_borrow %8
+  unwind
+}
+
+// The order of borrowed-from instructions doesn't reflect the nesting of the reborrow scopes.
+// Make sure that the inner scope is ended before the outer scope.
+// CHECK-LABEL: sil [ossa] @test_nested_reborrow_phis_end_borrow_unreachable :
+// CHECK:       bb3([[O:%.*]] : @reborrow $SomeClass, [[I:%.*]] : @reborrow $SomeClass):
+// CHECK-NEXT:    [[IB:%.*]] = borrowed [[I]] : $SomeClass from ([[O]] : $SomeClass)
+// CHECK-NEXT:    [[OB:%.*]] = borrowed [[O]] : $SomeClass from ()
+// CHECK-NEXT:    end_borrow [[IB]]
+// CHECK-NEXT:    end_borrow [[OB]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'test_nested_reborrow_phis_end_borrow_unreachable'
+sil [ossa] @test_nested_reborrow_phis_end_borrow_unreachable : $@convention(thin) (@in_guaranteed SomeClass) -> () {
+bb0(%0 : $*SomeClass):
+  %callee = function_ref @yield_nested_reborrow_phis : $@yield_once @convention(thin) (@in_guaranteed SomeClass) -> @yields @guaranteed SomeClass
+  (%value, %token) = begin_apply %callee(%0) : $@yield_once @convention(thin) (@in_guaranteed SomeClass) -> @yields @guaranteed SomeClass
+  end_borrow %token : $Builtin.SILToken
+  unreachable
+}
