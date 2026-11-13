@@ -304,8 +304,8 @@ private:
   /// Identifiers referenced by this module.
   MutableArrayRef<SerializedIdentifier> Identifiers;
 
-  MutableArrayRef<Serialized<Decl *>> HiddenTypeLayoutInfoDecls;
-  llvm::DenseMap<uint32_t, uint32_t> HiddenTypeFallbackMap;
+  MutableArrayRef<Serialized<HiddenTypeLayoutInfoDecl *>>
+      AbstractMemberTypeLayouts;
   std::vector<std::unique_ptr<AbstractTypeLayout>> DeserializedHiddenTypeLayouts;
 
   using SerializedDeclMembersTable =
@@ -510,6 +510,7 @@ private:
   llvm::Expected<Pattern *> readPattern(DeclContext *owningDC);
 
   llvm::Expected<ParameterList *> readParameterList();
+  SmallVector<serialization::DeclID, 8> readParameterListDeclIDs();
 
   /// Reads a generic param list from \c DeclTypeCursor.
   ///
@@ -1075,11 +1076,20 @@ public:
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
   llvm::Expected<HiddenTypeLayoutInfoDecl *>
-  getHiddenTypeLayoutInfoDecl(serialization::DeclID DID);
+  getAbstractMemberTypeLayout(serialization::MemberAbstractTypeLayoutID ID);
 
-  void consumeHiddenTypeXRefPathPieces(
-      llvm::BitstreamCursor &cursor, uint32_t pathLen,
-      SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces);
+  llvm::Expected<Type>
+  getAbstractMemberType(serialization::MemberAbstractTypeLayoutID ID,
+                        serialization::TypeID originalTypeID = 0);
+
+  serialization::BitOffset
+  getSerializedTypeOffset(serialization::TypeID ID) const;
+  serialization::BitOffset
+  getSerializedDeclOffset(serialization::DeclID ID) const;
+  llvm::BitstreamCursor getDeclTypeCursorForReplay() const;
+
+  llvm::Expected<HiddenTypeLayoutInfoDecl *>
+  deserializeHiddenTypeLayoutInfo(serialization::BitOffset offset);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);
@@ -1112,6 +1122,10 @@ public:
   /// Returns the generic environment for the given ID or the first error.
   llvm::Expected<GenericEnvironment *>
   getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID);
+
+  /// Returns the SIL layout for the given ID or the first error.
+  llvm::Expected<SILLayout *>
+  getSILLayoutChecked(serialization::SILLayoutID ID);
 
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.

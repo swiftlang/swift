@@ -52,7 +52,8 @@ public func passThrough(_ value: Wrapper) -> Wrapper {
 // CHECK-CLIENT-NEXT: origin: recovery
 // CHECK-BOTH-NEXT: TypeLowering:
 // CHECK-BOTH-NEXT:   class: TrivialTypeLowering
-// CHECK-BOTH-NEXT:   Expansion: Maximal
+// CHECK-LIBRARY-NEXT:   Expansion: Minimal
+// CHECK-CLIENT-NEXT:   Expansion: Maximal
 // CHECK-BOTH-NEXT:   isTrivial: true.
 // CHECK-BOTH-NEXT:   isEscapable: true.
 // CHECK-BOTH-NEXT:   isNonTrivialOnlyBecauseNonEscapable: false.
