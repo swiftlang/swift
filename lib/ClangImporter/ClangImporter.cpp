@@ -9354,21 +9354,14 @@ ClangImporter::getAssignmentOperator(const clang::CXXRecordDecl *decl,
   return assignOp;
 }
 
-bool ClangImporter::hasNonTrivialAssignmentOperator(Type type) {
-  auto *structDecl = type->getStructDecl();
-  if (!structDecl)
-    return false;
-
+bool ClangImporter::hasNonTrivialAssignmentOperator(const StructDecl *decl) {
   auto *cxxRecordDecl =
-      dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+      dyn_cast_or_null<clang::CXXRecordDecl>(decl->getClangDecl());
   if (!cxxRecordDecl)
     return false;
 
-  auto *importer = static_cast<ClangImporter *>(
-      structDecl->getASTContext().getClangModuleLoader());
   for (bool isMove : {false, true}) {
-    if (auto *assignOp =
-            importer->getAssignmentOperator(cxxRecordDecl, isMove)) {
+    if (auto *assignOp = getAssignmentOperator(cxxRecordDecl, isMove)) {
       if (!assignOp->isTrivial())
         return true;
     }

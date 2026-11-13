@@ -847,7 +847,7 @@ public:
   const clang::CXXMethodDecl *
   getAssignmentOperator(const clang::CXXRecordDecl *decl, bool isMove);
 
-  static bool hasNonTrivialAssignmentOperator(Type type);
+  bool hasNonTrivialAssignmentOperator(const StructDecl *decl);
 
   bool tryDefineCXXAssignmentOperatorBody(clang::CXXMethodDecl *assignOp);
 

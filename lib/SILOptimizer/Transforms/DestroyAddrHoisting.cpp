@@ -90,7 +90,6 @@
 #define DEBUG_TYPE "destroy-addr-hoisting"
 
 #include "swift/AST/Type.h"
-#include "swift/ClangImporter/ClangImporter.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -1074,8 +1073,7 @@ void DestroyAddrHoisting::run() {
         }
       } else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
         if (cai->isInitializationOfDest() == IsNotInitialization &&
-            !ClangImporter::hasNonTrivialAssignmentOperator(
-                cai->getDest()->getType().getASTType())) {
+            !cai->getDest()->getType().mayHaveCustomAssign(*getFunction())) {
           cais.push_back(cai);
         }
       }
