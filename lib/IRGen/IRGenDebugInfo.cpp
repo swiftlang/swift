@@ -1219,8 +1219,41 @@ private:
     return DIMemberTy;
   }
 
+  /// Owns a temporary node and checks, in assert builds, that it ends in
+  /// replace().
+  ///
+  /// A temporary may be referenced by nodes created while the full type is
+  /// being built. Dropping it would reset those references to null, and, for a
+  /// temporary registered in the type caches as
+  /// createTemporaryReplaceableForwardDecl() does, leave null cache entries
+  /// behind. When there is not enough type information to build the full type,
+  /// replace it with a forward declaration instead.
+  template <class TempTy> class TemporaryDINode {
+    std::unique_ptr<TempTy, llvm::TempMDNodeDeleter> Temp;
+
+  public:
+    explicit TemporaryDINode(TempTy *Node) : Temp(Node) {}
+    TemporaryDINode(TemporaryDINode &&) = default;
+    TemporaryDINode &operator=(TemporaryDINode &&) = delete;
+    ~TemporaryDINode() {
+      assert(!Temp && "temporary node dropped without being replaced");
+    }
+
+    TempTy *get() const { return Temp.get(); }
+
+    /// Makes \p Replacement the definition, updating every reference to the
+    /// temporary, including its cache entries.
+    template <class NodeTy>
+    NodeTy *replace(llvm::DIBuilder &DBuilder, NodeTy *Replacement) {
+      assert(Temp && "temporary node already replaced");
+      return DBuilder.replaceTemporary(std::move(Temp), Replacement);
+    }
+  };
+  using TemporaryDIType = TemporaryDINode<llvm::DIType>;
+  using TemporaryDICompositeType = TemporaryDINode<llvm::DICompositeType>;
+
   /// Creates a temporary replaceable forward decl to protect against recursion.
-  llvm::TempDIType createTemporaryReplaceableForwardDecl(
+  TemporaryDIType createTemporaryReplaceableForwardDecl(
       TypeBase *Type, llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
       unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
       StringRef MangledName, StringRef Name) {
@@ -1240,7 +1273,7 @@ private:
         llvm::dwarf::DW_TAG_structure_type, "", Scope, File, Line,
         llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
         MangledName);
-    auto FwdDecl = llvm::TempDIType(ReplaceableType);
+    TemporaryDIType FwdDecl(ReplaceableType);
 
     auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
     DITypeCache[Type] = TH;
@@ -1346,9 +1379,11 @@ private:
       });
       if (Incomplete)
         // Without complete type info we can only create a forward decl.
-        return DBuilder.createForwardDecl(
-            llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
-            llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
+        return FwdDecl.replace(
+            DBuilder,
+            DBuilder.createForwardDecl(
+                llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File,
+                Line, llvm::dwarf::DW_LANG_Swift, SizeInBits, 0));
     }
 
     SmallVector<llvm::Metadata *, 16> Members;
@@ -1363,7 +1398,7 @@ private:
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
         DBuilder.getOrCreateArray(Members), BoundParams, SpecificationOf,
         Annotations);
-    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return FwdDecl.replace(DBuilder, DITy);
   }
 
   /// Creates debug info for a generic struct or class with archetypes (e.g.:
@@ -1418,7 +1453,7 @@ private:
             DITy, SuperClassDITy, 0, 0, llvm::DINode::FlagZero));
       }
     }
-    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return FwdDecl.replace(DBuilder, DITy);
   }
 
   std::pair<bool, Type> getUnsubstitutedType(Type Ty, StringRef MangledName) {
@@ -1463,7 +1498,7 @@ private:
     llvm::DICompositeType *DIType = createOpaqueStruct(
         Scope, "", File, 0, SizeInBits, AlignInBits, Flags, MangledName,
         collectGenericParams(EnumTy), UnsubstitutedDITy);
-    return DBuilder.replaceTemporary(std::move(FwdDecl), DIType);
+    return FwdDecl.replace(DBuilder, DIType);
   }
 
   /// Create a DICompositeType from a specialized struct. A specialized type
@@ -1561,9 +1596,11 @@ private:
         CompletedDebugTypeInfo::getFromTypeInfo(RawType, TI, IGM);
     if (!ElemDbgTy)
       // Without complete type info we can only create a forward decl.
-      return DBuilder.createForwardDecl(
-          llvm::dwarf::DW_TAG_enumeration_type, Name, Scope, File, Line,
-          llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
+      return FwdDecl.replace(
+          DBuilder,
+          DBuilder.createForwardDecl(
+              llvm::dwarf::DW_TAG_enumeration_type, Name, Scope, File, Line,
+              llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName));
 
     SmallVector<llvm::Metadata *, 16> Elements;
     for (auto *ElemDecl : Decl->getAllElements()) {
@@ -1580,7 +1617,7 @@ private:
         DBuilder.getOrCreateArray(Elements), EnumType,
         llvm::dwarf::DW_LANG_Swift, MangledName, false);
 
-    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return FwdDecl.replace(DBuilder, DITy);
   }
 
   /// If the enum case is indirect, wrap the payload debug type in a
@@ -1635,9 +1672,11 @@ private:
               CompletedDebugTypeInfo::getFromTypeInfo(PayloadTy, TI, IGM, 0);
         if (!ElemDbgTy) {
           // Without complete type info we can only create a forward decl.
-          return DBuilder.createForwardDecl(
-              llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
-              llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName);
+          return FwdDecl.replace(
+              DBuilder,
+              DBuilder.createForwardDecl(
+                  llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
+                  llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, MangledName));
         }
         llvm::DIType *PayloadDITy = getOrCreateType(*ElemDbgTy);
         PayloadDITy =
@@ -1669,7 +1708,7 @@ private:
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
         DBuilder.getOrCreateArray(VPTy), llvm::dwarf::DW_LANG_Swift, nullptr,
         MangledName, nullptr, NumExtraInhabitants ? *NumExtraInhabitants : 0);
-    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return FwdDecl.replace(DBuilder, DITy);
   }
 
   // Create debug information for an enum with no raw type.
@@ -1730,7 +1769,7 @@ private:
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, nullptr,
         DBuilder.getOrCreateArray(VPTy), llvm::dwarf::DW_LANG_Swift, nullptr,
         MangledName, nullptr, NumExtraInhabitants.value_or(0));
-    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return FwdDecl.replace(DBuilder, DITy);
   }
 
   llvm::DICompositeType *createEnumType(CompletedDebugTypeInfo DbgTy,
@@ -1969,7 +2008,7 @@ private:
           Scope, MangledName, FnTy, MainFile, 0, Flags, MangledName,
           /*SpecificationOf=*/nullptr, NumExtraInhabitants);
     }
-    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return FwdDecl.replace(DBuilder, DITy);
   }
 
   llvm::DIType *createTuple(DebugTypeInfo DbgTy, llvm::DIScope *Scope,
@@ -2007,7 +2046,7 @@ private:
         DBuilder.getOrCreateArray(Members), llvm::dwarf::DW_LANG_Swift, nullptr,
         MangledName);
 
-    return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    return FwdDecl.replace(DBuilder, DITy);
   }
 
   /// Create a boolean annotation, which DWARF represents as a
@@ -2361,7 +2400,7 @@ private:
         return getOrCreateDesugaredType(CanTy, DbgTy);
       }
 
-      llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
+      TemporaryDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, nullptr, 0,
           llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags));
 
@@ -2379,7 +2418,7 @@ private:
           nullptr, DBuilder.getOrCreateArray(Members),
           llvm::dwarf::DW_LANG_Swift, /*VTableHolder=*/nullptr, MangledName);
 
-      return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+      return FwdDecl.replace(DBuilder, DITy);
     }
 
     // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
@@ -2469,7 +2508,7 @@ private:
       auto DerivedFrom = Superclass.isNull()
                              ? nullptr
                              : getOrCreateDesugaredType(Superclass, DbgTy);
-      llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
+      TemporaryDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, L.File,
           FwdDeclLine, llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits,
           Flags));
@@ -2495,7 +2534,7 @@ private:
           Flags, DerivedFrom, DBuilder.getOrCreateArray(Protocols),
           llvm::dwarf::DW_LANG_Swift, nullptr);
 
-      return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+      return FwdDecl.replace(DBuilder, DITy);
     }
 
     case TypeKind::ExistentialMetatype:
