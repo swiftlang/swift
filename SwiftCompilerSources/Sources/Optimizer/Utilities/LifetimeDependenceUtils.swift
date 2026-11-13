@@ -294,6 +294,22 @@ private func guaranteedAddressResultBase(of value: Value) -> Value? {
   return guaranteedReferenceRoot(of: selfArgument) ?? selfArgument
 }
 
+/// If `buffer` is the addressable buffer of a guaranteed indirect argument, return that argument.
+///
+/// With opaque values, such an argument is an object. SILGen builds the address of an addressable argument by
+/// `store_borrow`ing the object into a temporary, possibly through a move-only wrapper conversion.
+private func guaranteedIndirectArgument(ofAddressableBuffer buffer: StoreBorrowInst) -> FunctionArgument? {
+  var source = buffer.source
+  if let wrapper = source as? CopyableToMoveOnlyWrapperValueInst {
+    source = wrapper.operand.value
+  }
+  guard let arg = source as? FunctionArgument,
+        arg.convention.isIndirectIn && arg.convention.isGuaranteed else {
+    return nil
+  }
+  return arg
+}
+
 // Scope initialization.
 extension LifetimeDependence.Scope {
   /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
@@ -418,6 +434,12 @@ extension LifetimeDependence.Scope {
     case let .yield(result):
       self.init(yield: result)
     case .storeBorrow(let sb):
+      // AddressLowering replaces the addressable buffer of a guaranteed argument with the argument's own address (see
+      // forwardArgAddressToAddressableBuffers). The dependence is then on the argument, whose scope is in the caller.
+      if let arg = guaranteedIndirectArgument(ofAddressableBuffer: sb) {
+        self = .caller(arg)
+        return
+      }
       // Don't follow the stored value in case the dependence requires addressability.
       self = .initialized(.store(initializingStore: sb, initialAddress: sb))
     }
