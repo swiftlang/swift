@@ -318,6 +318,9 @@ private:
     SingleValueInstruction *projection, unsigned parentLocIdx,unsigned fieldNr,
     SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap);
 
+  unsigned addSubLocation(SingleValueInstruction *projection,
+                          unsigned parentLocIdx);
+
   /// Calculates Location::numFieldsNotCoveredBySubfields
   void initFieldsCounter(Location &loc);
 
