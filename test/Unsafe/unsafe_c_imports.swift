@@ -1,4 +1,9 @@
 // RUN: %target-typecheck-verify-swift -strict-memory-safety -I %S/Inputs -verify-additional-file %S/Inputs%{fs-sep}unsafe_decls.h
+// RUN: %target-typecheck-verify-swift -D FILE_DEFAULT -I %S/Inputs -verify-additional-file %S/Inputs%{fs-sep}unsafe_decls.h
+
+#if FILE_DEFAULT
+default @diagnose(StrictMemorySafety, as: warning)
+#endif
 
 import unsafe_decls
 

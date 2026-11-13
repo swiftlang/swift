@@ -192,6 +192,14 @@ public:
   /// Whether to print function definitions.
   bool FunctionDefinitions = false;
 
+  /// Whether to print the 'unsafe' of implicit 'unsafe' expressions.
+  ///
+  /// This compensates for codegen that defensively wraps with UnsafeExpr, so
+  /// that 'unsafe' isn't printed into files that don't check strict memory
+  /// safety. Avoid introducing more uses of this; we need to compute where
+  /// UnsafeExpr is actually needed.
+  bool PrintImplicitUnsafe = true;
+
   /// Whether to print expressions.
   bool PrintExprs = false;
   

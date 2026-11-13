@@ -106,8 +106,7 @@ deriveBodyRawRepresentable_raw(AbstractFunctionDecl *toRawDecl, void *) {
     auto *argList = ArgumentList::forImplicitCallTo(functionRef->getName(),
                                                     {selfRef, typeExpr}, C);
     Expr *call = CallExpr::createImplicit(C, functionRef, argList);
-    if (C.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
-      call = UnsafeExpr::createImplicit(C, SourceLoc(), call);
+    call = UnsafeExpr::createImplicit(C, SourceLoc(), call);
     auto *returnStmt = ReturnStmt::createImplicit(C, call);
     auto body = BraceStmt::create(C, SourceLoc(), ASTNode(returnStmt),
                                   SourceLoc());
@@ -408,8 +407,6 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
 static ValueDecl *deriveRawRepresentableViaMacros(DerivedConformance &derived,
                                                   ValueDecl *requirement) {
   auto &C = requirement->getASTContext();
-  bool isStrictMemorySafety = C.LangOpts.hasFeature(
-      Feature::StrictMemorySafety, /*allowMigration=*/true);
 
   std::string macro = "#_deriveRawRepresentable(";
   auto os = llvm::raw_string_ostream(macro);
@@ -421,7 +418,7 @@ static ValueDecl *deriveRawRepresentableViaMacros(DerivedConformance &derived,
     ASSERT(requirement->getBaseName().isConstructor());
     os << QuotedString("initializer");
   }
-  os << ", " << (isStrictMemorySafety ? "true" : "false") << ")";
+  os << ")";
   os.flush();
   return deriveRequirementViaMacro(
       derived, requirement, macro,

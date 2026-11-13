@@ -1141,11 +1141,6 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
   if (Args.hasArg(OPT_enable_builtin_module))
     Opts.enableFeature(Feature::BuiltinModule);
 
-  if (Args.hasArg(OPT_strict_memory_safety))
-    Opts.enableFeature(Feature::StrictMemorySafety);
-  else if (Args.hasArg(OPT_strict_memory_safety_migrate))
-    Opts.enableFeature(Feature::StrictMemorySafety, /*forMigration=*/true);
-
   if (Args.hasArg(OPT_enable_library_evolution, OPT_enable_resilience))
     Opts.enableFeature(Feature::LibraryEvolution);
 
@@ -1154,6 +1149,7 @@ bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
 
 static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
                           DiagnosticEngine &Diags,
+                          const DiagnosticOptions &DiagnosticOpts,
                           ModuleInterfaceOptions &ModuleInterfaceOpts,
                           const FrontendOptions &FrontendOpts) {
   using namespace options;
@@ -1429,6 +1425,21 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   if (parseFeatureArgs(Opts, Args, Diags))
     HadError = true;
+
+  // '-strict-memory-safety' only enables the diagnostic group, but
+  // `#if hasFeature` and the module's strict memory safety flag key on the
+  // feature. Turn the feature on whenever the group is enabled.
+  DiagnosticState commandLineDiagState;
+  commandLineDiagState.setWarningGroupControlRules(
+      DiagnosticOpts.WarningGroupControlRules);
+  if (!commandLineDiagState.isIgnoredDiagnosticGroupTree(
+          DiagGroupID::StrictMemorySafety))
+    Opts.enableFeature(Feature::StrictMemorySafety);
+
+  // Clients detect strict memory safety from the interface's flags.
+  if (Opts.hasFeature(Feature::StrictMemorySafety) &&
+      !Args.hasArg(OPT_strict_memory_safety))
+    ModuleInterfaceOpts.PublicFlags.IgnorableFlags += " -strict-memory-safety";
 
   // SuppressedAssociatedTypesWithDefaults is now always-on by default.
   // If the old prototype version of the feature has been requested, honor it.
@@ -2992,6 +3003,11 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
     Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsError,
                                                DiagGroupID::HeapAllocation);
   }
+
+  // Enabled before processing warning flags so `-warnings-as-errors` applies.
+  if (Args.hasArg(OPT_strict_memory_safety, OPT_strict_memory_safety_migrate))
+    Opts.WarningGroupControlRules.emplace_back(WarningGroupBehavior::AsWarning,
+                                               DiagGroupID::StrictMemorySafety);
 
   Opts.SuppressWarnings |= Args.hasArg(OPT_suppress_warnings);
   Opts.SuppressNotes |= Args.hasArg(OPT_suppress_notes);
@@ -4637,8 +4653,8 @@ bool CompilerInvocation::parseArgs(
     return true;
   }
 
-  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, ModuleInterfaceOpts,
-                    FrontendOpts)) {
+  if (ParseLangArgs(LangOpts, ParsedArgs, Diags, DiagnosticOpts,
+                    ModuleInterfaceOpts, FrontendOpts)) {
     return true;
   }
 
@@ -4704,20 +4720,16 @@ bool CompilerInvocation::parseArgs(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::StrictMemorySafety)) {
-    if (SILOpts.RemoveRuntimeAsserts ||
-        SILOpts.AssertConfig == SILOptions::Unchecked) {
-      Diags.diagnose(SourceLoc(),
-                     diag::command_line_conflicts_with_strict_safety,
-                     "-Ounchecked");
-    }
+  if (SILOpts.RemoveRuntimeAsserts ||
+      SILOpts.AssertConfig == SILOptions::Unchecked) {
+    Diags.diagnose(SourceLoc(), diag::command_line_conflicts_with_strict_safety,
+                   "-Ounchecked");
+  }
 
-    if (!LangOpts.EnableAccessControl &&
-        FrontendOpts.ModuleName != SWIFT_ONONE_SUPPORT) {
-      Diags.diagnose(SourceLoc(),
-                     diag::command_line_conflicts_with_strict_safety,
-                     "-disable-access-control");
-    }
+  if (!LangOpts.EnableAccessControl &&
+      FrontendOpts.ModuleName != SWIFT_ONONE_SUPPORT) {
+    Diags.diagnose(SourceLoc(), diag::command_line_conflicts_with_strict_safety,
+                   "-disable-access-control");
   }
 
   SILOpts.UseAggressiveReg2MemForCodeSize =
