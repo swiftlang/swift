@@ -287,6 +287,7 @@ protected:
   Flags flags;
   uint8_t numTableEntries = 0;
   MemberAbstractTypeLayoutID memberAbstractTypeLayoutID = {};
+  TypeID memberTypeID = {};
 
 public:
   DeclName getName() const {
@@ -305,6 +306,7 @@ public:
   MemberAbstractTypeLayoutID getMemberAbstractTypeLayoutID() const {
     return memberAbstractTypeLayoutID;
   }
+  TypeID getMemberTypeID() const { return memberTypeID; }
 
   bool isA(const void *const ClassID) const override {
     return ClassID == classID() || ErrorInfoBase::isA(ClassID);
@@ -449,11 +451,13 @@ private:
 public:
   explicit OverrideError(DeclName name,
                          Flags flags = {}, unsigned numTableEntries = 0,
-                         MemberAbstractTypeLayoutID memberLayoutID = {}) {
+                         MemberAbstractTypeLayoutID memberLayoutID = {},
+                         TypeID memberTypeID = {}) {
     this->name = name;
     this->flags = flags;
     this->numTableEntries = numTableEntries;
     this->memberAbstractTypeLayoutID = memberLayoutID;
+    this->memberTypeID = memberTypeID;
   }
 
   void log(raw_ostream &OS) const override {
@@ -516,12 +520,14 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError>,
 public:
   explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
                      Flags flags = {}, unsigned numTableEntries = 0,
-                     MemberAbstractTypeLayoutID memberLayoutID = {})
+                     MemberAbstractTypeLayoutID memberLayoutID = {},
+                     TypeID memberTypeID = {})
       : ErrorWithUnderlyingReason(std::move(reason)) {
     this->name = name;
     this->flags = flags;
     this->numTableEntries = numTableEntries;
     this->memberAbstractTypeLayoutID = memberLayoutID;
+    this->memberTypeID = memberTypeID;
   }
 
   void diagnose(const ModuleFile *MF) const;
