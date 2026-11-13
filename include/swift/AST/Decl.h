@@ -10478,15 +10478,6 @@ public:
   AbstractTypeLayout *Layout = nullptr;
   TypeDecl *ParentDecl = nullptr;
 
-  struct XRefPathPiece {
-    Identifier Name;
-    bool InProtocolExtension;
-    bool ImportedFromClang;
-  };
-  Identifier OriginalModuleName;
-  bool OriginalModuleIsObjCHeader = false;
-  ArrayRef<XRefPathPiece> OriginalXRefPath;
-
   SourceLoc getLocFromSource() const { return SourceLoc(); }
 
   static HiddenTypeLayoutInfoDecl *create(ASTContext &ctx, DeclContext *DC);
