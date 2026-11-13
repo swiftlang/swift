@@ -433,7 +433,7 @@ protected:
 
   /// Replace the borrow scope of an inlined borrow accessor's result with the
   /// scopes enclosing the callee's returned value.
-  void fixupBorrowAccessorResult();
+  void fixupBorrowAccessorGuaranteedResult();
 
   const SILDebugScope *getOrCreateInlineScope(const SILDebugScope *DS);
 
@@ -835,7 +835,7 @@ void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
 
   auto *ai = dyn_cast<ApplyInst>(Apply.getInstruction());
   if (ai && BorrowedValue(ai)) {
-    fixupBorrowAccessorResult();
+    fixupBorrowAccessorGuaranteedResult();
   }
 }
 
@@ -846,7 +846,7 @@ void SILInlineCloner::preFixUp(SILFunction *calleeFunction) {
 ///    return_borrow's enclosing scopes.
 ///    - If the caller uses the result in the enclosing scopes of a
 ///    return_borrow, replace the result with enclosing scopes.
-void SILInlineCloner::fixupBorrowAccessorResult() {
+void SILInlineCloner::fixupBorrowAccessorGuaranteedResult() {
   assert(ReturnToBB && "Expected ReturnToBB for borrow accessor inlining");
   auto *resultArg = cast<SILPhiArgument>(ReturnToBB->getArgument(0));
   if (ReturnToBB->pred_empty()) {
