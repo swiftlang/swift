@@ -878,7 +878,7 @@ namespace {
       if (assignOp->isTrivial())
         return nullptr;
 
-      if (!IGM.tryDefineCXXAssignmentOperatorBody(assignOp))
+      if (!importer->tryDefineCXXAssignmentOperatorBody(assignOp))
         return nullptr;
 
       return assignOp;
