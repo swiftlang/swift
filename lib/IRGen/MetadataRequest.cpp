@@ -3190,44 +3190,46 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
   std::tie(mangledString, mangledStringSize) =
     IGM.getTypeRef(type, CanGenericSignature(), MangledTypeRefRole::Metadata);
 
-  // Android AArch64 reserves the top byte of the address for memory tagging
-  // since Android 11, so only use the bottom 23 bits to store this size
-  // and the 24th bit to signal that there is a size.
-  if (IGM.Triple.isAndroid() && IGM.Triple.getArch() == llvm::Triple::aarch64)
-    assert(mangledStringSize < 0x00800001u &&
-           "8MB of mangled name ought to be enough for Android AArch64");
-  else
-    assert(mangledStringSize < 0x80000000u &&
-           "2GB of mangled name ought to be enough for anyone");
-  
+  ASSERT(mangledStringSize < 0x80000000u &&
+         "2GB of mangled name ought to be enough for anyone");
+
   // Get or create the cache variable if necessary.
-  auto cache = IGM.getAddrOfTypeMetadataDemanglingCacheVariable(type,
-                                                                ConstantInit());
-  
+  auto *cache =
+      IGM.getAddrOfTypeMetadataDemanglingCacheVariable(type, ConstantInit());
+
+  ConstantInitBuilder builder(IGM);
+
   if (cast<llvm::GlobalVariable>(cache->stripPointerCasts())->isDeclaration()) {
-    ConstantInitBuilder builder(IGM);
     auto structBuilder = builder.beginStruct();
-    
-    // A "negative" 64-bit value in the cache indicates the uninitialized state.
-    // Which word has that bit in the {i32, i32} layout depends on endianness.
+    structBuilder.addNullPointer(IGM.TypeMetadataPtrTy);
+    auto init = structBuilder.finishAndCreateFuture();
+    cache = IGM.getAddrOfTypeMetadataDemanglingCacheVariable(type, init);
+  }
+
+  auto *mangledNameRef =
+      IGM.getAddrOfTypeMetadataMangledNameRef(type, ConstantInit());
+
+  if (cast<llvm::GlobalVariable>(mangledNameRef->stripPointerCasts())
+          ->isDeclaration()) {
+    auto structBuilder = builder.beginStruct();
 
     if (IGM.getModule()->getDataLayout().isBigEndian()) {
-      structBuilder.addInt32(-mangledStringSize);
+      structBuilder.addInt32(mangledStringSize);
       structBuilder.addRelativeAddress(mangledString);
     } else {
       structBuilder.addRelativeAddress(mangledString);
-      structBuilder.addInt32(-mangledStringSize);
+      structBuilder.addInt32(mangledStringSize);
     }
 
     auto init = structBuilder.finishAndCreateFuture();
-    cache = IGM.getAddrOfTypeMetadataDemanglingCacheVariable(type, init);
+    mangledNameRef = IGM.getAddrOfTypeMetadataMangledNameRef(type, init);
   }
 
   // Get or create a shared helper function to do the instantiation.
   auto instantiationFnName =
       request.isStaticallyAbstract()
-          ? "__swift_instantiateConcreteTypeFromMangledNameAbstract"
-          : "__swift_instantiateConcreteTypeFromMangledName";
+          ? "__swift_instantiateConcreteTypeFromMangledNameAbstractV2"
+          : "__swift_instantiateConcreteTypeFromMangledNameV2";
   auto generateInstantiationFn = [&IGM, request](IRGenFunction &subIGF) {
     subIGF.CurFn->setOnlyReadsMemory();
     subIGF.CurFn->setWillReturn();
@@ -3237,7 +3239,8 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     IGM.setColocateMetadataSection(subIGF.CurFn);
 
     auto params = subIGF.collectParameters();
-    auto cache = params.claimNext();
+    auto *cache = params.claimNext();
+    auto *mangledNameRef = params.claimNext();
 
     // Load the existing cache value.
     // Conceptually, this needs to establish memory ordering with the
@@ -3260,7 +3263,7 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     // in the current LLVM ARM backend.
     auto cacheWordAddr = subIGF.Builder.CreateBitCast(cache, IGM.PtrTy);
     auto load = subIGF.Builder.CreateLoad(
-        Address(cacheWordAddr, IGM.Int64Ty, Alignment(8)));
+        Address(cacheWordAddr, IGM.TypeMetadataPtrTy, Alignment(8)));
     // Make this barrier explicit when building for TSan to avoid false positives.
     if (IGM.IRGen.Opts.Sanitizers & SanitizerKind::Thread)
       load->setOrdering(llvm::AtomicOrdering::Acquire);
@@ -3270,26 +3273,22 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     // Compare the load result to see if it's negative.
     auto isUnfilledBB = subIGF.createBasicBlock("");
     auto contBB = subIGF.createBasicBlock("");
-    llvm::Value *comparison = subIGF.Builder.CreateICmpSLT(load,
-                                      llvm::ConstantInt::get(IGM.Int64Ty, 0));
+    llvm::Value *isNull = subIGF.Builder.CreateICmpEQ(
+        load, llvm::ConstantPointerNull::get(IGM.TypeMetadataPtrTy));
 
-    // Check if the 24th bit is set on Android AArch64 and only instantiate the
-    // type metadata if it is, as otherwise it might be negative only because
-    // of the memory tag on Android.
-    if (IGM.Triple.isAndroid() &&
-        IGM.Triple.getArch() == llvm::Triple::aarch64) {
-
-      auto getBitAfterAndroidTag = subIGF.Builder.CreateAnd(
-        load, llvm::ConstantInt::get(IGM.Int64Ty, 0x0080000000000000));
-      auto checkNotAndroidTag = subIGF.Builder.CreateICmpNE(
-        getBitAfterAndroidTag, llvm::ConstantInt::get(IGM.Int64Ty, 0));
-
-      comparison = subIGF.Builder.CreateAnd(comparison, checkNotAndroidTag);
+    // We need to disambiguate between a cache that was populated by an abstract
+    // or complete metadata as we can't serve abstract metadata to a concrete
+    // request.
+    if (!request.isStaticallyAbstract()) {
+      auto ptrVal = subIGF.Builder.CreatePtrToInt(load, IGM.SizeTy);
+      llvm::Value *checkAbstractBitSet = subIGF.Builder.CreateAnd(
+          ptrVal, llvm::ConstantInt::get(IGM.SizeTy, 1));
+      checkAbstractBitSet = subIGF.Builder.CreateICmpEQ(
+          checkAbstractBitSet, llvm::ConstantInt::get(IGM.SizeTy, 1));
+      isNull = subIGF.Builder.CreateOr(checkAbstractBitSet, isNull);
     }
 
-    comparison = subIGF.Builder.CreateExpect(comparison,
-                                       llvm::ConstantInt::get(IGM.Int1Ty, 0));
-    subIGF.Builder.CreateCondBr(comparison, isUnfilledBB, contBB);
+    subIGF.Builder.CreateCondBr(isNull, isUnfilledBB, contBB);
     auto loadBB = subIGF.Builder.GetInsertBlock();
 
     // If the load is negative, emit the call to instantiate the type
@@ -3299,15 +3298,17 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
 
     // Break up the loaded value into size and relative address to the
     // string.
-    auto size = subIGF.Builder.CreateAShr(load, 32);
+    auto mangledNameRefLoad = subIGF.Builder.CreateLoad(
+        Address(mangledNameRef, IGM.Int64Ty, Alignment(8)));
+    auto size = subIGF.Builder.CreateAShr(mangledNameRefLoad, 32);
     size = subIGF.Builder.CreateTruncOrBitCast(size, IGM.SizeTy);
-    size = subIGF.Builder.CreateNeg(size);
 
-    auto stringAddrOffset = subIGF.Builder.CreateTrunc(load,
-                                                       IGM.Int32Ty);
+    auto stringAddrOffset =
+        subIGF.Builder.CreateTrunc(mangledNameRefLoad, IGM.Int32Ty);
     stringAddrOffset = subIGF.Builder.CreateSExtOrBitCast(stringAddrOffset,
                                                           IGM.SizeTy);
-    auto stringAddrBase = subIGF.Builder.CreatePtrToInt(cache, IGM.SizeTy);
+    auto stringAddrBase =
+        subIGF.Builder.CreatePtrToInt(mangledNameRef, IGM.SizeTy);
     if (IGM.getModule()->getDataLayout().isBigEndian()) {
       stringAddrBase = subIGF.Builder.CreateAdd(stringAddrBase,
                                       llvm::ConstantInt::get(IGM.SizeTy, 4));
@@ -3358,36 +3359,53 @@ emitMetadataAccessByMangledName(IRGenFunction &IGF, CanType type,
     call->setOnlyReadsMemory();
     call->setCallingConv(IGM.SwiftCC);
 
+    llvm::Value *resultWord = call;
+    // Mark the stored value as statically abstract so we can dis-ambiguate
+    // between abstract (in-complete) and complete metadata.
+    if (request.isStaticallyAbstract()) {
+      auto ptrVal = subIGF.Builder.CreatePtrToInt(resultWord, IGM.SizeTy);
+      resultWord = subIGF.Builder.CreateOr(
+          ptrVal, llvm::ConstantInt::get(IGM.SizeTy, 1));
+      resultWord =
+          subIGF.Builder.CreateIntToPtr(resultWord, IGM.TypeMetadataPtrTy);
+    }
+
     // Store the result back to the cache. Metadata instantiation should
     // already have emitted the necessary barriers to publish the instantiated
     // metadata to other threads, so we only need to expose the pointer.
     // Worst case, another thread might race with us and reinstantiate the
     // exact same metadata pointer.
-    auto resultWord = subIGF.Builder.CreatePtrToInt(call, IGM.SizeTy);
-    resultWord = subIGF.Builder.CreateZExtOrBitCast(resultWord, IGM.Int64Ty);
     auto store = subIGF.Builder.CreateStore(resultWord, cacheWordAddr,
-                                            Alignment(8));
+                                            Alignment(IGM.getPointerAlignment()));
     store->setOrdering(llvm::AtomicOrdering::Monotonic);
     subIGF.Builder.CreateBr(contBB);
 
     subIGF.Builder.SetInsertPoint(loadBB);
     subIGF.Builder.emitBlock(contBB);
-    auto phi = subIGF.Builder.CreatePHI(IGM.Int64Ty, 2);
+    auto phi = subIGF.Builder.CreatePHI(IGM.TypeMetadataPtrTy, 2);
     phi->addIncoming(load, loadBB);
     phi->addIncoming(resultWord, isUnfilledBB);
 
-    auto resultAddr = subIGF.Builder.CreateTruncOrBitCast(phi, IGM.SizeTy);
-    resultAddr = subIGF.Builder.CreateIntToPtr(resultAddr,
-                                               IGM.TypeMetadataPtrTy);
-    subIGF.Builder.CreateRet(resultAddr);
+    // Mask of the marking bit we used to mark the inline cache entry as
+    // abstract.
+    llvm::Value *resultVal = phi;
+    if (request.isStaticallyAbstract()) {
+      resultVal = subIGF.Builder.CreatePtrToInt(resultVal, IGM.SizeTy);
+      resultVal = subIGF.Builder.CreateAnd(
+          resultVal, llvm::ConstantInt::getSigned(IGM.SizeTy, -2));
+      resultVal =
+          subIGF.Builder.CreateIntToPtr(resultVal, IGM.TypeMetadataPtrTy);
+    }
+
+    subIGF.Builder.CreateRet(resultVal);
   };
   auto instantiationFn = cast<llvm::Function>(IGM.getOrCreateHelperFunction(
-      instantiationFnName, IGF.IGM.TypeMetadataPtrTy, cache->getType(),
-      generateInstantiationFn,
+      instantiationFnName, IGF.IGM.TypeMetadataPtrTy,
+      {cache->getType(), mangledNameRef->getType()}, generateInstantiationFn,
       /*noinline*/ true));
 
   auto call = IGF.Builder.CreateCall(instantiationFn->getFunctionType(),
-                                     instantiationFn, cache);
+                                     instantiationFn, {cache, mangledNameRef});
   call->setDoesNotThrow();
   call->setOnlyReadsMemory();
   

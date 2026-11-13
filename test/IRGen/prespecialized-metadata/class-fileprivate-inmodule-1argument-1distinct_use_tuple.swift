@@ -20,11 +20,11 @@ func consume<T>(_ t: T) {
 }
 
 // TODO: Once metadata records for structural types are prespecialized, there
-//       should be no call to __swift_instantiateConcreteTypeFromMangledName.
+//       should be no call to __swift_instantiateConcreteTypeFromMangledNameV2.
 
 //      CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-//      CHECK:   [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
-// CHECK-SAME:     @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z0-9_]+]]LLCySi_SStGMD"
+//      CHECK:   [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(
+// CHECK-SAME:     @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z0-9_]+]]LLCySi_SStGMd"
 //      CHECK:   {{%[0-9]+}} = call swiftcc ptr @"$s4main5Value[[UNIQUE_ID_1]]LLC5firstADyxGx_tcfC"(
 // CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
 // CHECK-SAME:     ptr swiftself [[METADATA]]

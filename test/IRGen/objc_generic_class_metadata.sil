@@ -29,7 +29,7 @@ entry:
 
   // All instances of the generic ObjC class are erased to the same metadata
   // at runtime.
-  // CHECK: [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sSo12GenericClassCMD")
+  // CHECK: [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$sSo12GenericClassCMd", ptr @"$sSo12GenericClassCMR")
   %a = metatype $@thick GenericClass<NSString>.Type
   // CHECK: call swiftcc void @metatype_sink(ptr [[METADATA]], ptr [[METADATA]])
   apply %z<GenericClass<NSString>>(%a) : $@convention(thin) <T> (@thick T.Type) -> ()
@@ -45,7 +45,7 @@ entry:
   apply %y<GenericClass<NSString>>(%c) : $@convention(thin) <T: AnyObject> (@objc_metatype T.Type) -> ()
 
   // Check that generic classes are erased at depth.
-  // CHECK: [[TUPLE_METADATA:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName{{.*}}({{.*}} @"$sSaySo12GenericClassC_SitGMD")
+  // CHECK: [[TUPLE_METADATA:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2{{.*}}({{.*}} @"$sSaySo12GenericClassC_SitGMd", ptr @"$sSaySo12GenericClassC_SitGMR")
   %d = metatype $@thick Array<(GenericClass<NSString>, Int)>.Type
   // CHECK: call swiftcc void @metatype_sink(ptr [[TUPLE_METADATA]], ptr [[TUPLE_METADATA]])
   apply %z<Array<(GenericClass<NSString>, Int)>>(%d) : $@convention(thin) <T> (@thick T.Type) -> ()

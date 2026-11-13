@@ -200,7 +200,7 @@ public func testGetFunc() {
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} hidden swiftcc void @"$s22big_types_corner_cases7TestBigC4testyyF"(ptr swiftself %0)
-// CHECK: [[CALL1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$sSayy22big_types_corner_cases9BigStructVcSgGMD"
+// CHECK: [[CALL1:%.*]] = call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$sSayy22big_types_corner_cases9BigStructVcSgGMd"
 // CHECK: [[CALL2:%.*]] = call ptr @"$sSayy22big_types_corner_cases9BigStructVcSgGSayxGSlsWl
 // CHECK:  call swiftcc void @"$sSlsE10firstIndex5where0B0QzSgSb7ElementQzKXE_tKF"(ptr noalias sret({{.*}}) %{{[0-9]+}}, ptr @"$s22big_types_corner_cases7TestBig{{.*}}", ptr null, ptr %{{[0-9]+}}, ptr [[CALL2]]
 class TestBig {
