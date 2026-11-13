@@ -1,6 +1,7 @@
 // {"kind":"emit-sil","signature":"swift::verificationFailure(llvm::Twine const&, swift::SILInstruction const*, llvm::function_ref<void (swift::SILPrintContext&)>)","signatureNext":"SILVerifier::visitSILInstruction"}
 // RUN: not --crash %target-swift-frontend -emit-sil %s
 // REQUIRES: OS=macosx
+// REQUIRES: differentiable_programming
 import _Differentiation
 protocol a: Differentiable {
 }
