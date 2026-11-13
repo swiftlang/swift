@@ -365,10 +365,10 @@ private:
 
   Decl *handleErrorAndSupplyMissingMember(ASTContext &context,
                                           Decl *container,
-                                          llvm::Error &&error) const;
+                                          llvm::Error &&error);
   Decl *handleErrorAndSupplyMissingClassMember(
       ASTContext &context, llvm::Error &&error,
-      ClassDecl *containingClass) const;
+      ClassDecl *containingClass);
 
 public:
   /// Change the status of the current module.
