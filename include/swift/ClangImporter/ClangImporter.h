@@ -849,6 +849,8 @@ public:
 
   static bool hasNonTrivialAssignmentOperator(Type type);
 
+  bool tryDefineCXXAssignmentOperatorBody(clang::CXXMethodDecl *assignOp);
+
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
 

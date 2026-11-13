@@ -1851,8 +1851,6 @@ public:
   void
   ensureImplicitCXXDestructorBodyIsDefined(clang::CXXDestructorDecl *cxxDtor);
 
-  bool tryDefineCXXAssignmentOperatorBody(clang::CXXMethodDecl *assignOp);
-
   llvm::ConstantInt *getInt32(uint32_t value);
   llvm::ConstantInt *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);

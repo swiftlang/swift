@@ -9376,6 +9376,39 @@ bool ClangImporter::hasNonTrivialAssignmentOperator(Type type) {
   return false;
 }
 
+bool ClangImporter::tryDefineCXXAssignmentOperatorBody(
+    clang::CXXMethodDecl *assignOp) {
+  if (assignOp->isInvalidDecl())
+    return false;
+
+  auto &sema = Impl.getClangSema();
+  auto &diags = sema.getDiagnostics();
+  bool prevSuppressAllDiagnostics = diags.getSuppressAllDiagnostics();
+  diags.setSuppressAllDiagnostics(true);
+  SWIFT_DEFER { diags.setSuppressAllDiagnostics(prevSuppressAllDiagnostics); };
+  clang::DiagnosticErrorTrap trap(diags);
+
+  {
+    clang::Sema::GlobalEagerInstantiationScope instantiations(
+        sema, /*Enabled=*/true, /*AtEndOfTU=*/true);
+
+    if (assignOp->isDefaulted() && !assignOp->doesThisDeclarationHaveABody()) {
+      if (assignOp->isMoveAssignmentOperator())
+        sema.DefineImplicitMoveAssignment(clang::SourceLocation(), assignOp);
+      else
+        sema.DefineImplicitCopyAssignment(clang::SourceLocation(), assignOp);
+    } else if (assignOp->getTemplateInstantiationPattern()) {
+      sema.InstantiateFunctionDefinition(assignOp->getLocation(), assignOp);
+    }
+
+    instantiations.perform();
+  }
+
+  if (trap.hasErrorOccurred())
+    assignOp->setInvalidDecl();
+  return !assignOp->isInvalidDecl();
+}
+
 ValueDecl *ClangImporter::getOverriddenSuperclassMember(const ValueDecl *decl) {
   const auto *classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl || !classDecl->getSuperclassDecl())
