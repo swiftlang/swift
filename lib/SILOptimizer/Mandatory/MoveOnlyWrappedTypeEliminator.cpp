@@ -45,6 +45,33 @@
 
 using namespace swift;
 
+/// With opaque values, SILGen builds the addressable buffer of a parameter by
+/// store_borrow'ing the incoming argument into a temporary. AddressLowering
+/// later replaces that temporary with the argument's own address (see
+/// forwardArgAddressToAddressableBuffers), so the callee passes along the
+/// caller's address. A store_borrow of a trivial argument must survive until
+/// then. Rewriting it into a store would make AddressLowering pass a copy.
+///
+/// The argument may still be under the conversions that this pass eliminates.
+static bool isAddressableArgumentBuffer(StoreBorrowInst *sbi) {
+  if (!sbi->getModule().usesOpaqueValues())
+    return false;
+
+  SILValue source = sbi->getSrc();
+  while (true) {
+    if (auto *wrapper = dyn_cast<CopyableToMoveOnlyWrapperValueInst>(source)) {
+      source = wrapper->getOperand();
+      continue;
+    }
+    if (auto *move = dyn_cast<MoveValueInst>(source)) {
+      source = move->getOperand();
+      continue;
+    }
+    break;
+  }
+  return isa<SILFunctionArgument>(source);
+}
+
 //===----------------------------------------------------------------------===//
 //                                  Visitor
 //===----------------------------------------------------------------------===//
@@ -109,6 +136,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     }
     if (!si->getSrc()->getType().isTrivial(*si->getFunction()))
       return false;
+    if (isAddressableArgumentBuffer(si))
+      return false;
     SILBuilderWithScope b(si);
     b.emitStoreValueOperation(si->getLoc(), si->getSrc(), si->getDest(),
                               StoreOwnershipQualifier::Trivial);
@@ -167,9 +196,19 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
     return eraseFromParent(inst);                                              \
   }
   DELETE_IF_TRIVIAL_OP(DestroyValue)
-  DELETE_IF_TRIVIAL_OP(EndBorrow)
   DELETE_IF_TRIVIAL_OP(ExtendLifetime)
 #undef DELETE_IF_TRIVIAL_OP
+
+  bool visitEndBorrowInst(EndBorrowInst *ebi) {
+    // Keep the end_borrow of a store_borrow that is kept.
+    if (auto *sbi = dyn_cast<StoreBorrowInst>(ebi->getOperand())) {
+      if (isAddressableArgumentBuffer(sbi))
+        return false;
+    }
+    if (!ebi->getOperand()->getType().isTrivial(*ebi->getFunction()))
+      return false;
+    return eraseFromParent(ebi);
+  }
 
 #define NEED_TO_CONVERT_FORWARDING_TO_NONE_IF_TRIVIAL_OP(CLS)                  \
   bool visit##CLS##Inst(CLS##Inst *inst) {                                     \
