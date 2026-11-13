@@ -655,7 +655,7 @@ irgen::getClassFieldAccess(IRGenModule &IGM, SILType baseType, VarDecl *field) {
 }
 
 Size
-irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
+irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, Field field) {
   auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
 
   // FIXME: For now we just assume fragile layout here, because this is used as
@@ -667,6 +667,11 @@ irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
   auto element = fieldInfo.second;
   assert(element.hasByteOffset());
   return element.getByteOffset();
+}
+
+Size
+irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
+  return getClassFieldOffset(IGM, baseType, Field(field));
 }
 
 StructLayout *
