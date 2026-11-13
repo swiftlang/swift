@@ -517,8 +517,7 @@ static CanType getLoweredAbstractMemberType(
   assert(layout && "missing member must have a storage layout");
   layout = layout->getWithSubstitutions(member.getASTContext(),
                                         substitutions);
-  Type memberType =
-      HiddenType::get(member.getASTContext(), layout, CanType());
+  Type memberType = HiddenType::get(member.getASTContext(), layout);
   return TC.getLoweredRValueType(context, memberType);
 }
 

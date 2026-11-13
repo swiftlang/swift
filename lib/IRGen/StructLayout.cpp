@@ -719,7 +719,7 @@ Type Field::getInterfaceType(IRGenModule &IGM) const {
 
     auto *layout = member.getFallbackLayout();
     assert(layout && "missing field has no storage layout");
-    return HiddenType::get(IGM.Context, layout, CanType());
+    return HiddenType::get(IGM.Context, layout);
   }
   case Field::DefaultActorStorage:
     return IGM.Context.TheDefaultActorStorageType;
