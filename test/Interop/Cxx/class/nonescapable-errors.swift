@@ -1,14 +1,9 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
-// RUN:   -I %t%{fs-sep}Inputs \
-// RUN:   -cxx-interoperability-mode=default \
-// RUN:   -verify-ignore-unrelated \
-// RUN:   -Xcc -Wno-nullability-completeness \
-// RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
-// RUN:   -verify-additional-prefix LIFETIMES- \
-// RUN:   -enable-experimental-feature LifetimeDependence
+// Typo correction depends on the declarations of the platform's C++ standard
+// library, and replaces the notes explaining why a declaration was not
+// imported, so turn it off.
 
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
 // RUN:   -I %t%{fs-sep}Inputs \
@@ -16,7 +11,18 @@
 // RUN:   -verify-ignore-unrelated \
 // RUN:   -Xcc -Wno-nullability-completeness \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
-// RUN:   -verify-additional-prefix NO-LIFETIMES-
+// RUN:   -verify-additional-prefix LIFETIMES- \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -typo-correction-limit 0
+
+// RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
+// RUN:   -I %t%{fs-sep}Inputs \
+// RUN:   -cxx-interoperability-mode=default \
+// RUN:   -verify-ignore-unrelated \
+// RUN:   -Xcc -Wno-nullability-completeness \
+// RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
+// RUN:   -verify-additional-prefix NO-LIFETIMES- \
+// RUN:   -typo-correction-limit 0
 
 // REQUIRES: swift_feature_LifetimeDependence
 
@@ -214,6 +220,76 @@ const View* usedToCrash(const View* p) {
 }
 
 View* usedToCrashAsInit(const int* p) SWIFT_NAME(View.init(p:));
+
+// A reference to a non-escapable type would be imported as an
+// 'Unsafe(Mutable)Pointer', which cannot have a non-escapable pointee.
+// expected-note@+3 {{function 'returnsReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+const View &returnsReference(const View &v [[clang::lifetimebound]]);
+
+// expected-note@+3 {{function 'returnsMutableReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+View &returnsMutableReference(View &v [[clang::lifetimebound]]);
+
+// Reference parameters are imported as their pointee type.
+void takesReference(const View &v);
+void takesMutableReference(View &v);
+void takesRvalueReference(View &&v);
+
+typedef const View &ViewRef;
+void takesTypedefReference(ViewRef v);
+
+// expected-note@+3 {{function 'returnsRvalueReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+View &&returnsRvalueReference(View &&v [[clang::lifetimebound]]);
+
+// expected-note@+3 {{function 'returnsTypedefReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+ViewRef returnsTypedefReference(ViewRef v [[clang::lifetimebound]]);
+
+// expected-note@+3 {{function 'returnsReferenceToPointer' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{pointer to non-'Escapable' type 'View' cannot be imported}}
+View *&returnsReferenceToPointer();
+
+// expected-note@+3 {{function 'returnsVectorReference' unavailable (cannot import)}}
+// expected-note@+2 {{return type unavailable (cannot import)}}
+// expected-note@+1 {{reference to non-'Escapable' type 'ViewVector' cannot be imported}}
+const ViewVector &returnsVectorReference();
+
+// A mutable reference parameter of a function pointer is imported as a
+// reference, so the function pointer falls back to 'OpaquePointer'. The note is
+// emitted when the function is used, although the function is imported.
+// expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+void takesFunctionPointer(void (*fp)(View &));
+
+struct SWIFT_NONESCAPABLE ViewHolder {
+    View v;
+    // expected-note@+3 {{function 'get' unavailable (cannot import)}}
+    // expected-note@+2 {{return type unavailable (cannot import)}}
+    // expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+    const View &get() const [[clang::lifetimebound]] { return v; }
+    // 'pointee' only needs the address, so the result depending on 'self' is
+    // enough to keep it.
+    const View &operator*() const [[clang::lifetimebound]] { return v; }
+    // expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
+    static const View &staticReference;
+};
+
+struct SWIFT_NONESCAPABLE UnannotatedViewHolder {
+    View v;
+    const View &operator*() const { return v; }
+};
+
+// The result of a prefix increment is dropped, so 'successor()' still works.
+struct SWIFT_NONESCAPABLE ViewIterator {
+    const int *p;
+    ViewIterator &operator++() { ++p; return *this; }
+};
 
 // expected-note@+1 {{'Escapable' record 'Invalid' cannot have non-'Escapable' field 'v'}}
 struct SWIFT_ESCAPABLE Invalid {
@@ -526,6 +602,34 @@ public func diagnoseInvalidSwiftAttributes() {
 
 public func test3(_ x: inout View) {
     usedToCrash(&x) // expected-error {{cannot find 'usedToCrash' in scope}}
+}
+
+public func references(_ x: inout View, _ h: borrowing ViewHolder,
+                       _ u: borrowing UnannotatedViewHolder,
+                       _ it: borrowing ViewIterator) {
+    _ = returnsReference(x) // expected-error {{cannot find 'returnsReference' in scope}}
+    _ = returnsMutableReference(&x) // expected-error {{cannot find 'returnsMutableReference' in scope}}
+    _ = returnsRvalueReference(x) // expected-error {{cannot find 'returnsRvalueReference' in scope}}
+    _ = returnsTypedefReference(x) // expected-error {{cannot find 'returnsTypedefReference' in scope}}
+    _ = returnsReferenceToPointer() // expected-error {{cannot find 'returnsReferenceToPointer' in scope}}
+    _ = returnsVectorReference() // expected-error {{cannot find 'returnsVectorReference' in scope}}
+    takesReference(x)
+    takesMutableReference(&x)
+    takesTypedefReference(x)
+    takesFunctionPointer(nil)
+    _ = h.get() // expected-error {{value of type 'ViewHolder' has no member 'get'}}
+    _ = h.pointee
+    _ = ViewHolder.staticReference // expected-error {{type 'ViewHolder' has no member 'staticReference'}}
+    // Without a dependence on 'self', 'pointee' would need a getter, which
+    // cannot load through the pointer.
+    _ = u.pointee // expected-error {{value of type 'UnannotatedViewHolder' has no member 'pointee'}}
+#if hasFeature(LifetimeDependence)
+    _ = it.successor()
+#endif
+}
+
+public func consumingReference(_ x: consuming View) {
+    takesRvalueReference(consuming: x)
 }
 
 public func optional() {
