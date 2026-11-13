@@ -59,7 +59,7 @@ protected:
 public:
   const TypeInfo &getTypeInfo() const { return Layout.getType(); }
 
-  Type getInterfaceTypeForSerialization() const { return {}; }
+  Type getInterfaceTypeForSerialization(IRGenModule &) const { return {}; }
 
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
@@ -148,7 +148,7 @@ protected:
 
     for (const auto &field : getFields()) {
       SerializableRecordFieldRepresentation fieldRepresentation;
-      auto fieldType = field.getInterfaceTypeForSerialization();
+      auto fieldType = field.getInterfaceTypeForSerialization(IGM);
       fieldRepresentation.resolvedType = fieldType;
       if (auto *hiddenType =
               fieldType ? fieldType->template getAs<HiddenType>() : nullptr) {

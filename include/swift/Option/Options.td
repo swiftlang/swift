@@ -518,6 +518,10 @@ def remark_hidden_type_layout_serialization : Flag<["-"], "Rhidden-type-layout-s
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild]>,
   HelpText<"Emit remarks about hidden type layout serialization">;
 
+def skip_writing_abstract_type_layouts : Flag<["-"], "skip-writing-abstract-type-layouts">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Analyze abstract type layout requirements without writing layouts">;
+
 def emit_tbd : Flag<["-"], "emit-tbd">,
   HelpText<"Emit a TBD file">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>;

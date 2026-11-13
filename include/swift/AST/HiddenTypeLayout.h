@@ -32,7 +32,6 @@ enum class HiddenTypeLayoutOrigin {
 };
 
 struct HiddenTypeLayoutRequirement {
-  const Decl *LayoutDecl;
   Type HiddenType;
   HiddenTypeLayoutOrigin Origin;
   NominalTypeDecl *ABIExposedType;
