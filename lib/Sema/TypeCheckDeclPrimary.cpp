@@ -3997,6 +3997,42 @@ public:
     return func->getName().isCompoundName("swift_deletedAsyncMethodError", { });
   }
 
+  /// A getter whose result borrows a non-Escapable 'self' cannot be combined
+  /// with a setter: modifying the storage would store a borrow of 'self' back
+  /// into 'self'. Existing .swiftinterface files may contain this pattern, so
+  /// only diagnose source files.
+  void checkBorrowingGetterWithSetter(AccessorDecl *getter) {
+    auto *storage = getter->getStorage();
+    if (storage->getParsedAccessor(AccessorKind::Get) != getter)
+      return;
+
+    auto *SF = getter->getDeclContext()->getParentSourceFile();
+    if (!SF || SF->Kind == SourceFileKind::Interface)
+      return;
+
+    if (!storage->getParsedAccessor(AccessorKind::Set)
+        || storage->getParsedAccessor(AccessorKind::Modify))
+      return;
+
+    auto *dc = storage->getDeclContext();
+    if (!dc->isTypeContext())
+      return;
+
+    auto lifetimeDependencies = getter->getLifetimeDependencies();
+    if (!lifetimeDependencies)
+      return;
+
+    for (auto &lifetimeDependenceInfo : *lifetimeDependencies) {
+      if (!lifetimeDependenceInfo.hasScopeLifetimeParamIndices())
+        continue;
+
+      auto selfType = dc->mapTypeIntoEnvironment(dc->getSelfInterfaceType());
+      if (!selfType->isEscapable())
+        getter->diagnose(diag::lifetime_dependence_borrowing_getter_with_setter);
+      return;
+    }
+  }
+
   void visitFuncDecl(FuncDecl *FD) {
     // Force these requests in case they emit diagnostics.
     (void) FD->getInterfaceType();
@@ -4069,6 +4105,9 @@ public:
     }
 
     checkExplicitAvailability(FD);
+
+    if (auto *accessor = dyn_cast<AccessorDecl>(FD))
+      checkBorrowingGetterWithSetter(accessor);
 
     // Skip this for accessors, since we should have diagnosed the
     // storage itself.

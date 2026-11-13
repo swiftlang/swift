@@ -9416,6 +9416,10 @@ ERROR(lifetime_dependence_cannot_infer_no_candidates, none,
       "non-'Escapable' or 'Escapable' with a borrowing ownership", (StringRef))
 ERROR(lifetime_dependence_cannot_infer_ambiguous_candidate, none,
       "cannot infer lifetime dependence%0, multiple parameters qualify as a candidate", (StringRef))
+ERROR(lifetime_dependence_borrowing_getter_with_setter, none,
+      "a getter that borrows 'self' cannot be combined with a setter on a "
+      "non-'Escapable' type; use '@_lifetime(copy self)' on the getter",
+      ())
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Sending
