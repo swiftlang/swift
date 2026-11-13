@@ -2610,17 +2610,6 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     llvm_unreachable("should not get here");
     return Type();
 
-  case DeclKind::HiddenTypeLayoutInfo: {
-    auto *hiddenDecl = cast<HiddenTypeLayoutInfoDecl>(D);
-    CanType parent;
-    if (auto *parentDecl = hiddenDecl->ParentDecl)
-      parent = parentDecl->getDeclaredInterfaceType()->getCanonicalType();
-
-    auto hiddenType = HiddenType::get(Context, hiddenDecl->Layout, parent,
-                                      hiddenDecl);
-    return MetatypeType::get(hiddenType, Context);
-  }
-
   case DeclKind::GenericTypeParam: {
     auto *paramDecl = cast<GenericTypeParamDecl>(D);
 

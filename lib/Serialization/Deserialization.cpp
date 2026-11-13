@@ -7992,16 +7992,6 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
   if (!declOrError)
     return declOrError.takeError();
 
-  if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(declOrError.get())) {
-    CanType parent = parentTy.get()
-                         ? parentTy.get()->getCanonicalType()
-                         : CanType();
-    CanType type = CanType(HiddenType::get(MF.getContext(), hidden->Layout,
-                                           parent, hidden));
-    MF.getContext().recordRecoveredHiddenType(type);
-    return type;
-  }
-
   // Look through compatibility aliases.
   if (auto *alias = dyn_cast<TypeAliasDecl>(declOrError.get())) {
     // Reminder: TypeBase::getAs will look through sugar. But we don't want to
@@ -9329,8 +9319,7 @@ Decl *ModuleFile::handleErrorAndSupplyMissingClassMember(
       storageLayout = layout.get();
       if (auto typeID = error.getMemberTypeID())
         storageLayout->serializedType = {this, typeID};
-      auto hiddenType = CanType(HiddenType::get(
-          context, storageLayout, CanType()));
+      auto hiddenType = CanType(HiddenType::get(context, storageLayout));
       context.recordRecoveredHiddenType(hiddenType);
     }
 
@@ -9413,8 +9402,7 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
           fatal(layout.takeError());
         if (auto typeID = declError->getMemberTypeID())
           layout.get()->serializedType = {this, typeID};
-        auto hiddenType = CanType(HiddenType::get(
-            context, layout.get(), CanType()));
+        auto hiddenType = CanType(HiddenType::get(context, layout.get()));
         context.recordRecoveredHiddenType(hiddenType);
         bool hasStorage = false;
         if (isa<StructDecl>(container)) {

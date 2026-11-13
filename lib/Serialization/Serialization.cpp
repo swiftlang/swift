@@ -2278,7 +2278,6 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::Module:
   case DeclKind::PrecedenceGroup:
   case DeclKind::FileDefault:
-  case DeclKind::HiddenTypeLayoutInfo:
     if (D->getASTContext().LangOpts.AllowModuleWithCompilerErrors)
       return false;
     llvm_unreachable("decl should never be a member");
@@ -4440,11 +4439,6 @@ public:
 
   /// If this gets referenced, we forgot to handle a decl.
   void visitDecl(const Decl *) = delete;
-
-  void visitHiddenTypeLayoutInfoDecl(const HiddenTypeLayoutInfoDecl *) {
-    llvm_unreachable(
-        "hidden layout declaration serialization is not implemented yet");
-  }
 
   /// Add all of the inherited entries to the result vector.
   ///
@@ -7343,13 +7337,7 @@ public:
       return;
     }
 
-    using namespace decls_block;
-    auto *layoutDecl = hidden->getLegacyLayoutInfoDecl();
-    assert(layoutDecl && "cannot serialize a hidden type without a source record");
-    unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
-    NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                  S.addDeclRef(layoutDecl),
-                                  S.addTypeRef(hidden->getParent()));
+    llvm_unreachable("cannot serialize a hidden type without a source record");
   }
 };
 
