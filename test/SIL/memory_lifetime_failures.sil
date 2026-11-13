@@ -156,6 +156,21 @@ bb2(%4 : @owned $Error):
 
 }
 
+sil [ossa] @yield : $@yield_once (Int, Float) -> (@yields @inout T, @yields Float) {
+bb0(%0 : $Int, %1 : $Float):
+  %2 = alloc_stack $T
+  yield (%2 : $*T, %1 : $Float), resume bb1, unwind bb2
+
+bb1:
+  dealloc_stack %2 : $*T
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  dealloc_stack %2 : $*T
+  unwind
+}
+
 // CHECK: SIL memory lifetime failure in @test_single_block: memory is initialized, but shouldn't be
 sil [ossa] @test_single_block : $@convention(thin) (@owned T) -> () {
 bb0(%0 : @owned $T):
@@ -996,6 +1011,40 @@ bb0:
   dealloc_stack %0
   %4 = tuple ()
   return %4
+}
+
+// CHECK: SIL memory lifetime failure in @yield_inout1: argument memory is not initialized, but should be
+sil [ossa] @yield_inout1 : $@yield_once () -> (@yields @inout T) {
+bb0:
+  %0 = alloc_stack $T
+  yield (%0 : $*T), resume bb1, unwind bb2
+
+bb1:
+  dealloc_stack %0 : $*T
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  dealloc_stack %0 : $*T
+  unwind
+}
+
+// CHECK: SIL memory lifetime failure in @yield_inout2: memory is initialized, but shouldn't be
+sil [ossa] @yield_inout2 : $@yield_once (@owned T) -> (@yields @inout T) {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $T
+  store %0 to [init] %1 : $*T
+  yield (%1 : $*T), resume bb1, unwind bb2
+
+bb1:
+  dealloc_stack %1 : $*T
+  %r = tuple ()
+  return %r : $()
+
+bb2:
+  destroy_addr %1 : $*T
+  dealloc_stack %1 : $*T
+  unwind
 }
 
 sil @read_write_in : $@convention(thin) (@in Int) -> () {
