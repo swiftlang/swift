@@ -23,6 +23,17 @@ public struct AddPayloadCaseMacro: MemberMacro {
   }
 }
 
+public struct AddBoolCaseMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    ["case custom(Bool)"]
+  }
+}
+
 //--- enums.swift
 @attached(member, names: named(custom))
 macro AddPayloadCaseNamed() = #externalMacro(module: "MacroDefinition", type: "AddPayloadCaseMacro")
@@ -43,6 +54,19 @@ enum ArbitraryKey {
 }
 
 
+@attached(member, names: named(custom))
+macro AddBoolCase() = #externalMacro(module: "MacroDefinition", type: "AddBoolCaseMacro")
+
+@AddBoolCase
+enum BoolKey { case first }
+
+func recognizesFirst(_ key: BoolKey) -> Bool {
+  switch key {
+  case .first: return true
+  case .custom: return false
+  }
+}
+
 // Look up each generated case here so this file sees the complete enum.
 func referenceSizes() -> [Int] {
   _ = NamedKey.custom
@@ -51,6 +75,8 @@ func referenceSizes() -> [Int] {
 }
 
 //--- other.swift
+func makeFirst() -> BoolKey { .first }
+
 func consumerSizes() -> [Int] {
   return [MemoryLayout<NamedKey>.size, MemoryLayout<ArbitraryKey>.size]
 }
@@ -58,3 +84,5 @@ func consumerSizes() -> [Int] {
 //--- main.swift
 // CHECK: layouts match: true
 print("layouts match: \(referenceSizes() == consumerSizes())")
+// CHECK: first preserved: true
+print("first preserved: \(recognizesFirst(makeFirst()))")

@@ -7255,9 +7255,11 @@ void EnumDecl::expandMemberMacrosForElements() const {
     return;
 
   auto &ctx = getASTContext();
-  (void)evaluateOrDefault(
-      ctx.evaluator,
-      ExpandSynthesizedMemberMacroRequest{const_cast<EnumDecl *>(this)}, {});
+  auto request = ExpandSynthesizedMemberMacroRequest{const_cast<EnumDecl *>(this)};
+  // Conformance lookup during expansion can inspect this enum's elements.
+  // Only the members available so far can be observed by the expansion itself.
+  if (!ctx.evaluator.hasActiveRequest(request))
+    (void)evaluateOrDefault(ctx.evaluator, request, {});
 }
 
 Type EnumDecl::getRawType() const {
