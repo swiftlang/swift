@@ -1481,6 +1481,10 @@ private:
   SmallVector<ProtocolDecl *, 4> SwiftProtocols;
   /// List of protocol conformances to generate descriptors for.
   std::vector<ConformanceDescription> ProtocolConformances;
+
+  /// Additional conformance descriptors, for the conformances of
+  /// back-deployed types, that refer to the defining module's type descriptor.
+  std::vector<llvm::Constant *> BackDeploymentCanonicalConformances;
   /// List of types to generate runtime-resolvable metadata records for that
   /// are consumable for any Swift runtime.
   SmallVector<GenericTypeDecl *, 4> RuntimeResolvableTypes;
@@ -1830,6 +1834,14 @@ public:
   void emitSILDifferentiabilityWitness(SILDifferentiabilityWitness *dw);
   llvm::Constant *emitFixedTypeLayout(CanType t, const FixedTypeInfo &ti);
   void emitProtocolConformance(const ConformanceDescription &record);
+  /// Get a slot holding a weak reference to the type context descriptor of a
+  /// back-deployed type in its defining module, as opposed to this module's
+  /// copy of it. The slot is null when that module doesn't provide the type at
+  /// runtime.
+  llvm::Constant *getAddrOfDefiningModuleTypeDescriptorSlot(
+      NominalTypeDecl *decl);
+  llvm::Constant *
+  emitCanonicalTypeProtocolConformance(const ConformanceDescription &record);
   void emitNestedTypeDecls(DeclRange members);
   void emitClangDecl(const clang::Decl *decl);
 

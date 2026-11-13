@@ -29,22 +29,23 @@
 import MyKit
 
 // The type's metadata and its conformances are emitted with non-unique,
-// hidden linkage.
+// hidden linkage. The copy of the descriptor has a distinct name, so that it
+// can refer to MyKit's by its usual name.
 // CHECK-DAG: @"$s5MyKit5PointVSQAAMc" = linkonce_odr hidden constant
-// CHECK-DAG: @"$s5MyKit5PointVMn" = linkonce_odr hidden constant
+// CHECK-DAG: @"$s5MyKit5PointVMnTwa" = linkonce_odr hidden constant
 // CHECK-DAG: @"$s5MyKit5PointVMf" = linkonce_odr hidden constant
 // CHECK-DAG: @"$s5MyKit5PointVMF" = linkonce_odr hidden constant
 // CHECK-DAG: @"__swift_back_deployment_anchor_$s5MyKit5PointVMn" = private global
 
 // It has records for the type and conformance, which reference them
 // directly.
-// CHECK-DAG: @"$s5MyKit5PointVHn" = private constant %swift.type_metadata_record { i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s5MyKit5PointVMn" to i64)
+// CHECK-DAG: @"$s5MyKit5PointVHn" = private constant %swift.type_metadata_record { i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s5MyKit5PointVMnTwa" to i64)
 // CHECK-DAG: @"$s5MyKit5PointVSQAAHc" = private constant i32 trunc (i64 sub (i64 ptrtoint (ptr @"$s5MyKit5PointVSQAAMc" to i64)
 
 // A type nested in a back-deployed type is emitted the same way, along with
 // the type descriptor of its parent.
-// CHECK-DAG: @"$s5MyKit5OuterV5InnerVMn" = linkonce_odr hidden constant
-// CHECK-DAG: @"$s5MyKit5OuterVMn" = linkonce_odr hidden constant
+// CHECK-DAG: @"$s5MyKit5OuterV5InnerVMnTwa" = linkonce_odr hidden constant
+// CHECK-DAG: @"$s5MyKit5OuterVMnTwa" = linkonce_odr hidden constant
 // CHECK-DAG: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s5MyKit5OuterV5InnerVMaTwa"(i64 %0)
 
 // CHECK-DAG: define linkonce_odr hidden swiftcc %swift.metadata_response @"$s5MyKit5PointVMaTwa"(i64 %0)

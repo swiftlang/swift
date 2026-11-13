@@ -3920,11 +3920,15 @@ llvm::Function *IRGenModule::getAddrOfSILFunction(
 
 static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
                                                  llvm::Constant *global,
-                                                 LinkEntity entity)
+                                                 LinkEntity entity,
+                                                 StringRef name = "")
 {
   // Determine the name of this entity.
   llvm::SmallString<64> globalName;
-  entity.mangle(IGM.Context, globalName);
+  if (name.empty())
+    entity.mangle(IGM.Context, globalName);
+  else
+    globalName = name;
 
   if (IGM.Triple.getObjectFormat() == llvm::Triple::COFF) {
     if (cast<llvm::GlobalValue>(global)->hasDLLImportStorageClass()) {
@@ -4007,6 +4011,25 @@ llvm::Constant *IRGenModule::getOrCreateGOTEquivalent(llvm::Constant *global,
   auto gotEquivalent = createGOTEquivalent(*this, global, entity);
   gotEntry = gotEquivalent;
   return gotEquivalent;
+}
+
+llvm::Constant *
+IRGenModule::getAddrOfDefiningModuleTypeDescriptorSlot(NominalTypeDecl *decl) {
+  // This module's copy of the descriptor has a different name.
+  auto name = IRGenMangler(Context).mangleNominalTypeDescriptor(decl);
+  auto *descriptor = Module.getNamedGlobal(name);
+  if (!descriptor)
+    descriptor = new llvm::GlobalVariable(Module, TypeContextDescriptorTy,
+                                          /*isConstant*/ true,
+                                          llvm::GlobalValue::ExternalWeakLinkage,
+                                          /*initializer*/ nullptr, name);
+
+  if (auto *existing = Module.getNamedGlobal("got." + name))
+    return existing;
+
+  // The slot's entity is only used to decide how to sign the descriptor.
+  return createGOTEquivalent(*this, descriptor,
+                             LinkEntity::forNominalTypeDescriptor(decl), name);
 }
 
 static llvm::Constant *getElementBitCast(IRGenModule &IGM,
@@ -4706,6 +4729,9 @@ void IRGenModule::addProtocolConformance(ConformanceDescription &&record) {
   emitProtocolConformance(record);
 
   if (conformanceIsVisibleViaMetadata(record.conformance)) {
+    if (auto *canonical = emitCanonicalTypeProtocolConformance(record))
+      BackDeploymentCanonicalConformances.push_back(canonical);
+
     // Add this conformance to the conformance list.
     ProtocolConformances.push_back(std::move(record));
   }
@@ -4787,6 +4813,8 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
         getAddrOfLLVMVariable(entity, ConstantInit(), DebugTypeInfo());
       descriptorArray.addRelativeAddress(descriptor);
     }
+    for (auto *descriptor : BackDeploymentCanonicalConformances)
+      descriptorArray.addRelativeAddress(descriptor);
 
     // Define the global variable for the conformance list.
     // FIXME: This needs to be a linker-local symbol in order for Darwin ld to
@@ -4830,6 +4858,18 @@ llvm::Constant *IRGenModule::emitProtocolConformances(bool asContiguousArray) {
       // or type (from the conformance) is not referenced.
       appendLLVMUsedConditionalEntry(var, record.conformance);
     }
+  }
+
+  for (auto *descriptor : BackDeploymentCanonicalConformances) {
+    auto var = new llvm::GlobalVariable(
+        Module, RelativeAddressTy, /*isConstant*/ true,
+        llvm::GlobalValue::PrivateLinkage, /*initializer*/ nullptr,
+        "record_" + descriptor->getName());
+    var->setInitializer(emitDirectRelativeReference(descriptor, var, {}));
+    var->setSection(sectionName);
+    var->setAlignment(llvm::MaybeAlign(4));
+    disableAddressSanitizer(*this, var);
+    addUsedGlobal(var);
   }
 
   return nullptr;

@@ -215,6 +215,13 @@ public:
     return mangleNominalTypeSymbol(Decl, "Mn");
   }
 
+  /// A module's copy of the type descriptor for a back-deployed type from
+  /// another module.
+  std::string
+  mangleBackDeploymentCopyNominalTypeDescriptor(const NominalTypeDecl *Decl) {
+    return mangleNominalTypeSymbol(Decl, "MnTwa");
+  }
+
   std::string mangleNominalTypeDescriptorRecord(const NominalTypeDecl *Decl) {
     return mangleNominalTypeSymbol(Decl, "Hn");
   }

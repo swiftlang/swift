@@ -2468,6 +2468,12 @@ private:
           if (!demangledRoot || demangledRoot->getKind() != Node::Kind::Global)
             return std::nullopt;
           auto nomTypeDescriptorRoot = demangledRoot->getChild(0);
+          // A module's copy of a back-deployed type's descriptor is prefixed
+          // with a marker node.
+          if (nomTypeDescriptorRoot &&
+              nomTypeDescriptorRoot->getKind() ==
+                  Node::Kind::BackDeploymentCopy)
+            nomTypeDescriptorRoot = demangledRoot->getChild(1);
           if (!nomTypeDescriptorRoot || nomTypeDescriptorRoot->getKind() !=
                                             Node::Kind::NominalTypeDescriptor)
             return std::nullopt;
