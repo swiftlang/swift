@@ -827,6 +827,24 @@ SILLayout *ModuleFile::readSILLayout(llvm::BitstreamCursor &Cursor) {
   }
 }
 
+Expected<SILLayout *> ModuleFile::getSILLayoutChecked(SILLayoutID ID) {
+  assert(ID > 0 && ID <= SILLayouts.size() && "invalid SIL layout ID");
+
+  auto &layoutOrOffset = SILLayouts[ID - 1];
+  if (layoutOrOffset.isComplete())
+    return layoutOrOffset;
+
+  BCOffsetRAII saveOffset(DeclTypeCursor);
+  if (auto error =
+          diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(layoutOrOffset)))
+    return std::move(error);
+  auto layout = readSILLayout(DeclTypeCursor);
+  if (!layout)
+    return diagnoseFatal();
+  layoutOrOffset = layout;
+  return layout;
+}
+
 namespace swift {
 class ProtocolConformanceDeserializer {
   ModuleFile &MF;
@@ -4223,7 +4241,7 @@ public:
 
       return llvm::make_error<OverrideError>(
           name, getErrorFlags(), numVTableEntries,
-          memberAbstractTypeLayoutID);
+          memberAbstractTypeLayoutID, interfaceTypeID);
     }
 
     // Extract the accessor IDs.
@@ -4242,7 +4260,7 @@ public:
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
             getErrorFlags(), numVTableEntries,
-            memberAbstractTypeLayoutID);
+            memberAbstractTypeLayoutID, interfaceTypeID);
       }
     }
 
@@ -4268,7 +4286,7 @@ public:
       return llvm::make_error<TypeError>(
           name, takeErrorInfo(interfaceTypeOrError.takeError()),
           getErrorFlags(), numVTableEntries,
-          memberAbstractTypeLayoutID);
+          memberAbstractTypeLayoutID, interfaceTypeID);
     Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
@@ -6181,9 +6199,10 @@ class SerializableTypeInfoReader {
               field.storage.Begin, field.storage.End))
         return false;
       if (fieldTypeID) {
+        field.serializedType = {&MF, fieldTypeID};
         auto fieldType = MF.getTypeChecked(fieldTypeID);
         if (fieldType)
-          field.type = *fieldType;
+          field.resolvedType = *fieldType;
         else
           llvm::consumeError(fieldType.takeError());
       }
@@ -6408,15 +6427,18 @@ ModuleFile::getAbstractMemberTypeLayout(MemberAbstractTypeLayoutID ID) {
   return layout;
 }
 
-llvm::Expected<Type>
-ModuleFile::getAbstractMemberType(MemberAbstractTypeLayoutID ID) {
-  auto layout = getAbstractMemberTypeLayout(ID);
-  if (!layout)
-    return layout.takeError();
+BitOffset ModuleFile::getSerializedTypeOffset(TypeID ID) const {
+  assert(ID && ID <= Core->Types.size() && "invalid serialized type ID");
+  return BitOffset(Core->Types[ID - 1]);
+}
 
-  Type type = HiddenType::get(getContext(), layout.get(), CanType());
-  getContext().recordRecoveredHiddenType(type->getCanonicalType());
-  return type;
+BitOffset ModuleFile::getSerializedDeclOffset(DeclID ID) const {
+  assert(ID && ID <= Core->Decls.size() && "invalid serialized decl ID");
+  return BitOffset(Core->Decls[ID - 1]);
+}
+
+llvm::BitstreamCursor ModuleFile::getDeclTypeCursorForReplay() const {
+  return Core->DeclTypeCursor;
 }
 
 static std::optional<AvailabilityDomainKind>
@@ -8707,28 +8729,7 @@ Expected<Type> DESERIALIZE_TYPE(SIL_BOX_TYPE)(
   SubstitutionMapID subMapID;
   decls_block::SILBoxTypeLayout::readRecord(scratch, layoutID, subMapID);
 
-  // Get the layout.
-  auto getLayout = [&MF](SILLayoutID layoutID) -> Expected<SILLayout *> {
-    assert(layoutID > 0 && layoutID <= MF.SILLayouts.size() &&
-           "invalid layout ID");
-
-    auto &layoutOrOffset = MF.SILLayouts[layoutID - 1];
-    if (layoutOrOffset.isComplete()) {
-      return layoutOrOffset;
-    }
-
-    BCOffsetRAII saveOffset(MF.DeclTypeCursor);
-    if (auto error = MF.diagnoseFatalIfNotSuccess(
-            MF.DeclTypeCursor.JumpToBit(layoutOrOffset)))
-      return std::move(error);
-    auto layout = MF.readSILLayout(MF.DeclTypeCursor);
-    if (!layout)
-      return MF.diagnoseFatal();
-    layoutOrOffset = layout;
-    return layout;
-  };
-
-  auto layout = getLayout(layoutID);
+  auto layout = MF.getSILLayoutChecked(layoutID);
   if (!layout)
     return layout.takeError();
   if (!*layout)
@@ -9418,6 +9419,8 @@ Decl *ModuleFile::handleErrorAndSupplyMissingClassMember(
       if (!layout)
         fatal(layout.takeError());
       storageLayout = layout.get();
+      if (auto typeID = error.getMemberTypeID())
+        storageLayout->serializedType = {this, typeID};
     }
 
     suppliedMissingMember = MissingMemberDecl::create(
@@ -9497,6 +9500,8 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
         auto layout = getAbstractMemberTypeLayout(layoutID);
         if (!layout)
           fatal(layout.takeError());
+        if (auto typeID = declError->getMemberTypeID())
+          layout.get()->serializedType = {this, typeID};
         bool hasStorage = false;
         if (isa<StructDecl>(container)) {
           hasStorage = declError->needsFieldOffsetVectorEntry();
