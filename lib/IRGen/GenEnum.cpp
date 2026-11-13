@@ -164,7 +164,7 @@ createMissingEnumElementForLayout(IRGenModule &IGM, EnumDecl *enumDecl,
   auto *element = new (ctx) EnumElementDecl(
       SourceLoc(), missing->getName(), nullptr, SourceLoc(), nullptr, enumDecl);
 
-  Type payloadType = HiddenType::get(ctx, missing->getStorageLayout(), CanType());
+  Type payloadType = HiddenType::get(ctx, missing->getStorageLayout());
   auto argumentNames = missing->getName().getArgumentNames();
   unsigned parameterCount = std::max<unsigned>(1, argumentNames.size());
   SmallVector<ParamDecl *, 2> parameters;

@@ -552,8 +552,7 @@ SILType SILType::getFieldType(MissingMemberDecl *field) const {
   assert(field->getStorageLayout() &&
          "missing field must have a storage layout");
   auto loweredTy =
-      HiddenType::get(field->getASTContext(), field->getStorageLayout(),
-                      CanType())
+      HiddenType::get(field->getASTContext(), field->getStorageLayout())
           ->getCanonicalType();
 
   return formFieldType(*this, loweredTy);

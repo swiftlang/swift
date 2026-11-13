@@ -172,7 +172,6 @@ public:
   UNREACHABLE(GenericTypeParam);
   UNREACHABLE(Param);
   UNREACHABLE(FileDefault);
-  UNREACHABLE(HiddenTypeLayoutInfo);
 
 #undef UNREACHABLE
 

@@ -5912,7 +5912,6 @@ getMemberIsolationPropagation(const ValueDecl *value) {
   case DeclKind::Macro:
   case DeclKind::MacroExpansion:
   case DeclKind::FileDefault:
-  case DeclKind::HiddenTypeLayoutInfo:
     return std::nullopt;
 
   case DeclKind::PatternBinding:
@@ -8816,9 +8815,6 @@ static bool isNonValueReference(const ValueDecl *value) {
   case DeclKind::Subscript:
   case DeclKind::Macro:
     return false;
-
-  case DeclKind::HiddenTypeLayoutInfo:
-    llvm_unreachable("hidden layout declarations are not value references");
 
   case DeclKind::BuiltinTuple:
     llvm_unreachable("BuiltinTupleDecl should not show up here");

@@ -4177,22 +4177,18 @@ StringRef HiddenType::getMangledName() const {
   return Layout->mangledName;
 }
 
-HiddenType *HiddenType::get(const ASTContext &ctx, AbstractTypeLayout *layout,
-                            CanType parent,
-                            HiddenTypeLayoutInfoDecl *legacyLayoutInfoDecl) {
+HiddenType *HiddenType::get(const ASTContext &ctx,
+                            AbstractTypeLayout *layout) {
   assert(layout && "HiddenType requires an abstract layout");
   llvm::FoldingSetNodeID id;
-  HiddenType::Profile(id, layout, parent);
+  HiddenType::Profile(id, layout);
 
   llvm::FoldingSetInsertToken insertToken;
-  if (auto *hidden = ctx.getImpl().HiddenTypes.lookup(id, insertToken)) {
-    if (!hidden->LegacyLayoutInfoDecl)
-      hidden->LegacyLayoutInfoDecl = legacyLayoutInfoDecl;
+  if (auto *hidden = ctx.getImpl().HiddenTypes.lookup(id, insertToken))
     return hidden;
-  }
 
-  auto *hidden = new (ctx, AllocationArena::Permanent)
-      HiddenType(layout, legacyLayoutInfoDecl, parent, ctx);
+  auto *hidden =
+      new (ctx, AllocationArena::Permanent) HiddenType(layout, ctx);
 
   ctx.getImpl().HiddenTypes.insert(hidden, insertToken);
   return hidden;

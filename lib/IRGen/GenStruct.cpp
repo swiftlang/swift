@@ -135,8 +135,7 @@ namespace {
       if (Field)
         return Field->getInterfaceType();
       if (MissingMember)
-        return HiddenType::get(IGM.Context, MissingMember->getStorageLayout(),
-                               CanType());
+        return HiddenType::get(IGM.Context, MissingMember->getStorageLayout());
       return Type();
     }
   };

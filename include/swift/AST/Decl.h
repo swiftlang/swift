@@ -10465,30 +10465,6 @@ public:
   }
 };
 
-/// Represents a type whose definition could not be resolved, but for which
-/// serialized layout information is available.
-class HiddenTypeLayoutInfoDecl final : public TypeDecl {
-  explicit HiddenTypeLayoutInfoDecl(DeclContext *DC)
-      : TypeDecl(DeclKind::HiddenTypeLayoutInfo, DC, Identifier(), SourceLoc(),
-                 {}) {
-    setImplicit();
-  }
-
-public:
-  AbstractTypeLayout *Layout = nullptr;
-  TypeDecl *ParentDecl = nullptr;
-
-  SourceLoc getLocFromSource() const { return SourceLoc(); }
-
-  static HiddenTypeLayoutInfoDecl *create(ASTContext &ctx, DeclContext *DC);
-
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::HiddenTypeLayoutInfo;
-  }
-};
-
 /// FileDefaultDecl - This represents a single `default` declaration, e.g.:
 ///   default @MainActor
 class FileDefaultDecl : public Decl {
