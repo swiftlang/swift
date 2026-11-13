@@ -1124,6 +1124,10 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
         assert(blobData.empty());
         allocateBuffer(HiddenTypeLayoutInfoDecls, scratch);
         break;
+      case index_block::ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS:
+        assert(blobData.empty());
+        allocateBuffer(AbstractMemberTypeLayouts, scratch);
+        break;
       case index_block::HIDDEN_TYPE_FALLBACK_TABLE:
         assert(blobData.empty());
         allocateBuffer(HiddenTypeFallbackTableData, scratch);

@@ -931,6 +931,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
+  BLOCK_RECORD(index_block, ABSTRACT_MEMBER_TYPE_LAYOUT_OFFSETS);
   BLOCK_RECORD(index_block, HIDDEN_TYPE_LAYOUT_INFORMATION_RECORD_OFFSETS);
   BLOCK_RECORD(index_block, HIDDEN_TYPE_FALLBACK_TABLE);
   BLOCK_RECORD(index_block, PRECEDENCE_GROUPS);
@@ -5033,6 +5034,9 @@ public:
                           accessors.ReadWriteImpl,
                           accessors.Decls.size(),
                           S.addTypeRef(ty),
+                          S.AbstractMemberTypeLayoutsToSerialize.hasRef(var)
+                              ? S.AbstractMemberTypeLayoutsToSerialize.addRef(var)
+                              : MemberAbstractTypeLayoutID(),
                           var->isImplicitlyUnwrappedOptional(),
                           S.addDeclRef(var->getOverriddenDecl()),
                           rawAccessLevel, rawSetterAccessLevel,
@@ -5345,6 +5349,11 @@ public:
                                   contextID.getOpaqueValue(),
                                   elem->isImplicit(),
                                   elem->hasAssociatedValues(),
+                                  S.AbstractMemberTypeLayoutsToSerialize.hasRef(
+                                      elem)
+                                      ? S.AbstractMemberTypeLayoutsToSerialize
+                                            .addRef(elem)
+                                      : MemberAbstractTypeLayoutID(),
                                   (unsigned)rawValueKind,
                                   isRawValueImplicit,
                                   isNegative,
@@ -6933,46 +6942,59 @@ IRABIDetailsProvider &Serializer::getLayoutProvider() {
   return *LayoutProvider;
 }
 
-void Serializer::writeHiddenTypeLayout(const Decl *decl) {
+void Serializer::writeAbstractTypeLayout(DeclID parentDeclID,
+                                         const AbstractTypeLayout &layout) {
   using namespace decls_block;
 
+  if (!layout.typeInfoRepresentation)
+    llvm::report_fatal_error(
+        "abstract type layout has no serializable TypeInfo representation");
+
+  auto mangledNameID = addUniquedString(layout.mangledName).second;
+  unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
+  HiddenTypeLayoutInfoLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, mangledNameID, parentDeclID,
+      encodeReferenceCounting(layout.referenceCountingSystem));
+
+  const auto &properties = layout.typeProperties;
+  abbrCode = DeclTypeAbbrCodes[SerializableSILTypePropertiesLayout::Code];
+  SerializableSILTypePropertiesLayout::emitRecord(
+      Out, ScratchRecord, abbrCode, properties.Flags);
+
+  writeSerializableTypeInfo(*layout.typeInfoRepresentation);
+}
+
+void Serializer::writeHiddenTypeLayout(const Decl *decl) {
   AbstractTypeLayout computedLayout;
   const AbstractTypeLayout *layout;
-  std::string mangledName;
   if (auto *hidden = dyn_cast<HiddenTypeLayoutInfoDecl>(decl)) {
     if (!hidden->Layout)
       llvm::report_fatal_error(
           "hidden type declaration has no abstract layout");
     layout = hidden->Layout;
   } else if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    computedLayout = getLayoutProvider().getAbstractTypeLayout(nominal);
+    computedLayout = getLayoutProvider().getAbstractTypeLayout(
+        nominal->getDeclaredTypeInContext());
     layout = &computedLayout;
   } else {
     llvm::report_fatal_error(
         "cannot serialize a hidden layout for a non-type declaration");
   }
 
-  if (!layout->typeInfoRepresentation)
-    llvm::report_fatal_error(
-        "abstract type layout has no serializable TypeInfo representation");
-
-  mangledName = layout->mangledName;
-
-  auto mangledNameID = addUniquedString(mangledName).second;
   auto *parentDecl = getHiddenTypeLayoutDeclParentDecl(decl);
   auto parentDeclID = parentDecl ? addDeclRef(parentDecl) : DeclID();
+  writeAbstractTypeLayout(parentDeclID, *layout);
+}
 
-  unsigned abbrCode = DeclTypeAbbrCodes[HiddenTypeLayoutInfoLayout::Code];
-  HiddenTypeLayoutInfoLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, mangledNameID, parentDeclID,
-      encodeReferenceCounting(layout->referenceCountingSystem));
-
-  const auto &properties = layout->typeProperties;
-  abbrCode = DeclTypeAbbrCodes[SerializableSILTypePropertiesLayout::Code];
-  SerializableSILTypePropertiesLayout::emitRecord(
-      Out, ScratchRecord, abbrCode, properties.Flags);
-
-  writeSerializableTypeInfo(*layout->typeInfoRepresentation);
+void Serializer::writeAbstractMemberTypeLayout(const Decl *decl) {
+  Type type;
+  if (auto *var = dyn_cast<VarDecl>(decl)) {
+    type = var->getInterfaceType();
+  } else {
+    type = cast<EnumElementDecl>(decl)->getPayloadInterfaceType();
+  }
+  auto layout = getLayoutProvider().getAbstractTypeLayout(type);
+  writeAbstractTypeLayout(DeclID(), layout);
 }
 
 void Serializer::writeAllDeclsAndTypes() {
@@ -7154,8 +7176,19 @@ void Serializer::writeAllDeclsAndTypes() {
     wroteSomething |=
         writeASTBlockEntitiesIfNeeded(PackConformancesToSerialize);
     wroteSomething |= writeASTBlockEntitiesIfNeeded(SILLayoutsToSerialize);
+    wroteSomething |= writeAbstractMemberTypeLayoutsIfNeeded();
     wroteSomething |= writeHiddenTypeLayoutInformationIfNeeded();
   } while (wroteSomething);
+}
+
+bool Serializer::writeAbstractMemberTypeLayoutsIfNeeded() {
+  if (!AbstractMemberTypeLayoutsToSerialize.hasMoreToSerialize())
+    return false;
+
+  while (auto next = AbstractMemberTypeLayoutsToSerialize.popNext(
+             Out.GetCurrentBitNo()))
+    writeAbstractMemberTypeLayout(next.value());
+  return true;
 }
 
 bool Serializer::writeHiddenTypeLayoutInformationIfNeeded() {
@@ -7647,6 +7680,13 @@ bool Serializer::scheduleHiddenTypeLayoutSerialization(const Decl *D) {
   return true;
 }
 
+bool Serializer::scheduleAbstractMemberTypeLayoutSerialization(const Decl *D) {
+  if (AbstractMemberTypeLayoutsToSerialize.hasRef(D))
+    return false;
+  AbstractMemberTypeLayoutsToSerialize.addRef(D);
+  return true;
+}
+
 void Serializer::handleHiddenTypeLayoutRequirement(
     const HiddenTypeLayoutRequirement &requirement) {
   if (!scheduleHiddenTypeLayoutSerialization(requirement.LayoutDecl) ||
@@ -7865,6 +7905,7 @@ void Serializer::writeAST(ModuleOrSourceFile DC) {
     writeOffsets(Offsets, AbstractConformancesToSerialize);
     writeOffsets(Offsets, PackConformancesToSerialize);
     writeOffsets(Offsets, SILLayoutsToSerialize);
+    writeOffsets(Offsets, AbstractMemberTypeLayoutsToSerialize);
     writeOffsets(Offsets, HiddenTypeLayoutsToSerialize);
 
     SmallVector<uint32_t, 32> fallbackPairs;

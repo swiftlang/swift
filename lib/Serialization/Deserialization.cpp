@@ -4170,6 +4170,7 @@ public:
     uint8_t readImpl, writeImpl, readWriteImpl, opaqueReadOwnership;
     uint8_t rawAccessLevel, rawSetterAccessLevel;
     TypeID interfaceTypeID;
+    MemberAbstractTypeLayoutID memberAbstractTypeLayoutID;
     bool isIUO;
     ModuleFile::AccessorRecord accessors;
     DeclID overriddenID, opaqueReturnTypeID;
@@ -4185,6 +4186,7 @@ public:
                                        readImpl, writeImpl, readWriteImpl,
                                        numAccessors,
                                        interfaceTypeID,
+                                       memberAbstractTypeLayoutID,
                                        isIUO,
                                        overriddenID,
                                        rawAccessLevel, rawSetterAccessLevel,
@@ -5337,6 +5339,7 @@ public:
                                           StringRef blobData) {
     DeclContextID contextID;
     bool isImplicit, hasPayload, isRawValueImplicit, isNegative;
+    MemberAbstractTypeLayoutID memberAbstractTypeLayoutID;
     unsigned rawValueKindID;
     IdentifierID rawValueData;
     unsigned numArgNames;
@@ -5344,6 +5347,7 @@ public:
 
     decls_block::EnumElementLayout::readRecord(scratch, contextID,
                                                isImplicit, hasPayload,
+                                               memberAbstractTypeLayoutID,
                                                rawValueKindID,
                                                isRawValueImplicit, isNegative,
                                                rawValueData,
@@ -6301,21 +6305,12 @@ public:
 };
 } // namespace
 
-llvm::Expected<HiddenTypeLayoutInfoDecl *>
-ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
+llvm::Expected<AbstractTypeLayout *>
+ModuleFile::deserializeAbstractTypeLayout(BitOffset offset,
+                                          DeclID &parentDeclID) {
   using namespace decls_block;
-  if (!DID)
-    return nullptr;
-
-  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
-         "invalid hidden type layout decl ID");
-  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID - 1];
-  if (declOrOffset.isComplete())
-    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
-
   BCOffsetRAII restoreOffset(DeclTypeCursor);
-  if (auto error =
-          diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(declOrOffset)))
+  if (auto error = diagnoseFatalIfNotSuccess(DeclTypeCursor.JumpToBit(offset)))
     return std::move(error);
 
   SmallVector<uint64_t, 64> scratch;
@@ -6330,7 +6325,6 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
     return diagnoseFatal();
 
   IdentifierID mangledNameID;
-  DeclID parentDeclID;
   uint64_t rawReferenceCounting;
   HiddenTypeLayoutInfoLayout::readRecord(
       scratch, mangledNameID, parentDeclID, rawReferenceCounting);
@@ -6347,20 +6341,71 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
   if (!representation)
     return diagnoseFatal();
 
-  auto *decl = HiddenTypeLayoutInfoDecl::create(getContext(),
-                                                 getAssociatedModule());
-  if (parentDeclID)
-    decl->ParentDecl = dyn_cast<TypeDecl>(getDecl(parentDeclID));
-
   auto layout = std::make_unique<AbstractTypeLayout>();
   layout->mangledName = getIdentifierText(mangledNameID).str();
   layout->typeProperties = *typeProperties;
   layout->referenceCountingSystem = referenceCounting;
   layout->typeInfoRepresentation = std::move(representation);
-  decl->Layout = layout.get();
+  auto *result = layout.get();
   DeserializedHiddenTypeLayouts.push_back(std::move(layout));
+  return result;
+}
+
+llvm::Expected<HiddenTypeLayoutInfoDecl *>
+ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
+  if (!DID)
+    return nullptr;
+
+  assert(DID <= HiddenTypeLayoutInfoDecls.size() &&
+         "invalid hidden type layout decl ID");
+  auto &declOrOffset = HiddenTypeLayoutInfoDecls[DID - 1];
+  if (declOrOffset.isComplete())
+    return cast<HiddenTypeLayoutInfoDecl>(declOrOffset.get());
+
+  DeclID parentDeclID;
+  auto layout = deserializeAbstractTypeLayout(declOrOffset, parentDeclID);
+  if (!layout)
+    return layout.takeError();
+
+  auto *decl = HiddenTypeLayoutInfoDecl::create(getContext(),
+                                                 getAssociatedModule());
+  if (parentDeclID)
+    decl->ParentDecl = dyn_cast<TypeDecl>(getDecl(parentDeclID));
+  decl->Layout = layout.get();
   declOrOffset = decl;
   return decl;
+}
+
+llvm::Expected<AbstractTypeLayout *>
+ModuleFile::getAbstractMemberTypeLayout(MemberAbstractTypeLayoutID ID) {
+  if (!ID)
+    return nullptr;
+
+  assert(ID <= AbstractMemberTypeLayouts.size() &&
+         "invalid abstract member type layout ID");
+  auto &declOrOffset = AbstractMemberTypeLayouts[ID - 1];
+  if (declOrOffset.isComplete())
+    return declOrOffset.get();
+
+  DeclID parentDeclID;
+  auto layout = deserializeAbstractTypeLayout(declOrOffset, parentDeclID);
+  if (!layout)
+    return layout.takeError();
+  if (parentDeclID)
+    return diagnoseFatal();
+  declOrOffset = layout.get();
+  return layout;
+}
+
+llvm::Expected<Type>
+ModuleFile::getAbstractMemberType(MemberAbstractTypeLayoutID ID) {
+  auto layout = getAbstractMemberTypeLayout(ID);
+  if (!layout)
+    return layout.takeError();
+
+  Type type = HiddenType::get(getContext(), layout.get(), CanType());
+  getContext().recordRecoveredHiddenType(type->getCanonicalType());
+  return type;
 }
 
 static std::optional<AvailabilityDomainKind>
