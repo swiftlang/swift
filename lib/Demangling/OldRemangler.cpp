@@ -644,6 +644,12 @@ ManglingError Remangler::mangleTypeMetadataDemanglingCache(Node *node,
   return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
 }
 
+ManglingError Remangler::mangleTypeMetadataMangledNameRef(Node *node,
+                                                          unsigned depth) {
+  // not supported
+  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+}
+
 ManglingError Remangler::mangleTypeMetadataLazyCache(Node *node,
                                                      unsigned depth) {
   Buffer << "ML";

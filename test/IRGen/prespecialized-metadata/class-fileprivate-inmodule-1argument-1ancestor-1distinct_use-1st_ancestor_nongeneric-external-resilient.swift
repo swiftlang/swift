@@ -33,5 +33,5 @@ func doit() {
 doit()
 
 // CHECK-LABEL: define hidden swiftcc void @"$s4main4doityyF"()
-//       CHECK:   call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$s4main5Value{{[A-Za-z_0-9]+}}LLCySiGMD")
+//       CHECK:   call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(ptr @"$s4main5Value{{[A-Za-z_0-9]+}}LLCySiGMd", ptr @"$s4main5Value{{[A-Za-z_0-9]+}}LLCySiGMR")
 //       CHECK: }
