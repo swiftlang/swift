@@ -5405,6 +5405,19 @@ IRGenModule::getAddrOfTypeMetadataDemanglingCacheVariable(CanType type,
   return getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
 }
 
+/// Get or create a type metadata mangled name ref.  These are an
+/// implementation detail of type metadata access functions.
+llvm::Constant *
+IRGenModule::getAddrOfTypeMetadataMangledNameRef(CanType type,
+                                                 ConstantInit definition) {
+  ASSERT(!type->hasArchetype() && !type->hasTypeParameter());
+  LinkEntity entity = LinkEntity::forTypeMetadataMangledNameRef(type);
+  auto *addr = getAddrOfLLVMVariable(entity, definition, DebugTypeInfo());
+  auto var = cast<llvm::GlobalVariable>(addr);
+  var->setConstant(true);
+  return addr;
+}
+
 llvm::Constant *
 IRGenModule::getAddrOfTypeMetadataSingletonInitializationCache(
                                            NominalTypeDecl *D,
