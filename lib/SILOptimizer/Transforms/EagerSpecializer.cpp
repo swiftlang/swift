@@ -932,6 +932,11 @@ void EagerSpecializerTransform::run() {
     ReInfoVec.emplace_back(FuncBuilder.getModule().getSwiftModule(),
                            FuncBuilder.getModule().isWholeModule(), targetFunc,
                            SA->getSpecializedSignature(), SA->isExported());
+    // E.g. the function is marked never to be specialized.
+    if (!ReInfoVec.back().canBeSpecialized()) {
+      SpecializedFuncs.push_back(nullptr);
+      continue;
+    }
     unsigned numNewFunctions = newFunctions.size();
     auto *NewFunc = eagerSpecialize(FuncBuilder, targetFunc, *SA,
                                     ReInfoVec.back(), newFunctions);
