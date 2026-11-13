@@ -7,6 +7,15 @@ import Builtin
 typealias Int = Builtin.Int32
 typealias Bool = Builtin.Int1
 
+// The runtime authenticates handlers with fixed discriminators, see
+// SpecialPointerAuthDiscriminators. The compiler must sign with the same values.
+// CHECK-arm64e-DAG: @"$s8builtins30testTaskAddCancellationHandleryyYaFyyXEfU_.ptrauth" = {{.*}}, i64 3848 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins30testTaskAddCancellationHandleryyYaFyyXEfU0_TA.ptrauth" = {{.*}}, i64 3848 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins36testTaskAddPriorityEscalationHandleryyYaFys5UInt8V_ADtXEfU_.ptrauth" = {{.*}}, i64 30817 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins36testTaskAddPriorityEscalationHandleryyYaFys5UInt8V_ADtXEfU0_TA.ptrauth" = {{.*}}, i64 30817 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaFys5UInt8VXEfU_.ptrauth" = {{.*}}, i64 62877 }, section "llvm.ptrauth"
+// CHECK-arm64e-DAG: @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaFys5UInt8VXEfU0_TA.ptrauth" = {{.*}}, i64 62877 }, section "llvm.ptrauth"
+
 // CHECK: call swiftcc void @swift_errorInMain(
 
 infix operator *
@@ -1008,6 +1017,26 @@ nonisolated(nonsending) func testTaskAddPriorityEscalationHandler() async {
   }
   Builtin.taskRemovePriorityEscalationHandler(record: result2)
   Builtin.taskRemovePriorityEscalationHandler(record: result)
+}
+
+// CHECK-LABEL: define {{.*}}void @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaF"(ptr swiftasync %0, i64 %1, i64 %2)
+// CHECK: [[RESULT:%.*]] = call{{.*}} @swift_task_addCancellationHandlerWithReason(ptr @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaFys5UInt8VXEfU_{{(.ptrauth)?}}", ptr null)
+// CHECK: [[CONTEXT:%.*]] = call {{.*}}@swift_allocObject(ptr getelementptr inbounds (%swift.full_boxmetadata, ptr @metadata.6, i32 0, i32 2), i64 32, i64 7)
+// CHECK: [[RESULT_2:%.*]] = call{{.*}} @swift_task_addCancellationHandlerWithReason(ptr @"$s8builtins40testTaskAddCancellationHandlerWithReasonyyYaFys5UInt8VXEfU0_TA{{(.ptrauth)?}}", ptr [[CONTEXT]])
+// CHECK: call{{.*}} void @swift_task_removeCancellationHandler(ptr [[RESULT_2]])
+// CHECK: call{{.*}} void @swift_task_removeCancellationHandler(ptr [[RESULT]])
+// CHECK: musttail call swifttailcc void {{%.*}}(ptr swiftasync {{%.*}})
+nonisolated(nonsending) func testTaskAddCancellationHandlerWithReason() async {
+  let result = Builtin.taskAddCancellationHandlerWithReason { (reason: UInt8) in
+    _ = reason
+  }
+  let x = "123"
+  let result2 = Builtin.taskAddCancellationHandlerWithReason { (reason: UInt8) in
+    print(x)
+    _ = reason
+  }
+  Builtin.taskRemoveCancellationHandler(record: result2)
+  Builtin.taskRemoveCancellationHandler(record: result)
 }
 
 // CHECK-LABEL: define {{.*}}void @"$s8builtins22testTaskLocalValuePushyyBp_xntYalF"(ptr swiftasync %0, i64 %1, i64 %2, ptr %3, ptr noalias %4, ptr %Value)
