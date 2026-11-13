@@ -1173,9 +1173,10 @@ bb0(%0 : @owned $P):
 
 // CHECK-LABEL: sil [ossa] @f162_testOpenedArchetype :
 // CHECK:  [[STK:%.*]] = alloc_stack $Optional<@opened(2, any P) Self>
+// CHECK:   destroy_addr {{%.*}} : $*@opened(2, any P) Self
+// CHECK-NEXT:   dealloc_stack [[STK]] : $*Optional<@opened(2, any P) Self>
 // CHECK: bb6:
-// CHECK:   dealloc_stack [[STK]] : $*Optional<@opened(2, any P) Self>
-// CHECK:   br bb7
+// CHECK-NEXT:   br bb7
 // CHECK-LABEL: } // end sil function 'f162_testOpenedArchetype'
 sil [ossa] @f162_testOpenedArchetype : $@convention(thin) (@in P) -> () {
 bb0(%0 : @owned $P):
@@ -2761,11 +2762,11 @@ exit:
 // CHECK-LABEL: sil [ossa] @test_destructure_tuple_2_from_enum : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INOUT_ADDR:%[^,]+]] :
 // CHECK:         [[ORIGINAL_ADDR:%[^,]+]] = alloc_stack $PairEnum<T>
-// CHECK:         [[NEW_ADDR:%[^,]+]] = alloc_stack $PairEnum<T>
 // CHECK:         copy_addr [[INOUT_ADDR]] to [init] [[ORIGINAL_ADDR]] : $*PairEnum<T>
 // CHECK:         switch_enum_addr [[ORIGINAL_ADDR]] : $*PairEnum<T>
 // CHECK:       bb1:
 // CHECK:         [[ORIGINAL_PAYLOAD_ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ORIGINAL_ADDR]]
+// CHECK:         [[NEW_ADDR:%[^,]+]] = alloc_stack $PairEnum<T>
 // CHECK:         [[NEW_PAYLOAD_ADDR:%[^,]+]] = init_enum_data_addr [[NEW_ADDR]]
 // CHECK:         [[NEW_FIRST_ADDR:%[^,]+]] = tuple_element_addr [[NEW_PAYLOAD_ADDR]] {{.*}}, 0
 // CHECK:         [[ORIGINAL_FIRST_ADDR:%[^,]+]] = tuple_element_addr [[ORIGINAL_PAYLOAD_ADDR]] {{.*}}, 0
@@ -3374,7 +3375,6 @@ entry:
 
 // CHECK-LABEL: sil [ossa] @test_struct_1_two_use_projections : {{.*}} {
 // CHECK:         [[S_ADDR:%[^,]+]] = alloc_stack $Box<T>                        
-// CHECK:         [[S2_ADDR:%[^,]+]] = alloc_stack $Box<T>                        
 // CHECK:         [[S_FIELD_ADDR:%[^,]+]] = struct_element_addr [[S_ADDR]] : $*Box<T>, #Box.t  
 // CHECK:         apply undef<T>([[S_FIELD_ADDR]])
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]                         
@@ -3382,12 +3382,13 @@ entry:
 // CHECK:         destroy_addr [[S_ADDR]] : $*Box<T>                      
 // CHECK:         br [[EXIT:bb[0-9]+]]                                          
 // CHECK:       [[LEFT]]:                                              
+// CHECK:         [[S2_ADDR:%[^,]+]] = alloc_stack $Box<T>                        
 // CHECK:         [[S2_FIELD_ADDR:%[^,]+]] = struct_element_addr [[S2_ADDR]] : $*Box<T>, #Box.t  
 // CHECK:         copy_addr [take] [[S_FIELD_ADDR]] to [init] [[S2_FIELD_ADDR]]
 // CHECK:         destroy_addr [[S2_ADDR]] : $*Box<T>                      
+// CHECK:         dealloc_stack [[S2_ADDR]] : $*Box<T>                     
 // CHECK:         br [[EXIT]]                                          
 // CHECK:       [[EXIT]]:                                              
-// CHECK:         dealloc_stack [[S2_ADDR]] : $*Box<T>                     
 // CHECK:         dealloc_stack [[S_ADDR]] : $*Box<T>                     
 // CHECK-LABEL: } // end sil function 'test_struct_1_two_use_projections'
 sil [ossa] @test_struct_1_two_use_projections : $@convention(thin) <T> () -> () {
@@ -4023,4 +4024,133 @@ bb2:
 bb3:
   %8 = tuple ()
   return %8 : $()
+}
+
+// The variable takes the payload into its own storage before the copied enum's
+// source is overwritten.
+// CHECK-LABEL: sil [ossa] @zzcVarBindsPayloadOfCopy : $@convention(thin) <T> (@inout Optional<T>) -> () {
+// CHECK:       bb0(%0 : $*Optional<T>):
+// CHECK-NEXT:    [[COPY:%[^ ]+]] = alloc_stack $Optional<T>
+// CHECK-NEXT:    copy_addr %0 to [init] [[COPY]] : $*Optional<T>
+// CHECK-NEXT:    switch_enum_addr [[COPY]] : $*Optional<T>, case #Optional.some!enumelt: [[SOME:bb[0-9]+]]
+// CHECK:       [[SOME]]:
+// CHECK-NEXT:    [[VAR:%[^ ]+]] = alloc_stack [lexical] $T
+// CHECK:         [[PAYLOAD:%[^ ]+]] = unchecked_inplace_enum_data_addr [[COPY]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK-NEXT:    copy_addr [take] [[PAYLOAD]] to [init] [[VAR]] : $*T
+// CHECK:         copy_addr [take] {{%[^ ]+}} to %0 : $*Optional<T>
+// CHECK:         apply {{%[^ ]+}}<T>([[VAR]])
+// CHECK-LABEL: } // end sil function 'zzcVarBindsPayloadOfCopy'
+sil [ossa] @zzcVarBindsPayloadOfCopy : $@convention(thin) <T> (@inout Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  %1 = load [copy] %0 : $*Optional<T>
+  switch_enum %1 : $Optional<T>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
+
+bb1:
+  br bb3
+
+bb2(%4 : @owned $T):
+  %5 = move_value [lexical] [var_decl] %4 : $T
+  %6 = enum $Optional<T>, #Optional.none!enumelt
+  store %6 to [assign] %0 : $*Optional<T>
+  %8 = function_ref @sink : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %9 = apply %8<T>(%5) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  destroy_value %5 : $T
+  br bb3
+
+bb3:
+  %12 = tuple ()
+  return %12 : $()
+}
+
+// The enum's storage is allocated and deallocated in the block that stores it.
+// CHECK-LABEL: sil [ossa] @zzdStoreEnumInBranch : $@convention(thin) <T> (@inout Optional<T>) -> () {
+// CHECK:       bb0(%0 : $*Optional<T>):
+// CHECK-NEXT:    cond_br undef, [[STORE:bb[0-9]+]], {{bb[0-9]+}}
+// CHECK:       [[STORE]]:
+// CHECK-NEXT:    [[ENUM:%[^ ]+]] = alloc_stack $Optional<T>
+// CHECK-NEXT:    [[DATA:%[^ ]+]] = init_enum_data_addr [[ENUM]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK-NEXT:    apply undef<T>([[DATA]])
+// CHECK-NEXT:    inject_enum_addr [[ENUM]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK-NEXT:    copy_addr [take] [[ENUM]] to %0 : $*Optional<T>
+// CHECK-NEXT:    dealloc_stack [[ENUM]] : $*Optional<T>
+// CHECK-NEXT:    br
+// CHECK-LABEL: } // end sil function 'zzdStoreEnumInBranch'
+sil [ossa] @zzdStoreEnumInBranch : $@convention(thin) <T> (@inout Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = apply undef<T>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %3 = enum $Optional<T>, #Optional.some!enumelt, %2 : $T
+  store %3 to [assign] %0 : $*Optional<T>
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// The enum is destroyed before `unreachable`, so its storage is freed in that
+// block too.
+// CHECK-LABEL: sil [ossa] @zzeEnumBeforeUnreachable : $@convention(thin) <T> (@in_guaranteed T) -> () {
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NEXT:    cond_br undef, [[DEAD:bb[0-9]+]], {{bb[0-9]+}}
+// CHECK:       [[DEAD]]:
+// CHECK-NEXT:    [[ENUM:%[^ ]+]] = alloc_stack $Optional<T>
+// CHECK:         apply undef<T>([[ENUM]])
+// CHECK-NEXT:    destroy_addr [[ENUM]] : $*Optional<T>
+// CHECK-NEXT:    dealloc_stack [[ENUM]] : $*Optional<T>
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'zzeEnumBeforeUnreachable'
+sil [ossa] @zzeEnumBeforeUnreachable : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = copy_value %0 : $T
+  %3 = enum $Optional<T>, #Optional.some!enumelt, %2 : $T
+  %4 = apply undef<T>(%3) : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>) -> ()
+  destroy_value [dead_end] %3 : $Optional<T>
+  unreachable
+
+bb2:
+  %7 = tuple ()
+  return %7 : $()
+}
+
+// The enum's address escapes, so its storage is not confined to the block that
+// uses it.
+// CHECK-LABEL: sil [ossa] @zzfEscapedEnumInBranch : $@convention(thin) <T> (@inout Optional<T>) -> () {
+// CHECK:       bb0(%0 : $*Optional<T>):
+// CHECK-NEXT:    [[ENUM:%[^ ]+]] = alloc_stack $Optional<T>
+// CHECK-NEXT:    cond_br undef, [[STORE:bb[0-9]+]], {{bb[0-9]+}}
+// CHECK:       [[STORE]]:
+// CHECK:         address_to_pointer [stack_protection] [[ENUM]] : $*Optional<T> to $Builtin.RawPointer
+// CHECK:         copy_addr [take] [[ENUM]] to %0 : $*Optional<T>
+// CHECK-NEXT:    br [[EXIT:bb[0-9]+]]
+// CHECK:       [[EXIT]]:
+// CHECK-NEXT:    tuple ()
+// CHECK-NEXT:    dealloc_stack [[ENUM]] : $*Optional<T>
+// CHECK-LABEL: } // end sil function 'zzfEscapedEnumInBranch'
+sil [ossa] @zzfEscapedEnumInBranch : $@convention(thin) <T> (@inout Optional<T>) -> () {
+bb0(%0 : $*Optional<T>):
+  cond_br undef, bb1, bb2
+
+bb1:
+  %2 = apply undef<T>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %3 = enum $Optional<T>, #Optional.some!enumelt, %2 : $T
+  %4 = builtin "addressOfBorrowOpaque"<Optional<T>>(%3 : $Optional<T>) : $Builtin.RawPointer
+  %5 = apply undef(%4) : $@convention(thin) (Builtin.RawPointer) -> ()
+  store %3 to [assign] %0 : $*Optional<T>
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %9 = tuple ()
+  return %9 : $()
 }
