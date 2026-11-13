@@ -230,6 +230,7 @@ extension Value {
   func lookThroughOwnedConvertibaleForwardingChain() -> Value {
     if let singleUse = uses.ignore(usersOfType: EndBorrowInst.self).ignoreDebugUses.ignoreTypeDependence.singleUse,
        let fwdInst = singleUse.instruction as? (SingleValueInstruction & ForwardingInstruction),
+       fwdInst.ownership != .none,
        fwdInst.canConvertToOwned,
        fwdInst.isSingleForwardedOperand(singleUse),
        fwdInst.parentBlock == parentBlock
@@ -308,8 +309,11 @@ func replaceGuaranteed(value: SingleValueInstruction, withOwnedValue ownedValue:
       result = replaceGuaranteed(value: sei, withOwnedValue: dsi.results[sei.fieldIndex], context)
       context.erase(instruction: sei)
     case let fwdInst as (SingleValueInstruction & ForwardingInstruction) where
-         fwdInst.isSingleForwardedOperand(use):
-      // Other forwarding instructions beside tuple_extract and struct_extract
+         fwdInst.isSingleForwardedOperand(use) && fwdInst.ownership != .none:
+      // Other forwarding instructions beside tuple_extract and struct_extract.
+      // Note that a forwarding instruction with a "none" result, e.g. a value hint
+      // `unchecked_ownership %x, forwarding: @none`, is not part of the forwarding chain. It's
+      // handled like any other (instantaneous) use.
       numForwardingUses += 1
       use.set(to: ownedValue, context)
       fwdInst.setForwardingOwnership(to: .owned, context)
