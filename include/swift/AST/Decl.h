@@ -5173,6 +5173,12 @@ public:
     return SourceRange::combine(EnumLoc, getBraces().End);
   }
 
+private:
+  /// Expand any attached member macros, which can introduce enum elements,
+  /// so that the element list is complete regardless of which file is being
+  /// compiled.
+  void expandMemberMacrosForElements() const;
+
 public:
   /// A range for iterating the elements of an enum.
   using ElementRange = DowncastFilterRange<EnumElementDecl, DeclRange>;
@@ -5187,6 +5193,7 @@ public:
 
   /// Return a range that iterates over all the elements of an enum.
   ElementRange getAllElements() const {
+    expandMemberMacrosForElements();
     return ElementRange(getMembers());
   }
 

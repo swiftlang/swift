@@ -7248,6 +7248,18 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
     = false;
 }
 
+void EnumDecl::expandMemberMacrosForElements() const {
+  // Member macros are custom attributes; skip the request entirely for the
+  // common case of an enum without any.
+  if (!getAttrs().hasAttribute<CustomAttr>())
+    return;
+
+  auto &ctx = getASTContext();
+  (void)evaluateOrDefault(
+      ctx.evaluator,
+      ExpandSynthesizedMemberMacroRequest{const_cast<EnumDecl *>(this)}, {});
+}
+
 Type EnumDecl::getRawType() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(
