@@ -14,6 +14,11 @@ import Swift
 sil @foo : $@convention(thin) () -> ()
 sil @bar : $@convention(thin) () -> ()
 
+struct TwoInts {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+}
+
 // The trampoline bb5 has two predecessors, both with an unconditional branch.
 // The debug_value is cloned at the end of both predecessors (bb1 and bb3).
 
@@ -126,4 +131,145 @@ bb4:
 
 bb5:
   cond_br %1, bb2, bb1
+}
+
+// Both destinations of the cond_br (bb1 and bb2) are trampolines to bb3.
+// The function is simplified to a single basic block, and the debug_values
+// from both branches are joined.
+
+// CHECK-LABEL: sil @test_cond_br_join
+// CHECK: bb0([[M:%[0-9]+]] : $Int64,
+
+// A variable which is the same on both branches is forwarded as is.
+// CHECK-NEXT:   debug_value [[M]], let, name "same"
+
+// A variable with different values on both branches is killed.
+// CHECK-NEXT:   debug_value undef : $Int64, let, name "differ"
+
+// A variable which only exists on one branch is killed. An analysis could be
+// added to find the value in predecessor blocks and try to salvage in this case.
+// CHECK-NEXT:   debug_value undef : $Int64, let, name "onlyone"
+
+// If two definitions exist in a continuous run, the last one is used.
+// CHECK-NEXT:   debug_value [[M]], let, name "last"
+
+// Debug reconstruction blocks aren't joined yet, they are killed.
+// CHECK-NEXT:   debug_value undef : $Builtin.Int64, let, name "rebuilt"
+
+// A killed address is described as an undef value, without the deref.
+// CHECK-NEXT:   debug_value undef : $Int64, let, name "deref"
+
+// Fragments are joined as separate variables.
+// CHECK-NEXT:   debug_value [[M]], let, name "frag", type $TwoInts, expr op_fragment:#TwoInts.x
+// CHECK-NEXT:   debug_value undef : $Int64, let, name "frag", type $TwoInts, expr op_fragment:#TwoInts.y
+
+// CHECK-NEXT:   // function_ref bar
+// CHECK: } // end sil function 'test_cond_br_join'
+
+sil @test_cond_br_join : $@convention(thin) (Int64, Int64, Builtin.Int1, @in_guaranteed Int64) -> () {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $Builtin.Int1, %6 : $*Int64):
+  br bb4
+
+bb1:
+  debug_value %0 : $Int64, let, (name "same", loc "t.swift":1:5)
+  debug_value %0 : $Int64, let, (name "differ", loc "t.swift":2:5)
+  debug_value %0 : $Int64, let, (name "onlyone", loc "t.swift":3:5)
+  debug_value %1 : $Int64, let, (name "last", loc "t.swift":4:5)
+  debug_value %0 : $Int64, let, (name "last", loc "t.swift":4:5)
+  debug_value %0 : $Int64, let, (name "rebuilt", loc "t.swift":5:5), transform {
+  bb0(%a : $Int64):
+    %r = struct_extract %a : $Int64, #Int64._value
+    return %r : $Builtin.Int64
+  }
+  debug_value %6 : $*Int64, let, (name "deref", loc "t.swift":6:5), expr op_deref
+  debug_value %0 : $Int64, let, (name "frag", loc "t.swift":7:5), type $TwoInts, expr op_fragment:#TwoInts.x
+  debug_value %1 : $Int64, let, (name "frag", loc "t.swift":7:5), type $TwoInts, expr op_fragment:#TwoInts.y
+  br bb3
+
+bb2:
+  debug_value %0 : $Int64, let, (name "same", loc "t.swift":1:5)
+  debug_value %1 : $Int64, let, (name "differ", loc "t.swift":2:5)
+  debug_value %0 : $Int64, let, (name "last", loc "t.swift":4:5)
+  debug_value %0 : $Int64, let, (name "rebuilt", loc "t.swift":5:5), transform {
+  bb0(%a : $Int64):
+    %r = struct_extract %a : $Int64, #Int64._value
+    return %r : $Builtin.Int64
+  }
+  debug_value %0 : $Int64, let, (name "frag", loc "t.swift":7:5), type $TwoInts, expr op_fragment:#TwoInts.x
+  br bb3
+
+bb3:
+  %3 = function_ref @bar : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  %5 = tuple ()
+  return %5 : $()
+
+bb4:
+  cond_br %2, bb1, bb2
+}
+
+// Same with a switch_enum rather than a cond_br.
+// All cases of the switch_enum are trampolines to bb3.
+
+// CHECK-LABEL: sil @test_switch_enum_join
+// CHECK: bb0([[A:%[0-9]+]] : $Int64,
+// CHECK-NEXT:   debug_value [[A]], let, name "a"
+// CHECK-NEXT:   debug_value undef : $Int64, let, name "b"
+// CHECK-NEXT:   // function_ref bar
+// CHECK: } // end sil function 'test_switch_enum_join'
+
+sil @test_switch_enum_join : $@convention(thin) (Int64, Int64, Optional<Int64>) -> () {
+bb0(%0 : $Int64, %1 : $Int64, %2 : $Optional<Int64>):
+  br bb4
+
+bb1:
+  debug_value %0 : $Int64, let, (name "a", loc "t.swift":6:5)
+  debug_value %0 : $Int64, let, (name "b", loc "t.swift":7:5)
+  br bb3
+
+bb2:
+  debug_value %0 : $Int64, let, (name "a", loc "t.swift":6:5)
+  debug_value %1 : $Int64, let, (name "b", loc "t.swift":7:5)
+  br bb3
+
+bb3:
+  %3 = function_ref @bar : $@convention(thin) () -> ()
+  %4 = apply %3() : $@convention(thin) () -> ()
+  %5 = tuple ()
+  return %5 : $()
+
+bb4:
+  switch_enum %2 : $Optional<Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+}
+
+// A killed variable of address-only type keeps the address and the deref.
+
+// CHECK-LABEL: sil @test_cond_br_join_address_only
+// CHECK: bb0([[T:%[0-9]+]] : $*T,
+// CHECK-NEXT:   debug_value [[T]], let, name "addrsame", expr op_deref
+// CHECK-NEXT:   debug_value undef : $*T, let, name "addronly", expr op_deref
+// CHECK-NEXT:   // function_ref bar
+// CHECK: } // end sil function 'test_cond_br_join_address_only'
+
+sil @test_cond_br_join_address_only : $@convention(thin) <T> (@in_guaranteed T, Builtin.Int1) -> () {
+bb0(%0 : $*T, %1 : $Builtin.Int1):
+  br bb4
+
+bb1:
+  debug_value %0 : $*T, let, (name "addrsame", loc "t.swift":8:5), expr op_deref
+  debug_value %0 : $*T, let, (name "addronly", loc "t.swift":9:5), expr op_deref
+  br bb3
+
+bb2:
+  debug_value %0 : $*T, let, (name "addrsame", loc "t.swift":8:5), expr op_deref
+  br bb3
+
+bb3:
+  %2 = function_ref @bar : $@convention(thin) () -> ()
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = tuple ()
+  return %4 : $()
+
+bb4:
+  cond_br %1, bb1, bb2
 }

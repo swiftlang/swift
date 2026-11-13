@@ -56,6 +56,7 @@
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
 
@@ -1213,6 +1214,92 @@ static void forwardTrampolineDebugValues(SILBasicBlock *trampolineBB,
   }
 }
 
+/// Identifies the variable described by \p dvi. Fragments are separate
+/// variables.
+static SILDebugVariable getVariableKey(DebugValueInst *dvi) {
+  SILDebugVariable var = *dvi->getVarInfo();
+  var.Type = std::nullopt;
+  var.DIExpr = var.DIExpr.getFragmentPart();
+  return var;
+}
+
+/// Whether \p a and \p b describe the same value of a variable.
+static bool isSameDebugValue(DebugValueInst *a, DebugValueInst *b) {
+  // Debug reconstruction blocks are not compared.
+  if (a->getDebugReconstructionBlock() || b->getDebugReconstructionBlock())
+    return false;
+  return a->getSingleOperand() == b->getSingleOperand() &&
+         a->getCompleteVarInfo() == b->getCompleteVarInfo() &&
+         a->usesMoveableValueDebugInfo() == b->usesMoveableValueDebugInfo() &&
+         a->hasTrace() == b->hasTrace();
+}
+
+/// Creates a debug_value before \p insertPt which describes the variable of
+/// \p dvi as optimized out.
+static void createKilledDebugValue(DebugValueInst *dvi,
+                                   SILInstruction *insertPt) {
+  SILFunction *f = dvi->getFunction();
+  // When fragments are removed, this could just use the vartype.
+  SILValue described;
+  if (auto *debugBB = dvi->getDebugReconstructionBlock())
+    described = cast<ReturnInst>(debugBB->getTerminator())->getOperand();
+  else
+    described = dvi->getSingleOperand();
+  SILType type = described->getType().getObjectType();
+  SILDebugVariable var = dvi->getCompleteVarInfo();
+  // Like killOperand: address-only types keep the address and deref.
+  if (!type.isLoadableOrOpaque(*f)) {
+    type = type.getAddressType();
+  } else if (var.DIExpr.startsWithDeref()) {
+    var.DIExpr.eraseElement(var.DIExpr.element_begin());
+  }
+  SILBuilder builder(insertPt, dvi->getDebugScope());
+  builder.createDebugValue(dvi->getLoc(), SILUndef::get(f, type), var,
+                           dvi->usesMoveableValueDebugInfo(), dvi->hasTrace());
+}
+
+/// Joins the debug_values of \p trampolineBBs, the paths to a common
+/// destination, before \p insertPt. The last debug_value of a variable in each
+/// path is kept if it is the same on all paths, and killed otherwise.
+static void joinTrampolineDebugValues(ArrayRef<SILBasicBlock *> trampolineBBs,
+                                      SILInstruction *insertPt) {
+  size_t trampolineCount = trampolineBBs.size();
+  // Map of each debug variable to the debug_values defining them in each
+  // trampoline. The SmallVector stores one debug_value per trampoline.
+  llvm::MapVector<SILDebugVariable, SmallVector<DebugValueInst *, 2>>
+      lastDebugValues;
+  for (size_t i = 0; i != trampolineCount; ++i) {
+    for (SILInstruction &inst : *trampolineBBs[i]) {
+      auto *dvi = dyn_cast<DebugValueInst>(&inst);
+      if (!dvi)
+        continue;
+      auto &debugValues = lastDebugValues[getVariableKey(dvi)];
+      debugValues.resize(trampolineCount);
+      // Set this debug_value as defining the variable for the current
+      // trampoline. Only the last definition is kept.
+      debugValues[i] = dvi;
+    }
+  }
+  for (auto &entry : lastDebugValues) {
+    ArrayRef<DebugValueInst *> debugValues = entry.second;
+    // Find the first nonnull debug_value, and check if the debug_value is the
+    // same in all trampolines.
+    DebugValueInst *first =
+        *llvm::find_if(debugValues, [](DebugValueInst *dvi) { return dvi; });
+    bool allSame = llvm::all_of(debugValues, [&](DebugValueInst *dvi) {
+      return dvi && isSameDebugValue(dvi, first);
+    });
+    // The debug_value is cloned if they are all the same, otherwise it is
+    // killed. Debug reconstruction block comparison is not supported.
+    // Moving the debug_value up is safe: as critical edges don't exist in
+    // SIL, all values that exist in the trampoline exist at insertPt.
+    if (allSame)
+      first->clone(insertPt);
+    else
+      createKilledDebugValue(first, insertPt);
+  }
+}
+
 #ifndef NDEBUG
 /// Is the block reachable from the entry.
 static bool isReachable(SILBasicBlock *Block) {
@@ -1633,6 +1720,7 @@ bool SimplifyCFG::simplifyCondBrBlock(CondBranchInst *BI) {
   if (trueTrampolineDest && (trueTrampolineDest == falseTrampolineDest)) {
     LLVM_DEBUG(llvm::dbgs()
                << "replace cond_br with same dests with br: " << *BI);
+    joinTrampolineDebugValues({TrueSide, FalseSide}, BI);
     SILBuilderWithScope(BI).createBranch(BI->getLoc(),
                                          trueTrampolineDest.destBB,
                                          trueTrampolineDest.newSourceBranchArgs);
@@ -2753,6 +2841,9 @@ bool SimplifyCFG::simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB) {
   }
   TermInst *Term = BB->getTerminator();
   LLVM_DEBUG(llvm::dbgs() << "replace term with identical dests: " << *Term);
+  SmallVector<SILBasicBlock *, 8> trampolineBBs(
+      BB->getSuccessorBlocks().begin(), BB->getSuccessorBlocks().end());
+  joinTrampolineDebugValues(trampolineBBs, Term);
   SILBuilderWithScope(Term).createBranch(Term->getLoc(), commonDest.destBB,
                                          commonDest.newSourceBranchArgs);
   Term->eraseFromParent();
