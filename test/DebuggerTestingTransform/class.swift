@@ -3,7 +3,7 @@
 class C1 {
   var x: Int = 0
   init() {
-    // CHECK-SIL: // closure #1 () -> () in M.C1.init() -> M.C1
+    // CHECK-SIL: // closure #2 () -> () in M.C1.init() -> M.C1
     // CHECK-SIL: string_literal utf8 "x"
     // CHECK-SIL: // function_ref Swift._stringForPrintObject(Any) -> Swift.String
     // CHECK-SIL: // function_ref Swift._debuggerTestingCheckExpect(Swift.String, Swift.String) -> ()
