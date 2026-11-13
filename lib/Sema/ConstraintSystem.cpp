@@ -2672,6 +2672,20 @@ static bool diagnoseAmbiguity(
         return true;
     }
   }
+  
+  {
+    bool didDiagnose = false;
+    for (auto &entry : aggregateFix) {
+      const auto &fix = entry.second;
+      if (fix->getKind() == FixKind::AllowArgumentTypeMismatch) {
+        if (fix->diagnoseForAmbiguity(aggregateFix))
+          didDiagnose = true;
+      }
+    }
+    
+    if (didDiagnose)
+      return true;
+  }
 
   auto *decl = *localAmbiguity.begin();
   auto *commonCalleeLocator = ambiguity.locator;
