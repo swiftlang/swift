@@ -2731,9 +2731,10 @@ void TranslateArguments::expandOuterSingleInnerParam(
   // Pull out a scalar component from the pack and process that.
   } else {
     auto outerValue = outerParam.projectPackComponent(SGF, Loc);
-    expandSingleOuterParam(innerOrigType, innerSubstParam,
-                           outerParam.getOrigType(), outerParam.getSubstParam(),
-                           outerValue);
+    expandSingleOuterParam(
+        innerOrigType, innerSubstParam,
+        outerParam.getOrigType().getPackExpansionPatternType(),
+        outerParam.getSubstParam(), outerValue);
   }
 
   outerParam.advance();
