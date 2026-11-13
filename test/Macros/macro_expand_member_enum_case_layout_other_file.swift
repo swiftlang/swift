@@ -45,6 +45,17 @@ public struct ConditionalCaseMacro: MemberMacro {
   }
 }
 
+public struct ObserveEquatableMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    protocols.isEmpty ? ["static var marker: Bool { true }"] : []
+  }
+}
+
 //--- enums.swift
 @attached(member, names: named(custom))
 macro AddPayloadCaseNamed() = #externalMacro(module: "MacroDefinition", type: "AddPayloadCaseMacro")
@@ -87,6 +98,24 @@ enum WrittenVariant { case first }
 func generatedCase() -> WithPayload { .custom }
 func declarationSize() -> Int { MemoryLayout<Variant>.size }
 
+protocol Marker {}
+@attached(member, conformances: Marker, names: named(custom))
+macro IntroduceCase() = #externalMacro(module: "MacroDefinition", type: "ConditionalCaseMacro")
+
+// The overlapping name can trigger extension expansion during case lookup.
+@attached(member, conformances: Equatable, names: named(marker), named(custom))
+macro ObserveEquatable() = #externalMacro(module: "MacroDefinition", type: "ObserveEquatableMacro")
+
+@IntroduceCase enum GeneratedOnly {}
+enum WrittenOnly { case custom }
+@ObserveEquatable extension GeneratedOnly {}
+@ObserveEquatable extension WrittenOnly {}
+
+func declarationMarkers() -> Bool {
+  _ = GeneratedOnly.custom
+  return GeneratedOnly.marker && WrittenOnly.marker
+}
+
 // Look up each generated case here so this file sees the complete enum.
 func referenceSizes() -> [Int] {
   _ = NamedKey.custom
@@ -95,6 +124,11 @@ func referenceSizes() -> [Int] {
 }
 
 //--- other.swift
+func consumerMarkers() -> Bool {
+  _ = GeneratedOnly.custom
+  return GeneratedOnly.marker && WrittenOnly.marker
+}
+
 func consumerSize() -> Int { MemoryLayout<Variant>.size }
 func makeFirst() -> BoolKey { .first }
 
@@ -110,3 +144,6 @@ print("first preserved: \(recognizesFirst(makeFirst()))")
 // CHECK: conditional expansion matches written enum: true
 let expected = MemoryLayout<WrittenVariant>.size
 print("conditional expansion matches written enum: \(declarationSize() == expected && consumerSize() == expected)")
+
+// CHECK: extension markers match: true
+print("extension markers match: \(declarationMarkers() && consumerMarkers())")

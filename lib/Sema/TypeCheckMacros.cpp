@@ -2074,6 +2074,7 @@ static bool hasParsedSimpleEnumConformance(NominalTypeDecl *nominal,
 
 static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
     NominalTypeDecl *nominal, MacroRole role, MacroDecl *macro,
+    bool expandingEnumBody,
     SmallVectorImpl<ProtocolDecl *> *potentialConformances = nullptr) {
   SmallVector<ProtocolDecl *, 2> potentialConformancesBuffer;
   if (!potentialConformances)
@@ -2082,15 +2083,14 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
 
   TinyPtrVector<ProtocolDecl *> introducedConformances;
   for (auto protocol : *potentialConformances) {
-    if (role == MacroRole::Member &&
-        hasParsedSimpleEnumConformance(nominal, protocol))
+    if (expandingEnumBody && hasParsedSimpleEnumConformance(nominal, protocol))
       continue;
 
     SmallVector<ProtocolConformance *, 2> existingConformances;
     // A member macro can change whether an enum is simple. Do not try to
     // derive a conformance from the cases this expansion has yet to produce.
     nominal->lookupConformance(protocol, existingConformances,
-                               /*includeSimpleEnumConformances=*/role != MacroRole::Member);
+                               /*includeSimpleEnumConformances=*/!expandingEnumBody);
 
     bool hasExistingConformance = llvm::any_of(
         existingConformances,
@@ -2132,7 +2132,7 @@ std::optional<unsigned> swift::expandMembers(CustomAttr *attr, MacroDecl *macro,
       return std::nullopt;
   }
   auto introducedConformances = getIntroducedConformances(
-      nominal, MacroRole::Member, macro);
+      nominal, MacroRole::Member, macro, /*expandingEnumBody=*/isa<EnumDecl>(decl));
 
   // Evaluate the macro.
   auto macroSourceFile =
@@ -2212,7 +2212,8 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
 
   SmallVector<ProtocolDecl *, 2> potentialConformances;
   auto introducedConformances = getIntroducedConformances(
-      nominal, MacroRole::Extension, macro, &potentialConformances);
+      nominal, MacroRole::Extension, macro, /*expandingEnumBody=*/false,
+      &potentialConformances);
   auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
                                                  /*passParentContext=*/false,
                                                  role, introducedConformances);
