@@ -271,6 +271,12 @@ namespace {
       return MacroWalking::Arguments;
     }
 
+    LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
+      // Lazy initializers get discriminators assigned after
+      // re-contextualization, so we should only walk the accessor.
+      return LazyInitializerWalking::InAccessor;
+    }
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Autoclosures need to be numbered and potentially reparented.
       // Reparenting is required with:
@@ -451,19 +457,6 @@ LocalDiscriminatorsRequest::evaluate(Evaluator &eval, DeclContext *dc) const {
       node = func->getBody();
     selfParam = func->getImplicitSelfDecl();
     params = func->getParameters();
-
-    // Accessors for lazy properties should be walked as part of the property's
-    // pattern.
-    if (auto accessor = dyn_cast<AccessorDecl>(func)) {
-      if (accessor->isImplicit() &&
-          accessor->getStorage()->getAttrs().hasAttribute<LazyAttr>()) {
-        if (auto var = dyn_cast<VarDecl>(accessor->getStorage())) {
-          if (auto binding = var->getParentPatternBinding()) {
-            node = binding;
-          }
-        }
-      }
-    }
   } else if (auto closure = dyn_cast<ClosureExpr>(dc)) {
     node = closure->getBody();
     params = closure->getParameters();

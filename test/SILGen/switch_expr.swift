@@ -855,7 +855,7 @@ func testLazyLocal(_ x: Int?) {
   // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
   lazy var c = switch Bool.random() {
   case true:
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg1xL3_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s11switch_expr13testLazyLocalyySiSgF1cL_SSvg1xL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
     lazy var x = ""
     then x
   case false:
