@@ -117,16 +117,16 @@ func makeGenericMetatypes() {
   // CHECK-SAME: )
   genericMetatype(OneArg<Foo>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes7TwoArgsVyAA3FooVAA3BarCGMD") [[NOUNWIND_READONLY:#[0-9]+]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$s17generic_metatypes7TwoArgsVyAA3FooVAA3BarCGMd", ptr @"$s17generic_metatypes7TwoArgsVyAA3FooVAA3BarCGMR") [[NOUNWIND_READONLY:#[0-9]+]]
   genericMetatype(TwoArgs<Foo, Bar>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes9ThreeArgsVyAA3FooVAA3BarCAEGMD") [[NOUNWIND_READONLY]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$s17generic_metatypes9ThreeArgsVyAA3FooVAA3BarCAEGMd", ptr @"$s17generic_metatypes9ThreeArgsVyAA3FooVAA3BarCAEGMR") [[NOUNWIND_READONLY]]
   genericMetatype(ThreeArgs<Foo, Bar, Foo>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMD") [[NOUNWIND_READONLY]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$s17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMd", ptr @"$s17generic_metatypes8FourArgsVyAA3FooVAA3BarCAeGGMR") [[NOUNWIND_READONLY]]
   genericMetatype(FourArgs<Foo, Bar, Foo, Bar>.self)
 
-  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledName({{.*}} @"$s17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMD") [[NOUNWIND_READONLY]]
+  // CHECK: call {{.*}} @__swift_instantiateConcreteTypeFromMangledNameV2({{.*}} @"$s17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMd", ptr @"$s17generic_metatypes8FiveArgsVyAA3FooVAA3BarCAegEGMR") [[NOUNWIND_READONLY]]
   genericMetatype(FiveArgs<Foo, Bar, Foo, Bar, Foo>.self)
 }
 

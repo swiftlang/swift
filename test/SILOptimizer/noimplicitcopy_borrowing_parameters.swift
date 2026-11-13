@@ -300,6 +300,30 @@ func testAddressOnlyBorrowingNonEscapingClosure<T : P>(_ x: borrowing GenericNon
     }
 }
 
+func testAddressOnlyBorrowingLocalFunction<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
+    func local() {
+        x.doSomethingBorrowing()
+    }
+    local()
+}
+
+func testAddressOnlyBorrowingLocalFunctionConsume<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
+    func local() {
+        let _ = x // expected-error {{'x' is borrowed and cannot be consumed}} expected-note {{consumed here}}
+    }
+    local()
+}
+
+func testAddressOnlyBorrowingDefer<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
+    defer { x.doSomethingBorrowing() }
+    x.doSomethingBorrowing()
+}
+
+func testAddressOnlyBorrowingDeferConsume<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
+    defer { let _ = x } // expected-error {{'x' is borrowed and cannot be consumed}} expected-note {{consumed here}}
+    x.doSomethingBorrowing()
+}
+
 func testAddressOnlyBorrowingCast<T : P>(_ x: borrowing GenericNonTrivialStruct<T>) {
     // expected-error @-1 {{'x' is borrowed and cannot be consumed}}
     let _ = x as Any // expected-note {{consumed here}}

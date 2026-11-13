@@ -7,7 +7,7 @@ sil @take_any_error : $@convention(thin) <T: Error> (@in T) -> ()
 // CHECK-LABEL: swiftcc void @test(ptr
 sil @test : $@convention(thin) (@in Error) -> () {
 entry(%0 : $*Error):
-  // CHECK: [[ERROR_METADATA:%.*]] = call {{.*}}@"$ss5Error_pMD"
+  // CHECK: [[ERROR_METADATA:%.*]] = call {{.*}}@"$ss5Error_pMd"
   // CHECK-NEXT: call swiftcc void @take_any_error(ptr noalias %0, ptr [[ERROR_METADATA]], ptr @"$ss5ErrorWS")
   // CHECK-NEXT: ret void
   %take = function_ref @take_any_error : $@convention(thin) <T: Error> (@in T) -> ()

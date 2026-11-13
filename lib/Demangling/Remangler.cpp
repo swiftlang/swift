@@ -3496,7 +3496,14 @@ ManglingError Remangler::mangleTypeMetadataCompletionFunction(Node *node,
 ManglingError Remangler::mangleTypeMetadataDemanglingCache(Node *node,
                                                            unsigned depth) {
   RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
-  Buffer << "MD";
+  Buffer << "Md";
+  return ManglingError::Success;
+}
+
+ManglingError Remangler::mangleTypeMetadataMangledNameRef(Node *node,
+                                                          unsigned depth) {
+  RETURN_IF_ERROR(mangleChildNodes(node, depth + 1));
+  Buffer << "MR";
   return ManglingError::Success;
 }
 

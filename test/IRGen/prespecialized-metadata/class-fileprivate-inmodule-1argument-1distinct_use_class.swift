@@ -30,11 +30,11 @@ func consume<T>(_ t: T) {
 // TODO: Prespecialize for Klazz<C> for C a class by initializing C in the
 //       canonical specialized metadata accessor for Klazz<C>.  At that point,
 //       there should be no call to
-//       __swift_instantiateConcreteTypeFromMangledName.
+//       __swift_instantiateConcreteTypeFromMangledNameV2.
 
 //      CHECK: define hidden swiftcc void @"$s4main4doityyF"() #{{[0-9]+}} {
-//      CHECK:   [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledName(
-// CHECK-SAME:     @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z0-9_]+]]LLCyAA3BoxACLLCGMD"
+//      CHECK:   [[METADATA:%[0-9]+]] = call ptr @__swift_instantiateConcreteTypeFromMangledNameV2(
+// CHECK-SAME:     @"$s4main5Value[[UNIQUE_ID_1:[A-Za-z0-9_]+]]LLCyAA3BoxACLLCGMd"
 //      CHECK:   {{%[0-9]+}} = call swiftcc ptr @"$s4main5Value[[UNIQUE_ID_1]]LLC5firstADyxGx_tcfC"(
 // CHECK-SAME:     ptr noalias {{%[0-9]+}}, 
 // CHECK-SAME:     ptr swiftself [[METADATA]]

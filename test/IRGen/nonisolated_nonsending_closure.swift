@@ -40,7 +40,7 @@ struct PImpl: P {
 
 // CHECK-SUPPORTED-NOT: @"get_type_metadata 30nonisolated_nonsending_closure1PRzl31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcG.3"
 // CHECK-SUPPORTED: define linkonce_odr hidden ptr @"$s31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcGACyxGAA0F0AAWl"() #1 {
-// CHECK-SUPPORTED:   call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstract(ptr @"$s31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcGMD")
+// CHECK-SUPPORTED:   call ptr @__swift_instantiateConcreteTypeFromMangledNameAbstractV2(ptr @"$s31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcGMd", ptr @"$s31associated_type_by_mangled_name9ProtoImplVyySiYaKYCcGMR")
 // CHECK-SUPPORTED: }
 struct MyStruct<T: P>: Proto {
   typealias Closure = nonisolated(nonsending) (Int) async throws -> Void

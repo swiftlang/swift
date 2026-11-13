@@ -486,7 +486,7 @@ $s7ElementSTQzqd__s5Error_pIgnrzo_ABqd__sAC_pIegnrzr_SlRzr__lTR ---> {T:} reabst
 $sS3fIedgyywTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned @noDerivative sending Swift.Float) -> (@unowned Swift.Float)
 $sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned sending Swift.Float) -> (@unowned Swift.Float)
 $s4testA2A5KlassCyYTF ---> test.test() -> sending test.Klass
-$s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> sending main.Klass
+$s4main5KlassCACYTcMd ---> demangling cache variable for type metadata for (main.Klass) -> sending main.Klass
 $s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() async -> sending null.NonSendableKlass
 $s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> sending (@out null.NonSendableKlass, @error @owned Swift.Error)
 $sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization

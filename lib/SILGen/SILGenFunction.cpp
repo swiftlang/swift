@@ -926,6 +926,9 @@ void SILGenFunction::emitCaptures(SILLocation loc,
         // address of the value.
         auto addr = getAddressValue(val, /*callerTakesOwnership=*/false,
                                     /*forLValue=*/false);
+        // If our address is move only wrapped, unwrap it.
+        if (addr->getType().isAddress() && addr->getType().isMoveOnlyWrapped())
+          addr = B.createMoveOnlyWrapperToCopyableAddr(loc, addr);
         capturedArgs.push_back(
             addr->getOwnershipKind() == OwnershipKind::Owned
                 ? ManagedValue::forOwnedRValue(addr, CleanupHandle::invalid())
