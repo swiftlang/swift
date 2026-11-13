@@ -19,7 +19,7 @@
 - ``subscript(unchecked:)``
 - ``Index``
 
-### AccessingBytes
+### Accessing Bytes
 
 - ``bytes-478ye``        <!-- @export(implementation) var bytes: RawSpan { borrowing get } -->
 - ``bytes-61tq``         <!-- @export(implementation) @unsafe var bytes: RawSpan { borrowing get } -->

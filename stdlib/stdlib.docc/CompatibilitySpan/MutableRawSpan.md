@@ -3,7 +3,7 @@
 
 ## Topics
 
-### Creating a raw span
+### Creating a Raw Span
 
 - ``init()``
 - ``init(bytesOf:)``
@@ -11,7 +11,7 @@
 - ``init(unsafeElements:)``
 - ``init(mutating:)``
 
-### Accessing span elements
+### Accessing Span Elements
 
 - ``byteCount``
 - ``isEmpty``
