@@ -71,7 +71,7 @@ swift_dispatch_thread_override_self_with_base(qos_class_t override_qos,
   struct swift_dispatch_priority_token_s token = {};
 
 #if DISPATCH_SWIFT_CONCURRENCY_PRIVATE_INTERFACE_VERSION >= 1
-  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, visionOS 9998, *)) {
     token.priority =
         dispatch_thread_override_self_with_base(override_qos, base_qos);
     return token;
@@ -90,7 +90,7 @@ static inline void swift_dispatch_thread_reset_override_self(
     struct swift_dispatch_priority_token_s opaque) {
 
 #if DISPATCH_SWIFT_CONCURRENCY_PRIVATE_INTERFACE_VERSION >= 1
-  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, *)) {
+  if (__builtin_available(macOS 9998, iOS 9998, tvOS 9998, watchOS 9998, visionOS 9998, *)) {
     dispatch_thread_reset_override_self(opaque.priority);
   }
 #endif

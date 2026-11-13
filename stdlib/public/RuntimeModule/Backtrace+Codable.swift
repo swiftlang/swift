@@ -17,7 +17,7 @@
 import Swift
 
 func stringFrom(sequence: some Sequence<UTF8.CodeUnit>) -> String? {
-  if #available(macOS 15.0, *) {
+  if #available(SwiftStdlib 6.0, *) {
     return String(validating: sequence, as: UTF8.self)
   } else {
     let bytes = Array(sequence)
