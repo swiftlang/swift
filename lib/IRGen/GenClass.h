@@ -38,6 +38,7 @@ namespace swift {
 
 namespace irgen {
   class ConstantStructBuilder;
+  struct Field;
   class FunctionPointer;
   class HeapLayout;
   class IRGenFunction;
@@ -197,6 +198,10 @@ namespace irgen {
   Size getClassFieldOffset(IRGenModule &IGM,
                            SILType baseType,
                            VarDecl *field);
+
+  Size getClassFieldOffset(IRGenModule &IGM,
+                           SILType baseType,
+                           Field field);
 
   /// Load the instance size and alignment mask from a reference to
   /// class type metadata of the given type.

@@ -28,6 +28,7 @@
 // Emit the client IR without access to the Clang definition.
 // RUN: %target-swift-frontend \
 // RUN:   -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes \
+// RUN:   -verify-type-layout VerifiableWrapper \
 // RUN:   -emit-ir -o %t/Client.ll -module-name Client \
 // RUN:   -I %t %t/Client.swift
 // RUN: %FileCheck --check-prefix=CLIENT-SIDE %s < %t/Client.ll
@@ -35,6 +36,8 @@
 // Build and run the client without exposing the bridging header.
 // RUN: %target-build-swift \
 // RUN:   -enable-experimental-feature SerializeAbstractTypeLayoutForHiddenTypes \
+// RUN:   -Xfrontend -verify-type-layout \
+// RUN:   -Xfrontend VerifiableWrapper \
 // RUN:   -I %t -o %t/client %t/Client.swift %t/Library.o
 // RUN: %target-codesign %t/client
 // RUN: %target-run %t/client
@@ -86,6 +89,8 @@ public func libraryWrapperIsBitwiseTakable() -> Bool {
 
 //--- Client.swift
 import Library
+
+typealias VerifiableWrapper = TrivialHiddenCStructWrapper
 
 public func use(_ value: TrivialHiddenCStructWrapper)
     -> TrivialHiddenCStructWrapper {
@@ -143,3 +148,4 @@ assert(clientWrapperIsBitwiseTakable() == libraryWrapperIsBitwiseTakable())
 // LIBRARY-SIDE-DAG: %TSd = type <{ double }>
 // LIBRARY-SIDE-DAG: %Ts5Int64V = type <{ i64 }>
 // CLIENT-SIDE-DAG: %T7Library27TrivialHiddenCStructWrapperV = type <{ <{ <{ i32 }>, [4 x i8], <{ double }> }>, %Ts5Int64V }>
+// CLIENT-SIDE-DAG: c"offset of struct field hidden_field\00"
