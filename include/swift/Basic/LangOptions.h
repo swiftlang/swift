@@ -679,6 +679,10 @@ namespace swift {
     /// if a deserialization failure is found; this flag causes the build to fail fast instead.
     bool AbortOnDeserializationFailForPackageCMO = false;
 
+    /// Returns the same discriminator for every ClosureExpr. Testing purposes
+    /// only.
+    bool DebugDuplicateClosureDiscriminators = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 

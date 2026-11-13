@@ -1361,7 +1361,15 @@ public:
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     SILDeclRef constant(e);
 
-    SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e));
+    if (SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e))) {
+      // If we couldn't emit the closure, emit an undef.
+      auto substType = cast<FunctionType>(e->getType()->getCanonicalType());
+      auto origType = getIndirectApplyAbstractionPattern(
+          SGF, AbstractionPattern(substType), substType);
+      ManagedValue fn = SGF.emitUndef(SGF.getLoweredType(substType));
+      setCallee(Callee::forIndirect(fn, origType, substType, e));
+      return;
+    }
 
     // If we're in top-level code, we don't need to physically capture script
     // globals, but we still need to mark them as escaping so that DI can flag

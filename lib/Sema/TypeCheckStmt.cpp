@@ -294,8 +294,16 @@ namespace {
 
       // Explicit closures start their own sequence.
       if (auto CE = dyn_cast<ClosureExpr>(E)) {
-        if(CE->getRawDiscriminator() == ClosureExpr::InvalidDiscriminator)
-          CE->setDiscriminator(NextClosureDiscriminator++);
+        if (CE->getRawDiscriminator() == ClosureExpr::InvalidDiscriminator) {
+          // We have a debug mode where we give every closure the same
+          // discriminator to ensure SILGen catches them.
+          auto &ctx = CE->getASTContext();
+          if (ctx.LangOpts.DebugDuplicateClosureDiscriminators) {
+            CE->setDiscriminator(0);
+          } else {
+            CE->setDiscriminator(NextClosureDiscriminator++);
+          }
+        }
 
         // We need to walk into closure bodies with a new sequence.
         SetLocalDiscriminators innerVisitor;

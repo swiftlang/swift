@@ -1259,6 +1259,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableWorkaroundBrokenModules
     &= !Args.hasArg(OPT_disable_workaround_broken_modules);
 
+  Opts.DebugDuplicateClosureDiscriminators |=
+      Args.hasArg(OPT_debug_duplicate_closure_discriminators);
+
   // Either the env var and the flag has to be set to enable package interface load
   Opts.EnablePackageInterfaceLoad = Args.hasArg(OPT_experimental_package_interface_load) ||
                                     ::getenv("SWIFT_ENABLE_PACKAGE_INTERFACE_LOAD");
