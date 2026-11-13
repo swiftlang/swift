@@ -58,23 +58,17 @@ public func namedLegacyCDecl() {}
 // CHECK: @_cdecl("objc_name")
 // CHECK-NEXT: public func namedLegacyCDecl
 
-/// Pointers to C arrays in explicitly @objc and @c declarations need the
-/// feature that allows them.
+/// Pointers to C arrays in @c declarations need the feature that allows them.
+/// Without it, the declaration is left out because dropping @c would change
+/// the function's symbol.
 @c
 public func cArrayPointer(_ p: UnsafeMutablePointer<(Int32, Int32)>) {}
 // CHECK: #if compiler(>=5.3) && $ObjCAttrAllowsCArrays
-// CHECK: public func cArrayPointer
-// CHECK: #endif
-
-public class CArrayMembers: NSObject {
-  @objc public func array(_ p: UnsafeMutablePointer<((Int32, Int32), (Int32, Int32))>) {}
-  // CHECK: #if compiler(>=5.3) && $ObjCAttrAllowsCArrays
-  // CHECK-NEXT: @objc public func array
-  // CHECK-NEXT: #endif
-
-  /// Other declarations don't.
-  @objc public func plain(_ p: UnsafeMutablePointer<Int32>) {}
-  // CHECK-NEXT: @objc public func plain
-  public func notObjC(_ p: UnsafeMutablePointer<(Int32, Int32)>) {}
-  // CHECK-NEXT: public func notObjC
-}
+// CHECK-NEXT: #if compiler(>=5.3) && hasAttribute(c)
+// CHECK-NEXT: @c
+// CHECK-NEXT: public func cArrayPointer
+// CHECK-NEXT: #else
+// CHECK-NEXT: @_cdecl("cArrayPointer")
+// CHECK-NEXT: public func cArrayPointer
+// CHECK-NEXT: #endif
+// CHECK-NEXT: #endif

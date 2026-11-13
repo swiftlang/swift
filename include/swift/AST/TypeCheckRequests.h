@@ -40,6 +40,7 @@
 #include "swift/Basic/TypeID.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -2257,6 +2258,65 @@ private:
   // Evaluation.
   ArrayRef<Decl *>
   evaluate(Evaluator &evaluator, IterableDeclContext *idc) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// The declarations that \p decl's printed module interface directly depends
+/// on, such that \p decl has to be left out of the interface if any of them
+/// is. This doesn't recurse into the dependencies.
+class ModuleInterfaceDependenciesRequest :
+    public SimpleRequest<ModuleInterfaceDependenciesRequest,
+                         ArrayRef<Decl *>(Decl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  ArrayRef<Decl *> evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+};
+
+/// Checks if \p decl or any declaration it visibly references (recursively)
+/// uses \p feature . This request works only for specific features supported by
+/// \c IndirectFeatureUseCheckRequest::usesFeatureDirectly() .
+class IndirectFeatureUseCheckRequest :
+    public SimpleRequest<IndirectFeatureUseCheckRequest,
+                         bool(Feature, Decl *),
+                         RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  bool evaluate(Evaluator &evaluator, Feature feature, Decl *decl) const;
+
+  // Predicate for direct feature checks; update this to use this machinery for
+  // a new feature.
+  bool usesFeatureDirectly(Feature feature, Decl *decl) const;
+
+  using NodesReferencingMap = llvm::DenseMap<Decl *, SmallVector<Decl *, 2>>;
+
+  // Stages in the process.
+  void gatherNodesToEvaluate(
+      Feature feature, Decl *root,
+      llvm::SmallSetVector<Decl *, 4> &nodesToEvaluate,
+      NodesReferencingMap &nodesReferencingNode,
+      llvm::SmallPtrSetImpl<Decl *> &nodesMarkedAsUser) const;
+  void evaluateAllNodes(
+      Feature feature, const llvm::SmallSetVector<Decl *, 4> &nodesToEvaluate,
+      const NodesReferencingMap &nodesReferencingNode,
+      llvm::SmallPtrSetImpl<Decl *> &nodesMarkedAsUser) const;
+
+  // Conveniences for fetching and storing cached request outputs.
+  std::optional<bool> getCachedEvaluation(Feature feature, Decl *decl) const;
+  void setCachedEvaluation(Feature feature, Decl *decl, bool result) const;
 
 public:
   bool isCached() const { return true; }

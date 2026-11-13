@@ -12,15 +12,19 @@
 
 #include "FeatureSet.h"
 
+#include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityQuery.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeDeclFinder.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 
@@ -81,6 +85,46 @@ static bool usesTypeMatching(WhereClauseOwner &&source,
   return forAllRequirementTypes(
       std::move(source),
       [&](Type ty, TypeRepr *_unused_) { return ty.findIf(fn); });
+}
+
+/// Determines whether \p root either uses \p feature directly, or needs to be
+/// dropped from a module interface because some other declaration it depends
+/// on uses \p feature directly. Works only for features supported by
+/// \c IndirectFeatureUseCheckRequest::usesFeatureDirectly() .
+///
+/// This helper accounts for the fact that a protocol declaration is unsafe to
+/// use if one of its requirements has been dropped and a frozen type is unsafe
+/// to use if part of its storage has been dropped. It also accounts for
+/// uses of types that have been dropped.
+static bool usesFeatureIndirectly(Decl *root, Feature feature) {
+  IndirectFeatureUseCheckRequest rootReq{feature, root};
+  return evaluateOrFatal(root->getASTContext().evaluator, rootReq);
+}
+
+static bool isExposedToClang(const Decl *decl) {
+  if (auto *VD = dyn_cast<ValueDecl>(decl))
+    if (VD->isObjC())
+      return true;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(decl))
+    if (AFD->getCDeclKind().has_value())
+      return true;
+  return false;
+}
+
+bool IndirectFeatureUseCheckRequest::usesFeatureDirectly(Feature feature,
+                                                          Decl *decl) const {
+  switch (feature) {
+  case Feature::ObjCAttrAllowsCArrays:
+    return isExposedToClang(decl) && usesTypeMatching(decl, [](Type type) {
+      return type->isStructurallyCArray(/*assumingFeatureAllowed=*/true);
+    });
+
+  default:
+    ABORT([&](auto &out) {
+      out << "IndirectFeatureUseCheckRequest for unsupported feature: "
+          << feature.getName() << "\n";
+    });
+  }
 }
 
 // ----------------------------------------------------------------------------
@@ -949,19 +993,7 @@ UNINTERESTING_FEATURE(ModernImportedCArrays)
 UNINTERESTING_FEATURE(ModernImportedCArraysOnly)
 
 static bool usesFeatureObjCAttrAllowsCArrays(Decl *decl) {
-  // A C array in the signature would only break source if there's *also* an
-  // explicit `@c`/`@objc` or equivalent; otherwise we just won't infer `@objc`.
-  if (!llvm::any_of(decl->getAttrs(), [](DeclAttribute * attr) {
-          return !attr->isImplicit() &&
-                    isa<ObjCAttr, CDeclAttr, IBActionAttr, IBOutletAttr,
-                        IBSegueActionAttr, IBInspectableAttr,
-                        GKInspectableAttr>(attr);
-        }))
-    return false;
-
-  return usesTypeMatching(decl, [](Type type) {
-    return type->isStructurallyCArray(/*assumingFeatureAllowed=*/true);
-  });
+  return usesFeatureIndirectly(decl, Feature::ObjCAttrAllowsCArrays);
 }
 
 // ----------------------------------------------------------------------------
@@ -1079,4 +1111,386 @@ FeatureSet swift::getUniqueFeaturesUsed(Decl *decl) {
   }
 
   return features;
+}
+
+// ----------------------------------------------------------------------------
+// MARK: - Machinery for usesFeatureIndirectly()
+// ----------------------------------------------------------------------------
+
+bool IndirectFeatureUseCheckRequest::evaluate(
+    Evaluator &evaluator, Feature feature, Decl *root) const {
+  if (!root || root->hasClangNode())
+    return false;
+
+  // Although the user only asked about `root`, we cannot evaluate `root`
+  // without evaluating many other nodes. Moreover, there can be cycles in the
+  // graph, so we cannot simply recurse to evaluate them. We will therefore
+  // gather all the nodes we need to evaluate, compute the feature check for
+  // each one, and manually cache all those results so we don't repeat work.
+
+  /// All of the nodes whose feature use is unknown and will need to be
+  /// evaluated and cached.
+  llvm::SmallSetVector<Decl *, 4> nodesToEvaluate;
+
+  /// All of the nodes which we have determined use `feature`, including those
+  /// evaluated during previous requests and cached.
+  llvm::SmallPtrSet<Decl *, 8> nodesMarkedAsUser;
+
+  /// Given a node, returns all the nodes that reference it (and that
+  /// therefore must be marked as users if it is).
+  llvm::DenseMap<Decl *, SmallVector<Decl *, 2>> nodesReferencingNode;
+
+  // Find the declarations reachable from `root`, populating `nodesToEvaluate`
+  // with those which have no cache entry and `nodesMarkedAsUser` with those
+  // whose cache entry says they use the feature. Also build
+  // `nodesReferencingNode` in the process.
+  gatherNodesToEvaluate(feature, root, nodesToEvaluate, nodesReferencingNode,
+                        nodesMarkedAsUser);
+
+  // Add each node from `nodesToEvaluate` that uses the feature (directly or
+  // indirectly) to `nodesMarkedAsUser`.
+  evaluateAllNodes(feature, nodesToEvaluate, nodesReferencingNode,
+                   nodesMarkedAsUser);
+
+  // Cache everything *but* `root` that we just computed.
+  for (auto *node : nodesToEvaluate)
+    if (node != root)
+      setCachedEvaluation(feature, node, nodesMarkedAsUser.count(node));
+
+  // Return the evaluation for `root`.
+  return nodesMarkedAsUser.count(root);
+}
+
+void IndirectFeatureUseCheckRequest::gatherNodesToEvaluate(
+    Feature feature, Decl *root,
+    llvm::SmallSetVector<Decl *, 4> &nodesToEvaluate,
+    IndirectFeatureUseCheckRequest::NodesReferencingMap &nodesReferencingNode,
+    llvm::SmallPtrSetImpl<Decl *> &nodesMarkedAsUser) const {
+  auto &ctx = root->getASTContext();
+  SmallVector<Decl *, 8> worklist{root};
+
+  while (!worklist.empty()) {
+    auto *node = worklist.pop_back_val();
+
+    // If we've cached a result for this node in a previous request, pull in the
+    // previous result instead of re-evaluating it.
+    if (auto known = getCachedEvaluation(feature, node)) {
+      if (*known)
+        nodesMarkedAsUser.insert(node);
+      continue;
+    }
+
+    // Schedule for evaluation, unless we already did.
+    if (!nodesToEvaluate.insert(node))
+      continue;
+
+    // Record that `node` references each of its dependencies.
+    auto deps = evaluateOrDefault(
+        ctx.evaluator, ModuleInterfaceDependenciesRequest{node}, {});
+    for (auto *dep : deps)
+      nodesReferencingNode[dep].push_back(node);
+
+    // Schedule their own dependencies to be gathered.
+    worklist.append(deps.begin(), deps.end());
+  }
+}
+
+void IndirectFeatureUseCheckRequest::evaluateAllNodes(
+    Feature feature, const llvm::SmallSetVector<Decl *, 4> &nodesToEvaluate,
+    const IndirectFeatureUseCheckRequest::NodesReferencingMap
+        &nodesReferencingNode,
+    llvm::SmallPtrSetImpl<Decl *> &nodesMarkedAsUser) const {
+  // Mark nodes which *directly* use the feature.
+  for (auto *node : nodesToEvaluate)
+    if (usesFeatureDirectly(feature, node))
+      nodesMarkedAsUser.insert(node);
+
+  // Starting from the nodes we've identified as users so far, mark every node
+  // that references them as a user.
+  SmallVector<Decl *, 4> worklist(nodesMarkedAsUser.begin(),
+                                  nodesMarkedAsUser.end());
+  while (!worklist.empty()) {
+    auto *node = worklist.pop_back_val();
+
+    auto referencers = nodesReferencingNode.find(node);
+    if (referencers == nodesReferencingNode.end())
+      continue;
+    for (auto *referencer : referencers->second)
+      if (nodesMarkedAsUser.insert(referencer).second)
+        worklist.push_back(referencer);
+  }
+}
+
+std::optional<bool>
+IndirectFeatureUseCheckRequest::getCachedEvaluation(Feature feature,
+                                                    Decl *decl) const {
+  auto &evaluator = decl->getASTContext().evaluator;
+  IndirectFeatureUseCheckRequest declReq{feature, decl};
+
+  if (!evaluator.hasCachedResult(declReq))
+    return std::nullopt;
+
+  return evaluateOrFatal(evaluator, declReq);
+}
+
+void IndirectFeatureUseCheckRequest::setCachedEvaluation(Feature feature,
+                                                         Decl *decl,
+                                                         bool result) const {
+  auto &evaluator = decl->getASTContext().evaluator;
+  IndirectFeatureUseCheckRequest declReq{feature, decl};
+  evaluator.cacheOutput(declReq, std::move(result));
+}
+
+ArrayRef<Decl *>
+ModuleInterfaceDependenciesRequest::evaluate(Evaluator &evaluator,
+                                             Decl *decl) const {
+  if (decl->hasClangNode())
+    return {};
+
+  class Collector : public DeclVisitor<Collector>, public TypeDeclFinder {
+    SmallVector<Decl *, 8> dependencies;
+    llvm::SmallPtrSet<const Decl *, 8> seen;
+
+    /// Can \p decl be seen in the interface of its module?
+    static bool isPrinted(const Decl *decl) {
+      // FIXME: Share more logic with the real source of truth
+      //        (`ShouldPrintForModuleInterface` in ASTPrinter.cpp)
+
+      if (auto ed = dyn_cast_or_null<ExtensionDecl>(decl))
+        return isPrinted(ed->getExtendedNominal());
+      if (auto vd = dyn_cast_or_null<ValueDecl>(decl))
+        return DeclExportabilityVisitor().visit(vd) ||
+                   isPrintedInModuleInterfaceDespiteAccessLevel(vd);
+
+      return true;
+    }
+
+    void addDependency(const Decl *decl) {
+      // Clang declarations aren't printed in module interfaces.
+      if (!decl || decl->hasClangNode() || !seen.insert(decl).second)
+        return;
+
+      if (isPrinted(decl))
+        dependencies.push_back(const_cast<Decl *>(decl));
+      else
+        // A declaration that isn't part of the interface can't be dropped from
+        // it, but whatever it inherits from can still be.
+        addInheritedDependencies(decl);
+    }
+
+    /// Adds the nominal types that \p type is made of.
+    void addTypeDependencies(Type type) {
+      if (!type.isNull())
+        type.walk(*this);
+    }
+
+    /// Adds the types that the where clause \p owner spells out mention.
+    void addWhereClauseDependencies(WhereClauseOwner &&owner) {
+      (void)usesTypeMatching(std::move(owner), [&](Type type) {
+        addTypeDependencies(type);
+        return false;
+      });
+    }
+
+    /// Adds the types named by \p decl's custom attributes.
+    void addCustomAttributeDependencies(const Decl *decl) {
+      for (auto *attr : decl->getAttrs().getAttributes<CustomAttr>()) {
+        Type type = decl->getResolvedCustomAttrType(
+                              const_cast<CustomAttr *>(attr));
+        if (!type)
+          continue;
+
+        addDependency(type->getAnyNominal());
+        addTypeDependencies(type);
+      }
+    }
+
+    /// Adds the types that the requirements of \p opaque's interface signature
+    /// (and so its constraints) mention.
+    void addOpaqueTypeDependencies(const OpaqueTypeDecl *opaque) {
+      for (const auto &req :
+               opaque->getOpaqueInterfaceGenericSignature().getRequirements()) {
+        addTypeDependencies(req.getFirstType());
+        if (req.getKind() != RequirementKind::Layout)
+          addTypeDependencies(req.getSecondType());
+      }
+    }
+
+    /// Adds the types in the inheritance clause of \p decl.
+    void addInheritedDependencies(const Decl *decl) {
+      InheritedTypes inherited(decl);
+      for (auto i : inherited.getIndices())
+        addTypeDependencies(inherited.getResolvedType(i));
+    }
+
+    /// Adds the types that the generic requirements \p gc spells out mention.
+    ///
+    /// You only need to call this on decls whose generic parameters do \em not
+    /// appear in their interface type (e.g. generic classes, but not generic
+    /// functions).
+    void addGenericRequirementDependencies(const GenericContext *gc) {
+      if (auto *params = gc->getGenericParams())
+        for (auto *param : *params)
+          addInheritedDependencies(param);
+
+      addWhereClauseDependencies(WhereClauseOwner(
+                                     const_cast<GenericContext *>(gc)));
+    }
+
+    /// If \p ntd is non-resilient, adds the members that \p affectsLayout says
+    /// determine its layout.
+    void addFragileMemberDependencies(
+        NominalTypeDecl *ntd, llvm::function_ref<bool(Decl *)> affectsLayout) {
+      if (ntd->isFormallyResilient())
+        return;
+      for (auto *member : ntd->getABIMembers())
+        if (affectsLayout(member))
+          addDependency(member);
+    }
+
+  public:
+    ArrayRef<Decl *> collect(const Decl *decl) {
+      addInheritedDependencies(decl);
+
+      if (isPrinted(decl))
+        visit(const_cast<Decl *>(decl));
+
+      return dependencies;
+    }
+
+    // TypeDeclFinder:
+    Action visitNominalType(NominalType *ty) override {
+      addDependency(ty->getDecl());
+      return TypeWalker::Action::Continue;
+    }
+
+    Action visitTypeAliasType(TypeAliasType *ty) override {
+      addDependency(ty->getDecl());
+      return TypeWalker::Action::Continue;
+    }
+
+    // DeclVisitor:
+    void visitDecl(Decl *decl) {}
+
+    void visitExtensionDecl(ExtensionDecl *ext) {
+      visitDecl(ext);
+      addGenericRequirementDependencies(ext);
+
+      // Drop an extension if the type it extends is dropped.
+      addDependency(ext->getExtendedNominal());
+    }
+
+    void visitPatternBindingDecl(PatternBindingDecl *pbd) {
+      visitDecl(pbd);
+
+      // A pattern binding is printed as a unit, so it's dropped if any of its
+      // variables are.
+      // FIXME: ASTPrinter could refine the scope of feature checks.
+      for (auto i : range(pbd->getNumPatternEntries()))
+        pbd->getPattern(i)->forEachVariable(
+            [&](VarDecl *var) { addDependency(var); });
+    }
+
+    void visitValueDecl(ValueDecl *VD) {
+      visitDecl(VD);
+
+      // Drop a decl whose interface type includes a dropped decl.
+      addTypeDependencies(VD->getInterfaceType());
+
+      // The interface type doesn't show an opaque result type's constraints.
+      if (auto *opaque = VD->getOpaqueResultTypeDecl())
+        addOpaqueTypeDependencies(opaque);
+
+      addCustomAttributeDependencies(VD);
+    }
+
+    void visitAbstractFunctionDecl(AbstractFunctionDecl *AFD) {
+      visitValueDecl(AFD);
+
+      // Parameters' custom attributes are printed with the function.
+      for (auto *param : *AFD->getParameters())
+        addCustomAttributeDependencies(param);
+    }
+
+    void visitSubscriptDecl(SubscriptDecl *SD) {
+      visitValueDecl(SD);
+
+      // Parameters' custom attributes are printed with the function.
+      for (auto *param : *SD->getIndices())
+        addCustomAttributeDependencies(param);
+    }
+
+    void visitAssociatedTypeDecl(AssociatedTypeDecl *ATD) {
+      visitValueDecl(ATD);
+
+      // An associated type's default and where clause are printed with it.
+      addTypeDependencies(ATD->getDefaultDefinitionType());
+      addWhereClauseDependencies(WhereClauseOwner(ATD));
+    }
+
+    void visitGenericTypeDecl(GenericTypeDecl *gtd) {
+      visitTypeDecl(gtd);
+      addGenericRequirementDependencies(gtd);
+    }
+
+    void visitTypeAliasDecl(TypeAliasDecl *tad) {
+      visitGenericTypeDecl(tad);
+
+      // The underlying type is printed in addition to the interface type.
+      addTypeDependencies(tad->getUnderlyingType());
+    }
+
+    void visitEnumDecl(EnumDecl *ed) {
+      visitNominalTypeDecl(ed);
+
+      // Drop a frozen enum with a dropped case (prevents using the wrong memory
+      // layout).
+      addFragileMemberDependencies(ed, [](Decl *member) {
+        return isa<EnumElementDecl>(member);
+      });
+    }
+
+    void visitStructDecl(StructDecl *sd) {
+      visitNominalTypeDecl(sd);
+
+      // Drop a frozen struct with a dropped stored property (prevents using the
+      // wrong memory layout).
+      addFragileMemberDependencies(sd, [](Decl *member) {
+        if (auto var = dyn_cast<VarDecl>(member))
+          return var->hasStorage() && !var->isStatic();
+        return false;
+      });
+    }
+
+    void visitClassDecl(ClassDecl *cd) {
+      visitNominalTypeDecl(cd);
+
+      // Drop a frozen class with a dropped stored property (prevents using the
+      // wrong memory layout).
+      addFragileMemberDependencies(cd, [](Decl *member) {
+        if (auto var = dyn_cast<VarDecl>(member))
+          return var->hasStorage() && !var->isStatic();
+        return false;
+      });
+    }
+
+    void visitProtocolDecl(ProtocolDecl *pd) {
+      visitNominalTypeDecl(pd);
+
+      // Drop a protocol with a dropped requirement (prevents bad conformances).
+      for (auto *req : pd->getProtocolRequirements())
+        addDependency(req);
+    }
+
+    void visitEnumCaseDecl(EnumCaseDecl *cd) {
+      visitDecl(cd);
+
+      // A case decl is printed as a unit, so it's dropped if any element is.
+      // FIXME: ASTPrinter could refine the scope of feature checks.
+      for (auto *element : cd->getElements())
+        addDependency(element);
+    }
+  };
+
+  return decl->getASTContext().AllocateCopy(Collector().collect(decl));
 }
