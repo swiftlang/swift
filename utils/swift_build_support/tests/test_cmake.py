@@ -102,6 +102,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan(self):
@@ -118,6 +119,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_ubsan(self):
@@ -134,6 +136,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_tsan(self):
@@ -150,6 +153,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan_ubsan(self):
@@ -167,6 +171,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_ubsan_tsan(self):
@@ -184,6 +189,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_asan_ubsan_tsan(self):
@@ -202,6 +208,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_lsan(self):
@@ -218,6 +225,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_coverage_sanitizer(self):
@@ -234,6 +242,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_export_compile_commands(self):
@@ -250,6 +259,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_distcc(self):
@@ -267,6 +277,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_sccache(self):
@@ -284,6 +295,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_launcher(self):
@@ -304,6 +316,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_clang_compiler_version(self):
@@ -319,6 +332,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_clang_user_visible_version(self):
@@ -334,6 +348,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DLLVM_VERSION_MAJOR:STRING=9",
              "-DLLVM_VERSION_MINOR:STRING=0",
              "-DLLVM_VERSION_PATCH:STRING=0",
@@ -355,6 +370,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DCMAKE_MAKE_PROGRAM=" + self.which_ninja(args)])
 
     def test_common_options_full(self):
@@ -380,6 +396,7 @@ class CMakeTestCase(unittest.TestCase):
              "-DCMAKE_LIBTOOL:PATH=/path/to/libtool",
              "-DCMAKE_AR:PATH=/path/to/ar",
              "-DCMAKE_RANLIB:PATH=/path/to/ranlib",
+             "-DCMAKE_Swift_COMPILATION_MODE=$<IF:$<CONFIG:Debug>,incremental,wholemodule>",
              "-DLLVM_VERSION_MAJOR:STRING=9",
              "-DLLVM_VERSION_MINOR:STRING=0",
              "-DLLVM_VERSION_PATCH:STRING=0",
