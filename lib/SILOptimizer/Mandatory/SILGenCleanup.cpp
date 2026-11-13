@@ -104,64 +104,7 @@ namespace {
 // satisfied.
 struct SILGenCleanup : SILFunctionTransform {
   void run() override;
-
-  bool removeAccessToNonDestructiveEnumProjection(SILFunction *function);
 };
-
-// When switching over an address enum with a potentially noncopyable payload,
-// SILGen emits a scoped 'begin_access' in the payload projection block. This
-// scoped access is problematic when returning a borrowing of the projection for
-// non-destructive enums because it gets treated as an escape:
-//
-//   extension Optional where Wrapped: ~Copyable & ~Escapable {
-//     func borrow() -> Borrow<Wrapped>? {
-//       switch self {
-//       case .some(let wrapped):
-//         return Borrow(wrapped)
-//       case .none:
-//         return nil
-//       }
-//     }
-//   }
-//
-// The above is perfectly safe since projecting the wrapped value out of an
-// optional does not destroy the enum value itself. For destructive enums
-// however, the above cannot possibly work because after switching over the
-// value we need to reconstruct the enum, so borrows cannot be returned from
-// such scopes (they could be yielded). Remove this scoped access for
-// non-destructive cases only.
-bool SILGenCleanup::removeAccessToNonDestructiveEnumProjection(
-                                                        SILFunction *function) {
-  auto changed = false;
-
-  for (auto &bb : *function) {
-    for (auto &inst : bb) {
-      auto beginAccess = dyn_cast<BeginAccessInst>(&inst);
-
-      if (!beginAccess) {
-        continue;
-      }
-
-      auto enumProjection =
-          dyn_cast<UncheckedInPlaceEnumDataAddrInst>(beginAccess->getSource());
-
-      if (!enumProjection) {
-        continue;
-      }
-
-      for (auto end : beginAccess->getEndAccesses()) {
-        end->eraseFromParent();
-      }
-
-      beginAccess->replaceAllUsesWith(enumProjection);
-      beginAccess->eraseFromParent();
-
-      changed = true;
-    }
-  }
-
-  return changed;
-}
 
 static void removeEndFormalScopeMarkers(SILFunction &f) {
   // TODO: Skip this when lifetime resolution is enabled, since that pass
@@ -209,7 +152,6 @@ void SILGenCleanup::run() {
   removeEndFormalScopeMarkers(*function);
   removeUnreachableBlocks(*function);
   bool changed = fixupBorrowAccessors(getPassManager(), function);
-  changed |= removeAccessToNonDestructiveEnumProjection(function);
   breakInfiniteLoops(getPassManager(), function);
   completeAllLifetimes(getPassManager(), function,
                        /*includeTrivialVars=*/true);
