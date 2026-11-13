@@ -2749,7 +2749,7 @@ namespace {
         
         SmallVector<std::pair<APInt, llvm::BasicBlock*>, 4> cases;
         
-        auto elements = getPayloadElement()->getParentEnum()->getAllElements();
+        auto elements = getPayloadElement()->getParentEnum()->getExpandedElements();
         unsigned inhabitant = 0;
         for (auto i = elements.begin(), end = elements.end();
              i != end && inhabitant < numExtraInhabitants;
@@ -6582,7 +6582,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   ResilienceExpansion layoutScope =
       TC.IGM.getResilienceExpansionForLayout(theEnum);
   // TODO: [availability] Only enumerate the elements available during lowering.
-  for (auto elt : theEnum->getAllElements()) {
+  for (auto elt : theEnum->getExpandedElements()) {
     ++numElements;
 
     if (!elt->hasAssociatedValues()) {

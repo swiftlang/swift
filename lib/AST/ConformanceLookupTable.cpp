@@ -1105,10 +1105,34 @@ void ConformanceLookupTable::registerProtocolConformance(
   dcConformances.push_back(entry);
 }
 
+void ConformanceLookupTable::addSimpleEnumConformancesIfNeeded(
+    NominalTypeDecl *nominal) {
+  if (!PendingSimpleEnumConformances)
+    return;
+
+  PendingSimpleEnumConformances = false;
+  auto elements = cast<EnumDecl>(nominal)->getExpandedElements();
+  if (elements.empty() || llvm::any_of(elements, [](EnumElementDecl *element) {
+        return element->hasAssociatedValues();
+      }))
+    return;
+
+  auto &ctx = nominal->getASTContext();
+  for (auto kind : {KnownProtocolKind::Equatable, KnownProtocolKind::Hashable})
+    if (auto *proto = ctx.getProtocol(kind))
+      addSynthesizedConformance(nominal, proto, nominal);
+}
+
 bool ConformanceLookupTable::lookupConformance(
        NominalTypeDecl *nominal,
        ProtocolDecl *protocol, 
-       SmallVectorImpl<ProtocolConformance *> &conformances) {
+       SmallVectorImpl<ProtocolConformance *> &conformances,
+       bool includeSimpleEnumConformances) {
+  if (includeSimpleEnumConformances &&
+      (protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+       protocol->isSpecificProtocol(KnownProtocolKind::Hashable)))
+    addSimpleEnumConformancesIfNeeded(nominal);
+
   // Update to record all explicit and inherited conformances.
   updateLookupTable(nominal, ConformanceStage::Inherited);
 
@@ -1149,6 +1173,8 @@ void ConformanceLookupTable::lookupConformances(
        DeclContext *dc,
        std::vector<ProtocolConformance *> *conformances,
        SmallVectorImpl<ConformanceDiagnostic> *diagnostics) {
+  addSimpleEnumConformancesIfNeeded(nominal);
+
   // We need to expand all implied conformances before we can find
   // those conformances that pertain to this declaration context.
   updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
@@ -1213,6 +1239,8 @@ void ConformanceLookupTable::lookupConformances(
 void ConformanceLookupTable::getAllProtocols(
     NominalTypeDecl *nominal, SmallVectorImpl<ProtocolDecl *> &scratch,
     bool sorted) {
+  addSimpleEnumConformancesIfNeeded(nominal);
+
   // We need to expand all implied conformances to find the complete
   // set of protocols to which this nominal type conforms.
   updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
@@ -1270,6 +1298,8 @@ void ConformanceLookupTable::getAllConformances(
        NominalTypeDecl *nominal,
        bool sorted,
        SmallVectorImpl<ProtocolConformance *> &scratch) {
+  addSimpleEnumConformancesIfNeeded(nominal);
+
   // We need to expand and resolve all conformances to enumerate them.
   updateLookupTable(nominal, ConformanceStage::Resolved);
 
@@ -1291,6 +1321,8 @@ void ConformanceLookupTable::getAllConformances(
 void ConformanceLookupTable::getImplicitProtocols(
        NominalTypeDecl *nominal,
        SmallVectorImpl<ProtocolDecl *> &protocols) {
+  addSimpleEnumConformancesIfNeeded(nominal);
+
   for (auto conformance : AllConformances[nominal]) {
     if (conformance->getKind() == ConformanceEntryKind::Synthesized) {
       protocols.push_back(conformance->getProtocol());

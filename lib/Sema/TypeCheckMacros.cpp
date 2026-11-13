@@ -2056,7 +2056,10 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
   TinyPtrVector<ProtocolDecl *> introducedConformances;
   for (auto protocol : *potentialConformances) {
     SmallVector<ProtocolConformance *, 2> existingConformances;
-    nominal->lookupConformance(protocol, existingConformances);
+    // A member macro can change whether an enum is simple. Do not try to
+    // derive a conformance from the cases this expansion has yet to produce.
+    nominal->lookupConformance(protocol, existingConformances,
+                               /*includeSimpleEnumConformances=*/role != MacroRole::Member);
 
     bool hasExistingConformance = llvm::any_of(
         existingConformances,

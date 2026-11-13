@@ -27,5 +27,12 @@ macro Inspect() = #externalMacro(module: "MacroDefinition", type: "AddFactoryMac
 @Inspect
 @objc enum Variant: Int, Error { case first }
 
+@attached(member, conformances: Hashable, names: named(custom))
+macro InspectHashable() = #externalMacro(module: "MacroDefinition", type: "AddFactoryMacro")
+@InspectHashable enum Simple { case first }
+
 //--- other.swift
 func use() -> Variant { Variant.custom() }
+
+func requireHash<T: Hashable>(_ value: T) {}
+func checkSimpleEnum() { requireHash(Simple.custom()) }

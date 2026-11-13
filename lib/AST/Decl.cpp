@@ -7248,18 +7248,13 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
     = false;
 }
 
-void EnumDecl::expandMemberMacrosForElements() const {
-  // Member macros are custom attributes; skip the request entirely for the
-  // common case of an enum without any.
-  if (!getAttrs().hasAttribute<CustomAttr>())
-    return;
-
-  auto &ctx = getASTContext();
-  auto request = ExpandSynthesizedMemberMacroRequest{const_cast<EnumDecl *>(this)};
-  // Conformance lookup during expansion can inspect this enum's elements.
-  // Only the members available so far can be observed by the expansion itself.
-  if (!ctx.evaluator.hasActiveRequest(request))
-    (void)evaluateOrDefault(ctx.evaluator, request, {});
+EnumDecl::ElementRange EnumDecl::getExpandedElements() const {
+  if (getExpandedAttrs().hasAttribute<CustomAttr>()) {
+    auto &ctx = getASTContext();
+    (void)evaluateOrDefault(ctx.evaluator,
+        ExpandSynthesizedMemberMacroRequest{const_cast<EnumDecl *>(this)}, {});
+  }
+  return getAllElements();
 }
 
 Type EnumDecl::getRawType() const {

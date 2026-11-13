@@ -9,6 +9,8 @@
 // is not treated as trivial.
 // RUN: %target-swift-emit-silgen -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name Test -primary-file %t/other.swift %t/enums.swift | %FileCheck %t/other.swift
 
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -verify %t/conformances.swift
+
 //--- MacroDefinition.swift
 import SwiftSyntax
 import SwiftSyntaxMacros
@@ -58,3 +60,25 @@ struct ArbitraryHolder {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4Test15ArbitraryHolderV3keyAcA0B3KeyO_tcfC :
 // CHECK: bb0(%0 : @owned $ArbitraryKey, %1 : $@thin ArbitraryHolder.Type):
+
+//--- conformances.swift
+protocol Marker {}
+@attached(member, conformances: Marker, names: named(custom))
+macro WithMarker() = #externalMacro(module: "MacroDefinition", type: "AddPayloadCaseMacro")
+@attached(member, names: named(custom))
+macro WithoutMarker() = #externalMacro(module: "MacroDefinition", type: "AddPayloadCaseMacro")
+
+enum Written { case plain, custom(String) }
+@WithMarker enum GeneratedWithMarker { case plain }
+@WithoutMarker enum GeneratedWithoutMarker { case plain }
+@WithMarker enum ExplicitlyHashable: Hashable { case plain }
+enum Simple { case plain }
+
+func requireHash<T: Hashable>(_ type: T.Type) {} // expected-note 3 {{where 'T' =}}
+func check() {
+  requireHash(Written.self) // expected-error {{requires that 'Written' conform to 'Hashable'}}
+  requireHash(GeneratedWithMarker.self) // expected-error {{requires that 'GeneratedWithMarker' conform to 'Hashable'}}
+  requireHash(GeneratedWithoutMarker.self) // expected-error {{requires that 'GeneratedWithoutMarker' conform to 'Hashable'}}
+  requireHash(ExplicitlyHashable.self)
+  requireHash(Simple.self)
+}
