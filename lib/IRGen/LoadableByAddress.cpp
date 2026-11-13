@@ -2421,9 +2421,8 @@ static void rewriteFunction(StructLoweringState &pass,
     SILType newSILType = pass.getNewSILType(pass.F->getLoweredFunctionType(),
                                             currSILType);
     auto varInfo = instr->getVarInfo();
-    // Update the debug variable type to match the new SSA type so the
-    // SIL verifier does not see a mismatch between the two.
-    if (varInfo && varInfo->Type)
+    // The variable type of an alloc_stack is its element type.
+    if (varInfo)
       varInfo->Type = newSILType.getObjectType();
     auto *newInstr =
         allocBuilder.createAllocStack(instr->getLoc(), newSILType, varInfo);
