@@ -2045,6 +2045,33 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
 
 // Collect the protocol conformances that the macro asked about but were
 // not already present on the declaration.
+// A member macro sees the implicit conformance of the enum as written.
+// Computing it from expanded members would make the macro input depend on
+// its own output or on which file triggered expansion.
+static bool hasParsedSimpleEnumConformance(NominalTypeDecl *nominal,
+                                           ProtocolDecl *protocol) {
+  auto *ed = dyn_cast<EnumDecl>(nominal);
+  if (!ed || !(protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+               protocol->isSpecificProtocol(KnownProtocolKind::Hashable)))
+    return false;
+  if (ed->getAttrs().hasAttribute<MoveOnlyAttr>() ||
+      ed->getAttrs().hasAttribute<NonEscapableAttr>())
+    return false;
+  for (auto kind : InvertibleProtocolSet::allKnown())
+    if (ed->suppressesConformance(getKnownProtocolKind(kind)))
+      return false;
+
+  bool hasCase = false;
+  for (auto *member : ed->getParsedMembers()) {
+    if (auto *elt = dyn_cast<EnumElementDecl>(member)) {
+      hasCase = true;
+      if (elt->hasAssociatedValues())
+        return false;
+    }
+  }
+  return hasCase;
+}
+
 static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
     NominalTypeDecl *nominal, MacroRole role, MacroDecl *macro,
     SmallVectorImpl<ProtocolDecl *> *potentialConformances = nullptr) {
@@ -2055,6 +2082,10 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
 
   TinyPtrVector<ProtocolDecl *> introducedConformances;
   for (auto protocol : *potentialConformances) {
+    if (role == MacroRole::Member &&
+        hasParsedSimpleEnumConformance(nominal, protocol))
+      continue;
+
     SmallVector<ProtocolConformance *, 2> existingConformances;
     // A member macro can change whether an enum is simple. Do not try to
     // derive a conformance from the cases this expansion has yet to produce.
