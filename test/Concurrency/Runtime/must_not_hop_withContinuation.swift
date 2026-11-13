@@ -29,8 +29,9 @@ if #available(SwiftStdlib 6.0, *) {
 // CHECK-NEXT: foo - withTaskExecutorPreference
 
 // After each continuation resumes, hop_to_executor targets the generic executor.
-// Since the task has a preferred task executor whose identity matches the current
-// serial executor, mustSwitchToRun elides the hop — no enqueue needed.
+// The task's preferred task executor is the current serial executor, so the
+// current context matches the preference and the code runs inline, without an
+// enqueue (canRunConcurrentCodeInline).
 
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation
 // CHECK-NEXT: foo - withTaskExecutorPreference - withCheckedContinuation done
