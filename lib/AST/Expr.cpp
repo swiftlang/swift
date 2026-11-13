@@ -1989,8 +1989,7 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   if (raw != InvalidDiscriminator)
     return raw;
 
-  ASTContext &ctx = getASTContext();
-  evaluateOrDefault(ctx.evaluator, LocalDiscriminatorsRequest{getParent()}, {});
+  getParent()->assignLocalDiscriminators();
 
 #if NDEBUG
   static constexpr bool useFallbackDiscriminator = true;
@@ -2004,6 +2003,7 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   //   3. We are within top-level code where there's nothing to anchor to
   //
   // then assign the next discriminator now.
+  ASTContext &ctx = getASTContext();
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
        getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||

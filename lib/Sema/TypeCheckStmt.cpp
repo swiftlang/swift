@@ -409,13 +409,36 @@ namespace {
 }
 
 evaluator::SideEffect
+BodyDiscriminatorsRequest::evaluate(Evaluator &eval, DeclContext *dc) const {
+  ASTNode body;
+  if (auto *func = dyn_cast<AbstractFunctionDecl>(dc)) {
+    if (!func->isBodySkipped())
+      body = func->getBody();
+  } else if (auto *tld = dyn_cast<TopLevelCodeDecl>(dc)) {
+    body = tld->getBody();
+  }
+  if (!body)
+    return {};
+
+  auto &ctx = dc->getASTContext();
+  SetLocalDiscriminators visitor(ctx.getNextDiscriminator(dc));
+  body.walk(visitor);
+  ctx.setMaxAssignedDiscriminator(dc, visitor.maxAssignedDiscriminator());
+  return {};
+}
+
+evaluator::SideEffect
 LocalDiscriminatorsRequest::evaluate(Evaluator &eval, DeclContext *dc) const {
   ASTContext &ctx = dc->getASTContext();
 
+  // Note that we've handled the body as part of this request.
+  if (isa<AbstractFunctionDecl, TopLevelCodeDecl>(dc))
+    eval.cacheOutput(BodyDiscriminatorsRequest{dc}, {});
+
   // Autoclosures aren't their own contexts; look to the parent instead.
   if (isa<AutoClosureExpr>(dc)) {
-    return evaluateOrDefault(eval, LocalDiscriminatorsRequest{dc->getParent()},
-                             {});
+    dc->getParent()->assignLocalDiscriminators();
+    return {};
   }
 
   ASTNode node;

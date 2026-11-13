@@ -4574,15 +4574,17 @@ unsigned ValueDecl::getLocalDiscriminator() const {
     return 0;
 
   // Assign local discriminators in this context.
-  ASTContext &ctx = getASTContext();
-  evaluateOrDefault(ctx.evaluator, LocalDiscriminatorsRequest{getDeclContext()},
-                    {});
+  // FIXME: If this a ParamDecl in a secondary file, this will assign
+  // discriminators for the function body too. We ought to be more granular
+  // here.
+  getDeclContext()->assignLocalDiscriminators();
 
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
   //   2. We are in a macro expansion buffer
   //
   // then assign the next discriminator now.
+  ASTContext &ctx = getASTContext();
   if (LocalDiscriminator == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
        (getLoc().isValid() &&
@@ -11543,6 +11545,7 @@ void AbstractFunctionDecl::setBodyToBeReparsed(SourceRange bodyRange) {
   keepOriginalBodySourceRange();
   BodyRange = bodyRange;
   setBodyKind(BodyKind::Unparsed);
+  setBodyHasDiscriminators(false);
 
   if (auto SF = getParentSourceFile()) {
     SF->getASTContext().evaluator.clearCachedOutput(LocalTypeDeclsRequest{SF});

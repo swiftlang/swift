@@ -472,6 +472,15 @@ void DeclContext::getSeparatelyImportedOverlays(
     SF->getSeparatelyImportedOverlays(declaring, overlays);
 }
 
+void DeclContext::assignLocalDiscriminators() {
+  auto &eval = getASTContext().evaluator;
+  evaluateOrDefault(eval, LocalDiscriminatorsRequest{this}, {});
+
+  // Also handle function/top-level bodies specially since they can be replaced.
+  if (isa<TopLevelCodeDecl, AbstractFunctionDecl>(this))
+    evaluateOrDefault(eval, BodyDiscriminatorsRequest{this}, {});
+}
+
 /// Determine whether the given context is generic at any level.
 bool DeclContext::isGenericContext() const {
   auto dc = this;

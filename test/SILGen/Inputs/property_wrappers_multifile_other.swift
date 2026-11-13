@@ -22,3 +22,22 @@ public struct PropertyWrapper {
     return false
   }
 }
+
+@propertyWrapper
+public struct ParameterWrapper<Value> {
+  public var wrappedValue: Value
+
+  public init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
+
+  public var projectedValue: ParameterWrapper<Value> { self }
+
+  public init(projectedValue: ParameterWrapper<Value>) {
+    self = projectedValue
+  }
+}
+
+public func takesWrappedParameter(@ParameterWrapper value: Int) {
+  _ = { value }
+}
