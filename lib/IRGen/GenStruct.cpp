@@ -136,8 +136,13 @@ namespace {
       return {};
     }
 
-    Type getInterfaceTypeForSerialization() const {
-      return Field ? Field->getInterfaceType() : Type();
+    Type getInterfaceTypeForSerialization(IRGenModule &IGM) const {
+      if (Field)
+        return Field->getInterfaceType();
+      if (MissingMember)
+        return HiddenType::get(IGM.Context, MissingMember->getStorageLayout(),
+                               CanType());
+      return Type();
     }
   };
 
@@ -172,7 +177,7 @@ namespace {
       return {};
     }
 
-    Type getInterfaceTypeForSerialization() const {
+    Type getInterfaceTypeForSerialization(IRGenModule &) const {
       return Field ? Field->getInterfaceType() : Type();
     }
   };
