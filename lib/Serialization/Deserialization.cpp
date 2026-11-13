@@ -4222,7 +4222,8 @@ public:
       MF.diagnoseAndConsumeError(overridden.takeError());
 
       return llvm::make_error<OverrideError>(
-          name, getErrorFlags(), numVTableEntries);
+          name, getErrorFlags(), numVTableEntries,
+          memberAbstractTypeLayoutID);
     }
 
     // Extract the accessor IDs.
@@ -4240,7 +4241,8 @@ public:
       if (!dependency) {
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
-            getErrorFlags(), numVTableEntries);
+            getErrorFlags(), numVTableEntries,
+            memberAbstractTypeLayoutID);
       }
     }
 
@@ -4263,7 +4265,10 @@ public:
 
     auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
     if (!interfaceTypeOrError)
-      return interfaceTypeOrError.takeError();
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(interfaceTypeOrError.takeError()),
+          getErrorFlags(), numVTableEntries,
+          memberAbstractTypeLayoutID);
     Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
@@ -9392,7 +9397,7 @@ ModuleFile::getClangType(ClangTypeID TID) {
 
 Decl *ModuleFile::handleErrorAndSupplyMissingClassMember(
     ASTContext &context, llvm::Error &&error,
-    ClassDecl *containingClass) const {
+    ClassDecl *containingClass) {
   Decl *suppliedMissingMember = nullptr;
   auto handleMissingClassMember = [&](const DeclDeserializationError &error) {
     if (error.isDesignatedInitializer())
@@ -9401,10 +9406,18 @@ Decl *ModuleFile::handleErrorAndSupplyMissingClassMember(
     if (error.getNumberOfTableEntries() > 0)
       containingClass->setHasMissingVTableEntries();
 
+    AbstractTypeLayout *storageLayout = nullptr;
+    if (auto layoutID = error.getMemberAbstractTypeLayoutID()) {
+      auto layout = getAbstractMemberTypeLayout(layoutID);
+      if (!layout)
+        fatal(layout.takeError());
+      storageLayout = layout.get();
+    }
+
     suppliedMissingMember = MissingMemberDecl::create(
         context, containingClass, error.getName(),
         error.getNumberOfTableEntries(),
-        error.needsFieldOffsetVectorEntry());
+        error.needsFieldOffsetVectorEntry(), storageLayout);
   };
 
   // Emit the diagnostics/remarks out of the ModularizationError
@@ -9458,7 +9471,7 @@ ModuleFile::handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const {
 Decl *
 ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
                                               Decl *container,
-                                              llvm::Error &&error) const {
+                                              llvm::Error &&error) {
   // Drop the member if it had a problem.
   // FIXME: Handle overridable members in class extensions too, someday.
   if (auto *containingClass = dyn_cast<ClassDecl>(container)) {

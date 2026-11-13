@@ -286,6 +286,7 @@ protected:
   DeclName name;
   Flags flags;
   uint8_t numTableEntries = 0;
+  MemberAbstractTypeLayoutID memberAbstractTypeLayoutID = {};
 
 public:
   DeclName getName() const {
@@ -300,6 +301,9 @@ public:
   }
   bool needsFieldOffsetVectorEntry() const {
     return flags.contains(Flag::NeedsFieldOffsetVectorEntry);
+  }
+  MemberAbstractTypeLayoutID getMemberAbstractTypeLayoutID() const {
+    return memberAbstractTypeLayoutID;
   }
 
   bool isA(const void *const ClassID) const override {
@@ -444,10 +448,12 @@ private:
 
 public:
   explicit OverrideError(DeclName name,
-                         Flags flags={}, unsigned numTableEntries=0) {
+                         Flags flags = {}, unsigned numTableEntries = 0,
+                         MemberAbstractTypeLayoutID memberLayoutID = {}) {
     this->name = name;
     this->flags = flags;
     this->numTableEntries = numTableEntries;
+    this->memberAbstractTypeLayoutID = memberLayoutID;
   }
 
   void log(raw_ostream &OS) const override {
@@ -509,11 +515,13 @@ class TypeError : public llvm::ErrorInfo<TypeError, DeclDeserializationError>,
 
 public:
   explicit TypeError(DeclName name, std::unique_ptr<ErrorInfoBase> reason,
-                     Flags flags={}, unsigned numTableEntries=0)
+                     Flags flags = {}, unsigned numTableEntries = 0,
+                     MemberAbstractTypeLayoutID memberLayoutID = {})
       : ErrorWithUnderlyingReason(std::move(reason)) {
     this->name = name;
     this->flags = flags;
     this->numTableEntries = numTableEntries;
+    this->memberAbstractTypeLayoutID = memberLayoutID;
   }
 
   void diagnose(const ModuleFile *MF) const;
