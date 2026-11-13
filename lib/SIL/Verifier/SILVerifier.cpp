@@ -4549,6 +4549,16 @@ public:
           loweredFieldTy, EI->getType(),
           "result of ref_element_addr does not match type of field");
     }
+    if (EI->getModule().getOptions().EnableImportPtrauthFieldFunctionPointers &&
+        EI->getField()->getPointerAuthQualifier().isPresent() &&
+        EI->getField()->hasClangNode()) {
+      for (auto *use : EI->getUses()) {
+        auto *bai = dyn_cast<BeginAccessInst>(use->getUser());
+        require(bai && bai->getEnforcement() == SILAccessEnforcement::Signed,
+                "Access to ptrauth qualified fields of a reference type should "
+                "be scoped with begin_access [signed]/end_access");
+      }
+    }
     EI->getFieldIndex();  // Make sure we can access the field without crashing.
     checkAddressWalkerCanVisitAllTransitiveUses(EI);
   }
