@@ -1016,15 +1016,11 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
             isClosureCapturedNonisolatedUnsafe);
       }
 
-      // All of the non-Sendable captures of non-escaping at-most-once
-      // closures that aren't explicitly `sending` are disconnected.
-      if (auto *closure = declRef.getClosureExpr();
-          closure && closure->hasCalledAtMostOnceSemantics()) {
-        auto *closureTy = closure->getType()->castTo<FunctionType>();
-        if (closureTy->getExtInfo().isNoEscape())
-          return SILIsolationInfo::getDisconnected(
-              isClosureCapturedNonisolatedUnsafe);
-      }
+      // The captures of non-escaping at-most-once closures that are inferred
+      // to be `sending` are disconnected.
+      if (isInferredSendingClosureCapture(fArg))
+        return SILIsolationInfo::getDisconnected(
+            isClosureCapturedNonisolatedUnsafe);
     }
   }
 
@@ -1798,6 +1794,30 @@ SILIsolationInfo SILIsolationInfo::getFunctionIsolation(SILFunction *fn) {
   }
 
   return {};
+}
+
+bool SILIsolationInfo::isInferredSendingClosureCapture(
+    SILFunctionArgument *arg) {
+  if (!arg->isClosureCapture() || arg->isSending())
+    return false;
+
+  auto declRef = arg->getFunction()->getDeclRef();
+  if (!declRef)
+    return false;
+
+  auto *closure = declRef.getClosureExpr();
+  if (!closure || !closure->hasCalledAtMostOnceSemantics())
+    return false;
+
+  auto *closureTy = closure->getType()->castTo<FunctionType>();
+  if (!closureTy->getExtInfo().isNoEscape())
+    return false;
+
+  // Listing a value in a capture list without `sending` opts it out of the
+  // inference, like in a regular closure. This includes the capture list of an
+  // enclosing closure, where the value isn't disconnected and so can't be sent.
+  auto *var = dyn_cast_or_null<VarDecl>(arg->getDecl());
+  return !var || !var->isCaptureList();
 }
 
 //===----------------------------------------------------------------------===//
