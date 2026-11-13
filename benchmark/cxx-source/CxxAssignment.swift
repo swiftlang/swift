@@ -49,7 +49,7 @@ func makeSetOnce() {
   initSet(setSize)
 }
 
-let vectorSize = 25_000
+let vectorSize = 100
 let setSize = 1_000
 let iterRepeatFactor = 50
 
