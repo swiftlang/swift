@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-library-evolution -module-name MyKit -emit-module-path %t/MyKit.swiftmodule -target %target-cpu-apple-macosx10.15 -DLIBRARY %s
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library -module-name Client -I %t -target %target-cpu-apple-macosx99 -DCLIENT %s | %FileCheck %s --check-prefix=NEW
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library -module-name Client -I %t -target %target-cpu-apple-macosx10.15 -DCLIENT %s | %FileCheck %s --check-prefix=OLD
+// RUN: split-file %s %t
+// RUN: %target-swift-frontend -emit-module -parse-as-library -enable-library-evolution -module-name MyKit -emit-module-path %t/MyKit.swiftmodule -target %target-cpu-apple-macosx10.15 %t/MyKit.swift
+// RUN: %target-swift-frontend -O -emit-sil -parse-as-library -module-name Client -I %t -target %target-cpu-apple-macosx99 %t/Client.swift | %FileCheck %t/Client.swift --check-prefix=NEW
+// RUN: %target-swift-frontend -O -emit-sil -parse-as-library -module-name Client -I %t -target %target-cpu-apple-macosx10.15 %t/Client.swift | %FileCheck %t/Client.swift --check-prefix=OLD
 
 // REQUIRES: OS=macosx
 
@@ -10,7 +11,7 @@
 // (and so calls it directly) can inline and specialize it. A client that goes
 // through the back deployment thunk can too.
 
-#if LIBRARY
+//--- MyKit.swift
 
 @backDeployed(before: macOS 50.3)
 @inlinable
@@ -27,7 +28,7 @@ public struct Box {
   public var value: Int { 42 }
 }
 
-#else
+//--- Client.swift
 
 import MyKit
 
@@ -54,5 +55,3 @@ public func test(_ x: Int) -> Int {
 public func testProperty() -> Int {
   Box().value
 }
-
-#endif
