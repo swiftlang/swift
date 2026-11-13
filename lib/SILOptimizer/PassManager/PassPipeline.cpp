@@ -96,6 +96,9 @@ static void addLifetimeResolutionPasses(SILPassPipelinePlan &P) {
   P.addLifetimeResolution();
   P.addDiagnoseResolvedLifetimes();
 
+  // Run the verifier in non-asserts builds to double-check LifetimeResolution.
+  P.addVerifier();
+
   // Remaining pieces of DefiniteInitialization we still rely-on.
   P.addLetPropertyLowering();
   P.addRawSILInstLowering();
