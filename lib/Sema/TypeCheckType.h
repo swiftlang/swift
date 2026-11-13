@@ -815,9 +815,8 @@ class ScopeBinder {
   /// declaration.
   const ScopeBinder *Parent;
   /// The scopes of the accesses of `Fn`'s parameters, relative to this
-  /// binder's function type, or `nullopt` for one whose `@_accessScope` was
-  /// diagnosed. Only set for the declaration.
-  ArrayRef<std::optional<ScopeRef>> ParamAccesses;
+  /// binder's function type. Only set for the declaration.
+  ArrayRef<ScopeRef> ParamAccesses;
   /// Whether something refers to the access of `self`. Only set for the
   /// declaration.
   bool IsSelfReferenced = false;
@@ -860,7 +859,7 @@ public:
 
   /// The scope of the access of the declaration's parameter \p index relative
   /// to this binder, or `nullopt` if its binding was diagnosed.
-  std::optional<ScopeRef> lookUpParamAccess(unsigned index) const;
+  ScopeRef lookUpParamAccess(unsigned index) const;
 
   /// The scope of the access of `self` relative to this binder, which the
   /// method's outer type binds.
@@ -875,9 +874,8 @@ Type applyScopedAttr(const ScopeBinder &binder, ScopedTypeAttr *attr, Type ty);
 /// Resolve the scope the `@_accessScope` on \p repr binds a parameter's access
 /// to, relative to \p binder. Checks that \p flags isn't consuming. Returns the
 /// call's body if there's none, and `nullopt` if it was diagnosed
-std::optional<ScopeRef> resolveAccessBinding(const ScopeBinder &binder,
-                                             TypeRepr *repr,
-                                             ParameterTypeFlags flags);
+ScopeRef resolveAccessBinding(const ScopeBinder &binder,
+                              TypeRepr *repr, ParameterTypeFlags flags);
 
 /// Check that \p ty, the type of a parameter or result in \p fn's signature
 /// resolved from \p repr, is saturated with scopes, diagnosing and returning an

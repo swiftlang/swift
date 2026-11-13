@@ -5181,8 +5181,10 @@ static RecursiveTypeProperties getFunctionRecursiveProperties(
     Type thrownError,
     ArrayRef<ASTExtInfoBuilder::TypeDependency> typeDependencies) {
   RecursiveTypeProperties properties;
-  for (auto param : params)
+  for (auto param : params) {
     properties |= param.getPlainType()->getRecursiveProperties();
+    properties |= param.getAccessScope().getRecursiveProperties();
+  }
   for (auto yield : yields)
     properties |= yield.getType()->getRecursiveProperties();
   properties |= result->getRecursiveProperties();

@@ -3318,7 +3318,8 @@ public:
       assert(!t->is<InOutType>() && "set flags instead");
       ASSERT(accessScope.getKind() != ScopeRef::Kind::Immortal &&
              "an access can't be immortal");
-      ASSERT((accessScope == ScopeRef::forCallBody() ||
+      ASSERT(((accessScope == ScopeRef::forCallBody() ||
+               accessScope.isError()) ||
               f.getValueOwnership() != ValueOwnership::Owned) &&
              "consumed parameters have no access");
     }
