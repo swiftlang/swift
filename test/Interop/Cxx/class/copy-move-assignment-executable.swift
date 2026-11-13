@@ -68,4 +68,36 @@ CxxCopyMoveAssignTestSuite.test("move assignment falls back to copy assignment")
     expectEqual(0, InstanceBalanceCounter.getCounterValue())
 }
 
+CxxCopyMoveAssignTestSuite.test("Optional<NonTrivialCopyAssign>") {
+    do {
+        var instance: NonTrivialCopyAssign? = NonTrivialCopyAssign()
+        expectEqual(0, instance!.copyAssignCounter)
+        let instance2: NonTrivialCopyAssign? = NonTrivialCopyAssign()
+        instance = instance2
+        // `operator=` is called.
+        expectEqual(1, instance!.copyAssignCounter)
+        takeValue(instance2)
+    }
+    // The number of constructors and destructors called for `NonTrivialCopyAssign` must be balanced.
+    expectEqual(0, InstanceBalanceCounter.getCounterValue())
+}
+
+struct HoldsNonTrivialCopyAssign {
+    var value = NonTrivialCopyAssign()
+}
+
+CxxCopyMoveAssignTestSuite.test("struct holding NonTrivialCopyAssign") {
+    do {
+        var instance = HoldsNonTrivialCopyAssign()
+        expectEqual(0, instance.value.copyAssignCounter)
+        let instance2 = HoldsNonTrivialCopyAssign()
+        instance = instance2
+        // `operator=` is called.
+        expectEqual(1, instance.value.copyAssignCounter)
+        takeValue(instance2)
+    }
+    // The number of constructors and destructors called for `NonTrivialCopyAssign` must be balanced.
+    expectEqual(0, InstanceBalanceCounter.getCounterValue())
+}
+
 runAllTests()
