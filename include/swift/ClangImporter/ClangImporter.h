@@ -847,6 +847,8 @@ public:
   const clang::CXXMethodDecl *
   getAssignmentOperator(const clang::CXXRecordDecl *decl, bool isMove);
 
+  static bool hasNonTrivialAssignmentOperator(Type type);
+
   void checkCalledClangFunction(const ValueDecl *funcDecl,
                                 SourceLoc callSiteLoc) override;
 
