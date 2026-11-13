@@ -102,6 +102,7 @@
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "clang/AST/DeclCXX.h"
 
 using namespace swift;
 
@@ -970,6 +971,20 @@ bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
 // Pipeline Pass
 // =============================================================================
 
+static bool hasCxxAssignmentOperator(SILType type) {
+  auto *structDecl = type.getStructDecl();
+  if (!structDecl)
+    return false;
+
+  auto *cxxRecordDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(structDecl->getClangDecl());
+  if (!cxxRecordDecl)
+    return false;
+
+  return cxxRecordDecl->hasNonTrivialCopyAssignment() ||
+         cxxRecordDecl->hasNonTrivialMoveAssignment();
+}
+
 namespace {
 class DestroyAddrHoisting : public swift::SILFunctionTransform {
   void run() override;
@@ -1072,7 +1087,8 @@ void DestroyAddrHoisting::run() {
           sis.push_back(si);
         }
       } else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
-        if (cai->isInitializationOfDest() == IsNotInitialization) {
+        if (cai->isInitializationOfDest() == IsNotInitialization &&
+            !hasCxxAssignmentOperator(cai->getDest()->getType())) {
           cais.push_back(cai);
         }
       }
