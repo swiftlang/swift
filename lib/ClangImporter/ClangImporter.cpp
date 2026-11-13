@@ -8384,6 +8384,9 @@ Type ClangImporter::importVarDeclType(
   if (!importedType)
     return ErrorType::get(Impl.SwiftContext);
 
+  if (!swiftDecl)
+    return importedType.getType();
+
   if (auto attr = swiftDecl->getAttrs().getAttribute<CArrayProjectionAttr>()) {
     importedType =
         importer::computeLegacyCArrayType(importedType, attr->getProjection());
