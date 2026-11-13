@@ -18,6 +18,7 @@
 #define SWIFT_AST_SCOPERESTRICTIONS_H
 
 #include "swift/AST/Identifier.h"
+#include "swift/AST/RecursiveTypeProperties.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/Located.h"
@@ -210,6 +211,8 @@ public:
 class ScopeRef {
 public:
   enum class Kind : uint8_t {
+    /// There was an error resolving this scope.
+    Error,
     /// The global scope, which outlives every other scope. Lives "sufficiently
     /// long". Escapable types have immortal scope.
     Immortal,
@@ -224,21 +227,45 @@ public:
   };
 
 private:
+  static bool hasDepth(Kind kind) {
+    switch (kind) {
+    case Kind::Error:
+    case Kind::Immortal:
+      return false;
+    case Kind::Param:
+    case Kind::Body:
+      return true;
+    }
+    llvm_unreachable("bad kind");
+  }
+
+  static bool hasIndex(Kind kind) {
+    switch (kind) {
+    case Kind::Error:
+    case Kind::Immortal:
+    case Kind::Body:
+      return false;
+    case Kind::Param:
+      return true;
+    }
+    llvm_unreachable("bad kind");
+  }
+
   static constexpr unsigned NumKindBits = 2;
   static constexpr unsigned NumDataBits = 32 - NumKindBits;
-  static constexpr unsigned NumParamIndexBits = 15;
-  static constexpr unsigned NumParamDepthBits = NumDataBits - NumParamIndexBits;
-  static constexpr uint32_t ParamIndexMask =
-      llvm::maskTrailingOnes<uint32_t>(NumParamIndexBits);
-  static constexpr unsigned ParamDepthShift = NumParamIndexBits;
+  static constexpr unsigned NumIndexBits = 15;
+  static constexpr unsigned NumDepthBits = NumDataBits - NumIndexBits;
+  static constexpr uint32_t IndexMask =
+      llvm::maskTrailingOnes<uint32_t>(NumIndexBits);
+  static constexpr unsigned DepthShift = NumIndexBits;
   static_assert(llvm::isUInt<NumKindBits>(unsigned(Kind::Last_Kind)),
                 "unable to fit a ScopeRef::Kind in the given number of bits");
 
   uint32_t TheKind : NumKindBits;
   /// Interpreted according to the kind:
-  /// - 32 of 0 for `Immortal`,
-  /// - `NumParamDepthBits` then `NumParamIndexBits` for `Param`
-  /// - `NumParamDepthBits` followed by `NumParamDepthBits` of 0 for `Body`
+  /// - all zero for `Error` and `Immortal`,
+  /// - `NumDepthBits` then `NumIndexBits` for `Param`
+  /// - `NumDepthBits` followed by `NumIndexBits` of 0 for `Body`
   uint32_t Data : NumDataBits;
 
   ScopeRef(Kind kind, uint32_t data) : TheKind(unsigned(kind)), Data(data) {
@@ -246,19 +273,21 @@ private:
   }
 
 public:
+  static ScopeRef forError() { return {Kind::Error, 0}; }
+
   static ScopeRef forImmortal() { return {Kind::Immortal, 0}; }
 
   static ScopeRef forParam(ScopeDepth depth, unsigned index) {
-    ASSERT(llvm::isUInt<NumParamDepthBits>(depth.Value) &&
-           llvm::isUInt<NumParamIndexBits>(index) &&
+    ASSERT(llvm::isUInt<NumDepthBits>(depth.Value) &&
+           llvm::isUInt<NumIndexBits>(index) &&
            "scope reference overflow");
-    return {Kind::Param, (depth.Value << ParamDepthShift) | index};
+    return {Kind::Param, (depth.Value << DepthShift) | index};
   }
 
   static ScopeRef forBody(ScopeDepth depth) {
-    ASSERT(llvm::isUInt<NumParamDepthBits>(depth.Value) &&
+    ASSERT(llvm::isUInt<NumDepthBits>(depth.Value) &&
            "scope reference overflow");
-    return {Kind::Body, depth.Value << ParamDepthShift};
+    return {Kind::Body, depth.Value << DepthShift};
   }
 
   /// Create a Body scope at depth 0, to use as the default access scope of a
@@ -266,6 +295,10 @@ public:
   static ScopeRef forCallBody() { return forBody(ScopeDepth::zero()); }
 
   Kind getKind() const { return Kind(TheKind); }
+
+  /// Is this the placeholder error scope, used when there was an error
+  /// resolving a scope specifier?
+  bool isError() const { return getKind() == Kind::Error; }
 
   /// The number of function types between this reference and its binder.
   ///
@@ -276,8 +309,8 @@ public:
   /// Here `&a` has depth 1, since the type of `body` is between it and the
   /// type of `with`.
   ScopeDepth getDepth() const {
-    ASSERT(getKind() != Kind::Immortal);
-    return ScopeDepth(Data >> ParamDepthShift);
+    ASSERT(hasDepth(getKind()));
+    return ScopeDepth(Data >> DepthShift);
   }
 
   /// The index of the scope parameter in its binder.
@@ -292,8 +325,8 @@ public:
   /// `&b`, the access scope of `b`, has index 2, since the result refers to it.
   /// The accesses of `a`, `x`, and `y` are body scopes and don't have an index.
   unsigned getIndex() const {
-    ASSERT(getKind() == Kind::Param);
-    return Data & ParamIndexMask;
+    ASSERT(hasIndex(getKind()));
+    return Data & IndexMask;
   }
 
   /// Reference the same scope from \p by more function types in.
@@ -301,6 +334,7 @@ public:
   /// Immortal scopes are not shifted, since they are global.
   ScopeRef shifted(ScopeDepth by) const {
     switch (getKind()) {
+    case Kind::Error:
     case Kind::Immortal:
       return *this;
     case Kind::Param:
@@ -309,6 +343,13 @@ public:
       return forBody(ScopeDepth(getDepth().Value + by.Value));
     }
     llvm_unreachable("unhandled kind");
+  }
+
+  /// Return the recursive properties that would apply to a type
+  /// with this scope reference as a component.
+  RecursiveTypeProperties getRecursiveProperties() const {
+    if (isError()) return RecursiveTypeProperties::HasError;
+    return {};
   }
 
   /// Prints `^depth.index`, `^depth.body`, or `immortal`.

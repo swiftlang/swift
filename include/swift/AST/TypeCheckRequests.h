@@ -5538,9 +5538,9 @@ public:
 /// parameters and `self`, before being written into `Param`s.
 struct ParamAccessScopes {
   /// For each parameter index, what access scope should it have relative to
-  /// the declaration's type, or `nullopt` for a parameter whose
-  /// `@_accessScope` was diagnosed.
-  ArrayRef<std::optional<ScopeRef>> Params;
+  /// the declaration's type. These can be error scopes if there was a
+  /// problem resolving the parameter.
+  ArrayRef<ScopeRef> Params;
   /// Whether something refers to the access of `self`, requiring the outer
   /// function type to have a scope parameter.
   bool IsSelfReferenced = false;

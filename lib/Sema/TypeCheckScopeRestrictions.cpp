@@ -217,7 +217,7 @@ std::optional<ScopeRef> ScopeBinder::lookUpScopeParam(ScopeName name) const {
   return std::nullopt;
 }
 
-std::optional<ScopeRef> ScopeBinder::lookUpParamAccess(unsigned index) const {
+ScopeRef ScopeBinder::lookUpParamAccess(unsigned index) const {
   auto depth = ScopeDepth::zero();
   auto *at = this;
   for (; at->Parent; at = at->Parent)
@@ -225,11 +225,9 @@ std::optional<ScopeRef> ScopeBinder::lookUpParamAccess(unsigned index) const {
   ASSERT(index < at->ParamAccesses.size() &&
          "the accesses of the parameters are resolved");
   auto access = at->ParamAccesses[index];
-  if (!access)
-    return std::nullopt;
-  ASSERT(*access != ScopeRef::forCallBody() &&
+  ASSERT(access != ScopeRef::forCallBody() &&
          "every access the signature refers to has a scope");
-  return access->shifted(depth);
+  return access.shifted(depth);
 }
 
 ScopeRef ScopeBinder::lookUpSelfAccess() const {
@@ -335,10 +333,10 @@ void swift::checkDeclaredScopeParams(const ScopeBinder &binder,
 //===----------------------------------------------------------------------===//
 
 /// Resolves \p repr, a scope written on a parameter or result of \p binder's
-/// function type, returning `nullopt` if it doesn't resolve. Diagnoses unknown
-/// scopes if they haven't already been diagnosed.
-static std::optional<ScopeRef> resolveWrittenScope(const ScopeBinder &binder,
-                                                   ScopeRepr repr) {
+/// function type, returning an error scope if it doesn't resolve. Diagnoses
+/// unknown scopes if they haven't already been diagnosed.
+static ScopeRef resolveWrittenScope(const ScopeBinder &binder,
+                                    ScopeRepr repr) {
   auto *fn = binder.getFunction();
   auto &ctx = fn->getASTContext();
   auto &diags = ctx.Diags;
@@ -352,17 +350,17 @@ static std::optional<ScopeRef> resolveWrittenScope(const ScopeBinder &binder,
     auto name = repr.getScopeName().getIdentifier();
     if (binder.namesFunctionTypeParam(name)) {
       diags.diagnose(loc, diag::scoped_function_type_param);
-      return std::nullopt;
+      return ScopeRef::forError();
     }
     if (auto scope = binder.lookUpScopeParam(repr.getScopeName()))
-      return scope;
+      return *scope;
     // TODO: Support the scope of a parameter's type as a shorthand for a scope
     // parameter?
     if (findParam(fn, name))
       diags.diagnose(loc, diag::scoped_param_scope_unsupported, name);
     else
       diags.diagnose(loc, diag::scope_unknown, name);
-    return std::nullopt;
+    return ScopeRef::forError();
   }
 
   case ScopeRepr::Kind::Self:
@@ -370,18 +368,18 @@ static std::optional<ScopeRef> resolveWrittenScope(const ScopeBinder &binder,
       diags.diagnose(loc, diag::scoped_param_scope_unsupported, ctx.Id_self);
     else
       diags.diagnose(loc, diag::scoped_unknown_param, ctx.Id_self);
-    return std::nullopt;
+    return ScopeRef::forError();
 
   case ScopeRepr::Kind::AccessedValue: {
     auto name = repr.getAccessedValue();
     if (binder.namesFunctionTypeParam(name)) {
       diags.diagnose(loc, diag::scoped_function_type_param);
-      return std::nullopt;
+      return ScopeRef::forError();
     }
     auto index = findParam(fn, name);
     if (!index) {
       diags.diagnose(loc, diag::scoped_unknown_param, name);
-      return std::nullopt;
+      return ScopeRef::forError();
     }
     return binder.lookUpParamAccess(*index);
   }
@@ -428,10 +426,14 @@ Type swift::applyScopedAttr(const ScopeBinder &binder, ScopedTypeAttr *attr,
     return ErrorType::get(ctx);
   }
   auto scope = resolveWrittenScope(binder, restriction.getScope());
-  if (!scope)
+
+  // TODO: form the application even for an error scope. The constraint
+  // system seems to be happier if we don't, though.
+  if (scope.isError())
     return ErrorType::get(ctx);
+
   return NominalType::get(nominal->getDecl(), nominal->getParent(),
-                          nominal->getGenericArgs(), ctx, *scope);
+                          nominal->getGenericArgs(), ctx, scope);
 }
 
 //===----------------------------------------------------------------------===//
@@ -439,12 +441,12 @@ Type swift::applyScopedAttr(const ScopeBinder &binder, ScopedTypeAttr *attr,
 //===----------------------------------------------------------------------===//
 
 /// Resolve the scope \p binding binds its access to, relative to \p binder.
-/// Returns `nullopt` if it doesn't resolve or was already diagnosed, and
-/// diagnoses it if it wasn't.
-static std::optional<ScopeRef> resolveBinding(const ScopeBinder &binder,
-                                              AccessScopeTypeAttr *binding) {
+/// Returns an error scope if it doesn't resolve or was already diagnosed,
+/// and diagnoses it if it wasn't.
+static ScopeRef resolveBinding(const ScopeBinder &binder,
+                               AccessScopeTypeAttr *binding) {
   if (binding->isInvalid())
-    return std::nullopt;
+    return ScopeRef::forError();
   auto scope = binding->getScope();
   ASSERT(scope.getKind() != ScopeRepr::Kind::Immortal &&
          "a binding to 'immortal' is invalid");
@@ -453,23 +455,24 @@ static std::optional<ScopeRef> resolveBinding(const ScopeBinder &binder,
           !findParam(binder.getFunction(), scope.getAccessedValue())) &&
          "a binding to another parameter's access is invalid");
   auto resolved = resolveWrittenScope(binder, scope);
-  if (!resolved)
+  if (resolved.isError())
     binding->setInvalid();
   return resolved;
 }
 
-std::optional<ScopeRef> swift::resolveAccessBinding(const ScopeBinder &binder,
-                                                    TypeRepr *repr,
-                                                    ParameterTypeFlags flags) {
+ScopeRef swift::resolveAccessBinding(const ScopeBinder &binder,
+                                     TypeRepr *repr,
+                                     ParameterTypeFlags flags) {
   auto &diags = binder.getFunction()->getASTContext().Diags;
   auto *binding = getAccessBinding(diags, repr);
   if (!binding)
     return ScopeRef::forCallBody();
   auto scope = resolveBinding(binder, binding);
-  if (scope && flags.getValueOwnership() == ValueOwnership::Owned) {
+  if (!scope.isError() &&
+      flags.getValueOwnership() == ValueOwnership::Owned) {
     diags.diagnose(binding->getAttrLoc(), diag::scoped_consuming_param);
     binding->setInvalid();
-    return std::nullopt;
+    scope = ScopeRef::forError();
   }
   return scope;
 }
@@ -511,7 +514,7 @@ ParamAccessScopesRequest::evaluate(Evaluator &evaluator,
   // without the accesses of the parameters.
   ScopeBinder binder(fn, accesses);
   unsigned next = binder.getDeclared().size();
-  SmallVector<std::optional<ScopeRef>> paramAccesses;
+  SmallVector<ScopeRef> paramAccesses;
   for (auto [param, referenced] : llvm::zip_equal(*params, isReferenced)) {
     auto *repr = param->getTypeRepr();
     auto *binding = repr ? getAccessBinding(diags, repr) : nullptr;
@@ -608,10 +611,8 @@ void swift::addScopes(AbstractFunctionDecl *fn,
                                   ParamAccessScopesRequest{fn});
   for (auto [param, paramDecl, access] :
        llvm::zip_equal(params, *fn->getParameters(), accesses.Params))
-    // Checking the declaration diagnoses the access of a consumed parameter,
-    // and a parameter whose binding was diagnosed has an error type.
-    param = param.withAccessScope(hasAccess(paramDecl) && access
-                                      ? *access
+    param = param.withAccessScope(hasAccess(paramDecl)
+                                      ? access
                                       : ScopeRef::forCallBody());
   info = info.withScopeSignature(accesses.Signature);
 }
@@ -694,6 +695,7 @@ void swift::checkScopedSignature(AbstractFunctionDecl *fn) {
   for (auto [param, access] : llvm::zip_equal(*params, accesses.Params))
     if (auto *repr = param->getTypeRepr())
       // A binding that doesn't resolve was diagnosed.
-      if (auto *binding = getAccessBinding(ctx.Diags, repr); binding && access)
+      if (auto *binding = getAccessBinding(ctx.Diags, repr);
+          binding && !access.isError())
         checkAccess(fn, param, binding->getAttrLoc());
 }
