@@ -21,13 +21,15 @@ extension Constrained where T == Int { // expected-note 2{{requirement specified
 }
 
 struct Unconstrained<T> {
-  // expected-note@-1 4{{generic struct 'Unconstrained' declared here}}
-  // expected-note@-2 11{{'T' declared as parameter to type 'Unconstrained'}}
+  // expected-note@-1 5{{generic struct 'Unconstrained' declared here}}
+  // expected-note@-2 13{{'T' declared as parameter to type 'Unconstrained'}}
   typealias NonGeneric = Int
   typealias GenericParam = T
 
   typealias Unbound = OtherGeneric
   typealias Generic<U> = OtherGeneric<U>
+  typealias Outer<U> = Unconstrained<T>
+  // expected-note@-1 {{'U' declared as parameter to type 'Unconstrained'}}
 
   struct Inner {
     typealias Generic<U> = OtherGeneric<U>
@@ -37,6 +39,7 @@ struct Unconstrained<T> {
 // Referencing an unbound generic parameter through a typealias is always invalid.
 func invalid(
   _: Unconstrained.GenericParam, // expected-error {{reference to generic type 'Unconstrained' requires arguments in <...>}}
+  _: Unconstrained.Outer<String>, // expected-error {{reference to generic type 'Unconstrained' requires arguments in <...>}}
 ) {
   let _ = Unconstrained.GenericParam.self
   // expected-error@-1 {{generic parameter 'T' could not be inferred}}
@@ -73,6 +76,8 @@ func use(
   let _ = Unconstrained.NonGeneric.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
   let _ = Unconstrained.Unbound<String>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
   let _ = Unconstrained.Generic<String>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+  let _ = Unconstrained.Outer<String>.self // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}}
+  let _ = Unconstrained.Outer.self // expected-error {{generic parameter 'T' could not be inferred}} expected-error {{generic parameter 'U' could not be inferred}} expected-note 2{{explicitly specify the generic arguments to fix this issue}}
 
   let _ = Constrained<_>.NonGeneric.self // expected-error {{could not infer type for placeholder}}
   let _ = Constrained<_>.FakeGeneric.self // expected-error {{could not infer type for placeholder}}
