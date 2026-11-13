@@ -227,10 +227,13 @@ public:
                                                    Alignment storageAlign);
   const TypeInfo &getMetatypeTypeInfo(MetatypeRepresentation representation);
 
-#define REF_STORAGE(Name, ...) \
-  const TypeInfo *create##Name##StorageType(llvm::Type *valueType, \
-                                            ReferenceCounting style, \
-                                            bool isOptional);
+#define CHECKED_REF_STORAGE(Name, ...)                                         \
+  const TypeInfo *create##Name##StorageType(                                   \
+      llvm::Type *valueType, ReferenceCounting style, bool isOptional,         \
+      bool isNonTransferable);
+#define UNCHECKED_REF_STORAGE(Name, ...)                                       \
+  const TypeInfo *create##Name##StorageType(                                   \
+      llvm::Type *valueType, ReferenceCounting style, bool isOptional);
 #include "swift/AST/ReferenceStorage.def"
 
   llvm::Type *getExistentialType(unsigned numWitnessTables);
