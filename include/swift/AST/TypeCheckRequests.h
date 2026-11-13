@@ -5072,11 +5072,10 @@ public:
 
 /// Compute the local discriminators for the given declaration context.
 ///
-/// This is a state-changing operation for closures within the context, which
-/// produces the discriminator value that any subsequent requests should use.
+/// This is a state-changing operation for closures within the context.
 class LocalDiscriminatorsRequest
     : public SimpleRequest<LocalDiscriminatorsRequest,
-                           unsigned(DeclContext *),
+                           evaluator::SideEffect(DeclContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5084,7 +5083,7 @@ public:
 private:
   friend SimpleRequest;
 
-  unsigned evaluate(Evaluator &evaluator, DeclContext *dc) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator, DeclContext *dc) const;
 
 public:
   bool isCached() const { return true; }

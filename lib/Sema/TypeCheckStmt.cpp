@@ -408,15 +408,14 @@ namespace {
   };
 }
 
-unsigned LocalDiscriminatorsRequest::evaluate(
-    Evaluator &evaluator, DeclContext *dc
-) const {
+evaluator::SideEffect
+LocalDiscriminatorsRequest::evaluate(Evaluator &eval, DeclContext *dc) const {
   ASTContext &ctx = dc->getASTContext();
 
   // Autoclosures aren't their own contexts; look to the parent instead.
   if (isa<AutoClosureExpr>(dc)) {
-    return evaluateOrDefault(evaluator,
-                             LocalDiscriminatorsRequest{dc->getParent()}, 0);
+    return evaluateOrDefault(eval, LocalDiscriminatorsRequest{dc->getParent()},
+                             {});
   }
 
   ASTNode node;
@@ -455,7 +454,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
         cast<ValueDecl>(dc->getParent()->getAsDecl()),
         defaultArgInit->getIndex());
     if (!param)
-      return 0;
+      return {};
 
     node = param->getTypeCheckedDefaultExpr();
   } else if (auto propertyWrapperInit =
@@ -480,11 +479,10 @@ unsigned LocalDiscriminatorsRequest::evaluate(
     params = getParameterList(dc);
   }
 
-  auto startDiscriminator = ctx.getNextDiscriminator(dc);
   if (!node && !args && !params && !selfParam)
-    return startDiscriminator;
+    return {};
 
-  SetLocalDiscriminators visitor(startDiscriminator);
+  SetLocalDiscriminators visitor(ctx.getNextDiscriminator(dc));
 
   // Set local discriminator for the 'self' parameter.
   if (selfParam)
@@ -503,11 +501,8 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   if (args)
     args->walk(visitor);
 
-  unsigned nextDiscriminator = visitor.maxAssignedDiscriminator();
-  ctx.setMaxAssignedDiscriminator(dc, nextDiscriminator);
-
-  // Return the next discriminator.
-  return nextDiscriminator;
+  ctx.setMaxAssignedDiscriminator(dc, visitor.maxAssignedDiscriminator());
+  return {};
 }
 
 /// Emits an error with a fixit for the case of unnecessary cast over a

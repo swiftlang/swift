@@ -1990,8 +1990,7 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
     return raw;
 
   ASTContext &ctx = getASTContext();
-  evaluateOrDefault(
-      ctx.evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
+  evaluateOrDefault(ctx.evaluator, LocalDiscriminatorsRequest{getParent()}, {});
 
 #if NDEBUG
   static constexpr bool useFallbackDiscriminator = true;

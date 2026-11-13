@@ -4575,9 +4575,8 @@ unsigned ValueDecl::getLocalDiscriminator() const {
 
   // Assign local discriminators in this context.
   ASTContext &ctx = getASTContext();
-  evaluateOrDefault(
-      ctx.evaluator,
-      LocalDiscriminatorsRequest{getDeclContext()}, InvalidDiscriminator);
+  evaluateOrDefault(ctx.evaluator, LocalDiscriminatorsRequest{getDeclContext()},
+                    {});
 
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
