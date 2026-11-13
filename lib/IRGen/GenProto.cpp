@@ -2358,6 +2358,7 @@ namespace {
     SILWitnessTable *SILWT;
     ConformanceDescription Description;
     ConformanceFlags Flags;
+    bool ForDefiningModuleType;
 
     using PlaceholderPosition =
       ConstantAggregateBuilderBase::PlaceholderPosition;
@@ -2367,9 +2368,11 @@ namespace {
     ProtocolConformanceDescriptorBuilder(
                                  IRGenModule &IGM,
                                  ConstantStructBuilder &B,
-                                 const ConformanceDescription &description)
+                                 const ConformanceDescription &description,
+                                 bool forDefiningModuleType = false)
       : IGM(IGM), B(B), Conformance(description.conformance),
-        SILWT(description.wtable), Description(description) { }
+        SILWT(description.wtable), Description(description),
+        ForDefiningModuleType(forDefiningModuleType) { }
 
     void layout() {
       addProtocol();
@@ -2399,6 +2402,18 @@ namespace {
     }
 
     void addConformingType() {
+      // Refer to the defining module's descriptor for a back-deployed type,
+      // through a slot that is null when that module doesn't provide the
+      // type at runtime.
+      if (ForDefiningModuleType) {
+        auto *nominal = Conformance->getDeclContext()->getSelfNominalTypeDecl();
+        auto *slot = IGM.getAddrOfDefiningModuleTypeDescriptorSlot(nominal);
+        B.addRelativeAddress(slot);
+        Flags = Flags.withTypeReferenceKind(
+            TypeReferenceKind::IndirectTypeDescriptor);
+        return;
+      }
+
       // Add a relative reference to the type, with the type reference
       // kind stored in the flags.
       auto ref = getConformingEntityReference(IGM, Conformance);
@@ -2602,11 +2617,16 @@ namespace {
         auto symbolName =
           mangler.mangleProtocolConformanceInstantiationCache(Conformance);
         
-        auto privateData =
-          new llvm::GlobalVariable(IGM.Module, privateDataTy,
-                                   /*constant*/ false,
-                                   llvm::GlobalVariable::InternalLinkage,
-                                   privateDataInit, symbolName);
+        // The descriptors for a conformance that refer to the type in
+        // different ways share the cache, so that they produce the same
+        // witness tables.
+        llvm::Constant *privateData = IGM.Module.getNamedGlobal(symbolName);
+        if (!privateData)
+          privateData =
+            new llvm::GlobalVariable(IGM.Module, privateDataTy,
+                                     /*constant*/ false,
+                                     llvm::GlobalVariable::InternalLinkage,
+                                     privateDataInit, symbolName);
         B.addRelativeAddress(privateData);
       }
     }
@@ -2667,6 +2687,48 @@ void IRGenModule::emitProtocolConformance(
                                                  init.finishAndCreateFuture()));
   var->setConstant(true);
   setTrueConstGlobal(var);
+}
+
+/// Whether the conformance is declared by this module for a back-deployed
+/// type from another module.
+static bool isConformanceOfBackDeployedType(
+    const RootProtocolConformance *conformance) {
+  auto normal = dyn_cast<NormalProtocolConformance>(conformance);
+  if (!normal || normal->isConformanceOfProtocol())
+    return false;
+
+  auto *nominal = normal->getDeclContext()->getSelfNominalTypeDecl();
+  return nominal && nominal->isBackDeployedIntoClient() &&
+         !nominal->emitsConformanceIntoClient(normal->getDeclContext());
+}
+
+llvm::Constant *IRGenModule::emitCanonicalTypeProtocolConformance(
+    const ConformanceDescription &record) {
+  if (!isConformanceOfBackDeployedType(record.conformance))
+    return nullptr;
+
+  // The runtime only matches the conformance records of a type to the
+  // metadata of the defining module's copy of the type, which has a unique
+  // descriptor, when they refer to that descriptor. Emit a second record that
+  // does so, which is ignored when the defining module doesn't provide the
+  // type. The other record, which refers to this module's copy of the
+  // descriptor, applies in that case.
+  ConstantInitBuilder initBuilder(*this);
+  auto init = initBuilder.beginStruct();
+  ProtocolConformanceDescriptorBuilder builder(*this, init, record,
+                                               /*forDefiningModuleType=*/true);
+  builder.layout();
+
+  auto name =
+      "__swift_back_deployment_canonical_conformance_" +
+      LinkEntity::forProtocolConformanceDescriptor(record.conformance)
+          .mangleAsString(Context);
+  auto var = init.finishAndCreateGlobal(name, Alignment(4),
+                                        /*isConstant*/ true,
+                                        llvm::GlobalValue::InternalLinkage);
+  setTrueConstGlobal(var);
+  addUsedGlobal(var);
+  return var;
 }
 
 void IRGenerator::ensureRelativeSymbolCollocation(SILWitnessTable &wt) {

@@ -260,9 +260,15 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
   case Kind::ClassMetadataBaseOffset:               // class metadata base offset
     return mangler.mangleClassMetadataBaseOffset(cast<ClassDecl>(getDecl()));
 
-  case Kind::NominalTypeDescriptor:
-    return mangler.mangleNominalTypeDescriptor(
-                                        cast<NominalTypeDecl>(getDecl()));
+  case Kind::NominalTypeDescriptor: {
+    auto *nominal = cast<NominalTypeDecl>(getDecl());
+    // A module's copy of the descriptor for a back-deployed type has a
+    // distinct name, so that conformance records can refer to the defining
+    // module's descriptor.
+    if (nominal->isBackDeployedIntoClient())
+      return mangler.mangleBackDeploymentCopyNominalTypeDescriptor(nominal);
+    return mangler.mangleNominalTypeDescriptor(nominal);
+  }
 
   case Kind::NominalTypeDescriptorRecord:
     return mangler.mangleNominalTypeDescriptorRecord(

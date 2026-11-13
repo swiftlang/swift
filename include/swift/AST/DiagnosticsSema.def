@@ -8810,15 +8810,6 @@ ERROR(back_deployed_type_nested_requires_frozen,none,
       "%kind0 nested in back-deployed %kind1 must be '@frozen'",
       (const ValueDecl *, const ValueDecl *))
 
-ERROR(conformance_back_deployed_type_availability,none,
-      "conformance of back-deployed type %0 to protocol %1 must "
-      "not be available before %2 %3",
-      (Type, const ProtocolDecl *, AvailabilityDomain, AvailabilityRange))
-NOTE(conformance_back_deployed_type_availability_note,none,
-      "this module uses its own copy of %0 before %1 %2, and the conformance "
-      "would not apply to %0 from %3",
-      (Type, AvailabilityDomain, AvailabilityRange, const ModuleDecl *))
-
 //------------------------------------------------------------------------------
 // MARK: Implicit opening of existential types
 //------------------------------------------------------------------------------
