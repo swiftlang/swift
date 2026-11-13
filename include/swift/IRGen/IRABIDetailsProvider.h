@@ -54,6 +54,8 @@ public:
     /// their primitive types that needs to be stored in a Clang/LLVM record
     /// when this type is passed or returned directly to/from swiftcc
     /// function.
+    /// The byte ranges are bounded by the Swift value's size; a primitive
+    /// ABI type can be larger than the range occupied in Swift storage.
     ///
     /// Returns true if an error occurred when a particular member can't be
     /// represented with an AST type.
@@ -89,6 +91,8 @@ public:
     /// their primitive types that needs to be stored in a Clang/LLVM record
     /// when this type is passed or returned directly to/from swiftcc
     /// function.
+    /// The byte ranges are bounded by the Swift value's size; a primitive
+    /// ABI type can be larger than the range occupied in Swift storage.
     ///
     /// Returns true if an error occurred when a particular member can't be
     /// represented with an AST type.
