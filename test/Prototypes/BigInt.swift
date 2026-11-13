@@ -1170,8 +1170,10 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
         tempData[i + 1] << highOffset
     }
 
-    // Finally, shift the highest word and standardize the result.
-    tempData[tempData.count - 1] >>= lowOffset
+    // Shift the highest word, preserving the sign extension.
+    let signExtension = lhs.isNegative ? Word.max << highOffset : 0
+    tempData[tempData.count - 1] =
+      (tempData[tempData.count - 1] >> lowOffset) | signExtension
     lhs = _BigInt(_twosComplementData: tempData)
   }
 }
@@ -1498,6 +1500,47 @@ BitTests.test("Basics") {
 
 var BigIntTests = TestSuite("BigInt")
 
+func checkSignedRightShifts<Word>(_ wordType: Word.Type)
+  where Word: FixedWidthInteger & UnsignedInteger, Word.Magnitude == Word
+{
+  let values = [Int.min, Int.min + 1, -257, -256, -129, -128, -3, -2, -1,
+                0, 1, 2, 3, 127, 128, 255, 256, 257, Int.max]
+  let shifts = [0, 1, 2, Word.bitWidth - 1, Word.bitWidth,
+                Word.bitWidth + 1, Int.bitWidth - 1, Int.bitWidth,
+                Int.bitWidth + 1, 2 * Int.bitWidth]
+  for value in values {
+    for shift in shifts {
+      let expected = _BigInt<Word>(value >> shift)
+      let actual = _BigInt<Word>(value)
+      expectEqual(expected, actual >> shift)
+      expectEqual(expected, actual << -shift)
+      var shifted = actual
+      shifted >>= shift
+      expectEqual(expected, shifted)
+    }
+  }
+}
+
+func checkMultiwordSignedRightShifts<Word>(_ wordType: Word.Type)
+  where Word: FixedWidthInteger & UnsignedInteger, Word.Magnitude == Word
+{
+  // -(2^128 + 3) spans multiple words even with native UInt storage.
+  let value = _BigInt<Word>("-340282366920938463463374607431768211459")!
+  for (shift, expected) in [
+    (1, "-170141183460469231731687303715884105730"),
+    (64, "-18446744073709551617"),
+    (128, "-2"),
+    (129, "-1"),
+  ] {
+    expectEqual(_BigInt<Word>(expected)!, value >> shift)
+  }
+}
+
+BigIntTests.test("Signed right shift") {
+  checkSignedRightShifts(UInt.self)
+  checkMultiwordSignedRightShifts(UInt.self)
+}
+
 BigIntTests.test("Initialization") {
   let x = testBinaryInit(1_000_000 as Int)
   expectEqual(x._data[0], 1_000_000)
@@ -1721,6 +1764,11 @@ BigIntTests.test("Randomized arithmetic").forEach(in: Array(1...10)) { _ in
 
 var BigInt8Tests = TestSuite("BigInt<UInt8>")
 
+BigInt8Tests.test("Signed right shift") {
+  checkSignedRightShifts(UInt8.self)
+  checkMultiwordSignedRightShifts(UInt8.self)
+}
+
 BigInt8Tests.test("BinaryInteger interop") {
   let x: BigInt8 = 100
   let xComp = UInt8(x)
@@ -1811,6 +1859,10 @@ BigInt8Tests.test("Bitwise").forEach(in: [
 }
 
 var BigIntBitTests = TestSuite("BigInt<Bit>")
+
+BigIntBitTests.test("Signed right shift") {
+  checkSignedRightShifts(Bit.self)
+}
 
 BigIntBitTests.test("Randomized arithmetic").forEach(in: Array(1...10)) { _ in
   // Test x == (x / y) * x + (x % y)
