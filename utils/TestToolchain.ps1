@@ -15,6 +15,9 @@ requested suites need, and the Run step runs them. Once the Build step is done,
 several Run steps can run different suites at the same time. The other tests
 build and run in their own build trees in the Run step.
 
+Given the paths of tests, it runs only these tests of the test suites of the
+compilers, as utils\run-test.cmd does with this script.
+
 .PARAMETER SourceCache
 The path to a directory where projects contributing to the Swift toolchain have
 been cloned.
@@ -38,6 +41,11 @@ Default: 'S:\ObjectStore'
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest,
 swift-format, sourcekit-lsp, llbuild, swiftpm
+
+.PARAMETER Paths
+The paths of tests, or of directories of tests, to run instead of the whole
+test suites. Each path adds its test suite (swift, lld, lldb, clang or llvm) to
+-Test.
 
 .PARAMETER Steps
 Build, Run, or both.
@@ -73,6 +81,12 @@ Write the build timings to build-timings-<name>.json in the binary cache.
 PS> .\TestToolchain.ps1 -Test swift,lld
 
 .EXAMPLE
+PS> .\TestToolchain.ps1 S:\SourceCache\swift\test\Interpreter\hello_func.swift
+
+.EXAMPLE
+PS> .\TestToolchain.ps1 -Steps Run S:\SourceCache\llvm-project\lld\test\COFF
+
+.EXAMPLE
 PS> .\TestToolchain.ps1 -Test swift,lld -Steps Build
 PS> .\TestToolchain.ps1 -Test swift -Steps Run
 PS> .\TestToolchain.ps1 -Test lld -Steps Run
@@ -88,6 +102,8 @@ param
   [System.IO.FileInfo] $ObjectStore = "S:\ObjectStore",
 
   [string[]] $Test = @(),
+  [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
+  [string[]] $Paths = @(),
   [ValidatePattern("^(Build|Run)(,(Build|Run))*$")]
   [string[]] $Steps = @("Build", "Run"),
 
@@ -329,8 +345,9 @@ $CompilerTestSuites = [ordered]@{
 
 # Runs the lit command of a check target, without building what it depends on.
 # Ninja runs these commands one at a time, so running them directly lets the
-# suites of one build tree run at the same time.
-function Invoke-LitTarget([string] $Bin, [string] $Target) {
+# suites of one build tree run at the same time. With $Paths, the command runs
+# these tests instead of the test directories of the target.
+function Invoke-LitTarget([string] $Bin, [string] $Target, [string[]] $Paths = @()) {
   $Ninja = (Get-Ninja).Path
 
   # Follow the phony targets of CMake to the custom command that runs lit.
@@ -368,11 +385,22 @@ function Invoke-LitTarget([string] $Bin, [string] $Target) {
     throw "Expected one command for '$Target', found $($Commands.Count)."
   }
 
-  # Run the command line as ninja would.
-  if ($Commands[0] -notmatch '^("[^"]+"|\S+)\s+(.*)$') {
-    throw "Cannot parse the command of '$Target': $($Commands[0])"
+  $Command = $Commands[0]
+  if ($Paths) {
+    # The command ends with the test directories, in the build tree.
+    $Pattern = '^(.*?)((?:\s+' + [Regex]::Escape($Bin.Replace("\", "/")) + '/[^\s"]*)+)("?)$'
+    if ($Command -notmatch $Pattern) {
+      throw "Cannot find the test directories in the command of '$Target': $Command"
+    }
+    $QuotedPaths = @($Paths | ForEach-Object { '"' + $_ + '"' }) -join " "
+    $Command = $Matches[1] + " " + $QuotedPaths + $Matches[3]
   }
-  Write-Host $Commands[0]
+
+  # Run the command line as ninja would.
+  if ($Command -notmatch '^("[^"]+"|\S+)\s+(.*)$') {
+    throw "Cannot parse the command of '$Target': $Command"
+  }
+  Write-Host $Command
   $Process = Start-Process -FilePath $Matches[1].Trim('"') -ArgumentList $Matches[2] -NoNewWindow -PassThru
   # Windows PowerShell only reports the exit code after the handle was opened.
   $null = $Process.Handle
@@ -557,7 +585,7 @@ function Test-Compilers([Hashtable] $Platform, [string[]] $Suites, [switch] $Bui
               Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
               $env:SDKROOT = $SwiftSDK
             }
-            Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target
+            Invoke-LitTarget $CompilerCache $CompilerTestSuites[$Suite].Target $TestPaths[$Suite]
           }
         }
       }
@@ -851,6 +879,39 @@ function Test-PackageManager() {
 #-------------------------------------------------------------------
 
 try {
+
+# The tests given by path run instead of their whole test suite. The llvm-lit of
+# the build tree finds the LLVM tests by the path of their sources, but the Swift
+# tests run from the build tree.
+$CompilerBinaryCache = Get-ProjectBinaryCache $HostPlatform Stage2Compilers
+$TestSources = @(
+  @{ Suite = "swift"; Source = "$SourceCache\swift\test"; Build = "$CompilerBinaryCache\tools\swift\test-windows-$($HostPlatform.Architecture.LLVMName)" },
+  @{ Suite = "swift"; Source = "$SourceCache\swift\validation-test"; Build = "$CompilerBinaryCache\tools\swift\validation-test-windows-$($HostPlatform.Architecture.LLVMName)" },
+  @{ Suite = "lld"; Source = "$SourceCache\llvm-project\lld\test"; Build = $null },
+  @{ Suite = "lldb"; Source = "$SourceCache\llvm-project\lldb\test"; Build = $null },
+  @{ Suite = "clang"; Source = "$SourceCache\llvm-project\clang\test"; Build = $null },
+  @{ Suite = "llvm"; Source = "$SourceCache\llvm-project\llvm\test"; Build = $null }
+)
+$TestPaths = @{}
+foreach ($Path in $Paths) {
+  $FullPath = [IO.Path]::GetFullPath([IO.Path]::Combine((Get-Location).ProviderPath, $Path)).TrimEnd("\")
+  if (-not (Test-Path -LiteralPath $FullPath)) {
+    throw "Cannot find the test '$Path'."
+  }
+  $TestSource = $TestSources | Where-Object {
+    $Root = [IO.Path]::GetFullPath($_.Source)
+    $FullPath -eq $Root -or $FullPath.StartsWith("$Root\", [StringComparison]::OrdinalIgnoreCase)
+  } | Select-Object -First 1
+  if (-not $TestSource) {
+    throw "'$Path' is not a test of swift, lld, lldb, clang or llvm."
+  }
+  $TestPaths[$TestSource.Suite] += @(if ($TestSource.Build) {
+    $TestSource.Build + $FullPath.Substring([IO.Path]::GetFullPath($TestSource.Source).Length)
+  } else {
+    $FullPath
+  })
+}
+$Test = @($Test) + @($TestPaths.Keys | Where-Object { $Test -notcontains $_ })
 
 $CompilerSuites = @($Test | Where-Object { $CompilerTestSuites.Contains($_) })
 # check-lldb includes the tests of check-lldb-swift.
