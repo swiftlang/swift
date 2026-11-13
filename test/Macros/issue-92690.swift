@@ -111,6 +111,17 @@ func flim() {
 }
 flim()
 
+func takesAutoclosure(_ x: @autoclosure () -> Int) -> Int { x() }
+
+// Explicit closures inside an autoclosure are numbered in the enclosing
+// function's sequence, but parented to the autoclosure.
+func flam() {
+  // CHECK-SIL: sil private @$s4main4flamyyFSiyXEfu_SiyXEfU_ : $@convention(thin) () -> Int {
+  // CHECK-SIL: sil private @$s4main4flamyyFSiyXEfu_SiyXEfU1_ : $@convention(thin) () -> Int {
+  print("flam:", takesAutoclosure({1}() + #id({2}()))) // CHECK: flam: 3
+}
+flam()
+
 func vid() {
   struct S {
     let fn = { // CHECK-SIL: sil private @$s4main3vidyyF1SL_V2fnyycvpfiyycfU_ : $@convention(thin) () -> () {

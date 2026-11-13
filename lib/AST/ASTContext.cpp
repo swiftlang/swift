@@ -2667,22 +2667,27 @@ unsigned ASTContext::getNextMacroDiscriminator(
   return getImpl().NextMacroDiscriminator[key]++;
 }
 
+static const DeclContext *getContextForDiscriminator(const DeclContext *dc) {
+  // Autoclosures don't start a new sequence.
+  while (auto *ACE = dyn_cast<AutoClosureExpr>(dc))
+    dc = ACE->getParent();
+
+  // Top-level code declarations don't have their own discriminators.
+  if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(dc))
+    dc = TLCD->getParentModule();
+
+  return dc;
+}
+
 /// Get the next discriminator within the given declaration context.
 unsigned ASTContext::getNextDiscriminator(const DeclContext *dc) {
-  // Top-level code declarations don't have their own discriminators.
-  if (auto tlcd = dyn_cast<TopLevelCodeDecl>(dc))
-    dc = tlcd->getParentModule();
-
-  return getImpl().NextDiscriminator[dc];
+  return getImpl().NextDiscriminator[getContextForDiscriminator(dc)];
 }
 
 /// Set the maximum assigned discriminator within the given declaration context.
 void ASTContext::setMaxAssignedDiscriminator(
     const DeclContext *dc, unsigned discriminator) {
-  // Top-level code declarations don't have their own discriminators.
-  if (auto tlcd = dyn_cast<TopLevelCodeDecl>(dc))
-    dc = tlcd->getParentModule();
-
+  dc = getContextForDiscriminator(dc);
   assert(discriminator >= getImpl().NextDiscriminator[dc]);
   getImpl().NextDiscriminator[dc] = discriminator;
 }
