@@ -14,6 +14,7 @@
 #define SWIFT_REFLECTION_DESCRIPTOR_FINDER_H
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/RemoteInspection/Records.h"
 #include "llvm/ADT/StringRef.h"
 
@@ -151,11 +152,11 @@ struct DescriptorFinder {
   virtual ~DescriptorFinder(){};
 
   virtual std::unique_ptr<BuiltinTypeDescriptorBase>
-  getBuiltinTypeDescriptor(const TypeRef *TR) = 0;
-
+  getBuiltinTypeDescriptor(const TypeRef *TR,
+                           Mangle::ManglingFlavor Flavor) = 0;
 
   virtual std::unique_ptr<FieldDescriptorBase>
-  getFieldDescriptor(const TypeRef *TR) = 0;
+  getFieldDescriptor(const TypeRef *TR, Mangle::ManglingFlavor Flavor) = 0;
 };
 
 } // namespace reflection
