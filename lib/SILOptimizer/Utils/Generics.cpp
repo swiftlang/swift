@@ -2628,6 +2628,34 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   return true;
 }
 
+/// Fixes up the uses of \p closure, which replaced a closure of type
+/// \p oldType, and of its copies: kills the operands of debug uses whose
+/// variable type can't follow the new type, and replaces each copy, which still
+/// has the old type, with a copy that has the new type.
+///
+/// No other uses need fixing up. trySpecializeApplyOfGeneric only lets a
+/// partial_apply change type if each use, through copies, is an apply of the
+/// partial_apply itself or a re-abstraction, which the caller replaces, or a
+/// use that doesn't depend on the type, such as a destroy_value. Any other use,
+/// such as a return or an apply that takes a copy, gets a thunk that keeps the
+/// old type instead.
+static void fixUpUsesOfRetypedClosure(SILValue closure, SILType oldType) {
+  SmallVector<Operand *, 8> uses(closure->getUses());
+  for (Operand *use : uses) {
+    SILInstruction *user = use->getUser();
+    if (auto *dvi = dyn_cast<DebugValueInst>(user)) {
+      if (!dvi->varTypeFollowsOperand())
+        dvi->killOperand(use->getOperandNumber(), oldType);
+    } else if (auto *cvi = dyn_cast<CopyValueInst>(user)) {
+      auto *newCVI =
+          SILBuilderWithScope(cvi).createCopyValue(cvi->getLoc(), closure);
+      cvi->replaceAllUsesWith(newCVI);
+      cvi->eraseFromParent();
+      fixUpUsesOfRetypedClosure(newCVI, oldType);
+    }
+  }
+}
+
 /// Create a new apply based on an old one, but with a different
 /// function being applied.
 ApplySite
@@ -2801,6 +2829,10 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
         pai->getResultIsolation(), pai->getExecutionSemantics(),
         pai->isOnStack(), pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
+    // The specialized closure can have different conventions, such as a direct
+    // result instead of an indirect one.
+    if (newPAI->getType() != pai->getType())
+      fixUpUsesOfRetypedClosure(newPAI, pai->getType());
     return newPAI;
   }
   }
@@ -3601,6 +3633,9 @@ void swift::trySpecializeApplyOfGeneric(
       if (FAS && FAS.getCallee() == PAI)
         continue;
 
+      // FIXME: Only a re-abstraction of the partial_apply itself is replaced
+      // below, not a re-abstraction of a copy, which then captures a closure of
+      // the new type.
       auto *PAIUser = dyn_cast<PartialApplyInst>(User);
       if (PAIUser && isPartialApplyOfReabstractionThunk(PAIUser)) {
         CanSILFunctionType NewPAType =
