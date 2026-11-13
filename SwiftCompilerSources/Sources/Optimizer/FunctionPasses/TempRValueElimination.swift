@@ -92,7 +92,7 @@ private func tryEliminate(copy: CopyLikeInstruction, keepDebugInfo: Bool, _ cont
   //   strong_release %x
   // ```
   guard copy.parentFunction.hasOwnership ||
-        allocStack.isDestroyedOnAllPaths(context) ||
+        allocStack.isDestroyedOnAllPaths(after: copy, users: allocStackUses.users, context) ||
         // We can easily remove a dead alloc_stack
         allocStack.uses.ignore(user: copy).hasOnlyUsers(ofType: DeallocStackInst.self)
   else {
@@ -158,28 +158,26 @@ private extension AllocStackInst {
   ///   %x = load %allocStack   // looks like a load, but is a `load [take]`
   ///   strong_release %x
   /// ```
-  func isDestroyedOnAllPaths(_ context: FunctionPassContext) -> Bool {
-    var liferange = InstructionRange(begin: self, context)
+  /// The liferange begins at `copy`, which is the only write to the `alloc_stack`.
+  func isDestroyedOnAllPaths(after copy: CopyLikeInstruction, users: Stack<Instruction>,
+                             _ context: FunctionPassContext) -> Bool {
+    var liferange = InstructionRange(begin: copy, ends: users, context)
     defer { liferange.deinitialize() }
 
-    liferange.insert(contentsOf: uses.ignore(usersOfType: DeallocStackInst.self).lazy.map { $0.instruction })
-
-    guard liferange.exitBlocks.isEmpty else {
+    guard liferange.blockRange.isValid, liferange.exitBlocks.isEmpty else {
       // If there is no use on a path leaving the liverange, we don't know how the value is destroyed there.
       return false
     }
 
-    for use in uses {
-      switch use.instruction {
-      case is DeallocStackInst, is DestroyAddrInst:
+    for user in users where !liferange.contains(user) {
+      switch user {
+      case let destroy as DestroyAddrInst where destroy.destroyedAddress == self:
         break
-      case let c as CopyAddrInst where c.sourceOperand == use && c.isTakeOfSource:
+      case let c as CopyAddrInst where c.source == self && c.isTakeOfSource:
         break
       default:
-        if !liferange.contains(use.instruction) {
-          // A non-destroying instruction is at the end of the liferange -> we are missing a "real" destroy.
-          return false
-        }
+        // A non-destroying instruction is at the end of the liferange -> we are missing a "real" destroy.
+        return false
       }
     }
     return true
