@@ -1086,8 +1086,9 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
-      if (auto assignOp = lookupAssignmentOperator(IGF.IGM, /*isMove=*/true)) {
-        emitAssignmentOperatorCall(IGF, assignOp, dest, src);
+      if (auto moveOrCopyAssign =
+              lookupAssignmentOperator(IGF.IGM, /*isMove=*/true)) {
+        emitAssignmentOperatorCall(IGF, moveOrCopyAssign, dest, src);
         destroy(IGF, src, T, isOutlined);
         return;
       }
