@@ -196,7 +196,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 
 // CHECK: SWIFT_INLINE_THUNK GenericOpt<uint16_t> makeConcreteOpt(uint16_t x) noexcept SWIFT_SYMBOL("s:8Generics15makeConcreteOptyAA07GenericD0Oys6UInt16VGAFF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return Generics::_impl::_impl_GenericOpt<uint16_t>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     Generics::_impl::swift_interop_returnDirect_Generics_uint32_t_0_4(result, Generics::_impl::$s8Generics15makeConcreteOptyAA07GenericD0Oys6UInt16VGAFF(x));
+// CHECK-NEXT:     Generics::_impl::swift_interop_returnDirect_Generics_uint32_t_0_3(result, Generics::_impl::$s8Generics15makeConcreteOptyAA07GenericD0Oys6UInt16VGAFF(x));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
@@ -216,7 +216,7 @@ public func inoutConcreteOpt(_ x: inout GenericOpt<UInt16>) {
 
 
 // CHECK: SWIFT_INLINE_THUNK void takeConcreteOpt(const GenericOpt<uint16_t>& x) noexcept SWIFT_SYMBOL("s:8Generics15takeConcreteOptyyAA07GenericD0Oys6UInt16VGF") {
-// CHECK-NEXT:   Generics::_impl::$s8Generics15takeConcreteOptyyAA07GenericD0Oys6UInt16VGF(Generics::_impl::swift_interop_passDirect_Generics_uint32_t_0_4(Generics::_impl::_impl_GenericOpt<uint16_t>::getOpaquePointer(x)));
+// CHECK-NEXT:   Generics::_impl::$s8Generics15takeConcreteOptyyAA07GenericD0Oys6UInt16VGF(Generics::_impl::swift_interop_passDirect_Generics_uint32_t_0_3(Generics::_impl::_impl_GenericOpt<uint16_t>::getOpaquePointer(x)));
 // CHECK-NEXT: }
 
 
