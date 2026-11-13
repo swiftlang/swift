@@ -56,7 +56,8 @@ let package = Package(
 
 let useLocalDeps = ProcessInfo.processInfo.environment["SWIFTCI_USE_LOCAL_DEPS"] != nil
 
-// crash-reduce requires swift-subprocess, which isn't yet supported with local deps.
+// crash-reduce and compare-solver-stat require swift-subprocess, which isn't
+// yet supported with local deps.
 if !useLocalDeps {
   package.targets += [
     // MARK: crash-reduce
@@ -86,6 +87,30 @@ if !useLocalDeps {
     .testTarget(
       name: "CrashReduceTests",
       dependencies: ["CrashReduce"]
+    ),
+
+    // MARK: compare-solver-stat
+    .target(
+      name: "CompareSolverStat",
+      dependencies: [
+        "Utils",
+        .product(name: "Subprocess", package: "swift-subprocess"),
+      ]
+    ),
+    .executableTarget(
+      name: "compare-solver-stat",
+      dependencies: [
+        "CompareSolverStat",
+        "Utils",
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+      ],
+      exclude: [
+        "README.md",
+      ]
+    ),
+    .testTarget(
+      name: "CompareSolverStatTests",
+      dependencies: ["CompareSolverStat", "Utils"]
     ),
   ]
 }

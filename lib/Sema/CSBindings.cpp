@@ -2275,7 +2275,7 @@ void BindingSet::promoteBindings() {
       opts.SolverEnableEnumerateSupertypes;
 
   // FIXME: Get this working in diagnostic mode too.
-  if (CS.shouldAttemptFixes())
+  if (CS.inSalvageMode())
     return;
 
   // Can't do anything if this type variable appears in invariant position
@@ -2288,6 +2288,12 @@ void BindingSet::promoteBindings() {
 
   unsigned subtypeCount = 0;
   std::optional<PotentialBinding> promotedSubtype;
+
+  unsigned fallbackCount = 0;
+  std::optional<PotentialBinding> promotedFallback;
+
+  // we shouldn't need to promote an exact
+  unsigned exactCount = 0;
 
   bool considerSupertypes =
       Info.SupertypeOf.empty() &&
@@ -2346,15 +2352,30 @@ void BindingSet::promoteBindings() {
       break;
 
     case AllowedBindingKind::Exact:
+        if (binding.BindingType->isVoid())
+          ++exactCount;
+        break;
+
     case AllowedBindingKind::Fallback:
+      if (binding.BindingType->isVoid()) {
+        ++fallbackCount;
+        promotedFallback = binding;
+      }
       break;
     }
   }
 
   auto promoteBinding = [&](PotentialBinding &&binding) {
     // This binding will subsume all existing non-fallback bindings.
+    // but we clear them to save the work of comparing each binding
+    // Note: we could consider an assert here if we are concerned of
+    // promotion introducing a conflict.
+    Bindings.clear();
     binding.Kind = AllowedBindingKind::Exact;
     addBinding(binding);
+
+    if (binding.BindingType->isVoid())
+      return;
 
     // If this is a type variable representing closure result,
     // which is on the right-side of some relational constraint
@@ -2386,6 +2407,13 @@ void BindingSet::promoteBindings() {
     promoteBinding(*std::move(promotedSubtype));
   };
 
+  auto promoteFallbackBinding = [&](const char *reason) {
+    LLVM_DEBUG(llvm::dbgs() << "Promote fallback to exact, " << reason << "\n";
+               dump(llvm::dbgs(), 0);
+               llvm::dbgs() << "\n");
+    promoteBinding(*std::move(promotedFallback));
+  };
+
   // This is in service of a hack, see below.
   auto labelsMismatch = [&](TupleType *lhsTuple, TupleType *rhsTuple) -> bool {
     if (lhsTuple->getNumElements() != rhsTuple->getNumElements())
@@ -2403,7 +2431,19 @@ void BindingSet::promoteBindings() {
     return false;
   };
 
-  if (subtypeCount == 1) {
+  if (fallbackCount == 1 && exactCount == 1) {
+    // First handle the case where Void is the only case
+    ASSERT(subtypeCount == 0 && supertypeCount == 0);
+    promoteFallbackBinding("onlyVoid");
+    return;
+  } else if (fallbackCount == 1) {
+    // Then consider where void should be promoted
+    if (supertypeCount == 1) {
+      promoteFallbackBinding("voidOverSuper");
+      return;
+    }
+  } else if (subtypeCount == 1) {
+    // Then consider cases where potential fallbacks are not relevant
     // First, handle the case where we have both a subtype and a supertype binding.
     if (supertypeCount == 1) {
       // If we have something like this:
