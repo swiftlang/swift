@@ -38,7 +38,7 @@ func testTypeUses(value: AlwaysUnsafeType) {
   unsafe value.method()
 }
 
-// Only the always-unsafe use is reported in this language mode.
+// Only the always-unsafe use is reported, as with strict memory safety checking.
 @unsafe(always) func alwaysUnsafeValue() -> Int { 0 }
 
 @unsafe func unsafeValue() -> Int { 0 }

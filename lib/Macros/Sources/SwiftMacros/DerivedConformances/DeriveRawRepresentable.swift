@@ -48,12 +48,11 @@ public struct DeriveRawRepresentableMacro: DeclarationMacro {
     of node: some FreestandingMacroExpansionSyntax,
     in context: some MacroExpansionContext
   ) throws -> [DeclSyntax] {
-    // Expecting #_deriveRawRepresentable(<type info>, <witness>, <isStrictMemorySafety>)
+    // Expecting #_deriveRawRepresentable(<type info>, <witness>)
 
-    let (typeInfo, witnessKind, isStrictMemorySafety) = try node.arguments.expect(
+    let (typeInfo, witnessKind) = try node.arguments.expect(
       .init(parser: NominalTypeInfo.fromStringLit),
-      .init(parser: RawRepresentableWitness.fromStringLit),
-      .boolArg(nil)
+      .init(parser: RawRepresentableWitness.fromStringLit)
     )
     let enumInfo: EnumTypeInfo
 
@@ -68,7 +67,7 @@ public struct DeriveRawRepresentableMacro: DeclarationMacro {
 
     switch witnessKind {
     case .varDef:
-      witness = expandVarDef(enumInfo, isStrictMemorySafety: isStrictMemorySafety)
+      witness = expandVarDef(enumInfo)
     case .initializer:
       witness = expandInitializer(enumInfo)
     }
@@ -77,18 +76,15 @@ public struct DeriveRawRepresentableMacro: DeclarationMacro {
   }
 
   /// Expands the `rawValue` var declaration
-  static func expandVarDef(
-    _ enumInfo: EnumTypeInfo, isStrictMemorySafety: Bool
-  ) -> DeclSyntax {
+  static func expandVarDef(_ enumInfo: EnumTypeInfo) -> DeclSyntax {
     let rawType = enumInfo.rawTypeName!
 
     if enumInfo.isObjC {
       // ObjC enums are represented by their raw value, so just use a bitcast.
-      let unsafePrefix = isStrictMemorySafety ? "unsafe " : ""
       return
         """
         nonisolated var rawValue: \(raw: rawType) {
-          return \(raw: unsafePrefix)Swift::unsafeBitCast(self, to: \(raw: rawType).self)
+          return unsafe Swift::unsafeBitCast(self, to: \(raw: rawType).self)
         }
         """
     }

@@ -4827,27 +4827,23 @@ private:
         auto unsafeUses = classification.getUnsafeUses();
         SmallVector<UnsafeUse, 4> usesToDiagnose(unsafeUses.begin(),
                                                  unsafeUses.end());
-        bool anyAlways = retainUnsafeUsesToDiagnose(
-            usesToDiagnose, /*includeMerelyUnsafe=*/Ctx.LangOpts.hasFeature(
-                Feature::StrictMemorySafety, /*allowMigration=*/true));
+        bool anyAlways = retainUnsafeUsesToDiagnose(usesToDiagnose);
 
-        if (!usesToDiagnose.empty()) {
-          auto insertionLoc = S->getPattern()->getStartLoc();
-          Ctx.Diags.diagnose(S->getForLoc(),
-                             anyAlways
-                                 ? diag::for_always_unsafe_without_unsafe
-                                 : diag::for_unsafe_without_unsafe)
-            .fixItInsert(insertionLoc, "unsafe ")
-            // As above: the marker doesn't survive interface printing.
-            .warnInSwiftInterface(CurContext.getDeclContext());
+        auto insertionLoc = S->getPattern()->getStartLoc();
+        Ctx.Diags.diagnose(S->getForLoc(),
+                           anyAlways
+                               ? diag::for_always_unsafe_without_unsafe
+                               : diag::for_unsafe_without_unsafe)
+          .fixItInsert(insertionLoc, "unsafe ")
+          // As above: the marker doesn't survive interface printing.
+          .warnInSwiftInterface(CurContext.getDeclContext());
 
-          for (auto unsafeUse : usesToDiagnose) {
-            // If we don't have a source location for this use, use the
-            // location of the `for` instead.
-            if (unsafeUse.getLocation().isInvalid())
-              unsafeUse.replaceLocation(S->getForLoc());
-            diagnoseUnsafeUse(unsafeUse);
-          }
+        for (auto unsafeUse : usesToDiagnose) {
+          // If we don't have a source location for this use, use the
+          // location of the `for` instead.
+          if (unsafeUse.getLocation().isInvalid())
+            unsafeUse.replaceLocation(S->getForLoc());
+          diagnoseUnsafeUse(unsafeUse);
         }
       }
     }
@@ -5209,26 +5205,17 @@ private:
 
   void diagnoseUncoveredUnsafeSite(
       const Expr *anchor, ArrayRef<UnsafeUse> unsafeUses) {
-    bool strictSafety = Ctx.LangOpts.hasFeature(Feature::StrictMemorySafety,
-                                                /*allowMigration=*/true);
-
     // Compiler-synthesized code cannot be annotated with 'unsafe' by hand, so
     // an always-unsafe use there isn't actionable. Treat it as merely unsafe,
     // which keeps it out of the way unless strict memory safety checking asked
     // to hear about unsafe code at all.
     bool isSynthesized =
         isSynthesizedAnchor(anchor) || isSynthesizedContext();
-    if (isSynthesized && !strictSafety)
-      return;
 
     SmallVector<UnsafeUse, 4> usesToDiagnose(unsafeUses.begin(),
                                              unsafeUses.end());
-    bool anyAlways = retainUnsafeUsesToDiagnose(
-        usesToDiagnose, /*includeMerelyUnsafe=*/strictSafety);
-    if (isSynthesized)
-      anyAlways = false;
-    if (usesToDiagnose.empty())
-      return;
+    bool anyAlways =
+        !isSynthesized && retainUnsafeUsesToDiagnose(usesToDiagnose);
 
     const auto &[loc, insertText] = getFixItForUncoveredSite(anchor, "unsafe");
     Ctx.Diags.diagnose(anchor->getStartLoc(),

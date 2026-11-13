@@ -159,8 +159,7 @@ deriveBodyDistributed_doInvokeOnReturn(AbstractFunctionDecl *afd, void *arg) {
                          new (C) DeclRefExpr(ConcreteDeclRef(returnTypeParam),
                                              dloc, implicit))}));
 
-    if (C.LangOpts.hasFeature(Feature::StrictMemorySafety, /*allowMigration=*/true))
-      resultLoadCall = new (C) UnsafeExpr(sloc, resultLoadCall, Type(), true);
+    resultLoadCall = new (C) UnsafeExpr(sloc, resultLoadCall, Type(), true);
 
     auto resultPattern = NamedPattern::createImplicit(C, resultVar);
     auto resultPB = PatternBindingDecl::createImplicit(
