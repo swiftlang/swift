@@ -358,3 +358,22 @@ extension AvailableLaterOnMacCatalyst { // expected-note 2 {{enclosing scope req
   }
 
 }
+
+@available(macCatalyst 52, *)
+class OuterWithMacCatalystAvailability {
+  class Base {
+    @available(iOS 53, *)
+    init() {}
+  }
+
+  // The inherited initializer must respect the iOS availability of the
+  // superclass initializer, even though an enclosing declaration has
+  // macCatalyst availability.
+  class Sub: Base {}
+}
+
+@available(macCatalyst 52, *)
+func testInheritedInitInMacCatalyst() {
+  let _ = OuterWithMacCatalystAvailability.Sub() // expected-error {{'init()' is only available in Mac Catalyst 53 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}}
+}
