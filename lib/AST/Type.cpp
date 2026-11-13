@@ -3367,6 +3367,96 @@ getObjCObjectRepresentable(Type type, const DeclContext *dc) {
   return ForeignRepresentableKind::None;
 }
 
+bool TypeBase::isStructurallyCArray(bool assumingFeatureAllowed) {
+  if (!assumingFeatureAllowed &&
+      !getASTContext().LangOpts.hasFeature(Feature::ObjCAttrAllowsCArrays))
+    return false;
+
+  if (auto count = getInlineArrayCount())
+    return !count->isZero();
+
+  if (auto tuple = getAs<TupleType>()) {
+    if (tuple->getNumElements() <= 1 || !tuple->isHomogeneous())
+      return false;
+
+    // ClangImporter never labels the elements of a tuple it imports.
+    for (const auto &element : tuple->getElements())
+      if (element.hasName())
+        return false;
+
+    // A multidimensional array is a tuple of tuples; every level has to look
+    // like an array.
+    auto elementType = tuple->getElementType(0);
+    if (elementType->is<TupleType>())
+      return elementType->isStructurallyCArray(true);
+
+    return true;
+  }
+
+  if (auto *nominal = getAnyNominal())
+    if (nominal->hasClangNode())
+      if (auto underlying = getSwiftNewtypeUnderlyingType())
+        return underlying->isStructurallyCArray(true);
+
+  return false;
+}
+
+/// Determine whether \p type can be the pointee of a pointer, or the element of
+/// a C array, in \p language.
+///
+/// \param isArrayElement Whether \p type is the element of a C array. (C arrays
+///        don't currently support refcounted element types.)
+static bool
+isTriviallyRepresentableBehindPointer(Type pointeeType,
+                                      ForeignLanguage language,
+                                      const DeclContext *dc,
+                                      bool isArrayElement = false) {
+  // Unsafe*Pointer<T> where T is representable as a C array is allowed if the
+  // element type is okay.
+  if (pointeeType->isStructurallyCArray()) {
+    // A swift_newtype of an array is allowed.
+    if (auto underlying = pointeeType->getSwiftNewtypeUnderlyingType())
+      return isTriviallyRepresentableBehindPointer(underlying, language, dc,
+                                                   isArrayElement);
+
+    // We allow both InlineArrays and tuples, not just the one for the visible
+    // projection, to handle edge cases involving @objc overrides and witnesses.
+    Type elemType;
+    if (auto tuple = pointeeType->getAs<TupleType>())
+      elemType = tuple->getElementType(0);
+    else
+      elemType = pointeeType->getInlineArrayElementType();
+
+    return isTriviallyRepresentableBehindPointer(elemType, language, dc,
+                                                 /*isArrayElement=*/true);
+  }
+
+  // Unsafe*Pointer<T> where T is Void is allowed (but not as an array element).
+  if (!isArrayElement && pointeeType->isVoid())
+    return true;
+
+  // Unsafe*Pointer<T> where T is trivially representable is allowed;
+  // Unsafe*Pointer<T> where T is an object is allowed (but not as an array
+  // element).
+  // FIXME: If C arrays start supporting ARC objects, this becomes
+  //        `isTriviallyRepresentableIn()`.
+  switch (pointeeType->getForeignRepresentableIn(language, dc).first) {
+  case ForeignRepresentableKind::Trivial:
+    return true;
+
+  case ForeignRepresentableKind::Object:
+    return !isArrayElement;
+
+  case ForeignRepresentableKind::None:
+  case ForeignRepresentableKind::Bridged:
+  case ForeignRepresentableKind::BridgedError:
+  case ForeignRepresentableKind::StaticBridged:
+    return false;
+  }
+
+  llvm_unreachable("Unhandled ForeignRepresentableKind in switch.");
+}
+
 /// Determine the foreign representation of this type.
 ///
 /// This function determines when and how a particular type is mapped
@@ -3539,6 +3629,11 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     return failure();
   }
 
+  // Bare C arrays decay to pointers in parameter or result position, so even
+  // imported array types can't be represented except as a pointee.
+  if (nominal->hasClangNode() && type->isStructurallyCArray())
+    return failure();
+
   // If the type was imported from Clang, check whether it is
   // representable in the requested language.
   if (nominal->hasClangNode() || nominal->isObjC()) {
@@ -3624,10 +3719,7 @@ getForeignRepresentable(Type type, ForeignLanguage language,
     case PTK_UnsafeRawPointer:
     case PTK_UnsafeMutablePointer:
     case PTK_UnsafePointer:
-      // An UnsafeMutablePointer<T> or UnsafePointer<T> is
-      // representable if T is trivially representable or Void.
-      if (pointerElt->isVoid() ||
-          pointerElt->isTriviallyRepresentableIn(language, dc))
+      if (isTriviallyRepresentableBehindPointer(pointerElt, language, dc))
         return { ForeignRepresentableKind::Trivial, nullptr };
 
       return failure();

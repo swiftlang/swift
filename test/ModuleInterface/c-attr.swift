@@ -4,6 +4,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) \
 // RUN:   -emit-module %t/Lib.swift -o %t -I %t \
 // RUN:   -swift-version 6 -enable-library-evolution \
+// RUN:   -enable-experimental-feature ObjCAttrAllowsCArrays \
 // RUN:   -emit-module-interface-path %t/Lib.swiftinterface
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -I %t \
@@ -12,6 +13,7 @@
 // RUN: %FileCheck %s --input-file %t/Lib.swiftinterface
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_ObjCAttrAllowsCArrays
 
 //--- module.modulemap
 module Lib {
@@ -55,3 +57,24 @@ public func namedCDecl() {}
 public func namedLegacyCDecl() {}
 // CHECK: @_cdecl("objc_name")
 // CHECK-NEXT: public func namedLegacyCDecl
+
+/// Pointers to C arrays in explicitly @objc and @c declarations need the
+/// feature that allows them.
+@c
+public func cArrayPointer(_ p: UnsafeMutablePointer<(Int32, Int32)>) {}
+// CHECK: #if compiler(>=5.3) && $ObjCAttrAllowsCArrays
+// CHECK: public func cArrayPointer
+// CHECK: #endif
+
+public class CArrayMembers: NSObject {
+  @objc public func array(_ p: UnsafeMutablePointer<((Int32, Int32), (Int32, Int32))>) {}
+  // CHECK: #if compiler(>=5.3) && $ObjCAttrAllowsCArrays
+  // CHECK-NEXT: @objc public func array
+  // CHECK-NEXT: #endif
+
+  /// Other declarations don't.
+  @objc public func plain(_ p: UnsafeMutablePointer<Int32>) {}
+  // CHECK-NEXT: @objc public func plain
+  public func notObjC(_ p: UnsafeMutablePointer<(Int32, Int32)>) {}
+  // CHECK-NEXT: public func notObjC
+}

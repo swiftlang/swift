@@ -948,6 +948,21 @@ static bool usesFeatureNondeinitableTypes(Decl *decl) {
 UNINTERESTING_FEATURE(ModernImportedCArrays)
 UNINTERESTING_FEATURE(ModernImportedCArraysOnly)
 
+static bool usesFeatureObjCAttrAllowsCArrays(Decl *decl) {
+  // A C array in the signature would only break source if there's *also* an
+  // explicit `@c`/`@objc` or equivalent; otherwise we just won't infer `@objc`.
+  if (!llvm::any_of(decl->getAttrs(), [](DeclAttribute * attr) {
+          return !attr->isImplicit() &&
+                    isa<ObjCAttr, CDeclAttr, IBActionAttr, IBOutletAttr,
+                        IBSegueActionAttr, IBInspectableAttr,
+                        GKInspectableAttr>(attr);
+        }))
+    return false;
+
+  return usesTypeMatching(decl, [](Type type) {
+    return type->isStructurallyCArray(/*assumingFeatureAllowed=*/true);
+  });
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

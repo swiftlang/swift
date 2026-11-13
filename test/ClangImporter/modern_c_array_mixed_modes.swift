@@ -4,6 +4,7 @@
 // XRef and SIL deserialization not mix them up.
 
 // REQUIRES: swift_feature_ModernImportedCArrays
+// REQUIRES: swift_feature_ObjCAttrAllowsCArrays
 // REQUIRES: executable_test
 // UNSUPPORTED: back_deployment_runtime || use_os_stdlib
 
@@ -168,9 +169,9 @@ module CLib {
 
 //--- src/LegacyLib.swift
 
-// RUN: %target-swift-frontend %t/src/LegacyLib.swift -I %t/include -c -module-name LegacyLib -o %t/fragile/LegacyLib.o -emit-module-path %t/fragile/LegacyLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple
+// RUN: %target-swift-frontend %t/src/LegacyLib.swift -I %t/include -c -module-name LegacyLib -o %t/fragile/LegacyLib.o -emit-module-path %t/fragile/LegacyLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -enable-experimental-feature ObjCAttrAllowsCArrays
 
-// RUN: %target-swift-frontend %t/src/LegacyLib.swift -I %t/include -c -module-name LegacyLib -o %t/resilient/LegacyLib.o -emit-module-path %t/resilient/LegacyLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -emit-module-interface-path %t/resilient/LegacyLib.swiftinterface -enable-library-evolution
+// RUN: %target-swift-frontend %t/src/LegacyLib.swift -I %t/include -c -module-name LegacyLib -o %t/resilient/LegacyLib.o -emit-module-path %t/resilient/LegacyLib.swiftmodule -parse-as-library -module-cache-path %t/module-cache -swift-version 5 -target %target-has-inline-array-triple -emit-module-interface-path %t/resilient/LegacyLib.swiftinterface -enable-library-evolution -enable-experimental-feature ObjCAttrAllowsCArrays
 
 import CLib
 
@@ -230,9 +231,8 @@ import CLib
   print("U", ptr.pointee.array.0, ptr.pointee.array.1, ptr.pointee.array.2, ptr.pointee.array.3)
 }
 
-// FIXME: This can't be `@c @implementation public` until `@c` allows C arrays
-@c(print_row) @usableFromInline internal func printRowImpl(_ ptr: UnsafePointer<Int32>!) {
-  print("Row", ptr[0], ptr[1], ptr[2], ptr[3])
+@c(print_row) @implementation public func print_row(_ ptr: UnsafePointer<Row>!) {
+  print("Row", ptr.pointee.0, ptr.pointee.1, ptr.pointee.2, ptr.pointee.3)
 }
 
 //--- src/ModernLib.swift
