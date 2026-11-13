@@ -862,8 +862,8 @@ namespace {
       IGF.Builder.CreateCall(callee->getFunctionType(), callee, args);
     }
 
-    const clang::CXXMethodDecl *findAssignmentOperator(IRGenModule &IGM,
-                                                       bool isMove) const {
+    const clang::CXXMethodDecl *lookupAssignmentOperator(IRGenModule &IGM,
+                                                         bool isMove) const {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
@@ -1045,7 +1045,8 @@ namespace {
 
     void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
                         SILType T, bool isOutlined) const override {
-      if (auto copyAssign = findAssignmentOperator(IGF.IGM, /*isMove=*/false)) {
+      if (auto copyAssign =
+              lookupAssignmentOperator(IGF.IGM, /*isMove=*/false)) {
         emitAssignmentOperatorCall(IGF, copyAssign, destAddr, srcAddr);
         return;
       }
@@ -1085,7 +1086,7 @@ namespace {
 
     void assignWithTake(IRGenFunction &IGF, Address dest, Address src, SILType T,
                         bool isOutlined) const override {
-      if (auto assignOp = findAssignmentOperator(IGF.IGM, /*isMove=*/true)) {
+      if (auto assignOp = lookupAssignmentOperator(IGF.IGM, /*isMove=*/true)) {
         emitAssignmentOperatorCall(IGF, assignOp, dest, src);
         destroy(IGF, src, T, isOutlined);
         return;
