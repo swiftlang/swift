@@ -273,6 +273,7 @@ fileprivate func maybeSwap<T: FixedWidthInteger>(_ x: T) -> T {
 
 // .. PeCoffStringTable ........................................................
 
+@available(BacktracingDT 6.2, *)
 struct PeCoffStringTable {
   let source: ImageSource
 
@@ -341,11 +342,13 @@ struct PeCodeview {
   var pdbPath: String
 }
 
+@available(BacktracingDT 6.2, *)
 struct PeFunction {
   var name: String
   var address: ImageSource.Address
 }
 
+@available(BacktracingDT 6.2, *)
 final class PeCoffImage {
   typealias Address = ImageSource.Address
 
@@ -778,6 +781,7 @@ final class PeCoffImage {
   }()
 }
 
+@available(BacktracingDT 6.2, *)
 extension PeCoffImage: SymbolSource {
   func lookupSymbol(address: SymbolSource.Address) -> SymbolSource.Symbol? {
     let address = address &+ Address(imageBase)
@@ -854,6 +858,7 @@ extension PeCoffImage: SymbolSource {
   }
 }
 
+@available(BacktracingDT 6.2, *)
 extension PeCoffImage: DwarfSource {
 
   static var pathSeparator: String { "\\" }
@@ -927,6 +932,7 @@ extension PeCoffImage: DwarfSource {
 }
 
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 extension PeCoffImage: SymbolLocator.Image {
 
   public var name: String? {

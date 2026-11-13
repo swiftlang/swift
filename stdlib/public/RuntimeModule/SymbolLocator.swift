@@ -27,6 +27,7 @@ public struct SymbolLocationSymbol: Sendable, Hashable, Equatable {
 }
 
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 public struct SymbolLocationCallSiteInfo: Sendable, Hashable, Equatable {
   var rawName: String?
   var name: String?
@@ -37,6 +38,7 @@ public struct SymbolLocationCallSiteInfo: Sendable, Hashable, Equatable {
 /// It *may* be an image of some sort, or it could be some other kind of
 /// thing (e.g. for Windows binaries, a PDB file).
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 public protocol SymbolSource {
   typealias Address = UInt64
 
@@ -50,6 +52,7 @@ public protocol SymbolSource {
 }
 
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 public protocol SymbolLocator {
 
   typealias Image = SymbolLoader.Image
@@ -63,6 +66,7 @@ public protocol SymbolLocator {
 }
 
 @_spi(Symbolication)
+@available(BacktracingDT 6.2, *)
 extension SymbolLocator {
   public func findSymbols(for image: any Image) -> (any SymbolSource)? {
     return findSymbols(for: image, format: .auto)
@@ -70,12 +74,14 @@ extension SymbolLocator {
 }
 
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Image: SymbolLocator.Image {
   public var uuid: [UInt8]? { uniqueID }
   public var age: UInt32? { nil }
 }
 
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 public struct SymbolLoader {
 
   public protocol Image {

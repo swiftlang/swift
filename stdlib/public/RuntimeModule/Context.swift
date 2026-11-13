@@ -1027,7 +1027,7 @@ extension arm_gprs {
 
 // .. Darwin specifics .........................................................
 
-#if os(anyAppleOS)
+#if os(macOS)
 private func thread_get_state<T>(_ thread: thread_t,
                                  _ flavor: CInt,
                                  _ result: inout T) -> kern_return_t {

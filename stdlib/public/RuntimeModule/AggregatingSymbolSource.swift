@@ -18,6 +18,7 @@
 import Swift
 
 @_spi(Symbolication)
+@available(BacktracingDT 6.2, *)
 public struct AggregatingSymbolSource: SymbolSource {
   public var sources: [any SymbolSource]
 
