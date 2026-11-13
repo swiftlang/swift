@@ -151,32 +151,6 @@ collectTypeDependentOperands(SmallVectorImpl<SILValue> &typeDependentOperands,
 // SILInstruction Subclasses
 //===----------------------------------------------------------------------===//
 
-/// Returns the size of the debug variable data that is tail allocated after an
-/// instruction's operands.
-static size_t getDebugVarTrailingDataSize(size_t nameLength, bool hasType,
-                                       bool hasLoc, bool hasScope,
-                                       size_t numDIExprElements) {
-  return nameLength + (hasType ? sizeof(SILType) : 0) +
-         (hasLoc ? sizeof(SILLocation) : 0) +
-         (hasScope ? sizeof(const SILDebugScope *) : 0) +
-         sizeof(SILDIExprElement) * numDIExprElements;
-}
-
-template <typename INST>
-static void *allocateDebugVarCarryingInst(SILModule &M,
-                                          std::optional<SILDebugVariable> Var,
-                                          ArrayRef<SILValue> Operands = {}) {
-  return M.allocateInst(
-      sizeof(INST) +
-          (Var ? getDebugVarTrailingDataSize(
-                     Var->Name.size(), Var->Type.has_value(),
-                     Var->Loc.has_value(), Var->Scope != nullptr,
-                     Var->DIExpr.getNumElements())
-               : 0) +
-          sizeof(Operand) * Operands.size(),
-      alignof(INST));
-}
-
 TailAllocatedDebugVariable::TailAllocatedDebugVariable(
     std::optional<SILDebugVariable> Var, char *buf, SILType *AuxVarType,
     SILLocation *DeclLoc, const SILDebugScope **DeclScope,
@@ -284,8 +258,14 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
                                elementType.getASTType());
-  void *Buffer = allocateDebugVarCarryingInst<AllocStackInst>(
-      F.getModule(), Var, TypeDependentOperands);
+  // Let TrailingObjects compute the size, so that the padding it inserts to
+  // align each trailing type is accounted for.
+  auto Size = totalSizeToAlloc<SILType, SILLocation, const SILDebugScope *,
+                               swift::Operand, char>(
+      Var && Var->Type ? 1 : 0, Var && Var->Loc ? 1 : 0,
+      Var && Var->Scope ? 1 : 0, TypeDependentOperands.size(),
+      Var ? Var->Name.size() : 0);
+  void *Buffer = F.getModule().allocateInst(Size, alignof(AllocStackInst));
   return ::new (Buffer)
       AllocStackInst(Loc, elementType, TypeDependentOperands, F, Var,
                      hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
@@ -485,7 +465,13 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
   if (prependDeref) {
     Var.DIExpr.eraseElement(Var.DIExpr.element_begin());
   }
-  void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var, Operands);
+  // Let TrailingObjects compute the size, so that the padding it inserts to
+  // align each trailing type is accounted for.
+  auto Size = totalSizeToAlloc<swift::Operand, SILType, SILLocation,
+                               const SILDebugScope *, SILDIExprElement, char>(
+      Operands.size(), Var.Type ? 1 : 0, Var.Loc ? 1 : 0, Var.Scope ? 1 : 0,
+      Var.DIExpr.getNumElements(), Var.Name.size());
+  void *buf = M.allocateInst(Size, alignof(DebugValueInst));
   return ::new (buf)
     DebugValueInst(DebugLoc, Operands, M, Var, wasMoved, trace, prependDeref);
 }
