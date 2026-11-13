@@ -4496,16 +4496,8 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
     if (auto *scopeBinder = options.getScopeBinder()) {
       ty = checkScopeSaturated(scopeBinder->getFunction(), eltTypeRepr, ty);
       if (!ty->hasError()) {
-        if (auto scope =
-                resolveAccessBinding(*scopeBinder, eltTypeRepr, paramFlags))
-          accessScope = *scope;
-        else
-          ty = ErrorType::get(getASTContext());
-      }
-      if (ty->hasError()) {
-        elements.push_back(AnyFunctionType::Param::bodyAccess(
-            ErrorType::get(getASTContext())));
-        continue;
+        accessScope =
+          resolveAccessBinding(*scopeBinder, eltTypeRepr, paramFlags);
       }
     }
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName,

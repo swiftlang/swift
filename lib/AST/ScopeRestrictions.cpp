@@ -24,6 +24,9 @@ using namespace swift;
 
 void ScopeRef::print(llvm::raw_ostream &os) const {
   switch (getKind()) {
+  case Kind::Error:
+    os << "<<error scope>>";
+    return;
   case Kind::Immortal:
     os << "immortal";
     return;
