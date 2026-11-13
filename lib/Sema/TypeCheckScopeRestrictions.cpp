@@ -427,8 +427,11 @@ Type swift::applyScopedAttr(const ScopeBinder &binder, ScopedTypeAttr *attr,
   }
   auto scope = resolveWrittenScope(binder, restriction.getScope());
 
-  // TODO: form the application even for an error scope. The constraint
-  // system seems to be happier if we don't, though.
+  // FIXME [nested-errors]: The general rule in type resolution is that errors
+  // in nested positions monadically propagate to make the entire type an
+  // ErrorType rather than preserving the original error in its position.
+  // It'd probably be better if we didn't do that (for one, we'd probably get
+  // better diagnostics in invalid code), but for now, don't rock the boat.
   if (scope.isError())
     return ErrorType::get(ctx);
 
@@ -692,10 +695,12 @@ void swift::checkScopedSignature(AbstractFunctionDecl *fn) {
     }
   }
 
-  for (auto [param, access] : llvm::zip_equal(*params, accesses.Params))
+  for (auto [param, access] : llvm::zip_equal(*params, accesses.Params)) {
+    // If the access is an error, we've already diagnosed it.
+    if (access.isError()) continue;
+
     if (auto *repr = param->getTypeRepr())
-      // A binding that doesn't resolve was diagnosed.
-      if (auto *binding = getAccessBinding(ctx.Diags, repr);
-          binding && !access.isError())
+      if (auto *binding = getAccessBinding(ctx.Diags, repr))
         checkAccess(fn, param, binding->getAttrLoc());
+  }
 }
