@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -parse-as-library -target %target-swift-5.1-abi-triple -enable-experimental-feature RawLayout -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
+// RUN: %if swift_feature_OnceFunctions %{ %target-swift-frontend -parse-as-library -target %target-swift-5.1-abi-triple -enable-experimental-feature RawLayout -enable-experimental-feature OnceFunctions -D ONCE_FUNCTIONS -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify -verify-additional-prefix once- %}
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_RawLayout
@@ -609,3 +610,34 @@ extension G where T == Int {
 func testUntypedDeallocation(_ p: UnsafeMutableRawPointer) {
     p.deallocate() // expected-error {{this code pattern can cause a deallocation}}
 }
+
+#if ONCE_FUNCTIONS
+@inline(__always)
+func callOnce(_ body: @once () -> Int) -> Int {
+  body()
+}
+
+@_transparent
+func and(_ lhs: Bool, _ rhs: @autoclosure @callable(once) () -> Bool) -> Bool {
+  lhs ? rhs() : false
+}
+
+@_noLocks
+func testOnceClosure(_ x: Int) -> Int {
+  callOnce { x &+ 1 }
+}
+
+@_noAllocation
+func testAllocatingOnceClosure(_ x: Int) -> Int {
+  callOnce { // expected-once-note {{called from here}}
+    _ = H() // expected-once-error {{Using type 'H' can cause metadata allocation or locks}}
+    return x
+  }
+}
+
+// Calling the closure is fine, but dropping it releases its context.
+@_noLocks
+func testDroppedAtMostOnceClosure(_ x: Int, _ y: Int) -> Bool {
+  and(x > 0, y > 0) // expected-once-error {{ending the lifetime of a value of type '@noescape @callable(once) @callee_owned () -> Bool' can cause a deallocation}}
+}
+#endif
