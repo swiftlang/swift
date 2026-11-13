@@ -6576,8 +6576,8 @@ public:
 
   void visitHiddenType(const HiddenType *hidden) {
     using namespace decls_block;
-    auto *layoutDecl = hidden->getLayoutInfoDecl();
-    assert(layoutDecl && "HiddenType must carry an abstract layout");
+    auto *layoutDecl = hidden->getLegacyLayoutInfoDecl();
+    assert(layoutDecl && "cannot serialize a hidden type without a legacy XREF");
     unsigned abbrCode = S.DeclTypeAbbrCodes[NominalTypeLayout::Code];
     NominalTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                   S.addDeclRef(layoutDecl),
@@ -6944,12 +6944,9 @@ void Serializer::writeHiddenTypeLayout(const Decl *decl) {
       llvm::report_fatal_error(
           "hidden type declaration has no abstract layout");
     layout = hidden->Layout;
-    mangledName = hidden->MangledName.str();
   } else if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
     computedLayout = getLayoutProvider().getAbstractTypeLayout(nominal);
     layout = &computedLayout;
-    mangledName =
-        Mangle::ASTMangler(nominal->getASTContext()).mangleNominalType(nominal);
   } else {
     llvm::report_fatal_error(
         "cannot serialize a hidden layout for a non-type declaration");
@@ -6958,6 +6955,8 @@ void Serializer::writeHiddenTypeLayout(const Decl *decl) {
   if (!layout->typeInfoRepresentation)
     llvm::report_fatal_error(
         "abstract type layout has no serializable TypeInfo representation");
+
+  mangledName = layout->mangledName;
 
   auto mangledNameID = addUniquedString(mangledName).second;
   auto *parentDecl = getHiddenTypeLayoutDeclParentDecl(decl);

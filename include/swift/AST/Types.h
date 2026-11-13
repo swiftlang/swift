@@ -68,6 +68,7 @@ class ArchetypeType;
 class ArgumentList;
 class AssociatedTypeDecl;
 class ASTContext;
+struct AbstractTypeLayout;
 enum BufferPointerTypeKind : unsigned;
 struct BuiltinNameStringLiteral;
 class BuiltinTupleDecl;
@@ -8623,34 +8624,37 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
 class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
-  StringRef MangledName;
-  HiddenTypeLayoutInfoDecl *LayoutInfoDecl = nullptr;
+  AbstractTypeLayout *Layout;
+  HiddenTypeLayoutInfoDecl *LegacyLayoutInfoDecl;
   CanType Parent;
 
-  HiddenType(StringRef mangledName, HiddenTypeLayoutInfoDecl *layoutInfoDecl,
-             CanType parent, const ASTContext &ctx)
+  HiddenType(AbstractTypeLayout *layout,
+             HiddenTypeLayoutInfoDecl *legacyLayoutInfoDecl, CanType parent,
+             const ASTContext &ctx)
       : TypeBase(TypeKind::Hidden, &ctx,
                  parent ? parent->getRecursiveProperties()
                         : RecursiveTypeProperties()),
-        MangledName(mangledName), LayoutInfoDecl(layoutInfoDecl), Parent(parent) {}
+        Layout(layout), LegacyLayoutInfoDecl(legacyLayoutInfoDecl),
+        Parent(parent) {}
 
 public:
-  static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
-                         HiddenTypeLayoutInfoDecl *layoutInfoDecl,
-                         CanType parent);
+  static HiddenType *
+  get(const ASTContext &ctx, AbstractTypeLayout *layout, CanType parent,
+      HiddenTypeLayoutInfoDecl *legacyLayoutInfoDecl = nullptr);
 
-  StringRef getMangledName() const { return MangledName; }
-  HiddenTypeLayoutInfoDecl *getLayoutInfoDecl() const { return LayoutInfoDecl; }
+  StringRef getMangledName() const;
+  AbstractTypeLayout *getLayout() const { return Layout; }
+  HiddenTypeLayoutInfoDecl *getLegacyLayoutInfoDecl() const {
+    return LegacyLayoutInfoDecl;
+  }
   CanType getParent() const { return Parent; }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
-    Profile(ID, getMangledName(), getLayoutInfoDecl(), getParent());
+    Profile(ID, getLayout(), getParent());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
-                      HiddenTypeLayoutInfoDecl *layoutInfoDecl,
+  static void Profile(llvm::FoldingSetNodeID &ID, AbstractTypeLayout *layout,
                       CanType parent) {
-    ID.AddString(mangledName);
-    ID.AddPointer(layoutInfoDecl);
+    ID.AddPointer(layout);
     ID.AddPointer(parent.getPointer());
   }
 

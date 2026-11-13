@@ -6349,11 +6349,11 @@ ModuleFile::getHiddenTypeLayoutInfoDecl(DeclID DID) {
 
   auto *decl = HiddenTypeLayoutInfoDecl::create(getContext(),
                                                  getAssociatedModule());
-  decl->MangledName = getIdentifierText(mangledNameID);
   if (parentDeclID)
     decl->ParentDecl = dyn_cast<TypeDecl>(getDecl(parentDeclID));
 
   auto layout = std::make_unique<AbstractTypeLayout>();
+  layout->mangledName = getIdentifierText(mangledNameID).str();
   layout->typeProperties = *typeProperties;
   layout->referenceCountingSystem = referenceCounting;
   layout->typeInfoRepresentation = std::move(representation);
@@ -8010,8 +8010,8 @@ Expected<Type> DESERIALIZE_TYPE(NOMINAL_TYPE)(
     CanType parent = parentTy.get()
                          ? parentTy.get()->getCanonicalType()
                          : CanType();
-    CanType type = CanType(
-        HiddenType::get(MF.getContext(), hidden->MangledName, hidden, parent));
+    CanType type = CanType(HiddenType::get(MF.getContext(), hidden->Layout,
+                                           parent, hidden));
     MF.getContext().recordRecoveredHiddenType(type);
     return type;
   }

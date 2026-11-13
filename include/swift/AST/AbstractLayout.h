@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <optional>
+#include <string>
 
 #include "swift/AST/ReferenceCounting.h"
 #include "swift/SIL/SILTypeProperties.h"
@@ -29,6 +30,7 @@ namespace swift {
 class SerializableHiddenTypeInfoRepresentation;
 
 struct AbstractTypeLayout {
+  std::string mangledName;
   SILTypeProperties typeProperties;
   std::optional<ReferenceCounting> referenceCountingSystem;
   std::shared_ptr<SerializableHiddenTypeInfoRepresentation>

@@ -1048,11 +1048,8 @@ namespace {
     SILTypeProperties
     visitHiddenType(CanHiddenType type, AbstractionPattern origType,
                     IsTypeExpansionSensitive_t isSensitive) {
-      auto *layoutInfo = type->getLayoutInfoDecl();
-      assert(layoutInfo && layoutInfo->Layout &&
-             "HiddenTypeLayoutInfoDecl should have abstract layout");
       return mergeIsTypeExpansionSensitive(
-          isSensitive, layoutInfo->Layout->typeProperties);
+          isSensitive, type->getLayout()->typeProperties);
     }
 
   private:
@@ -2729,13 +2726,11 @@ namespace {
     TypeLowering *
     visitHiddenType(CanHiddenType type, AbstractionPattern origType,
                     IsTypeExpansionSensitive_t isSensitive) {
-      auto *layoutInfo = type->getLayoutInfoDecl();
-      assert(layoutInfo && layoutInfo->Layout &&
-             "HiddenTypeLayoutInfoDecl should have abstract layout");
+      auto *layout = type->getLayout();
       auto properties = mergeIsTypeExpansionSensitive(
-          isSensitive, layoutInfo->Layout->typeProperties);
-      if (layoutInfo->Layout->referenceCountingSystem) {
-        if (*layoutInfo->Layout->referenceCountingSystem ==
+          isSensitive, layout->typeProperties);
+      if (layout->referenceCountingSystem) {
+        if (*layout->referenceCountingSystem ==
             ReferenceCounting::None)
           return handleTrivial(type, properties);
         return handleReference(type, properties);

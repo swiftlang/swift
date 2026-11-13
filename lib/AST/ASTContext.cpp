@@ -20,6 +20,7 @@
 #include "ForeignRepresentationInfo.h"
 #include "SubstitutionMapStorage.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContextGlobalCache.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -4172,21 +4173,26 @@ IntegerType *IntegerType::get(const APSInt &value, const ASTContext &ctx) {
   return IntegerType::get(countBuf, isNegative, ctx);
 }
 
-HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
-                            HiddenTypeLayoutInfoDecl *layoutInfoDecl,
-                            CanType parent) {
+StringRef HiddenType::getMangledName() const {
+  return Layout->mangledName;
+}
+
+HiddenType *HiddenType::get(const ASTContext &ctx, AbstractTypeLayout *layout,
+                            CanType parent,
+                            HiddenTypeLayoutInfoDecl *legacyLayoutInfoDecl) {
+  assert(layout && "HiddenType requires an abstract layout");
   llvm::FoldingSetNodeID id;
-  HiddenType::Profile(id, mangledName, layoutInfoDecl, parent);
+  HiddenType::Profile(id, layout, parent);
 
   llvm::FoldingSetInsertToken insertToken;
   if (auto *hidden = ctx.getImpl().HiddenTypes.lookup(id, insertToken)) {
+    if (!hidden->LegacyLayoutInfoDecl)
+      hidden->LegacyLayoutInfoDecl = legacyLayoutInfoDecl;
     return hidden;
   }
 
-  auto nameCopy = ctx.AllocateCopy(mangledName);
-
   auto *hidden = new (ctx, AllocationArena::Permanent)
-      HiddenType(nameCopy, layoutInfoDecl, parent, ctx);
+      HiddenType(layout, legacyLayoutInfoDecl, parent, ctx);
 
   ctx.getImpl().HiddenTypes.insert(hidden, insertToken);
   return hidden;
