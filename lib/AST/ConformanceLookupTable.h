@@ -96,6 +96,7 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     TypeRepr *inheritedTypeRepr;
 
     ConformanceEntryKind Kind;
+    bool inferredOnDemand = false;
 
     ConformanceAttributes attributes;
 
@@ -139,6 +140,14 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     static ConformanceSource forSynthesized(DeclContext *dc) {
       return ConformanceSource(dc, ConformanceEntryKind::Synthesized);
     }
+
+    static ConformanceSource forInferredConformance(DeclContext *dc) {
+      auto source = forSynthesized(dc);
+      source.inferredOnDemand = true;
+      return source;
+    }
+
+    bool isInferredOnDemand() const { return inferredOnDemand; }
 
     static ConformanceSource forUnexpandedMacro(DeclContext *dc) {
       return ConformanceSource(dc, ConformanceEntryKind::PreMacroExpansion);

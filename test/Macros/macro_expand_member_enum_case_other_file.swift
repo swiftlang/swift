@@ -11,6 +11,17 @@
 
 // RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -verify %t/conformances.swift
 
+// RUN: %target-swift-frontend -typecheck -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -verify -primary-file %t/bitwise.swift %t/enums.swift
+
+//--- bitwise.swift
+func requireBits<T: BitwiseCopyable>(_ type: T.Type) {} // expected-note {{where 'T' =}}
+func invalidClosure() -> () -> Int {
+  { construct() } // expected-error {{cannot convert value of type 'GeneratedOnly' to closure result type 'Int'}}
+}
+func checkPayload() {
+  requireBits(NamedKey.self) // expected-error {{requires that 'NamedKey' conform to 'BitwiseCopyable'}}
+}
+
 //--- MacroDefinition.swift
 import SwiftSyntax
 import SwiftSyntaxMacros
@@ -45,6 +56,10 @@ enum ArbitraryKey {
   case second
 }
 
+@AddPayloadCaseNamed
+enum GeneratedOnly {}
+func construct() -> GeneratedOnly { .custom("hello") }
+
 //--- other.swift
 // This file never mentions the macro-introduced `custom` case.
 struct NamedHolder {
@@ -60,6 +75,13 @@ struct ArbitraryHolder {
 
 // CHECK-LABEL: sil hidden [ossa] @$s4Test15ArbitraryHolderV3keyAcA0B3KeyO_tcfC :
 // CHECK: bb0(%0 : @owned $ArbitraryKey, %1 : $@thin ArbitraryHolder.Type):
+
+// CHECK-LABEL: sil hidden [ossa] {{.*}}eraseGenerated
+// CHECK: apply
+// CHECK-NOT: unreachable
+// CHECK: init_existential_addr
+// CHECK: return
+func eraseGenerated() -> Any { construct() }
 
 //--- conformances.swift
 protocol Marker {}

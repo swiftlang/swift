@@ -63,6 +63,9 @@ macro AddPayloadCaseNamed() = #externalMacro(module: "MacroDefinition", type: "A
 @attached(member, names: arbitrary)
 macro AddPayloadCaseArbitrary() = #externalMacro(module: "MacroDefinition", type: "AddPayloadCaseMacro")
 
+@AddPayloadCaseNamed enum Message {}
+func constructMessage() -> Message { .custom("hello") }
+
 @AddPayloadCaseNamed
 enum NamedKey {
   case first
@@ -116,6 +119,20 @@ func declarationMarkers() -> Bool {
   return GeneratedOnly.marker && WrittenOnly.marker
 }
 
+@attached(member, conformances: BitwiseCopyable, names: named(custom))
+macro IfMissingBitwise() = #externalMacro(module: "MacroDefinition", type: "ConditionalCaseMacro")
+
+@IfMissingBitwise enum Bits { case first(Int) }
+enum WrittenBits { case first(Int), custom }
+@IfMissingBitwise enum ExplicitBits: BitwiseCopyable { case first(Int) }
+func checkExplicit(_ bits: ExplicitBits) {
+  switch bits { case .first: break }
+}
+func declaredBitsSize() -> Int {
+  _ = Bits.custom
+  return MemoryLayout<Bits>.size
+}
+
 // Look up each generated case here so this file sees the complete enum.
 func referenceSizes() -> [Int] {
   _ = NamedKey.custom
@@ -124,6 +141,14 @@ func referenceSizes() -> [Int] {
 }
 
 //--- other.swift
+func eraseMessage() -> Any { constructMessage() }
+
+func requireBits<T: BitwiseCopyable>(_ type: T.Type) {}
+func consumerBitsSize() -> Int {
+  requireBits(Bits.self)
+  return MemoryLayout<Bits>.size
+}
+
 func consumerMarkers() -> Bool {
   _ = GeneratedOnly.custom
   return GeneratedOnly.marker && WrittenOnly.marker
@@ -147,3 +172,12 @@ print("conditional expansion matches written enum: \(declarationSize() == expect
 
 // CHECK: extension markers match: true
 print("extension markers match: \(declarationMarkers() && consumerMarkers())")
+
+// CHECK: bitwise expansion matches written cases: true
+let bitsSize = MemoryLayout<WrittenBits>.size
+print("bitwise expansion matches written cases: \(declaredBitsSize() == bitsSize && consumerBitsSize() == bitsSize)")
+
+// CHECK: erased payload: hello
+if let message = eraseMessage() as? Message, case let .custom(payload) = message {
+  print("erased payload: \(payload)")
+}

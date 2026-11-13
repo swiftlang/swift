@@ -1088,7 +1088,7 @@ void ConformanceLookupTable::registerProtocolConformance(
   ConformanceSource source =
       inherited ? ConformanceSource::forInherited(cast<ClassDecl>(nominal))
       : synthesized
-          ? ConformanceSource::forSynthesized(dc)
+          ? ConformanceSource::forInferredConformance(dc)
           : ConformanceSource::forExplicit(dc, /*inheritedEntry=*/nullptr);
 
   ASTContext &ctx = nominal->getASTContext();
@@ -1120,7 +1120,8 @@ void ConformanceLookupTable::addSimpleEnumConformancesIfNeeded(
   auto &ctx = nominal->getASTContext();
   for (auto kind : {KnownProtocolKind::Equatable, KnownProtocolKind::Hashable})
     if (auto *proto = ctx.getProtocol(kind))
-      addSynthesizedConformance(nominal, proto, nominal);
+      addProtocol(proto, nominal->getLoc(),
+                  ConformanceSource::forInferredConformance(nominal));
 }
 
 bool ConformanceLookupTable::lookupConformance(
@@ -1161,6 +1162,11 @@ bool ConformanceLookupTable::lookupConformance(
   // Resolve the conformances for this protocol.
   resolveConformances(protocol);
   for (auto entry : Conformances[protocol]) {
+    // Enum body macros must see the same inputs before and after a client
+    // triggers inference, including protocols implied by an inferred one.
+    if (!includeSimpleEnumConformances &&
+        entry->getDeclaredConformance()->Source.isInferredOnDemand())
+      continue;
     if (auto conformance = getConformance(nominal, entry)) {
       conformances.push_back(conformance);
     }
