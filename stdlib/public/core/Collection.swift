@@ -1198,18 +1198,24 @@ extension Collection {
       return []
     }
 
-    var result = ContiguousArray<T>()
-    result.reserveCapacity(n)
-
+    let result = _ContiguousArrayBuffer<T>(
+      _uninitializedCount: 0, minimumCapacity: n)
+    let base = unsafe result.firstElementAddress
+    var written = 0
     var i = self.startIndex
-
-    for _ in 0..<n {
-      result.append(try transform(self[i]))
-      formIndex(after: &i)
+    do throws(E) {
+      for _ in 0..<n {
+        unsafe (base + written).initialize(to: try transform(self[i]))
+        written &+= 1
+        formIndex(after: &i)
+      }
+    } catch {
+      result.mutableCount = written
+      throw error
     }
-
     _expectEnd(of: self, is: i)
-    return Array(result)
+    result.mutableCount = n
+    return Array(ContiguousArray(_buffer: result))
   }
 
 #if !$Embedded
