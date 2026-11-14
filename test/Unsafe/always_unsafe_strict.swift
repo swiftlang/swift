@@ -1,5 +1,7 @@
-// RUN: %target-typecheck-verify-swift -strict-memory-safety
-// RUN: %target-typecheck-verify-swift -Wwarning StrictMemorySafety
+// RUN: %target-typecheck-verify-swift -strict-memory-safety -enable-experimental-feature AlwaysUnsafeAttribute
+// RUN: %target-typecheck-verify-swift -Wwarning StrictMemorySafety -enable-experimental-feature AlwaysUnsafeAttribute
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // How the two flavors of unsafety interact when strict memory safety checking
 // is enabled: '@unsafe(always)' declarations are diagnosed as errors while

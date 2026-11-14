@@ -1,6 +1,8 @@
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name always_unsafe
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name always_unsafe -enable-experimental-feature AlwaysUnsafeAttribute
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name always_unsafe
 // RUN: %FileCheck %s --input-file %t.swiftinterface --match-full-lines
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // Older compilers don't understand the argument of '@unsafe(always)', so the
 // interface falls back to plain '@unsafe' for them.
