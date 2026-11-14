@@ -8151,6 +8151,9 @@ public:
     if (T->hasExplicitAnyObject())
       printSpecial("AnyObject");
 
+    if (T->hasExplicitAnyReference())
+      printSpecial("_AnyReference");
+
     for (auto ip : T->getInverses())
       printSpecial(getProtocolName(getKnownProtocolKind(ip)), true);
 
@@ -8642,6 +8645,7 @@ void LayoutConstraintInfo::print(ASTPrinter &Printer,
   case LayoutConstraintKind::UnknownLayout:
   case LayoutConstraintKind::RefCountedObject:
   case LayoutConstraintKind::NativeRefCountedObject:
+  case LayoutConstraintKind::ObjectReference:
   case LayoutConstraintKind::Class:
   case LayoutConstraintKind::NativeClass:
   case LayoutConstraintKind::Trivial:

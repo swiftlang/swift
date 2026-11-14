@@ -302,6 +302,9 @@ struct ASTContext::Implementation {
   /// The AnyObject type.
   CanType AnyObjectType;
 
+  /// The AnyReference type.
+  CanType AnyReferenceType;
+
 #define KNOWN_STDLIB_TYPE_DECL(NAME, DECL_CLASS, NUM_GENERIC_PARAMS) \
   /** The declaration of Swift.NAME. */ \
   DECL_CLASS *NAME##Decl = nullptr;
@@ -1423,6 +1426,22 @@ CanType ASTContext::getAnyObjectConstraint() const {
 
 CanType ASTContext::getAnyObjectType() const {
   return ExistentialType::get(getAnyObjectConstraint())
+      ->getCanonicalType();
+}
+
+CanType ASTContext::getAnyReferenceConstraint() const {
+  if (getImpl().AnyReferenceType) {
+    return getImpl().AnyReferenceType;
+  }
+
+  getImpl().AnyReferenceType =
+      CanType(ProtocolCompositionType::theAnyReferenceType(*this));
+  return getImpl().AnyReferenceType;
+}
+
+CanType ASTContext::getAnyReferenceType() const {
+  return ExistentialType::get(
+             ProtocolCompositionType::theAnyReferenceType(*this))
       ->getCanonicalType();
 }
 
@@ -4956,16 +4975,19 @@ ClassType::ClassType(ClassDecl *D, Type parent, ArrayRef<Type> args,
                      RecursiveTypeProperties properties)
   : NominalType(TypeKind::Class, D, parent, args, ctx, properties) {}
 
-ProtocolCompositionType *
-ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
-                               InvertibleProtocolSet Inverses,
-                               bool HasExplicitAnyObject) {
-  assert(Members.size() != 1 || HasExplicitAnyObject || !Inverses.empty());
+ProtocolCompositionType *ProtocolCompositionType::build(
+    const ASTContext &C, ArrayRef<Type> Members, InvertibleProtocolSet Inverses,
+    bool HasExplicitAnyObject, bool HasExplicitAnyReference) {
+  ASSERT(Members.size() != 1 || HasExplicitAnyObject ||
+         HasExplicitAnyReference || !Inverses.empty());
+  ASSERT(!(HasExplicitAnyObject && HasExplicitAnyReference) &&
+         "AnyObject implies AnyReference");
 
   // Check to see if we've already seen this protocol composition before.
   llvm::FoldingSetInsertToken InsertToken;
   llvm::FoldingSetNodeID ID;
-  ProtocolCompositionType::Profile(ID, Members, Inverses, HasExplicitAnyObject);
+  ProtocolCompositionType::Profile(ID, Members, Inverses, HasExplicitAnyObject,
+                                   HasExplicitAnyReference);
 
   bool isCanonical = true;
   RecursiveTypeProperties properties;
@@ -4985,11 +5007,9 @@ ProtocolCompositionType::build(const ASTContext &C, ArrayRef<Type> Members,
   // Use trailing objects for member type storage
   auto size = totalSizeToAlloc<Type>(Members.size());
   auto mem = C.Allocate(size, alignof(ProtocolCompositionType), arena);
-  auto compTy = new (mem) ProtocolCompositionType(isCanonical ? &C : nullptr,
-                                                  Members,
-                                                  Inverses,
-                                                  HasExplicitAnyObject,
-                                                  properties);
+  auto compTy = new (mem) ProtocolCompositionType(
+      isCanonical ? &C : nullptr, Members, Inverses, HasExplicitAnyObject,
+      HasExplicitAnyReference, properties);
   C.getImpl().getArena(arena).ProtocolCompositionTypes.insert(compTy,
                                                               InsertToken);
   return compTy;

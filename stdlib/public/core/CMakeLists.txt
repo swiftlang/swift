@@ -387,6 +387,7 @@ list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowAnd
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BorrowInout")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "RawLayout")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BackDeployFrozenValueTypes")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AnyReference")
 list(APPEND swift_stdlib_compile_flags "-strict-memory-safety")
 
 # For `@DebugDescription`. `SWIFT_HOST_PLUGINS_DIR` is computed once in

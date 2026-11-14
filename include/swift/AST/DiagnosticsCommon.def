@@ -137,6 +137,10 @@ ERROR(generic_signature_not_equal,none,
       "generic signature %0 is not equal to new signature %1",
       (StringRef, StringRef))
 
+ERROR(any_reference_is_experimental, none,
+      "'_AnyReference' is experimental; enable it with "
+      "'-enable-experimental-feature AnyReference'",
+      ())
 // FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
 // file just for a few errors.
 ERROR(sdk_node_unrecognized_key,none,
