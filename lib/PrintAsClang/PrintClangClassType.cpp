@@ -61,6 +61,8 @@ void ClangClassTypePrinter::printClassTypeDecl(
       baseClassQualifiedName = "swift::_impl::RefCountedClass";
     }
 
+    ClangSyntaxPrinter(typeDecl->getASTContext(), os)
+        .printSwiftNameCommentIfNeeded(typeDecl);
     os << "class";
     declAndTypePrinter.printAvailability(os, typeDecl);
     ClangSyntaxPrinter(typeDecl->getASTContext(), os).printSymbolUSRAttribute(typeDecl);
