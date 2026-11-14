@@ -2363,6 +2363,30 @@ static FuncDecl *findAnnotatableFunction(DeclContext *dc) {
   return fn;
 }
 
+/// If the given expression is the resolved form of a call to
+/// `withoutActuallyEscaping(_:do:)` or `withoutActuallyDeiniting(_:do:)` with
+/// a closure literal as its body, returns that closure.
+static ClosureExpr *getWithoutActuallyEscapingOrDeinitingBody(Expr *expr) {
+  // `withoutActuallyEscaping(f) { ... }` resolves to a
+  // `MakeTemporarilyEscapableExpr` that calls the body.
+  if (auto *MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(expr)) {
+    if (auto *call = dyn_cast<CallExpr>(MTEE->getSubExpr()))
+      return dyn_cast<ClosureExpr>(call->getFn());
+    return nullptr;
+  }
+
+  // `withoutActuallyDeiniting(f) { ... }` resolves to a call to the body with
+  // a marked conversion of `f` as its argument.
+  if (auto *call = dyn_cast<CallExpr>(expr)) {
+    auto *conversion = dyn_cast_or_null<FunctionConversionExpr>(
+        call->getArgs()->getUnaryExpr());
+    if (conversion && conversion->isWithoutActuallyDeiniting())
+      return dyn_cast<ClosureExpr>(call->getFn());
+  }
+
+  return nullptr;
+}
+
 namespace {
   /// Check for adherence to the actor isolation rules, emitting errors
   /// when actor-isolated declarations are used in an unsafe manner.
@@ -3545,24 +3569,20 @@ namespace {
       if (auto isolationExpr = dyn_cast<CurrentContextIsolationExpr>(expr))
         recordCurrentContextIsolation(isolationExpr);
 
-      // `withoutActuallyEscaping` parameter types are set to be
-      // `nonisolated(nonsending)` when the `NonisolatedNonsendingByDefault`
-      // feature is enabled, which means that we need to make the argument
-      // as `nonisolated(nonsending)` if it's a closure. This cannot be done
-      // sooner because we need to make sure that closure is definitely
-      // nonisolated and due to how AST is structured we cannot do this in
-      // `determineClosureIsolation`.
+      // The body parameter types of `withoutActuallyEscaping` and
+      // `withoutActuallyDeiniting` are set to be `nonisolated(nonsending)`
+      // when the `NonisolatedNonsendingByDefault` feature is enabled, which
+      // means that we need to make the argument as `nonisolated(nonsending)`
+      // if it's a closure. This cannot be done sooner because we need to make
+      // sure that closure is definitely nonisolated and due to how AST is
+      // structured we cannot do this in `determineClosureIsolation`.
       if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault)) {
-        if (auto *MTEE = dyn_cast<MakeTemporarilyEscapableExpr>(expr)) {
-          if (auto *call = dyn_cast<CallExpr>(MTEE->getSubExpr())) {
-            if (auto *closure = dyn_cast<ClosureExpr>(call->getFn())) {
-              if (auto closureTy = closure->getType()->getAs<FunctionType>()) {
-                if (closureTy->isAsync() &&
-                    closure->getActorIsolation().isNonisolatedOrConcurrent())
-                  closure->setActorIsolation(
-                      ActorIsolation::forNonisolatedNonsending());
-              }
-            }
+        if (auto *closure = getWithoutActuallyEscapingOrDeinitingBody(expr)) {
+          if (auto closureTy = closure->getType()->getAs<FunctionType>()) {
+            if (closureTy->isAsync() &&
+                closure->getActorIsolation().isNonisolatedOrConcurrent())
+              closure->setActorIsolation(
+                  ActorIsolation::forNonisolatedNonsending());
           }
         }
       }
