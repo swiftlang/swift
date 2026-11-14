@@ -10,7 +10,7 @@
  *
  *===----------------------------------------------------------------------=== *
  *
- * This file provides declarations for functions that a platform much provide
+ * This file provides declarations for functions that a platform must provide
  * to support Swift's standard output, e.g., the print() function.
  *
  *===----------------------------------------------------------------------===*/

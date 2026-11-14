@@ -6,6 +6,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     EmbeddedPlatform.h
     SwiftPlatform/Clocks.h
     SwiftPlatform/Concurrency.h
+    SwiftPlatform/Errors.h
     SwiftPlatform/ExecutorTypes.h
     SwiftPlatform/Heap.h
     SwiftPlatform/Mutex.h
