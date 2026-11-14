@@ -414,61 +414,6 @@ void _swift_tls_set(__swift_tls_key_t key,
 __swift_ptrdiff_t _swift_thread_isMain(void);
 
 /**
- * Reads the continuous clock, which keeps advancing while the system is
- * asleep, as a time since an arbitrary fixed point such as system boot.
- *
- * - Parameter nanoseconds: Receives the remaining nanoseconds, in
- *   [0, 999999999].
- *
- * When the program is linked with dead stripping (`-dead_strip` or
- * `--gc-sections`), the `_swift_clockContinuous_*` functions are required only
- * by code that reads the continuous clock.
- *
- * This function can be implemented as a call to `clock_gettime` with
- * `CLOCK_MONOTONIC_RAW` on Darwin or `CLOCK_BOOTTIME` on Linux.
- */
-void _swift_clockContinuous_getTime(
-    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
-    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
-
-/**
- * Reports the resolution of the continuous clock.
- *
- * This function can be implemented as a call to `clock_getres`.
- */
-void _swift_clockContinuous_getResolution(
-    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
-    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
-
-/**
- * Reads the suspending clock, which does not advance while the system is
- * asleep, as a time since an arbitrary fixed point such as system boot.
- *
- * - Parameter nanoseconds: Receives the remaining nanoseconds, in
- *   [0, 999999999].
- *
- * When the program is linked with dead stripping, the
- * `_swift_clockSuspending_*` functions are required only by code that reads
- * the suspending clock. A platform that never sleeps can read the same time
- * source as the continuous clock.
- *
- * This function can be implemented as a call to `clock_gettime` with
- * `CLOCK_UPTIME_RAW` on Darwin or `CLOCK_MONOTONIC` on Linux.
- */
-void _swift_clockSuspending_getTime(
-    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
-    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
-
-/**
- * Reports the resolution of the suspending clock.
- *
- * This function can be implemented as a call to `clock_getres`.
- */
-void _swift_clockSuspending_getResolution(
-    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE seconds,
-    __swift_int64_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE nanoseconds);
-
-/**
  * Exit the program.
  *
  * - Parameters:

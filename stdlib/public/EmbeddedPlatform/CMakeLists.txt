@@ -4,6 +4,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   # All of the embedded platform headers.
   set(_embedded_platform_headers
     EmbeddedPlatform.h
+    EmbeddedPlatform+Clocks.h
     EmbeddedPlatform+Concurrency.h
     EmbeddedPlatform+Types.h
     ExecutorTypes.h)
