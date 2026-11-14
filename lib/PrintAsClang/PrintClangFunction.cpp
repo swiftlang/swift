@@ -703,6 +703,38 @@ static bool isOptionalObjCExistential(Type ty) {
   return false;
 }
 
+/// Returns the retain function of a shared foreign reference type \p ty, or of
+/// the one an optional \p ty wraps, as its annotation names it.
+static const clang::FunctionDecl *getForeignReferenceRetain(Type ty) {
+  if (auto obj = ty->getOptionalObjectType())
+    ty = obj;
+  const auto *cd = dyn_cast_or_null<ClassDecl>(ty->getAnyNominal());
+  if (!cd || !cd->isForeignReferenceType())
+    return nullptr;
+  const auto *record = dyn_cast_or_null<clang::RecordDecl>(cd->getClangDecl());
+  if (!record)
+    return nullptr;
+  return cd->getASTContext()
+      .getClangModuleLoader()
+      ->getForeignReferenceTypeAnnotatedRetain(record);
+}
+
+/// Prints a C++ call to the foreign reference type retain function \p retain
+/// on the pointer \p reference.
+static void printForeignReferenceRetainCall(raw_ostream &os,
+                                            const clang::FunctionDecl *retain,
+                                            StringRef reference) {
+  if (isa<clang::CXXMethodDecl>(retain)) {
+    os << reference << "->" << retain->getName() << "()";
+    return;
+  }
+  clang::PrintingPolicy policy(retain->getASTContext().getLangOpts());
+  policy.SuppressUnwrittenScope = true;
+  os << "::";
+  retain->printQualifiedName(os, policy);
+  os << '(' << reference << ')';
+}
+
 static bool isOptionalForeignReferenceType(Type ty) {
   if (auto obj = ty->getOptionalObjectType()) {
     if (const auto *cd =
@@ -1499,6 +1531,19 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
     assert(!result.isUnsupported());
     typeOS.flush();
 
+    // A foreign reference is a plain pointer in C++, so copying it does not
+    // retain it. Call the retain operation that its annotation names.
+    if (auto *retain = getForeignReferenceRetain(param.getInterfaceType());
+        retain && !param.isSelfParameter()) {
+      os << "  " << paramType << ' ' << consumedName << " = " << name << ";\n";
+      if (param.getInterfaceType()->getOptionalObjectType())
+        os << "  if (" << consumedName << ")\n  ";
+      os << "  ";
+      printForeignReferenceRetainCall(os, retain, consumedName);
+      os << ";\n";
+      return;
+    }
+
     os << "  alignas(alignof(" << paramType << ")) char copyBuffer_"
        << consumedName << "[sizeof(" << paramType << ")];\n";
     os << "  auto &" << consumedName << " = *(new(copyBuffer_" << consumedName
@@ -1975,9 +2020,10 @@ void DeclAndTypeClangFunctionPrinter::collectConsumedParameters(
   signature.visitParameterList(
       [](const LoweredFunctionSignature::IndirectResultValue &) {},
       [&](const LoweredFunctionSignature::DirectParameter &param) {
+        auto type = param.getParamDecl().getInterfaceType();
         if (isConsumedParameterInCaller(param.getConvention()) &&
-            !hasKnownOptionalNullableCxxMapping(
-                param.getParamDecl().getInterfaceType()))
+            (!hasKnownOptionalNullableCxxMapping(type) ||
+             getForeignReferenceRetain(type)))
           consumed.insert(&param.getParamDecl());
       },
       [&](const LoweredFunctionSignature::IndirectParameter &param) {
