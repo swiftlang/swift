@@ -2420,6 +2420,7 @@ public:
     DeclVisitor<DeclChecker>::visit(decl);
 
     TypeChecker::checkExistentialTypes(decl);
+    diagnoseUnusableImportedTypesInDecl(decl);
 
     if (auto VD = dyn_cast<ValueDecl>(decl)) {
       TypeChecker::checkForForbiddenPrefix(Ctx, VD->getBaseName());

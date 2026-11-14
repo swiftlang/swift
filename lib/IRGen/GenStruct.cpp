@@ -707,10 +707,7 @@ namespace {
       const auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
       if (!cxxRecordDecl)
         return nullptr;
-      if (auto *cctor = importer::findCopyConstructor(cxxRecordDecl);
-          cctor && cctor->getAccess() == clang::AS_public)
-        return cctor;
-      return nullptr;
+      return importer::findCopyConstructor(cxxRecordDecl);
     }
 
     const clang::CXXConstructorDecl *findMoveConstructor() const {
@@ -895,10 +892,11 @@ namespace {
 
     void destroy(IRGenFunction &IGF, Address address, SILType T,
                  bool isOutlined) const override {
-      auto *destructor = getCXXDestructor(T);
-      // If the destructor is trivial, clang will assert when we call
-      // `emitCXXDestructorCall` so, just let Swift handle this destructor.
-      if (!destructor || destructor->isTrivial()) {
+      auto *cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(ClangDecl);
+      auto *destructor = cxxRecordDecl
+                             ? importer::findNonTrivialDestructor(cxxRecordDecl)
+                             : nullptr;
+      if (!destructor) {
         // If we didn't find a destructor to call, bail out to the parent
         // implementation.
         StructTypeInfoBase<AddressOnlyCXXClangRecordTypeInfo, FixedTypeInfo,
