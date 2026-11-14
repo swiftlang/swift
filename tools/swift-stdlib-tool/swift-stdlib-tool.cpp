@@ -1275,11 +1275,12 @@ int main(int argc, const char *argv[]) {
       // to devices.
       const auto dst = dst_dir + "/" + filename(lib);
       const auto oldSignatureData = query_code_signature(dst);
+      std::string tmpFile;
       const char *tmpFilePath = 0;
       if (!oldSignatureData.empty()) {
         // Make a copy of the existing file, with permissions and
         // mtime preserved.
-        auto tmpFile = dst + ".original";
+        tmpFile = dst + ".original";
         tmpFilePath = tmpFile.c_str();
         xcrunToolCommand({"cp", "-p", dst, tmpFile});
       }
