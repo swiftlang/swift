@@ -5,10 +5,11 @@
 // Strict memory safety diagnostics can be enabled with '@diagnose' without
 // passing '-strict-memory-safety'.
 
-// RUN: %target-swift-frontend -typecheck -verify %t/decl.swift
+// RUN: %target-swift-frontend -typecheck -verify %t/decl.swift -enable-experimental-feature AlwaysUnsafeAttribute
 // RUN: %target-swift-frontend -typecheck -verify %t/file_default.swift -strict-concurrency=complete -I %t
 
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 //--- decl.swift
 
