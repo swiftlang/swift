@@ -38,10 +38,10 @@ these initializers.
 ### Adding Keys and Values
 
 - ``Swift/Dictionary/updateValue(_:forKey:)``
-- ``Swift/Dictionary/merge(_:uniquingKeysWith:)-m2ub``
-- ``Swift/Dictionary/merge(_:uniquingKeysWith:)-7smbb``
-- ``Swift/Dictionary/merging(_:uniquingKeysWith:)-3vtfs``
-- ``Swift/Dictionary/merging(_:uniquingKeysWith:)-9bik6``
+- ``Swift/Dictionary/merge(_:uniquingKeysWith:)-(S,_)``
+- ``Swift/Dictionary/merge(_:uniquingKeysWith:)-([Key:Value],_)``
+- ``Swift/Dictionary/merging(_:uniquingKeysWith:)-(S,_)``
+- ``Swift/Dictionary/merging(_:uniquingKeysWith:)-([Key:Value],_)``
 - ``Swift/Dictionary/reserveCapacity(_:)``
 
 ### Removing Keys and Values
@@ -55,6 +55,7 @@ these initializers.
 
 - ``Swift/Dictionary/==(_:_:)``
 - ``Swift/Dictionary/!=(_:_:)``
+- ``Swift/Dictionary/isTriviallyIdentical(to:)``
 
 ### Iterating over Keys and Values
 
@@ -87,6 +88,8 @@ these initializers.
 - ``Swift/Dictionary/sorted(by:)``
 - ``Swift/Dictionary/shuffled()``
 - ``Swift/Dictionary/shuffled(using:)``
+- ``Swift/Dictionary/mapKeyedValues(_:)``
+- ``Swift/Dictionary/compactMapKeyedValues(_:)``
 
 ### Performing Collection Operations
 

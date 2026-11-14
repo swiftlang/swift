@@ -85,6 +85,7 @@ below to get started.
 - <doc:Distributed-collection>
 - <doc:RegexBuilder-collection>
 - <doc:Synchronization-collection>
+- <doc:CompatibilitySpan-collection>
 
 ### Deprecated
 

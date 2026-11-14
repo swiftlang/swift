@@ -10,14 +10,18 @@ Allocate and manage memory manually.
 
 ### Safe Memory Access
 
-- ``Swift/Span``
-- ``Swift/RawSpan``
-- ``Swift/OutputSpan``
-- ``Swift/OutputRawSpan``
+- ``CompatibilitySpan/Span``
+- ``CompatibilitySpan/RawSpan``
+- ``CompatibilitySpan/OutputSpan``
+- ``CompatibilitySpan/OutputRawSpan``
 - ``Swift/UTF8Span``
-- ``Swift/MutableSpan``
-- ``Swift/MutableRawSpan``
-- ``Swift/SpanIterator``
+- ``CompatibilitySpan/MutableSpan``
+- ``CompatibilitySpan/MutableRawSpan``
+
+### Non-Exclusive Memory Access
+
+- ``Swift/Cell``
+- ``Swift/ConstCell``
 
 ### Safe Access to Raw Bytes
 
@@ -26,6 +30,7 @@ Allocate and manage memory manually.
 - ``Swift/ConvertibleToBytes``
 - ``Swift/ByteOrder``
 - ``Swift/bitCast(_:to:)``
+
 ### Typed Pointers
 
 Use typed pointers and buffers to access memory as instances of a specific type.

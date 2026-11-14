@@ -41,11 +41,13 @@ Access a pointer to a variable in memory for explicit passing to C functions.
 - ``Swift/CInt``
 - ``Swift/CLong``
 - ``Swift/CLongLong``
+- ``Swift/CInt128``
 - ``Swift/CShort``
 - ``Swift/CSignedChar``
 - ``Swift/CUnsignedChar``
 - ``Swift/CUnsignedInt``
 - ``Swift/CUnsignedLong``
 - ``Swift/CUnsignedLongLong``
+- ``Swift/CUnsignedInt128``
 - ``Swift/CUnsignedShort``
 - ``Swift/CWideChar``

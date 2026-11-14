@@ -9,7 +9,8 @@
 ### Adding Values
 
 - ``Swift/Hasher/combine(_:)``
-- ``Swift/Hasher/combine(bytes:)``
+- ``Swift/Hasher/combine(bytes:)-(RawSpan)``
+- ``Swift/Hasher/combine(bytes:)-(UnsafeRawBufferPointer)``
 
 ### Finalizing a Hasher
 

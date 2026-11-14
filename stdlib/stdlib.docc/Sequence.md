@@ -12,6 +12,7 @@
 
 - ``Swift/Sequence/contains(_:)``
 - ``Swift/Sequence/contains(where:)``
+- ``Swift/Sequence/count(where:)``
 - ``Swift/Sequence/allSatisfy(_:)``
 - ``Swift/Sequence/first(where:)``
 - ``Swift/Sequence/min()``
@@ -30,7 +31,7 @@
 - ``Swift/Sequence/dropFirst(_:)``
 - ``Swift/Sequence/dropLast(_:)``
 - ``Swift/Sequence/drop(while:)``
-- ``Swift/Sequence/filter(_:)-5y9d2``
+- ``Swift/Sequence/filter(_:)``
 
 ### Transforming a Sequence
 
@@ -79,3 +80,7 @@
 ### Accessing Underlying Storage
 
 - ``Swift/Sequence/withContiguousStorageIfAvailable(_:)-4don7``
+
+### Working with Borrowing Iterators
+
+- ``Swift/Sequence/makeBorrowingIterator()``
