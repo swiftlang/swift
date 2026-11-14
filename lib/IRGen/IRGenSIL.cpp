@@ -6317,8 +6317,15 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
   // swifterror in a register.
   if (IGM.ShouldUseSwiftError)
     return;
-  auto ErrorResultSlot = getCalleeErrorResultSlot(IGM.silConv.getSILType(
-      ErrorInfo, FnTy, IGM.getMaximalTypeExpansionContext()), false);
+  // The shadow variable describes the thrown value as two dereferences of the
+  // error result slot, which is only correct for an 'any Error' pointer. A
+  // typed error is never stored behind that pointer, so don't describe one.
+  SILFunctionConventions fnConv(FnTy, IGM.silConv);
+  if (fnConv.isTypedError())
+    return;
+  auto ErrorResultSlot = getCalleeErrorResultSlot(
+      fnConv.getSILType(ErrorInfo, IGM.getMaximalTypeExpansionContext()),
+      fnConv.isTypedError());
   auto Var = DbgValue->getVarInfo();
   assert(Var && "error result without debug info");
   auto Storage =
