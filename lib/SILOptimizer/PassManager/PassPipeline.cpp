@@ -94,7 +94,7 @@ static void addLifetimeResolutionPasses(SILPassPipelinePlan &P) {
   // Main sequence for LifetimeResolution
   P.addRemoveSILGenLifetimes();
   P.addLifetimeResolution();
-  P.addLifetimeResolutionDiagnose();
+  P.addDiagnoseResolvedLifetimes();
 
   // Remaining pieces of DefiniteInitialization we still rely-on.
   P.addLetPropertyLowering();

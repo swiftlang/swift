@@ -640,7 +640,7 @@ private func findSuperInitCall(passingSelfLoadedBy load: LoadInst) -> FullApplyS
 //                                  Markers
 //===----------------------------------------------------------------------===//
 
-/// A marker that LifetimeResolution leaves where it corrected a misuse, which LifetimeResolutionDiagnose turns into
+/// A marker that LifetimeResolution leaves where it corrected a misuse, which DiagnoseResolvedLifetimes turns into
 /// a user-facing diagnostic.
 enum LifetimeResolutionMarker {
   /// `assign undef to [init] %leaf`, after the root's `markerInsertionPoint`: the leaf is read before being

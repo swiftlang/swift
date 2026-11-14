@@ -1,4 +1,4 @@
-//===--- LifetimeResolutionDiagnose.swift ---------------------------------===//
+//===--- DiagnoseResolvedLifetimes.swift- ---------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -14,7 +14,7 @@ import AST
 import SIL
 
 // Turns each LifetimeResolutionMarker left behind by LifetimeResolution into a user-facing diagnostic.
-let lifetimeResolutionDiagnosePass = FunctionPass(name: "lifetime-resolution-diagnose") {
+let diagnoseResolvedLifetimesPass = FunctionPass(name: "diagnose-resolved-lifetimes") {
   (function: Function, context: FunctionPassContext) in
 
   guard function.hasOwnership else { return }
@@ -55,7 +55,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
   if !markers.isEmpty {
     // Ensure we actually did emit an error.
     guard context.hadError else {
-      fatalError("LifetimeResolutionDiagnose didn't emit an error when it should have! \n\(function)")
+      fatalError("DiagnoseResolvedLifetimes didn't emit an error when it should have! \n\(function)")
     }
 
     // Like DefiniteInitialization, silence later diagnostics like ImplicitDestroyChecker's after reporting an error.
@@ -1178,7 +1178,7 @@ private struct Diagnoser {
   }
 }
 
-let lifetimeResolutionDiagnoseTest = FunctionTest("lifetime_resolution_diagnose") {
+let diagnoseResolvedLifetimesTest = FunctionTest("diagnose_resolved_lifetimes") {
   function, arguments, context in
   diagnoseLifetimeViolations(function, context)
 }

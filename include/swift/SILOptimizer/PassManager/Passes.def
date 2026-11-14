@@ -118,7 +118,7 @@ PASS(RemoveSILGenLifetimes, "remove-silgen-lifetimes",
      "Remove SILGen's lifetimes in preparation for LifetimeResolution")
 PASS(LifetimeResolution, "lifetime-resolution",
      "Resolve lifetimes based on uses")
-PASS(LifetimeResolutionDiagnose, "lifetime-resolution-diagnose",
+PASS(DiagnoseResolvedLifetimes, "diagnose-resolved-lifetimes",
      "Diagnose lifetime violations based on resolved lifetimes")
 PASS(MergeBorrowScopes, "merge-borrow-scopes",
      "Merge borrow scopes")
