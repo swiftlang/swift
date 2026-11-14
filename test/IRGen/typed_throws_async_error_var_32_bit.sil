@@ -1,0 +1,54 @@
+// RUN: %target-swift-frontend -parse-stdlib -module-name Swift -target i686-unknown-windows-msvc -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -module-name Swift -target i686-unknown-linux-gnu -emit-ir %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-stdlib -module-name Swift -target i686-unknown-windows-msvc -emit-ir -g %s | %FileCheck %s --check-prefix=DBG --implicit-check-not='name: "$error"'
+
+// REQUIRES: CODEGENERATOR=X86
+
+// x86-32 does not pass swifterror in a register, so IRGen creates a shadow
+// "$error" debug variable that describes the thrown error as two dereferences
+// of the error result slot. That is only correct for an 'any Error' pointer.
+// Creating the variable for a typed error used to crash IRGen for async
+// functions that throw a loadable typed error, and described the wrong memory
+// for synchronous ones, so no "$error" variable is emitted for typed errors.
+
+sil_stage canonical
+
+import Builtin
+
+struct MyError {
+  var x: Builtin.Int32
+  var y: Builtin.Int32
+}
+
+protocol Error {}
+
+// The non-debug runs check that IRGen emits these functions without crashing.
+// The DBG run checks that they have no "$error" variable.
+
+// CHECK-LABEL: define {{.*}}swifttailcc void @async_typed_throws(ptr swiftasync
+sil @async_typed_throws : $@convention(thin) @async () -> @error MyError {
+bb0:
+  debug_value undef : $MyError, var, name "$error", argno 1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: define {{.*}}swiftcc { i32, i32 } @sync_typed_throws(
+sil @sync_typed_throws : $@convention(thin) () -> @error MyError {
+bb0:
+  debug_value undef : $MyError, var, name "$error", argno 1
+  %r = tuple ()
+  return %r : $()
+}
+
+// The typed-throws functions have no "$error" variable. The untyped function
+// below is a control: its "$error" variable must still be emitted, and it is
+// the only one in the module.
+// DBG:     ![[UNTYPED:[0-9]+]] = distinct !DISubprogram(name: "untyped_throws"
+// DBG:     !DILocalVariable(name: "$error", arg: 1, scope: ![[UNTYPED]], {{.*}}flags: DIFlagArtificial)
+sil @untyped_throws : $@convention(thin) () -> @error any Error {
+bb0:
+  debug_value undef : $any Error, var, name "$error", argno 1
+  %r = tuple ()
+  return %r : $()
+}
