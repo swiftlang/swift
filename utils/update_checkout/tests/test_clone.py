@@ -213,6 +213,8 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             "--clone",
             "--max-retries",
             "1",
+            "--retry-base-delay",
+            "0.01",
         ]
         with contextlib.redirect_stdout(StringIO()):
             main()
@@ -244,6 +246,8 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             "--clone",
             "--max-retries",
             "1",
+            "--retry-base-delay",
+            "0.01",
         ]
         with contextlib.redirect_stdout(StringIO()):
             main()

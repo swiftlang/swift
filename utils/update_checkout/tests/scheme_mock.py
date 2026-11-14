@@ -247,6 +247,8 @@ class SchemeMockTestCase(unittest.TestCase):
             self.config_path,
             "--source-root",
             self.source_root,
+            "--retry-base-delay",
+            "0.01",
         ]
 
     def setUp(self):
