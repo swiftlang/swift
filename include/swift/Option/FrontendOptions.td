@@ -1511,6 +1511,9 @@ def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
 def disable_sil_opaque_values : Flag<["-"], "disable-sil-opaque-values">,
   HelpText<"Disable SIL Opaque Values">;
 
+// swiftc passes -new-driver-path only so that the build log shows the new
+// driver ran; it does not affect the output, so it stays out of cache keys.
+let Flags = [FrontendOption, NoDriverOption, HelpHidden, CacheInvariant] in
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
