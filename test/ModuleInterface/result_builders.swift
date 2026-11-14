@@ -67,3 +67,44 @@ public protocol ProtocolWithBuilderProperty {
   // CHECK: @ResultBuilders::TupleBuilder func myFunc<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2)
   @TupleBuilder func myFunc<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2)
 }
+
+// Generic arguments inferred for a result builder attribute are printed
+// explicitly, so the interface can be used by compilers that don't support
+// inferring them.
+@resultBuilder
+public enum ArrayBuilder<Element> {
+  public static func buildBlock(_ elements: Element...) -> [Element] {
+    elements
+  }
+}
+
+@resultBuilder
+public enum DictionaryBuilder<Key: Hashable, Value> {
+  public static func buildBlock(_ elements: (Key, Value)...) -> [Key: Value] {
+    Dictionary(elements, uniquingKeysWith: { $1 })
+  }
+}
+
+// CHECK-LABEL: public func makeArray(@ResultBuilders::ArrayBuilder<Swift::String> _ build: () -> [Swift::String]) -> [Swift::String]
+public func makeArray(@ArrayBuilder _ build: () -> [String]) -> [String] {
+  build()
+}
+
+// CHECK-LABEL: public func makeDictionary(@ResultBuilders::DictionaryBuilder<Swift::String, Swift::Int> _ build: () -> [Swift::String : Swift::Int]) -> [Swift::String : Swift::Int]
+public func makeDictionary(
+  @DictionaryBuilder<String, _> _ build: () -> [String: Int]
+) -> [String: Int] {
+  build()
+}
+
+// CHECK-LABEL: public func makeGenericArray<Element>(@ResultBuilders::ArrayBuilder<Element> _ build: () -> [Element]) -> [Element]
+public func makeGenericArray<Element>(
+  @ArrayBuilder _ build: () -> [Element]
+) -> [Element] {
+  build()
+}
+
+public protocol ProtocolWithInferredBuilder {
+  // CHECK: @ResultBuilders::ArrayBuilder<Swift::String> var items: [Swift::String] { get }
+  @ArrayBuilder var items: [String] { get }
+}

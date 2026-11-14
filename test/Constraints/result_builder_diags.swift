@@ -1125,3 +1125,498 @@ func testInvalidPatternInResultBuilderBody() {
     }
   }
 }
+
+@resultBuilder
+enum SimpleArrayBuilder<ElementKind> {
+  static func buildBlock(_ elements: ElementKind...) -> [ElementKind] {
+    elements
+  }
+}
+
+@resultBuilder
+enum SimpleDictionaryBuilder<Key: Hashable, Value> {
+  static func buildBlock(_ elements: (Key, Value)...) -> [Key: Value] {
+    var dict = [Key: Value]()
+    for element in elements {
+      dict[element.0] = element.1
+    }
+    return dict
+  }
+}
+
+@resultBuilder
+enum CollectionBuilder<Element> {
+    static func buildBlock(_ component: Element...) -> [Element] {
+      component
+    }
+
+    static func buildFinalResult(_ component: [Element]) -> [Element] {
+        component
+    }
+
+    static func buildFinalResult(_ component: [Element]) -> Set<Element> where Element: Hashable {
+        Set(component)
+    }
+}
+
+func testInferResultBuilderGenerics() {
+  @SimpleArrayBuilder
+  var stringArray: [String] {
+    "foo"
+    "bar"
+  }
+
+  @SimpleArrayBuilder
+  func makeStringArray() -> Array<String> {
+    "foo"
+    "bar"
+  }
+
+  func takesClosure(@SimpleArrayBuilder _ makeArray: () -> [String]) {
+    print(makeArray())
+  }
+
+  @SimpleArrayBuilder // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder'}}
+  var string: String {
+    "foo"
+  }
+
+  @SimpleArrayBuilder<String>
+  var elements: [String] {
+    "foo"
+    "bar"
+  }
+
+  @SimpleArrayBuilder<(_, _)>
+  var elements2: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @SimpleArrayBuilder<(String, _)>
+  var elements3: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @SimpleArrayBuilder<(_, Int)>
+  var elements4: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @SimpleArrayBuilder<(Int, _)> // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder<(Int, _)>'}}
+  var elements5: [(String, Int)] {
+    ("foo", 42) // expected-error {{cannot convert return expression of type '(String, Int)' to return type '[(String, Int)]'}}
+  }
+
+  @SimpleArrayBuilder<(_, String)> // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder<(_, String)>'}}
+  var elements6: [(String, Int)] {
+    ("foo", 42) // expected-error {{cannot convert return expression of type '(String, Int)' to return type '[(String, Int)]'}}
+  }
+
+  @SimpleArrayBuilder<(Int, String)>
+  var elements7: [(String, Int)] { // expected-error {{cannot convert return expression of type '[(Int, String)]' to return type '[(String, Int)]'}} expected-note {{arguments to generic parameter 'Element' ('(Int, String)' and '(String, Int)') are expected to be equal}}
+    ("foo", 42) // expected-error {{cannot convert value of type '(String, Int)' to expected argument type '(Int, String)'}}
+  }
+
+  @SimpleDictionaryBuilder
+  var dictionary: [String: Int] {
+    ("foo", 42)
+  }
+
+  @SimpleDictionaryBuilder<_, _>
+  var dictionary2: [String: Int] {
+    ("foo", 42)
+  }
+
+  @SimpleDictionaryBuilder<String, _>
+  var dictionary3: [String: Int] {
+    ("foo", 42)
+  }
+
+  @SimpleDictionaryBuilder<_, Int>
+  var dictionary4: [String: Int] {
+    ("foo", 42)
+  }
+
+  @SimpleDictionaryBuilder<Int, _> // expected-error {{unable to infer generic arguments for result builder '@SimpleDictionaryBuilder<Int, _>'}}
+  var dictionary5: [String: Int] {
+    ("foo", 42) // expected-error {{cannot convert return expression of type '(String, Int)' to return type '[String : Int]'}}
+  }
+
+  struct MyValue {
+    @SimpleArrayBuilder var array1: [String]
+    @SimpleArrayBuilder var array2: () -> [String]
+  }
+
+  _ = MyValue(
+    array1: {
+      "foo"
+      "bar"
+    },
+    array2: {
+      "bar"
+      "baaz"
+    },
+  )
+
+  @SimpleArrayBuilder // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder'}}
+  var makeStringArrayClosure: () -> [String] {
+    {
+      ["foo"]
+    }
+  }
+
+  @resultBuilder
+  struct TupleArrayBuilder<One, Two> {
+    static func buildBlock(_ elements: (One, Two)...) -> [(One, Two)] {
+      elements
+    }
+  }
+
+  @TupleArrayBuilder
+  var tupleArray: [(String, Int)] {
+    ("foo", 1)
+    ("bar", 2)
+  }
+
+  @resultBuilder
+  struct TooManyArgsBuilder<One, Two, Three> {
+    static func buildBlock(_ elements: (One, Two)...) -> [(One, Two)] {
+      elements
+    }
+  }
+
+  @TooManyArgsBuilder // expected-error {{unable to infer generic arguments for result builder '@TooManyArgsBuilder'}}
+  var invalidTupleArray: [(String, Int)] {
+    ("foo", 1) // expected-warning {{expression of type '(String, Int)' is unused}}
+    ("bar", 2) // expected-warning {{expression of type '(String, Int)' is unused}}
+  }
+
+  @resultBuilder
+  enum ComplexListBuilder<Element> {
+    static func buildBlock(_ elements: Element...) -> [Element] {
+      elements
+    }
+    
+    static func buildFinalResult(_ component: [Element]) -> Set<Element> where Element: Hashable {
+      Set(component)
+    }
+    
+    static func buildFinalResult(_ component: [Element]) -> ContiguousArray<Element> {
+      ContiguousArray(component)
+    }
+  }
+
+  @ComplexListBuilder
+  var stringSetFromBuildFinalResult: Set<String> {
+    "foo"
+    "bar"
+  }
+
+  @ComplexListBuilder
+  var contiguousStringsFromBuildFinalResult: ContiguousArray<String> {
+    "foo"
+    "bar"
+  }
+
+  @ComplexListBuilder // expected-error {{unable to infer generic arguments for result builder '@ComplexListBuilder'}}
+  var stringArrayFromBuildFinalResult: [String] {
+    "foo" // expected-warning {{string literal is unused}}
+    "bar" // expected-warning {{string literal is unused}}
+  }
+
+  @resultBuilder
+  enum PartialArrayBuilder<Element> {
+    static func buildPartialBlock(first: Element) -> [Element] {
+      [first]
+    }
+
+    static func buildPartialBlock(accumulated: [Element], next: Element) -> [Element] {
+      accumulated + [next]
+    }
+  }
+
+  @PartialArrayBuilder
+  var stringArrayFromBuildPartial: [String] {
+    "foo"
+    "bar"
+  }
+
+  @CollectionBuilder
+  var array: [String] {
+      "a"
+      "b"
+  }
+
+  @CollectionBuilder
+  var set: Set<String> {
+      "c"
+      "d"
+  }
+  
+  @CollectionBuilder // expected-error {{unable to infer generic arguments for result builder '@CollectionBuilder'}}
+  var contiguousArray: ContiguousArray<String> {
+      "c" // expected-warning {{string literal is unused}}
+      "d" // expected-warning {{string literal is unused}}
+  }
+}
+
+extension Array {
+  init(@SimpleArrayBuilder build1: () -> Self) {
+    self = build1()
+  }
+  
+  init(@SimpleArrayBuilder build2: () -> [Element]) {
+      self = build2()
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> Array<Self.Element>) {
+      self = build3()
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> ContiguousArray<Element>) { // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder'}}
+      self = Array(build3())
+  }
+}
+
+extension Set {
+  init(@CollectionBuilder build: () -> Self) {
+    self = build()
+  }
+  
+  init(@CollectionBuilder build2: () -> [Element]) {
+    self = Set(build2())
+  }
+  
+  init(@SimpleArrayBuilder build3: () -> Self) { // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder'}}
+    self = build3()
+  }
+}
+
+extension Array {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock(_ elements: Element...) -> [Element] {
+      elements
+    }
+  }
+}
+
+extension Dictionary {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock(_ elements: (Key, Value)...) -> Dictionary {
+      Dictionary(elements, uniquingKeysWith: { $1 })
+    }
+  }
+}
+
+func testNonGenericResultBuildersInGenericTypeExtensions() {
+  @Array.Builder
+  var elements: [String] {
+    "foo"
+    "bar"
+  }
+  
+  @Array.Builder // expected-error {{unable to infer generic arguments for result builder '@Array.Builder'}}
+  var set: Set<String> {
+    "foo" // expected-warning {{string literal is unused}}
+    "bar" // expected-warning {{string literal is unused}}
+  }
+  
+  @Dictionary.Builder
+  var dictionary: [String: String] {
+    ("foo", "bar")
+    ("baaz", "quux")
+  }
+  
+  @Dictionary.Builder // expected-error {{unable to infer generic arguments for result builder '@Dictionary.Builder'}}
+  var dictionary2: [(String, String)] {
+    ("foo", "bar") // expected-warning {{expression of type '(String, String)' is unused}}
+    ("baaz", "quux") // expected-warning {{expression of type '(String, String)' is unused}}
+  }
+
+  @Array<_>.Builder
+  var elements2: [String] {
+    "foo"
+    "bar"
+  }
+
+  @Array<String>.Builder
+  var elements3: [String] {
+    "foo"
+    "bar"
+  }
+
+  @Array<(_, _)>.Builder
+  var elements4: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @Array<(String, _)>.Builder
+  var elements5: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @Array<(_, Int)>.Builder
+  var elements6: [(String, Int)] {
+    ("foo", 42)
+  }
+
+  @Array<(Int, _)>.Builder // expected-error {{unable to infer generic arguments for result builder '@Array<(Int, _)>.Builder'}}
+  var elements7: [(String, Int)] {
+    ("foo", 42) // expected-error {{cannot convert return expression of type '(String, Int)' to return type '[(String, Int)]'}}
+  }
+
+  @Array<(Int, String)>.Builder
+  var elements8: [(String, Int)] { // expected-error {{cannot convert return expression of type '[(Int, String)]' to return type '[(String, Int)]'}} expected-note {{arguments to generic parameter 'Element' ('(Int, String)' and '(String, Int)') are expected to be equal}}
+    ("foo", 42) // expected-error {{cannot convert value of type '(String, Int)' to expected argument type '(Int, String)'}}
+  }
+}
+
+// Result builder parameters whose generic arguments can't be inferred are
+// diagnosed at the declaration. The result builder then isn't applied at call
+// sites, so the closures are type checked as regular closures.
+@resultBuilder
+struct ThreeArgBuilder<One, Two, Three> {
+  static func buildBlock(_ elements: (One, Two)...) -> [(One, Two)] {
+    elements
+  }
+}
+
+struct SetInvocation {
+  @SimpleArrayBuilder let arguments: Set<String> // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder'}}
+}
+
+func takesSetBuilder(@SimpleArrayBuilder _ build: () -> Set<String>) {} // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder'}}
+func takesThreeArgBuilder(@ThreeArgBuilder _ build: () -> [(String, Int)]) {} // expected-error {{unable to infer generic arguments for result builder '@ThreeArgBuilder'}}
+func takesPlaceholderBuilder(@SimpleArrayBuilder<(Int, _)> _ build: () -> [(String, Int)]) {} // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder<(Int, _)>'}}
+func takesGenericBuilder<T>(@SimpleArrayBuilder _ build: () -> [T]) -> [T] { build() }
+
+func testInferResultBuilderGenericsAtCallSite() {
+  takesSetBuilder {
+    "foo" // expected-error {{cannot convert value of type 'String' to closure result type 'Set<String>'}}
+  }
+
+  takesThreeArgBuilder {
+    ("foo", 1) // expected-error {{cannot convert value of type '(String, Int)' to closure result type '[(String, Int)]'}}
+  }
+
+  takesPlaceholderBuilder {
+    ("foo", 1) // expected-error {{cannot convert value of type '(String, Int)' to closure result type '[(String, Int)]'}}
+  }
+
+  // Inferred as `@SimpleArrayBuilder<T>`, where `T` is inferred at each call.
+  let ints: [Int] = takesGenericBuilder {
+    1
+    2
+  }
+  _ = ints
+
+  let strings = takesGenericBuilder {
+    "a"
+    "b"
+  }
+  let _: [String] = strings
+}
+
+// Inferring the generic arguments of a result builder resolves overloads of
+// the method producing the final result like an unapplied reference to it,
+// with the declared result type as context.
+@resultBuilder
+enum OptionalArrayBuilder<Element> {
+  static func buildBlock(_ elements: Element...) -> [Element] {
+    elements
+  }
+
+  static func buildFinalResult(_ elements: [Element]) -> [Element] {
+    elements
+  }
+
+  static func buildFinalResult(_ elements: [Element]) -> [Element?] {
+    elements.map { $0 } + [nil]
+  }
+}
+
+@resultBuilder
+enum PairBuilder<Element> {
+  static func buildBlock(_ elements: Element...) -> [Element] {
+    elements
+  }
+
+  static func buildFinalResult(_ elements: [Element]) -> (Element, Double) { // expected-note 2 {{found this candidate}}
+    (elements[0], 0)
+  }
+
+  static func buildFinalResult(_ elements: [Element]) -> (Int, Element) { // expected-note 2 {{found this candidate}}
+    (0, elements[0])
+  }
+}
+
+@resultBuilder
+enum JoinedBuilder<Element: CustomStringConvertible> {
+  static func buildBlock(_ elements: Element...) -> [Element] {
+    elements
+  }
+
+  static func buildFinalResult(_ elements: [Element]) -> String {
+    elements.map(\.description).joined(separator: " ")
+  }
+}
+
+func testInferResultBuilderGenericsOverloadResolution() {
+  // Like `let _: (_) -> [Int?] = OptionalArrayBuilder.buildFinalResult`, this
+  // is `OptionalArrayBuilder<Int>`, regardless of the elements in the body.
+  let _: ([Int]) -> [Int?] = OptionalArrayBuilder.buildFinalResult
+
+  @OptionalArrayBuilder
+  var optionalValues: [Int?] {
+    Optional(1) // expected-error {{cannot convert value of type 'Int?' to expected argument type 'Int'}}
+  }
+
+  // `Element` could be either `Int` or `Double`, and neither is preferred.
+  let _: (_) -> (Int, Double) = PairBuilder.buildFinalResult // expected-error {{ambiguous use of 'buildFinalResult'}}
+
+  @PairBuilder // expected-error {{generic arguments for result builder '@PairBuilder' are ambiguous}}
+  var pair: (Int, Double) {
+    1 // expected-warning {{integer literal is unused}}
+    2 // expected-warning {{integer literal is unused}}
+  }
+
+  // Writing the generic arguments explicitly resolves the ambiguity.
+  @PairBuilder<Int>
+  var intPair: (Int, Double) {
+    1
+  }
+}
+
+func testInferResultBuilderGenericsUndetermined() {
+  // The result types don't determine the generic arguments.
+  @JoinedBuilder // expected-error {{unable to infer generic arguments for result builder '@JoinedBuilder'}}
+  var joined: String {
+    1 // expected-warning {{integer literal is unused}}
+    2 // expected-warning {{integer literal is unused}}
+  }
+
+  @SimpleArrayBuilder // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder'}}
+  var collection: some Collection { // expected-error {{function declares an opaque return type, but has no return statements in its body from which to infer an underlying type}}
+    "foo" // expected-warning {{string literal is unused}}
+    "bar" // expected-warning {{string literal is unused}} expected-note {{did you mean to return the last expression?}}
+  }
+
+  @SimpleArrayBuilder // expected-error {{unable to infer generic arguments for result builder '@SimpleArrayBuilder'}}
+  var any: Any {
+    "foo" // expected-warning {{string literal is unused}}
+    "bar" // expected-warning {{string literal is unused}}
+  }
+
+  // Writing the generic arguments explicitly is always possible.
+  @JoinedBuilder<Int>
+  var explicitJoined: String {
+    1
+  }
+
+  @SimpleArrayBuilder<String>
+  var explicitCollection: some Collection {
+    "foo"
+  }
+}
