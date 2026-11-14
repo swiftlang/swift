@@ -91,6 +91,8 @@ struct CxxSpan: ParamInfo {
   var dependencies: [LifetimeDependence]
   var typeMappings: [String: String]
   var original: SyntaxProtocol
+  // Set by setCellSpanReturn.
+  var cellSpan: Bool = false
 
   var description: String {
     return "std::span(pointer: \(pointerIndex), nonescaping: \(nonescaping))"
@@ -110,7 +112,7 @@ struct CxxSpan: ParamInfo {
       }
       return CxxSpanReturnThunkBuilder(
         base: base, funcDecl: funcDecl,
-        typeMappings: typeMappings, node: original)
+        typeMappings: typeMappings, node: original, cellSpan: cellSpan)
     case .self:
       return base
     }
@@ -136,6 +138,8 @@ struct CountedBy: ParamInfo {
   // `_Null_unspecified` (IUO) pointers, which always follow the
   // empty-Span convention.
   var nullableAsEmptySpan: Bool = false
+  // Set by setCellSpanReturn.
+  var cellSpan: Bool = false
 
   var description: String {
     let name: String
@@ -166,7 +170,7 @@ struct CountedBy: ParamInfo {
         funcDecl: funcDecl,
         nonescaping: nonescaping, isSizedBy: sizedBy, isOrNull: isOrNull,
         nullableAsEmptySpan: nullableAsEmptySpan,
-        dependencies: dependencies)
+        dependencies: dependencies, cellSpan: cellSpan)
     case .self:
       return base
     }
@@ -454,6 +458,22 @@ func getPointeeType(_ type: TypeSyntax) -> TypeSyntax? {
   return firstArg.argument.as(TypeSyntax.self)
 }
 
+// `Swift::Cell<T>`, or `Swift::ConstCell<T>` if not mutable. The stdlib types use a module
+// selector, because `Cell` is a common name for C++ types too, and a type named `Swift` would
+// shadow the module in `Swift.Cell`.
+func getCellType(pointee: TypeSyntax, mutable: Bool) -> TypeSyntax {
+  return TypeSyntax("Swift::\(raw: mutable ? "Cell" : "ConstCell")<\(pointee.trimmed)>")
+}
+
+// `Swift::Cell<T>` for `UnsafeMutablePointer<T>`, `Swift::ConstCell<T>` for `UnsafePointer<T>`,
+// looking through Optional, implicitly unwrapped Optional and attributes.
+func getCellType(_ pointerType: TypeSyntax) -> TypeSyntax? {
+  guard let pointee = getPointeeType(pointerType) else {
+    return nil
+  }
+  return getCellType(pointee: pointee, mutable: isMutablePointerType(pointerType))
+}
+
 protocol BoundsCheckedThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax
   // `let <count> = ...` bindings that extract the length of a buffer to compare the rest to.
@@ -668,10 +688,21 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   public let funcDecl: FunctionParts
   public let typeMappings: [String: String]
   public let node: SyntaxProtocol
+  public let cellSpan: Bool
   let isParameter: Bool = false
 
   var oldType: TypeSyntax {
     return signature.returnClause!.type
+  }
+
+  var newType: TypeSyntax {
+    get throws {
+      guard cellSpan else {
+        return try defaultNewType
+      }
+      let (element, isConst) = dropCxxQualifiers(try genericArg)
+      return TypeSyntax("Span<\(getCellType(pointee: element, mutable: !isConst))>")
+    }
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -681,9 +712,29 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
     return try base.buildFunctionSignature(argTypes, newType)
   }
 
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item] {
+    var res = try base.buildPreReturnStatements()
+    if cellSpan {
+      let call = try base.buildFunctionCall([:])
+      res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax(
+        "let _resultValue = \(call)")))
+    }
+    return res
+  }
+
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
+    let (element, isConst) = dropCxxQualifiers(try genericArg)
+    if cellSpan {
+      // The call has already been bound to `_resultValue` by `buildPreReturnStatements`. data()
+      // is imported as an implicitly unwrapped Optional, and may be null for an empty span.
+      assert(pointerArgs.isEmpty)
+      let dataPointer = isConst ? "UnsafePointer" : "UnsafeMutablePointer"
+      let cell = getCellType(pointee: element, mutable: !isConst)
+      return """
+        unsafe _swiftifyOverrideLifetime(Span(_unsafeElements: UnsafeBufferPointer(start: UnsafeRawPointer(_resultValue.data() as \(raw: dataPointer)<\(element.trimmed)>?)?.assumingMemoryBound(to: \(cell).self), count: Int(_resultValue.size()))), copying: ())
+        """
+    }
     let call = try base.buildFunctionCall(pointerArgs)
-    let (_, isConst) = dropCxxQualifiers(try genericArg)
     let cast =
       if isConst {
         "Span"
@@ -717,14 +768,13 @@ struct CxxReferenceReturnThunkBuilder: ForwardingThunkBuilder {
 
   var cellType: TypeSyntax {
     get throws {
-      // getPointeeType looks through Optional, which a reference cannot be.
-      guard oldType.is(IdentifierTypeSyntax.self), let pointee = getPointeeType(oldType) else {
+      // getCellType looks through Optional, which a reference cannot be.
+      guard oldType.is(IdentifierTypeSyntax.self), let cell = getCellType(oldType) else {
         throw DiagnosticError(
           "expected non-optional Unsafe[Mutable]Pointer<T> type for reference, got '\(oldType.trimmed)'",
           node: node)
       }
-      let cell = isMutablePointerType(oldType) ? "Cell" : "ConstCell"
-      return TypeSyntax("Swift.\(raw: cell)<\(pointee.trimmed)>")
+      return cell
     }
   }
 
@@ -732,14 +782,14 @@ struct CxxReferenceReturnThunkBuilder: ForwardingThunkBuilder {
     -> FunctionSignatureSyntax
   {
     assert(returnType == nil)
-    return try base.buildFunctionSignature(argTypes, TypeSyntax("Swift.Ref<\(cellType)>"))
+    return try base.buildFunctionSignature(argTypes, TypeSyntax("Swift::Ref<\(cellType)>"))
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     let call = try base.buildFunctionCall(pointerArgs)
     let cell = try cellType
     return """
-      unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(\(call)).assumingMemoryBound(to: \(cell).self), borrowing: ()), copying: ())
+      unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(\(call)).assumingMemoryBound(to: \(cell).self), borrowing: ()), copying: ())
       """
   }
 }
@@ -798,6 +848,13 @@ extension SpanBoundsThunkBuilder {
   }
   var newType: TypeSyntax {
     get throws {
+      return try defaultNewType
+    }
+  }
+
+  // Lets a builder that overrides newType fall back to the default.
+  var defaultNewType: TypeSyntax {
+    get throws {
       let (strippedArg, isConst) = dropCxxQualifiers(try genericArg)
       let mutablePrefix =
         if isConst {
@@ -840,6 +897,13 @@ extension PointerBoundsThunkBuilder {
 
   var newType: TypeSyntax {
     get throws {
+      return try defaultNewType
+    }
+  }
+
+  // Lets a builder that overrides newType fall back to the default.
+  var defaultNewType: TypeSyntax {
+    get throws {
       if !nullable, let optType = oldType.as(OptionalTypeSyntax.self) {
         return try transformType(optType.wrappedType, generateSpan, isSizedBy, isParameter)
       }
@@ -880,12 +944,35 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let isOrNull: Bool
   public let nullableAsEmptySpan: Bool
   public let dependencies: [LifetimeDependence]
+  public let cellSpan: Bool
   let isParameter: Bool = false
 
   var generateSpan: Bool { !dependencies.isEmpty }
 
   var oldType: TypeSyntax {
     return signature.returnClause!.type
+  }
+
+  var cellType: TypeSyntax {
+    get throws {
+      assert(cellSpan && generateSpan && !isSizedBy)
+      guard let cell = getCellType(oldType) else {
+        throw DiagnosticError(
+          "expected Unsafe[Mutable]Pointer<T> type for countedBy, got '\(oldType.trimmed)'",
+          node: oldType)
+      }
+      return cell
+    }
+  }
+
+  var newType: TypeSyntax {
+    get throws {
+      guard cellSpan else {
+        return try defaultNewType
+      }
+      let span = TypeSyntax("Span<\(try cellType)>")
+      return nullable ? TypeSyntax("\(span)?") : span
+    }
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -958,7 +1045,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
       }
       expr =
         """
-        \(raw: cast)(\(raw: startLabel): \(raw: castOpaquePointerToRawPointer("_resultValue!")), \(raw: countLabel): Int(\(countExpr)))
+        \(raw: cast)(\(raw: startLabel): \(raw: try startPointer("_resultValue!")), \(raw: countLabel): Int(\(countExpr)))
         """
     } else {
       // Either input is non-Optional, or output is an UnsafeBufferPointer
@@ -966,13 +1053,20 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
       let call = try base.buildFunctionCall(pointerArgs)
       expr =
         """
-        \(raw: cast)(\(raw: startLabel): \(castOpaquePointerToRawPointer(call)), \(raw: countLabel): Int(\(countExpr)))
+        \(raw: cast)(\(raw: startLabel): \(try startPointer(call)), \(raw: countLabel): Int(\(countExpr)))
         """
     }
     if generateSpan {
       expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
     }
     return "unsafe \(expr)"
+  }
+
+  func startPointer(_ expr: ExprSyntax) throws -> ExprSyntax {
+    if cellSpan {
+      return "UnsafeRawPointer(\(expr)).assumingMemoryBound(to: \(try cellType).self)"
+    }
+    return castOpaquePointerToRawPointer(expr)
   }
 
   func castOpaquePointerToRawPointer(_ expr: ExprSyntax) -> ExprSyntax {
@@ -1599,6 +1693,25 @@ func setLifetimeDependencies(
   }
 }
 
+// Exposes a lifetime-dependent std::span or countedBy return value as Span<[Const]Cell<T>>
+// rather than MutableSpan<T> (or Span<T>). Cell and ConstCell have the same layout as T, so the
+// elements can be rebound. Returns whether there is such a return value.
+func setCellSpanReturn(_ args: inout [ParamInfo]) -> Bool {
+  for i in args.indices where args[i].pointerIndex == .return && !args[i].dependencies.isEmpty {
+    if var countedBy = args[i] as? CountedBy, !countedBy.sizedBy {
+      countedBy.cellSpan = true
+      args[i] = countedBy
+      return true
+    }
+    if var span = args[i] as? CxxSpan {
+      span.cellSpan = true
+      args[i] = span
+      return true
+    }
+  }
+  return false
+}
+
 // For each count parameter shared by two or more `CountedBy` parameter
 // entries, pick one entry to be the count extractor and mark the rest as
 // checkers. The extractor binds `let <count> = <param>.count`. The checkers
@@ -1760,15 +1873,18 @@ func isAnySpan(_ type: TypeSyntax) -> Bool {
     || name == "MutableRawSpan"
 }
 
-// `refAvailability` is the availability of Ref<Cell<T>>, if the wrapper
-// returns one.
+// `refAvailability` is the availability of Ref<Cell<T>> or Span<[Const]Cell<T>>, if the wrapper
+// returns one. It is empty when there is no availability info.
 func getAvailability(
   _ newSignature: FunctionSignatureSyntax, _ spanAvailability: String?,
   _ refAvailability: String?
 ) throws -> [AttributeListSyntax.Element] {
-  // Ref<Cell<T>> is newer than Span, so its availability also covers any Span
-  // parameters.
+  // Ref<Cell<T>> is newer than Span, and Span<[Const]Cell<T>> is as new as Span, so its
+  // availability also covers any Span parameters.
   if let refAvailability {
+    if refAvailability.isEmpty {
+      return []
+    }
     return [.attribute(AttributeSyntax("@available(\(raw: refAvailability), *)"))]
   }
   guard let spanAvailability else {
@@ -2012,6 +2128,8 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     contentsOf: try parseCxxSpansInSignature(funcComponents.signature, typeMappings))
   setNonescapingPointers(&parsedArgs, nonescapingPointers)
   setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
+  // Passing refAvailability opts into Cell-based return values.
+  let returnsCellSpan = refAvailability != nil && setCellSpanReturn(&parsedArgs)
   // We only transform non-escaping spans.
   parsedArgs = parsedArgs.filter {
     if let cxxSpanArg = $0 as? CxxSpan {
@@ -2073,9 +2191,9 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   let newLifetimeAttr = mergeLifetimeAttrs(
     funcComponents.attributes, lifetimes, funcComponents.signature.parameterClause.parameters,
     rewriter.nameMap)
-  let returnsRef = parsedArgs.contains { $0 is CxxReference }
+  let returnsCells = returnsCellSpan || parsedArgs.contains { $0 is CxxReference }
   let availabilityAttr = try getAvailability(
-    newSignature, spanAvailability, returnsRef ? refAvailability : nil)
+    newSignature, spanAvailability, returnsCells ? refAvailability : nil)
   let addressableSelfAttr: [AttributeListSyntax.Element] =
     needsAddressableSelf(funcComponents, lifetimeDependencies)
     ? [.attribute(AttributeSyntax("@_addressableSelf"))] : []
