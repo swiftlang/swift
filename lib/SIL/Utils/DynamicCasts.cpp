@@ -617,20 +617,25 @@ swift::classifyDynamicCast(SILFunction *function,
             sourceMetatype.isAnyExistentialType())
       return DynamicCastFeasibility::WillSucceed;
 
-    // If the source and target are the same existential type, but the source is
-    // P.Protocol and the dest is P.Type, then we need to consider whether the
-    // protocol is self-conforming.
-    // The only cases where a protocol self-conforms are objc protocols, but
-    // we're going to expect P.Type to hold a class object. And this case
-    // doesn't matter since for a self-conforming protocol type there can't be
-    // any type-level methods.
-    // Thus we consider this kind of cast to always fail. The only exception
-    // from this rule is when the target is Any.Type, because *.Protocol
-    // can always be casted to Any.Type.
+    // Casting P.Protocol to Q.Type asks whether the existential type `any P`
+    // itself conforms to Q.  In general it does not, so we consider this kind
+    // of cast to fail, with two exceptions:
+    //  - *.Protocol can always be cast to Any.Type.
+    //  - The runtime recognizes self-conformances that are backed by a
+    //    self-conformance witness table (currently only `any Error`), so
+    //    `(any Error).self is any Error.Type` succeeds at runtime.  Leave
+    //    such casts to the runtime.
+    // Note that @objc protocols are not treated as self-conforming by the
+    // runtime cast machinery, so they are correctly folded to failure here.
     if (source->isAnyExistentialType() && isa<MetatypeType>(sourceMetatype) &&
         isa<ExistentialMetatypeType>(targetMetatype)) {
-      return target->isAny() ? DynamicCastFeasibility::WillSucceed
-                             : DynamicCastFeasibility::WillFail;
+      if (target->isAny())
+        return DynamicCastFeasibility::WillSucceed;
+      if (auto existential = dyn_cast<ExistentialType>(source))
+        if (auto proto = dyn_cast<ProtocolType>(existential.getConstraintType()))
+          if (proto->getDecl()->requiresSelfConformanceWitnessTable())
+            return DynamicCastFeasibility::MaySucceed;
+      return DynamicCastFeasibility::WillFail;
     }
 
     if (targetMetatype.isAnyExistentialType() && target->isExistentialType()) {
