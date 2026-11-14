@@ -776,3 +776,46 @@ bb2:
   unreachable
 }
 
+
+// The order of borrowed-from instructions doesn't reflect the nesting of the reborrow scopes.
+// Make sure that the inner scope is ended before the outer scope.
+// CHECK-LABEL: sil [ossa] @nested_reborrow_phis :
+// CHECK:       bb3([[O:%.*]] : @reborrow $C, [[I:%.*]] : @reborrow $C):
+// CHECK-NEXT:    [[IB:%.*]] = borrowed [[I]] from ([[O]])
+// CHECK-NEXT:    [[OB:%.*]] = borrowed [[O]] from ()
+// CHECK:       bb5:
+// CHECK-NEXT:    end_borrow [[IB]]
+// CHECK-NEXT:    end_borrow [[OB]]
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'nested_reborrow_phis'
+sil [ossa] @nested_reborrow_phis : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  specify_test "lifetime_completion"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = load_borrow %0
+  %2 = begin_borrow %1
+  br bb3(%1, %2)
+
+bb2:
+  %3 = load_borrow %0
+  %4 = begin_borrow %3
+  br bb3(%3, %4)
+
+bb3(%5 : @reborrow $C, %6 : @reborrow $C):
+  %7 = borrowed %6 from (%5)
+  %8 = borrowed %5 from ()
+  %9 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+  %10 = apply %9(%7) : $@convention(thin) (@guaranteed C) -> ()
+  cond_br undef, bb4, bb5
+
+bb4:
+  end_borrow %7
+  end_borrow %8
+  %r = tuple ()
+  return %r
+
+bb5:
+  unreachable
+}
