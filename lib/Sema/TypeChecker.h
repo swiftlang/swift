@@ -1488,25 +1488,6 @@ diagnoseAndRemoveAttr(const Decl *D, const DeclAttribute *attr,
   return diagnoseAttrWithRemovalFixIt(D, attr, std::forward<ArgTypes>(Args)...);
 }
 
-/// Look for closure discriminators within an AST.
-class DiscriminatorFinder : public ASTWalker {
-  unsigned FirstDiscriminator = AbstractClosureExpr::InvalidDiscriminator;
-  unsigned NextDiscriminator = 0;
-
-public:
-  MacroWalking getMacroWalkingBehavior() const override {
-    return MacroWalking::Expansion;
-  }
-
-  PostWalkResult<Expr *> walkToExprPost(Expr *E) override;
-
-  // Get the next available closure discriminator.
-  unsigned getNextDiscriminator();
-
-  unsigned getFirstDiscriminator() const {
-    return FirstDiscriminator;
-  }
-};
 
 using RequiredImportAccessLevelCallback =
     std::function<void(AttributedImport<ImportedModule>)>;

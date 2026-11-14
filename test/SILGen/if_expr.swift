@@ -608,7 +608,7 @@ func testLazyLocal(_ x: Int?) {
 
   // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1cL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
   lazy var c = if .random() {
-    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1cL_SSvg1xL2_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
+    // CHECK-LABEL: sil private [lazy_getter] [noinline] [ossa] @$s7if_expr13testLazyLocalyySiSgF1cL_SSvg1xL_SSvg : $@convention(thin) (@guaranteed { var Optional<String> }) -> @owned String
     lazy var x = ""
     then x
   } else {

@@ -5073,11 +5073,14 @@ public:
 
 /// Compute the local discriminators for the given declaration context.
 ///
-/// This is a state-changing operation for closures within the context, which
-/// produces the discriminator value that any subsequent requests should use.
+/// This is a state-changing operation for closures within the context.
+///
+/// NOTE: Do not call into this request directly: Use
+/// `DeclContext::assignLocalDiscriminators` instead since that handles function
+/// bodies.
 class LocalDiscriminatorsRequest
     : public SimpleRequest<LocalDiscriminatorsRequest,
-                           unsigned(DeclContext *),
+                           evaluator::SideEffect(DeclContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5085,10 +5088,33 @@ public:
 private:
   friend SimpleRequest;
 
-  unsigned evaluate(Evaluator &evaluator, DeclContext *dc) const;
+  evaluator::SideEffect evaluate(Evaluator &evaluator, DeclContext *dc) const;
 
 public:
   bool isCached() const { return true; }
+};
+
+/// The function/top-level body equivalent to LocalDiscriminatorsRequest.
+///
+/// This is necessary since we support replacing function/top-level bodies for
+/// code completion, so need to be able to re-assign discriminators without also
+/// re-assigning for function parameters.
+class BodyDiscriminatorsRequest
+    : public SimpleRequest<BodyDiscriminatorsRequest,
+                           evaluator::SideEffect(DeclContext *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &eval, DeclContext *) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<evaluator::SideEffect> getCachedResult() const;
+  void cacheResult(evaluator::SideEffect) const;
 };
 
 /// Retrieve the raw documentation comment of a declaration.

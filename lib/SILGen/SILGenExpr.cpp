@@ -1912,6 +1912,7 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
           destFnType = origParamType.getClangType();
       }
     }
+    bool closureError = false;
     (void)emitAnyClosureExpr(
         SGF, semanticExpr, [&](AbstractClosureExpr *closure) {
           // Emit the closure body.
@@ -1921,10 +1922,13 @@ static ManagedValue emitCFunctionPointer(SILGenFunction &SGF,
                 AbstractionPattern(functionInfo.OrigType.getType(), destFnType);
             SGF.SGM.Types.withClosureTypeInfo(closure, functionInfo, [] {});
           }
-          SGF.SGM.emitClosure(closure, functionInfo);
+          closureError |= SGF.SGM.emitClosure(closure, functionInfo);
           loc = closure;
           return ManagedValue::forInContext();
         });
+    // If we had an error, bail with an undef.
+    if (closureError)
+      return SGF.emitUndef(SGF.getLoweredType(conversionExpr->getType()));
   } else {
     llvm_unreachable("c function pointer converted from a non-concrete decl ref");
   }
@@ -3580,9 +3584,11 @@ RValue RValueEmitter::visitAbstractClosureExpr(AbstractClosureExpr *e,
 ManagedValue
 RValueEmitter::emitClosureReference(AbstractClosureExpr *e,
                                     const FunctionTypeInfo &contextInfo) {
-  // Emit the closure body.
-  SGF.SGM.emitClosure(e, contextInfo);
-
+  // Emit the closure body, bailing with an undef on failure.
+  if (SGF.SGM.emitClosure(e, contextInfo)) {
+    return SGF.emitUndef(
+        SILType::getPrimitiveObjectType(contextInfo.ExpectedLoweredType));
+  }
   // Generate the closure value (if any) for the closure expr's function
   // reference.
   SILLocation loc = e;
