@@ -201,6 +201,17 @@ func testImplicitPropertyWrapper() {
   }
 }
 
+// A `$`-prefixed closure parameter is an implicit property wrapper parameter
+// with a same-named synthesized projection variable. A nested closure in the
+// body must not cause the projection's local discriminator to be assigned
+// twice.
+func testImplicitWrapperParamContainingNestedClosure() {
+  let _: (ProjectionWrapper<Int>) -> Void = { $value in
+    _ = $value
+    _ = ({ 0 })()
+  }
+}
+
 @resultBuilder
 struct PairBuilder {
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
