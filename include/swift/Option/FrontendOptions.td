@@ -44,6 +44,9 @@ def emit_variant_module_doc_path
 def emit_dependencies_path
   : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output basic Make-compatible dependencies file to <path>">;
+def emit_dependencies_first_output_only
+  : Flag<["-"], "emit-dependencies-first-output-only">,
+    HelpText<"Emit only the first target rule in each Make-style dependency file">;
 def emit_reference_dependencies_path
   : Separate<["-"], "emit-reference-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output Swift-style dependencies file to <path>">;
