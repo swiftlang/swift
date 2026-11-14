@@ -310,20 +310,26 @@ template <class T> static inline const constexpr bool isOpaqueLayout = false;
 template <class T>
 static inline const constexpr bool isSwiftBridgedCxxRecord = false;
 
+// The caller already named T, so its availability was checked there.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wunguarded-availability"
+
 /// Returns the opaque pointer to the given value.
 template <class T>
 SWIFT_INLINE_THUNK const void *_Nonnull getOpaquePointer(const T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<const OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<const void *>(&value);
 }
 
 template <class T>
 SWIFT_INLINE_THUNK void *_Nonnull getOpaquePointer(T &value) {
-  if constexpr (isOpaqueLayout<T>)
-    return reinterpret_cast<OpaqueStorage &>(value).getOpaquePointer();
+  if constexpr (isValueType<T>)
+    return implClassFor<T>::type::getOpaquePointer(value);
   return reinterpret_cast<void *>(&value);
 }
+
+#pragma clang diagnostic pop
 
 /// Helper struct that destroys any additional storage allocated (e.g. for
 /// resilient value types) for a Swift value owned by C++ code after the Swift

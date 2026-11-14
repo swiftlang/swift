@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -module-name Noncopyable -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/noncopyable.h
-// RUN: %FileCheck %s < %t/noncopyable.h
+// RUN: %FileCheck --implicit-check-not="bool _isMovedFrom =" %s < %t/noncopyable.h
 // RUN: %check-interop-cxx-header-in-clang(%t/noncopyable.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %target-swift-frontend %s -module-name Noncopyable -enable-library-evolution -enable-experimental-feature GenerateBindingsForNoncopyableTypesInCXX -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/noncopyable-evo.h
@@ -82,7 +82,7 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::CopyableStruct> = true;
 // CHECK: class SWIFT_SYMBOL({{.*}}) CopyableStruct final {
 // CHECK:   SWIFT_INLINE_THUNK ~CopyableStruct() noexcept = default;
-// CHECK-NOT:     if (_isMovedFrom) return;
+// CHECK-NOT: _isMovedFrom
 // CHECK:   SWIFT_INLINE_THUNK CopyableStruct(const CopyableStruct &other) noexcept = default;
 // CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
 // CHECK-NEXT:   friend class _impl::_impl_CopyableStruct;
@@ -92,7 +92,7 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) MoveOnlyEnum final {
 // CHECK:   SWIFT_INLINE_THUNK ~MoveOnlyEnum() noexcept {
-// CHECK-NEXT:     if (_isMovedFrom) return;
+// CHECK-NEXT:     if (_isMovedFrom()) return;
 // CHECK:   MoveOnlyEnum(const MoveOnlyEnum &) = delete;
 // CHECK-NEXT:   MoveOnlyEnum &operator =(const MoveOnlyEnum &) = delete;
 // CHECK-NEXT:   SWIFT_INLINE_THUNK MoveOnlyEnum(MoveOnlyEnum &&other) noexcept {
@@ -102,50 +102,17 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // CHECK-NOT: getA
 // CHECK:   SWIFT_INLINE_THUNK bool isB() const;
 
+// A fixed layout with no extra inhabitants uses a box instead of an added
+// state member.
 // CHECK: inline const constexpr bool isUsableInGenericContext<Noncopyable::MoveOnlyStruct> = false;
-
-// A noncopyable type is exposed as a move-only C++ class whose destructor is a
-// no-op once the value has been moved out of it.
 // CHECK: class SWIFT_SYMBOL({{.*}}) MoveOnlyStruct final {
 // CHECK:   SWIFT_INLINE_THUNK ~MoveOnlyStruct() noexcept {
-// CHECK-NEXT:     if (_isMovedFrom) return;
-// CHECK:     vwTable->destroy(_getOpaquePointer(), metadata._0);
-// CHECK-NEXT:   }
-// CHECK-NEXT:   MoveOnlyStruct(const MoveOnlyStruct &) = delete;
+// CHECK-NEXT:     if (!_storage.isAllocated()) return;
+// CHECK:   MoveOnlyStruct(const MoveOnlyStruct &) = delete;
 // CHECK-NEXT:   MoveOnlyStruct &operator =(const MoveOnlyStruct &) = delete;
-// CHECK-NEXT:   SWIFT_INLINE_THUNK MoveOnlyStruct(MoveOnlyStruct &&other) noexcept {
-// CHECK-NEXT:     if (other._isMovedFrom) {
-// CHECK-NEXT:       _isMovedFrom = true;
-// CHECK-NEXT:       return;
-// CHECK-NEXT:     }
-// CHECK:     vwTable->initializeWithTake(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
-// CHECK-NEXT:     other._isMovedFrom = true;
-// CHECK-NEXT:   }
-
-// The destination of a move assignment may itself be moved from, as in
-// 'std::swap'.
-// CHECK-NEXT:   SWIFT_INLINE_THUNK MoveOnlyStruct &operator =(MoveOnlyStruct &&other) noexcept {
-// CHECK-NEXT:     if (this == &other) return *this;
-// CHECK:     if (!_isMovedFrom)
-// CHECK-NEXT:       vwTable->destroy(_getOpaquePointer(), metadata._0);
-// CHECK-NEXT:     if (other._isMovedFrom) {
-// CHECK-NEXT:       _isMovedFrom = true;
-// CHECK-NEXT:       return *this;
-// CHECK-NEXT:     }
-// CHECK-NEXT:     _isMovedFrom = false;
-// CHECK-NEXT:     vwTable->initializeWithTake(_getOpaquePointer(), const_cast<char *>(other._getOpaquePointer()), metadata._0);
-// CHECK-NEXT:     other._isMovedFrom = true;
-// CHECK-NEXT:   return *this;
-// CHECK-NEXT:   }
-
-// Handing a moved-from value to Swift traps.
-// CHECK:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { if (_isMovedFrom) abort(); return _storage; }
-// CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { if (_isMovedFrom) abort(); return _storage; }
-
-// The moved-from flag is stored after the Swift value, so that the address of
-// the C++ object is still the address of the Swift value.
-// CHECK:   alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
-// CHECK-NEXT:   bool _isMovedFrom = false;
+// CHECK-NEXT:   SWIFT_INLINE_THUNK MoveOnlyStruct(MoveOnlyStruct &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// CHECK:   swift::_impl::OpaqueStorage _storage;
+// CHECK-NEXT:   friend class _impl::_impl_MoveOnlyStruct;
 
 // A boxed value has no moved-from flag. A move transfers the box, and a
 // moved-from object has none.
@@ -159,6 +126,37 @@ public func consumeBigMoveOnly(_ s: consuming BigMoveOnly) {}
 // BOXED:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { return _storage.getOpaquePointer(); }
 // BOXED:   swift::_impl::OpaqueStorage _storage;
 // BOXED-NEXT:   friend class _impl::_impl_MoveOnlyStruct;
+
+// A reference extra inhabitant supplies the inline moved-from state.
+// CHECK: class SWIFT_SYMBOL({{.*}}) MoveOnlyWithRef final {
+// CHECK:   SWIFT_INLINE_THUNK ~MoveOnlyWithRef() noexcept {
+// CHECK-NEXT:     if (_isMovedFrom()) return;
+// CHECK:   SWIFT_INLINE_THUNK MoveOnlyWithRef(MoveOnlyWithRef &&other) noexcept {
+// CHECK-NEXT:     if (other._isMovedFrom()) {
+// CHECK-NEXT:       _setMovedFrom();
+// CHECK-NEXT:       return;
+// CHECK-NEXT:     }
+// CHECK:     vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:     other._setMovedFrom();
+// CHECK:   SWIFT_INLINE_THUNK MoveOnlyWithRef &operator =(MoveOnlyWithRef &&other) noexcept {
+// CHECK-NEXT:     if (this == &other) return *this;
+// CHECK:     if (_isMovedFrom()) {
+// CHECK-NEXT:       if (other._isMovedFrom()) return *this;
+// CHECK-NEXT:       vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:       other._setMovedFrom();
+// CHECK-NEXT:       return *this;
+// CHECK-NEXT:     }
+// CHECK-NEXT:     alignas({{[0-9]+}}) char _oldValue[{{[0-9]+}}];
+// CHECK-NEXT:     vwTable->initializeWithTake(_oldValue, _storage, metadata._0);
+// CHECK:     vwTable->initializeWithTake(_storage, const_cast<char *>(other._getOpaquePointer()), metadata._0);
+// CHECK-NEXT:     other._setMovedFrom();
+// CHECK-NEXT:     }
+// CHECK-NEXT:     vwTable->destroy(_oldValue, metadata._0);
+// CHECK:   SWIFT_INLINE_THUNK const char * _Nonnull _getOpaquePointer() const noexcept { if (_isMovedFrom()) ::abort(); return _storage; }
+// CHECK-NEXT:   SWIFT_INLINE_THUNK char * _Nonnull _getOpaquePointer() noexcept { if (_isMovedFrom()) ::abort(); return _storage; }
+// CHECK:   bool _isMovedFrom() const noexcept {
+// CHECK:   void _setMovedFrom() noexcept {
+// CHECK:   friend class _impl::_impl_MoveOnlyWithRef;
 
 // A borrowing parameter is still taken by const reference.
 // CHECK: SWIFT_INLINE_THUNK swift::Int borrowMoveOnlyStruct(const MoveOnlyStruct& s) noexcept

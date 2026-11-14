@@ -90,6 +90,12 @@
 // CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair final {
 
 // CHECK: alignas({{[0-9]+}}) char _storage[{{[0-9]+}}];
+// CHECK-NEXT: SWIFT_INLINE_PRIVATE_HELPER bool _isMovedFrom() const noexcept {
+// CHECK-NEXT: return (static_cast<unsigned char>(_storage[0]) & 255) == 0 &&
+// CHECK: }
+// CHECK-NEXT: SWIFT_INLINE_PRIVATE_HELPER void _setMovedFrom() noexcept {
+// CHECK-NEXT: _storage[0] = static_cast<char>(0);
+// CHECK: }
 // CHECK-NEXT: friend class _impl::_impl_GenericPair<T_0_0, T_0_1>;
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"

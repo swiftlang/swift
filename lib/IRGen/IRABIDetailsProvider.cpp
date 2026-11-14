@@ -139,6 +139,30 @@ public:
            typeInfo.isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
   }
 
+  std::optional<IRABIDetailsProvider::ExtraInhabitant>
+  getTypeExtraInhabitant(const NominalTypeDecl *TD) {
+    auto layout = getTypeSizeAlignment(TD, ResilienceExpansion::Minimal);
+    if (!layout || !layout->size)
+      return std::nullopt;
+    auto &TI = cast<FixedTypeInfo>(
+        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext()));
+    if (!TI.getFixedExtraInhabitantCount(IGM))
+      return std::nullopt;
+
+    unsigned bits = layout->size * 8;
+    auto mask = TI.getFixedExtraInhabitantMask(IGM).zextOrTrunc(bits);
+    if (mask.isZero())
+      return std::nullopt;
+    auto value = TI.getFixedExtraInhabitantValue(IGM, bits, 0);
+    IRABIDetailsProvider::ExtraInhabitant result;
+    for (unsigned i = 0; i < layout->size; ++i) {
+      unsigned offset = IGM.Triple.isLittleEndian() ? i : layout->size - i - 1;
+      result.mask.push_back(mask.extractBitsAsZExtValue(8, offset * 8));
+      result.value.push_back(value.extractBitsAsZExtValue(8, offset * 8));
+    }
+    return result;
+  }
+
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
     auto &typeInfo =
         IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
@@ -533,6 +557,11 @@ std::optional<IRABIDetailsProvider::SizeAndAlignment>
 IRABIDetailsProvider::getTypeSizeAlignment(const NominalTypeDecl *TD,
                                            ResilienceExpansion expansion) {
   return impl->getTypeSizeAlignment(TD, expansion);
+}
+
+std::optional<IRABIDetailsProvider::ExtraInhabitant>
+IRABIDetailsProvider::getTypeExtraInhabitant(const NominalTypeDecl *TD) {
+  return impl->getTypeExtraInhabitant(TD);
 }
 
 bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {

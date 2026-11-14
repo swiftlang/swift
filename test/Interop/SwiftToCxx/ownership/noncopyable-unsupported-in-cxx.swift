@@ -96,11 +96,11 @@ public struct FrozenMO: ~Copyable {
 // CHECK-DAG: class EmptyDeinitMO { } SWIFT_UNAVAILABLE_MSG("'EmptyDeinitMO' is a zero sized value type, it cannot be exposed to C++ yet");
 
 // Under library evolution a non-frozen type is boxed, including a zero sized
-// one, while a frozen one keeps its inline layout.
+// one. A frozen type without extra inhabitants is boxed too.
 // EVO: class SWIFT_SYMBOL({{.*}}) EmptyMO final {
 // EVO: SWIFT_INLINE_THUNK EmptyMO(EmptyMO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
 // EVO: class SWIFT_SYMBOL({{.*}}) FrozenMO final {
-// EVO: SWIFT_INLINE_THUNK FrozenMO(FrozenMO &&other) noexcept {
-// EVO: bool _isMovedFrom = false;
+// EVO: SWIFT_INLINE_THUNK FrozenMO(FrozenMO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
+// EVO: swift::_impl::OpaqueStorage _storage;
 // EVO: class SWIFT_SYMBOL({{.*}}) MO final {
 // EVO: SWIFT_INLINE_THUNK MO(MO &&other) noexcept : _storage(static_cast<swift::_impl::OpaqueStorage &&>(other._storage)) {}
