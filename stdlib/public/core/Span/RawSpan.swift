@@ -517,7 +517,11 @@ extension RawSpan {
   @_lifetime(copy self)
   public func extracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
-    let newSpan = unsafe RawSpan(_unchecked: newStart, byteCount: bounds.count)
+    // bounds.count uses checked subtraction, but we use unchecked arithmetic
+    // here because this function assumes 0 <= lowerBound < upperBound. This
+    // is enforced by the precondition in extracting(_:).
+    let newCount = bounds.upperBound &- bounds.lowerBound
+    let newSpan = unsafe RawSpan(_unchecked: newStart, byteCount: newCount)
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
