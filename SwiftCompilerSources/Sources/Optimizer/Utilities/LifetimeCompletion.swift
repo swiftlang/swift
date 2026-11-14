@@ -53,10 +53,24 @@ func completeLifetimes(in function: Function, includeTrivialVars: Bool = false, 
   // Process blocks in reverse dominance order.
   // This is important to not invalidate nesting of e.g. borrow scopes.
   for block in blocks.reversed() {
+    var borrowedFroms = Stack<Value>(context)
+    defer { borrowedFroms.deinitialize() }
+
     for inst in block.instructions.reversed() {
+      if let bf = inst as? BorrowedFromInst {
+        borrowedFroms.append(bf)
+        continue
+      }
       for result in inst.results {
         completeLifetime(of: result, includeTrivialVars: includeTrivialVars, context)
       }
+    }
+    // The order of `borrowed_from` instructions doesn't necessarily reflect the nesting of the
+    // reborrow scopes. Therefore inner scopes must be completed before their enclosing scopes.
+    var sortedBorrowedFroms = sortInNestingOrder(borrowedFroms, context)
+    defer { sortedBorrowedFroms.deinitialize() }
+    while let bf = sortedBorrowedFroms.pop() {
+      completeLifetime(of: bf, includeTrivialVars: includeTrivialVars, context)
     }
     for arg in block.arguments {
       completeLifetime(of: arg, includeTrivialVars: includeTrivialVars, context)
@@ -171,7 +185,11 @@ func completeLifetimes(of values: some RandomAccessCollection<Value>,
   defer { deadEndBlocks.deinitialize() }
   deadEndBlocks.insert(contentsOf: deadEnds.lazy.map { $0.parentBlock })
 
-  for value in values.reversed() {
+  // The order of `borrowed_from` instructions doesn't necessarily reflect the nesting of the
+  // reborrow scopes. Therefore inner scopes must be completed before their enclosing scopes.
+  var sortedValues = sortInNestingOrder(values, context)
+  defer { sortedValues.deinitialize() }
+  while let value = sortedValues.pop() {
     completeLifetime(
       of: value,
       includeTrivialVars: includeTrivialVars,
@@ -224,6 +242,42 @@ private func complete(value: Value,
       liveBlocks.pushIfNotVisited(contentsOf: block.successors)
     }
   }
+}
+
+/// Returns `values` in an order where a `borrowed_from` instruction comes after the `borrowed_from`
+/// instructions of its enclosing reborrow-phis - in case those are also contained in `values`, e.g.
+/// ```
+///   bb1(%1 : @reborrow $C, %2 : @reborrow $C):
+///     %3 = borrowed %2 from (%1)   // returned second
+///     %4 = borrowed %1 from ()     // returned first
+/// ```
+/// Apart from that, the order of `values` is preserved.
+/// The returned stack must be deinitialized by the caller.
+private func sortInNestingOrder(_ values: some Sequence<Value>, _ context: FunctionPassContext) -> Stack<Value> {
+  var result = Stack<Value>(context)
+  var valueSet = ValueSet(insertContentsOf: values, context)
+  defer { valueSet.deinitialize() }
+  var handled = ValueSet(context)
+  defer { handled.deinitialize() }
+
+  func add(_ value: Value) {
+    if !handled.insert(value) {
+      return
+    }
+    if let bf = value as? BorrowedFromInst {
+      for ev in bf.enclosingValues {
+        if let evPhi = Phi(ev), let evBF = evPhi.borrowedFrom, valueSet.contains(evBF) {
+          add(evBF)
+        }
+      }
+    }
+    result.append(value)
+  }
+
+  for value in values {
+    add(value)
+  }
+  return result
 }
 
 /// Returns all blocks which dominate any dead-end block with an `unreachable`.
