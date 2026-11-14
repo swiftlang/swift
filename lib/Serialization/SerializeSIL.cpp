@@ -362,6 +362,19 @@ namespace {
 
     /// Serialize and write SILDebugScope graph in post order.
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
+    /// The line, column and filename of a serialized location.
+    struct EncodedLoc {
+      unsigned Row, Column;
+      IdentifierID FNameID;
+    };
+    /// Encode \p Loc's position, or std::nullopt if it has none.
+    std::optional<EncodedLoc> encodeLoc(SILLocation Loc,
+                                        const SourceManager &SM);
+    /// Write a SIL_DEBUG_VALUE record: \p ListOfValues followed by \p Var.
+    void writeDebugVariable(const SILInstruction &SI,
+                            std::optional<SILDebugVariable> Var,
+                            unsigned attrs,
+                            SmallVectorImpl<uint64_t> &ListOfValues);
     void writeSourceLoc(SILLocation SLoc, const SourceManager &SM);
     void writeApplyArgLocs(ApplySite AS, const SourceManager &SM);
 
@@ -1150,12 +1163,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
 
     auto operands = DVI->getAllOperands();
 
-    unsigned DebugVarTypeCategory = 0;
-    auto DebugVar = DVI->getVarInfo();
-    const SILDebugScope *ScopeToWrite = nullptr;
-
-    auto &SM = SI.getFunction()->getModule().getSourceManager();
-
     SmallVector<uint64_t, 8> ListOfValues;
 
     // Encode operand count only when there's a reconstruction block
@@ -1172,88 +1179,8 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       ListOfValues.push_back((unsigned)op.get()->getType().getCategory());
     }
 
-    if (DebugVar) {
-      // Is a DebugVariable being serialized.
-      attrs |= 1 << 3;
-      attrs |= DebugVar->isLet() << 4;
-
-      // isDenseMapSingleton needs two bits.
-      attrs |= DebugVar->isDenseMapSingleton << 5;
-
-      ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
-      ListOfValues.push_back(DebugVar->ArgNo);
-
-      if (DebugVar->Type.has_value()) {
-        attrs |= 1 << 7;
-        ListOfValues.push_back(S.addTypeRef(DebugVar->Type->getRawASTType()));
-        DebugVarTypeCategory = (unsigned)DebugVar->Type->getCategory();
-      }
-
-      if (DebugVar->Scope) {
-        attrs |= 1 << 8;
-        ScopeToWrite = DebugVar->Scope;
-      }
-
-      if (DebugVar->Loc) {
-        auto RawLoc = DebugVar->Loc.value();
-        SourceLoc Loc = RawLoc.getSourceLoc();
-        if (Loc.isValid()) {
-          attrs |= 1 << 9;
-          auto LC = SM.getPresumedLineAndColumnForLoc(Loc);
-          auto FName = SM.getDisplayNameForLoc(Loc);
-          auto FNameID = S.addUniquedStringRef(FName);
-
-          ListOfValues.push_back(LC.first);
-          ListOfValues.push_back(LC.second);
-          ListOfValues.push_back(FNameID);
-        } else if (RawLoc.isFilenameAndLocation()) {
-          // getSourceLoc produces an empty SourceLoc for FilenameAndLocation,
-          // so this needs to be handled separately. rdar://25225083.
-          attrs |= 1 << 9;
-          auto FNameLoc = RawLoc.getFilenameAndLocation();
-          ListOfValues.push_back(FNameLoc->line);
-          ListOfValues.push_back(FNameLoc->column);
-          ListOfValues.push_back(S.addUniquedStringRef(FNameLoc->filename));
-        }
-      }
-
-      for (auto &Expr : DebugVar->DIExpr.elements()) {
-        attrs |= 1 << 10;
-        ListOfValues.push_back(Expr.getKind());
-        switch (Expr.getKind()) {
-        case SILDIExprElement::Kind::OperatorKind:
-          ListOfValues.push_back((unsigned)Expr.getAsOperator());
-          break;
-        case SILDIExprElement::Kind::DeclKind:
-          ListOfValues.push_back(S.addDeclRef(Expr.getAsDecl()));
-          break;
-        case SILDIExprElement::Kind::ConstIntKind: {
-          llvm::SmallString<10> Str;
-          APInt(64, Expr.getAsConstInt().value()).toStringUnsigned(Str);
-          ListOfValues.push_back(S.addUniquedStringRef(Str));
-          break;
-        }
-        case SILDIExprElement::Kind::TypeKind:
-          ListOfValues.push_back(S.addTypeRef(Expr.getAsType()));
-        }
-      }
-    }
-    SILDebugValueLayout::emitRecord(
-        Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
-        DebugVarTypeCategory, attrs,
-    ListOfValues);
-
-    if (ScopeToWrite) {
-      assert(DebugVar->Scope->getInlinedFunction() == DVI->getDebugScope()->getInlinedFunction());
-      writeDebugScopes(ScopeToWrite, SM);
-      // Add a delimiter record since debug scope records are read by the
-      // deserializer in a loop until the first non debug scope record is
-      // found. As a result, the deserializer might read debug scopes of
-      // subsequent instructions while deserializing scopes for the current
-      // DebugValue instruction.
-      // TODO: Maybe add a bit to the debug scope layout to mark the ending.
-      DebugValueDelimiterLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[DebugValueDelimiterLayout::Code]);
-    }
+    writeDebugVariable(SI, DVI->getVarInfo(/*includeLoc=*/ false), attrs,
+                       ListOfValues);
     break;
   }
   case SILInstructionKind::DebugStepInst:
@@ -1388,9 +1315,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     flags |= unsigned(ABI->usesMoveableValueDebugInfo()) << 2;
     flags |= unsigned(ABI->hasPointerEscape()) << 3;
     flags |= unsigned(ABI->isInferredImmutable()) << 4;
+    auto DebugVar = Options.SerializeDebugInfoSIL
+                        ? ABI->getVarInfo(/*complete=*/ false)
+                        : std::nullopt;
+    flags |= unsigned(DebugVar.has_value()) << 5;
     writeOneTypeLayout(ABI->getKind(),
                        flags,
                        ABI->getType());
+    if (DebugVar) {
+      SmallVector<uint64_t, 8> ListOfValues;
+      writeDebugVariable(SI, DebugVar, 0, ListOfValues);
+    }
     break;
   }
   case SILInstructionKind::AllocRefInst:
@@ -1436,7 +1371,15 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
     attr |= unsigned(ASI->isFromVarDecl()) << 2;
     attr |= unsigned(ASI->usesMoveableValueDebugInfo()) << 3;
     attr |= unsigned(ASI->isStackAllocationNested()) << 4;
+    auto DebugVar = Options.SerializeDebugInfoSIL
+                        ? ASI->getVarInfo(/*complete*/ false)
+                        : std::nullopt;
+    attr |= unsigned(DebugVar.has_value()) << 5;
     writeOneTypeLayout(ASI->getKind(), attr, ASI->getElementType());
+    if (DebugVar) {
+      SmallVector<uint64_t, 8> ListOfValues;
+      writeDebugVariable(SI, DebugVar, 0, ListOfValues);
+    }
     break;
   }
   case SILInstructionKind::AllocPackInst: {
@@ -3578,8 +3521,6 @@ void SILSerializer::writeSILProperty(const SILProperty &prop) {
 }
 
 void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
-  auto SLoc = Loc.getSourceLoc();
-  auto OpaquePtr = SLoc.getOpaquePointerValue();
   uint8_t LocationKind;
   switch(Loc.getKind()) {
     case SILLocation::ReturnKind:
@@ -3597,6 +3538,9 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
       break;
   }
 
+  const void *OpaquePtr = Loc.isFilenameAndLocation()
+                              ? Loc.getFilenameAndLocation()
+                              : Loc.getSourceLoc().getOpaquePointerValue();
   if (SourceLocMap.find(OpaquePtr) != SourceLocMap.end()) {
     SourceLocRefLayout::emitRecord(Out, ScratchRecord,
                                    SILAbbrCodes[SourceLocRefLayout::Code],
@@ -3604,22 +3548,36 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
     return;
   }
 
-  ValueID Row = 0;
-  ValueID Column = 0;
-  ValueID FNameID = 0;
-
-  if (!SLoc.isValid()) {
+  auto Encoded = encodeLoc(Loc, SM);
+  if (!Encoded) {
     //emit empty source loc
     SourceLocRefLayout::emitRecord(Out, ScratchRecord, SILAbbrCodes[SourceLocRefLayout::Code], 0, 0, (unsigned)0);
     return;
   }
 
-  std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-  FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
   SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
   SourceLocLayout::emitRecord(Out, ScratchRecord,
-                              SILAbbrCodes[SourceLocLayout::Code], Row, Column,
-                              FNameID, LocationKind, (unsigned)Loc.isImplicit());
+                              SILAbbrCodes[SourceLocLayout::Code],
+                              Encoded->Row, Encoded->Column, Encoded->FNameID,
+                              LocationKind, (unsigned)Loc.isImplicit());
+}
+
+std::optional<SILSerializer::EncodedLoc>
+SILSerializer::encodeLoc(SILLocation Loc, const SourceManager &SM) {
+  SourceLoc SLoc = Loc.getSourceLoc();
+  if (SLoc.isValid()) {
+    auto LC = SM.getPresumedLineAndColumnForLoc(SLoc);
+    return EncodedLoc{LC.first, LC.second,
+                      S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc))};
+  }
+  // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so this
+  // needs to be handled separately. rdar://25225083.
+  if (Loc.isFilenameAndLocation()) {
+    auto FNameLoc = Loc.getFilenameAndLocation();
+    return EncodedLoc{FNameLoc->line, FNameLoc->column,
+                      S.addUniquedStringRef(FNameLoc->filename)};
+  }
+  return std::nullopt;
 }
 
 void SILSerializer::writeApplyArgLocs(ApplySite AS, const SourceManager &SM) {
@@ -3655,6 +3613,82 @@ void SILSerializer::writeExtraStringIfNonEmpty(
   SILExtraStringLayout::emitRecord(
       Out, ScratchRecord, SILAbbrCodes[SILExtraStringLayout::Code],
       static_cast<uint8_t>(flavor), string);
+}
+
+void SILSerializer::writeDebugVariable(const SILInstruction &SI,
+                                       std::optional<SILDebugVariable> DebugVar,
+                                       unsigned attrs,
+                                       SmallVectorImpl<uint64_t> &ListOfValues) {
+  unsigned DebugVarTypeCategory = 0;
+  const SILDebugScope *ScopeToWrite = nullptr;
+  auto &SM = SI.getFunction()->getModule().getSourceManager();
+
+  if (DebugVar) {
+    // Is a DebugVariable being serialized.
+    attrs |= 1 << 3;
+    attrs |= DebugVar->isLet() << 4;
+
+    ListOfValues.push_back(S.addUniquedStringRef(DebugVar->Name));
+    ListOfValues.push_back(DebugVar->ArgNo);
+
+    if (DebugVar->Type.has_value()) {
+      attrs |= 1 << 5;
+      ListOfValues.push_back(S.addTypeRef(DebugVar->Type->getRawASTType()));
+      DebugVarTypeCategory = (unsigned)DebugVar->Type->getCategory();
+    }
+
+    if (DebugVar->Scope) {
+      attrs |= 1 << 6;
+      ScopeToWrite = DebugVar->Scope;
+    }
+
+    if (DebugVar->Loc) {
+      if (auto Encoded = encodeLoc(*DebugVar->Loc, SM)) {
+        attrs |= 1 << 7;
+        ListOfValues.push_back(Encoded->Row);
+        ListOfValues.push_back(Encoded->Column);
+        ListOfValues.push_back(Encoded->FNameID);
+      }
+    }
+
+    for (auto &Expr : DebugVar->DIExpr.elements()) {
+      attrs |= 1 << 8;
+      ListOfValues.push_back(Expr.getKind());
+      switch (Expr.getKind()) {
+      case SILDIExprElement::Kind::OperatorKind:
+        ListOfValues.push_back((unsigned)Expr.getAsOperator());
+        break;
+      case SILDIExprElement::Kind::DeclKind:
+        ListOfValues.push_back(S.addDeclRef(Expr.getAsDecl()));
+        break;
+      case SILDIExprElement::Kind::ConstIntKind: {
+        llvm::SmallString<10> Str;
+        APInt(64, Expr.getAsConstInt().value()).toStringUnsigned(Str);
+        ListOfValues.push_back(S.addUniquedStringRef(Str));
+        break;
+      }
+      case SILDIExprElement::Kind::TypeKind:
+        ListOfValues.push_back(S.addTypeRef(Expr.getAsType()));
+      }
+    }
+  }
+  SILDebugValueLayout::emitRecord(
+      Out, ScratchRecord, SILAbbrCodes[SILDebugValueLayout::Code],
+      DebugVarTypeCategory, attrs, ListOfValues);
+
+  if (ScopeToWrite) {
+    assert(ScopeToWrite->getInlinedFunction() ==
+           SI.getDebugScope()->getInlinedFunction());
+    writeDebugScopes(ScopeToWrite, SM);
+    // Add a delimiter record since debug scope records are read by the
+    // deserializer in a loop until the first non debug scope record is
+    // found. As a result, the deserializer might read debug scopes of
+    // subsequent instructions while deserializing scopes for the current
+    // instruction.
+    // TODO: Maybe add a bit to the debug scope layout to mark the ending.
+    DebugValueDelimiterLayout::emitRecord(
+        Out, ScratchRecord, SILAbbrCodes[DebugValueDelimiterLayout::Code]);
+  }
 }
 
 void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
@@ -3700,22 +3734,14 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
     InlinedID = DebugScopeMap[Inlined];
   }
 
-  SourceLoc SLoc = Scope->getLoc().getSourceLoc();
-
   ValueID Row = 0;
   ValueID Column = 0;
   ValueID FNameID = 0;
   // TODO: we can emit SourceLocRef here
-  if (SLoc.isValid()) {
-    std::tie(Row, Column) = SM.getPresumedLineAndColumnForLoc(SLoc);
-    FNameID = S.addUniquedStringRef(SM.getDisplayNameForLoc(SLoc));
-  } else if (Scope->Loc.isFilenameAndLocation()) {
-    // getSourceLoc produces an empty SourceLoc for FilenameAndLocation, so
-    // this needs to be handled separately. rdar://25225083.
-    auto FNameLoc = Scope->Loc.getFilenameAndLocation();
-    Row = FNameLoc->line;
-    Column = FNameLoc->column;
-    FNameID = S.addUniquedStringRef(FNameLoc->filename);
+  if (auto Encoded = encodeLoc(Scope->getLoc(), SM)) {
+    Row = Encoded->Row;
+    Column = Encoded->Column;
+    FNameID = Encoded->FNameID;
   }
 
   DebugScopeMap.insert({Scope, DebugScopeMap.size() + 1});

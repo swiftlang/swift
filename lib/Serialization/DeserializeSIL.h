@@ -191,6 +191,18 @@ namespace swift {
     llvm::Expected<unsigned> readNextRecord(SmallVectorImpl<uint64_t> &scratch);
     llvm::Expected<std::optional<SILLocation>>
     readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch);
+    /// Decode a location written by SILSerializer::encodeLoc.
+    SILLocation::FilenameAndLocation *
+    decodeLoc(unsigned Row, unsigned Column,
+              serialization::IdentifierID FNameID);
+    /// Read the debug variable in \p ListOfValues, the values of a
+    /// SIL_DEBUG_VALUE record after its operands.
+    llvm::Expected<std::optional<SILDebugVariable>>
+    readDebugVariable(SILFunction *Fn, SILBuilder &Builder, unsigned Attr,
+                      unsigned TyCategory, ArrayRef<uint64_t> ListOfValues);
+    /// Read the SIL_DEBUG_VALUE record following an alloc_stack or alloc_box.
+    llvm::Expected<std::optional<SILDebugVariable>>
+    readAllocationDebugVariable(SILFunction *Fn, SILBuilder &Builder);
 
     llvm::DenseMap<unsigned, const SILDebugScope *> ParsedScopes;
     llvm::SmallVector<SILLocation::FilenameAndLocation *> ParsedLocs;

@@ -474,6 +474,13 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   return maybeKind;
 }
 
+SILLocation::FilenameAndLocation *
+SILDeserializer::decodeLoc(unsigned Row, unsigned Column,
+                           IdentifierID FNameID) {
+  return SILLocation::FilenameAndLocation::alloc(
+      Row, Column, MF->getIdentifierText(FNameID), SILMod);
+}
+
 llvm::Expected<std::optional<SILLocation>>
 SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
   unsigned LocationKind, Implicit = 0;
@@ -494,8 +501,7 @@ SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
     SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind,
                                 Implicit);
 
-    FNameLoc = SILLocation::FilenameAndLocation::alloc(
-        Row, Col, MF->getIdentifierText(FNameID), SILMod);
+    FNameLoc = decodeLoc(Row, Col, FNameID);
 
     ParsedLocs.push_back(FNameLoc);
   }
@@ -550,8 +556,7 @@ SILDeserializer::readDebugScopes(SILFunction *F,
     if (!Row && !Column && !FName)
       Loc = SILLocation::invalid();
     else
-      Loc = RegularLocation(SILLocation::FilenameAndLocation::alloc(
-          Row, Column, MF->getIdentifierText(FName), SILMod));
+      Loc = RegularLocation(decodeLoc(Row, Column, FName));
 
     if (isFuncParent) {
       Parent = getFuncForReference(MF->getIdentifierText(ParentID), true);
@@ -593,6 +598,99 @@ SILDeserializer::readDebugScopes(SILFunction *F,
 
   assert(Scope);
   return Scope;
+}
+
+llvm::Expected<std::optional<SILDebugVariable>>
+SILDeserializer::readDebugVariable(SILFunction *Fn, SILBuilder &Builder,
+                                   unsigned Attr, unsigned TyCategory,
+                                   ArrayRef<uint64_t> ListOfValues) {
+  bool HaveDebugVar = (Attr >> 3) & 0x1;
+  if (!HaveDebugVar)
+    return std::nullopt;
+
+  unsigned I = 0;
+  assert(ListOfValues.size() >= 2 &&
+         "Unexpected number of values for debug variable info");
+  bool IsLet = (Attr >> 4) & 0x1;
+  bool HasType = (Attr >> 5) & 0x1;
+  bool HasScope = (Attr >> 6) & 0x1;
+  bool HasLoc = (Attr >> 7) & 0x1;
+
+  auto VarName = MF->getIdentifierText(ListOfValues[I++]);
+  auto ArgNo = ListOfValues[I++];
+  std::optional<SILType> Type;
+  std::optional<SILLocation> Loc;
+  if (HasType) {
+    Type = getSILType(MF->getType(ListOfValues[I++]),
+                      (SILValueCategory)TyCategory, Fn);
+  }
+
+  if (HasLoc) {
+    Loc = RegularLocation(
+        decodeLoc(ListOfValues[I], ListOfValues[I + 1], ListOfValues[I + 2]));
+    I += 3;
+  }
+
+  SILDebugInfoExpression Expressions;
+  while (I < ListOfValues.size()) {
+    using DIExpr = SILDIExprElement;
+    SILDIExprElement::Kind Kind = (SILDIExprElement::Kind)ListOfValues[I++];
+    switch (Kind) {
+    case DIExpr::OperatorKind:
+      Expressions.push_back(
+          DIExpr::createOperator((SILDIExprOperator)ListOfValues[I++]));
+      break;
+    case DIExpr::DeclKind: {
+      auto D = MF->getDeclChecked(ListOfValues[I++]);
+      if (!D)
+        return D.takeError();
+      Expressions.push_back(DIExpr::createDecl(D.get()));
+      break;
+    }
+    case DIExpr::ConstIntKind: {
+      auto Str = MF->getIdentifierText(ListOfValues[I++]);
+      APInt Int;
+      Str.getAsInteger(10, Int);
+      Expressions.push_back(DIExpr::createConstInt(Int.getLimitedValue()));
+      break;
+    }
+    case SILDIExprElement::Kind::TypeKind:
+      Expressions.push_back(
+          DIExpr::createType(MF->getType(ListOfValues[I++])));
+      break;
+    }
+  }
+
+  const SILDebugScope *Scope = nullptr;
+  if (HasScope) {
+    SmallVector<uint64_t, 64> scratch;
+    auto maybeKind = readNextRecord(scratch);
+    if (!maybeKind) MF->fatal(maybeKind.takeError());
+    auto maybeScope = readDebugScopes(Fn, scratch, Builder, maybeKind.get());
+    if (!maybeScope) MF->fatal(maybeScope.takeError());
+    Scope = maybeScope.get();
+  }
+
+  return SILDebugVariable(
+      VarName, IsLet, ArgNo, Type, Loc, Scope,
+      llvm::ArrayRef<SILDIExprElement>(Expressions.element_begin(),
+                                       Expressions.element_end()));
+}
+
+llvm::Expected<std::optional<SILDebugVariable>>
+SILDeserializer::readAllocationDebugVariable(SILFunction *Fn,
+                                             SILBuilder &Builder) {
+  SmallVector<uint64_t, 16> scratch;
+  auto maybeKind = readNextRecord(scratch);
+  if (!maybeKind)
+    return maybeKind.takeError();
+  if (maybeKind.get() != SIL_DEBUG_VALUE)
+    return llvm::createStringError("Expected the allocation's debug variable");
+
+  unsigned TyCategory, Attr;
+  ArrayRef<uint64_t> ListOfValues;
+  SILDebugValueLayout::readRecord(scratch, TyCategory, Attr, ListOfValues);
+  return readDebugVariable(Fn, Builder, Attr, TyCategory, ListOfValues);
 }
 
 /// Helper function to find a SILDifferentiabilityWitness, given its mangled
@@ -1966,88 +2064,14 @@ llvm::Error SILDeserializer::readSILInstruction(
       I += 3;
     }
 
-    bool HaveDebugVar = (Attr >> 3) & 0x1;
-    bool HasLoc = false;
-
-    SILDebugVariable DebugVar;
-    if (HaveDebugVar) {
-      assert(ListOfValues.size() >= I + 2 &&
-             "Unexpected number of values for debug variable info");
-      bool IsLet = (Attr >> 4) & 0x1;
-      unsigned IsDenseMapSingleton = (Attr >> 5) & 0x3;
-      bool HasType = (Attr >> 7) & 0x1;
-      bool HasScope = (Attr >> 8) & 0x1;
-      HasLoc = (Attr >> 9) & 0x1;
-
-      auto VarName = MF->getIdentifierText(ListOfValues[I++]);
-      auto ArgNo = ListOfValues[I++];
-      std::optional<SILType> Type;
-      unsigned Row, Col;
-      StringRef FileName;
-      std::optional<SILLocation> Loc;
-      if (HasType) {
-        Type = getSILType(MF->getType(ListOfValues[I++]),
-                          (SILValueCategory)TyCategory2, Fn);
-      }
-
-      if (HasLoc) {
-        Row = ListOfValues[I++];
-        Col = ListOfValues[I++];
-        FileName = MF->getIdentifierText(ListOfValues[I++]);
-        Loc = RegularLocation(SILLocation::FilenameAndLocation::alloc(
-            Row, Col, FileName, Fn->getModule()));
-      }
-
-      SILDebugInfoExpression Expressions;
-      while (I < ListOfValues.size()) {
-        using DIExpr = SILDIExprElement;
-        SILDIExprElement::Kind Kind = (SILDIExprElement::Kind)ListOfValues[I++];
-        switch (Kind) {
-        case DIExpr::OperatorKind:
-          Expressions.push_back(
-              DIExpr::createOperator((SILDIExprOperator)ListOfValues[I++]));
-          break;
-        case DIExpr::DeclKind: {
-          auto D = MF->getDeclChecked(ListOfValues[I++]);
-          if (!D)
-            return D.takeError();
-          Expressions.push_back(DIExpr::createDecl(D.get()));
-          break;
-        }
-        case DIExpr::ConstIntKind: {
-          auto Str = MF->getIdentifierText(ListOfValues[I++]);
-          APInt Int;
-          Str.getAsInteger(10, Int);
-          Expressions.push_back(DIExpr::createConstInt(Int.getLimitedValue()));
-          break;
-        }
-        case SILDIExprElement::Kind::TypeKind:
-          Expressions.push_back(
-              DIExpr::createType(MF->getType(ListOfValues[I++])));
-          break;
-        }
-      }
-
-      const SILDebugScope *Scope = nullptr;
-      if (HasScope) {
-        SmallVector<uint64_t, 64> scratch;
-        auto maybeKind = readNextRecord(scratch);
-        if (!maybeKind) MF->fatal(maybeKind.takeError());
-        auto maybeScope = readDebugScopes(Fn, scratch, Builder, maybeKind.get());
-        if (!maybeScope) MF->fatal(maybeScope.takeError());
-        Scope = maybeScope.get();
-      }
-
-      DebugVar = SILDebugVariable(
-          VarName, IsLet, ArgNo, Type, Loc, Scope,
-          llvm::ArrayRef<SILDIExprElement>(Expressions.element_begin(),
-                                           Expressions.element_end()));
-      DebugVar.isDenseMapSingleton = IsDenseMapSingleton;
-    }
-
-    ResultInst =
-        Builder.createDebugValue(Loc, Operands, DebugVar,
-                                 UsesMoveableValDebugInfo, HasTrace, !HasLoc);
+    auto DebugVar = readDebugVariable(Fn, Builder, Attr, TyCategory2,
+                                      ListOfValues.drop_front(I));
+    if (!DebugVar)
+      return DebugVar.takeError();
+    // The location override is the instruction's own serialized location.
+    ResultInst = Builder.createDebugValue(
+        Loc, Operands, DebugVar.get().value_or(SILDebugVariable()),
+        UsesMoveableValDebugInfo, HasTrace, /*overrideLoc=*/ false);
 
     // If the serialized debug_value has a reconstruction block, add it to
     // the worklist. The matching SIL_DEBUG_RECONSTRUCTION_BLOCK records
@@ -2065,9 +2089,16 @@ llvm::Error SILDeserializer::readSILInstruction(
         UsesMoveableValueDebugInfo_t((Attr >> 2) & 0x1);
     auto pointerEscape = HasPointerEscape_t((Attr >> 3) & 0x1);
     auto inferredImmutable = (Attr >> 4) & 0x1;
+    std::optional<SILDebugVariable> DebugVar;
+    if ((Attr >> 5) & 0x1) {
+      auto MaybeVar = readAllocationDebugVariable(Fn, Builder);
+      if (!MaybeVar)
+        return MaybeVar.takeError();
+      DebugVar = MaybeVar.get();
+    }
     ResultInst = Builder.createAllocBox(
         Loc, cast<SILBoxType>(MF->getType(TyID)->getCanonicalType()),
-        std::nullopt, hasDynamicLifetime, reflection,
+        DebugVar, hasDynamicLifetime, reflection,
         usesMoveableValueDebugInfo,
         /*skipVarDeclAssert*/ false, pointerEscape, inferredImmutable);
     break;
@@ -2079,9 +2110,20 @@ llvm::Error SILDeserializer::readSILInstruction(
     auto isFromVarDecl = IsFromVarDecl_t((Attr >> 2) & 0x1);
     auto wasMoved = UsesMoveableValueDebugInfo_t((Attr >> 3) & 0x1);
     auto isNested = StackAllocationIsNested_t((Attr >> 4) & 0x1);
+    std::optional<SILDebugVariable> DebugVar;
+    if ((Attr >> 5) & 0x1) {
+      auto MaybeVar = readAllocationDebugVariable(Fn, Builder);
+      if (!MaybeVar)
+        return MaybeVar.takeError();
+      DebugVar = MaybeVar.get();
+    }
+    // createAllocStack ignores the location override for the variable.
+    // The location override contains the correct deserialized location here,
+    // so pass it through.
     auto ASI = Builder.createAllocStack(
-        Loc, getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
-        std::nullopt, hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
+        Builder.getCurrentDebugLocOverride().value_or(Loc),
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn),
+        DebugVar, hasDynamicLifetime, isLexical, isFromVarDecl, wasMoved);
     ASI->setStackAllocationIsNested(isNested);
     ResultInst = ASI;
     break;
