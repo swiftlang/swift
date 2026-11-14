@@ -21,9 +21,9 @@ func testMethods(_ x: CFRefCounted) {
   _ = CFRefCounted.staticGetRetained()
   // CHECK: function_ref @{{.*}}staticGetRetained{{.*}} : $@convention(c) () -> @owned CFRefCounted
   _ = x.methodNotRetained()
-  // CHECK: function_ref @{{.*}}methodNotRetained{{.*}} : $@convention(cxx_method) (CFRefCounted) -> CFRefCounted
+  // CHECK: function_ref @{{.*}}methodNotRetained{{.*}} : $@convention(cxx_method) (@guaranteed CFRefCounted) -> CFRefCounted
   _ = x.methodRetained()
-  // CHECK: function_ref @{{.*}}methodRetained{{.*}} : $@convention(cxx_method) (CFRefCounted) -> @owned CFRefCounted
+  // CHECK: function_ref @{{.*}}methodRetained{{.*}} : $@convention(cxx_method) (@guaranteed CFRefCounted) -> @owned CFRefCounted
 }
 
 // CHECK-NOT: @autoreleased

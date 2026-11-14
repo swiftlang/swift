@@ -170,16 +170,15 @@ int main() {
     SharedFRT sfrt;
     sfrt.x = 2;
     UseCxx::takeSharedFRT(&sfrt);
-    // CHECK-NEXT: retainShared
-    // CHECK-NEXT: releaseShared
     // CHECK-NEXT: take shared frt x 2
+    // The thunk retains the reference that Swift consumes.
     UseCxx::consumeSharedFRT(&sfrt);
     // CHECK-NEXT: retainShared
     // CHECK-NEXT: consume shared frt x 2
-    SharedFRT *sfrtptr = UseCxx::returnSharedFRT(&sfrt);
     // CHECK-NEXT: releaseShared
-    // CHECK-NEXT: retainShared
+    SharedFRT *sfrtptr = UseCxx::returnSharedFRT(&sfrt);
     // CHECK-NEXT: return shared frt x 2
+    // CHECK-NEXT: retainShared
     SharedFRT *sfrtptr2 = UseCxx::returnSharedFRT2();
     // No retain or release here.
   }
