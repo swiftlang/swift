@@ -579,6 +579,32 @@ extension InputSpan where Element: ~Copyable {
     let prefix = unsafe InputSpan(_uncheckedBuffer: buffer, initializedCount: c)
     return unsafe _overrideLifetime(prefix, mutating: &self)
   }
+
+  /// Removes up to `maxCount` elements from the beginning of this span
+  /// by passing them to a closure through an input span.
+  ///
+  /// The closure takes ownership of the elements: it can do anything with them,
+  /// including nothing. Any elements still initialized when the input span
+  /// goes out of scope are deinitialized, whether the closure returns normally
+  /// or by throwing.
+  ///
+  /// The input span has a capacity equal to the number of elements it holds.
+  ///
+  /// - Parameters:
+  ///   - maxCount: The maximum number of elements to consume.
+  ///       `maxCount` must not be negative. If it exceeds `count`,
+  ///       all elements are consumed.
+  ///   - consumer: A closure that takes ownership of an `InputSpan`
+  ///       containing the consumed elements.
+  /// - Returns: The value returned by `consumer`.
+  @export(implementation)
+  public mutating func consumePrefix<E: Error, R: ~Copyable>(
+    maxCount: Int,
+    consumingWith consumer: (consuming InputSpan<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    let prefix = consumePrefix(maxCount: maxCount)
+    return try consumer(prefix)
+  }
 }
 
 @available(SwiftStdlib 6.5, *)
