@@ -2716,6 +2716,9 @@ namespace {
       if (auto *UDE = dyn_cast<UnresolvedDotExpr>(anchor)) {
         buildKeyPathMemberComponent(overload, UDE->getLoc(), componentLoc,
                                     components);
+      } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(anchor)) {
+        buildKeyPathMemberComponent(overload, UME->getLoc(), componentLoc,
+                                    components);
       } else if (auto *SE = dyn_cast<SubscriptExpr>(anchor)) {
         buildKeyPathSubscriptComponent(overload, SE->getLoc(), SE->getArgs(),
                                        componentLoc, components);
@@ -3460,11 +3463,20 @@ namespace {
       auto base = TypeExpr::createImplicitHack(expr->getDotLoc(), baseTy, ctx);
       cs.cacheExprTypes(base);
 
-      // Build the member reference.
+      // Build the member reference. A dynamic member is accessed through a
+      // static `subscript(dynamicMember:)`, e.g. `.foo` becomes
+      // `T[dynamicMember: "foo"]`.
       auto *exprLoc = cs.getConstraintLocator(expr);
-      auto result = buildMemberRef(
-          base, expr->getDotLoc(), selected, expr->getNameLoc(), exprLoc,
-          memberLocator, expr->isImplicit(), AccessSemantics::Ordinary);
+      Expr *result;
+      if (selected.choice.isAnyDynamicMemberLookup()) {
+        result = buildDynamicMemberLookupRef(expr, base, expr->getDotLoc(),
+                                             expr->getNameLoc().getStartLoc(),
+                                             selected, memberLocator);
+      } else {
+        result = buildMemberRef(base, expr->getDotLoc(), selected,
+                                expr->getNameLoc(), exprLoc, memberLocator,
+                                expr->isImplicit(), AccessSemantics::Ordinary);
+      }
       if (!result)
         return nullptr;
 
