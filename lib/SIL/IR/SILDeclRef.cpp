@@ -1140,13 +1140,15 @@ SerializedKind_t SILDeclRef::getSerializedKind() const {
   if (isClangImported())
     return IsSerialized;
 
-  // Handle back deployed functions. The original back deployed function
-  // should not be serialized, but the thunk and fallback should be since they
-  // need to be emitted into the client.
+  // Handle back deployed functions. The thunk and fallback are always
+  // emitted into the client. The original back-deployed function is only
+  // serialized when it explicitly has an attribute that implies inlinability.
   if (isBackDeployed()) {
     switch (backDeploymentKind) {
       case BackDeploymentKind::None:
-        return IsNotSerialized;
+        // Accessors inherit this from their storage declaration.
+        return d->hasAttributeWithInlinableSemantics() ? IsSerialized
+                                                       : IsNotSerialized;
       case BackDeploymentKind::Fallback:
       case BackDeploymentKind::Thunk:
         return IsSerialized;
