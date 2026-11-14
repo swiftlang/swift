@@ -27,6 +27,8 @@ struct Trivial {
     short x, y;
 };
 
+struct EmptyStruct {};
+
 namespace ns {
 
     struct TrivialinNS {
@@ -77,6 +79,11 @@ namespace ns {
     using NonTrivialTemplateInt = NonTrivialTemplate<int>;
 
     using NonTrivialTemplateTrivial = NonTrivialTemplate<TrivialinNS>;
+
+    template<class T>
+    struct EmptyTemplate {};
+
+    using EmptyTemplateInt = EmptyTemplate<int>;
 }
 
 using SimpleTypedef = int;
@@ -100,6 +107,16 @@ module CxxTest {
 
 //--- use-cxx-types.swift
 import CxxTest
+
+@_expose(Cxx)
+public func retEmpty() -> EmptyStruct {
+    return EmptyStruct()
+}
+
+@_expose(Cxx)
+public func retEmptyTemplate() -> ns.EmptyTemplateInt {
+    return ns.EmptyTemplateInt()
+}
 
 @_expose(Cxx)
 public func retImmortal() -> ns.Immortal {
@@ -147,6 +164,11 @@ public func retSimpleTypedef() -> SimpleTypedef {
 }
 
 @_expose(Cxx)
+public func retStrctWithEmpty() -> StrctWithEmpty {
+    return StrctWithEmpty(empty: EmptyStruct())
+}
+
+@_expose(Cxx)
 public func retTrivial() -> Trivial {
     return Trivial()
 }
@@ -181,6 +203,11 @@ public struct Strct {
     public let transform2: ns.anonStructInNS
 }
 
+@_expose(Cxx)
+public struct StrctWithEmpty {
+    public let empty: EmptyStruct
+}
+
 // CHECK: #if __has_feature(objc_modules)
 // CHECK: #if __has_feature(objc_modules)
 // CHECK: #if __has_feature(objc_modules)
@@ -191,8 +218,27 @@ public struct Strct {
 // CHECK-NEXT: #endif
 
 
+// CHECK: SWIFT_EXTERN void $s8UseCxxTy8retEmptySo0E6StructVyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retEmpty()
+// CHECK-NEXT: SWIFT_EXTERN void $s8UseCxxTy16retEmptyTemplateSo2nsO0025EmptyTemplateCInt_msFCfhbVyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retEmptyTemplate()
 // CHECK: SWIFT_EXTERN void $s8UseCxxTy13retNonTrivialSo2nsO0030NonTrivialTemplateCInt_hHAFhrbVyF(SWIFT_INDIRECT_RESULT void * _Nonnull) SWIFT_NOEXCEPT SWIFT_CALL; // retNonTrivial()
+// CHECK: SWIFT_EXTERN void $s8UseCxxTy17retStrctWithEmptyAA0efG0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retStrctWithEmpty()
 // CHECK: SWIFT_EXTERN struct swift_interop_returnStub_UseCxxTy_uint32_t_0_4 $s8UseCxxTy10retTrivialSo0E0VyF(void) SWIFT_NOEXCEPT SWIFT_CALL; // retTrivial()
+
+// CHECK: SWIFT_INLINE_THUNK EmptyStruct retEmpty() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: alignas(alignof(EmptyStruct)) char storage[sizeof(EmptyStruct)];
+// CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<EmptyStruct *>(storage);
+// CHECK-NEXT: (void)storage;
+// CHECK-NEXT: UseCxxTy::_impl::$s8UseCxxTy8retEmptySo0E6StructVyF();
+// CHECK-NEXT: return *storageObjectPtr;
+// CHECK-NEXT: }
+
+// CHECK: SWIFT_INLINE_THUNK ns::EmptyTemplate<int> retEmptyTemplate() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: alignas(alignof(ns::EmptyTemplate<int>)) char storage[sizeof(ns::EmptyTemplate<int>)];
+// CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::EmptyTemplate<int> *>(storage);
+// CHECK-NEXT: (void)storage;
+// CHECK-NEXT: UseCxxTy::_impl::$s8UseCxxTy16retEmptyTemplateSo2nsO0025EmptyTemplateCInt_msFCfhbVyF();
+// CHECK-NEXT: return *storageObjectPtr;
+// CHECK-NEXT: }
 
 // CHECK: ns::Immortal *_Nonnull retImmortal() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT SWIFT_RETURNS_RETAINED {
 // CHECK-NEXT: return UseCxxTy::_impl::$s8UseCxxTy11retImmortalSo2nsO0E0VyF();
@@ -296,6 +342,13 @@ public struct Strct {
 // CHECK: SimpleScopedEnum retSimpleScopedEnumTypedef() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK: int retSimpleTypedef() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 
+// CHECK: SWIFT_INLINE_THUNK StrctWithEmpty retStrctWithEmpty() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
+// CHECK-NEXT: return UseCxxTy::_impl::_impl_StrctWithEmpty::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT: (void)result;
+// CHECK-NEXT: UseCxxTy::_impl::$s8UseCxxTy17retStrctWithEmptyAA0efG0VyF();
+// CHECK-NEXT: });
+// CHECK-NEXT: }
+
 // CHECK: SWIFT_INLINE_THUNK Trivial retTrivial() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(Trivial)) char storage[sizeof(Trivial)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<Trivial *>(storage);
@@ -330,3 +383,11 @@ public struct Strct {
 
 // CHECK: SWIFT_INLINE_THUNK ns::anonStructInNS Strct::getTransform2() const noexcept {
 // CHECK-NEXT: alignas(alignof(ns::anonStructInNS)) char storage[sizeof(ns::anonStructInNS)];
+
+// CHECK: SWIFT_INLINE_THUNK EmptyStruct StrctWithEmpty::getEmpty() const noexcept {
+// CHECK-NEXT: alignas(alignof(EmptyStruct)) char storage[sizeof(EmptyStruct)];
+// CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<EmptyStruct *>(storage);
+// CHECK-NEXT: (void)storage;
+// CHECK-NEXT: UseCxxTy::_impl::$s8UseCxxTy14StrctWithEmptyV5emptySo0F6StructVvg();
+// CHECK-NEXT: return *storageObjectPtr;
+// CHECK-NEXT: }
