@@ -128,6 +128,7 @@ if(${PROJECT_NAME}_ENABLE_BACKTRACING)
   target_sources(swiftRuntime PRIVATE
     Address.swift
     AggregatingSymbolSource.swift
+    ApkFile.swift
     Backtrace.swift
     Backtrace+Codable.swift
     BacktraceFormatter.swift

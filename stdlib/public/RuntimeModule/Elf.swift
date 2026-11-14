@@ -27,6 +27,8 @@ internal import WinSDK
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 @_implementationOnly import BacktracingImpl.ImageFormats.Elf
 
@@ -1766,10 +1768,10 @@ typealias Elf64Image = ElfImage<Elf64Traits>
 /// Test if there is a valid ELF image at the specified address; if there is,
 /// extract the address range for the text segment and the UUID, if any.
 @_specialize(kind: full, where R == UnsafeLocalMemoryReader)
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(Linux) || os(Android)
 @_specialize(kind: full, where R == RemoteMemoryReader)
 #endif
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_specialize(kind: full, where R == MemserverMemoryReader)
 #endif
 @available(BacktracingDT 6.2, *)
@@ -1805,11 +1807,11 @@ func getElfImageInfo<R: MemoryReader>(at address: R.Address,
 
 @_specialize(kind: full, where R == UnsafeLocalMemoryReader, Traits == Elf32Traits)
 @_specialize(kind: full, where R == UnsafeLocalMemoryReader, Traits == Elf64Traits)
-#if os(macOS) || os(Linux)
+#if os(macOS) || os(Linux) || os(Android)
 @_specialize(kind: full, where R == RemoteMemoryReader, Traits == Elf32Traits)
 @_specialize(kind: full, where R == RemoteMemoryReader, Traits == Elf64Traits)
 #endif
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_specialize(kind: full, where R == MemserverMemoryReader, Traits == Elf32Traits)
 @_specialize(kind: full, where R == MemserverMemoryReader, Traits == Elf64Traits)
 #endif

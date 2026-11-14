@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 
 import Swift
 
@@ -183,4 +183,4 @@ struct OSReleaseScanner<S: StringProtocol>: Sequence, IteratorProtocol {
   }
 }
 
-#endif // os(Linux)
+#endif // os(Linux) || os(Android)

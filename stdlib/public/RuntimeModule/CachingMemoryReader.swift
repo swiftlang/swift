@@ -85,7 +85,7 @@ public class CachingMemoryReader<Reader: MemoryReader>: MemoryReader {
   }
 }
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_spi(MemoryReaders)
 public typealias MemserverMemoryReader
   = CachingMemoryReader<UncachedMemserverMemoryReader>
@@ -97,7 +97,7 @@ extension CachingMemoryReader where Reader == UncachedMemserverMemoryReader {
 }
 #endif
 
-#if os(Linux) || os(macOS) || os(Windows)
+#if os(Linux) || os(Android) || os(macOS) || os(Windows)
 @_spi(MemoryReaders)
 @available(BacktracingDT 6.2, *)
 public typealias RemoteMemoryReader = CachingMemoryReader<UncachedRemoteMemoryReader>
@@ -108,7 +108,7 @@ extension CachingMemoryReader where Reader == UncachedRemoteMemoryReader {
   convenience public init(task: Any) {
     self.init(for: UncachedRemoteMemoryReader(task: task))
   }
-  #elseif os(Linux)
+  #elseif os(Linux) || os(Android)
   convenience public init(pid: Any) {
     self.init(for: UncachedRemoteMemoryReader(pid: pid))
   }
@@ -129,4 +129,4 @@ extension CachingMemoryReader where Reader == UncachedLocalMemoryReader {
     self.init(for: UncachedLocalMemoryReader())
   }
 }
-#endif // os(Linux) || os(macOS)
+#endif // os(Linux) || os(Android) || os(macOS)

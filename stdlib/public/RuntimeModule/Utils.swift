@@ -25,6 +25,8 @@ internal import ucrt
 internal import Glibc
 #elseif canImport(Musl)
 internal import Musl
+#elseif canImport(Android)
+internal import Android
 #endif
 
 @_spi(Utils)
@@ -160,7 +162,7 @@ func realPath(_ path: String) -> String? {
   #endif
 }
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 @_spi(Utils)
 @available(BacktracingDT 6.2, *)
 public func readString(from file: String) -> String? {

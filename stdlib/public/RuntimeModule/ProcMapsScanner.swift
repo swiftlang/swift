@@ -15,7 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+#if os(Linux) || os(Android)
 
 import Swift
 
@@ -253,4 +253,4 @@ struct ProcMapsScanner<S: StringProtocol>: Sequence, IteratorProtocol {
   }
 }
 
-#endif // os(Linux)
+#endif // os(Linux) || os(Android)
