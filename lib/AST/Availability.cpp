@@ -164,47 +164,91 @@ static AvailableAttr *createAvailableAttr(AvailabilityDomain Domain,
       Inferred.IsSPI);
 }
 
+/// Returns true if any version of \p Attr must be remapped to be compared with
+/// versions in \p Domain.
+static bool requiresVersionRemapping(SemanticAvailableAttr Attr,
+                                     AvailabilityDomain Domain) {
+  for (auto Version :
+       {Attr.getIntroduced(), Attr.getDeprecated(), Attr.getObsoleted()}) {
+    if (Version && Attr.getDomain().requiresVersionRemapping(Domain, *Version))
+      return true;
+  }
+  return false;
+}
+
 void AvailabilityInference::applyInferredAvailableAttrs(
     Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls) {
   auto &Context = ToDecl->getASTContext();
 
-  // Iterate over the declarations and infer required availability on
-  // a per-domain basis.
+  // Collect the attributes of the declarations and of the declarations that
+  // enclose them, since each of them constrains the required availability.
+  llvm::SmallPtrSet<const Decl *, 8> VisitedDecls;
+  llvm::SmallVector<llvm::SmallVector<SemanticAvailableAttr, 4>, 8>
+      AttrsPerDecl;
+  for (const Decl *D : InferredFromDecls) {
+    // Stop at a declaration that was already visited since the declarations
+    // enclosing it were visited, too.
+    for (; D && VisitedDecls.insert(D).second;
+         D = D->parentDeclForAvailability()) {
+      auto &Attrs = AttrsPerDecl.emplace_back();
+      for (auto Attr : D->getSemanticAvailableAttrs())
+        Attrs.push_back(Attr);
+    }
+  }
+
+  // Infer required availability on a per-domain basis.
   std::map<AvailabilityDomain, InferredAvailability,
            StableAvailabilityDomainComparator>
       Inferred;
-  for (const Decl *D : InferredFromDecls) {
-    llvm::SmallVector<SemanticAvailableAttr, 8> MergedAttrs;
+  for (auto &Attrs : AttrsPerDecl) {
+    for (auto Attr : Attrs)
+      mergeWithInferredAvailability(Attr, Inferred[Attr.getDomain()]);
+  }
 
-    do {
-      llvm::SmallVector<SemanticAvailableAttr, 8> PendingAttrs;
-
-      for (auto AvAttr : D->getSemanticAvailableAttrs()) {
-        // Skip an attribute from an outer declaration if it is for a platform
-        // that was already handled implicitly by an attribute from an inner
-        // declaration.
-        if (llvm::any_of(MergedAttrs,
-                         [&AvAttr](SemanticAvailableAttr MergedAttr) {
-                           auto platform = AvAttr.getPlatform();
-                           auto mergedPlatform = MergedAttr.getPlatform();
-                           if (!platform || !mergedPlatform)
-                             return false;
-
-                           return inheritsAvailabilityFromPlatform(
-                               *platform, *mergedPlatform);
-                         }))
+  // When a platform domain has availability attributes, attributes for its
+  // ancestor domains are ignored. So a declaration without an attribute for
+  // one of the inferred domains has the availability specified by its
+  // attributes for the closest ancestor domain instead. For example, a
+  // declaration that is only annotated `@available(anyAppleOS 26, *)` is
+  // introduced in macOS 26, so it must still constrain the inferred
+  // availability for macOS when another declaration is annotated
+  // `@available(macOS 10.15, *)`.
+  for (auto &Pair : Inferred) {
+    auto Domain = Pair.first;
+    for (auto &Attrs : AttrsPerDecl) {
+      // Find the most specific domain containing Domain with attributes on
+      // this declaration. Like activePlatformDomainForDecl(), the last of
+      // several unrelated domains wins.
+      std::optional<AvailabilityDomain> MostSpecific;
+      for (auto Attr : Attrs) {
+        auto AttrDomain = Attr.getDomain();
+        if (!AttrDomain.contains(Domain))
           continue;
-
-        mergeWithInferredAvailability(AvAttr, Inferred[AvAttr.getDomain()]);
-        PendingAttrs.push_back(AvAttr);
+        if (MostSpecific && AttrDomain.contains(*MostSpecific))
+          continue;
+        MostSpecific = AttrDomain;
       }
 
-      MergedAttrs.append(PendingAttrs);
+      // Attributes for Domain itself were already merged above.
+      if (!MostSpecific || *MostSpecific == Domain)
+        continue;
 
-      // Walk up the enclosing declaration hierarchy to make sure we aren't
-      // missing any inherited attributes.
-      D = D->parentDeclForAvailability();
-    } while (D);
+      auto AncestorAttrs = llvm::make_filter_range(
+          Attrs, [&](auto Attr) { return Attr.getDomain() == *MostSpecific; });
+
+      // FIXME: [availability] Versions for the ancestor domain can't be
+      // inherited if they must be remapped (iOS versions before 26 for
+      // visionOS) since the remapping data is only available when compiling
+      // for the target domain and the inferred attributes must not depend on
+      // the target.
+      if (llvm::any_of(AncestorAttrs, [&](auto Attr) {
+            return requiresVersionRemapping(Attr, Domain);
+          }))
+        continue;
+
+      for (auto Attr : AncestorAttrs)
+        mergeWithInferredAvailability(Attr, Pair.second);
+    }
   }
 
   // Create an availability attribute for each observed platform and add

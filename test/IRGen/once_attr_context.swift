@@ -172,7 +172,7 @@ public func borrowedForward(_ f: borrowing @once () -> Void) {
 // CHECK: [[CONTEXT:%.*]] = alloca i8, i64 32
 // CHECK-NOT: call {{.*}}@swift_allocObject
 // CHECK-NOT: call {{.*}}@swift_retain
-// CHECK: call swiftcc void @"$s4test3runyyyyXEF"(ptr @"$s4test15borrowedCaptureyyyyXEFyyXEfU_TA", ptr [[CONTEXT]])
+// CHECK: call swiftcc void @"$s4test3runyyyyXEF"(ptr @"$s4test15borrowedCaptureyyyyXEFyyXEfU_TA{{(\.ptrauth)?}}", ptr [[CONTEXT]])
 // CHECK-NOT: call {{.*}}@swift_release
 // CHECK: ret void
 public func borrowedCapture(_ f: borrowing @once () -> Void) {
