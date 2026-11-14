@@ -1072,7 +1072,8 @@ void DestroyAddrHoisting::run() {
           sis.push_back(si);
         }
       } else if (auto *cai = dyn_cast<CopyAddrInst>(&inst)) {
-        if (cai->isInitializationOfDest() == IsNotInitialization) {
+        if (cai->isInitializationOfDest() == IsNotInitialization &&
+            !cai->getDest()->getType().mayHaveCustomAssign(*getFunction())) {
           cais.push_back(cai);
         }
       }

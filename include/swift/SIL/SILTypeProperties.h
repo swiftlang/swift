@@ -138,6 +138,11 @@ enum MayHaveCustomDeinit_t : bool {
   MayHaveCustomDeinit = true,
 };
 
+enum MayHaveCustomAssign_t : bool {
+  HasOnlyDefaultAssign = false,
+  MayHaveCustomAssign = true,
+};
+
 /// Is this a very large type whose expansion into SSA values is likely
 /// detrimential i.e should be kept indirect.
 enum IsVeryLargeType_t : bool {
@@ -165,12 +170,13 @@ class SILTypeProperties {
     IsVeryLargeTypeFlag                      = 1 << 12,
     DefinitelyAddressableForDependenciesFlag = 1 << 13,
     DefinitelyHasRawLayoutFlag               = 1 << 14,
-    NonEscapableFlag                         = 1 << 15
+    NonEscapableFlag                         = 1 << 15,
+    CustomAssignFlag                         = 1 << 16
   };
   // clang-format on
 
 public:
-  uint16_t Flags;
+  uint32_t Flags;
 
   /// Construct a default SILTypeProperties, which corresponds to
   /// a trivial, loadable, fixed-layout type.
@@ -299,6 +305,9 @@ public:
   MayHaveCustomDeinit_t mayHaveCustomDeinit() const {
     return MayHaveCustomDeinit_t((Flags & CustomDeinitFlag) != 0);
   }
+  MayHaveCustomAssign_t mayHaveCustomAssign() const {
+    return MayHaveCustomAssign_t((Flags & CustomAssignFlag) != 0);
+  }
   IsVeryLargeType_t isVeryLargeType() const {
     return IsVeryLargeType_t((Flags & IsVeryLargeTypeFlag) != 0);
   }
@@ -345,6 +354,7 @@ public:
     Flags = (Flags & ~CustomDeinitFlag)
       | (hasCustomDeinit ? CustomDeinitFlag : 0);
   }
+  void setCustomAssign() { Flags |= CustomAssignFlag; }
   void setVeryLargeType() { Flags |= IsVeryLargeTypeFlag; }
   void setDefinitelyAddressableForDependencies() {
     Flags |= AddressableForDependenciesFlag;

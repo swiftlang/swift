@@ -9321,6 +9321,87 @@ ClangImporter::getOriginalForeignReferenceConstructor(const ConstructorDecl *cto
   return Impl.foreignReferenceFactoryToOriginalConstructor.lookup(factory);
 }
 
+const clang::CXXMethodDecl *
+ClangImporter::getAssignmentOperator(const clang::CXXRecordDecl *decl,
+                                     bool isMove) {
+  if (decl->isAnonymousStructOrUnion())
+    return nullptr;
+
+  auto &sema = Impl.getClangSema();
+  auto *record = const_cast<clang::CXXRecordDecl *>(decl);
+
+  clang::CXXMethodDecl *assignOp =
+      isMove ? sema.LookupMovingAssignment(record, /*Quals=*/0,
+                                           /*RValueThis=*/false,
+                                           /*ThisQuals=*/0)
+             : sema.LookupCopyingAssignment(record, clang::Qualifiers::Const,
+                                            /*RValueThis=*/false,
+                                            /*ThisQuals=*/0);
+
+  if (!assignOp)
+    return nullptr;
+
+  if (!assignOp->isCopyAssignmentOperator() &&
+      !assignOp->isMoveAssignmentOperator())
+    return nullptr;
+
+  if (assignOp->isDeleted())
+    return nullptr;
+
+  if (assignOp->getAccess() != clang::AS_public)
+    return nullptr;
+
+  return assignOp;
+}
+
+bool ClangImporter::hasNonTrivialAssignmentOperator(const StructDecl *decl) {
+  auto *cxxRecordDecl =
+      dyn_cast_or_null<clang::CXXRecordDecl>(decl->getClangDecl());
+  if (!cxxRecordDecl)
+    return false;
+
+  for (bool isMove : {false, true}) {
+    if (auto *assignOp = getAssignmentOperator(cxxRecordDecl, isMove)) {
+      if (!assignOp->isTrivial())
+        return true;
+    }
+  }
+  return false;
+}
+
+bool ClangImporter::tryDefineCXXAssignmentOperatorBody(
+    clang::CXXMethodDecl *assignOp) {
+  if (assignOp->isInvalidDecl())
+    return false;
+
+  auto &sema = Impl.getClangSema();
+  auto &diags = sema.getDiagnostics();
+  bool prevSuppressAllDiagnostics = diags.getSuppressAllDiagnostics();
+  diags.setSuppressAllDiagnostics(true);
+  SWIFT_DEFER { diags.setSuppressAllDiagnostics(prevSuppressAllDiagnostics); };
+  clang::DiagnosticErrorTrap trap(diags);
+
+  {
+    clang::Sema::GlobalEagerInstantiationScope instantiations(
+        sema, /*Enabled=*/true, /*AtEndOfTU=*/true);
+
+    if (assignOp->isDefaulted() && !assignOp->doesThisDeclarationHaveABody()) {
+      if (assignOp->isMoveAssignmentOperator())
+        sema.DefineImplicitMoveAssignment(clang::SourceLocation(), assignOp);
+      else
+        sema.DefineImplicitCopyAssignment(clang::SourceLocation(), assignOp);
+    } else if (assignOp->getTemplateInstantiationPattern()) {
+      sema.InstantiateFunctionDefinition(assignOp->getLocation(), assignOp);
+    }
+
+    instantiations.perform();
+  }
+
+  if (trap.hasErrorOccurred())
+    assignOp->setInvalidDecl();
+  return !assignOp->isInvalidDecl();
+}
+
 ValueDecl *ClangImporter::getOverriddenSuperclassMember(const ValueDecl *decl) {
   const auto *classDecl = decl->getDeclContext()->getSelfClassDecl();
   if (!classDecl || !classDecl->getSuperclassDecl())

@@ -64,6 +64,7 @@ import ContiguousArrayTests
 import ContinuationResume
 import CountAlgo
 import CreateObjects
+import CxxAssignment
 // rdar://128520766
 import CxxSetToCollection
 import CxxSpanTests
@@ -291,6 +292,7 @@ register(CountAlgo.benchmarks)
 register(ClassArrayGetter.benchmarks)
 register(ClockMeasure.benchmarks)
 register(CreateObjects.benchmarks)
+register(CxxAssignment.benchmarks)
 // rdar://128520766
 register(CxxSetToCollection.benchmarks)
 register(CxxSpanTests.benchmarks)
