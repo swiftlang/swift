@@ -12,6 +12,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     SwiftPlatform/Mutex.h
     SwiftPlatform/Random.h
     SwiftPlatform/StandardOutput.h
+    SwiftPlatform/SwiftPlatform.h
     SwiftPlatform/ThreadLocalStorage.h
     SwiftPlatform/Types.h
     SwiftPlatform/Version.h

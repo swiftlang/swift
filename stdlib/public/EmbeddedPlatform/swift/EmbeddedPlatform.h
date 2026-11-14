@@ -26,43 +26,6 @@
 #ifndef EMBEDDED_SWIFT_PLATFORM_H
 #define EMBEDDED_SWIFT_PLATFORM_H
 
-#include "SwiftPlatform/Errors.h"
-#include "SwiftPlatform/Heap.h"
-#include "SwiftPlatform/Mutex.h"
-#include "SwiftPlatform/Random.h"
-#include "SwiftPlatform/StandardOutput.h"
-#include "SwiftPlatform/ThreadLocalStorage.h"
-#include "SwiftPlatform/Types.h"
-#include "SwiftPlatform/Version.h"
-
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
-/**
- * Returns nonzero when the current execution context is the platform's main
- * execution context.
- */
-__swift_ptrdiff_t _swift_thread_isMain(void);
-
-/**
- * Exit the program.
- *
- * - Parameters:
- *   - code: The exit code, which is typically 0 for normal termination.
- *
- * This function must not return.
- *
- * This function can be implemented directly with a call to the POSIX exit()
- * function.
- */
-void _swift_exit(int code) EMBEDDED_SWIFT_NORETURN;
-
-#if defined(__cplusplus)
-}
-#endif
-
-#undef EMBEDDED_SWIFT_NAME
-#undef EMBEDDED_SWIFT_OPTION_SET
+#include "SwiftPlatform/SwiftPlatform.h"
 
 #endif
