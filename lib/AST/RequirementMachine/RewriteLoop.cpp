@@ -19,9 +19,9 @@
 //
 // A RewritePath is a composition of RewriteSteps describing the transformation
 // of a term into another term. One place where a RewritePath originates is
-// RewriteSystem::simplify(); that method takes an optional RewritePath argument
-// to which the series of RewriteSteps performed during simplification are
-// appended. If the term was already canonical, the resulting path is empty,
+// RewriteSystem::reduce(); that method takes an optional RewritePath argument
+// to which the series of RewriteSteps performed by the normal form algorithm
+// are recorded. If the term was already irreducible, this path is empty,
 // otherwise it will consist of at least one RewriteStep.
 //
 // Simplification always applies rules by replacing a subterm equal to the LHS

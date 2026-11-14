@@ -62,7 +62,7 @@ RewriteSystem::~RewriteSystem() {
 ///
 /// - importedRules: Rewrite rules for referenced protocols. These come from
 ///   the Requirement Machine instances for these protocols' connected
-///   components, so they are already confluent and can be imported verbatim.
+///   components, so they are already complete and can be imported verbatim.
 ///
 /// - permanentRules: Permanent rules, such as associated type introduction
 ///   rules for associated types defined in protocols in this connected
@@ -72,8 +72,8 @@ RewriteSystem::~RewriteSystem() {
 ///   by the user.
 ///
 /// This can only be called once. It adds the rules to the rewrite system,
-/// allowing computeConfluentCompletion() to be called to compute the
-/// complete rewrite system.
+/// which then allows performKnuthBendix() to construct the complete
+/// rewrite system.
 void RewriteSystem::initialize(
     bool recordLoops, ArrayRef<const ProtocolDecl *> protos,
     std::vector<Rule> &&importedRules,
@@ -103,7 +103,7 @@ void RewriteSystem::initialize(
 /// Reduce a term by applying all rewrite rules until fixed point.
 ///
 /// If \p path is non-null, records the series of rewrite steps taken.
-bool RewriteSystem::simplify(MutableTerm &term, RewritePath *path) const {
+bool RewriteSystem::reduce(MutableTerm &term, RewritePath *path) const {
   bool changed = false;
 
   MutableTerm original;
@@ -193,8 +193,8 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
   RewritePath lhsPath;
   RewritePath rhsPath;
 
-  simplify(lhs, &lhsPath);
-  simplify(rhs, &rhsPath);
+  reduce(lhs, &lhsPath);
+  reduce(rhs, &rhsPath);
 
   RewritePath loop;
   if (path) {
@@ -275,7 +275,7 @@ bool RewriteSystem::addRule(MutableTerm lhs, MutableTerm rhs,
       out << "\nTrying to replay what happened when I simplified this term:\n";
       Debug |= DebugFlags::Simplify;
       MutableTerm term = lhs;
-      simplify(lhs);
+      reduce(lhs);
 
       dump(out);
     });
@@ -365,9 +365,6 @@ void RewriteSystem::addRules(
 }
 
 /// Delete any rules whose left hand sides can be reduced by other rules.
-///
-/// Must be run after the completion procedure, since the deletion of
-/// rules is only valid to perform if the rewrite system is confluent.
 void RewriteSystem::simplifyLeftHandSides() {
   ASSERT(Complete);
 
@@ -408,9 +405,6 @@ void RewriteSystem::simplifyLeftHandSides() {
 
 /// Reduce the right hand sides of all remaining rules as much as
 /// possible.
-///
-/// Must be run after the completion procedure, since the deletion of
-/// rules is only valid to perform if the rewrite system is confluent.
 void RewriteSystem::simplifyRightHandSides() {
   ASSERT(Complete);
 
@@ -422,7 +416,7 @@ void RewriteSystem::simplifyRightHandSides() {
     // Now, try to reduce the right hand side.
     RewritePath rhsPath;
     MutableTerm rhs(rule.getRHS());
-    if (!simplify(rhs, &rhsPath))
+    if (!reduce(rhs, &rhsPath))
       continue;
 
     auto lhs = rule.getLHS();
