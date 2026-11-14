@@ -378,6 +378,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       list(APPEND extra_c_compile_flags "-DSWIFT_USE_EMBEDDED_SWIFT_PLATFORM=1")
     endif()
 
+    # Bare-metal triples have no executable test of custom serial executors.
+    if(NOT "${triple}" MATCHES "-none-")
+      list(APPEND extra_c_compile_flags
+        "-DSWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS=1")
+    endif()
+
     if("${arch}" MATCHES "wasm32")
       set(SWIFT_RUNTIME_CONCURRENCY_EMBEDDED_SWIFT_SOURCES
         ExecutorImpl.swift
