@@ -297,6 +297,7 @@ UID_REQUESTS = [
     REQUEST('TestNotification', 'source.request.test_notification'),
     REQUEST('CollectExpressionType', 'source.request.expression.type'),
     REQUEST('CollectVariableType', 'source.request.variable.type'),
+    REQUEST('CollectDeclarationUSR', 'source.request.declaration.usr'),
     REQUEST('GlobalConfiguration', 'source.request.configuration.global'),
     REQUEST('DependencyUpdated', 'source.request.dependency_updated'),
     REQUEST('Diagnostics', 'source.request.diagnostics'),
