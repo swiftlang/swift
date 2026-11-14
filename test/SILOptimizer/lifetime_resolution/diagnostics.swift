@@ -1,7 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify %s
 
 // Use-after-consume / use-before-init diagnostics emitted by LifetimeResolution
-// and LifetimeResolutionDiagnose.
+// and DiagnoseResolvedLifetimes.
 
 class C {}
 func use(_ c: C) {}

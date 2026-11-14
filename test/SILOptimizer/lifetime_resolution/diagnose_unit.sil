@@ -1,6 +1,6 @@
 // RUN: %target-sil-opt %s -test-runner -verify -sil-verify-none -sil-disable-input-verify -o /dev/null
 
-// Unit tests for the LifetimeResolutionDiagnose pass. Each function is hand-written
+// Unit tests for the DiagnoseResolvedLifetimes pass. Each function is hand-written
 // with the markers that LifetimeResolution's `legalize` would leave behind, so the
 // diagnose pass is exercised in isolation via its FunctionTest hook:
 //   - `diagnose [unpermitted_copy]` on a `load [copy]`  -> use-after-consume
@@ -31,7 +31,7 @@ bb0:
   %1 = mark_uninitialized [var] %0 : ${ var K }
   %2 = begin_borrow [lexical] [var_decl] %1 : ${ var K }
   %root = project_box %2 : ${ var K }, 0
-  specify_test "lifetime_resolution_diagnose"
+  specify_test "diagnose_resolved_lifetimes"
 
   %val = apply %getFn() : $@convention(thin) () -> @owned K
   assign %val to %root : $*K
@@ -57,7 +57,7 @@ bb0:
 sil [ossa] @diagnose_use_after_consume_value : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned K
-  specify_test "lifetime_resolution_diagnose"
+  specify_test "diagnose_resolved_lifetimes"
 
   %0 = apply %getFn() : $@convention(thin) () -> @owned K
   %root = move_value [lexical] [var_decl] %0 : $K
@@ -85,7 +85,7 @@ bb0:
   %2 = begin_borrow [lexical] [var_decl] %1 : ${ var K }
   %root = project_box %2 : ${ var K }, 0
   assign undef to [init] %root : $*K
-  specify_test "lifetime_resolution_diagnose"
+  specify_test "diagnose_resolved_lifetimes"
 
   %d1 = begin_access [deinit] [unknown] %root : $*K
   %l1 = load [take] %d1 : $*K // expected-error {{used before being initialized}}
@@ -104,7 +104,7 @@ sil [ossa] @diagnose_grouped_consumes : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned K
   %0 = alloc_stack [lexical] [var_decl] $K, let, name "x"
-  specify_test "lifetime_resolution_diagnose"
+  specify_test "diagnose_resolved_lifetimes"
   %v = apply %getFn() : $@convention(thin) () -> @owned K
   store %v to [init] %0 : $*K
   cond_br undef, bb1, bb2
@@ -135,7 +135,7 @@ bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned K
   %0 = alloc_stack [lexical] [var_decl] $K, let, name "x"
   %1 = mark_uninitialized [var] %0 : $*K
-  specify_test "lifetime_resolution_diagnose"
+  specify_test "diagnose_resolved_lifetimes"
   %a = apply %getFn() : $@convention(thin) () -> @owned K
   store %a to [init] %1 : $*K
   %b = apply %getFn() : $@convention(thin) () -> @owned K
@@ -152,7 +152,7 @@ sil [ossa] @diagnose_unknown_storage : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned K
   %0 = global_addr @globalK : $*K
-  specify_test "lifetime_resolution_diagnose"
+  specify_test "diagnose_resolved_lifetimes"
   assign undef to [init] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
   %a = apply %getFn() : $@convention(thin) () -> @owned K
   diagnose [let_reinit] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
