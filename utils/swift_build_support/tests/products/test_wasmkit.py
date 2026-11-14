@@ -45,7 +45,8 @@ class WasmKitTestCase(unittest.TestCase):
             build_jobs = 1,
             cross_compile_hosts = "",
             install_prefix = "install_prefix",
-            install_destdir="/path/to/install_destdir")
+            install_destdir="/path/to/install_destdir",
+            enable_swiftpm_caching=False)
 
         # Setup shell
         shell.dry_run = True
