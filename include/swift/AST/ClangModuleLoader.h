@@ -281,6 +281,12 @@ public:
   virtual std::pair<const clang::FunctionDecl *, const clang::FunctionDecl *>
   getForeignReferenceTypeOperations(const clang::RecordDecl *decl) = 0;
 
+  /// Returns the retain function that the annotation of the foreign reference
+  /// type with Clang record \p decl names, which C++ code can call with a
+  /// pointer to \p decl, or nullptr if it has no custom reference counting.
+  virtual const clang::FunctionDecl *
+  getForeignReferenceTypeAnnotatedRetain(const clang::RecordDecl *decl) = 0;
+
   /// Returns true if we synthesize this member for every type so no need to
   /// clone it for the derived classes.
   virtual bool isMemberSynthesizedPerType(const ValueDecl *decl) = 0;

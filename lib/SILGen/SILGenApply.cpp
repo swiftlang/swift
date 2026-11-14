@@ -1476,8 +1476,10 @@ public:
       // However, a `super` call should statically dispatch to the base class
       // implementation. Substitute it so the direct call below references that
       // symbol instead of the thunk.
+      bool isForeignReferenceType = false;
       if (auto classDecl = funcDecl->getDeclContext()->getSelfClassDecl()) {
         if (classDecl->isForeignReferenceType()) {
+          isForeignReferenceType = true;
           auto clangImporter = SGF.getASTContext().getClangModuleLoader();
           if (auto original =
                   clangImporter->getOriginalForVirtualThunk(funcDecl))
@@ -1490,7 +1492,11 @@ public:
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();
-      super = SGF.emitRValue(arg);
+      // Borrow a foreign reference type's `self`. A copy would be released
+      // after a super call that frees the object, like C++ `free()`.
+      super = SGF.emitRValue(arg, isForeignReferenceType
+                                      ? SGFContext::AllowGuaranteedPlusZero
+                                      : SGFContext());
     } else {
       llvm_unreachable("invalid super callee");
     }

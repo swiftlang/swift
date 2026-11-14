@@ -222,10 +222,10 @@ func testtFreeFunctionsTemplated(frt : FRTStruct, nonFrt: NonFRTStruct) {
     // CHECK: function_ref @$sSo75global_templated_function_returning_FRT_create_with_attr_returns_unretainedySo9FRTStructVSiFTo : $@convention(c) (Int) -> FRTStruct
 
     let frtLocalVar13 = global_function_returning_templated_retrun_frt(frt)
-    // CHECK: function_ref @$sSo46global_function_returning_templated_retrun_frtySo9FRTStructVACFTo : $@convention(c) (FRTStruct) -> FRTStruct
+    // CHECK: function_ref @$sSo46global_function_returning_templated_retrun_frtySo9FRTStructVACFTo : $@convention(c) (@guaranteed FRTStruct) -> FRTStruct
 
     let frtLocalVar14 = global_function_returning_templated_retrun_frt_owned(frt)
-    // CHECK: function_ref @$sSo52global_function_returning_templated_retrun_frt_ownedySo9FRTStructVACFTo : $@convention(c) (FRTStruct) -> @owned FRTStruct
+    // CHECK: function_ref @$sSo52global_function_returning_templated_retrun_frt_ownedySo9FRTStructVACFTo : $@convention(c) (@guaranteed FRTStruct) -> @owned FRTStruct
 
     let nonFrtLocalVar1 = global_function_returning_templated_retrun_frt_owned(nonFrt)
     // CHECK: function_ref @$sSo52global_function_returning_templated_retrun_frt_ownedySo12NonFRTStructVACFTo : $@convention(c) (NonFRTStruct) -> NonFRTStruct

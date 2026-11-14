@@ -1535,6 +1535,18 @@ public:
           return getDirectSelfParameter(type);
         return getDirectParameter(index, type, substTL);
       }
+      // The importer makes an rvalue `this` of a foreign reference type
+      // `consuming`, but a C++ method never releases it. Take a foreign
+      // reference at +1 only where the C conventions say so, e.g. `cf_consumed`.
+      if ((kind == ConventionsKind::CFunction ||
+           kind == ConventionsKind::CFunctionType ||
+           kind == ConventionsKind::CXXMethod) &&
+          substTL.getLoweredType().unwrapOptionalType()
+              .isForeignReferenceType()) {
+        if (forSelf)
+          return getDirectSelfParameter(type);
+        return getDirectParameter(index, type, substTL);
+      }
       return ParameterConvention::Direct_Owned;
     }
     llvm_unreachable("unhandled ownership");
@@ -2201,10 +2213,7 @@ private:
       convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
                                      origType, substTLConv);
       assert(isIndirectFormalParameter(convention));
-    } else if (substTL.isTrivial() ||
-               // Foreign reference types are passed trivially.
-               (substType->getClassDecl() &&
-                substType->isForeignReferenceType())) {
+    } else if (substTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       // If we are no implicit copy, our ownership is always Owned.
@@ -4220,6 +4229,10 @@ public:
                            const TypeLowering &substTL) const override {
     if (cast<clang::FunctionProtoType>(FnType)->isParamConsumed(index))
       return ParameterConvention::Direct_Owned;
+    // A C++ caller keeps a pointer or reference argument alive for the whole
+    // call, so the callee borrows it.
+    if (substTL.getLoweredType().unwrapOptionalType().isForeignReferenceType())
+      return ParameterConvention::Direct_Guaranteed;
     auto *cml = substTL.getLoweredType()
                     .getASTType()
                     ->getASTContext()
@@ -4371,6 +4384,22 @@ public:
       return getIndirectSelfParameter(type);
     }
     return super::getIndirectParameter(index, type, substTL);
+  }
+
+  ParameterConvention
+  getDirectSelfParameter(const AbstractionPattern &type) const override {
+    // Only a foreign reference type passes `this` directly. The caller keeps
+    // it alive for the whole call, like a pointer argument.
+    return ParameterConvention::Direct_Guaranteed;
+  }
+
+  ParameterConvention
+  getDirectParameter(unsigned int index, const AbstractionPattern &type,
+                     const TypeLowering &substTL) const override {
+    // `self` is the last parameter.
+    if (index == TheDecl->getNumParams())
+      return getDirectSelfParameter(type);
+    return super::getDirectParameter(index, type, substTL);
   }
   ResultConvention getResult(const TypeLowering &resultTL) const override {
     if (isa<clang::CXXConstructorDecl>(TheDecl)) {
@@ -4886,19 +4915,22 @@ static CanSILFunctionType getUncachedSILFunctionTypeForConstant(
     }
   }
 
-  // The type of the native-to-foreign thunk for a swift closure.
-  if (constant.isForeign && constant.hasClosureExpr() &&
-      shouldStoreClangType(TC.getDeclRefRepresentation(constant))) {
+  // The C entry point of a Swift closure or function. Lower it like a C
+  // function pointer of the same type, so it converts to one without a thunk.
+  if (constant.isForeign &&
+      silRep == SILFunctionTypeRepresentation::CFunctionPointer) {
     auto clangType = extInfoBuilder.getClangTypeInfo().getType();
-    if (!clangType)
+    if (!clangType && TC.Context.getClangModuleLoader())
       clangType = TC.Context.getClangFunctionType(
           origLoweredInterfaceType->getParams(),
           origLoweredInterfaceType->getResult(),
           FunctionTypeRepresentation::CFunctionPointer);
-    AbstractionPattern pattern =
-        AbstractionPattern(origLoweredInterfaceType, clangType);
-    return getSILFunctionTypeForAbstractCFunction(
-        TC, pattern, origLoweredInterfaceType, extInfoBuilder, constant);
+    if (clangType) {
+      AbstractionPattern pattern =
+          AbstractionPattern(origLoweredInterfaceType, clangType);
+      return getSILFunctionTypeForAbstractCFunction(
+          TC, pattern, origLoweredInterfaceType, extInfoBuilder, constant);
+    }
   }
 
   // If the decl belongs to an ObjC method family, use that family's
