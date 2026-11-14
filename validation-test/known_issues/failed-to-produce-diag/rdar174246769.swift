@@ -12,6 +12,6 @@ class FileManager {
 
 extension FileManager {
   func foo() {
-    enumerator(at: url, includingPropertiesForKeys: nil) // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    enumerator(at: url, includingPropertiesForKeys: nil) // expected-error {{function value passed to 'enumerator' as argument #1 could be any of '(Int) -> URL', '(String?) -> URL?' but 'URL' is expected}}
   }
 }

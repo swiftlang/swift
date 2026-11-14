@@ -105,6 +105,7 @@ struct Key: ExpressibleByStringInterpolation {
   struct StringInterpolation: StringInterpolationProtocol {
     init(literalCapacity: Int, interpolationCount: Int) {}
     mutating func appendLiteral(_ literal: String) {}
+    // expected-note@+1{{candidate expects value of type 'Decimal.FormatStyle.Input' (aka 'Decimal') for parameter #1 (got 'String')}}
     mutating func appendInterpolation<F: Style>(_ input: F.Input, format: F) {}
   }
 }
@@ -117,7 +118,8 @@ struct Text: P {
 struct TestView: P {
   var year = "2010"
 
-  var body: some P { // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+  var body: some P {
+    // expected-error@+1{{cannot convert argument #1 with type 'String' to any of 14 different types in call to 'appendInterpolation'}}
     Text("\(year, format: .number.grouping(.never))")
   }
 }

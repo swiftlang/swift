@@ -5401,8 +5401,53 @@ WARNING(use_of_void_pointer,none,
 "Unsafe%0Pointer<Void> has been replaced by Unsafe%0RawPointer", (StringRef))
 
 // Ambiguities
+ERROR(incorrect_argument_for_call,none,
+      "cannot convert argument #%1 with type %2 to expected type %3 in call to %0",
+      (DeclNameRef, int, Type, Type))
+ERROR(incorrect_argument_for_init,none,
+      "cannot convert argument #%0 with type %1 to expected type %2 for initializer",
+      (int, Type, Type))
+ERROR(incorrect_operand_for_op,none,
+      "cannot convert value of type %1 to expected %0 operand type %2",
+      (DeclNameRef, Type, Type))
+ERROR(incorrect_function_for_call,none,
+      "cannot convert any of %select{%5|%4}3 results from %0 for argument #%2 with type %6 in call to %1",
+      (DeclNameRef, DeclNameRef, int, bool, StringRef, StringRef, Type))
+ERROR(unsupported_closure_argument,none,
+      "function value %select{with type %3 |}2passed to %0 as argument #%1 which expects %4",
+      (DeclNameRef, int, bool, Type, Type))
+ERROR(incorrect_function_for_init,none,
+      "cannot convert any of %select{%4|%3}2 results from %0 for argument #%1 with type %5 in call to initializer",
+      (DeclNameRef, int, bool, StringRef, StringRef, Type))
+ERROR(incorrect_function_operand_for_op,none,
+      "cannot select between %select{function types %3|%2}1 for expected %0 operand type %4",
+      (DeclNameRef, bool, StringRef, StringRef, Type))
+ERROR(ambiguous_decl_ref_types,none,
+      "cannot convert argument #%1 with type %2 to any of %select{%5|%4}3 in call to %0",
+      (DeclNameRef, int, Type, bool, StringRef, StringRef))
+ERROR(ambiguous_decl_ref_function_types,none,
+      "cannot convert %3 results from %1 to any of %select{%6|%5}4 for argument #%2 in call to %0",
+      (DeclNameRef, DeclNameRef, int, StringRef, bool, StringRef, StringRef))
+ERROR(ambiguous_decl_ref_unknown,none,
+      "cannot convert %2 results to any of %select{%5|%4}3 for argument #%1 in call to %0",
+      (DeclNameRef, int, StringRef, bool, StringRef, StringRef))
+ERROR(unsupported_closure_arg_options,none,
+      "function value %select{|with type %3 }2passed to %0 as argument #%1 which accepts any of %select{%6|%5}4",
+      (DeclNameRef, int, bool, Type, bool, StringRef, StringRef))
+ERROR(ambiguous_function_arg_for_type,none,
+      "function value passed to %0 as argument #%1 could be any of %select{%5|%4}3 but %2 is expected",
+      (DeclNameRef, int, Type, bool, StringRef, StringRef))
+ERROR(cannot_match_expr_pattern_with_options,none,
+      "cannot match given pattern expression type %0 with expected %select{potential types %3|%2}1",
+      (Type, bool, StringRef, StringRef))
 ERROR(ambiguous_decl_ref,none,
       "ambiguous use of %0", (DeclNameRef))
+ERROR(ambiguous_init,none,
+      "cannot convert argument #%0 with type %1 to any of %select{%4|%3}2 in initializer",
+      (int, Type, bool, StringRef, StringRef))
+ERROR(ambiguous_function_init,none,
+      "cannot select argument #%0 between functions with results %1 to any of %select{%4|%3}2 in initializer",
+      (int, StringRef, bool, StringRef, StringRef))
 ERROR(ambiguous_operator_ref,none,
       "ambiguous use of operator %0", (DeclNameRef))
 NOTE(ambiguous_because_of_trailing_closure,none,
