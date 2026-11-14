@@ -30,6 +30,7 @@
 namespace swift {
 
 class ASTContext;
+class MissingMemberDecl;
 class VarDecl;
 class SILFunction;
 class SILModule;
@@ -636,6 +637,8 @@ public:
                        TypeExpansionContext context) const;
 
   SILType getFieldType(VarDecl *field, SILFunction *fn) const;
+
+  SILType getFieldType(MissingMemberDecl *field) const;
 
   SILType getFieldType(intptr_t fieldIndex, SILFunction *function) const;
 

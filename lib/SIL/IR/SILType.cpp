@@ -500,6 +500,12 @@ static void addFieldSubstitutionsIfNeeded(TypeConverter &TC, SILType ty,
   }
 }
 
+static SILType formFieldType(SILType baseType, CanType loweredFieldType) {
+  if (baseType.isAddress() || baseType.getClassDecl() != nullptr)
+    return SILType::getPrimitiveAddressType(loweredFieldType);
+  return SILType::getPrimitiveObjectType(loweredFieldType);
+}
+
 VarDecl *SILType::getFieldDecl(intptr_t fieldIndex) const {
   NominalTypeDecl *decl = getNominalDecl();
   assert(decl && "expected nominal type");
@@ -530,11 +536,7 @@ SILType SILType::getFieldType(VarDecl *field, TypeConverter &TC,
   if (!getClassDecl() && isMoveOnlyWrapped())
     loweredTy = SILMoveOnlyWrappedType::get(loweredTy);
 
-  if (isAddress() || getClassDecl() != nullptr) {
-    return SILType::getPrimitiveAddressType(loweredTy);
-  } else {
-    return SILType::getPrimitiveObjectType(loweredTy);
-  }
+  return formFieldType(*this, loweredTy);
 }
 
 SILType SILType::getFieldType(VarDecl *field, SILModule &M,
@@ -544,6 +546,16 @@ SILType SILType::getFieldType(VarDecl *field, SILModule &M,
 
 SILType SILType::getFieldType(VarDecl *field, SILFunction *fn) const {
   return getFieldType(field, fn->getModule(), fn->getTypeExpansionContext());
+}
+
+SILType SILType::getFieldType(MissingMemberDecl *field) const {
+  assert(field->getStorageLayout() &&
+         "missing field must have a storage layout");
+  auto loweredTy =
+      HiddenType::get(field->getASTContext(), field->getStorageLayout())
+          ->getCanonicalType();
+
+  return formFieldType(*this, loweredTy);
 }
 
 SILType SILType::getFieldType(intptr_t fieldIndex, SILFunction *function) const {

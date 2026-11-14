@@ -34,6 +34,7 @@ namespace swift {
 namespace irgen {
   class Address;
   class Explosion;
+  struct Field;
   class IRGenFunction;
   class IRGenModule;
   class MemberAccessStrategy;
@@ -65,6 +66,10 @@ namespace irgen {
   llvm::Constant *emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
                                                       SILType baseType,
                                                       VarDecl *field);
+
+  llvm::Constant *emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
+                                                      SILType baseType,
+                                                      Field field);
 
   /// Return a strategy for accessing the given stored struct property.
   ///

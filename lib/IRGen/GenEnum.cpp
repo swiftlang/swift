@@ -109,6 +109,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/LazyResolver.h"
+#include "swift/AST/ParameterList.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/IR/CFG.h"
@@ -154,6 +155,46 @@ areElementsABIAccessible(ArrayRef<EnumImplStrategy::Element> elts) {
       return IsNotABIAccessible;
   }
   return IsABIAccessible;
+}
+
+static EnumElementDecl *
+createMissingEnumElementForLayout(IRGenModule &IGM, EnumDecl *enumDecl,
+                                  MissingMemberDecl *missing) {
+  auto &ctx = IGM.Context;
+  auto *element = new (ctx) EnumElementDecl(
+      SourceLoc(), missing->getName(), nullptr, SourceLoc(), nullptr, enumDecl);
+
+  Type payloadType = HiddenType::get(ctx, missing->getStorageLayout());
+  auto argumentNames = missing->getName().getArgumentNames();
+  unsigned parameterCount = std::max<unsigned>(1, argumentNames.size());
+  SmallVector<ParamDecl *, 2> parameters;
+  parameters.reserve(parameterCount);
+  for (unsigned index = 0; index < parameterCount; ++index) {
+    Identifier argumentName =
+        index < argumentNames.size() ? argumentNames[index] : Identifier();
+    Type parameterType =
+        index == 0 ? payloadType : Type(ctx.TheEmptyTupleType);
+    parameters.push_back(ParamDecl::createImplicit(
+        ctx, argumentName, Identifier(), parameterType, element));
+  }
+  element->setParameterList(ParameterList::create(ctx, parameters));
+  element->setImplicit();
+  return element;
+}
+
+static SmallVector<EnumElementDecl *, 8>
+getEnumElementsForLayout(IRGenModule &IGM, EnumDecl *enumDecl) {
+  SmallVector<EnumElementDecl *, 8> elements;
+  for (auto *member : enumDecl->getMembers()) {
+    if (auto *element = dyn_cast<EnumElementDecl>(member)) {
+      elements.push_back(element);
+    } else if (auto *missing = dyn_cast<MissingMemberDecl>(member)) {
+      if (missing->getStorageLayout())
+        elements.push_back(
+            createMissingEnumElementForLayout(IGM, enumDecl, missing));
+    }
+  }
+  return elements;
 }
 
 static APInt zextOrSelf(const APInt &i, unsigned width) {
@@ -2749,11 +2790,10 @@ namespace {
         
         SmallVector<std::pair<APInt, llvm::BasicBlock*>, 4> cases;
         
-        auto elements = getPayloadElement()->getParentEnum()->getAllElements();
         unsigned inhabitant = 0;
-        for (auto i = elements.begin(), end = elements.end();
-             i != end && inhabitant < numExtraInhabitants;
-             ++i, ++inhabitant) {
+        for (; inhabitant < NumElements &&
+               inhabitant < numExtraInhabitants;
+             ++inhabitant) {
           auto xi = getFixedPayloadTypeInfo()
             .getFixedExtraInhabitantValue(IGF.IGM, bitWidth, inhabitant);
           cases.push_back({xi, nonzeroBB});
@@ -6582,7 +6622,7 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   ResilienceExpansion layoutScope =
       TC.IGM.getResilienceExpansionForLayout(theEnum);
   // TODO: [availability] Only enumerate the elements available during lowering.
-  for (auto elt : theEnum->getAllElements()) {
+  for (auto elt : getEnumElementsForLayout(TC.IGM, theEnum)) {
     ++numElements;
 
     if (!elt->hasAssociatedValues()) {

@@ -2692,10 +2692,6 @@ public:
     });
   }
 
-  void visitHiddenTypeLayoutInfoDecl(HiddenTypeLayoutInfoDecl *) {
-    llvm_unreachable("hidden layout declarations are not type checked");
-  }
-
   /// Nothing consumes the value of a global, a static property, a lazy
   /// property, or an `async let` binding explicitly, so its type must be
   /// Deinitable.

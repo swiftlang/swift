@@ -71,10 +71,22 @@ public:
 
     // Struct field offsets.
     asImpl().noteStartOfFieldOffsets();
-    for (VarDecl *prop : Target->getStoredProperties()) {
-      if (isExportableField(prop))
-        asImpl().addFieldOffset(prop);
-    }
+    forEachField(IGM, Target, [&](Field field) {
+      if (!isExportableField(field))
+        return;
+
+      switch (field.getKind()) {
+      case Field::Var:
+        asImpl().addFieldOffset(field.getVarDecl());
+        return;
+      case Field::MissingMember:
+        asImpl().addFieldOffsetPlaceholders(field.getMissingMemberDecl());
+        return;
+      case Field::DefaultActorStorage:
+      case Field::NonDefaultDistributedActorStorage:
+        llvm_unreachable("struct cannot have actor storage");
+      }
+    });
 
     asImpl().noteEndOfFieldOffsets();
 
@@ -112,6 +124,12 @@ public:
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
   void addFieldOffset(VarDecl *) { addInt32(); }
+  void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+    for (unsigned i = 0,
+                  e = placeholder->getNumberOfFieldOffsetVectorEntries();
+         i < e; ++i)
+      addInt32();
+  }
   void addGenericRequirement(GenericRequirement requirement) { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
 

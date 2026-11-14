@@ -85,8 +85,9 @@ static bool classHasIncompleteLayout(IRGenModule &IGM,
     return false;
 
   for (auto field : theClass->getStoredPropertiesAndMissingMemberPlaceholders())
-    if (isa<MissingMemberDecl>(field))
-      return true;
+    if (auto *missing = dyn_cast<MissingMemberDecl>(field))
+      if (!missing->getStorageLayout())
+        return true;
 
   return false;
 }
@@ -360,7 +361,7 @@ namespace {
       auto fn = [&](Field field) {
         // Ignore missing properties here; we should have flagged these
         // with the classHasIncompleteLayout call above.
-        if (!field.isConcrete()) {
+        if (!field.hasKnownLayout()) {
           assert(Options & ClassMetadataFlags::ClassHasMissingMembers);
           return;
         }
@@ -654,7 +655,7 @@ irgen::getClassFieldAccess(IRGenModule &IGM, SILType baseType, VarDecl *field) {
 }
 
 Size
-irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
+irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, Field field) {
   auto &baseClassTI = IGM.getTypeInfo(baseType).as<ClassTypeInfo>();
 
   // FIXME: For now we just assume fragile layout here, because this is used as
@@ -666,6 +667,11 @@ irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
   auto element = fieldInfo.second;
   assert(element.hasByteOffset());
   return element.getByteOffset();
+}
+
+Size
+irgen::getClassFieldOffset(IRGenModule &IGM, SILType baseType, VarDecl *field) {
+  return getClassFieldOffset(IGM, baseType, Field(field));
 }
 
 StructLayout *

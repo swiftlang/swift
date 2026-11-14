@@ -59,7 +59,7 @@ protected:
 public:
   const TypeInfo &getTypeInfo() const { return Layout.getType(); }
 
-  Type getInterfaceTypeForSerialization() const { return {}; }
+  Type getInterfaceTypeForSerialization(IRGenModule &) const { return {}; }
 
   void completeFrom(const ElementLayout &layout) {
     Layout.completeFrom(layout);
@@ -148,10 +148,19 @@ protected:
 
     for (const auto &field : getFields()) {
       SerializableRecordFieldRepresentation fieldRepresentation;
-      fieldRepresentation.type = field.getInterfaceTypeForSerialization();
-      fieldRepresentation.typeInfo = field.getTypeInfo()
-                                         .createSerializableHiddenTypeInfoRepresentation(
-                                             IGM);
+      auto fieldType = field.getInterfaceTypeForSerialization(IGM);
+      fieldRepresentation.resolvedType = fieldType;
+      if (auto *hiddenType =
+              fieldType ? fieldType->template getAs<HiddenType>() : nullptr) {
+        auto *layout = hiddenType->getLayout();
+        assert(layout && layout->typeInfoRepresentation &&
+               "hidden field type must carry a TypeInfo representation");
+        fieldRepresentation.typeInfo = layout->typeInfoRepresentation;
+      } else {
+        fieldRepresentation.typeInfo =
+            field.getTypeInfo()
+                .createSerializableHiddenTypeInfoRepresentation(IGM);
+      }
       fieldRepresentation.layout = field.getLayoutStorage();
       auto projectionRange = field.getProjectionRange();
       fieldRepresentation.storage.Begin = projectionRange.first;

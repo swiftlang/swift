@@ -258,10 +258,7 @@ Type TypeBase::findAlwaysUnsafeType() const {
 
 static std::optional<ReferenceCounting>
 getHiddenTypeReferenceCounting(CanHiddenType type) {
-  auto *layoutInfoDecl = type->getLayoutInfoDecl();
-  assert(layoutInfoDecl && layoutInfoDecl->Layout &&
-         "HiddenTypeLayoutInfoDecl should have abstract layout");
-  return layoutInfoDecl->Layout->referenceCountingSystem;
+  return type->getLayout()->referenceCountingSystem;
 }
 
 bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,

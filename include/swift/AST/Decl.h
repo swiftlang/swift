@@ -10260,10 +10260,17 @@ public:
 class MissingMemberDecl : public Decl {
   DeclName Name;
 
+  /// If the missing member represented by this MissingMemberDecl defined
+  /// physical storage within the enclosing type, a non-null AbstractTypeLayout
+  /// here describes the layout of that storage.
+  AbstractTypeLayout *StorageLayout = nullptr;
+
   MissingMemberDecl(DeclContext *DC, DeclName name,
                     unsigned vtableEntries,
-                    unsigned fieldOffsetVectorEntries)
-      : Decl(DeclKind::MissingMember, DC), Name(name) {
+                    unsigned fieldOffsetVectorEntries,
+                    AbstractTypeLayout *storageLayout)
+      : Decl(DeclKind::MissingMember, DC), Name(name),
+        StorageLayout(storageLayout) {
     Bits.MissingMemberDecl.NumberOfVTableEntries = vtableEntries;
     assert(getNumberOfVTableEntries() == vtableEntries && "not enough bits");
     Bits.MissingMemberDecl.NumberOfFieldOffsetVectorEntries =
@@ -10279,13 +10286,15 @@ class MissingMemberDecl : public Decl {
 public:
   static MissingMemberDecl *
   create(ASTContext &ctx, DeclContext *DC, DeclName name,
-         unsigned numVTableEntries, bool hasStorage) {
+         unsigned numVTableEntries, bool hasStorage,
+         AbstractTypeLayout *storageLayout = nullptr) {
     assert(!numVTableEntries || isa<ProtocolDecl>(DC) || isa<ClassDecl>(DC) &&
            "Only classes and protocols have vtable/witness table entries");
     assert(!hasStorage || !isa<ProtocolDecl>(DC) &&
            "Protocols cannot have missing stored properties");
 
-    return new (ctx) MissingMemberDecl(DC, name, numVTableEntries, hasStorage);
+    return new (ctx) MissingMemberDecl(DC, name, numVTableEntries, hasStorage,
+                                       storageLayout);
   }
 
   DeclName getName() const {
@@ -10298,6 +10307,10 @@ public:
 
   unsigned getNumberOfFieldOffsetVectorEntries() const {
     return Bits.MissingMemberDecl.NumberOfFieldOffsetVectorEntries;
+  }
+
+  AbstractTypeLayout *getStorageLayout() const {
+    return StorageLayout;
   }
 
   SourceRange getSourceRange() const {
@@ -10449,40 +10462,6 @@ public:
   }
   static bool classof(const FreestandingMacroExpansion *expansion) {
     return expansion->getFreestandingMacroKind() == FreestandingMacroKind::Decl;
-  }
-};
-
-/// Represents a type whose definition could not be resolved, but for which
-/// serialized layout information is available.
-class HiddenTypeLayoutInfoDecl final : public TypeDecl {
-  explicit HiddenTypeLayoutInfoDecl(DeclContext *DC)
-      : TypeDecl(DeclKind::HiddenTypeLayoutInfo, DC, Identifier(), SourceLoc(),
-                 {}) {
-    setImplicit();
-  }
-
-public:
-  AbstractTypeLayout *Layout = nullptr;
-  TypeDecl *ParentDecl = nullptr;
-
-  struct XRefPathPiece {
-    Identifier Name;
-    bool InProtocolExtension;
-    bool ImportedFromClang;
-  };
-  StringRef MangledName;
-  Identifier OriginalModuleName;
-  bool OriginalModuleIsObjCHeader = false;
-  ArrayRef<XRefPathPiece> OriginalXRefPath;
-
-  SourceLoc getLocFromSource() const { return SourceLoc(); }
-
-  static HiddenTypeLayoutInfoDecl *create(ASTContext &ctx, DeclContext *DC);
-
-  SourceRange getSourceRange() const { return SourceRange(); }
-
-  static bool classof(const Decl *D) {
-    return D->getKind() == DeclKind::HiddenTypeLayoutInfo;
   }
 };
 

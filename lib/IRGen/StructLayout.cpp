@@ -18,6 +18,7 @@
 #include "llvm/IR/DataLayout.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/ABI/MetadataValues.h"
 
@@ -697,7 +698,7 @@ SILType Field::getType(IRGenModule &IGM, SILType baseType) const {
     return baseType.getFieldType(getVarDecl(), IGM.getSILModule(),
                                  TypeExpansionContext::minimal());
   case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+    return baseType.getFieldType(getMissingMemberDecl());
   case Field::DefaultActorStorage:
     return SILType::getPrimitiveObjectType(
                              IGM.Context.TheDefaultActorStorageType);
@@ -712,8 +713,11 @@ Type Field::getInterfaceType(IRGenModule &IGM) const {
   switch (getKind()) {
   case Field::Var:
     return getVarDecl()->getInterfaceType();
-  case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+  case Field::MissingMember: {
+    auto *layout = getMissingMemberDecl()->getStorageLayout();
+    assert(layout && "missing field has no storage layout");
+    return HiddenType::get(IGM.Context, layout);
+  }
   case Field::DefaultActorStorage:
     return IGM.Context.TheDefaultActorStorageType;
   case Field::NonDefaultDistributedActorStorage:
@@ -727,7 +731,7 @@ StringRef Field::getName() const {
   case Field::Var:
     return getVarDecl()->getName().str();
   case Field::MissingMember:
-    llvm_unreachable("cannot ask for type of missing member");
+    return getMissingMemberDecl()->getName().getBaseIdentifier().str();
   case Field::DefaultActorStorage:
     return DEFAULT_ACTOR_STORAGE_FIELD_NAME;
   case Field::NonDefaultDistributedActorStorage:

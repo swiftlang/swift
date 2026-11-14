@@ -17,6 +17,7 @@
 #include "GenStruct.h"
 
 #include "IRGen.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
@@ -47,6 +48,7 @@
 #include "llvm/IR/Function.h"
 
 #include "GenDecl.h"
+#include "Field.h"
 #include "GenMeta.h"
 #include "GenRecord.h"
 #include "GenType.h"
@@ -97,6 +99,13 @@ namespace {
     StructFieldInfo(VarDecl *field, const TypeInfo &type)
       : RecordField(type), Field(field) {}
 
+    StructFieldInfo(MissingMemberDecl *missingMember, const TypeInfo &type)
+      : RecordField(type), Field(nullptr), MissingMember(missingMember),
+        HiddenFieldName("hidden_field") {
+      assert(missingMember->getStorageLayout() &&
+             "missing struct field has no storage layout");
+    }
+
     StructFieldInfo(VarDecl *field, const ElementLayout &layout,
                     unsigned explosionBegin, unsigned explosionEnd)
         : RecordField(layout, explosionBegin, explosionEnd), Field(field),
@@ -104,6 +113,7 @@ namespace {
 
     /// The field.
     VarDecl * const Field;
+    MissingMemberDecl *MissingMember = nullptr;
     StringRef HiddenFieldName;
 
     StringRef getFieldName() const {
@@ -113,12 +123,41 @@ namespace {
     }
 
     SILType getType(IRGenModule &IGM, SILType T) const {
-      return T.getFieldType(Field, IGM.getSILModule(),
-                            IGM.getMaximalTypeExpansionContext());
+      if (Field)
+        return T.getFieldType(Field, IGM.getSILModule(),
+                              IGM.getMaximalTypeExpansionContext());
+      if (MissingMember)
+        return T.getFieldType(MissingMember);
+      return {};
     }
 
-    Type getInterfaceTypeForSerialization() const {
-      return Field ? Field->getInterfaceType() : Type();
+    Type getInterfaceTypeForSerialization(IRGenModule &IGM) const {
+      if (Field)
+        return Field->getInterfaceType();
+      if (MissingMember)
+        return HiddenType::get(IGM.Context, MissingMember->getStorageLayout());
+      return Type();
+    }
+
+    bool matches(swift::irgen::Field field) const {
+      switch (field.getKind()) {
+      case swift::irgen::Field::Var:
+        return Field == field.getVarDecl();
+      case swift::irgen::Field::MissingMember:
+        return MissingMember == field.getMissingMemberDecl();
+      case swift::irgen::Field::DefaultActorStorage:
+      case swift::irgen::Field::NonDefaultDistributedActorStorage:
+        return false;
+      }
+      llvm_unreachable("bad field kind");
+    }
+
+    std::optional<swift::irgen::Field> getMetadataField() const {
+      if (Field)
+        return swift::irgen::Field(Field);
+      if (MissingMember)
+        return swift::irgen::Field(MissingMember);
+      return std::nullopt;
     }
   };
 
@@ -153,8 +192,19 @@ namespace {
       return {};
     }
 
-    Type getInterfaceTypeForSerialization() const {
+    Type getInterfaceTypeForSerialization(IRGenModule &) const {
       return Field ? Field->getInterfaceType() : Type();
+    }
+
+    bool matches(swift::irgen::Field field) const {
+      return field.getKind() == swift::irgen::Field::Var &&
+             Field == field.getVarDecl();
+    }
+
+    std::optional<swift::irgen::Field> getMetadataField() const {
+      if (Field)
+        return swift::irgen::Field(Field);
+      return std::nullopt;
     }
   };
 
@@ -190,17 +240,21 @@ namespace {
 
   public:
 
-    const FieldInfoType &getFieldInfo(VarDecl *field) const {
+    const FieldInfoType &getFieldInfo(swift::irgen::Field field) const {
       // TypeInfo derived from a hidden representation does not support
       // AST based operations.
       assertNotDeserialized("StructTypeInfoBase::getFieldInfo");
 
       // FIXME: cache the physical field index in the VarDecl.
       for (auto &fieldInfo : asImpl().getFields()) {
-        if (fieldInfo.Field == field)
+        if (fieldInfo.matches(field))
           return fieldInfo;
       }
       llvm_unreachable("field not in struct?");
+    }
+
+    const FieldInfoType &getFieldInfo(VarDecl *field) const {
+      return getFieldInfo(swift::irgen::Field(field));
     }
 
     /// Given a full struct explosion, project out a single field.
@@ -223,9 +277,8 @@ namespace {
     /// single field.
     Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                                 const FieldInfoType &field) const {
-      // We can't access field.Field with deserialized TypeInfo.
-      assertNotDeserialized("StructTypeInfoBase::projectFieldAddress");
-      return asImpl().projectFieldAddress(IGF, addr, T, field.Field);
+      auto offsets = asImpl().getNonFixedOffsets(IGF, T);
+      return field.projectAddress(IGF, addr, offsets);
     }
 
     /// Given the address of a struct value, project out the address of a
@@ -250,6 +303,16 @@ namespace {
     /// field is not at a fixed offset.
     llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
                                            VarDecl *field) const {
+      auto &fieldInfo = getFieldInfo(field);
+      if (fieldInfo.hasFixedByteOffset()) {
+        return llvm::ConstantInt::get(
+            IGM.Int32Ty, fieldInfo.getFixedByteOffset().getValue());
+      }
+      return nullptr;
+    }
+
+    llvm::Constant *getConstantFieldOffset(IRGenModule &IGM,
+                                           swift::irgen::Field field) const {
       auto &fieldInfo = getFieldInfo(field);
       if (fieldInfo.hasFixedByteOffset()) {
         return llvm::ConstantInt::get(
@@ -381,31 +444,63 @@ namespace {
           class FindOffsetOfFieldOffsetVector
             : public StructMetadataScanner<FindOffsetOfFieldOffsetVector> {
           public:
-            VarDecl *FieldToFind;
+            swift::irgen::Field FieldToFind;
             Size AddressPoint = Size::invalid();
             Size FieldOffset = Size::invalid();
 
-            FindOffsetOfFieldOffsetVector(IRGenModule &IGM, VarDecl *Field)
+            FindOffsetOfFieldOffsetVector(IRGenModule &IGM,
+                                          StructDecl *structDecl,
+                                          swift::irgen::Field field)
                 : StructMetadataScanner<FindOffsetOfFieldOffsetVector>(
-                      IGM, cast<StructDecl>(Field->getDeclContext())),
-                  FieldToFind(Field) {}
+                      IGM, structDecl),
+                  FieldToFind(field) {}
 
             void noteAddressPoint() {
               AddressPoint = this->NextOffset;
             }
 
             void addFieldOffset(VarDecl *Field) {
-              if (Field == FieldToFind) {
+              if (swift::irgen::Field(Field) == FieldToFind) {
                 FieldOffset = this->NextOffset;
               }
               StructMetadataScanner<
                   FindOffsetOfFieldOffsetVector>::addFieldOffset(Field);
             }
+
+            void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+              if (swift::irgen::Field(placeholder) == FieldToFind) {
+                assert(placeholder->getNumberOfFieldOffsetVectorEntries() ==
+                           1 &&
+                       "missing struct field must have one offset entry");
+                FieldOffset = this->NextOffset;
+              }
+              StructMetadataScanner<FindOffsetOfFieldOffsetVector>::
+                  addFieldOffsetPlaceholders(placeholder);
+            }
           };
 
-          // We can't access field.Field without AST backed TypeInfo
+          auto astField = field.getMetadataField();
+          if (!astField) {
+            assertNotDeserialized("StructTypeInfoBase::verify");
+            continue;
+          }
           assertNotDeserialized("StructTypeInfoBase::verify");
-          FindOffsetOfFieldOffsetVector scanner(IGF.IGM, field.Field);
+          DeclContext *fieldContext;
+          switch (astField->getKind()) {
+          case swift::irgen::Field::Var:
+            fieldContext = astField->getVarDecl()->getDeclContext();
+            break;
+          case swift::irgen::Field::MissingMember:
+            fieldContext =
+                astField->getMissingMemberDecl()->getDeclContext();
+            break;
+          case swift::irgen::Field::DefaultActorStorage:
+          case swift::irgen::Field::NonDefaultDistributedActorStorage:
+            llvm_unreachable("struct cannot have actor storage");
+          }
+          auto *structDecl = cast<StructDecl>(fieldContext);
+          FindOffsetOfFieldOffsetVector scanner(IGF.IGM, structDecl,
+                                                *astField);
           scanner.layout();
 
           if (scanner.FieldOffset == Size::invalid()
@@ -1504,7 +1599,7 @@ namespace {
   };
 
   class StructTypeBuilder :
-    public RecordTypeBuilder<StructTypeBuilder, StructFieldInfo, VarDecl*> {
+    public RecordTypeBuilder<StructTypeBuilder, StructFieldInfo, Field> {
 
     llvm::StructType *StructTy;
     CanType TheStruct;
@@ -1562,17 +1657,23 @@ namespace {
                                             structAccessible);
     }
 
-    StructFieldInfo getFieldInfo(unsigned index,
-                                 VarDecl *field, const TypeInfo &fieldTI) {
-      return StructFieldInfo(field, fieldTI);
+    StructFieldInfo getFieldInfo(unsigned index, Field field,
+                                 const TypeInfo &fieldTI) {
+      if (field.getKind() == Field::Var)
+        return StructFieldInfo(field.getVarDecl(), fieldTI);
+      return StructFieldInfo(field.getMissingMemberDecl(), fieldTI);
     }
 
-    SILType getType(VarDecl *field) {
-      assert(field->getDeclContext() == TheStruct->getAnyNominal());
+    SILType getType(Field field) {
       auto silType = SILType::getPrimitiveAddressType(TheStruct);
-      return silType.getFieldType(
-          field, IGM.getSILModule(),
-          IGM.getMaximalTypeExpansionContext());
+      if (field.getKind() == Field::Var) {
+        auto *var = field.getVarDecl();
+        assert(var->getDeclContext() == TheStruct->getAnyNominal() &&
+               "field belongs to a different nominal type");
+        return silType.getFieldType(var, IGM.getSILModule(),
+                                    IGM.getMaximalTypeExpansionContext());
+      }
+      return field.getType(IGM, silType);
     }
 
     StructLayout performLayout(ArrayRef<const TypeInfo *> fieldTypes) {
@@ -1924,6 +2025,12 @@ llvm::Constant *irgen::emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
   FOR_STRUCT_IMPL(IGM, baseType, getConstantFieldOffset, field);
 }
 
+llvm::Constant *irgen::emitPhysicalStructMemberFixedOffset(IRGenModule &IGM,
+                                                           SILType baseType,
+                                                           Field field) {
+  FOR_STRUCT_IMPL(IGM, baseType, getConstantFieldOffset, field);
+}
+
 MemberAccessStrategy
 irgen::getPhysicalStructMemberAccessStrategy(IRGenModule &IGM,
                                              SILType baseType, VarDecl *field) {
@@ -2020,8 +2127,9 @@ namespace {
   createRecordFieldTypeInfoFromSerializableRepresentation(
       IRGenModule &IGM,
       const SerializableRecordFieldRepresentation &field) {
-    if (field.type) {
-      auto loweredType = IGM.getLoweredType(field.type->getCanonicalType());
+    if (field.resolvedType) {
+      auto loweredType =
+          IGM.getLoweredType(field.resolvedType->getCanonicalType());
       return IGM.getTypeInfo(loweredType);
     }
     if (!field.typeInfo)
@@ -2137,9 +2245,13 @@ const TypeInfo *TypeConverter::convertStructType(TypeBase *key, CanType type,
   }
 
   // Collect all the fields from the type.
-  SmallVector<VarDecl*, 8> fields;
-  for (VarDecl *VD : D->getStoredProperties())
-    fields.push_back(VD);
+  SmallVector<Field, 8> fields;
+  for (auto *field : D->getStoredPropertiesAndMissingMemberPlaceholders()) {
+    if (auto *var = dyn_cast<VarDecl>(field))
+      fields.emplace_back(var);
+    else
+      fields.emplace_back(cast<MissingMemberDecl>(field));
+  }
 
   // Build the type.
   StructTypeBuilder builder(IGM, ty, type);

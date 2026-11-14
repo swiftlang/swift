@@ -2997,12 +2997,11 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for the type info an IntegerType");
   case TypeKind::Hidden: {
     auto hidden = cast<HiddenType>(ty);
-    auto *layoutInfo = hidden->getLayoutInfoDecl();
-    assert(layoutInfo && layoutInfo->Layout &&
-           layoutInfo->Layout->typeInfoRepresentation &&
+    auto *layout = hidden->getLayout();
+    assert(layout->typeInfoRepresentation &&
            "HiddenType must carry a serialized TypeInfo representation");
     return createTypeInfoFromSerializableRepresentation(
-               IGM, *layoutInfo->Layout->typeInfoRepresentation)
+               IGM, *layout->typeInfoRepresentation)
         .release();
   }
   }
@@ -3524,6 +3523,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     // we can't assume anything about its layout.
     if (IGM.isResilient(enumDecl, expansion))
       return SILType();
+
+    for (auto *member : enumDecl->getMembers())
+      if (auto *missing = dyn_cast<MissingMemberDecl>(member))
+        if (missing->getStorageLayout())
+          return SILType();
 
     auto allCases = enumDecl->getAllElements();
     

@@ -248,7 +248,6 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::BuiltinTuple:
     case DeclKind::MacroExpansion:
     case DeclKind::FileDefault:
-    case DeclKind::HiddenTypeLayoutInfo:
       break;
   }
 
