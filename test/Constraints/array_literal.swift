@@ -551,3 +551,16 @@ do {
   let _: C = x1
   let _: C = x2
 }
+
+// https://github.com/swiftlang/swift/issues/93849
+do {
+  class Base {}
+  class Derived: Base {}
+
+  let _: [Int?] = ["a"] // expected-error {{cannot convert value of type 'String' to expected element type 'Int?'}}
+  let _: [Int??] = ["a"] // expected-error {{cannot convert value of type 'String' to expected element type 'Int??'}}
+  let _: [[Int?]] = [["a"]] // expected-error {{cannot convert value of type 'String' to expected element type 'Int?'}}
+  let _: Set<Int?> = ["a"] // expected-error {{cannot convert value of type 'String' to expected element type 'Int?'}}
+  let _: [Derived] = [Base()] // expected-error {{cannot convert value of type 'Base' to expected element type 'Derived'}}
+  let _: [Derived?] = [Base()] // expected-error {{cannot convert value of type 'Base' to expected element type 'Derived?'}}
+}

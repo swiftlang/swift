@@ -232,3 +232,14 @@ f59215(["", "", "", ""]) //expected-error{{dictionary of type '[String : String]
 // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{11-12=:}} {{19-20=:}}
 f59215(["", "", "", ""]) //expected-error{{dictionary of type '[String : String]' cannot be used with array literal}}
 // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{11-12=:}} {{19-20=:}}
+
+// https://github.com/swiftlang/swift/issues/93849
+do {
+  class Base {}
+  class Derived: Base {}
+
+  let _: [String: Int?] = ["k": "a"] // expected-error {{cannot convert value of type 'String' to expected dictionary value type 'Int?'}}
+  let _: [Int?: String] = ["k": "a"] // expected-error {{cannot convert value of type 'String' to expected dictionary key type 'Int?'}}
+  let _: [String: Derived] = ["k": Base()] // expected-error {{cannot convert value of type 'Base' to expected dictionary value type 'Derived'}}
+  let _: [String: Derived?] = ["k": Base()] // expected-error {{cannot convert value of type 'Base' to expected dictionary value type 'Derived?'}}
+}
