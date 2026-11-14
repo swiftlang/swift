@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -parse-as-library %platform-module-dir/Swift.swiftmodule/%module-target-triple.swiftinterface -enable-library-evolution -disable-objc-attr-requires-foundation-module -typecheck -module-name Swift -parse-stdlib -enable-experimental-cxx-interop -clang-header-expose-decls=has-expose-attr-or-stdlib -emit-clang-header-path %t/Swift.h  -experimental-skip-all-function-bodies -enable-experimental-feature LifetimeDependence  -enable-experimental-feature Lifetimes -enable-experimental-feature Reparenting -enable-experimental-feature AddressableParameters -enable-experimental-feature RawLayout
 // RUN: %FileCheck %s < %t/Swift.h
+// RUN: %FileCheck %s --check-prefix=STRING-%target-ptrsize < %t/Swift.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi)
 // RUN: %check-interop-cxx-header-in-clang(%t/Swift.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -Wno-unused-private-field -Wno-unused-function -Wc++98-compat-extra-semi -DDEBUG=1)
@@ -151,3 +152,39 @@
 // CHECK-NEXTZ: #pragma clang diagnostic pop
 
 // CHECK: } // namespace swift
+
+// On 64-bit platforms, a String is a trivial word followed by a bridge object,
+// so its copies and destruction retain and release that object directly.
+// STRING-64-LABEL: class SWIFT_SYMBOL("s:SS") String final {
+// STRING-64-NEXT:  public:
+// STRING-64-NEXT:    SWIFT_INLINE_THUNK ~String() noexcept {
+// STRING-64-NEXT:      void *reference;
+// STRING-64-NEXT:      memcpy(&reference, _getOpaquePointer() + 8, sizeof(reference));
+// STRING-64-NEXT:      swift::_impl::swift_bridgeObjectRelease(reference);
+// STRING-64-NEXT:    }
+// STRING-64-NEXT:    SWIFT_INLINE_THUNK String(const String &other) noexcept {
+// STRING-64-NEXT:      void *reference;
+// STRING-64-NEXT:      memcpy(&reference, other._getOpaquePointer() + 8, sizeof(reference));
+// STRING-64-NEXT:      swift::_impl::swift_bridgeObjectRetain(reference);
+// STRING-64-NEXT:      memcpy(_getOpaquePointer(), other._getOpaquePointer(), sizeof(_storage));
+// STRING-64-NEXT:    }
+// STRING-64-NEXT:    SWIFT_INLINE_THUNK String &operator =(const String &other) noexcept {
+// STRING-64-NEXT:      void *newReference;
+// STRING-64-NEXT:      memcpy(&newReference, other._getOpaquePointer() + 8, sizeof(newReference));
+// STRING-64-NEXT:      swift::_impl::swift_bridgeObjectRetain(newReference);
+// STRING-64-NEXT:      void *oldReference;
+// STRING-64-NEXT:      memcpy(&oldReference, _getOpaquePointer() + 8, sizeof(oldReference));
+// STRING-64-NEXT:      memmove(_getOpaquePointer(), other._getOpaquePointer(), sizeof(_storage));
+// STRING-64-NEXT:      swift::_impl::swift_bridgeObjectRelease(oldReference);
+// STRING-64-NEXT:    return *this;
+// STRING-64-NEXT:    }
+// STRING-64:       class _impl_String {
+// STRING-64:         static SWIFT_INLINE_THUNK void initializeWithTake(char * _Nonnull destStorage, char * _Nonnull srcStorage) {
+// STRING-64-NEXT:      memcpy(destStorage, srcStorage, 16);
+// STRING-64-NEXT:    }
+
+// STRING-32-LABEL: class SWIFT_SYMBOL("s:SS") String final {
+// STRING-32-NEXT:  public:
+// STRING-32-NEXT:    SWIFT_INLINE_THUNK ~String() noexcept {
+// STRING-32:           vwTable->destroy(_getOpaquePointer(), metadata._0);
+// STRING-32-NEXT:    }

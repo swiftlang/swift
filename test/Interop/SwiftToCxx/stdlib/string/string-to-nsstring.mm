@@ -42,7 +42,32 @@ int main() {
 
 #include <cassert>
 #include <string>
+#include <CoreFoundation/CoreFoundation.h>
 #include "StringCreator.h"
+
+static CFIndex retainCount(NSString *object) {
+  return CFGetRetainCount((__bridge CFTypeRef)object);
+}
+
+// Copies of a large String retain the object that backs it, and destroying or
+// overwriting them releases it again.
+static void checkCopiesRetainBackingObject(const swift::String &value) {
+  NSString *object = value;
+  CFIndex count = retainCount(object);
+  {
+    swift::String copy = value;
+    assert(retainCount(object) == count + 1);
+    swift::String assigned = swift::String::init();
+    assigned = copy;
+    assert(retainCount(object) == count + 2);
+    swift::String &alias = assigned;
+    assigned = alias;
+    assert(retainCount(object) == count + 2);
+    assigned = swift::String::init();
+    assert(retainCount(object) == count + 1);
+  }
+  assert(retainCount(object) == count);
+}
 
 int main() {
   using namespace swift;
@@ -97,6 +122,11 @@ int main() {
     auto std_chinese = (std::string)swift_chinese;
     assert(std_chinese == "你好世界");
   }
+
+  checkCopiesRetainBackingObject(StringCreator::createString(
+      "a native string that is too long to be stored inline"));
+  checkCopiesRetainBackingObject(String::init([NSString
+      stringWithFormat:@"%@ %d", @"a bridged string that is too long", 42]));
 
   return 0;
 }

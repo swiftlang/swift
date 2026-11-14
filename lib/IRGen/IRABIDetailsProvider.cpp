@@ -15,6 +15,7 @@
 #include "FixedTypeInfo.h"
 #include "GenEnum.h"
 #include "GenPointerAuth.h"
+#include "GenStruct.h"
 #include "GenType.h"
 #include "GenericRequirement.h"
 #include "IRGen.h"
@@ -126,17 +127,74 @@ public:
            TI.isBitwiseTakable(ResilienceExpansion::Minimal);
   }
 
-  bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD) {
+  std::optional<IRABIDetailsProvider::SingleReference>
+  getSingleReference(const NominalTypeDecl *TD) {
     auto type = TD->getDeclaredTypeInContext();
     // The header is also used outside this module's resilience domain. The
     // locally lowered TypeInfo alone may expose a resilient field's layout.
     if (!typeConverter.getTypeProperties(type, TypeExpansionContext::minimal())
              .isFixedABI())
+      return std::nullopt;
+    auto silType = IGM.getLoweredType(type);
+    const auto &typeInfo = IGM.getTypeInfo(silType);
+    if (!typeInfo.isFixedSize(ResilienceExpansion::Minimal) ||
+        !typeInfo.isBitwiseTakable(ResilienceExpansion::Minimal) ||
+        !typeInfo.isCopyable(ResilienceExpansion::Minimal))
+      return std::nullopt;
+    std::optional<IRABIDetailsProvider::SingleReference> reference;
+    if (!findSingleReference(silType, typeInfo, /*offset=*/0, reference))
+      return std::nullopt;
+    return reference;
+  }
+
+  /// Records the strong reference in a value of \p type at \p offset. Returns
+  /// false if the value holds a second reference or anything else that needs
+  /// ownership operations.
+  bool findSingleReference(
+      SILType type, const TypeInfo &typeInfo,
+      IRABIDetailsProvider::SizeType offset,
+      std::optional<IRABIDetailsProvider::SingleReference> &reference) {
+    using Kind = IRABIDetailsProvider::SingleReference::Kind;
+    if (typeInfo.isTriviallyDestroyable(ResilienceExpansion::Minimal))
+      return true;
+    ReferenceCounting refcounting;
+    if (typeInfo.isSingleRetainablePointer(ResilienceExpansion::Minimal,
+                                           &refcounting)) {
+      if (reference)
+        return false;
+      switch (refcounting) {
+      case ReferenceCounting::Native:
+        reference = {offset, Kind::Native};
+        return true;
+      case ReferenceCounting::Bridge:
+        reference = {offset, Kind::Bridge};
+        return true;
+      default:
+        return false;
+      }
+    }
+    // Look through the fields of Swift structs. Imported C and C++ records keep
+    // their own copy and destroy operations.
+    auto *structDecl = type.getStructDecl();
+    if (!structDecl || structDecl->hasClangNode())
       return false;
-    const auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
-    return typeInfo.isFixedSize(ResilienceExpansion::Minimal) &&
-           typeInfo.isBitwiseTakable(ResilienceExpansion::Minimal) &&
-           typeInfo.isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
+    for (auto *field : structDecl->getStoredProperties()) {
+      // An empty field has no type info.
+      const auto *fieldTypeInfo =
+          getPhysicalStructFieldTypeInfo(IGM, type, field);
+      if (!fieldTypeInfo)
+        continue;
+      auto *fieldOffset = dyn_cast_or_null<llvm::ConstantInt>(
+          emitPhysicalStructMemberFixedOffset(IGM, type, field));
+      if (!fieldOffset)
+        return false;
+      auto fieldType = type.getFieldType(field, IGM.getSILModule(),
+                                         TypeExpansionContext::minimal());
+      if (!findSingleReference(fieldType, *fieldTypeInfo,
+                               offset + fieldOffset->getZExtValue(), reference))
+        return false;
+    }
+    return true;
   }
 
   AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
@@ -539,9 +597,9 @@ bool IRABIDetailsProvider::isTypeTrivial(const NominalTypeDecl *TD) {
   return impl->isTypeTrivial(TD);
 }
 
-bool IRABIDetailsProvider::isSingleSwiftRetainablePointer(
-    const NominalTypeDecl *TD) {
-  return impl->isSingleSwiftRetainablePointer(TD);
+std::optional<IRABIDetailsProvider::SingleReference>
+IRABIDetailsProvider::getSingleReference(const NominalTypeDecl *TD) {
+  return impl->getSingleReference(TD);
 }
 
 AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(
