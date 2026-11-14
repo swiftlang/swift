@@ -3088,10 +3088,9 @@ static bool hasExposeAttr(const ValueDecl *VD) {
   // Clang decls don't need to be explicitly exposed.
   if (VD->hasClangNode())
     return true;
-  for (auto *EA : VD->getAttrs().getAttributes<ExposeAttr>()) {
-    if (EA->getExposureKind() == ExposureKind::Cxx)
-      return true;
-  }
+  if (cxx_translation::hasExposeCxxAttr(VD))
+    return true;
+  // Members of stdlib and Clang types, which are exposed without an attribute.
   if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
     return hasExposeAttr(NMT);
   if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
@@ -3141,18 +3140,6 @@ static bool excludeForObjCImplementation(const ValueDecl *VD) {
     if (ED && ED->isObjCImplementation())
       return true;
   }
-  return false;
-}
-
-bool swift::hasExposeNotCxxAttr(const ValueDecl *VD) {
-  for (const auto *attr : VD->getAttrs().getAttributes<ExposeAttr>())
-    if (attr->getExposureKind() == ExposureKind::NotCxx)
-      return true;
-  if (const auto *NMT = dyn_cast<NominalTypeDecl>(VD->getDeclContext()))
-    return hasExposeNotCxxAttr(NMT);
-  if (const auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext()))
-    if (const auto *NTD = ED->getExtendedNominal())
-      return hasExposeNotCxxAttr(NTD);
   return false;
 }
 
@@ -3213,7 +3200,7 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
       !hasExposeAttr(VD))
     return false;
 
-  if (hasExposeNotCxxAttr(VD))
+  if (cxx_translation::hasExposeNotCxxAttr(VD))
     return false;
 
   if (!isVisible(VD))
@@ -3267,6 +3254,15 @@ bool DeclAndTypePrinter::shouldInclude(const ValueDecl *VD,
 
   if (excludeForObjCImplementation(VD))
     return false;
+
+  // The optimizer keeps what the header may reference based on this
+  // predicate, so it must not miss anything the header prints. The standard
+  // library, which the header may print too, has its own exposure rules.
+  assert((outputLang != OutputLanguageMode::Cxx || isImportedInheritedMember ||
+          VD->getModuleContext() != &M || M.isStdlibModule() ||
+          cxx_translation::mayBePrintedInCxxHeader(VD, minRequiredAccess,
+                                                   requiresExposedAttribute)) &&
+         "printed C++ declaration that the optimizer may remove");
 
   return true;
 }

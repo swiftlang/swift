@@ -3261,6 +3261,18 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // Propagate -experimental-skip-non-exportable-decls to SIL.
   Opts.SkipNonExportableDecls = LangOpts.SkipNonExportableDecls;
 
+  // The generated C++ header references the declarations it prints, which
+  // must then survive optimization. Only internal declarations can be removed
+  // otherwise; public and package ones are already visible outside the module.
+  // This does not require -emit-clang-header-path: when the driver emits the
+  // module in a separate job, only that job gets the header path, while every
+  // job gets -emit-clang-header-min-access.
+  if (FEOpts.clangHeaderHasCxxContent(LangOpts.EnableCXXInterop) &&
+      FEOpts.ClangHeaderMinAccess == AccessLevel::Internal) {
+    Opts.CxxHeaderMinAccess = FEOpts.ClangHeaderMinAccess;
+    Opts.CxxHeaderRequiresExposeAttr = FEOpts.clangHeaderRequiresExposeAttr();
+  }
+
   // Parse the optimization level.
   // Default to Onone settings if no option is passed.
   Opts.OptMode = OptimizationMode::NoOptimization;

@@ -1378,7 +1378,11 @@ SILFunction::isPossiblyUsedExternally() const {
       isSwiftRuntimeFunction())
     return true;
 
-  return swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule());
+  if (swift::isPossiblyUsedExternally(linkage, getModule().isWholeModule()))
+    return true;
+
+  // The generated C++ header may call this function.
+  return getDeclRef().mayBeCalledFromCxxHeader(getModule());
 }
 
 bool SILFunction::shouldBePreservedForDebugger() const {

@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_SILOPTIONS_H
 #define SWIFT_AST_SILOPTIONS_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/OptionSet.h"
@@ -26,6 +27,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Remarks/RemarkFormat.h"
 #include <climits>
+#include <optional>
 #include <string>
 
 namespace swift {
@@ -202,6 +204,15 @@ public:
 
   /// Whether to skip declarations that are internal to the module.
   bool SkipNonExportableDecls = false;
+
+  /// The minimum access level of declarations printed into the generated C++
+  /// header, if it is set and the header has C++ content. The members that
+  /// the header references must be kept even when nothing in Swift uses them.
+  std::optional<AccessLevel> CxxHeaderMinAccess;
+
+  /// Whether the generated C++ header only prints declarations that are
+  /// '@_expose(Cxx)' or are members of such types.
+  bool CxxHeaderRequiresExposeAttr = false;
 
   /// Optimization mode being used.
   OptimizationMode OptMode = OptimizationMode::NotSet;
