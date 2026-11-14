@@ -1,0 +1,55 @@
+//===--- IncrementalBuildStatistics.def - Incremental Stats -----*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file lists the counters that -incremental-build-stats collects: the
+// counters that measure incremental build performance. The timers are chosen
+// where each FrontendStatsTracer is created, with IsIncrementalBuildEvent. The
+// timer for the whole frontend process is always collected.
+//
+// INCREMENTAL_BUILD_COUNTER(Subsystem, Id)
+//   - A counter from Statistics.def, with the same Subsystem and Id
+//
+//===----------------------------------------------------------------------===//
+
+#ifdef INCREMENTAL_BUILD_COUNTER
+
+// The job
+INCREMENTAL_BUILD_COUNTER(Frontend, WallClockMicroseconds)
+
+// Parsing
+INCREMENTAL_BUILD_COUNTER(Parse, NumFunctionsParsed)
+INCREMENTAL_BUILD_COUNTER(Parse, NumIterableDeclContextParsed)
+
+// Type checking
+INCREMENTAL_BUILD_COUNTER(Sema, NumDeclsTypechecked)
+INCREMENTAL_BUILD_COUNTER(Sema, NumDeclsDeserialized)
+INCREMENTAL_BUILD_COUNTER(Sema, NumConstraintScopes)
+INCREMENTAL_BUILD_COUNTER(Sema, NumSolverBytesAllocated)
+
+// Dependencies
+INCREMENTAL_BUILD_COUNTER(AST, NumReferencedTopLevelNames)
+
+// SIL generation
+INCREMENTAL_BUILD_COUNTER(SILModule, NumSILGenFunctions)
+INCREMENTAL_BUILD_COUNTER(SILModule, NumSILGenWitnessTables)
+INCREMENTAL_BUILD_COUNTER(SILModule, NumSILGenVtables)
+
+// SIL processing
+INCREMENTAL_BUILD_COUNTER(SILModule, NumSILOptFunctions)
+
+// IR generation and LLVM
+INCREMENTAL_BUILD_COUNTER(IRModule, NumIRFunctions)
+INCREMENTAL_BUILD_COUNTER(IRModule, NumIRBasicBlocks)
+INCREMENTAL_BUILD_COUNTER(IRModule, NumIRInsts)
+INCREMENTAL_BUILD_COUNTER(LLVM, NumLLVMBytesOutput)
+
+#endif

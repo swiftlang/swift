@@ -447,7 +447,8 @@ void CompilerInstance::setupStatsReporter() {
       Invoke.getFrontendOptions().TraceStats,
       Invoke.getFrontendOptions().ProfileEvents,
       Invoke.getFrontendOptions().ProfileEntities,
-      Invoke.getFrontendOptions().PrintZeroStats);
+      Invoke.getFrontendOptions().PrintZeroStats,
+      Invoke.getFrontendOptions().IncrementalBuildStats);
   // Hand the stats reporter down to the ASTContext so the rest of the compiler
   // can use it.
   getASTContext().setStatsReporter(Reporter.get());
@@ -994,9 +995,11 @@ bool CompilerInstance::setUpModuleLoaders() {
   }
 
   // If memory statistics were requested, start tracking per-module materialized
-  // decl counts now, before any significant deserialization occurs.
+  // decl counts now, before any significant deserialization occurs. The
+  // incremental build statistics don't need them: their set has no Clang
+  // memory counters.
   if (FEOpts.CompilerDebuggingOpts.PrintClangStats ||
-      !FEOpts.StatsOutputDir.empty())
+      (!FEOpts.StatsOutputDir.empty() && !FEOpts.IncrementalBuildStats))
     clangImporter->enableMemoryStatistics();
 
   // Configure ModuleInterfaceChecker for the ASTContext.
@@ -1757,7 +1760,8 @@ void CompilerInstance::setMainModule(ModuleDecl *newMod) {
 }
 
 bool CompilerInstance::performParseAndResolveImportsOnly() {
-  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports");
+  FrontendStatsTracer tracer(getStatsReporter(), "parse-and-resolve-imports",
+                             /*IsIncrementalBuildEvent=*/true);
 
   // NOTE: Do not add new logic to this function, use the request evaluator to
   // lazily evaluate instead. Once the below computations are requestified we
@@ -1774,7 +1778,8 @@ bool CompilerInstance::performParseAndResolveImportsOnly() {
 void CompilerInstance::performSema() {
   performParseAndResolveImportsOnly();
 
-  FrontendStatsTracer tracer(getStatsReporter(), "perform-sema");
+  FrontendStatsTracer tracer(getStatsReporter(), "perform-sema",
+                             /*IsIncrementalBuildEvent=*/true);
 
   forEachFileToTypeCheck([&](SourceFile &SF) {
     performTypeChecking(SF);
@@ -1991,7 +1996,8 @@ void CompilerInstance::freeASTContext() {
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
   FrontendStatsTracer tracer(SM->getASTContext().Stats,
-                             "SIL-mandatory-passes");
+                             "SIL-mandatory-passes",
+                             /*IsIncrementalBuildEvent=*/true);
   auto Action = Invocation.getFrontendOptions().RequestedAction;
 
   // Don't run diagnostic passes at all when merging modules.
@@ -2022,7 +2028,8 @@ static bool performMandatorySILPasses(CompilerInvocation &Invocation,
 static void performSILOptimizations(CompilerInvocation &Invocation,
                                     SILModule *SM) {
   FrontendStatsTracer tracer(SM->getASTContext().Stats,
-                             "SIL optimization");
+                             "SIL optimization",
+                             /*IsIncrementalBuildEvent=*/true);
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::MergeModules ||
       !Invocation.getSILOptions().shouldOptimize()) {
@@ -2059,7 +2066,8 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
 
 bool CompilerInstance::performSILProcessing(SILModule *silModule) {
   FrontendStatsTracer tracer(silModule->getASTContext().Stats,
-                             "SIL-processing");
+                             "SIL-processing",
+                             /*IsIncrementalBuildEvent=*/true);
 
   if (performMandatorySILPasses(Invocation, silModule) &&
       !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
@@ -2074,7 +2082,8 @@ bool CompilerInstance::performSILProcessing(SILModule *silModule) {
 
   performSILOptimizations(Invocation, silModule);
 
-  if (auto *stats = getStatsReporter())
+  auto *stats = getStatsReporter();
+  if (stats && stats->isCollectingSubsystem("SILModule"))
     countStatsPostSILOpt(*stats, *silModule);
 
   {

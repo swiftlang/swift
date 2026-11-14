@@ -293,7 +293,8 @@ void swift::performImportResolution(SourceFile &SF) {
     return;
 
   FrontendStatsTracer tracer(SF.getASTContext().Stats,
-                             "Import resolution");
+                             "Import resolution",
+                             /*IsIncrementalBuildEvent=*/true);
 
   // If we're silencing parsing warnings, then also silence import warnings.
   // This is necessary for secondary files as they can be parsed and have their

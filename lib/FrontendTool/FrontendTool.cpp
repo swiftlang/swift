@@ -327,8 +327,9 @@ static void countASTStats(UnifiedStatsReporter &Stats,
   // importer's aggregate + per-module memory. Snapshots taken here at
   // end-of-pipeline while both ASTContexts and the importer are still alive.
   C.SwiftASTContextBytes = AST.getTotalMemory();
-  if (auto *clangImporter =
-          static_cast<ClangImporter *>(AST.getClangModuleLoader())) {
+  auto *clangImporter =
+      static_cast<ClangImporter *>(AST.getClangModuleLoader());
+  if (clangImporter && Stats.isCollectingSubsystem("ClangImporter")) {
     auto clangStats = clangImporter->getClangMemoryStats();
     C.ClangASTContextBytes = clangStats.astContextBytes;
     C.ClangModuleBufferBytesMMap = clangStats.moduleBufferMMapBytes;
@@ -340,8 +341,10 @@ static void countASTStats(UnifiedStatsReporter &Stats,
     C.ClangTotalBytes =
         clangStats.astContextBytes + clangStats.moduleBufferMallocBytes;
 
+    // The incremental build statistics are all in the stats file, so they
+    // don't add a file of their own.
     const auto &FEOpts = Instance.getInvocation().getFrontendOptions();
-    if (!FEOpts.StatsOutputDir.empty())
+    if (!FEOpts.StatsOutputDir.empty() && !FEOpts.IncrementalBuildStats)
       writeClangModuleMemoryJSON(FEOpts.StatsOutputDir, FEOpts.ModuleName,
                                  clangStats);
   }
@@ -351,6 +354,11 @@ static void countASTStats(UnifiedStatsReporter &Stats,
     C.NumIncrementalDependencies = D->getIncrementalDependencies().size();
     C.NumMacroPluginDependencies = D->getMacroPluginDependencies().size();
   }
+
+  // The rest walks every primary file's references and declarations, so skip
+  // it when no AST counter is collected.
+  if (!Stats.isCollectingSubsystem("AST"))
+    return;
 
   for (auto SF : Instance.getPrimarySourceFiles()) {
     auto &Ctx = SF->getASTContext();
@@ -373,6 +381,10 @@ static void countASTStats(UnifiedStatsReporter &Stats,
       }
     });
   }
+
+  // The incremental build statistics need only the referenced names.
+  if (Stats.isCollectingIncrementalBuildStatsOnly())
+    return;
 
   if (!Instance.getPrimarySourceFiles().empty()) {
     for (auto SF : Instance.getPrimarySourceFiles())
@@ -2523,7 +2535,8 @@ static bool performCompileStepsPostSILGen(
     ArrayRef<PrimarySpecificPaths> auxPSPs) {
 
   FrontendStatsTracer tracer(SM->getASTContext().Stats,
-                             "SIL-and-LLVM-processing");
+                             "SIL-and-LLVM-processing",
+                             /*IsIncrementalBuildEvent=*/true);
 
   const auto &Invocation = Instance.getInvocation();
   const auto &opts = Invocation.getFrontendOptions();
@@ -2543,7 +2556,7 @@ static bool performCompileStepsPostSILGen(
     return true;
 
   auto *Stats = Instance.getASTContext().Stats;
-  if (Stats)
+  if (Stats && Stats->isCollectingSubsystem("SILModule"))
     countStatsPostSILGen(*Stats, *SM);
 
   // We've been told to emit SIL after SILGen, so write it now.
