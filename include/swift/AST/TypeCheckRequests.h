@@ -27,6 +27,7 @@
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/LocalTypeDeclManglings.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PluginRegistry.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -886,12 +887,11 @@ private:
                        USRGenerationOptions options) const;
 };
 
-/// Generate the mangling for the given local type declaration.
-class MangleLocalTypeDeclRequest :
-    public SimpleRequest<MangleLocalTypeDeclRequest,
-                         std::string(const TypeDecl*),
-                         RequestFlags::Cached>
-{
+/// Generate the manglings for the given local type declaration.
+class MangleLocalTypeDeclRequest
+    : public SimpleRequest<MangleLocalTypeDeclRequest,
+                           Mangle::LocalTypeDeclManglings(const TypeDecl *),
+                           RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
@@ -899,7 +899,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  std::string evaluate(Evaluator &eval, const TypeDecl *d) const;
+  Mangle::LocalTypeDeclManglings evaluate(Evaluator &eval,
+                                          const TypeDecl *d) const;
 
 public:
   // Caching

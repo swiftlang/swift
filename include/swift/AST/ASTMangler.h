@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/LocalTypeDeclManglings.h"
 #include "swift/AST/SILThunkKind.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
@@ -101,9 +102,9 @@ protected:
   bool AllowTypedThrows = true;
 
   /// If enabled, declarations annotated with @_originallyDefinedIn are mangled
-  /// as if they're part of their original module. Disabled for debug mangling,
-  /// because lldb wants to find declarations in the modules they're currently
-  /// defined in.
+  /// as if they're part of their original module. Disabled for USRs and some
+  /// debugger manglings, because the IDE and lldb want to find declarations in
+  /// the modules they're currently defined in.
   bool RespectOriginallyDefinedIn = true;
 
   /// Whether to always mangle using the declaration's API, ignoring e.g
@@ -420,7 +421,9 @@ public:
                                         StringRef USRPrefix,
                                         bool IsStatic);
 
-  std::string mangleLocalTypeDecl(const TypeDecl *type);
+  /// Mangle a local type declaration for lookup by the mangled name of its
+  /// type.
+  LocalTypeDeclManglings mangleLocalTypeDecl(const TypeDecl *type);
 
   std::string mangleOpaqueTypeDecl(const OpaqueTypeDecl *decl);
 
