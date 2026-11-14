@@ -898,6 +898,11 @@ protected:
     NumberOfVTableEntries : 2
   );
 
+  SWIFT_INLINE_BITFIELD(TopLevelCodeDecl, Decl, 1,
+    /// Whether we've assigned discriminators for the body.
+    HasBodyDiscriminators : 1
+  );
+
   } Bits;
   // Turn back on clang-format now that we have defined our inline bitfields.
   // clang-format on
@@ -3010,14 +3015,29 @@ class TopLevelCodeDecl : public DeclContext, public Decl {
   BraceStmt *Body;
   SourceLoc getLocFromSource() const { return getStartLoc(); }
   friend class Decl;
+
+  // Caching for BodyDiscriminatorsRequest.
+  friend class BodyDiscriminatorsRequest;
+  bool bodyHasDiscriminators() const {
+    return Bits.TopLevelCodeDecl.HasBodyDiscriminators;
+  }
+  void setBodyHasDiscriminators(bool value = true) {
+    Bits.TopLevelCodeDecl.HasBodyDiscriminators = value;
+  }
+
 public:
   TopLevelCodeDecl(DeclContext *Parent, BraceStmt *Body = nullptr)
-    : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
-      Decl(DeclKind::TopLevelCode, Parent),
-      Body(Body) {}
+      : DeclContext(DeclContextKind::TopLevelCodeDecl, Parent),
+        Decl(DeclKind::TopLevelCode, Parent), Body(Body) {
+    Bits.TopLevelCodeDecl.HasBodyDiscriminators = false;
+  }
 
   BraceStmt *getBody() const { return Body; }
-  void setBody(BraceStmt *b) { Body = b; }
+  void setBody(BraceStmt *b, bool resetDiscriminators = false) {
+    Body = b;
+    if (resetDiscriminators)
+      setBodyHasDiscriminators(false);
+  }
 
   SourceLoc getStartLoc() const;
   SourceRange getSourceRange() const;
@@ -8325,7 +8345,21 @@ protected:
     unsigned NeedsNewVTableEntryComputed : 1;
     unsigned NeedsNewVTableEntry : 1;
     unsigned NoLifetimeDependenceInfo : 1;
+
+    /// Whether we've assigned discriminators for a function body.
+    /// NOTE: This should really be a bit on AbstractFunctionDecl, but that
+    /// bitfield is full.
+    unsigned HasBodyDiscriminators : 1;
   } LazySemanticInfo = { };
+
+  // Caching for BodyDiscriminatorsRequest.
+  friend class BodyDiscriminatorsRequest;
+  bool bodyHasDiscriminators() const {
+    return LazySemanticInfo.HasBodyDiscriminators;
+  }
+  void setBodyHasDiscriminators(bool value = true) {
+    LazySemanticInfo.HasBodyDiscriminators = value;
+  }
 
   AbstractFunctionDecl(DeclKind Kind, DeclContext *Parent, DeclName Name,
                        SourceLoc NameLoc, bool Async, SourceLoc AsyncLoc,

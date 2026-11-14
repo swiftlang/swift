@@ -330,8 +330,12 @@ public:
 
   /// Generates code for the given closure expression and adds the
   /// SILFunction to the current SILModule under the name SILDeclRef(ce).
-  SILFunction *emitClosure(AbstractClosureExpr *ce,
-                           const FunctionTypeInfo &closureInfo);
+  ///
+  /// Returns false if the closure was emitted, true if it clashed with the
+  /// mangled name of another closure and was diagnosed.
+  [[nodiscard]]
+  bool emitClosure(AbstractClosureExpr *ce,
+                   const FunctionTypeInfo &closureInfo);
 
   /// Generates code for the given ConstructorDecl and adds
   /// the SILFunction to the current SILModule under the name SILDeclRef(decl).

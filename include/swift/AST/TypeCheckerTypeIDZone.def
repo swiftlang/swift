@@ -574,8 +574,11 @@ SWIFT_REQUEST(TypeChecker, ExpandBodyMacroRequest,
               std::optional<unsigned>(AnyFunctionRef),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, LocalDiscriminatorsRequest,
-              unsigned(DeclContext *),
+              evaluator::SideEffect(DeclContext *),
               Cached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, BodyDiscriminatorsRequest,
+              evaluator::SideEffect(DeclContext *),
+              SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, RawCommentRequest,
               RawComment(const Decl *),
               Cached, NoLocationInfo)

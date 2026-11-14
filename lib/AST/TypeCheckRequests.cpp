@@ -1616,6 +1616,36 @@ void CallerSideDefaultArgExprRequest::cacheResult(Expr *expr) const {
 }
 
 //----------------------------------------------------------------------------//
+// BodyDiscriminatorsRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<evaluator::SideEffect>
+BodyDiscriminatorsRequest::getCachedResult() const {
+  auto *dc = std::get<0>(getStorage());
+  bool hasDiscriminators = true;
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
+    hasDiscriminators = AFD->bodyHasDiscriminators();
+  } else if (auto *TLD = dyn_cast<TopLevelCodeDecl>(dc)) {
+    hasDiscriminators = TLD->bodyHasDiscriminators();
+  }
+  if (!hasDiscriminators)
+    return std::nullopt;
+
+  return evaluator::SideEffect();
+}
+
+void BodyDiscriminatorsRequest::cacheResult(evaluator::SideEffect) const {
+  auto *dc = std::get<0>(getStorage());
+  if (auto *AFD = dyn_cast<AbstractFunctionDecl>(dc)) {
+    AFD->setBodyHasDiscriminators();
+  } else if (auto *TLD = dyn_cast<TopLevelCodeDecl>(dc)) {
+    TLD->setBodyHasDiscriminators();
+  } else {
+    ABORT("Expected TopLevelCodeDecl or AbstractFunctionDecl");
+  }
+}
+
+//----------------------------------------------------------------------------//
 // DifferentiableAttributeTypeCheckRequest computation.
 //----------------------------------------------------------------------------//
 

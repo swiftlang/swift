@@ -52,6 +52,9 @@ ERROR(bridging_objcbridgeable_broken,none,
 ERROR(sil_function_redefinition,none,
       "multiple definitions of symbol '%0'",
       (StringRef))
+ERROR(sil_function_redefinition_bug,none,
+      "multiple definitions of symbol '%0'; " SWIFT_BUG_REPORT_MESSAGE,
+      (StringRef))
 NOTE(sil_function_redefinition_note,none,
       "other definition here",
       ())
