@@ -524,6 +524,10 @@ SWIFT_NAME("BridgedLangOptions.getCompilerVersion(self:_:)")
 SwiftInt BridgedLangOptions_getCompilerVersion(BridgedLangOptions cLangOpts,
                                                SwiftInt* _Nullable * _Nonnull cComponents);
 
+SWIFT_NAME("BridgedLangOptions.getDeploymentTargetVersion(self:_:)")
+SwiftInt BridgedLangOptions_getDeploymentTargetVersion(
+    BridgedLangOptions cLangOpts, SwiftInt *_Nullable *_Nonnull cComponents);
+
 /* Deallocate an array of Swift int values that was allocated in C++. */
 void deallocateIntBuffer(SwiftInt * _Nullable cComponents);
 

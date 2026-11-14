@@ -1974,6 +1974,9 @@ public:
   parseArgumentList(tok leftTok, tok rightTok, bool isExprBasic,
                     bool allowTrailingClosure = true);
 
+  /// Parse the availability-style arguments to deploymentTargetAtLeast.
+  ParserResult<ArgumentList> parseDeploymentTargetArgumentList();
+
   ParserStatus parseExprListElement(tok rightTok, bool isArgumentList, SourceLoc leftLoc, SmallVectorImpl<ExprListElt> &elts);
 
   /// Parse one or more trailing closures after an argument list.
