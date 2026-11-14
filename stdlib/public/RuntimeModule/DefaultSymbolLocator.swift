@@ -40,6 +40,7 @@ fileprivate let elfSymbolPath = "\(symbolPath)/.build-id"
 #endif
 
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 open class DefaultSymbolLocator: SymbolLocator {
 
   public init() {}

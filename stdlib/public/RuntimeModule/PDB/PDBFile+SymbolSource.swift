@@ -17,6 +17,7 @@
 import Swift
 
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 extension PDBFile: SymbolSource {
   public func lookupSymbol(
     address: SymbolSource.Address
