@@ -2782,9 +2782,30 @@ llvm::Error SILDeserializer::readSILInstruction(
   }
   case SILInstructionKind::DeallocRefInst: {
     auto Ty = MF->getType(TyID);
-    ResultInst = Builder.createDeallocRef(
-        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
-                           getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    // Without tail elements: the one-operand record.
+    if (RecordKind != SIL_ONE_TYPE_VALUES) {
+      ResultInst = Builder.createDeallocRef(
+          Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                             getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+      break;
+    }
+    // [instance, (tail type, count, count type)...], like alloc_ref.
+    unsigned NumVals = ListOfValues.size();
+    assert(NumVals >= 1 && (NumVals - 1) % 3 == 0 && "Bad dealloc_ref record");
+    SILValue Instance =
+        getLocalValue(Builder.maybeGetFunction(), ListOfValues[0],
+                      getSILType(Ty, (SILValueCategory)TyCategory, Fn));
+    SmallVector<SILType, 4> TailTypes;
+    SmallVector<SILValue, 4> Counts;
+    for (unsigned i = 1; i + 2 < NumVals; i += 3) {
+      TailTypes.push_back(getSILType(MF->getType(ListOfValues[i]),
+                                     SILValueCategory::Object, Fn));
+      SILType CountType = getSILType(MF->getType(ListOfValues[i + 2]),
+                                     SILValueCategory::Object, Fn);
+      Counts.push_back(getLocalValue(Builder.maybeGetFunction(),
+                                     ListOfValues[i + 1], CountType));
+    }
+    ResultInst = Builder.createDeallocRef(Loc, Instance, TailTypes, Counts);
     break;
   }
   case SILInstructionKind::DeallocPartialRefInst: {

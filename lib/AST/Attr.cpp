@@ -1522,6 +1522,23 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::TailAllocated: {
+    auto *attr = cast<TailAllocatedAttr>(this);
+    Printer.printAttrName("@_tailAllocated");
+    Printer << "(counts: " << attr->getCountsName();
+    auto types = attr->getTypes();
+    auto reprs = attr->getTypeReprs();
+    for (unsigned i = 0, e = types.size(); i != e; ++i) {
+      Printer << ", ";
+      if (types[i])
+        types[i].print(Printer, Options);
+      else
+        reprs[i]->print(Printer, Options);
+    }
+    Printer << ")";
+    break;
+  }
+
   case DeclAttrKind::Target: {
     Printer.printAttrName("@_target");
     Printer << "(\"" << cast<TargetAttr>(this)->Value << "\")";
@@ -2353,6 +2370,8 @@ StringRef DeclAttribute::getAttrName() const {
     return "callable(once)";
   case DeclAttrKind::Target:
     return "_target";
+  case DeclAttrKind::TailAllocated:
+    return "_tailAllocated";
   case DeclAttrKind::ScopeParams:
     return "_scopeParams";
   }
@@ -2637,6 +2656,48 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
                               const_cast<RawLayoutAttr *>(this),
                               /*isLikeType*/ false},
                            ErrorType::get(ctx));
+}
+
+TailAllocatedAttr *TailAllocatedAttr::createParsed(
+    ASTContext &ctx, SourceLoc atLoc, SourceRange range, Identifier countsName,
+    SourceLoc countsNameLoc, ArrayRef<TypeRepr *> typeReprs) {
+  return new (ctx) TailAllocatedAttr(
+      countsName, countsNameLoc, ctx.AllocateCopy(typeReprs),
+      ctx.Allocate<Type>(typeReprs.size()), atLoc, range, /*implicit=*/false);
+}
+
+TailAllocatedAttr *TailAllocatedAttr::create(ASTContext &ctx,
+                                             Identifier countsName,
+                                             ArrayRef<Type> types,
+                                             bool implicit) {
+  return new (ctx) TailAllocatedAttr(countsName, SourceLoc(), /*typeReprs=*/{},
+                                     ctx.AllocateCopy(types), SourceLoc(),
+                                     SourceRange(), implicit);
+}
+
+VarDecl *TailAllocatedAttr::getCountsDecl(const ClassDecl *owner) const {
+  for (auto *cls = owner; cls; cls = cls->getSuperclassDecl()) {
+    for (auto *member :
+         const_cast<ClassDecl *>(cls)->lookupDirect(DeclName(CountsName))) {
+      auto *var = dyn_cast<VarDecl>(member);
+      if (var && var->isInstanceMember())
+        return var;
+    }
+  }
+  return nullptr;
+}
+
+bool TailAllocatedAttr::isEquivalent(const TailAllocatedAttr *other,
+                                     Decl *attachedTo) const {
+  if (getCountsName() != other->getCountsName() ||
+      getTypes().size() != other->getTypes().size())
+    return false;
+  for (unsigned i = 0, e = getTypes().size(); i != e; ++i) {
+    Type thisType = getTypes()[i], otherType = other->getTypes()[i];
+    if (!thisType || !otherType || !thisType->isEqual(otherType))
+      return false;
+  }
+  return true;
 }
 
 bool RawLayoutAttr::isEquivalent(const RawLayoutAttr *other,

@@ -1108,7 +1108,7 @@ function(add_swift_target_library_single target name)
 
   if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
       # Flags required to build embedded libraries
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded)
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded;-enable-experimental-feature;TailAllocatedAttribute)
 
       # Two orthogonal per-triple opt-ins gate the departures from the
       # default embedded stdlib build:

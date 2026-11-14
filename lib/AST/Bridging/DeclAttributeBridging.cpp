@@ -765,6 +765,14 @@ BridgedSemanticsAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                     /*Implicit=*/false);
 }
 
+BridgedTailAllocatedAttr BridgedTailAllocatedAttr_createParsed(
+    BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
+    Identifier countsName, SourceLoc countsNameLoc, BridgedArrayRef cTypes) {
+  return TailAllocatedAttr::createParsed(cContext.unbridged(), atLoc, range,
+                                         countsName, countsNameLoc,
+                                         cTypes.unbridged<TypeRepr *>());
+}
+
 BridgedTargetAttr
 BridgedTargetAttr_createParsed(BridgedASTContext cContext, SourceLoc atLoc,
                                SourceRange range, BridgedStringRef cValue) {

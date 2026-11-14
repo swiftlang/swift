@@ -3516,6 +3516,21 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       return;
     }
 
+    case DeclAttrKind::TailAllocated: {
+      auto *theAttr = cast<TailAllocatedAttr>(DA);
+      SmallVector<TypeID, 3> typeIDs;
+      for (Type type : theAttr->getTypes()) {
+        if (!type)
+          return; // Not type-checked; the attribute is invalid.
+        typeIDs.push_back(S.addTypeRef(type));
+      }
+      auto abbrCode = S.DeclTypeAbbrCodes[TailAllocatedDeclAttrLayout::Code];
+      TailAllocatedDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, theAttr->isImplicit(),
+          S.addDeclBaseNameRef(theAttr->getCountsName()), typeIDs);
+      return;
+    }
+
     case DeclAttrKind::TypeEraser: {
       auto abbrCode = S.DeclTypeAbbrCodes[TypeEraserDeclAttrLayout::Code];
       auto attr = cast<TypeEraserAttr>(DA);

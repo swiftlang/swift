@@ -230,6 +230,10 @@ static bool usesFeatureTargetAttribute(Decl *decl) {
   return decl->getAttrs().hasAttribute<TargetAttr>();
 }
 
+static bool usesFeatureTailAllocatedAttribute(Decl *decl) {
+  return decl->getAttrs().hasAttribute<TailAllocatedAttr>();
+}
+
 static bool usesFeatureExtendedSpecializedAttribute(Decl *decl) {
   for (auto *attr : decl->getAttrs().getAttributes<SpecializedAttr>())
     // Exported functions and types, and non-exported types.

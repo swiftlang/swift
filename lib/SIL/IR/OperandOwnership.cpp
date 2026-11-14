@@ -332,7 +332,6 @@ OPERAND_OWNERSHIP(BitwiseEscape, BridgeObjectToWord)
 OPERAND_OWNERSHIP(DestroyingConsume, AutoreleaseValue)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocBox)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocExistentialBox)
-OPERAND_OWNERSHIP(DestroyingConsume, DeallocRef)
 OPERAND_OWNERSHIP(DestroyingConsume, DestroyValue)
 OPERAND_OWNERSHIP(DestroyingConsume, DestroyNotEscapedClosure)
 OPERAND_OWNERSHIP(DestroyingConsume, EndLifetime)
@@ -787,6 +786,14 @@ visitLoadBorrowInst(LoadBorrowInst *lbi) {
     return OperandOwnership::TrivialUse;
   }
   return OperandOwnership::NonUse;
+}
+
+OperandOwnership
+OperandOwnershipClassifier::visitDeallocRefInst(DeallocRefInst *dri) {
+  // The instance; the tail element counts are trivial.
+  if (getOperandIndex() == 0)
+    return OperandOwnership::DestroyingConsume;
+  return OperandOwnership::TrivialUse;
 }
 
 OperandOwnership

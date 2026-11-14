@@ -287,8 +287,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
           classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, loweredTy);
     } else {
       SmallVector<SILType, 1> fieldTypes{loweredTy};
-      descriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes,
-                                                    /*isArray=*/false);
+      descriptor = computeTypedMallocTypeDescriptor(IGF.IGM, fieldTypes);
     }
     if (descriptor) {
       out.add(llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor));
@@ -699,7 +698,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
     llvm::Value *alloc;
     if (auto descriptor = computeTypedMallocTypeDescriptor(
-            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+            IGF.IGM, fieldTypes, TypedMemoryCallsiteFlags::Array)) {
       auto descriptorConst =
           llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
       alloc = IGF.emitAllocRawTypedCall(size, alignMask, descriptorConst,
@@ -722,7 +721,7 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     auto boundTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
     SmallVector<SILType, 1> fieldTypes{IGF.IGM.getLoweredType(boundTy)};
     if (auto descriptor = computeTypedMallocTypeDescriptor(
-            IGF.IGM, fieldTypes, /*isArray=*/true)) {
+            IGF.IGM, fieldTypes, TypedMemoryCallsiteFlags::Array)) {
       auto descriptorConst =
           llvm::ConstantInt::get(IGF.IGM.Int64Ty, *descriptor);
       IGF.emitDeallocRawTypedCall(pointer, size, alignMask, descriptorConst);

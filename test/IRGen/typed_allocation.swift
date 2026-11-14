@@ -3,12 +3,20 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=ERRORBOX
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=COROFRAME
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -target arm64-apple-macos99.99 -wmo | %FileCheck %s --check-prefix=MEMLAYOUTTYPEDALLOCID
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -enable-experimental-feature TypedAllocation -enable-experimental-feature TailAllocatedAttribute -target arm64-apple-macos99.99 -wmo > %t/tail.ll
+// RUN: %FileCheck %s --check-prefix=TAILALLOC-ARRAY < %t/tail.ll
+// RUN: %FileCheck %s --check-prefix=TAILALLOC-STRING < %t/tail.ll
+// RUN: %FileCheck %s --check-prefix=TAILALLOC-SET < %t/tail.ll
+// RUN: %FileCheck %s --check-prefix=TAILALLOC-DICTIONARY < %t/tail.ll
+// RUN: %FileCheck %s --check-prefix=TAILALLOC-CLASSHOLDER < %t/tail.ll
 
 // REQUIRES: OS=macosx
 // REQUIRES: SWIFT_STDLIB_ARCH=arm64
 // REQUIRES: embedded_stdlib
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_TypedAllocation
+// REQUIRES: swift_feature_TailAllocatedAttribute
 
 import Swift
 
@@ -523,3 +531,63 @@ public func typedAllocationIDForMyStruct() -> UInt64 {
 //
 // MEMLAYOUTTYPEDALLOCID-LABEL: define swiftcc i64 @"$e16typed_allocation0A23AllocationIDForMyStructs6UInt64VyF"() #{{.*}} {
 // MEMLAYOUTTYPEDALLOCID:   ret i64 [[INT_TYPEDALLOCID]]
+
+// The stdlib's @_tailAllocated classes: each is allocated and freed with the
+// same type ID, and its free passes the size computed from the tail element
+// counts its deinit read. (The values are checked at run time by
+// test/embedded/typed_allocation_tail_allocations.swift.)
+public func makeArray(_ n: Int) -> [Int] {
+  Array(repeating: 1, count: n)
+}
+// TAILALLOC-ARRAY-LABEL: define {{.*}}@"$es23_ContiguousArrayStorageCfDSi_Tgq5"(
+// TAILALLOC-ARRAY:         [[ELEMENTS:%[0-9]+]] = mul i64 8, {{%[0-9]+}}
+// TAILALLOC-ARRAY:         [[SIZE:%[0-9]+]] = add i64 32, [[ELEMENTS]]
+// TAILALLOC-ARRAY:         call void @swift_deallocClassInstanceTyped(ptr {{%[0-9]+}}, i64 [[SIZE]], i64 7, i64 [[ID:[0-9]+]])
+// TAILALLOC-ARRAY-LABEL: define {{.*}}@"$eSa28_allocateBufferUninitialized{{.*}}Si_Tt0g5"(
+// TAILALLOC-ARRAY:         call noalias ptr @swift_allocObjectTyped({{.*}}ContiguousArrayStorageCySiGMf{{.*}}, i64 {{%[0-9]+}}, i64 7, i64 [[ID]])
+
+public func makeString(_ n: Int) -> String {
+  var s = ""
+  for _ in 0..<n { s += "abcd" }
+  return s
+}
+// TAILALLOC-STRING-LABEL: define {{.*}}@"$es15__StringStorageCfD"(
+// TAILALLOC-STRING:         call void @swift_deallocClassInstanceTyped(ptr %0, i64 {{%[0-9]+}}, i64 7, i64 [[ID:[0-9]+]])
+// TAILALLOC-STRING-LABEL: define {{.*}}@"$es22_allocateStringStorage{{.*}}"(
+// TAILALLOC-STRING:         call noalias ptr @swift_allocObjectTyped({{.*}}__StringStorageCMf{{.*}}, i64 {{%[0-9]+}}, i64 7, i64 [[ID]])
+
+public func makeSet(_ n: Int) -> Set<Int> {
+  var s: Set<Int> = []
+  for i in 0..<n { s.insert(i) }
+  return s
+}
+// TAILALLOC-SET-LABEL: define {{.*}}@"$es11_SetStorageCfDSi_Tgq5"(
+// TAILALLOC-SET:         call void @swift_deallocClassInstanceTyped(ptr {{%[0-9]+}}, i64 {{%[0-9]+}}, i64 7, i64 [[ID:[0-9]+]])
+// TAILALLOC-SET-LABEL: define {{.*}}@"$es11_SetStorageC8allocate{{.*}}Si_Tt2g5"(
+// TAILALLOC-SET:         call noalias ptr @swift_allocObjectTyped({{.*}}_SetStorageCySiGMf{{.*}}, i64 {{%[0-9]+}}, i64 7, i64 [[ID]])
+
+public func makeDictionary(_ n: Int) -> [Int: Int] {
+  var d: [Int: Int] = [:]
+  for i in 0..<n { d[i] = i }
+  return d
+}
+// TAILALLOC-DICTIONARY-LABEL: define {{.*}}@"$es18_DictionaryStorageCfDSi_SiTgq5"(
+// TAILALLOC-DICTIONARY:         call void @swift_deallocClassInstanceTyped(ptr {{%[0-9]+}}, i64 {{%[0-9]+}}, i64 7, i64 [[ID:[0-9]+]])
+// TAILALLOC-DICTIONARY-LABEL: define {{.*}}@"$es18_DictionaryStorageC8allocate{{.*}}Si_SiTt2g5"(
+// TAILALLOC-DICTIONARY:         call noalias ptr @swift_allocObjectTyped({{.*}}_DictionaryStorageCyS2iGMf{{.*}}, i64 {{%[0-9]+}}, i64 7, i64 [[ID]])
+
+// A writable key path through a class allocates a KeyPath ClassHolder, whose
+// count is the constant 1.
+public final class KeyPathObj { var value = 0 }
+public struct KeyPathOuter { var obj: KeyPathObj; var n: Int }
+public func write(_ o: inout KeyPathOuter,
+                  _ kp: WritableKeyPath<KeyPathOuter, Int>) {
+  o[keyPath: kp] = 1
+}
+public func writeThroughClass(_ o: inout KeyPathOuter) {
+  write(&o, \KeyPathOuter.obj.value)
+}
+// TAILALLOC-CLASSHOLDER-LABEL: define {{.*}}@"$es11ClassHolderC7_create{{.*}}s5UInt8V_Tt2t3g5"(
+// TAILALLOC-CLASSHOLDER:         call noalias ptr @swift_allocObjectTyped({{.*}}ClassHolderCys5UInt8VGMf{{.*}}, i64 [[SIZE:[0-9]+]], i64 7, i64 [[ID:[0-9]+]])
+// TAILALLOC-CLASSHOLDER-LABEL: define {{.*}}@"$es11ClassHolderCfDs5UInt8V_Tgq5"(
+// TAILALLOC-CLASSHOLDER:         call void @swift_deallocClassInstanceTyped(ptr %0, i64 [[SIZE]], i64 7, i64 [[ID]])

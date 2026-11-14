@@ -20,6 +20,7 @@
 
 #include "NecessaryBindings.h"
 #include "StructLayout.h"
+#include "TypeLayout.h"
 
 namespace llvm {
   class Constant;
@@ -242,7 +243,8 @@ IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 std::optional<uint64_t>
 computeTypedMallocTypeDescriptor(IRGenModule &IGM,
                                  llvm::SmallVectorImpl<SILType> &fieldTypes,
-                                 bool isArray = false);
+                                 TypedMemoryCallsiteFlags callsiteFlags =
+                                     TypedMemoryCallsiteFlags::FixedSize);
 
 } // end namespace irgen
 } // end namespace swift

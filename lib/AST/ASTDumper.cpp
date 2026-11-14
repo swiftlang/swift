@@ -5666,6 +5666,13 @@ public:
     printFieldQuoted(Attr->Value, Label::always("value"));
     printFoot();
   }
+  void visitTailAllocatedAttr(TailAllocatedAttr *Attr, Label label) {
+    printCommon(Attr, "tail_allocated_attr", label);
+    printFieldQuoted(Attr->getCountsName().str(), Label::always("counts"));
+    for (auto *tyR : Attr->getTypeReprs())
+      printRec(tyR, Label::optional("type_repr"));
+    printFoot();
+  }
   void visitTargetAttr(TargetAttr *Attr, Label label) {
     printCommon(Attr, "target_attr", label);
     printFieldQuoted(Attr->Value, Label::always("value"));

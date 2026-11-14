@@ -1,0 +1,25 @@
+// Parse, print and serialize dealloc_ref with tail elements.
+
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name dealloc
+// RUN: %target-sil-opt %t/tmp.sib -o %t/tmp.2.sib -module-name dealloc
+// RUN: %target-sil-opt %t/tmp.2.sib -module-name dealloc -emit-sorted-sil | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+
+// CHECK-LABEL: sil @dealloc_tail_elems : $@convention(thin) (@owned C, Builtin.Word, Builtin.Word) -> () {
+// CHECK:         dealloc_ref [tail_elems $Builtin.Int8 * %1] [tail_elems $Builtin.Int64 * %2] %0
+// CHECK:         dealloc_ref %0
+// CHECK-LABEL: } // end sil function 'dealloc_tail_elems'
+sil @dealloc_tail_elems : $@convention(thin) (@owned C, Builtin.Word, Builtin.Word) -> () {
+bb0(%0 : $C, %1 : $Builtin.Word, %2 : $Builtin.Word):
+  dealloc_ref [tail_elems $Builtin.Int8 * %1 : $Builtin.Word] [tail_elems $Builtin.Int64 * %2 : $Builtin.Word] %0 : $C
+  dealloc_ref %0 : $C
+  %r = tuple ()
+  return %r : $()
+}

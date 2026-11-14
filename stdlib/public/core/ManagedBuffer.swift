@@ -34,6 +34,9 @@ internal func _swift_bufferAllocate(
 /// any live elements in the `deinit` of a subclass.
 /// - Note: Subclasses must not have any stored properties; any storage
 ///   needed should be included in `Header`.
+#if hasFeature(TypedAllocation) && hasFeature(TailAllocatedAttribute)
+@_tailAllocated(counts: _tailCount, Element)
+#endif
 @_fixed_layout
 open class ManagedBuffer<Header, Element: ~Copyable> {
   /// The stored `Header` instance.
@@ -44,6 +47,15 @@ open class ManagedBuffer<Header, Element: ~Copyable> {
   /// reading the `header` property during `ManagedBuffer.create` is undefined.
   @_preInverseGenerics
   public final var header: Header
+
+#if hasFeature(TypedAllocation) && hasFeature(TailAllocatedAttribute)
+  // Only where the stdlib is built with typed allocation,
+  // since it makes every buffer a word bigger.
+  /// The number of tail-allocated elements, as passed to the allocation, for
+  /// typed deallocation and `capacity`.
+  @usableFromInline
+  internal final var _tailCount: Int
+#endif
 
   #if $Embedded
   // In embedded mode this initializer has to be public, otherwise derived
@@ -89,6 +101,10 @@ extension ManagedBuffer where Element: ~Copyable {
     let p = Builtin.allocWithTailElems_1(
          self,
          minimumCapacity._builtinWordValue, Element.self)
+#if hasFeature(TypedAllocation) && hasFeature(TailAllocatedAttribute)
+    // Before the factory, which may read `capacity`.
+    p._tailCount = minimumCapacity
+#endif
 
     let initHeaderVal = try factory(p)
     unsafe p.headerAddress.initialize(to: initHeaderVal)
@@ -108,11 +124,15 @@ extension ManagedBuffer where Element: ~Copyable {
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public final var capacity: Int {
+#if hasFeature(TypedAllocation) && hasFeature(TailAllocatedAttribute)
+    return _tailCount
+#else
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
     let endAddr = unsafe storageAddr + _swift_stdlib_malloc_size(storageAddr)
     let realCapacity = unsafe endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
+#endif
   }
 
   @_preInverseGenerics
@@ -431,9 +451,15 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   @available(OpenBSD, unavailable, message: "malloc_size is unavailable.")
   public var capacity: Int {
+#if hasFeature(TypedAllocation) && hasFeature(TailAllocatedAttribute)
+    // ManagedBuffer's stored count follows the header.
+    return unsafe (_address + ManagedBufferPointer._tailCountOffset)
+      .load(as: Int.self)
+#else
     return (
       _capacityInBytes &- ManagedBufferPointer._elementOffset
     ) / MemoryLayout<Element>.stride
+#endif
   }
 
   /// Call `body` with an `UnsafeMutablePointer` to the stored
@@ -629,10 +655,28 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   internal static var _elementOffset: Int {
     _onFastPath()
+#if hasFeature(TypedAllocation) && hasFeature(TailAllocatedAttribute)
+    return _roundUp(
+      _tailCountOffset + MemoryLayout<Int>.size,
+      toAlignment: MemoryLayout<Element>.alignment)
+#else
     return _roundUp(
       _headerOffset + MemoryLayout<Header>.size,
       toAlignment: MemoryLayout<Element>.alignment)
+#endif
   }
+
+#if hasFeature(TypedAllocation) && hasFeature(TailAllocatedAttribute)
+  /// Offset from the allocated storage for `self` to ManagedBuffer's stored
+  /// count, which follows the `Header`.
+  @_preInverseGenerics
+  @inlinable
+  internal static var _tailCountOffset: Int {
+    return _roundUp(
+      _headerOffset + MemoryLayout<Header>.size,
+      toAlignment: MemoryLayout<Int>.alignment)
+  }
+#endif
 }
 
 @_preInverseGenerics

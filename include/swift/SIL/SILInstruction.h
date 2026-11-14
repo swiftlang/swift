@@ -10413,13 +10413,60 @@ public:
 ///
 /// It is undefined behavior if the type of the operand does not match the
 /// most derived type of the allocated instance.
-class DeallocRefInst :
-  public UnaryInstructionBase<SILInstructionKind::DeallocRefInst,
-                              DeallocationInst> {
+///
+/// Optionally, it names the tail-allocated arrays the instance was allocated
+/// with, as in `alloc_ref`, so that the deallocation can pass the allocation's
+/// size (and, with typed allocation, its type ID). The instance is operand 0,
+/// followed by the tail element counts.
+class DeallocRefInst final : public InstructionBaseWithTrailingOperands<
+                                 SILInstructionKind::DeallocRefInst,
+                                 DeallocRefInst, DeallocationInst, SILType> {
   friend SILBuilder;
+  USE_SHARED_UINT8;
 
-  DeallocRefInst(SILDebugLocation DebugLoc, SILValue Operand)
-      : UnaryInstructionBase(DebugLoc, Operand) { }
+  DeallocRefInst(SILDebugLocation DebugLoc, ArrayRef<SILValue> AllOperands,
+                 ArrayRef<SILType> ElementTypes)
+      : InstructionBaseWithTrailingOperands(AllOperands, DebugLoc) {
+    sharedUInt8().DeallocRefInst.numTailTypes = ElementTypes.size();
+    assert(sharedUInt8().DeallocRefInst.numTailTypes == ElementTypes.size() &&
+           "Truncation");
+    assert(AllOperands.size() > ElementTypes.size());
+    std::uninitialized_copy(ElementTypes.begin(), ElementTypes.end(),
+                            getTrailingObjects<SILType>());
+  }
+
+  static DeallocRefInst *create(SILDebugLocation DebugLoc, SILFunction &F,
+                                SILValue Operand,
+                                ArrayRef<SILType> ElementTypes,
+                                ArrayRef<SILValue> ElementCountOperands);
+
+public:
+  /// The instance to deallocate.
+  SILValue getOperand() const { return getAllOperands()[0].get(); }
+
+  unsigned getNumTailTypes() const {
+    return sharedUInt8().DeallocRefInst.numTailTypes;
+  }
+
+  ArrayRef<SILType> getTailAllocatedTypes() const {
+    return {getTrailingObjects<SILType>(), getNumTailTypes()};
+  }
+
+  MutableArrayRef<SILType> getTailAllocatedTypes() {
+    return {getTrailingObjects<SILType>(), getNumTailTypes()};
+  }
+
+  ArrayRef<Operand> getTailAllocatedCounts() const {
+    return getAllOperands().slice(1, getNumTailTypes());
+  }
+
+  ArrayRef<Operand> getTypeDependentOperands() const {
+    return getAllOperands().slice(1 + getNumTailTypes());
+  }
+
+  MutableArrayRef<Operand> getTypeDependentOperands() {
+    return getAllOperands().slice(1 + getNumTailTypes());
+  }
 };
 
 /// Deallocate memory for a reference type instance from a failure path of a

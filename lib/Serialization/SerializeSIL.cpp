@@ -1428,6 +1428,29 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)ARI->getType().getCategory(), Args);
     break;
   }
+  case SILInstructionKind::DeallocRefInst:
+    if (cast<DeallocRefInst>(&SI)->getNumTailTypes() != 0) {
+      // [instance, (tail type, count, count type)...], like alloc_ref.
+      const auto *DRI = cast<DeallocRefInst>(&SI);
+      SILValue Instance = DRI->getOperand();
+      SmallVector<ValueID, 4> Args;
+      Args.push_back(addValueRef(Instance));
+      for (auto [TailType, Count] : llvm::zip(DRI->getTailAllocatedTypes(),
+                                              DRI->getTailAllocatedCounts())) {
+        assert(TailType.isObject());
+        Args.push_back(S.addTypeRef(TailType.getRawASTType()));
+        Args.push_back(addValueRef(Count.get()));
+        Args.push_back(S.addTypeRef(Count.get()->getType().getRawASTType()));
+      }
+      SILOneTypeValuesLayout::emitRecord(
+          Out, ScratchRecord, SILAbbrCodes[SILOneTypeValuesLayout::Code],
+          (unsigned)SI.getKind(),
+          S.addTypeRef(Instance->getType().getRawASTType()),
+          (unsigned)Instance->getType().getCategory(), Args);
+      break;
+    }
+    writeOneOperandLayout(SI.getKind(), /*attrs=*/0, SI.getOperand(0));
+    break;
   case SILInstructionKind::AllocStackInst: {
     const AllocStackInst *ASI = cast<AllocStackInst>(&SI);
     unsigned attr = 0;
@@ -1861,7 +1884,6 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::DeallocStackInst:
   case SILInstructionKind::DeallocStackRefInst:
   case SILInstructionKind::DeallocPackInst:
-  case SILInstructionKind::DeallocRefInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
   case SILInstructionKind::DestroyAddrInst:

@@ -970,7 +970,13 @@ DECL_ATTR(_cArrayProjection, CArrayProjection,
   UserInaccessible | RejectByParser | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   183)
 
-LAST_DECL_ATTR(CArrayProjection)
+DECL_ATTR(_tailAllocated, TailAllocated,
+  OnClass,
+  UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIStableToRemove | UnreachableInABIAttr,
+  184)
+DECL_ATTR_FEATURE_REQUIREMENT(TailAllocated, TailAllocatedAttribute)
+
+LAST_DECL_ATTR(TailAllocated)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

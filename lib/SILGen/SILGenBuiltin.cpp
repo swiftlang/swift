@@ -1265,6 +1265,26 @@ static ManagedValue emitBuiltinAllocWithTailElems(SILGenFunction &SGF,
     ElemTypes.push_back(SGF.getLoweredType(replacementTypes[Idx+1]->
                                           getCanonicalType()).getObjectType());
   }
+  // A class with @_tailAllocated is deallocated with its attribute's element
+  // types, so it must be allocated with them, lowered the same way.
+  SmallVector<CanType, 4> AttrFormalTypes;
+  SmallVector<SILType, 4> AttrTypes;
+  if (SGF.getTailAllocatedElementTypes(RefType.getASTType(), AttrFormalTypes,
+                                       AttrTypes)) {
+    bool matches = AttrFormalTypes.size() == NumTailTypes;
+    for (unsigned Idx = 0; matches && Idx < NumTailTypes; ++Idx)
+      matches =
+          AttrFormalTypes[Idx] == replacementTypes[Idx + 1]->getCanonicalType();
+    if (matches) {
+      ElemTypes.assign(AttrTypes.begin(), AttrTypes.end());
+    } else {
+      SGF.SGM.diagnose(loc, diag::tail_allocated_wrong_element_types,
+                       RefType.getASTType());
+      // Keep the SIL valid for the verifier; compilation fails anyway.
+      ElemTypes.clear();
+      Counts.clear();
+    }
+  }
   ManagedValue Metatype = args[0];
   if (isa<MetatypeInst>(Metatype)) {
     auto InstanceType =

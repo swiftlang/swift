@@ -154,6 +154,24 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         checkSuperCallToSafeInteropWrapper(selfApply);
       }
 
+      // A class with @_tailAllocated is deallocated with the tail element
+      // counts its counts property reports, so it must be allocated with
+      // Builtin.allocWithTailElems, not through an initializer. An allocating
+      // reference to an initializer, applied or not, is a DeclRefExpr;
+      // delegating `self.init` and `super.init` calls aren't allocations and
+      // use OtherConstructorDeclRefExpr instead.
+      if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
+        if (auto *ctor = dyn_cast<ConstructorDecl>(DRE->getDecl())) {
+          auto *classDecl = ctor->getDeclContext()->getSelfClassDecl();
+          auto *attr =
+              classDecl ? classDecl->getTailAllocatedAttr().first : nullptr;
+          if (attr && !attr->isInvalid())
+            Ctx.Diags.diagnose(DRE->getLoc(),
+                               diag::tail_allocated_init_allocation,
+                               classDecl->getDeclaredInterfaceType());
+        }
+      }
+
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
