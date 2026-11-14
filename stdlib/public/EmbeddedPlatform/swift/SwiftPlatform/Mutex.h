@@ -17,8 +17,8 @@
  *
  *===----------------------------------------------------------------------===*/
 
-#ifndef EMBEDDED_SWIFT_PLATFORM_MUTEX_H
-#define EMBEDDED_SWIFT_PLATFORM_MUTEX_H
+#ifndef SWIFT_PLATFORM_MUTEX_H
+#define SWIFT_PLATFORM_MUTEX_H
 
 #include "Types.h"
 

@@ -16,8 +16,8 @@
  *
  *===----------------------------------------------------------------------===*/
 
-#ifndef EMBEDDED_SWIFT_PLATFORM_TYPES_H
-#define EMBEDDED_SWIFT_PLATFORM_TYPES_H
+#ifndef SWIFT_PLATFORM_TYPES_H
+#define SWIFT_PLATFORM_TYPES_H
 
 
 #if !defined(__has_feature)

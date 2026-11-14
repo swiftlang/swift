@@ -20,8 +20,8 @@
  *
  *===----------------------------------------------------------------------===*/
 
-#ifndef EMBEDDED_SWIFT_PLATFORM_CLOCKS_H
-#define EMBEDDED_SWIFT_PLATFORM_CLOCKS_H
+#ifndef SWIFT_PLATFORM_CLOCKS_H
+#define SWIFT_PLATFORM_CLOCKS_H
 
 #include "Types.h"
 

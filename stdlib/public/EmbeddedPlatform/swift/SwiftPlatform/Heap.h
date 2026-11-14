@@ -15,8 +15,8 @@
  *
  *===----------------------------------------------------------------------===*/
 
-#ifndef EMBEDDED_SWIFT_PLATFORM_HEAP_H
-#define EMBEDDED_SWIFT_PLATFORM_HEAP_H
+#ifndef SWIFT_PLATFORM_HEAP_H
+#define SWIFT_PLATFORM_HEAP_H
 
 #include "Types.h"
 
