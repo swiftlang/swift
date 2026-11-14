@@ -1426,6 +1426,12 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (parseFeatureArgs(Opts, Args, Diags))
     HadError = true;
 
+  // The C++ overlay uses '@unsafe(always)', including in .swiftinterface files
+  // built without the flag, so the feature is always on for it. This also makes
+  // '$AlwaysUnsafeAttribute' true when its interface is rebuilt.
+  if (FrontendOpts.ModuleName == CXX_MODULE_NAME)
+    Opts.enableFeature(Feature::AlwaysUnsafeAttribute);
+
   // '-strict-memory-safety' only enables the diagnostic group, but
   // `#if hasFeature` and the module's strict memory safety flag key on the
   // feature. Turn the feature on whenever the group is enabled.

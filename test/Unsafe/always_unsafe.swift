@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature AlwaysUnsafeAttribute
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 // Uses of '@unsafe(always)' declarations must be acknowledged with 'unsafe'
 // even though strict memory safety checking is not enabled here.

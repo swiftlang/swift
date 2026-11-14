@@ -2,7 +2,9 @@
 // RUN: split-file %s %t
 
 // Check how the diagnostic chains are actually rendered.
-// RUN: not %target-swift-frontend -typecheck %t/test.swift -diagnostic-style=llvm 2>&1 | %PathSanitizingDiff %t/llvm-render.expected
+// RUN: not %target-swift-frontend -typecheck %t/test.swift -diagnostic-style=llvm -enable-experimental-feature AlwaysUnsafeAttribute 2>&1 | %PathSanitizingDiff %t/llvm-render.expected
+
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 //--- test.swift
 @unsafe(always)

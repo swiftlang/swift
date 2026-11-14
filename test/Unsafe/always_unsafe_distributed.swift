@@ -1,7 +1,8 @@
-// RUN: %target-typecheck-verify-swift -target %target-swift-5.7-abi-triple -I %t
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.7-abi-triple -I %t -enable-experimental-feature AlwaysUnsafeAttribute
 
 // REQUIRES: concurrency
 // REQUIRES: distributed
+// REQUIRES: swift_feature_AlwaysUnsafeAttribute
 
 import Distributed
 
