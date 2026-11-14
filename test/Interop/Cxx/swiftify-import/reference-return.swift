@@ -29,69 +29,69 @@
 // CHECK-LABEL:@__swiftmacro_So4pick15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&a) @_disfavoredOverload public func pick(_ a: inout CInt, _ b: inout CInt) -> Swift.Ref<Swift.Cell<CInt>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe pick(&a, &b)).assumingMemoryBound(to: Swift.Cell<CInt>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&a) @_disfavoredOverload public func pick(_ a: inout CInt, _ b: inout CInt) -> Swift::Ref<Swift::Cell<CInt>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe pick(&a, &b)).assumingMemoryBound(to: Swift::Cell<CInt>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 // CHECK-LABEL:@__swiftmacro_So9constPick15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(borrow a) @_disfavoredOverload public func constPick(_ a: borrowing @_addressable CInt) -> Swift.Ref<Swift.ConstCell<CInt>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe constPick(a)).assumingMemoryBound(to: Swift.ConstCell<CInt>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(borrow a) @_disfavoredOverload public func constPick(_ a: borrowing @_addressable CInt) -> Swift::Ref<Swift::ConstCell<CInt>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe constPick(a)).assumingMemoryBound(to: Swift::ConstCell<CInt>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 // CHECK-LABEL:@__swiftmacro_So7CounterV3get15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&self) @_disfavoredOverload
-// CHECK-NEXT:public mutating func get() -> Swift.Ref<Swift.Cell<CInt>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe get()).assumingMemoryBound(to: Swift.Cell<CInt>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:public mutating func get() -> Swift::Ref<Swift::Cell<CInt>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe get()).assumingMemoryBound(to: Swift::Cell<CInt>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 // CHECK-LABEL:@__swiftmacro_So7CounterV4cget15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_addressableSelf @_lifetime(borrow self) @_disfavoredOverload
-// CHECK-NEXT:public borrowing func cget() -> Swift.Ref<Swift.ConstCell<CInt>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe cget()).assumingMemoryBound(to: Swift.ConstCell<CInt>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:public borrowing func cget() -> Swift::Ref<Swift::ConstCell<CInt>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe cget()).assumingMemoryBound(to: Swift::ConstCell<CInt>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 // CHECK-LABEL:@__swiftmacro_So10counterRef15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&c) @_disfavoredOverload public func counterRef(_ c: inout Counter) -> Swift.Ref<Swift.Cell<Counter>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe counterRef(&c)).assumingMemoryBound(to: Swift.Cell<Counter>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&c) @_disfavoredOverload public func counterRef(_ c: inout Counter) -> Swift::Ref<Swift::Cell<Counter>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe counterRef(&c)).assumingMemoryBound(to: Swift::Cell<Counter>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 // CHECK-LABEL:@__swiftmacro_So10typedefRef15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
-// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&a) @_disfavoredOverload public func typedefRef(_ a: inout CInt) -> Swift.Ref<Swift.Cell<CInt>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe typedefRef(&a)).assumingMemoryBound(to: Swift.Cell<CInt>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&a) @_disfavoredOverload public func typedefRef(_ a: inout CInt) -> Swift::Ref<Swift::Cell<CInt>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe typedefRef(&a)).assumingMemoryBound(to: Swift::Cell<CInt>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 // CHECK-LABEL:@__swiftmacro_So9ContainerV5front15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&self) @_disfavoredOverload
-// CHECK-NEXT:public mutating func front() -> Swift.Ref<Swift.Cell<Container.value_type>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe front()).assumingMemoryBound(to: Swift.Cell<Container.value_type>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:public mutating func front() -> Swift::Ref<Swift::Cell<Container.value_type>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe front()).assumingMemoryBound(to: Swift::Cell<Container.value_type>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 // CHECK-LABEL:@__swiftmacro_So9ContainerV6cfront15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT:@_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_addressableSelf @_lifetime(borrow self) @_disfavoredOverload
-// CHECK-NEXT:public borrowing func cfront() -> Swift.Ref<Swift.ConstCell<Container.value_type>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe cfront()).assumingMemoryBound(to: Swift.ConstCell<Container.value_type>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:public borrowing func cfront() -> Swift::Ref<Swift::ConstCell<Container.value_type>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe cfront()).assumingMemoryBound(to: Swift::ConstCell<Container.value_type>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 // CHECK-LABEL:@__swiftmacro_So10asProperty15_SwiftifyImportfMp_.swift
 // CHECK-NEXT:------------------------------
 // CHECK-NEXT:/// This is an auto-generated wrapper for safer interop
 // CHECK-NEXT:@available(swift, obsoleted: 3, renamed: "getter:Counter.property(self:_:)") @_alwaysEmitIntoClient @inline(always) {{(@available\(.*\) )?}}@_lifetime(&c) @_disfavoredOverload
-// CHECK-NEXT:public func asProperty(_ c: inout Counter) -> Swift.Ref<Swift.Cell<CInt>> {
-// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift.Ref(unsafeAddress: UnsafeRawPointer(unsafe asProperty(&c)).assumingMemoryBound(to: Swift.Cell<CInt>.self), borrowing: ()), copying: ())
+// CHECK-NEXT:public func asProperty(_ c: inout Counter) -> Swift::Ref<Swift::Cell<CInt>> {
+// CHECK-NEXT:    return unsafe _swiftifyOverrideLifetime(Swift::Ref(unsafeAddress: UnsafeRawPointer(unsafe asProperty(&c)).assumingMemoryBound(to: Swift::Cell<CInt>.self), borrowing: ()), copying: ())
 // CHECK-NEXT:}
 // CHECK-NEXT:------------------------------
 

@@ -5,7 +5,7 @@
 // RUN: split-file %s %t
 
 // The generated code refers to the stdlib's Ref and Cell, not to C++ types
-// that happen to have the same name.
+// that happen to have the same name, even one shadowing the Swift module.
 // RUN: %target-swift-frontend -emit-sil -o /dev/null -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature SafeInteropWrappers -enable-experimental-feature Cells \
 // RUN:   -strict-memory-safety -warnings-as-errors -Xcc -Werror %t/test.swift -verify -eager-macro-checking
@@ -23,6 +23,7 @@ struct Cell { int x; };
 struct ConstCell { int x; };
 template <class T> struct Ref { T t; };
 using IntRef = Ref<int>;
+struct Swift { int x; };
 
 inline int &pick(int &a [[clang::lifetimebound]]) { return a; }
 inline const int &constPick(const int &a [[clang::lifetimebound]]) { return a; }
@@ -36,10 +37,10 @@ func test(_ x: inout CInt) {
   // of scope rather than until its last use. The 'do' ends it before 'x' is
   // read again below.
   do {
-    let r: Swift.Ref<Swift.Cell<CInt>> = pick(&x)
+    let r: Swift::Ref<Swift::Cell<CInt>> = pick(&x)
     r.value.value = 3
   }
-  let c: Swift.Ref<Swift.ConstCell<CInt>> = constPick(x)
+  let c: Swift::Ref<Swift::ConstCell<CInt>> = constPick(x)
   _ = c.value.value
 }
 
