@@ -8,7 +8,7 @@ and syntax highlighting.
 ## Setting up Package.el for MELPA
 
 Before we do anything, we need to setup package.el so we can grab packages from
-[https://melpa.org/](MELPA) and GNU. This can be done by
+[MELPA](https://melpa.org/) and GNU. This can be done by
 including the below in your elisp startup file. Make sure it is run before any
 other code is run.
 
