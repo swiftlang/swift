@@ -38,13 +38,19 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
   @safe
   let _position: Unsafe${Mutable}Pointer<Element>?
 
+  @usableFromInline
+  @_preInverseGenerics
+  @safe
+  internal let _count: Int
+
   /// The number of elements in the buffer.
   ///
   /// If the `baseAddress` of this buffer is `nil`, the count is zero. However,
   /// a buffer can have a `count` of zero even with a non-`nil` base address.
   @_preInverseGenerics
+  @inlinable
   @safe
-  public let count: Int
+  public var count: Int { _assumeNonNegative(_count) }
 
   // This works around _debugPrecondition() impacting the performance of
   // optimized code. (rdar://72246338)
@@ -54,7 +60,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
     count: Int
   ) {
     _position = unsafe start
-    self.count = count
+    self._count = count
   }
 
   /// Creates a new buffer pointer over the specified number of contiguous
@@ -85,7 +91,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
   @safe
   public init(_empty: ()) {
     _position = nil
-    count = 0
+    _count = 0
   }
 
 % if Mutable:
@@ -97,7 +103,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
   @_preInverseGenerics
   public init(mutating other: UnsafeBufferPointer<Element>) {
     _position = unsafe UnsafeMutablePointer<Element>(mutating: other._position)
-    count = other.count
+    _count = other._count
   }
 % else:
   /// Creates an immutable typed buffer pointer referencing the same memory as the 
@@ -109,7 +115,7 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
   @safe
   public init(_ other: UnsafeMutableBufferPointer<Element>) {
     _position = unsafe UnsafePointer<Element>(other._position)
-    count = other.count
+    _count = other._count
   }
 % end
 }
