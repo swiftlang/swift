@@ -4898,7 +4898,8 @@ public:
   /// \returns true if any conformances were found. 
   bool lookupConformance(
          ProtocolDecl *protocol,
-         SmallVectorImpl<ProtocolConformance *> &conformances) const;
+         SmallVectorImpl<ProtocolConformance *> &conformances,
+         bool includeSimpleEnumConformances = true) const;
 
   /// Retrieve all of the protocols that this nominal type conforms to.
   ///
@@ -5189,6 +5190,9 @@ public:
   ElementRange getAllElements() const {
     return ElementRange(getMembers());
   }
+
+  /// Expand member macros before inspecting the final enum representation.
+  ElementRange getExpandedElements() const;
 
   unsigned getNumElements() const {
     auto eltRange = getAllElements();
