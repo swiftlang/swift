@@ -310,7 +310,7 @@ struct NonescapableSelfAccessors: ~Escapable {
 
   var neComputedBorrow: NE {
     @_lifetime(borrow self)
-    get {
+    get { // expected-error{{a getter that borrows 'self' cannot be combined with a setter on a non-'Escapable' type; use '@_lifetime(copy self)' on the getter}}
       ne
     }
 
@@ -407,7 +407,7 @@ struct NoncopyableSelfAccessors: ~Copyable & ~Escapable {
 
   var neComputedBorrow: NE {
     @_lifetime(borrow self)
-    get {
+    get { // expected-error{{a getter that borrows 'self' cannot be combined with a setter on a non-'Escapable' type; use '@_lifetime(copy self)' on the getter}}
       ne
     }
 

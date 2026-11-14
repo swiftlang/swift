@@ -324,6 +324,9 @@ private struct ScopeExtension {
   // Initialized after walking dependent uses. True if the scope can be extended into the caller.
   var dependsOnCaller: Bool?
 
+  // Initialized after walking dependent uses. The inout arguments that the dependent value escapes into.
+  var inoutTargets = SingleInlineArray<FunctionArgument>()
+
   // Does scope extension potentially invalidate stack nesting?
   var mustFixStackNesting = false
 
@@ -639,6 +642,7 @@ extension ScopeExtension {
   /// - The dependent value is returned from this function.
   /// - All nested scopes are access scopes that are redundant with the caller's exclusive access scope.
   /// - All scope owners are function arguments.
+  /// - An inout argument that the dependent value is stored into has a scoped dependence on itself if it is an owner.
   func findArgumentDependencies() -> SingleInlineArray<FunctionArgument> {
     let noCallerScope = SingleInlineArray<FunctionArgument>()
     // Check that the dependent value is returned by this function.
@@ -663,6 +667,25 @@ extension ScopeExtension {
       }
       guard arg.convention.isIndirectIn || arg.convention.isInout else {
         return noCallerScope
+      }
+      // An inout argument can only hold a value that depends on the caller's access to itself if the inout
+      // argument has a scoped dependence on itself. A copied (inherited) dependence, as in
+      // `@_lifetime(self: copy self)`, does not cover the argument's own storage, so keep the local scope to
+      // diagnose the escape. LifetimeDependenceDiagnostics checks the dependence on any other argument.
+      //
+      // Existing .swiftinterface files may declare a getter that borrows 'self' together with a setter that copies
+      // into 'self'. Their compiler-generated '_modify' stores the getter's borrow back into 'self'. Don't diagnose
+      // it, so those interfaces still build.
+      let function = arg.parentFunction
+      let isSynthesizedModifyFromInterface =
+        function.sourceFileKind == .interface && function.isImplicit && function.accessorKindName == "_modify"
+      let argumentConventions = function.argumentConventions
+      for inoutArg in inoutTargets where inoutArg == arg && !isSynthesizedModifyFromInterface {
+        guard let dep = argumentConventions.parameterDependence(targetArgumentIndex: inoutArg.index,
+                                                                sourceArgumentIndex: arg.index),
+              dep.isScoped else {
+          return noCallerScope
+        }
       }
       compatibleArgs.push(arg)
     }
@@ -762,6 +785,7 @@ extension ScopeExtension {
         return nil
       }
       dependsOnCaller = walker.dependsOnCaller
+      inoutTargets = walker.inoutTargets
     }
     for owner in owners {
       guard var ownershipRange = computeSingleOwnerRange(owner: owner) else {
@@ -1192,6 +1216,9 @@ internal struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
   /// Set to true if the dependence is returned from the current function.
   var dependsOnCaller = false
 
+  /// The inout arguments that the dependent value is stored into, escaping the function.
+  var inoutTargets = SingleInlineArray<FunctionArgument>()
+
   init(_ function: Function, _ localReachabilityCache: LocalVariableReachabilityCache, _ context: Context,
        visitor: @escaping (Instruction) -> WalkResult) {
     self.function = function
@@ -1238,6 +1265,7 @@ internal struct LifetimeDependentUseWalker : LifetimeDependenceDefUseWalker {
 
   mutating func inoutDependence(argument: FunctionArgument, functionExit: Instruction) -> WalkResult {
     dependsOnCaller = true
+    inoutTargets.push(argument)
     return visitor(functionExit)
   }
 

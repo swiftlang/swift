@@ -58,11 +58,7 @@ struct NCNEHolder : ~Copyable, ~Escapable {
     borrowing get {
       _overrideLifetime(NCNE(p), borrowing: self)
     }
-    // CHECK-LABEL: sil{{.*}} @$s9accessors10NCNEHolderV10ncneBorrowAA4NCNEVvM : $@yield_once @convention(method) (@lifetime(copy 0) @inout NCNEHolder) -> @lifetime(borrow 0) @yields @inout NCNE {
-    @_lifetime(self: copy self)
-    set {
-      p = newValue._p
-    }
+    // No setter: a getter that borrows 'self' cannot be combined with a setter.
   }
 
   // this cannot be public in order to synthesize the _read accessor.
