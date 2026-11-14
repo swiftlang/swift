@@ -546,37 +546,17 @@ void CompilerInstance::setupOutputBackend() {
   OutputBackend =
       llvm::makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>();
 
-  // Mirror the output into CAS.
+  // Store the outputs into CAS. The CAS backend also writes them on disk, by
+  // exporting them from the CAS.
   if (supportCaching()) {
-    auto &InAndOuts = Invocation.getFrontendOptions().InputsAndOutputs;
     CASOutputBackend = createSwiftCachingOutputBackend(
-        *CAS, *ResultCache, *CompileJobBaseKey, InAndOuts,
+        *CAS, *ResultCache, *CompileJobBaseKey,
+        Invocation.getFrontendOptions().InputsAndOutputs,
         Invocation.getFrontendOptions(),
         Invocation.getFrontendOptions().RequestedAction,
-        Invocation.getCASOptions().WriteOutputHashXAttr);
-
-    if (Invocation.getIRGenOptions().UseCASBackend) {
-      auto OutputFiles = InAndOuts.copyOutputFilenames();
-      std::unordered_set<std::string> OutputFileSet(
-          std::make_move_iterator(OutputFiles.begin()),
-          std::make_move_iterator(OutputFiles.end()));
-      // Filter the object file output if MCCAS is enabled, we do not want to
-      // store the object file itself, but store the MCCAS CASID instead.
-      auto FilterBackend = llvm::vfs::makeFilteringOutputBackend(
-          CASOutputBackend,
-          [&, OutputFileSet](StringRef Path,
-                             std::optional<llvm::vfs::OutputConfig> Config) {
-            if (InAndOuts.getPrincipalOutputType() != file_types::ID::TY_Object)
-              return true;
-            return !(OutputFileSet.find(Path.str()) != OutputFileSet.end());
-          });
-      OutputBackend =
-          llvm::vfs::makeMirroringOutputBackend(OutputBackend, FilterBackend);
-      return;
-    }
-
-    OutputBackend =
-        llvm::vfs::makeMirroringOutputBackend(OutputBackend, CASOutputBackend);
+        Invocation.getCASOptions().WriteOutputHashXAttr,
+        Invocation.getIRGenOptions().UseCASBackend);
+    OutputBackend = CASOutputBackend;
   }
 
   // Setup verification backend.
