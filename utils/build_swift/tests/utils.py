@@ -106,11 +106,11 @@ class redirect_stdout():
         self._stream = stream or StringIO()
 
     def __enter__(self):
-        self._old_stdout, sys.stderr = sys.stderr, self._stream
+        self._old_stdout, sys.stdout = sys.stdout, self._stream
         return self._stream
 
     def __exit__(self, exc_type, exc_value, traceback):
-        sys.stderr = self._old_stdout
+        sys.stdout = self._old_stdout
 
 
 @cache_utils.cache
