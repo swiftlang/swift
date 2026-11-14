@@ -18,6 +18,8 @@
 #ifndef SWIFT_PLATFORM_VERSION_H
 #define SWIFT_PLATFORM_VERSION_H
 
+#include "Types.h"
+
 #if defined(__cplusplus)
 extern "C" {
 #endif

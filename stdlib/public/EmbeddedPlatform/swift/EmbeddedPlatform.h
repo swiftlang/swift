@@ -27,55 +27,14 @@
 #define EMBEDDED_SWIFT_PLATFORM_H
 
 #include "SwiftPlatform/Heap.h"
-#include "SwiftPlatform/Types.h"
 #include "SwiftPlatform/Mutex.h"
+#include "SwiftPlatform/StandardOutput.h"
+#include "SwiftPlatform/Types.h"
 #include "SwiftPlatform/Version.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
-
-
-/**
- * Acquires the standard output stream lock.
- *
- * Embedded Swift holds this lock across a complete print operation, including
- * its terminator. The lock must be recursive: formatting a value can itself
- * call print, and output writes may acquire the same stream lock internally.
- * Each acquisition must be paired with `_swift_unlockStandardOutput` in the
- * same execution context.
- *
- * Single-threaded platforms can implement both locking functions as no-ops.
- */
-void _swift_lockStandardOutput(void);
-
-/**
- * Releases one level of ownership of the standard output stream lock.
- */
-void _swift_unlockStandardOutput(void);
-
-/**
- * Writes a sequence of UTF-8 code points to standard output.
- *
- * - Parameters:
- *   - chars: The UTF-8 code points to standard output. It is not
- *     NULL-terminated.
- *   - count: The number of UTF-8 code points.
- *
- * - Returns: The number of characters that were written.
- *
- * This function is required when using the Embedded Swift print() facilities.
- *
- * This function can be implemented as a call to fwrite or printf with the
- * specified number of code points.
- *
- * This function can be called with the standard output stream lock held.
- * A single print operation can invoke it multiple times. Locking only within
- * this function does not serialize an entire print operation.
- */
-__swift_size_t _swift_writeToStandardOutput(
-    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(count) chars,
-    __swift_size_t count);
 
 /**
  * Reports a fatal error before the program is terminated.
