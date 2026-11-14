@@ -98,8 +98,8 @@ def windows_default_build_dirs():
 
 # Set up the environment that utils/build.ps1 uses when it runs the tests
 # (see Test-Compilers), so that the tools built in `build_dir` can find the
-# Swift runtime and friends.  The Visual Studio environment is set up by
-# run-test.cmd.
+# Swift runtime and friends.  The Visual Studio environment must already be
+# set up.
 def setup_windows_test_environment(build_dir):
     triple_dir = os.path.dirname(build_dir)
     binary_cache = os.path.dirname(triple_dir)
@@ -308,7 +308,7 @@ def main():
                                      'Swift.swiftmodule')
         if not os.path.isdir(stdlib_module) or not os.listdir(stdlib_module):
             error_exit("'%s' has no standard library; run "
-                       "`utils\\build.cmd -Test swift-prepare` first" %
+                       "`utils\\TestToolchain.ps1 -Test swift -Steps Build` first" %
                        build_dir)
 
     if IS_WINDOWS:
