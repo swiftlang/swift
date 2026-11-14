@@ -140,6 +140,8 @@ public:
 
   bool isOpaqueLayout(const NominalTypeDecl *decl);
 
+  bool hasInlineMovedFromState(const NominalTypeDecl *decl);
+
   /// Returns true if \p vd is visible given the current access level and thus
   /// can be included in the generated header.
   bool isVisible(const ValueDecl *vd) const;

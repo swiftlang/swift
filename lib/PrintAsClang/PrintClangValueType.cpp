@@ -179,7 +179,7 @@ static void addCppExtensionsToStdlibType(const NominalTypeDecl *typeDecl,
               "_impl::$sSS10FoundationE36_"
               "unconditionallyBridgeFromObjectiveCySSSo8NSStringCSgFZ((__bridge "
               "void *)nsString);\n";
-        os << "    memcpy(result._getOpaquePointer(), &res, sizeof(res));\n";
+        os << "    memcpy(result._storage, &res, sizeof(res));\n";
         os << "    return result;\n";
         os << "  }\n";
       });
@@ -225,14 +225,16 @@ void ClangValueTypePrinter::printValueTypeDecl(
       return;
     }
   }
-  // A noncopyable type is exposed as a move-only C++ class. Because Swift's
-  // moves are destructive and C++'s are not, such a class carries a flag that
-  // records whether it was moved from, so that its destructor can be a no-op.
-  // A class with an opaque layout needs no flag, as a moved-from object has no
-  // allocation.
+  // Swift moves end the source value's lifetime. Inline wrappers use an extra
+  // inhabitant for that state; boxed wrappers use a null allocation.
   bool isNoncopyable =
       cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl);
-  bool hasMovedFromFlag = isNoncopyable && !isOpaqueLayout;
+  bool hasInlineMovedFromState =
+      declAndTypePrinter.hasInlineMovedFromState(typeDecl);
+  auto extraInhabitant =
+      hasInlineMovedFromState
+          ? interopContext.getIrABIDetails().getTypeExtraInhabitant(typeDecl)
+          : std::nullopt;
 
   bool isTrivial = !isOpaqueLayout && !isNoncopyable &&
                    interopContext.getIrABIDetails().isTypeTrivial(typeDecl);
@@ -253,10 +255,18 @@ void ClangValueTypePrinter::printValueTypeDecl(
         Context, os, typeMetadataFuncName, typeMetadataFuncGenericParams);
   };
   auto printReferenceCountCall = [&](raw_ostream &os, StringRef function,
-                                     StringRef reference) {
-    os << "    ";
+                                     StringRef reference, unsigned indent = 4) {
+    os << std::string(indent, ' ');
     ClangSyntaxPrinter(Context, os).printSwiftImplQualifier();
     os << function << '(' << reference << ");\n";
+  };
+  auto printInlineMove = [&](raw_ostream &os) {
+    if (isSingleSwiftReference) {
+      os << "    memcpy(_storage, other._storage, sizeof(void *));\n";
+    } else {
+      os << "    vwTable->initializeWithTake(_storage, "
+            "const_cast<char *>(other._getOpaquePointer()), metadata._0);\n";
+    }
   };
   std::string baseName;
   {
@@ -329,8 +339,8 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << " = default;\n";
     } else {
       os << " {\n";
-      if (hasMovedFromFlag)
-        os << "    if (_isMovedFrom) return;\n";
+      if (hasInlineMovedFromState)
+        os << "    if (_isMovedFrom()) return;\n";
       // A moved-from object with an opaque layout has no allocation.
       if (isOpaqueLayout)
         os << "    if (!_storage.isAllocated()) return;\n";
@@ -351,21 +361,21 @@ void ClangValueTypePrinter::printValueTypeDecl(
          << " &) = delete;\n";
     }
 
-    if (hasMovedFromFlag) {
+    if (hasInlineMovedFromState) {
       // move constructor.
       os << "  ";
       printer.printInlineForThunk();
       os << baseName << "(" << baseName << " &&other) noexcept {\n";
       // The standard library moves from moved-from objects too, for example
       // when a vector reallocates.
-      os << "    if (other._isMovedFrom) {\n";
-      os << "      _isMovedFrom = true;\n";
+      os << "    if (other._isMovedFrom()) {\n";
+      os << "      _setMovedFrom();\n";
       os << "      return;\n";
       os << "    }\n";
-      printVWTable(os);
-      os << "    vwTable->initializeWithTake(_getOpaquePointer(), "
-            "const_cast<char *>(other._getOpaquePointer()), metadata._0);\n";
-      os << "    other._isMovedFrom = true;\n";
+      if (!isSingleSwiftReference)
+        printVWTable(os);
+      printInlineMove(os);
+      os << "    other._setMovedFrom();\n";
       os << "  }\n";
 
       // move assignment.
@@ -374,20 +384,25 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << baseName << " &operator =(" << baseName
          << " &&other) noexcept {\n";
       os << "    if (this == &other) return *this;\n";
-      printVWTable(os);
+      if (!isSingleSwiftReference)
+        printVWTable(os);
       // The destination may itself be moved from, as in 'std::swap'. Destroy
       // explicitly: 'assignWithTake' does not run a declared 'deinit'.
-      os << "    if (!_isMovedFrom)\n";
-      os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
-      os << "    if (other._isMovedFrom) {\n";
-      os << "      _isMovedFrom = true;\n";
+      os << "    if (!_isMovedFrom()) {\n";
+      if (isSingleSwiftReference) {
+        os << "      void *reference;\n"
+              "      memcpy(&reference, _storage, sizeof(reference));\n";
+        printReferenceCountCall(os, "swift_release", "reference", 6);
+      } else {
+        os << "      vwTable->destroy(_getOpaquePointer(), metadata._0);\n";
+      }
+      os << "    }\n";
+      os << "    if (other._isMovedFrom()) {\n";
+      os << "      _setMovedFrom();\n";
       os << "      return *this;\n";
       os << "    }\n";
-      // Cleared first, as '_getOpaquePointer' traps on a moved-from value.
-      os << "    _isMovedFrom = false;\n";
-      os << "    vwTable->initializeWithTake(_getOpaquePointer(), "
-            "const_cast<char *>(other._getOpaquePointer()), metadata._0);\n";
-      os << "    other._isMovedFrom = true;\n";
+      printInlineMove(os);
+      os << "    other._setMovedFrom();\n";
       os << "  return *this;\n";
       os << "  }\n";
     }
@@ -404,12 +419,21 @@ void ClangValueTypePrinter::printValueTypeDecl(
         // A copy of a moved-from object is moved from too.
         if (isOpaqueLayout)
           os << "    if (!other._storage.isAllocated()) return;\n";
+        if (hasInlineMovedFromState) {
+          os << "    if (other._isMovedFrom()) {\n";
+          os << "      _setMovedFrom();\n";
+          os << "      return;\n";
+          os << "    }\n";
+        }
+        StringRef copyStorage =
+            hasInlineMovedFromState ? "_storage" : "_getOpaquePointer()";
         if (isSingleSwiftReference) {
           os << "    void *reference;\n"
                 "    memcpy(&reference, other._getOpaquePointer(), "
                 "sizeof(reference));\n";
           printReferenceCountCall(os, "swift_retain", "reference");
-          os << "    memcpy(_getOpaquePointer(), &reference, sizeof(reference));\n";
+          os << "    memcpy(" << copyStorage
+             << ", &reference, sizeof(reference));\n";
         } else {
           printVWTable(os);
           if (isOpaqueLayout) {
@@ -418,7 +442,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
             os << cxx_synthesis::getCxxOpaqueStorageClassName()
                << "(vwTable->size, vwTable->getAlignment());\n";
           }
-          os << "    vwTable->initializeWithCopy(_getOpaquePointer(), "
+          os << "    vwTable->initializeWithCopy(" << copyStorage << ", "
                 "const_cast<char "
                 "*>(other._getOpaquePointer()), metadata._0);\n";
         }
@@ -439,6 +463,12 @@ void ClangValueTypePrinter::printValueTypeDecl(
         if (isOpaqueLayout) {
           os << "    if (!_storage.isAllocated() || "
                 "!other._storage.isAllocated()) {\n";
+          os << "      *this = " << baseName << "(other);\n";
+          os << "      return *this;\n";
+          os << "    }\n";
+        }
+        if (hasInlineMovedFromState) {
+          os << "    if (_isMovedFrom() || other._isMovedFrom()) {\n";
           os << "      *this = " << baseName << "(other);\n";
           os << "      return *this;\n";
           os << "    }\n";
@@ -493,8 +523,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "  return *this;\n";
       os << "  }\n";
     }
-    // FIXME: implement the move operations for a copyable type with an inline
-    // layout.
+    // Inline copyable types without extra inhabitants fall back to copying.
 
     bodyPrinter();
     if (typeDecl->isStdlibDecl())
@@ -516,7 +545,10 @@ void ClangValueTypePrinter::printValueTypeDecl(
       // A user-provided default constructor would make the C++ type nontrivial.
       os << "() noexcept = default;\n";
     } else {
-      os << "() noexcept {}\n";
+      os << "() noexcept {";
+      if (hasInlineMovedFromState)
+        os << " _setMovedFrom(); ";
+      os << "}\n";
     }
     // Print out '_make' function which returns an unitialized instance for
     // passing to Swift.
@@ -540,7 +572,7 @@ void ClangValueTypePrinter::printValueTypeDecl(
     // moved-from noncopyable value, which holds no Swift value, is caught.
     // 'OpaqueStorage' checks its own allocation.
     StringRef movedFromCheck =
-        hasMovedFromFlag ? "if (_isMovedFrom) abort(); " : "";
+        hasInlineMovedFromState ? "if (_isMovedFrom()) abort(); " : "";
     os << "  ";
     printer.printInlineForThunk();
     os << "const char * _Nonnull _getOpaquePointer() const noexcept { "
@@ -564,15 +596,17 @@ void ClangValueTypePrinter::printValueTypeDecl(
       printEnumVWTableVariable();
       os << "    enumVWTable->destructiveProjectEnumData(_getOpaquePointer(), "
             "metadata._0);\n";
-      os << "    return _getOpaquePointer();\n";
+      os << "    return "
+         << (hasInlineMovedFromState ? "_storage" : "_getOpaquePointer()")
+         << ";\n";
       os << "  }\n";
       os << "  ";
       printer.printInlineForThunk();
       os << "void _destructiveInjectEnumTag(unsigned tag) noexcept {\n";
       printEnumVWTableVariable();
-      os << "    enumVWTable->destructiveInjectEnumTag(_getOpaquePointer(), "
-            "tag, "
-            "metadata._0);\n";
+      os << "    enumVWTable->destructiveInjectEnumTag("
+         << (hasInlineMovedFromState ? "_storage" : "_getOpaquePointer()")
+         << ", tag, metadata._0);\n";
       os << "  }\n";
       os << "  ";
       printer.printInlineForThunk();
@@ -591,10 +625,32 @@ void ClangValueTypePrinter::printValueTypeDecl(
       os << "alignas(" << typeSizeAlign->alignment << ") ";
       os << "char _storage[" << typeSizeAlign->size << "];\n";
     }
-    // The moved-from flag has to come after the Swift value, so that the
-    // address of this class stays the address of the value itself.
-    if (hasMovedFromFlag)
-      os << "  bool _isMovedFrom = false;\n";
+    if (hasInlineMovedFromState) {
+      os << "  ";
+      printer.printInlineForHelperFunction();
+      os << "bool _isMovedFrom() const noexcept {\n    return ";
+      bool first = true;
+      for (unsigned i = 0; i < extraInhabitant->mask.size(); ++i) {
+        unsigned mask = extraInhabitant->mask[i];
+        if (!mask)
+          continue;
+        if (!first)
+          os << " &&\n           ";
+        first = false;
+        os << "(static_cast<unsigned char>(_storage[" << i << "]) & "
+           << mask << ") == " << (extraInhabitant->value[i] & mask);
+      }
+      os << ";\n  }\n";
+      os << "  ";
+      printer.printInlineForHelperFunction();
+      os << "void _setMovedFrom() noexcept {\n";
+      for (unsigned i = 0; i < extraInhabitant->mask.size(); ++i) {
+        if (extraInhabitant->mask[i])
+          os << "    _storage[" << i << "] = static_cast<char>("
+             << unsigned(extraInhabitant->value[i]) << ");\n";
+      }
+      os << "  }\n";
+    }
     // Wrap up the value type.
     os << "  friend class " << cxx_synthesis::getCxxImplNamespaceName() << "::";
     printCxxImplClassName(os, typeDecl);
@@ -645,7 +701,12 @@ void ClangValueTypePrinter::printValueTypeDecl(
           printCxxTypeName(os, typeDecl, moduleContext);
           printGenericParamRefs(os);
           os << "::_make();\n";
-          os << "    callable(result._getOpaquePointer());\n";
+          // An inline result with move state still contains its moved-from
+          // sentinel until Swift initializes it.
+          if (hasInlineMovedFromState)
+            os << "    callable(result._storage);\n";
+          else
+            os << "    callable(result._getOpaquePointer());\n";
           os << "    return result;\n";
           os << "  }\n";
           // Print out helper function for initializeWithTake
@@ -759,7 +820,11 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
   printer.printNominalTypeReference(typeDecl,
                                     /*moduleContext=*/nullptr);
   os << "> = ";
-  if (typeDecl->hasGenericParamList()) {
+  // A noncopyable type can't be a generic argument yet, as it would make the
+  // generic type conditionally noncopyable.
+  if (cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl)) {
+    os << "false";
+  } else if (typeDecl->hasGenericParamList()) {
     auto signature = typeDecl->getGenericSignature().getCanonicalSignature();
     llvm::interleave(
         signature.getInnermostGenericParams(), os,
@@ -770,11 +835,7 @@ void ClangValueTypePrinter::printTypePrecedingGenericTraits(
         },
         " && ");
   } else {
-    // A noncopyable argument would make the generic type conditionally
-    // noncopyable.
-    os << (cxx_translation::isNoncopyableValueTypeExposableToCxx(typeDecl)
-               ? "false"
-               : "true");
+    os << "true";
   }
   os << ";\n";
 
