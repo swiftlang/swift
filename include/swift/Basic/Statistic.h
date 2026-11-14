@@ -167,6 +167,11 @@ private:
   std::unique_ptr<StatsProfilers> EventProfilers;
   std::unique_ptr<StatsProfilers> EntityProfilers;
 
+  /// Objects referenced by trace events.
+  ///
+  /// Retained until the next call to flushTracesAndProfiles().
+  std::vector<std::unique_ptr<void, void (*)(void *)>> PendingTracedEntities;
+
   /// Whether fine-grained timers are enabled. In practice, this means request
   /// evaluator requests. This will have a runtime performance impact.
   bool FineGrainedTimers;
@@ -213,6 +218,16 @@ public:
   AlwaysOnDriverCounters &getDriverCounters();
   AlwaysOnFrontendCounters &getFrontendCounters();
   void flushTracesAndProfiles();
+
+  /// Retains \p Object until the next call to flushTracesAndProfiles()
+  template <typename T>
+  void retainUntilFlushed(std::unique_ptr<T> Object) {
+    PendingTracedEntities.emplace_back(
+      Object.release(), [](void *P) {
+        delete static_cast<T *>(P);
+      });
+  }
+
   void noteCurrentProcessExitStatus(int);
   void saveAnyFrontendStatsEvents(FrontendStatsTracer const &T, bool IsEntry);
   void recordJobMaxRSS(long rss);

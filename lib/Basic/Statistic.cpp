@@ -812,6 +812,7 @@ UnifiedStatsReporter::flushTracesAndProfiles() {
   FrontendStatsEvents.reset();
   EventProfilers.reset();
   EntityProfilers.reset();
+  PendingTracedEntities.clear();
 }
 
 } // namespace swift
