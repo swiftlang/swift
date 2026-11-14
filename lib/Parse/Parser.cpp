@@ -149,10 +149,6 @@ void Parser::performIDEInspectionSecondPassImpl(
 
   DeclContext *DC = info.ParentContext;
 
-  // Forget about the fact that we may have already computed local
-  // discriminators.
-  Context.evaluator.clearCachedOutput(LocalDiscriminatorsRequest{DC});
-
   // Clear any ASTScopes that were expanded.
   SF.clearScope();
 
@@ -169,7 +165,7 @@ void Parser::performIDEInspectionSecondPassImpl(
     parseExprOrStmt(Result);
     if (!Result.isNull()) {
       auto Brace = BraceStmt::create(Context, StartLoc, Result, Tok.getLoc());
-      TLCD->setBody(Brace);
+      TLCD->setBody(Brace, /*resetDiscriminators*/ true);
     }
     break;
   }

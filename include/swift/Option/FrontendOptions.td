@@ -633,6 +633,11 @@ def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
   DebugCrashOpt, Flags<[HelpHidden]>,
   HelpText<"Deprecated alias for -debug-crash-after-type-checking">;
 
+def debug_duplicate_closure_discriminators
+  : Flag<["-"], "debug-duplicate-closure-discriminators">,
+    Flags<[HelpHidden]>,
+    HelpText<"Assign all closures the same discriminator">;
+
 def debug_test_dependency_scan_cache_serialization: Flag<["-"], "test-dependency-scan-cache-serialization">,
    HelpText<"After performing a dependency scan, serialize and then deserialize the scanner's internal state.">;
 
