@@ -674,19 +674,13 @@ extension DistributedActorSystem {
     try _validateMatchingInvocationDecoder(Act.self, Self.self)
     try _validateMatchingResultHandler(Act.self, Self.self)
 
-    // NOTE: Implementation could be made more efficient because we still risk
-    // demangling a RemoteCallTarget identity (if it is a mangled name) multiple
-    // times. We would prefer to store if it is a mangled name, demangle, and
-    // always refer to that demangled repr perhaps? We do cache the resulting
-    // pretty formatted name of the call target, but perhaps we can do better.
-
     // Get the expected parameter count of the func
     let targetName = target.identifier
     let targetNameUTF8 = Array(targetName.utf8)
 
     // Swift 6.5 adds the pre-check `_getDistributedAccessibleRecord` function,
     // so we don't re-fetch the same record multiple times below.
-    let accessorRecord: UnsafeRawPointer?
+    var accessorRecord: UnsafeRawPointer? = nil
     if #available(StdlibDeploymentTarget 6.5, *) {
       unsafe accessorRecord = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
         unsafe _getDistributedAccessibleRecord(
@@ -700,13 +694,36 @@ extension DistributedActorSystem {
       }
     }
 
-    // Gen the generic environment (if any) associated with the target.
-    let genericEnv =
-      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        unsafe _getGenericEnvironmentOfDistributedTarget(
+    // Since Swift 6.5 the runtime resolves the target's signature once per
+    // accessor record and keeps it, so a call to a target seen before demangles
+    // nothing. A generic target's parameter and return types still depend on
+    // the substitutions sent with the call and are resolved below, per call.
+    var cachedSignature: _DistributedTargetSignature? = nil
+    if #available(StdlibDeploymentTarget 6.5, *),
+       let accessorRecord = unsafe accessorRecord {
+      let signature = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        unsafe _getDistributedTargetSignature(
+          accessorRecord,
           targetNameUTF8.baseAddress!,
           UInt(targetNameUTF8.endIndex))
       }
+      if unsafe signature.parameterCount >= 0 {
+        unsafe cachedSignature = signature
+      }
+    }
+
+    // Gen the generic environment (if any) associated with the target.
+    let genericEnv: UnsafeRawPointer?
+    if let cachedSignature = unsafe cachedSignature {
+      unsafe genericEnv = cachedSignature.genericEnvironment
+    } else {
+      unsafe genericEnv =
+        targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+          unsafe _getGenericEnvironmentOfDistributedTarget(
+            targetNameUTF8.baseAddress!,
+            UInt(targetNameUTF8.endIndex))
+        }
+    }
 
     var substitutionsBuffer: UnsafeMutablePointer<Any.Type>? = nil
     var witnessTablesBuffer: UnsafeRawPointer? = nil
@@ -755,12 +772,17 @@ extension DistributedActorSystem {
       }
     }
 
-    let paramCount =
-      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        unsafe __getParameterCount(
-          targetNameUTF8.baseAddress!,
-          UInt(targetNameUTF8.endIndex))
-      }
+    let paramCount: Int32
+    if let cachedSignature = unsafe cachedSignature {
+      paramCount = unsafe Int32(cachedSignature.parameterCount)
+    } else {
+      paramCount =
+        targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+          unsafe __getParameterCount(
+            targetNameUTF8.baseAddress!,
+            UInt(targetNameUTF8.endIndex))
+        }
+    }
 
     guard paramCount >= 0 else {
       throw ExecuteDistributedTargetError(
@@ -772,40 +794,44 @@ extension DistributedActorSystem {
         errorCode: .invalidParameterCount)
     }
 
-    // Prepare buffer for the parameter types to be decoded into:
-    let argumentTypesBuffer = UnsafeMutableBufferPointer<Any.Type>.allocate(capacity: Int(paramCount))
+    // The parameter types the accessor decodes the arguments as: the cached
+    // ones for a non-generic target, otherwise demangled into a buffer of ours.
+    let argumentTypes: UnsafeRawPointer
+    var ownedArgumentTypes: UnsafeMutableBufferPointer<Any.Type>? = nil
     defer {
-      unsafe argumentTypesBuffer.deallocate()
+      unsafe ownedArgumentTypes?.deallocate()
     }
 
-    // Demangle and write all parameter types into the prepared buffer
-    let decodedNum = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-      unsafe __getParameterTypeInfo(
-        targetNameUTF8.baseAddress!,
-        UInt(targetNameUTF8.endIndex),
-        genericEnv,
-        substitutionsBuffer,
-        argumentTypesBuffer.baseAddress!._rawValue, Int(paramCount))
-    }
+    if let cachedSignature = unsafe cachedSignature,
+       let parameterTypes = unsafe cachedSignature.parameterTypes {
+      unsafe argumentTypes = parameterTypes
+    } else {
+      // Prepare buffer for the parameter types to be decoded into:
+      let argumentTypesBuffer = UnsafeMutableBufferPointer<Any.Type>.allocate(capacity: Int(paramCount))
+      unsafe ownedArgumentTypes = argumentTypesBuffer
 
-    // Fail if the decoded parameter types count seems off and fishy
-    guard decodedNum == paramCount else {
-      throw ExecuteDistributedTargetError(
-        message: """
-                 Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
-                 decoded: \(decodedNum), expected params: \(paramCount)
-                 mangled name: \(targetName)
-                 """,
-        errorCode: .invalidParameterCount)
-    }
-
-    // Copy the types from the buffer into a Swift Array
-    var argumentTypes: [Any.Type] = []
-    do {
-      argumentTypes.reserveCapacity(Int(decodedNum))
-      for unsafe argumentType in unsafe argumentTypesBuffer {
-        argumentTypes.append(argumentType)
+      // Demangle and write all parameter types into the prepared buffer
+      let decodedNum = targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+        unsafe __getParameterTypeInfo(
+          targetNameUTF8.baseAddress!,
+          UInt(targetNameUTF8.endIndex),
+          genericEnv,
+          substitutionsBuffer,
+          argumentTypesBuffer.baseAddress!._rawValue, Int(paramCount))
       }
+
+      // Fail if the decoded parameter types count seems off and fishy
+      guard decodedNum == paramCount else {
+        throw ExecuteDistributedTargetError(
+          message: """
+                   Failed to decode the expected number of params of distributed invocation target, error code: \(decodedNum)
+                   decoded: \(decodedNum), expected params: \(paramCount)
+                   mangled name: \(targetName)
+                   """,
+          errorCode: .invalidParameterCount)
+      }
+
+      unsafe argumentTypes = UnsafeRawPointer(argumentTypesBuffer.baseAddress!)
     }
 
     // Decode the return type
@@ -813,14 +839,20 @@ extension DistributedActorSystem {
       return UnsafeMutableRawPointer(UnsafeMutablePointer<R>.allocate(capacity: 1))
     }
 
-    let maybeReturnTypeFromTypeInfo =
-      targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
-        unsafe __getReturnTypeInfo(
-          /*targetName:*/targetNameUTF8.baseAddress!,
-          /*targetLength:*/UInt(targetNameUTF8.endIndex),
-          /*genericEnv:*/genericEnv,
-          /*genericArguments:*/substitutionsBuffer)
-      }
+    let maybeReturnTypeFromTypeInfo: Any.Type?
+    if let cachedSignature = unsafe cachedSignature,
+       let returnType = unsafe cachedSignature.returnType {
+      maybeReturnTypeFromTypeInfo = returnType
+    } else {
+      maybeReturnTypeFromTypeInfo =
+        targetNameUTF8.withUnsafeBufferPointer { targetNameUTF8 in
+          unsafe __getReturnTypeInfo(
+            /*targetName:*/targetNameUTF8.baseAddress!,
+            /*targetLength:*/UInt(targetNameUTF8.endIndex),
+            /*genericEnv:*/genericEnv,
+            /*genericArguments:*/substitutionsBuffer)
+        }
+    }
     guard let returnTypeFromTypeInfo: Any.Type = maybeReturnTypeFromTypeInfo else {
       throw ExecuteDistributedTargetError(
         message: "Failed to decode distributed target return type",
@@ -879,10 +911,12 @@ extension DistributedActorSystem {
       // onto a remote reference. `__isLocalActor` gates that.
       //
       // The `_executeDistributedTargetWithIsolation` runtime entry point is
-      // only available on SwiftStdlib 6.5 and later. This check only exists
+      // only available on SwiftStdlib 6.5 and later, and takes the accessor
+      // record found above on the same condition. This check only exists
       // for the compiler: this function ships in the same library as that
       // entry point, so the legacy branch is not taken at runtime.
-      if #available(SwiftStdlib 6.5, *) {
+      if #available(SwiftStdlib 6.5, *),
+         let accessorRecord = unsafe accessorRecord {
         let isolatedActor: (any Actor)? =
           if __isLocalActor(actor) {
             Builtin.distributedActorAsAnyActor(actor)
@@ -893,10 +927,9 @@ extension DistributedActorSystem {
         try unsafe await _executeDistributedTargetWithIsolation(
           on: actor,
           isolatedActor: isolatedActor,
-          /*targetNameData:*/targetName,
-          /*targetNameLength:*/UInt(targetName.utf8.count),
+          accessorRecord,
           argumentDecoder: &invocationDecoder,
-          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+          argumentTypes: argumentTypes._rawValue,
           resultBuffer: resultBuffer._rawValue,
           substitutions: UnsafeRawPointer(substitutionsBuffer),
           witnessTables: witnessTablesBuffer,
@@ -905,10 +938,10 @@ extension DistributedActorSystem {
       } else {
         try unsafe await _executeDistributedTarget(
           on: actor,
-          /*targetNameData:*/targetName,
-          /*targetNameLength:*/UInt(targetName.utf8.count),
+          /*targetNameData:*/targetNameUTF8,
+          /*targetNameLength:*/UInt(targetNameUTF8.count),
           argumentDecoder: &invocationDecoder,
-          argumentTypes: argumentTypesBuffer.baseAddress!._rawValue,
+          argumentTypes: argumentTypes._rawValue,
           resultBuffer: resultBuffer._rawValue,
           substitutions: UnsafeRawPointer(substitutionsBuffer),
           witnessTables: witnessTablesBuffer,
@@ -1181,7 +1214,7 @@ func _executeDistributedTargetWithIsolation<D: DistributedTargetInvocationDecode
   // value is forwarded into. Here it is just a value: the erased target actor
   // when local, nil when remote.
   isolatedActor: (any Actor)?,
-  _ targetName: UnsafePointer<UInt8>, _ targetNameLength: UInt,
+  _ accessorRecord: UnsafeRawPointer, // from _getDistributedAccessibleRecord
   argumentDecoder: inout D,
   argumentTypes: Builtin.RawPointer,
   resultBuffer: Builtin.RawPointer,
