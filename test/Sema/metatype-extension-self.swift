@@ -42,3 +42,28 @@ extension IGizmo.Protocol {
   func paramAssoc(_ x: Element) { }
   // expected-error@-1 {{associated type 'Element' cannot be referenced in a protocol metatype extension}}
 }
+
+// A pattern first tries its base as a type with diagnostics silenced, and falls
+// back to an expression. The silenced attempt must leave the reference for the
+// fallback to diagnose.
+enum Box<T> { case a }
+
+extension IWidget.Protocol {
+  func matchSelf(_ x: Box<Int>) {
+    switch x {
+    case Box<Self>.a: break
+    // expected-error@-1 {{'Self' cannot be referenced in a protocol metatype extension}}
+    default: break
+    }
+  }
+}
+
+extension IGizmo.Protocol {
+  func matchAssoc(_ x: Box<Int>) {
+    switch x {
+    case Box<Element>.a: break
+    // expected-error@-1 {{associated type 'Element' cannot be referenced in a protocol metatype extension}}
+    default: break
+    }
+  }
+}
