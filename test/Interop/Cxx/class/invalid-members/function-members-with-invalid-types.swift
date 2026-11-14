@@ -220,6 +220,13 @@ struct HasTemplateMembers {
 // CHECK-NEXT:   static func badStaticTemplate<T>(_ t: T) -> Never
 // CHECK-NEXT: }
 
+// Constructor templates are imported lazily too, so importing this type should
+// not instantiate Bro<Ken>.
+struct HasBadCtorTemplate {
+  template <class T>
+  HasBadCtorTemplate(T t, Bro<Ken> b);
+};
+
 //--- ok.cpp
 // expected-no-diagnostics
 #include <function.h>
@@ -286,6 +293,7 @@ func ok() {
   let _: UnsafePointer<DerivedGoodStruct>
   let _: UnsafePointer<UsingGoodStruct>
   let _: UnsafePointer<UsesGoodStruct>
+  let _: UnsafePointer<HasBadCtorTemplate>
 
   // Importing BadInitKen should not define its default constructor.
   let _: UnsafePointer<BadInitKen>
