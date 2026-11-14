@@ -1351,6 +1351,10 @@ Expr *buildPropertyWrapperInitCall(
     PropertyWrapperInitKind initKind,
     llvm::function_ref<void(ApplyExpr *)> callback = [](ApplyExpr *) {});
 
+/// Build a call to the initializer of the outermost property wrapper,
+/// passing the arguments of its attribute.
+Expr *buildPropertyWrapperAttributeInitCall(const VarDecl *var);
+
 /// Check if this var is the \c wrappedValue property belonging to
 /// a property wrapper type declaration.
 bool isWrappedValueOfPropWrapper(VarDecl *var);

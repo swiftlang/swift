@@ -4230,8 +4230,23 @@ bool ConstraintSystem::generateConstraints(
       if (propertyType->hasError())
         return true;
 
-      return generateWrappedPropertyTypeConstraints(
-        wrappedVar, /*initializerType=*/Type(), propertyType);
+      Type initializerType;
+      auto *binding = wrappedVar->getParentPatternBinding();
+      if (binding && binding->isDefaultInitializableViaPropertyWrapper(
+                         binding->getPatternEntryIndexForVarDecl(wrappedVar))) {
+        auto *defaultInit = buildPropertyWrapperAttributeInitCall(wrappedVar);
+        if (!defaultInit)
+          return true;
+
+        defaultInit = generateConstraints(defaultInit, target.getDeclContext());
+        if (!defaultInit)
+          return true;
+
+        initializerType = getType(defaultInit);
+      }
+
+      return generateWrappedPropertyTypeConstraints(wrappedVar, initializerType,
+                                                    propertyType);
     } else {
       auto pattern = target.getAsUninitializedVar();
       auto locator = getConstraintLocator(
