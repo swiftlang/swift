@@ -1,32 +1,33 @@
 # Install the EmbeddedPlatform headers into "swift".
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  # All of the embedded platform headers.
+  set(_embedded_platform_headers
+    EmbeddedPlatform.h
+    EmbeddedPlatform+Concurrency.h
+    EmbeddedPlatform+Types.h
+    ExecutorTypes.h)
+
+  set(_embedded_platform_header_sources ${_embedded_platform_headers})
+  list(TRANSFORM _embedded_platform_header_sources
+    PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/swift/")
+
+  set(_embedded_platform_header_outputs ${_embedded_platform_headers})
+  list(TRANSFORM _embedded_platform_header_outputs
+    PREPEND "${SWIFT_INCLUDE_DIR}/swift/")
+
   add_custom_command(
-      OUTPUT
-        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
-        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
-        "${SWIFT_INCLUDE_DIR}/swift/ExecutorTypes.h"
-      DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
+      OUTPUT ${_embedded_platform_header_outputs}
+      DEPENDS ${_embedded_platform_header_sources}
       COMMAND "${CMAKE_COMMAND}" "-E" "copy"
-        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
-        "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
+        ${_embedded_platform_header_sources}
         "${SWIFT_INCLUDE_DIR}/swift")
 
   add_custom_target("copy_embedded_swift_platform_header"
-      DEPENDS
-        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform.h"
-        "${SWIFT_INCLUDE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
-        "${SWIFT_INCLUDE_DIR}/swift/ExecutorTypes.h"
+      DEPENDS ${_embedded_platform_header_outputs}
       COMMENT "Copying Embedded Swift platform headers to ${SWIFT_INCLUDE_DIR}/swift")
 
-  swift_install_in_component(FILES
-      "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h"
-      "${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform+Concurrency.h"
-      "${CMAKE_CURRENT_SOURCE_DIR}/swift/ExecutorTypes.h"
+  swift_install_in_component(FILES ${_embedded_platform_header_sources}
       DESTINATION "include/swift"
       COMPONENT stdlib)
 
