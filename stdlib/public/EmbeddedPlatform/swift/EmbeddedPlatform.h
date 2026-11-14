@@ -26,8 +26,8 @@
 #ifndef EMBEDDED_SWIFT_PLATFORM_H
 #define EMBEDDED_SWIFT_PLATFORM_H
 
-#include "EmbeddedPlatform+Types.h"
-#include "EmbeddedPlatform+Mutex.h"
+#include "SwiftPlatform/Types.h"
+#include "SwiftPlatform/Mutex.h"
 
 #if defined(__cplusplus)
 extern "C" {

@@ -41,7 +41,7 @@
 #include "swift/Threading/Mutex.h"
 
 #if SWIFT_CONCURRENCY_EMBEDDED
-#include "swift/EmbeddedPlatform+Concurrency.h"
+#include "swift/SwiftPlatform/Concurrency.h"
 #endif
 #include <atomic>
 #include <new>

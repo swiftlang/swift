@@ -23,7 +23,7 @@
 #ifndef EMBEDDED_SWIFT_PLATFORM_CLOCKS_H
 #define EMBEDDED_SWIFT_PLATFORM_CLOCKS_H
 
-#include "EmbeddedPlatform+Types.h"
+#include "Types.h"
 
 #if defined(__cplusplus)
 extern "C" {

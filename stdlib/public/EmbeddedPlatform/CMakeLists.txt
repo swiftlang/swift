@@ -1,37 +1,38 @@
 # Install the EmbeddedPlatform headers into "swift".
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
-  # All of the embedded platform headers.
+  # All of the embedded platform headers, relative to the "swift" directory.
+  # The copied and installed forms below are derived from this list, and
+  # preserve the subdirectory structure.
   set(_embedded_platform_headers
     EmbeddedPlatform.h
-    EmbeddedPlatform+Clocks.h
-    EmbeddedPlatform+Concurrency.h
-    EmbeddedPlatform+Mutex.h
-    EmbeddedPlatform+Types.h
-    ExecutorTypes.h)
+    SwiftPlatform/Clocks.h
+    SwiftPlatform/Concurrency.h
+    SwiftPlatform/ExecutorTypes.h
+    SwiftPlatform/Mutex.h
+    SwiftPlatform/Types.h)
 
-  set(_embedded_platform_header_sources ${_embedded_platform_headers})
-  list(TRANSFORM _embedded_platform_header_sources
-    PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/swift/")
+  set(_embedded_platform_header_outputs)
+  foreach(_header ${_embedded_platform_headers})
+    get_filename_component(_header_dir "${_header}" DIRECTORY)
+    set(_header_source "${CMAKE_CURRENT_SOURCE_DIR}/swift/${_header}")
+    set(_header_output "${SWIFT_INCLUDE_DIR}/swift/${_header}")
 
-  set(_embedded_platform_header_outputs ${_embedded_platform_headers})
-  list(TRANSFORM _embedded_platform_header_outputs
-    PREPEND "${SWIFT_INCLUDE_DIR}/swift/")
+    add_custom_command(
+        OUTPUT "${_header_output}"
+        DEPENDS "${_header_source}"
+        COMMAND "${CMAKE_COMMAND}" "-E" "copy"
+          "${_header_source}" "${SWIFT_INCLUDE_DIR}/swift/${_header_dir}")
+    list(APPEND _embedded_platform_header_outputs "${_header_output}")
 
-  add_custom_command(
-      OUTPUT ${_embedded_platform_header_outputs}
-      DEPENDS ${_embedded_platform_header_sources}
-      COMMAND "${CMAKE_COMMAND}" "-E" "copy"
-        ${_embedded_platform_header_sources}
-        "${SWIFT_INCLUDE_DIR}/swift")
+    swift_install_in_component(FILES "${_header_source}"
+        DESTINATION "include/swift/${_header_dir}"
+        COMPONENT stdlib)
+  endforeach()
 
   add_custom_target("copy_embedded_swift_platform_header"
       DEPENDS ${_embedded_platform_header_outputs}
       COMMENT "Copying Embedded Swift platform headers to ${SWIFT_INCLUDE_DIR}/swift")
-
-  swift_install_in_component(FILES ${_embedded_platform_header_sources}
-      DESTINATION "include/swift"
-      COMPONENT stdlib)
 
   add_dependencies(embedded-libraries
     "copy_embedded_swift_platform_header")

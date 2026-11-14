@@ -1,4 +1,4 @@
-/*===--- EmbeddedPlatform+Concurrency.h - Embedded Swift executor --*- C -*-===*
+/*===--- SwiftPlatform/Concurrency.h - Executor hooks --------------*- C -*-===*
  *
  * This source file is part of the Swift.org open source project
  *
@@ -13,7 +13,7 @@
 #ifndef EMBEDDED_SWIFT_PLATFORM_CONCURRENCY_H
 #define EMBEDDED_SWIFT_PLATFORM_CONCURRENCY_H
 
-#include "EmbeddedPlatform.h"
+#include "../EmbeddedPlatform.h"
 #include "ExecutorTypes.h"
 
 #if defined(__cplusplus)
