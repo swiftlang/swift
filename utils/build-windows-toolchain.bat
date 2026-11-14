@@ -61,18 +61,27 @@ set TMPDIR=%BuildRoot%\tmp
 
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
-:: Build the -Test argument, if any, by subtracting skipped tests
+:: Build the lists of tests, by subtracting skipped tests. The tests run in
+:: two processes at the same time. The compiler tests build the FileCheck that
+:: the xctest tests use, and the dispatch tests rebuild the libdispatch that the
+:: xctest tests link, so these stay in one process. The package tests run in the
+:: other one.
 set TestsList=lld,lldb,lldb-swift,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp
-set "TestArg="
+set "PackageTestsList=,foundation,swift-format,sourcekit-lsp,"
+set "CompilerTests="
+set "PackageTests="
 :: Strip stray double quotes from SKIP_TESTS so the substring match below still works.
 set "SkipTests=%SKIP_TESTS:"=%"
 set "Skip=,%SkipTests%,"
 for %%I in (%TestsList%) do (
   if "!Skip:,%%I,=!" == "!Skip!" (
-      set "TestArg=!TestArg!%%I,"
+    if "!PackageTestsList:,%%I,=!" == "!PackageTestsList!" (
+      set "CompilerTests=!CompilerTests!%%I,"
+    ) else (
+      set "PackageTests=!PackageTests!%%I,"
+    )
   )
 )
-set "TestArg=-Test !TestArg!"
 
 :: Build the packaging arguments (skipped for normal PRs and an added stage for toolchain PRs)
 set "PackagingArg="
@@ -95,8 +104,32 @@ if not "%HOST_ARCH_NAME%"=="" set "HostArchNameArg=-HostArchName %HOST_ARCH_NAME
 set "DebugInfoArg="
 if not "%DEBUG_INFO%"=="" set "DebugInfoArg=-DebugInfo"
 
+:: Build the arguments for build-sdk.ps1, which builds each Windows SDK in its
+:: own process. The SDK of the host architecture is always built because the
+:: toolchain is built against it.
+set "SDKArchs=X64,X86,Arm64"
+if not "%WINDOWS_SDKS%"=="" set "SDKArchs=%WINDOWS_SDKS%"
+set "HostArch=%HOST_ARCH_NAME%"
+if "%HostArch%"=="" set "HostArch=%PROCESSOR_ARCHITECTURE%"
+set "HostSDKArch=X64"
+if /i "%HostArch%"=="ARM64" set "HostSDKArch=Arm64"
+set "SDKArchList=,%SDKArchs%,"
+if /i "!SDKArchList:,%HostSDKArch%,=!"=="!SDKArchList!" set "SDKArchs=%HostSDKArch%,%SDKArchs%"
+
+set "SDKArgs=%HostArchNameArg% -SourceCache %SourceRoot% -BinaryCache %BuildRoot% -ArtifactCache %BuildRoot%\ArtifactCache -BuildRoot %BuildRoot% %DebugInfoArg% -Summary"
+if "%INCLUDE_PACKAGING%"=="" set "SDKArgs=%SDKArgs% -LinkModes dynamic"
+
+:: The SDKs of the other architectures are staged separately, so that the
+:: processes do not install into the same directories, and merged afterwards.
+set "SDKStaging=%BuildRoot%\SDKStaging"
+set "SDKLogs=%BuildRoot%\build-sdk"
+set "TestLogs=%BuildRoot%\build-tests"
+set "PlatformRoot=%BuildRoot%\Program Files\Swift\Platforms\Windows.platform"
+set "ScriptDir=%~dp0"
+
 call :CloneRepositories || (exit /b 1)
 
+:: Build the Stage1 toolchain, which the SDKs are built with.
 :: We only have write access to BuildRoot, so use that as the image root.
 powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   %HostArchNameArg% ^
@@ -106,12 +139,32 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -BuildRoot %BuildRoot% ^
   -ObjectStore %BuildRoot%\ObjectStore ^
   %WindowsSDKArgs% ^
-  %PackagingArg% ^
-  %TestArg% ^
-  %SBoMArg% ^
   %DebugInfoArg% ^
+  -Phase Bootstrap ^
   -Summary ^
   -Trace || (exit /b 1)
+
+:: Build the Windows SDKs in parallel.
+call :BuildSDKs || (exit /b 1)
+
+:: Build the rest of the toolchain against the SDKs.
+powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
+  %HostArchNameArg% ^
+  -SourceCache %SourceRoot% ^
+  -BinaryCache %BuildRoot% ^
+  -ArtifactCache %BuildRoot%\ArtifactCache ^
+  -BuildRoot %BuildRoot% ^
+  -ObjectStore %BuildRoot%\ObjectStore ^
+  %WindowsSDKArgs% ^
+  %PackagingArg% ^
+  %SBoMArg% ^
+  %DebugInfoArg% ^
+  -Phase Toolchain ^
+  -Summary ^
+  -Trace || (exit /b 1)
+
+:: Run the tests in parallel.
+call :RunTests || (exit /b 1)
 
 :: Publish PDBs into a Microsoft-compatible symbol store and zip it so that
 :: CI can upload the archive to the Swift debug-symbols server.
@@ -126,6 +179,106 @@ if not "%DEBUG_INFO%"=="" (
 rd /s /q %LocalAppData%\clang\ModuleCache
 
 goto :end
+endlocal
+
+:BuildSDKs
+setlocal enableextensions enabledelayedexpansion
+
+if exist "%SDKLogs%" rd /s /q "%SDKLogs%"
+md "%SDKLogs%"
+
+for %%A in (%SDKArchs%) do (
+  set "JobArgs=-Architecture %%A %SDKArgs%"
+  if /i not "%%A"=="%HostSDKArch%" set "JobArgs=!JobArgs! -PlatformRoot %SDKStaging%\%%A\Windows.platform"
+  call :StartJob "%SDKLogs%" %%A build-sdk.ps1
+)
+
+set "JobNames=%SDKArchs%"
+call :WaitJobs "%SDKLogs%" || (exit /b 1)
+
+:: Merge the staged SDKs into the platform of the toolchain.
+for %%A in (%SDKArchs%) do (
+  if /i not "%%A"=="%HostSDKArch%" (
+    robocopy "%SDKStaging%\%%A\Windows.platform" "%PlatformRoot%" /E /NFL /NDL /NJH /NJS /NP > nul
+    if errorlevel 8 exit /b 1
+  )
+)
+
+:: robocopy leaves a nonzero errorlevel when it copied files.
+exit /b 0
+endlocal
+
+:RunTests
+setlocal enableextensions enabledelayedexpansion
+
+if exist "%TestLogs%" rd /s /q "%TestLogs%"
+md "%TestLogs%"
+
+set "TestArgs=%HostArchNameArg% -SourceCache %SourceRoot% -BinaryCache %BuildRoot% -ArtifactCache %BuildRoot%\ArtifactCache -BuildRoot %BuildRoot% -ObjectStore %BuildRoot%\ObjectStore %WindowsSDKArgs% %DebugInfoArg% -Phase Test -Summary -Trace"
+set "JobNames="
+
+if defined CompilerTests (
+  set "JobArgs=%TestArgs% -Test %CompilerTests%"
+  call :StartJob "%TestLogs%" compilers build.ps1
+  set "JobNames=!JobNames!,compilers"
+)
+
+:: Keep the CPU for the compiler tests, which take the longest.
+if defined PackageTests (
+  set "JobArgs=%TestArgs% -Test %PackageTests%"
+  set "JobPriority=/belownormal"
+  call :StartJob "%TestLogs%" packages build.ps1
+  set "JobPriority="
+  set "JobNames=!JobNames!,packages"
+)
+
+if not defined JobNames exit /b 0
+call :WaitJobs "%TestLogs%"
+exit /b %errorlevel%
+endlocal
+
+:: Runs `%ScriptDir%<script> %JobArgs%` in the background, at %JobPriority%,
+:: logging to <dir>\<name>.log. `start` cannot return an exit code, so the
+:: process records it in <dir>\<name>.exit.
+:StartJob
+setlocal enableextensions disabledelayedexpansion
+
+> "%~1\%~2.cmd" (
+  echo @echo off
+  echo powershell.exe -ExecutionPolicy RemoteSigned -File "%ScriptDir%%~3" %JobArgs% ^> "%~1\%~2.log" 2^>^&1
+  echo ^> "%~1\%~2.tmp" echo %%errorlevel%%
+  echo move /y "%~1\%~2.tmp" "%~1\%~2.exit" ^> nul
+)
+start "%~2" /b %JobPriority% cmd /c "%~1\%~2.cmd"
+
+goto :eof
+endlocal
+
+:: Waits for the jobs in %JobNames% that StartJob started in <dir>, then
+:: replays their logs one after the other, and fails if any of them failed.
+:WaitJobs
+setlocal enableextensions enabledelayedexpansion
+
+:WaitForJobs
+set "Pending="
+for %%J in (%JobNames%) do if not exist "%~1\%%J.exit" set "Pending=1"
+if defined Pending (
+  ping -n 16 127.0.0.1 > nul
+  goto :WaitForJobs
+)
+
+set "Failed="
+for %%J in (%JobNames%) do (
+  echo ===== %%J =====
+  type "%~1\%%J.log"
+  set /p ExitCode=<"%~1\%%J.exit"
+  if not "!ExitCode!"=="0" (
+    echo %%J failed with exit code !ExitCode!
+    set "Failed=1"
+  )
+)
+if defined Failed exit /b 1
+exit /b 0
 endlocal
 
 :CloneRepositories

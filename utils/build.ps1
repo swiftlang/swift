@@ -120,6 +120,18 @@ Remove selected build outputs before building.
 .PARAMETER Toolchain
 Build the toolchain.
 
+.PARAMETER Phase
+The part of the build to run, so that build-sdk.ps1 can build the Windows SDKs
+in between:
+- All: the whole build.
+- Bootstrap: the Stage1 toolchain and the bootstrap macros, which build-sdk.ps1
+  builds the SDKs with.
+- Toolchain: the rest of the build, which uses the Windows SDKs that
+  build-sdk.ps1 built instead of building them.
+- Test: only the tests selected with -Test, against a completed build. Several
+  instances can run different tests at the same time.
+Default: All
+
 .PARAMETER Package
 Build the MSI installers and packaging.
 
@@ -229,6 +241,8 @@ param
 
   # Build Phases
   [switch] $Toolchain = $true,
+  [ValidateSet("All", "Bootstrap", "Toolchain", "Test")]
+  [string] $Phase = "All",
   [switch] $Package = $false,
 
   # Incremental Build Support
@@ -6076,7 +6090,7 @@ if ($DependenciesOnly) {
   exit 0;
 }
 
-if ($Clean) {
+if ($Clean -and $Phase -in "All", "Bootstrap") {
   # Fail instead of leaving a partially-cleaned tree behind.
   function Clean-Path([string] $Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return }
@@ -6105,7 +6119,7 @@ if ($Clean) {
   }
 }
 
-if ($Toolchain) {
+if ($Toolchain -and $Phase -in "All", "Bootstrap") {
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
   if ($HostPlatform.OS -eq [OS]::Windows) {
     (@($HostPlatform) + @($WindowsSDKBuilds)) | ForEach-Object {
@@ -6146,6 +6160,10 @@ if ($Toolchain) {
     SwiftSyntax_DIR = (Get-ProjectCMakeModules $BuildPlatform Stage1Compilers);
   }
 
+  if ($Phase -eq "Bootstrap") {
+    exit 0
+  }
+
   Invoke-BuildStep Build-SDK $HostPlatform -SummaryVariant "Dynamic" -Context @{
     SDKIdentifier        = $HostPlatform.OS.ToString();
     Variant              = "Dynamic";
@@ -6154,7 +6172,9 @@ if ($Toolchain) {
     BuildFoundation      = $true;
     SupplementalRuntimes = $SDKSupplementalRuntimes;
   }
+}
 
+if ($Toolchain -and $Phase -in "All", "Toolchain") {
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Compiler" -SummaryVariant "Compiler"
@@ -6325,40 +6345,43 @@ if ($Toolchain) {
   }
 }
 
-if ($IncludeDS2) {
+if ($IncludeDS2 -and $Phase -ne "Test") {
   Invoke-BuildStep Build-RegsGen2 $BuildPlatform
 }
 
-if ($Windows) {
-  Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1
-
+if ($Windows -and $Phase -ne "Test") {
   $SDKROOT = Get-SwiftSDK -OS Windows
-  foreach ($Build in $WindowsSDKBuilds) {
-    if ($Build.LinkModes.contains("dynamic")) {
-      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Dynamic" -Context @{
-        SDKIdentifier        = "Windows";
-        Variant              = "Dynamic";
-        Compilers            = $Compilers.Stage1;
-        Static               = $false;
-        BuildFoundation      = $true;
-        SupplementalRuntimes = $SDKSupplementalRuntimes;
+
+  # In the Toolchain phase, build-sdk.ps1 has built the SDKs.
+  if ($Phase -eq "All") {
+    Build-SDKDependencies $WindowsSDKBuilds -Compilers $Compilers.Stage1
+
+    foreach ($Build in $WindowsSDKBuilds) {
+      if ($Build.LinkModes.contains("dynamic")) {
+        Invoke-BuildStep Build-SDK $Build -SummaryVariant "Dynamic" -Context @{
+          SDKIdentifier        = "Windows";
+          Variant              = "Dynamic";
+          Compilers            = $Compilers.Stage1;
+          Static               = $false;
+          BuildFoundation      = $true;
+          SupplementalRuntimes = $SDKSupplementalRuntimes;
+        }
       }
-    }
 
-    if ($Build.LinkModes.contains("static")) {
-      Invoke-BuildStep Build-SDK $Build -SummaryVariant "Static" -Context @{
-        SDKIdentifier        = "Windows";
-        Variant              = "Static";
-        Compilers            = $Compilers.Stage1;
-        Static               = $true;
-        BuildFoundation      = $true;
-        SupplementalRuntimes = $SDKSupplementalRuntimes;
+      if ($Build.LinkModes.contains("static")) {
+        Invoke-BuildStep Build-SDK $Build -SummaryVariant "Static" -Context @{
+          SDKIdentifier        = "Windows";
+          Variant              = "Static";
+          Compilers            = $Compilers.Stage1;
+          Static               = $true;
+          BuildFoundation      = $true;
+          SupplementalRuntimes = $SDKSupplementalRuntimes;
+        }
       }
+
+      ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift\windows"        -Filter @("*.lib")
+      ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift_static\windows" -Filter @("*.lib")
     }
-
-    ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift\windows"        -Filter @("*.lib")
-    ConvertTo-ThickLayout -Platform $Build -Resources "${SDKROOT}\usr\lib\swift_static\windows" -Filter @("*.lib")
-
   }
 
   Install-SDK $WindowsSDKBuilds
@@ -6373,7 +6396,7 @@ if ($Windows) {
 
   # Copy static dependencies
   foreach ($Build in $WindowsSDKBuilds) {
-    if (-not $Build.LinkModes.Contains("static")) { continue }
+    if ($Phase -ne "All" -or -not $Build.LinkModes.Contains("static")) { continue }
 
     $SwiftResourceDir = "${SDKROOT}\usr\lib\swift_static\$($Build.OS.ToString().ToLowerInvariant())\$($Build.Architecture.LLVMName)"
     Copy-Item -Force -Path "$(Get-ProjectBinaryCache $Build brotli)\brotlicommon.lib" -Destination "${SwiftResourceDir}\brotlicommon.lib" | Out-Null
@@ -6390,7 +6413,7 @@ if ($Windows) {
   ).Count -gt 0
   # If -Windows rebuilds the host dynamic runtime, refresh the private SxS
   # copies after the final runtime image is in place.
-  if ($Toolchain -and $RebuiltHostDynamicRuntime) {
+  if ($Toolchain -and $Phase -eq "All" -and $RebuiltHostDynamicRuntime) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Get-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform -SummaryVariant "Asserts" @{
@@ -6406,7 +6429,7 @@ if ($Windows) {
   }
 }
 
-if ($Android) {
+if ($Android -and $Phase -ne "Test") {
   Build-SDKDependencies $AndroidSDKBuilds -Compilers $Compilers.Stage1
 
   $SDKROOT = Get-SwiftSDK -OS Android
@@ -6471,13 +6494,13 @@ if ($Android) {
   }
 }
 
-if ($Package) {
+if ($Package -and $Phase -ne "Test") {
   Invoke-BuildStep Build-mimalloc $HostPlatform
   Invoke-BuildStep Patch-mimalloc $HostPlatform
   Invoke-BuildStep Build-Installer $HostPlatform
 }
 
-if ($Stage) {
+if ($Stage -and $Phase -ne "Test") {
   Copy-BuildArtifactsToStage $HostPlatform
 }
 
@@ -6530,7 +6553,7 @@ if (-not $IsCrossCompiling) {
   }
 }
 
-if ($IncludeSBoM) {
+if ($IncludeSBoM -and $Phase -ne "Test") {
   Invoke-IsolatingEnvVars {
     $env:SYFT_FILE_METADATA_SELECTION = "all"
     $env:SYFT_FILE_CONTENT_GLOBS = "**\*.h"
@@ -6586,6 +6609,11 @@ if ($IncludeSBoM) {
   if ($Trace) {
     # Stage the trace with the other CI artifacts so that it can be downloaded.
     $TimingTraceDir = if ($Stage) { $Stage } else { $BinaryCache }
-    Write-TimingTrace "$TimingTraceDir\build-timings.json"
+    $TimingTraceName = switch ($Phase) {
+      "Bootstrap" { "build-timings-bootstrap.json" }
+      "Test"      { "build-timings-test-$(($Test | Where-Object { $_ }) -join "-").json" }
+      default     { "build-timings.json" }
+    }
+    Write-TimingTrace "$TimingTraceDir\$TimingTraceName"
   }
 }
