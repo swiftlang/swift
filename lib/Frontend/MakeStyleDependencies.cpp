@@ -115,13 +115,18 @@ static void emitMakeDependenciesFile(std::vector<std::string> dependencies,
     dep = frontend::utils::escapeForMake(dep, buffer).str();
   });
 
-  // FIXME: Xcode can't currently handle multiple targets in a single
-  // dependency line.
+  // Keep one rule per output by default for consumers that need every
+  // target. Consumers that track dependencies for the entire job can opt in
+  // to just the first rule, since all rules have the same prerequisites.
+  bool emittedRule = false;
   opts.forAllOutputPaths(input, [&](const StringRef path) {
+    if (opts.EmitDependenciesFirstOutputOnly && emittedRule)
+      return;
     os << frontend::utils::escapeForMake(path, buffer) << " :";
     for (auto &dep : dependencies)
       os << ' ' << dep;
     os << "\n";
+    emittedRule = true;
   });
 }
 
