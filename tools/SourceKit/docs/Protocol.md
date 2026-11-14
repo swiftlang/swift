@@ -833,6 +833,54 @@ var-type-info ::=
 $ sourcekitd-test -req=collect-var-type /path/to/file.swift -- /path/to/file.swift
 ```
 
+## Declaration USR
+
+This request collects the USRs of value declarations (types, functions,
+variables, ...) written in a source file after type checking. Extensions,
+operator and precedence group declarations, and declarations produced by macro
+expansions are not reported. To fulfill this task, the client must provide the
+path to the Swift source file under type checking and the necessary compiler
+arguments to help resolve all dependencies. Offsets and lengths are byte-based.
+Requested ranges that extend past the file are clamped to the file bounds. A
+zero-length range returns no declarations.
+
+### Request
+
+```
+{
+    <key.request>:                  (UID)     <source.request.declaration.usr>,
+    <key.sourcefile>:               (string)  // Absolute path to the file.
+    <key.compilerargs>:             [string*] // Array of zero or more strings for the compiler arguments,
+                                              // e.g ["-sdk", "/path/to/sdk"]. If key.sourcefile is provided,
+                                              // these must include the path to that file.
+    [opt] <key.offset>:             (int64)   // Byte offset of the requested range. Defaults to zero.
+    [opt] <key.length>:             (int64)   // Byte length of the requested range. Defaults to the rest of the file.
+}
+```
+
+### Response
+```
+{
+    <key.declarations>: (array) [declaration-info*]   // A list of declarations and USRs
+}
+```
+
+```
+declaration-info ::=
+{
+    <key.offset>:       (int64)    // Byte offset of a declaration identifier in the source file
+    <key.length>:       (int64)    // Byte length of a declaration identifier in the source file
+    <key.kind>:         (UID)      // SourceKit declaration kind
+    <key.usr>:          (string)   // Declaration USR
+}
+```
+
+### Testing
+
+```
+$ sourcekitd-test -req=collect-decl-usr /path/to/file.swift -- /path/to/file.swift
+```
+
 # UIDs
 
 ## Keys
