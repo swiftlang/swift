@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -o /dev/null 2>&1 | %FileCheck %s
 
 // The elements of the dataflow state that LifetimeResolution tracks for each kind of root.
 

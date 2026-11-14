@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -module-name test -verify %s \
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -module-name test -verify %s \
 // RUN:   -Xllvm -sil-print-after=raw-sil-inst-lowering -o /dev/null 2>&1 | %FileCheck %s
 
 // For extra coverage, compile without opaque values, but skip FileCheck.
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -disable-sil-opaque-values -verify %s -o /dev/null
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -disable-sil-opaque-values -verify %s -o /dev/null
 
 // When a derived class initializer fails, how `self` is cleaned up depends on how far it got. Before
 // `super.init`, its initialized stored properties are destroyed and `self` is deallocated without running

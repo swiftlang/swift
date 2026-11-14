@@ -7746,6 +7746,15 @@ public:
         }
       }
 
+      if (F->hasUnresolvedLifetimes()) {
+        require(F->isDefinition(),
+                "only a function definition can have unresolved lifetimes");
+        require(F->hasOwnership(),
+                "a function with unresolved lifetimes must be in OSSA");
+        require(F->getFunctionStage() == SILStage::Raw,
+                "a function with unresolved lifetimes must be in raw SIL");
+      }
+
       if (F->isExternalDeclaration()) {
         if (F->hasForeignBody())
           return;
@@ -7788,7 +7797,7 @@ public:
     visitSILBasicBlocks(F);
 
     if (F->hasOwnership() && F->shouldVerifyOwnership() &&
-        !mod.getASTContext().hadError()) {
+        !F->hasUnresolvedLifetimes() && !mod.getASTContext().hadError()) {
       F->verifyMemoryLifetime(calleeCache, &getDeadEndBlocks());
     }
 

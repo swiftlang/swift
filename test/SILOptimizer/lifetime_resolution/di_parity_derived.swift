@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -verify -verify-additional-prefix lr- %s
+// RUN: %target-swift-frontend -emit-sil -enable-lifetime-resolution -sil-verify-all -verify -verify-additional-prefix lr- %s
 // RUN: %target-swift-frontend -emit-sil -disable-lifetime-resolution -verify -verify-additional-prefix di- %s
 
 // Use-before-init, `super.init` and let-reinit diagnostics for `self` in a derived class initializer, checked

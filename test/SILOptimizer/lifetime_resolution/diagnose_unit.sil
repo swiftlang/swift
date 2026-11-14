@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -verify -sil-verify-none -sil-disable-input-verify -o /dev/null
+// RUN: %target-sil-opt %s -test-runner -verify -o /dev/null
 
 // Unit tests for the DiagnoseResolvedLifetimes pass. Each function is hand-written
 // with the markers that LifetimeResolution's `legalize` would leave behind, so the

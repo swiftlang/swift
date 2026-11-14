@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -lifetime-resolution -sil-disable-input-verify | %FileCheck %s --implicit-check-not diagnose
+// RUN: %target-sil-opt %s -lifetime-resolution | %FileCheck %s --implicit-check-not diagnose
 
 // Roots must be resolved in post-order, so that a value loaded from storage is resolved
 // before the storage itself, independent of block layout.
@@ -18,7 +18,7 @@ sil @consumeNC : $@convention(thin) (@owned NC) -> ()
 // Resolving %v first copies it for the interior consume, leaving the load with only
 // borrowing uses, so it becomes a load_borrow rather than a diagnosed load [copy].
 
-// CHECK-LABEL: sil [ossa] @storage_laid_out_after_load :
+// CHECK-LABEL: sil [ossa] @storage_laid_out_after_load : $@convention(thin) () -> () {
 // CHECK:       bb1:
 // CHECK:         [[LB:%.*]] = load_borrow [[ROOT:%.*]] : $*NC
 // CHECK-NEXT:    [[COPY:%.*]] = copy_value [[LB]]
@@ -30,7 +30,7 @@ sil @consumeNC : $@convention(thin) (@owned NC) -> ()
 // CHECK:       bb2:
 // CHECK:         [[ROOT]] = mark_uninitialized [var]
 // CHECK:       } // end sil function 'storage_laid_out_after_load'
-sil [ossa] @storage_laid_out_after_load : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @storage_laid_out_after_load : $@convention(thin) () -> () {
 bb0:
   br bb2
 

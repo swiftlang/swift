@@ -4054,6 +4054,9 @@ void SILFunction::print(SILPrintContext &PrintCtx) const {
   if (!hasLoweredAddresses())
     OS << "[opaque] ";
 
+  if (hasUnresolvedLifetimes())
+    OS << "[unresolved] ";
+
   if (needsStackProtection())
     OS << "[stack_protection] ";
 

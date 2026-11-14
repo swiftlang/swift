@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -o /dev/null 2>&1 | %FileCheck %s
 
 // How LifetimeResolution classifies the uses of the memory holding `self` in a derived class initializer.
 

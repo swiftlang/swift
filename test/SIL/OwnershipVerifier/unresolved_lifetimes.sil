@@ -1,0 +1,55 @@
+// RUN: %empty-directory(%t)
+// RUN: split-file %s %t
+// RUN: not --crash %target-sil-opt %t/operand.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=OPERAND
+// RUN: not --crash %target-sil-opt %t/terminator.sil -o /dev/null 2>&1 | %FileCheck %s --check-prefix=TERMINATOR
+
+// REQUIRES: asserts
+
+// A function with unresolved lifetimes skips lifetime verification, but its
+// operands must still satisfy their ownership constraints.
+
+//--- operand.sil
+
+sil_stage raw
+
+import Builtin
+
+class K {}
+
+sil @consumeK : $@convention(thin) (@owned K) -> ()
+
+// OPERAND-LABEL: Begin Error in Function: 'guaranteed_passed_as_owned'
+// OPERAND-NEXT:  Found an operand with a value that is not compatible with the operand's operand ownership kind map.
+// OPERAND-NEXT:  Value: %0 = argument of bb0 : $K
+sil [ossa] [unresolved] @guaranteed_passed_as_owned : $@convention(thin) (@guaranteed K) -> () {
+bb0(%0 : @guaranteed $K):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %1 = apply %consumeK(%0) : $@convention(thin) (@owned K) -> ()
+  %t = tuple ()
+  return %t : $()
+}
+
+//--- terminator.sil
+
+sil_stage raw
+
+import Builtin
+
+class K {}
+
+sil @consumeK : $@convention(thin) (@owned K) -> ()
+
+// The over-consume of %0 is allowed, but %1's incorrect operand use is not.
+
+// TERMINATOR-NOT:   Found over consume
+// TERMINATOR-LABEL: Begin Error in Function: 'guaranteed_returned_as_owned'
+// TERMINATOR-NEXT:  Have operand with incompatible ownership?!
+// TERMINATOR-NEXT:  Value: %1 = argument of bb0 : $K
+// TERMINATOR-NEXT:  User: return %1 : $K
+sil [ossa] [unresolved] @guaranteed_returned_as_owned : $@convention(thin) (@owned K, @guaranteed K) -> @owned K {
+bb0(%0 : @owned $K, %1 : @guaranteed $K):
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %2 = apply %consumeK(%0) : $@convention(thin) (@owned K) -> ()
+  %3 = apply %consumeK(%0) : $@convention(thin) (@owned K) -> ()
+  return %1 : $K
+}

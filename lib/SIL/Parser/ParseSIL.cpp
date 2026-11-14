@@ -738,6 +738,7 @@ struct DeclSILOptional {
     bool *isCanonical = nullptr;
     bool *hasOwnershipSSA = nullptr;
     bool *hasLoweredAddresses = nullptr;
+    bool *hasUnresolvedLifetimes = nullptr;
     IsThunk_t *isThunk = nullptr;
     IsDynamicallyReplaceable_t *isDynamic = nullptr;
     IsDistributed_t *isDistributed = nullptr;
@@ -818,6 +819,8 @@ static bool parseDeclSILOptional(
       *options.hasOwnershipForTrivial = true;
     else if (options.hasLoweredAddresses && SP.P.Tok.getText() == "opaque")
       *options.hasLoweredAddresses = false;
+    else if (options.hasUnresolvedLifetimes && SP.P.Tok.getText() == "unresolved")
+      *options.hasUnresolvedLifetimes = true;
     else if (options.needStackProtection && SP.P.Tok.getText() == "stack_protection")
       *options.needStackProtection = true;
     else if (options.isSpecialized && SP.P.Tok.getText() == "specialized")
@@ -7871,6 +7874,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   IsExactSelfClass_t isExactSelfClass = IsNotExactSelfClass;
   bool hasOwnershipSSA = false;
   bool hasLoweredAddresses = false;
+  bool hasUnresolvedLifetimes = false;
   IsThunk_t isThunk = IsNotThunk;
   SILFunction::Purpose specialPurpose = SILFunction::Purpose::None;
   bool isWeakImported = false;
@@ -7898,8 +7902,8 @@ bool SILParserState::parseDeclSIL(Parser &P) {
   if (parseSILLinkage(FnLinkage, P) ||
       parseDeclSILOptional({
           &isTransparent, &isSerialized, &isCanonical, &hasOwnershipSSA,
-          &hasLoweredAddresses, &isThunk, &isDynamic, &isDistributed,
-          &isRuntimeAccessible, &forceEnableLexicalLifetimes,
+          &hasLoweredAddresses, &hasUnresolvedLifetimes, &isThunk, &isDynamic,
+          &isDistributed, &isRuntimeAccessible, &forceEnableLexicalLifetimes,
           &useStackForPackMetadata, &hasUnsafeNonEscapableResult,
           &isExactSelfClass, &DynamicallyReplacedFunction,
           &AdHocWitnessFunction, &objCReplacementFor, &specialPurpose,
@@ -7940,6 +7944,7 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     if (!hasOwnershipSSA)
       FunctionState.F->setOwnershipEliminated();
     FunctionState.F->setHasLoweredAddresses(hasLoweredAddresses);
+    FunctionState.F->setHasUnresolvedLifetimes(hasUnresolvedLifetimes);
     FunctionState.F->setThunk(IsThunk_t(isThunk));
     FunctionState.F->setIsDynamic(isDynamic);
     FunctionState.F->setIsDistributed(isDistributed);
