@@ -13,7 +13,7 @@
 #ifndef SWIFT_PLATFORM_CONCURRENCY_H
 #define SWIFT_PLATFORM_CONCURRENCY_H
 
-#include "../EmbeddedPlatform.h"
+#include "Types.h"
 #include "ExecutorTypes.h"
 
 #if defined(__cplusplus)
