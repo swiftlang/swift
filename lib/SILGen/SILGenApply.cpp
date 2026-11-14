@@ -3667,6 +3667,9 @@ SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
     if (auto *underlying = OpaqueExprs.lookup(OV))
       expr = underlying;
   }
+  while (auto pe = dyn_cast<ParenExpr>(expr)) {
+    expr = pe->getSubExpr();
+  }
   if (auto le = dyn_cast<LoadExpr>(expr)) {
     expr = le->getSubExpr();
   }

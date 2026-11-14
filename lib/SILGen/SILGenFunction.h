@@ -437,6 +437,17 @@ public:
   /// BindOptionalExpr is a missing value.
   SmallVector<JumpDest, 2> BindOptionalFailureDests;
 
+  /// Whether the result of the matching entry of BindOptionalFailureDests
+  /// is non-Escapable.
+  SmallVector<bool, 2> BindOptionalNonEscapableChains;
+
+  bool isInNonEscapableOptionalChain(unsigned depth) const {
+    if (depth >= BindOptionalNonEscapableChains.size())
+      return false;
+    return BindOptionalNonEscapableChains
+        [BindOptionalNonEscapableChains.size() - depth - 1];
+  }
+
   /// The cleanup depth and epilog BB for "return" statements.
   JumpDest ReturnDest = JumpDest::invalid();
   /// The cleanup depth and epilog BB for "fail" statements.
