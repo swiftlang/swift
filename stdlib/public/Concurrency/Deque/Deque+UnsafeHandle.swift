@@ -57,7 +57,7 @@ extension _Deque._UnsafeHandle {
   }
 
   var count: Int {
-    get { unsafe _header.pointee.count }
+    get { unsafe _assumeNonNegative(_header.pointee.count) }
     nonmutating set { unsafe _header.pointee.count = newValue }
   }
 

@@ -27,8 +27,12 @@
 ///     // "Humperdinck"
 @frozen
 public struct Repeated<Element> {
+  @usableFromInline
+  internal let _count: Int
+
   /// The number of elements in this collection.
-  public let count: Int
+  @inlinable
+  public var count: Int { _assumeNonNegative(_count) }
 
   /// The value of every element in this collection.
   public let repeatedValue: Element
@@ -38,7 +42,7 @@ public struct Repeated<Element> {
   @inlinable // trivial-implementation
   internal init(_repeating repeatedValue: Element, count: Int) {
     _precondition(count >= 0, "Repetition count should be non-negative")
-    self.count = count
+    self._count = count
     self.repeatedValue = repeatedValue
   }
 }
