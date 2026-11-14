@@ -2,15 +2,16 @@
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   # All of the embedded platform headers, relative to the "swift" directory.
-  # The copied and installed forms below are derived from this list, and
-  # preserve the subdirectory structure.
   set(_embedded_platform_headers
     EmbeddedPlatform.h
     SwiftPlatform/Clocks.h
     SwiftPlatform/Concurrency.h
     SwiftPlatform/ExecutorTypes.h
+    SwiftPlatform/Heap.h
     SwiftPlatform/Mutex.h
-    SwiftPlatform/Types.h)
+    SwiftPlatform/Types.h
+    SwiftPlatform/Version.h
+  )
 
   set(_embedded_platform_header_outputs)
   foreach(_header ${_embedded_platform_headers})

@@ -118,24 +118,6 @@ typedef void (*__swift_tls_dtor_t)(void * EMBEDDED_SWIFT_NULLABLE);
 #endif
 
 /**
- * Major version number for the Swift Platform Abstraction Layer.
- *
- * The major version number will be increased when there is a breaking change to
- * existing APIs.
- */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR 1
-
-/**
- * Minor version number for the Swift Platform Abstraction Layer.
- *
- * The minor version number will be increased when new APIs or flags are
- * introduced in a manner that is not breaking for existing clients. The
- * entrypoints might be optional, where the entrypoint is needed only when
- * certain Swift functionality is used.
- */
-#define EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR 2
-
-/**
  * The number of pointer-size words that will be used to store a non-recursive
  * Mutex (as provided by the Synchronization library), i.e., one backed by the
  * `_swift_mutex_*` functions.

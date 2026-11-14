@@ -29,27 +29,12 @@
 #include "SwiftPlatform/Heap.h"
 #include "SwiftPlatform/Types.h"
 #include "SwiftPlatform/Mutex.h"
+#include "SwiftPlatform/Version.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-/**
- * Determine the version of the platform abstraction layer that the Embedded
- * Swift library was built with.
- *
- * - Parameters:
- *   - major: The value of EMBEDDED_SWIFT_PLATFORM_VERSION_MAJOR that the
- *     Swift standard library was built with.
- *   - minor: The value of EMBEDDED_SWIFT_PLATFORM_VERSION_MINOR that the
- *     Swift standard library was built with.
- *
- * This function is provided by the Swift standard library, and declared here
- * for the convenience of C clients.
- */
-void swift_getPlatformLayerVersion(
-  __swift_ptrdiff_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE major,
-  __swift_ptrdiff_t * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE minor);
 
 /**
  * Acquires the standard output stream lock.
