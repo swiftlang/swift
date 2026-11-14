@@ -4,6 +4,18 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
+public struct HasOverloadedMethods {
+    let x: Int
+
+    public func overloadedMethod(x _: Int) { }
+    public func overloadedMethod(y _: Int) { }
+}
+
+// CHECK: class SWIFT_SYMBOL("s:9Functions20HasOverloadedMethodsV") HasOverloadedMethods final {
+// CHECK:        SWIFT_INLINE_THUNK void overloadedMethod(swift::Int _1) const noexcept SWIFT_SYMBOL("s:9Functions20HasOverloadedMethodsV16overloadedMethod1xySi_tF");
+// CHECK-NEXT:   // Unavailable in C++: Swift instance method 'overloadedMethod(y:)'. An overload with the same C++ parameter types already exists.
+// CHECK-NEXT: private:
+
 // Different arity should always work.
 public func arityOverload() { }
 public func arityOverload(_ x: Int) { }
