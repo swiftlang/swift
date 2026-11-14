@@ -125,6 +125,14 @@ void registerDeclWithOpaqueResultType(SourceFile *SF, ArrayRef<Decl *> items) {
 
 } // namespace
 
+#if SWIFT_BUILD_SWIFT_SYNTAX
+namespace {
+bool shouldParseViaASTGen(SourceFile &SF);
+template <typename Bridged, typename Native>
+void appendToVector(Bridged cNode, void *vecPtr);
+} // namespace
+#endif
+
 FingerprintAndMembers
 ParseMembersRequest::evaluate(Evaluator &evaluator,
                               IterableDeclContext *idc) const {
@@ -149,6 +157,31 @@ ParseMembersRequest::evaluate(Evaluator &evaluator,
     }
     return FingerprintAndMembers{fp, ctx.AllocateCopy(members)};
   }
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  SourceRange braces;
+  if (auto *ext = dyn_cast<ExtensionDecl>(idc))
+    braces = ext->getBraces();
+  else
+    braces = cast<NominalTypeDecl>(idc)->getBraces();
+
+  // An implicit declaration has no braces and no members written in source.
+  if (braces.isValid() && shouldParseViaASTGen(*sf)) {
+    // The members were left for ASTGen to build.
+    SmallVector<Decl *, 16> members;
+    auto *decl = const_cast<Decl *>(idc->getDecl());
+    auto fingerprint = swift_ASTGen_buildMembers(
+        &ctx.Diags, sf->getExportedSourceFile(), decl,
+        idc->getAsGenericContext(), ctx, braces.Start,
+        static_cast<SmallVectorImpl<Decl *> *>(&members),
+        appendToVector<BridgedDecl, Decl *>);
+
+    registerDeclWithOpaqueResultType(sf->getOutermostParentSourceFile(),
+                                     llvm::ArrayRef(members));
+    return FingerprintAndMembers{fingerprint.unbridged(),
+                                 ctx.AllocateCopy(llvm::ArrayRef(members))};
+  }
+#endif
 
   unsigned bufferID = sf->getBufferID();
 
@@ -211,6 +244,40 @@ ParseAbstractFunctionBodyRequest::evaluate(Evaluator &evaluator,
       }
       assert(sf && "Could not find source file containing parsed body");
     }
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+    if (shouldParseViaASTGen(*sf)) {
+      auto &ctx = afd->getASTContext();
+      if (bufferID != sf->getBufferID()) {
+        // The body lives in a buffer of its own, such as the replacement for an
+        // edited body in SourceKit's incremental recompile, rather than in the
+        // syntax tree ASTGen holds for the file. Build it from its own text.
+        SourceLoc bodyStart = afd->getBodySourceRange().Start;
+        StringRef text = sourceMgr.getEntireTextForBuffer(bufferID);
+        text = text.substr(sourceMgr.getLocOffsetInBuffer(bodyStart, bufferID));
+        swift_ASTGen_buildReplacementFunctionBody(
+            &ctx.Diags, sf->getExportedSourceFile(), afd, afd, ctx,
+            BridgedStringRef(text));
+        assert(afd->getBodyKind() == BodyKind::Parsed &&
+               "ASTGen did not build the replacement body");
+        auto result = afd->BodyAndFP;
+        registerDeclWithOpaqueResultType(afd->getOutermostParentSourceFile(),
+                                         result.getBody()->getElements());
+        return result;
+      }
+
+      // The body was left for ASTGen to build.
+      swift_ASTGen_buildFunctionBody(&ctx.Diags, sf->getExportedSourceFile(),
+                                     afd, afd, ctx,
+                                     afd->getBodySourceRange().Start);
+      assert(afd->getBodyKind() == BodyKind::Parsed &&
+             "ASTGen did not build the delayed body");
+      auto result = afd->BodyAndFP;
+      registerDeclWithOpaqueResultType(afd->getOutermostParentSourceFile(),
+                                       result.getBody()->getElements());
+      return result;
+    }
+#endif
 
     Parser parser(bufferID, *sf, /*SIL*/ nullptr);
     auto result = parser.parseAbstractFunctionBodyDelayed(afd);
@@ -395,18 +462,28 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   // regions cache.
   swift_ASTGen_evaluateConfiguredRegionsForDiagnostics(Ctx, exportedSourceFile);
 
+  // Function bodies are built on demand when the source file allows delayed
+  // parsing, as in the C++ parser. The on-demand request has to emit the
+  // diagnostics directly, and it knows nothing about the generated source
+  // information needed by macro expansions, so keep those eager.
+  bool delayFunctionBodies = SF.hasDelayedBodyParsing() &&
+                             !suppressedDiagQueue && !genInfo &&
+                             !SM.hasIDEInspectionTargetBuffer();
+
   // Emit parser diagnostics.
   if (!suppressedDiagQueue) {
     (void)swift_ASTGen_emitParserDiagnostics(
         Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
         /*downgradePlaceholderErrorsToWarnings=*/langOpts.Playground ||
-            langOpts.WarnOnEditorPlaceholder);
+            langOpts.WarnOnEditorPlaceholder,
+        delayFunctionBodies);
   }
 
   // Generate AST nodes.
   SmallVector<ASTNode, 8> items;
   swift_ASTGen_buildTopLevelASTNodes(
       &Diags, exportedSourceFile, declContext, attachedDecl, Ctx,
+      delayFunctionBodies,
       static_cast<SmallVectorImpl<ASTNode> *>(&items),
       appendToVector<BridgedASTNode, ASTNode>);
 
