@@ -9,7 +9,8 @@
 // the entry block, BEFORE the loop body — not in the loop header.
 // CHECK:       bb0(%0 : $*any Collection):
 // CHECK:         [[PHI_STK:%[^,]+]] = alloc_stack [lexical] $Optional<Any>
-// CHECK:         alloc_stack $any IteratorProtocol
+// CHECK:         [[GEN:%[^,]+]] = alloc_stack [lexical] [var_decl] $any IteratorProtocol, var, name "$v$generator"
+// CHECK:         init_existential_addr [[GEN]]
 // CHECK:         br [[HEADER:bb[0-9]+]]
 //
 // Loop header allocates the per-iteration apply @out slot for iterator.next().
