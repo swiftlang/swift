@@ -71,6 +71,17 @@ public protocol BorrowingIteratorProtocol<Element, Failure>: ~Copyable, ~Escapab
   ///   In that case, the iterator's position is set to the end of the underlying type.
   @_lifetime(self: copy self)
   mutating func skip(by maxOffset: Int) throws(Failure) -> Int
+  
+  /// Advances the position of this iterator by the specified offset, or until
+  /// the end of the underlying type's elements.
+  ///
+  /// - Parameter offset: The maximum number of elements
+  ///   to offset the position of this iterator. `offset` must be
+  ///   nonnegative. On return, `offset` is set to zero if the
+  ///   operation succeeded without hitting the limit; otherwise,
+  ///   `offset` reflects the number of elements that couldn’t be skipped.
+  @_lifetime(self: copy self)
+  mutating func skip(by offset: inout Int) throws(Failure)
 }
 
 @available(SwiftStdlib 6.4, *)
@@ -89,15 +100,35 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
   @available(SwiftStdlib 6.4, *)
   @export(implementation)
   @_lifetime(self: copy self)
-  public mutating func skip(by offset: Int) throws(Failure) -> Int {
+  internal mutating func _skip(by offset: inout Int) throws(Failure) {
     _precondition(offset >= 0, "Can't skip by a negative offset")
-    var remainder = offset
-    while remainder > 0 {
-      let span = try nextSpan(maxCount: remainder)
+    while offset > 0 {
+      let span = try nextSpan(maxCount: offset)
       if span.isEmpty { break }
-      remainder &-= span.count
+      offset &-= span.count
+    }
+  }
+  
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func skip(by offset: Int) throws(Failure) -> Int {
+    var remainder = offset
+    // TODO: Use correct availability for protocol-based skip(by:)
+    if #available(anyAppleOS 27.0, *) {
+      try skip(by: &remainder)
+    } else {
+      try _skip(by: &remainder)
     }
     return offset &- remainder
+  }
+  
+  // TODO: Use correct availability
+  @available(SwiftStdlib 6.4, *)
+  @export(implementation)
+  @_lifetime(self: copy self)
+  public mutating func skip(by offset: inout Int) throws(Failure) {
+    try _skip(by: &offset)
   }
 }
 
