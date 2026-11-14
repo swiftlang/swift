@@ -936,6 +936,7 @@ static bool usesFeatureOnceFunctions(Decl *D) {
 
 UNINTERESTING_FEATURE(BuiltinExtendVectorLanes)
 UNINTERESTING_FEATURE(BuiltinRelaxedFP)
+UNINTERESTING_FEATURE(PackExpansionInArrayLiterals)
 
 static bool usesFeatureNondeinitableTypes(Decl *decl) {
   auto &ctx = decl->getASTContext();

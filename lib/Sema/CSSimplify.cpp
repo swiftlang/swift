@@ -9342,6 +9342,15 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
         return SolutionKind::Solved;
       }
 
+      // A value pack expansion contributes a dynamic number of elements,
+      // which isn't supported in an 'InlineArray' literal yet. This is
+      // diagnosed when applying the solution instead of as a count mismatch.
+      if (llvm::any_of(arrayLiteral->getElements(), [](Expr *element) {
+            return isa<PackExpansionExpr>(element);
+          })) {
+        return SolutionKind::Solved;
+      }
+
       // Otherwise this is an error and the counts aren't equal to each other.
       if (!shouldAttemptFixes())
         return SolutionKind::Error;

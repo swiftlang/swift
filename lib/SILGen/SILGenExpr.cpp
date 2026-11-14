@@ -2792,17 +2792,97 @@ static SILValue getArrayBuffer(SILValue array, SILGenFunction &SGF, SILLocation 
   return v;
 }
 
+/// The formal pack type to iterate over for a pack expansion element of an
+/// array literal, e.g. `repeat each x` in `[repeat each x]`.
+static CanPackType getArrayElementFormalPackType(PackExpansionExpr *expansion) {
+  auto expansionType =
+      cast<PackExpansionType>(expansion->getType()->getCanonicalType());
+  return CanPackType::get(expansion->getType()->getASTContext(),
+                          {expansionType});
+}
+
+namespace {
+/// Cleanup to destroy the elements in the range
+/// `[startIndex, startIndex + count)` of a partially-initialized array buffer.
+class PartialDestroyArrayElementsCleanup : public Cleanup {
+  SILValue BaseAddr;
+  SILValue StartIndex;
+  SILValue Count;
+
+public:
+  PartialDestroyArrayElementsCleanup(SILValue baseAddr, SILValue startIndex,
+                                     SILValue count)
+      : BaseAddr(baseAddr), StartIndex(startIndex), Count(count) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    SGF.emitDestroyArrayElements(l, BaseAddr, StartIndex, Count);
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "PartialDestroyArrayElementsCleanup\n"
+                 << "State: " << getState() << "\n"
+                 << "BaseAddr: " << BaseAddr << "StartIndex: " << StartIndex
+                 << "Count: " << Count;
+#endif
+  }
+};
+} // end anonymous namespace
+
+CleanupHandle SILGenFunction::enterPartialDestroyArrayElementsCleanup(
+    SILValue baseAddr, SILValue startIndex, SILValue count) {
+  Cleanups.pushCleanup<PartialDestroyArrayElementsCleanup>(baseAddr, startIndex,
+                                                           count);
+  return Cleanups.getTopCleanup();
+}
+
+void SILGenFunction::emitDestroyArrayElements(SILLocation loc,
+                                              SILValue baseAddr,
+                                              SILValue startIndex,
+                                              SILValue count) {
+  auto &ctx = getASTContext();
+  auto wordTy = SILType::getBuiltinWordType(ctx);
+  auto boolTy = SILType::getBuiltinIntegerType(1, ctx);
+
+  // for (i = 0; i != count; ++i) destroy_addr base[startIndex + i]
+  SILValue zero = B.createIntegerLiteral(loc, wordTy, 0);
+  SILValue one = B.createIntegerLiteral(loc, wordTy, 1);
+
+  auto *condBB = createBasicBlock();
+  auto *bodyBB = createBasicBlock();
+  auto *endBB = createBasicBlock();
+
+  B.createBranch(loc, condBB, {zero});
+
+  B.emitBlock(condBB);
+  SILValue i = condBB->createPhiArgument(wordTy, OwnershipKind::None);
+  SILValue atEnd =
+      B.createBuiltinBinaryFunction(loc, "cmp_eq", wordTy, boolTy, {i, count});
+  B.createCondBranch(loc, atEnd, endBB, bodyBB);
+
+  B.emitBlock(bodyBB);
+  SILValue index =
+      B.createBuiltinBinaryFunction(loc, "add", wordTy, wordTy, {startIndex, i});
+  SILValue eltAddr =
+      B.createIndexAddr(loc, baseAddr, index, /*needsStackProtection=*/false,
+                        /*isProjection=*/true);
+  B.createDestroyAddr(loc, eltAddr);
+  SILValue next =
+      B.createBuiltinBinaryFunction(loc, "add", wordTy, wordTy, {i, one});
+  B.createBranch(loc, condBB, {next});
+
+  B.emitBlock(endBB);
+}
+
 VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
                                        CanType baseTy, CanType arrayTy,
-                                       unsigned numElements) {
+                                       SILValue numEltsVal) {
   // Reabstract the base type against the array element type.
   auto baseAbstraction = AbstractionPattern::getOpaque();
   auto &baseTL = SGF.getTypeLowering(baseAbstraction, baseTy);
 
   // Allocate the array.
-  SILValue numEltsVal = SGF.B.createIntegerLiteral(loc,
-                             SILType::getBuiltinWordType(SGF.getASTContext()),
-                             numElements);
   ManagedValue array = SGF.emitUninitializedArrayAllocation(arrayTy, numEltsVal, loc);
 
   // Temporarily deactivate the main array cleanup.
@@ -2826,7 +2906,8 @@ VarargsInfo Lowering::emitBeginVarargs(SILGenFunction &SGF, SILLocation loc,
 
 ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
                                       VarargsInfo &&varargs,
-                                      unsigned numElements) {
+                                      unsigned numStaticElements,
+                                      SILValue numElements) {
   // Kill the abort cleanup.
   SGF.Cleanups.setCleanupState(varargs.getAbortCleanup(), CleanupState::Dead);
 
@@ -2842,10 +2923,42 @@ ManagedValue Lowering::emitEndVarargs(SILGenFunction &SGF, SILLocation loc,
   // singleton is used. "Finalization" means to emit an end_cow_mutation
   // instruction on the array. As the empty-array singleton is a read-only and
   // shared object, it's not legal to do a end_cow_mutation on it.
-  if (numElements == 0)
+  if (numStaticElements > 0)
+    return SGF.emitUninitializedArrayFinalization(loc, std::move(array));
+  if (!numElements)
     return array;
-    
-  return SGF.emitUninitializedArrayFinalization(loc, std::move(array));
+
+  // Whether the array is empty is only known dynamically, e.g. because the
+  // literal only contains pack expansions, which may be empty. Branch on the
+  // count and only finalize the array if it was really allocated.
+  auto &ctx = SGF.getASTContext();
+  auto wordTy = SILType::getBuiltinWordType(ctx);
+  auto boolTy = SILType::getBuiltinIntegerType(1, ctx);
+  SILValue zero = SGF.B.createIntegerLiteral(loc, wordTy, 0);
+  SILValue isEmpty = SGF.B.createBuiltinBinaryFunction(
+      loc, "cmp_eq", wordTy, boolTy, {numElements, zero});
+
+  auto *emptyBB = SGF.createBasicBlock();
+  auto *nonEmptyBB = SGF.createBasicBlock();
+  auto *contBB = SGF.createBasicBlock();
+
+  SILValue arrayValue = array.forward(SGF);
+  SGF.B.createCondBranch(loc, isEmpty, emptyBB, nonEmptyBB);
+
+  SGF.B.emitBlock(emptyBB);
+  SGF.B.createBranch(loc, contBB, {arrayValue});
+
+  SGF.B.emitBlock(nonEmptyBB);
+  {
+    auto finalized = SGF.emitUninitializedArrayFinalization(
+        loc, SGF.emitManagedRValueWithCleanup(arrayValue));
+    SGF.B.createBranch(loc, contBB, {finalized.forward(SGF)});
+  }
+
+  SGF.B.emitBlock(contBB);
+  auto *result =
+      contBB->createPhiArgument(arrayValue->getType(), OwnershipKind::Owned);
+  return SGF.emitManagedRValueWithCleanup(result);
 }
 
 RValue RValueEmitter::visitTupleExpr(TupleExpr *E, SGFContext C) {
@@ -5558,24 +5671,137 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     elementType = genericType.getGenericArgs()[0];
   }
 
+  auto &ctx = SGF.getASTContext();
+  auto wordTy = SILType::getBuiltinWordType(ctx);
+
+  // Value pack expansions (e.g. `[repeat each x]`) contribute a dynamic number
+  // of elements. Count the scalar elements statically, then add the length of
+  // each expansion.
+  unsigned numScalarElements = 0;
+  for (auto *element : E->getElements())
+    if (!isa<PackExpansionExpr>(element))
+      ++numScalarElements;
+
+  SILValue numElements;
+  if (numScalarElements > 0 || E->getNumElements() == 0)
+    numElements = SGF.B.createIntegerLiteral(loc, wordTy, numScalarElements);
+
+  // The length of each pack expansion element, in order.
+  SmallVector<SILValue, 2> expansionLengths;
+  for (auto *element : E->getElements()) {
+    auto *expansion = dyn_cast<PackExpansionExpr>(element);
+    if (!expansion)
+      continue;
+    SILValue length =
+        SGF.B.createPackLength(loc, getArrayElementFormalPackType(expansion));
+    expansionLengths.push_back(length);
+    numElements = numElements
+                      ? SGF.B.createBuiltinBinaryFunction(
+                            loc, "add", wordTy, wordTy, {numElements, length})
+                      : length;
+  }
+
   VarargsInfo varargsInfo =
-      emitBeginVarargs(SGF, loc, elementType, arrayType,
-                       E->getNumElements());
+      emitBeginVarargs(SGF, loc, elementType, arrayType, numElements);
+
+  auto baseAddr = varargsInfo.getBaseAddress();
+  auto &destTL = varargsInfo.getBaseTypeLowering();
+  bool needsCleanups = !destTL.isTrivial(&SGF.F);
 
   // Cleanups for any elements that have been initialized so far.
   SmallVector<CleanupHandle, 8> cleanups;
 
+  // The index of the next element is `dynamicOffset + staticOffset`, where
+  // `dynamicOffset` is the index just past the most recent pack expansion (or
+  // null if we haven't seen one yet).
+  SILValue dynamicOffset;
+  unsigned staticOffset = 0;
+  auto getCurrentIndex = [&]() -> SILValue {
+    if (dynamicOffset && staticOffset == 0)
+      return dynamicOffset;
+    SILValue staticIndex = SGF.B.createIntegerLiteral(loc, wordTy, staticOffset);
+    if (!dynamicOffset)
+      return staticIndex;
+    return SGF.B.createBuiltinBinaryFunction(loc, "add", wordTy, wordTy,
+                                             {dynamicOffset, staticIndex});
+  };
+
+  unsigned expansionIndex = 0;
   for (unsigned index : range(E->getNumElements())) {
-    SILValue indexValue = SGF.B.createIntegerLiteral(
-        loc, SILType::getBuiltinWordType(SGF.getASTContext()), index);
-    SILValue destAddr = SGF.B.createIndexAddr(loc, varargsInfo.getBaseAddress(), indexValue,
-            /*needsStackProtection=*/ false, /*isProjection=*/ true);
-    auto &destTL = varargsInfo.getBaseTypeLowering();
+    auto *element = E->getElement(index);
+    if (auto *expansion = dyn_cast<PackExpansionExpr>(element)) {
+      SILValue startIndex = getCurrentIndex();
+      SILValue length = expansionLengths[expansionIndex++];
+
+      // Enter a dormant cleanup that destroys all of the elements of the
+      // expansion once they've all been initialized.
+      CleanupHandle expansionCleanup = CleanupHandle::invalid();
+      if (needsCleanups) {
+        expansionCleanup = SGF.enterPartialDestroyArrayElementsCleanup(
+            baseAddr, startIndex, length);
+        SGF.Cleanups.setCleanupState(expansionCleanup, CleanupState::Dormant);
+        cleanups.push_back(expansionCleanup);
+      }
+
+      SGF.emitDynamicPackLoop(
+          expansion, getArrayElementFormalPackType(expansion),
+          /*componentIndex*/ 0, expansion->getGenericEnvironment(),
+          []() -> SILBasicBlock * { return nullptr; },
+          [&](SILValue indexWithinComponent, SILValue packExpansionIndex,
+              SILValue packIndex) {
+            // If initializing this element exits, destroy the elements of
+            // the expansion that have already been initialized.
+            CleanupHandle precedingCleanup = CleanupHandle::invalid();
+            if (needsCleanups)
+              precedingCleanup = SGF.enterPartialDestroyArrayElementsCleanup(
+                  baseAddr, startIndex, indexWithinComponent);
+
+            SILValue index = SGF.B.createBuiltinBinaryFunction(
+                loc, "add", wordTy, wordTy, {startIndex, indexWithinComponent});
+            SILValue destAddr = SGF.B.createIndexAddr(
+                loc, baseAddr, index, /*needsStackProtection=*/false,
+                /*isProjection=*/true);
+
+            CleanupHandle destCleanup = CleanupHandle::invalid();
+            if (needsCleanups) {
+              destCleanup = SGF.enterDestroyCleanup(destAddr);
+              SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+            }
+
+            TemporaryInitialization init(destAddr, destCleanup);
+            ArgumentSource(expansion->getPatternExpr())
+                .forwardInto(SGF, varargsInfo.getBaseAbstractionPattern(),
+                             &init, destTL);
+
+            // The element is now owned by the expansion cleanup; deactivate
+            // the per-iteration cleanups before continuing the loop.
+            if (needsCleanups) {
+              SGF.Cleanups.forwardCleanup(precedingCleanup);
+              SGF.Cleanups.forwardCleanup(destCleanup);
+            }
+          });
+
+      if (needsCleanups)
+        SGF.Cleanups.setCleanupState(expansionCleanup, CleanupState::Active);
+
+      // Subsequent elements follow the elements of the expansion.
+      if (index + 1 != E->getNumElements()) {
+        dynamicOffset = SGF.B.createBuiltinBinaryFunction(
+            loc, "add", wordTy, wordTy, {startIndex, length});
+        staticOffset = 0;
+      }
+      continue;
+    }
+
+    SILValue destAddr = SGF.B.createIndexAddr(
+        loc, baseAddr, getCurrentIndex(), /*needsStackProtection=*/false,
+        /*isProjection=*/true);
+    ++staticOffset;
+
     // Create a dormant cleanup for the value in case we exit before the
     // full array has been constructed.
-
     CleanupHandle destCleanup = CleanupHandle::invalid();
-    if (!destTL.isTrivial(&SGF.F)) {
+    if (needsCleanups) {
       destCleanup = SGF.enterDestroyCleanup(destAddr);
       SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
       cleanups.push_back(destCleanup);
@@ -5583,9 +5809,8 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
 
     TemporaryInitialization init(destAddr, destCleanup);
 
-    ArgumentSource(E->getElements()[index])
-        .forwardInto(SGF, varargsInfo.getBaseAbstractionPattern(), &init,
-                     destTL);
+    ArgumentSource(element).forwardInto(
+        SGF, varargsInfo.getBaseAbstractionPattern(), &init, destTL);
   }
 
   // Kill the per-element cleanups. The array will take ownership of them.
@@ -5593,7 +5818,10 @@ RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
     SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
   RValue array(SGF, loc, arrayType,
-        emitEndVarargs(SGF, loc, std::move(varargsInfo), E->getNumElements()));
+               emitEndVarargs(SGF, loc, std::move(varargsInfo),
+                              numScalarElements,
+                              expansionLengths.empty() ? SILValue()
+                                                       : numElements));
 
   array = scope.popPreservingValue(std::move(array));
 

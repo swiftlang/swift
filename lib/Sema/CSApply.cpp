@@ -3911,11 +3911,71 @@ namespace {
     }
 
     /// "Finish" an array expression by filling in the semantic expression.
+    /// Diagnose value pack expansion elements of an array literal that
+    /// aren't supported yet. Returns true if any were diagnosed.
+    bool diagnoseUnsupportedArrayPackExpansions(ArrayExpr *expr,
+                                                Type elementType,
+                                                bool isInlineArray) {
+      for (auto *element : expr->getElements()) {
+        auto *expansion = dyn_cast<PackExpansionExpr>(element);
+        if (!expansion)
+          continue;
+
+        // The number of elements of an 'InlineArray' is part of its type.
+        if (isInlineArray) {
+          ctx.Diags.diagnose(expansion->getLoc(),
+                             diag::expansion_in_inline_array_literal_unsupported);
+          return true;
+        }
+
+        // The array exists outside of the expansion, so its element type
+        // can't reference the element archetypes opened by the expansion.
+        // The solver avoids inferring such an element type from the pattern
+        // directly, but it can still end up there through e.g. a generic
+        // argument (`[Box<each T>]`) or a function parameter
+        // (`[(each T) -> Void]`).
+        auto *env = expansion->getGenericEnvironment();
+        Type packElementType;
+        elementType.findIf([&](Type type) {
+          if (auto *archetype = type->getAs<ElementArchetypeType>()) {
+            if (archetype->getGenericEnvironment() == env) {
+              packElementType = archetype;
+              return true;
+            }
+          }
+          return false;
+        });
+
+        if (packElementType) {
+          // Print the types as written, e.g. `each T`, if possible.
+          auto *packEnv = cs.DC->getGenericEnvironmentOfContext();
+          auto mapIntoPackContext = [&](Type type) -> Type {
+            bool hasOtherElementArchetypes = type.findIf([&](Type t) {
+              auto *archetype = t->getAs<ElementArchetypeType>();
+              return archetype && archetype->getGenericEnvironment() != env;
+            });
+            if (!packEnv || hasOtherElementArchetypes)
+              return type;
+            return packEnv->mapElementTypeIntoPackContext(type);
+          };
+
+          ctx.Diags.diagnose(
+              expansion->getLoc(),
+              diag::expansion_array_literal_element_type_unsupported,
+              mapIntoPackContext(elementType),
+              mapIntoPackContext(packElementType));
+          return true;
+        }
+      }
+      return false;
+    }
+
     ArrayExpr *finishArrayExpr(ArrayExpr *expr) {
       Type arrayTy = cs.getType(expr);
       Type elementType;
 
-      if (arrayTy->isInlineArray() || arrayTy->is_InlineArray()) {
+      bool isInlineArray = arrayTy->isInlineArray() || arrayTy->is_InlineArray();
+      if (isInlineArray) {
         // <let count: Int, Element>
         elementType = arrayTy->castTo<StructType>()->getGenericArgs()[1];
       } else {
@@ -3937,11 +3997,34 @@ namespace {
         elementType = expr->getElementType();
       }
 
+      if (diagnoseUnsupportedArrayPackExpansions(expr, elementType,
+                                                 isInlineArray))
+        return nullptr;
+
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
+        auto *locator = cs.getConstraintLocator(
+            expr, {LocatorPathElt::TupleElement(i)});
+
+        // A value pack expansion contributes zero or more elements, each of
+        // which is produced by evaluating the pattern for one element of
+        // the pack. Coerce the pattern to the array element type, which by
+        // construction can't reference any pack elements.
+        if (auto *expansion = dyn_cast<PackExpansionExpr>(expr->getElement(i))) {
+          auto *pattern =
+              coerceToType(expansion->getPatternExpr(), elementType, locator);
+          if (!pattern)
+            return nullptr;
+          expansion->setPatternExpr(pattern);
+
+          auto countType =
+              cs.getType(expansion)->castTo<PackExpansionType>()->getCountType();
+          expansion->setType(PackExpansionType::get(elementType, countType));
+          cs.cacheType(expansion);
+          continue;
+        }
+
         expr->setElement(
-            i, coerceToType(expr->getElement(i), elementType,
-                            cs.getConstraintLocator(
-                                expr, {LocatorPathElt::TupleElement(i)})));
+            i, coerceToType(expr->getElement(i), elementType, locator));
       }
 
       return expr;

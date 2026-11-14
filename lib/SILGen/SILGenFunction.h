@@ -3348,6 +3348,19 @@ public:
                               unsigned componentIndex,
                               SILValue limitWithinComponent);
 
+  /// Enter a cleanup to destroy the elements in the range
+  /// `[startIndex, startIndex + count)` of an array buffer whose element
+  /// storage begins at `baseAddr`.
+  CleanupHandle enterPartialDestroyArrayElementsCleanup(SILValue baseAddr,
+                                                        SILValue startIndex,
+                                                        SILValue count);
+
+  /// Emit a loop which destroys the elements in the range
+  /// `[startIndex, startIndex + count)` of an array buffer whose element
+  /// storage begins at `baseAddr`.
+  void emitDestroyArrayElements(SILLocation loc, SILValue baseAddr,
+                                SILValue startIndex, SILValue count);
+
   /// Emit a loop which destroys all the elements of a pack value.
   ///
   /// \param packAddr - the address of the overall pack value
