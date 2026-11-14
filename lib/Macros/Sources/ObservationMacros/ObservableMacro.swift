@@ -271,6 +271,13 @@ extension PatternBindingListSyntax {
 }
 
 extension VariableDeclSyntax {
+  // Attributes that are invalid on the private backing storage. They remain on
+  // the observed property, whose accessors provide their effect.
+  static let attributesExcludedFromPrivateStorage: Set<String> = [
+    "_spi",
+    "usableFromInline",
+  ]
+
   func privatePrefixed(_ prefix: String, addingAttribute attribute: AttributeSyntax, removingAttribute toRemove: AttributeSyntax, in context: LocalMacroExpansionContext<some MacroExpansionContext>) -> VariableDeclSyntax {
     var newAttribute = attribute
     newAttribute.leadingTrivia = .newline
@@ -278,7 +285,8 @@ extension VariableDeclSyntax {
     let newAttributes = attributes.filter { attribute in
       switch attribute {
       case .attribute(let attr):
-        attr.attributeName.identifier != toRemove.attributeName.identifier
+        attr.attributeName.identifier != toRemove.attributeName.identifier &&
+          !Self.attributesExcludedFromPrivateStorage.contains(attr.attributeName.identifier ?? "")
       default: true
       }
     } + [.attribute(newAttribute)]

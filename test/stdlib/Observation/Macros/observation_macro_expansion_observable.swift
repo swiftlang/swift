@@ -67,3 +67,30 @@ final class CommentOnSameLineNoAnnotation {
 // CHECK-NEXT:  @ObservationIgnored
 // CHECK-NEXT:  private final /*2*/ var _it /*4*/ /*4*/ = 0
 _ = 0
+
+@available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
+@Observable
+public final class SPIProperty {
+  @_spi(Testing) public var it = 0
+}
+
+// The private backing storage cannot be SPI; the observed property keeps it.
+// CHECK-LABEL: @__swiftmacro{{.*}}SPIProperty{{.*}}ObservationTracked{{.*}}fMp_.swift
+// CHECK-NEXT:  {{-+}}
+// CHECK-NEXT:  @ObservationIgnored
+// CHECK-NEXT:  private  var _it  = 0
+_ = 0
+
+@available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
+@Observable
+public final class UsableFromInlineProperty {
+  @usableFromInline var it = 0
+}
+
+// The private backing storage cannot be '@usableFromInline'; the observed
+// property keeps it.
+// CHECK-LABEL: @__swiftmacro{{.*}}UsableFromInlineProperty{{.*}}ObservationTracked{{.*}}fMp_.swift
+// CHECK-NEXT:  {{-+}}
+// CHECK-NEXT:  @ObservationIgnored
+// CHECK-NEXT:  private  var _it  = 0
+_ = 0
