@@ -83,9 +83,9 @@ struct SILDebugVariable {
   /// or nullptr if we don't have one.
   VarDecl *getDecl() const;
 
-  // We're not comparing DIExpr here because strictly speaking,
-  // DIExpr is not part of the debug variable. We simply piggyback
-  // it in this class so that's it's easier to carry DIExpr around.
+  // DIExpr is compared (and hashed) so that, e.g., different fragments of the
+  // same source variable are distinct keys.  Use withoutDIExpr() to compare
+  // just the underlying variable.
   bool operator==(const SILDebugVariable &V) const {
     return ArgNo == V.ArgNo && Constant == V.Constant && Name == V.Name &&
            Type == V.Type && Loc == V.Loc && Scope == V.Scope &&

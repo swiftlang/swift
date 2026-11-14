@@ -24,6 +24,7 @@
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/iterator_range.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <optional>
 
@@ -118,12 +119,32 @@ public:
     DIOp.TypePtr = T;
     return DIOp;
   }
+
+  bool operator==(const SILDIExprElement &other) const {
+    if (OpKind != other.OpKind)
+      return false;
+    switch (OpKind) {
+    case OperatorKind:
+      return Operator == other.Operator;
+    case DeclKind:
+      return Declaration == other.Declaration;
+    case ConstIntKind:
+      return ConstantInt == other.ConstantInt;
+    case TypeKind:
+      return TypePtr.getPointer() == other.TypePtr.getPointer();
+    }
+    llvm_unreachable("unhandled SILDIExprElement kind");
+  }
+  bool operator!=(const SILDIExprElement &other) const {
+    return !(*this == other);
+  }
 };
 
 /// Returns the hashcode for the di expr element.
 inline llvm::hash_code hash_value(const SILDIExprElement &elt) {
-  return llvm::hash_combine(elt.getKind(), elt.getAsDecl(), elt.getAsDecl(),
-                            elt.getAsConstInt());
+  return llvm::hash_combine(elt.getKind(), elt.getAsOperator(),
+                            elt.getAsDecl(), elt.getAsConstInt(),
+                            elt.getAsType().getPointer());
 }
 
 /// For a given SILDIExprOperator, provides information
@@ -272,7 +293,17 @@ public:
   }
 
   /// Return true if this expression is not empty
-  inline operator bool() const { return Elements.size(); }
+  ///
+  /// This is explicit so that `expr1 == expr2` cannot silently compile as a
+  /// comparison of two bools.
+  explicit operator bool() const { return !Elements.empty(); }
+
+  bool operator==(const SILDebugInfoExpression &other) const {
+    return Elements == other.Elements;
+  }
+  bool operator!=(const SILDebugInfoExpression &other) const {
+    return !(*this == other);
+  }
 
   /// Create a `op_fragment` expression
   static SILDebugInfoExpression createFragment(VarDecl *Field);
