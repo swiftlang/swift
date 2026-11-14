@@ -267,3 +267,21 @@ import lifetime_underscored_dependence
 // CHECK-NEXT:   takeTakeImplicitCopyClosure(g: takeClosureImplicitDependenceKind)
 // CHECK-NEXT:   takeTakeImplicitCopyClosure(g: takeClosureImplicitDependence)
 // CHECK-NEXT: }
+
+// CHECK:      public protocol ViewProjecting : ~Escapable {
+// CHECK-NEXT:   #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT:   var borrowed: lifetime_underscored_dependence::AnotherView { @_lifetime(borrow self) get }
+// CHECK-NEXT:   #else
+// CHECK-NEXT:   var borrowed: lifetime_underscored_dependence::AnotherView { @lifetime(borrow self) get }
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT:   var copied: lifetime_underscored_dependence::AnotherView { @_lifetime(copy self) get @_lifetime(self: copy newValue) set }
+// CHECK-NEXT:   #else
+// CHECK-NEXT:   var copied: lifetime_underscored_dependence::AnotherView { @lifetime(copy self) get @lifetime(self: copy newValue) set }
+// CHECK-NEXT:   #endif
+// CHECK-NEXT:   #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT:   subscript(index: Swift::Int) -> lifetime_underscored_dependence::AnotherView { @_lifetime(borrow self) get }
+// CHECK-NEXT:   #else
+// CHECK-NEXT:   subscript(index: Swift::Int) -> lifetime_underscored_dependence::AnotherView { @lifetime(borrow self) get }
+// CHECK-NEXT:   #endif
+// CHECK-NEXT: }

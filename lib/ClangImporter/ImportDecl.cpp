@@ -4899,6 +4899,62 @@ namespace {
       return false;
     }
 
+    // 'std::optional' stores copies of its constructor arguments, so a
+    // non-Escapable optional copies the lifetime of each argument. The
+    // 'std::nullopt_t' and 'std::in_place_t' tags carry no lifetime, so an
+    // optional constructed from tags alone, or from nothing, is immortal. This
+    // includes the constructor synthesized for 'CxxOptional', and the internal
+    // base classes libc++ builds 'std::optional' on.
+    bool inferStdOptionalConstructorDependence(const clang::FunctionDecl *decl,
+                                               AbstractFunctionDecl *result,
+                                               size_t returnIdx) {
+      const auto *ctor = dyn_cast<clang::CXXConstructorDecl>(decl);
+      if (!ctor)
+        return false;
+      const auto *record = ctor->getParent();
+      if (!record->isInStdNamespace() || !record->getIdentifier() ||
+          (record->getName() != "optional" &&
+           !record->getName().starts_with("__optional_")))
+        return false;
+
+      auto isNonEscapableType = [&](clang::QualType type) {
+        return isNonEscapable(Impl.SwiftContext.evaluator,
+                              type.getNonReferenceType().getTypePtr(), &Impl);
+      };
+      if (!isNonEscapableType(
+              Impl.getClangASTContext().getCanonicalTagType(record)))
+        return false;
+
+      auto isTag = [](clang::QualType type) {
+        const auto *tag = type.getNonReferenceType()->getAsCXXRecordDecl();
+        return tag && tag->isInStdNamespace() && tag->getIdentifier() &&
+               (tag->getName() == "nullopt_t" || tag->getName() == "in_place_t");
+      };
+      SmallBitVector inheritIndices(returnIdx);
+      for (auto [idx, param] : llvm::enumerate(ctor->parameters())) {
+        if (isTag(param->getType()))
+          continue;
+        // An argument that is not the value itself, e.g. one forwarded to a
+        // constructor of the value, needs a dependence we cannot know.
+        if (!isNonEscapableType(param->getType()))
+          return false;
+        inheritIndices[idx] = true;
+      }
+
+      LifetimeDependenceInfo dependence =
+          inheritIndices.any()
+              ? LifetimeDependenceInfo(
+                    IndexSubset::get(Impl.SwiftContext, inheritIndices),
+                    nullptr, returnIdx, LifetimeFlags().withAnnotated())
+              : LifetimeDependenceInfo(
+                    nullptr, nullptr, returnIdx,
+                    LifetimeFlags().withImmortalSpecifier().withAnnotated());
+      Impl.SwiftContext.evaluator.cacheOutput(
+          LifetimeDependenceInfoRequest{result},
+          Impl.SwiftContext.AllocateCopy(ArrayRef(dependence)));
+      return true;
+    }
+
     static bool isReturnDependsOnSelf(
         AbstractFunctionDecl *f,
         const ArrayRef<LifetimeDependenceInfo> &lifetimeDeps) {
@@ -4959,7 +5015,8 @@ namespace {
 
       auto returnIdx = result->getLifetimeDependenceResultIndex();
 
-      if (inferSelfDependence(decl, result, returnIdx))
+      if (inferSelfDependence(decl, result, returnIdx) ||
+          inferStdOptionalConstructorDependence(decl, result, returnIdx))
         return;
 
       auto &ASTContext = result->getASTContext();

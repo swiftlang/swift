@@ -273,13 +273,13 @@ struct SWIFT_NONESCAPABLE ViewHolder {
     // expected-note@+2 {{return type unavailable (cannot import)}}
     // expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
     const View &get() const [[clang::lifetimebound]] { return v; }
-    // 'pointee' only needs the address, so the result depending on 'self' is
-    // enough to keep it.
     const View &operator*() const [[clang::lifetimebound]] { return v; }
     // expected-note@+1 {{reference to non-'Escapable' type 'View' cannot be imported}}
     static const View &staticReference;
 };
 
+// 'operator*' backs 'pointee', whose address accessor never dereferences the
+// pointer, so a dependence on 'self' is not needed.
 struct SWIFT_NONESCAPABLE UnannotatedViewHolder {
     View v;
     const View &operator*() const { return v; }
@@ -620,9 +620,7 @@ public func references(_ x: inout View, _ h: borrowing ViewHolder,
     _ = h.get() // expected-error {{value of type 'ViewHolder' has no member 'get'}}
     _ = h.pointee
     _ = ViewHolder.staticReference // expected-error {{type 'ViewHolder' has no member 'staticReference'}}
-    // Without a dependence on 'self', 'pointee' would need a getter, which
-    // cannot load through the pointer.
-    _ = u.pointee // expected-error {{value of type 'UnannotatedViewHolder' has no member 'pointee'}}
+    _ = u.pointee
 #if hasFeature(LifetimeDependence)
     _ = it.successor()
 #endif

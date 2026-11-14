@@ -184,3 +184,21 @@ public func callTTICC() {
   takeTakeImplicitCopyClosure(g: takeClosureImplicitDependenceKind)
   takeTakeImplicitCopyClosure(g: takeClosureImplicitDependence)
 }
+
+// Lifetimes on the accessors of a requirement are part of the requirement.
+public protocol ViewProjecting: ~Escapable {
+  var borrowed: AnotherView {
+    @_lifetime(borrow self)
+    get
+  }
+  var copied: AnotherView {
+    @_lifetime(copy self)
+    get
+    @_lifetime(self: copy newValue)
+    set
+  }
+  subscript(index: Int) -> AnotherView {
+    @_lifetime(borrow self)
+    get
+  }
+}
