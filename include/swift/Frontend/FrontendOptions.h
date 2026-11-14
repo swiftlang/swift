@@ -346,6 +346,10 @@ public:
   /// output path is configured.
   std::optional<IntermoduleDepTrackingMode> IntermoduleDependencyTracking;
 
+  /// Emit only the first target rule in each Make-style dependency file.
+  /// The consumer must associate the dependencies with the entire job.
+  bool EmitDependenciesFirstOutputOnly = false;
+
   /// Should we emit the cType when printing @convention(c) or no?
   bool PrintFullConvention = false;
 

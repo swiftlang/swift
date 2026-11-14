@@ -121,6 +121,9 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.EnableImplicitDynamic |= Args.hasArg(OPT_enable_implicit_dynamic);
 
+  Opts.EmitDependenciesFirstOutputOnly |=
+      Args.hasArg(OPT_emit_dependencies_first_output_only);
+
   if (Args.hasArg(OPT_track_system_dependencies)) {
     Opts.IntermoduleDependencyTracking =
         IntermoduleDepTrackingMode::IncludeSystem;
