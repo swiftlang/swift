@@ -2821,6 +2821,33 @@ namespace {
       D->setInherited(Impl.SwiftContext.AllocateCopy(entries));
     }
 
+    /// Whether \p record has been completely imported as a type known not to
+    /// expose an unusable foreign type.
+    bool isImportedAsDefinitelyUsable(const clang::RecordDecl *record) {
+      auto D = Impl.findImportedDecl(
+          Impl.getImportedDeclsKey(record, getVersionWithoutProjection()),
+          /*requireCompletelyImported=*/true);
+      auto *NTD = D ? dyn_cast_or_null<NominalTypeDecl>(*D) : nullptr;
+      return NTD && NTD->hasNoExposedUnusableForeignTypes();
+    }
+
+    /// Whether \p field is known not to expose an unusable foreign type.
+    bool isFieldDefinitelyUsable(const clang::FieldDecl *field) {
+      auto ty = field->getType().getCanonicalType();
+      while (auto *array = dyn_cast<clang::ArrayType>(ty.getTypePtr()))
+        ty = array->getElementType().getCanonicalType();
+      if (ty->isPointerType() || ty->isReferenceType())
+        ty = ty->getPointeeType().getCanonicalType();
+
+      // Primitive types, including void and enums, hold no foreign types, and
+      // neither do C function pointers.
+      if (ty->isBuiltinType() || ty->isEnumeralType() || ty->isFunctionType())
+        return true;
+      if (auto *record = ty->getAsRecordDecl())
+        return isImportedAsDefinitelyUsable(record);
+      return false;
+    }
+
     Decl *VisitRecordDecl(const clang::RecordDecl *decl) {
       if (getCArrayProjection() == CArrayProjection::HiddenStorage)
         return nullptr;
@@ -3043,6 +3070,9 @@ namespace {
         isNonEscapable = true;
       }
 
+      // Whether this record is known not to expose an unusable foreign type.
+      bool definitelyUsable = true;
+
       // FIXME: Figure out what to do with superclasses in C++. One possible
       // solution would be to turn them into members and add conversion
       // functions.
@@ -3051,6 +3081,9 @@ namespace {
           for (auto base : cxxRecordDecl->bases()) {
             if (auto *baseRecordDecl = base.getType()->getAsCXXRecordDecl()) {
               Impl.importDecl(baseRecordDecl, getVersionWithoutProjection());
+              if (definitelyUsable &&
+                  !isImportedAsDefinitelyUsable(baseRecordDecl))
+                definitelyUsable = false;
             }
 
             if (!isNonEscapable) {
@@ -3154,6 +3187,10 @@ namespace {
           continue;
 
         Decl *member = Impl.importDecl(nd, getActiveSwiftVersion());
+
+        if (auto *field = dyn_cast<clang::FieldDecl>(nd))
+          if (definitelyUsable && !isFieldDefinitelyUsable(field))
+            definitelyUsable = false;
 
         if (isFriend)
           // We import friend decls because we (might) rely on side effects from
@@ -3584,6 +3621,10 @@ namespace {
       }
 
       result->setMemberLoader(&Impl, 0);
+
+      if (!Impl.UnusableForeignTypes.count(result) &&
+          (definitelyUsable || !hasExposedStorage(result)))
+        result->setNoExposedUnusableForeignTypes();
       return result;
     }
 

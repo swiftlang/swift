@@ -602,10 +602,15 @@ private:
 
 public:
   /// Returns the cached import of \p key, which is null if the declaration
-  /// could not be imported, or std::nullopt if nothing is cached.
-  std::optional<Decl *> findImportedDecl(ImportedDeclsKey key) const {
+  /// could not be imported, or std::nullopt if nothing is cached (or if
+  /// \p requireCompletelyImported and the cached import is not complete).
+  std::optional<Decl *>
+  findImportedDecl(ImportedDeclsKey key,
+                   bool requireCompletelyImported = false) const {
     auto it = ImportedDecls.find(key);
     if (it == ImportedDecls.end())
+      return std::nullopt;
+    if (requireCompletelyImported && !it->second.getInt())
       return std::nullopt;
     return it->second.getPointer();
   }
@@ -2956,6 +2961,10 @@ void checkRetainReleaseFunctions(ClassDecl *classDecl,
 bool isOverrideOfRetainReleaseMethod(const clang::CXXMethodDecl *method,
                                      StringRef swiftBaseName,
                                      Evaluator &evaluator);
+
+/// Whether Swift copies and destroys values of \p nominal by copying and
+/// destroying its storage.
+bool hasExposedStorage(const NominalTypeDecl *nominal);
 
 /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
 /// have a valid owning module.

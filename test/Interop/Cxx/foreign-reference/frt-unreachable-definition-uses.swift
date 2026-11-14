@@ -17,6 +17,9 @@
 // fine, since Swift does not need to retain or release them.
 // RUN: %{frontend} -emit-ir %t/copied-by-cxx.swift -o /dev/null
 
+// A record imported while the FRT it holds is still being imported.
+// RUN: %{frontend} -typecheck -verify %t%{fs-sep}import-cycle.swift
+
 //--- Inputs/module.modulemap
 module Lib {
   explicit module Base { header "Base.h" export * }
@@ -50,6 +53,16 @@ namespace NS {
 // The note is for the two uses in uses.swift that name Anchor.
 // expected-note@+1 2 {{'Anchor' has been explicitly marked unavailable here}}
 class Anchor : public RefCountedBase<Anchor> {};
+
+struct CycleKey;
+
+// Importing CycleAnchor imports CycleKey through its operator, which is
+// imported eagerly. CycleKey finishes importing before CycleAnchor does, and so
+// before CycleAnchor is found to be unusable.
+class CycleAnchor : public RefCountedBase<CycleAnchor> {
+public:
+  bool operator==(const CycleKey &) const;
+};
 } // namespace NS
 
 //--- Inputs/Visible.h
@@ -73,6 +86,13 @@ struct Key {
 };
 inline bool operator==(const Key &, const Key &) { return true; }
 Key makeKey();
+
+class CycleAnchor;
+CycleAnchor *makeCycleAnchor();
+struct CycleKey {
+  CycleAnchor *anchor;
+};
+CycleKey makeCycleKey();
 
 // Pointers don't copy or destroy their pointee.
 Handle *makeHandlePtr();
@@ -397,4 +417,22 @@ public func test() {
   let c = NS.makeCopiedByCxx()
   let c2 = c
   _ = (c, c2)
+}
+
+//--- import-cycle.swift
+import Lib.Visible
+
+// Finds Anchor unusable, so that records imported later are checked as soon as
+// they are imported.
+public func anchor() {
+  _ = NS.makeAnchor() // expected-error {{contains foreign reference type 'Anchor'}}
+}
+
+// Imports CycleAnchor first, which imports CycleKey.
+public func cycleAnchor() {
+  _ = NS.makeCycleAnchor() // expected-error {{contains foreign reference type 'CycleAnchor'}}
+}
+
+public func cycleKey() {
+  _ = NS.makeCycleKey() // expected-error {{type 'NS.CycleKey' cannot be used because it contains foreign reference type 'CycleAnchor'}}
 }
