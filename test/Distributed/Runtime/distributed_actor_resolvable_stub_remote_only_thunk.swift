@@ -16,9 +16,9 @@
 // UNSUPPORTED: OS=windows-msvc
 
 // The distributed thunks of the '$Greeter' stub only contain the remote branch,
-// make sure calls through 'any Greeter' and 'some Greeter' still reach the system,
-// and that calling into a locally initialized stub traps with the same message
-// the stub bodies use
+// make sure calls through 'any Greeter' and 'some Greeter' still reach the system.
+// A local '$Greeter' cannot be created, its 'init(actorSystem:)' is unavailable,
+// see distributed_resolvable_stub_init_unavailable.swift
 
 import StdlibUnittest
 import Distributed
@@ -74,20 +74,6 @@ func callSome(_ greeter: some Greeter) async throws -> String {
       let count = try! await greeter.count
       // CHECK: >> remoteCall: on:main.$Greeter, target:main.$Greeter.count
       expectEqual(count, 42)
-    }
-
-    tests.test("calling a distributed func on a local stub traps") {
-      let system = FakeRoundtripActorSystem()
-      let stub = $Greeter(actorSystem: system)
-      expectCrashLater(withMessage: "Unexpected invocation of distributed method 'greet(name:)' stub!")
-      _ = try? await stub.greet(name: "local")
-    }
-
-    tests.test("reading a distributed var on a local stub traps") {
-      let system = FakeRoundtripActorSystem()
-      let stub = $Greeter(actorSystem: system)
-      expectCrashLater(withMessage: "Unexpected invocation of distributed method 'count' stub!")
-      _ = try? await stub.count
     }
 
     await runAllTestsAsync()
