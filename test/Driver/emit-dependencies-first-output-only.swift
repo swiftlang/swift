@@ -9,7 +9,7 @@
 // RUN: %target-swift-frontend -c -module-name Test %s -o %t/single.o -emit-dependencies-path %t/single-first-only.d -emit-dependencies-first-output-only
 // RUN: diff -u %t/single-default.d %t/single-first-only.d
 
-// DEFAULT: first.o : {{.*}}emit-dependencies-first-output-only.swift{{.*}}second.swift
-// DEFAULT-NEXT: second.o : {{.*}}emit-dependencies-first-output-only.swift{{.*}}second.swift
+// DEFAULT: first.o : {{.*}}second.swift{{.*}}emit-dependencies-first-output-only.swift
+// DEFAULT-NEXT: second.o : {{.*}}second.swift{{.*}}emit-dependencies-first-output-only.swift
 
 struct First {}
