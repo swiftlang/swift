@@ -48,8 +48,8 @@
 // CHECK-NEXT: }
 
 // CHECK:      public struct UsingBaseConstructorWithParam {
-// CHECK-NEXT:   public init(_: CUnsignedInt)
 // CHECK-NEXT:   public init(_: CInt)
+// CHECK-NEXT:   public init(_: CUnsignedInt)
 // CHECK-NEXT:   public var value: CInt
 // CHECK-NEXT: }
 

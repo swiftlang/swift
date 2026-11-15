@@ -384,6 +384,8 @@ lookupClangConstructors(ClangImporter::Implementation &Impl,
   if (!cxxRecordDecl)
     return result;
 
+  Impl.declareImplicitConstructors(cxxRecordDecl);
+
   bool isForeignReference = isa<ClassDecl>(recordDecl);
 
   for (const auto *member : cxxRecordDecl->decls()) {
@@ -451,6 +453,9 @@ static bool isFRTFactoryCandidate(const clang::CXXConstructorDecl *ctor) {
 /// Whether to synthesize static factories for \a record: it must not provide
 /// its own, and must have a constructor to synthesize them from and a usable
 /// operator new to allocate with.
+///
+/// Expects declareImplicitConstructors() to have been called on \a record, so
+/// that its inherited constructors are among its ctors().
 static bool canSynthesizeFRTFactories(ClangImporter::Implementation &Impl,
                                       const clang::CXXRecordDecl *record) {
   // A user-provided static factory is a static member function (or member

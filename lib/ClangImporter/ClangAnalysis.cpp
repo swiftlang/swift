@@ -1646,6 +1646,7 @@ ClangImporter::Implementation::validateRefCountedPtr(NominalTypeDecl *Record) {
     // deleted ctors aren't bridgeable. The selected constructor is
     // relied on during SILGen to introduce implicit bridging.
     std::optional<int> selectedRank;
+    declareImplicitConstructors(clangRecord);
     for (auto *clangCtor : clangRecord->ctors()) {
       if (clangCtor->isDeleted() || clangCtor->getNumParams() != 1)
         continue;

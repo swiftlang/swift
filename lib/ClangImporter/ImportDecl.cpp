@@ -1006,6 +1006,36 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+void ClangImporter::Implementation::declareImplicitConstructors(
+    const clang::CXXRecordDecl *record) {
+  record = record->getDefinition();
+  if (!record || !record->hasInheritedConstructor())
+    return;
+
+  // Mirror the conditions under which Clang can declare special members
+  // (see CanDeclareSpecialMemberFunction in SemaLookup.cpp)
+  if (record->isDependentContext() || !areRecordFieldsComplete(record))
+    return;
+
+  // findInheritingConstructor() adds the constructors it declares to the
+  // record, so collect the shadows of the using-declarations before calling it.
+  // (It returns the existing constructor if it has already declared one.)
+  llvm::SmallVector<clang::ConstructorUsingShadowDecl *, 4> shadows;
+  for (auto *member : record->decls())
+    if (auto *shadow = dyn_cast<clang::ConstructorUsingShadowDecl>(member))
+      shadows.push_back(shadow);
+
+  for (auto *shadow : shadows) {
+    auto *baseCtor =
+        dyn_cast<clang::CXXConstructorDecl>(shadow->getTargetDecl());
+    if (!baseCtor || baseCtor->isDeleted() || baseCtor->isCopyConstructor() ||
+        baseCtor->isMoveConstructor())
+      continue;
+    getClangSema().findInheritingConstructor(shadow->getLocation(), baseCtor,
+                                             shadow);
+  }
+}
+
 static bool hasComputedPropertyAttr(const clang::Decl *decl) {
   return hasSwiftAttribute(decl, {"import_computed_property"});
 }
@@ -3662,33 +3692,10 @@ namespace {
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
-      // Clang declares implicit special members lazily, but we look for them
-      // among the record's members, so declare them now (if the record is
-      // complete enough for Clang to do so). Constructors are only defined once
-      // they are needed, by defineConstructorIfNeeded().
+      // Declare the implicit special members we look for among the record's
+      // members, which Clang only declares lazily.
       assert(!decl->isBeingDefined() && "can only import fully defined decls");
       if (!decl->isDependentContext() && areRecordFieldsComplete(decl)) {
-        if (decl->hasInheritedConstructor()) {
-          for (auto member : decl->decls()) {
-            if (auto usingDecl = dyn_cast<clang::UsingDecl>(member)) {
-              for (auto usingShadowDecl : usingDecl->shadows()) {
-                if (auto ctorUsingShadowDecl =
-                        dyn_cast<clang::ConstructorUsingShadowDecl>(
-                            usingShadowDecl)) {
-                  auto baseCtorDecl = dyn_cast<clang::CXXConstructorDecl>(
-                      ctorUsingShadowDecl->getTargetDecl());
-                  if (!baseCtorDecl || baseCtorDecl->isDeleted() ||
-                      baseCtorDecl->isCopyConstructor() ||
-                      baseCtorDecl->isMoveConstructor())
-                    continue;
-                  clangSema.findInheritingConstructor(
-                      ctorUsingShadowDecl->getLocation(), baseCtorDecl,
-                      ctorUsingShadowDecl);
-                }
-              }
-            }
-          }
-        }
         if (decl->needsImplicitDefaultConstructor()) {
           clangSema.DeclareImplicitDefaultConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));
@@ -11896,6 +11903,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
                              Feature::ImportNonPublicCxxMembers) &&
                          baseRecord &&
                          importer::getPrivateFileIDAttrs(baseRecord).empty();
+
+  if (auto *cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord);
+      cxxRecord && !storage && !inheritance)
+    Impl.declareImplicitConstructors(cxxRecord);
 
   // Import all of the members.
   llvm::SmallVector<Decl *, 16> members;

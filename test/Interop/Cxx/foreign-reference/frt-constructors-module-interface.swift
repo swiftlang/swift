@@ -42,3 +42,7 @@
 // CHECK:      class FRTTemplateFactory {
 // CHECK-NOT:    init(_
 // CHECK:      }
+
+// CHECK:      class FRTInheritedCtor {
+// CHECK:        convenience init(_ {{.*}}: CInt)
+// CHECK:      }

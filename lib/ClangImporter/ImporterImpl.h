@@ -834,6 +834,9 @@ public:
   /// Returns nothing unless \a Record is imported from a CXXRecordDecl, or if
   /// it already provides its own SWIFT_NAME(init(...)) factories.
   ///
+  /// Callers should ensure declareImplicitConstructors() has been called on
+  /// \a Record's Clang decl first.
+  ///
   /// This function is idempotent, and if successful, ensures the synthesized
   /// factories that it returns are members of \a Record.
   llvm::ArrayRef<ValueDecl *>
@@ -847,6 +850,10 @@ public:
   /// Returns false if \a ctor is invalid and should not be imported,
   /// e.g., because defining it failed.
   bool defineConstructorIfNeeded(const clang::CXXConstructorDecl *ctor);
+
+  /// Declare the constructors of \a record that Clang only declares when they
+  /// are needed, so that they are among \a record's members.
+  void declareImplicitConstructors(const clang::CXXRecordDecl *record);
 
   /// Info about a Clang record decl possibly annotated with REFCOUNTED_PTR.
   ///

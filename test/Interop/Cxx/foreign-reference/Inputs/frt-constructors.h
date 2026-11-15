@@ -328,3 +328,16 @@ FRTTemplateFactory {
 
   FRTTemplateFactory(int x) {}
 };
+
+struct InheritedCtorBase {
+  InheritedCtorBase(int x) {}
+};
+
+// A static factory is synthesized from an inherited constructor too.
+struct
+  __attribute__((swift_attr("import_reference")))
+  __attribute__((swift_attr("retain:immortal")))
+  __attribute__((swift_attr("release:immortal")))
+FRTInheritedCtor : InheritedCtorBase {
+  using InheritedCtorBase::InheritedCtorBase;
+};
