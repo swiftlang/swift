@@ -1183,7 +1183,7 @@ void SwiftLangSupport::getPolyglotAST(
 
 void SourceKit::disableExpensiveSILOptions(SILOptions &Opts) {
   // Disable the sanitizers.
-  Opts.Sanitizers = {};
+  Opts.Sanitizers = OptionSet<SanitizerKind>();
 
   // Disable PGO and code coverage.
   Opts.GenerateProfile = false;
