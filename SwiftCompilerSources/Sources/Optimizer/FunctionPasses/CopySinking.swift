@@ -273,7 +273,7 @@ private func trySinkCopiesOver(terminator: ForwardingInstruction & UnaryInstruct
   case let load as LoadInst:
     guard load.uses.isSingleUse,
           load.loadOwnership == .copy,
-          !mayWrite(toAddressOf: load, before: terminator, context)
+          !mayWriteOrEndAccess(toAddressOf: load, before: terminator, context)
     else {
       return false
     }
@@ -322,9 +322,11 @@ private func extendBorrowScope(from copy: CopyValueInst,
   return extendBorrowScope(of: copy.fromValue, toOverlap: liveRange, context)
 }
 
-private func mayWrite(toAddressOf load: LoadInst,
-                      before endInstruction: Instruction,
-                      _ context: FunctionPassContext) -> Bool
+/// Returns true if the loaded memory may be written, or its access scope ends, before `endInstruction`. Either way,
+/// a `load_borrow` couldn't replace the load.
+private func mayWriteOrEndAccess(toAddressOf load: LoadInst,
+                                 before endInstruction: Instruction,
+                                 _ context: FunctionPassContext) -> Bool
 {
   let aliasAnalysis = context.aliasAnalysis
   var worklist = InstructionWorklist(context)
@@ -333,11 +335,10 @@ private func mayWrite(toAddressOf load: LoadInst,
   worklist.pushPredecessors(of: endInstruction, ignoring: load)
 
   while let inst = worklist.pop() {
-    if inst.mayWrite(toAddress: load.address, aliasAnalysis) {
+    if inst.mayWrite(toAddress: load.address, aliasAnalysis) || inst.endsAccessScope(of: load) {
       return true
     }
     worklist.pushPredecessors(of: inst, ignoring: load)
   }
   return false
 }
-
