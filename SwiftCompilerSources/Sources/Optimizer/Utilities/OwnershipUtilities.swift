@@ -37,6 +37,17 @@ extension InstructionRange {
   }
 }
 
+extension Instruction {
+  /// Returns true if this is an `end_access` of the innermost access scope that `load` reads from, which is found
+  /// through any `mark_dependence` of the access.
+  func endsAccessScope(of load: LoadInst) -> Bool {
+    guard let endAccess = self as? EndAccessInst else {
+      return false
+    }
+    return endAccess.beginAccess == load.address.accessBaseWithScopes.innermostAccess
+  }
+}
+
 /// Extends the borrow scope of a guaranteed `value` to ensure it overlaps with a given instruction range.
 ///
 /// This function attempts to move `end_borrow` instructions that fall within the specified range
