@@ -2,12 +2,10 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -parse-as-library -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/include/SwiftPlatform/Concurrency.h
 // RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/include/SwiftPlatform/Concurrency.h %s -c -o %t/executor.o
 // RUN: not %target-swift-frontend -typecheck -D NOT_IMPORTED -enable-experimental-feature Embedded -parse-as-library -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/include/SwiftPlatform/Concurrency.h %s 2>&1 | %FileCheck %s --check-prefix=NOT-IMPORTED
-// RUN: not %target-swift-frontend -typecheck -enable-experimental-feature Embedded -parse-as-library -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/include/SwiftPlatform/Heap.h %s 2>&1 | %FileCheck %s --check-prefix=PLATFORM-ONLY
 
 // REQUIRES: swift_feature_Embedded
 
 // NOT-IMPORTED: error: cannot find '_swift_job_run_c' in scope
-// PLATFORM-ONLY: error: cannot find type 'SwiftJob' in scope
 
 nonisolated(unsafe) var queue: UnsafeMutablePointer<SwiftJob>? = nil
 

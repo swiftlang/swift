@@ -18,6 +18,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     SwiftPlatform/ThreadLocalStorage.h
     SwiftPlatform/Types.h
     SwiftPlatform/Version.h
+    SwiftPlatform/module.modulemap
   )
 
   set(_embedded_platform_header_outputs)
