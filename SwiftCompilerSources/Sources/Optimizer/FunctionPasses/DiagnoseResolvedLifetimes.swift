@@ -24,13 +24,14 @@ let diagnoseResolvedLifetimesPass = FunctionPass(name: "diagnose-resolved-lifeti
 
 private func diagnoseLifetimeViolations(_ function: Function, _ context: FunctionPassContext) {
   var markers: [LifetimeResolutionMarker] = []
-  var ignoredMarkers: [DiagnoseInst] = []
+  var undiagnosedMarkers: [DiagnoseInst] = []
+  var copiesOfNoncopyable: [Instruction] = []
   for inst in function.instructions {
     if let marker = LifetimeResolutionMarker(inst) {
-      // TODO: diagnose once SILGen's copies of borrowed values are eliminated before LifetimeResolution.
+      // TODO: diagnose consumes of borrowed values.
       if case .unpermittedCopy(let diagnose) = marker, let copy = diagnose.operand.value as? CopyValueInst,
          copy.fromValue.ownership == .guaranteed {
-        ignoredMarkers.append(diagnose)
+        undiagnosedMarkers.append(diagnose)
         continue
       }
       markers.append(marker)
@@ -42,11 +43,24 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
     case let loadBorrow as LoadBorrowInst where loadBorrow.isUnchecked:
       loadBorrow.set(isUnchecked: false, context)
 
-    // TODO: add missed copy of noncopyable backstop
+    case let copy as CopyValueInst where copy.type.isMoveOnly:
+      copiesOfNoncopyable.append(copy)
+    case let load as LoadInst where load.loadOwnership == .copy && load.type.isMoveOnly:
+      copiesOfNoncopyable.append(load)
+    case let copyAddr as CopyAddrInst where !copyAddr.isTakeOfSource && copyAddr.source.type.isMoveOnly:
+      copiesOfNoncopyable.append(copyAddr)
 
     default:
       break
     }
+  }
+
+  // As a backstop, every copy of a noncopyable value must have been marked by LifetimeResolution.
+  let undiagnosedCopies: [Instruction] = undiagnosedMarkers.map { $0.operand.value as! CopyValueInst }
+  let markedCopies = Set(markers.compactMap { $0.copy } + undiagnosedCopies)
+  let missedCopies = undiagnosedCopies + copiesOfNoncopyable.filter { !markedCopies.contains($0) }
+  for copy in missedCopies {
+    context.diagnosticEngine.diagnose(.sil_lifetime_resolution_bug_missed_copy, at: copy.location)
   }
 
   var diagnoser = Diagnoser(function, markers, context)
@@ -55,11 +69,11 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
   diagnoser.diagnoseUsesAfterConsume()
 
   // The `diagnose` markers are erased last, as they identify which copies were demoted consumes.
-  for case let diagnose? in markers.map({ $0.diagnose }) + ignoredMarkers {
+  for case let diagnose? in markers.map({ $0.diagnose }) + undiagnosedMarkers {
     context.erase(instruction: diagnose)
   }
 
-  if !markers.isEmpty {
+  if !markers.isEmpty || !missedCopies.isEmpty {
     // Ensure we actually did emit an error.
     guard context.hadError else {
       fatalError("DiagnoseResolvedLifetimes didn't emit an error when it should have! \n\(function)")
@@ -948,14 +962,14 @@ private struct Diagnoser {
   /// Diagnoses the `unpermittedCopy` markers.
   mutating func diagnoseUsesAfterConsume() {
     for marker in unrecognizedConsumes {
-      diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: marker.location)
+      diagnostics.diagnose(.sil_lifetime_resolution_bug_missed_copy, at: marker.location)
     }
 
     // Each use is reported once, noting every consume that reaches it.
     var reports: [UseAfterConsume] = []
     for consume in consumes {
       guard let report = analyze(consume) else {
-        diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: consume.marker.location)
+        diagnostics.diagnose(.sil_lifetime_resolution_bug_missed_copy, at: consume.marker.location)
         continue
       }
       if !report.violation.isReportedAtConsume,

@@ -34,7 +34,7 @@ import sys
 EXCEPTIONAL_FILES = [
     # Spurious use-before-init / use-after-consume errors
     pathlib.Path("benchmark/single-source/DictionaryKeysContains.swift"),
-    # Spurious 'copy of noncopyable typed value' errors
+    # Spurious 'LifetimeResolution missed diagnosing a copy' errors
     pathlib.Path("benchmark/single-source/SpanTests.swift"),
     # async let support
     pathlib.Path("benchmark/single-source/Concurrency/ChildTaskCreation.swift"),

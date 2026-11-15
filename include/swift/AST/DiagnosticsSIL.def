@@ -1036,6 +1036,8 @@ ERROR(sil_movechecking_not_understand_moveonly, none,
       "usage of a non-'Copyable' type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_missed_copy, none,
       "copy of non-'Copyable' typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
+ERROR(sil_lifetime_resolution_bug_missed_copy, none,
+      "LifetimeResolution missed diagnosing a copy. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_exclusivity_violation, none,
       "'%0' has an unexpected exclusivity violation. This is a compiler bug. Please file a bug with a small example of the bug", (StringRef))
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,
