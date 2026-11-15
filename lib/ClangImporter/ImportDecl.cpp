@@ -1006,33 +1006,63 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+/// Whether Clang can declare the special members of \a record (see
+/// CanDeclareSpecialMemberFunction in SemaLookup.cpp).
+static bool canDeclareSpecialMembers(const clang::CXXRecordDecl *record) {
+  return !record->isDependentContext() && areRecordFieldsComplete(record);
+}
+
+/// Whether \a record's C++ default constructor is imported, including an
+/// implicit one that is not declared yet (see declareImplicitConstructors()).
+static bool hasImportedDefaultConstructor(const clang::CXXRecordDecl *record) {
+  if (!record->hasDefaultConstructor())
+    return false;
+  if (!record->ctors().empty())
+    return true;
+  return record->needsImplicitDefaultConstructor() &&
+         canDeclareSpecialMembers(record);
+}
+
 void ClangImporter::Implementation::declareImplicitConstructors(
     const clang::CXXRecordDecl *record) {
+  // LLDB can import C++ records without C++ interop (e.g., from DWARF), where
+  // declaring their members can crash Clang's Sema.
+  if (!SwiftContext.LangOpts.EnableCXXInterop)
+    return;
+
   record = record->getDefinition();
-  if (!record || !record->hasInheritedConstructor())
+  if (!record)
     return;
 
-  // Mirror the conditions under which Clang can declare special members
-  // (see CanDeclareSpecialMemberFunction in SemaLookup.cpp)
-  if (record->isDependentContext() || !areRecordFieldsComplete(record))
+  bool needsDefaultCtor = record->needsImplicitDefaultConstructor(),
+       hasInheritedCtors = record->hasInheritedConstructor();
+  if ((!needsDefaultCtor && !hasInheritedCtors) ||
+      !canDeclareSpecialMembers(record))
     return;
 
-  // findInheritingConstructor() adds the constructors it declares to the
-  // record, so collect the shadows of the using-declarations before calling it.
-  // (It returns the existing constructor if it has already declared one.)
-  llvm::SmallVector<clang::ConstructorUsingShadowDecl *, 4> shadows;
-  for (auto *member : record->decls())
-    if (auto *shadow = dyn_cast<clang::ConstructorUsingShadowDecl>(member))
-      shadows.push_back(shadow);
+  if (needsDefaultCtor) {
+    getClangSema().DeclareImplicitDefaultConstructor(
+        const_cast<clang::CXXRecordDecl *>(record));
+  }
 
-  for (auto *shadow : shadows) {
-    auto *baseCtor =
-        dyn_cast<clang::CXXConstructorDecl>(shadow->getTargetDecl());
-    if (!baseCtor || baseCtor->isDeleted() || baseCtor->isCopyConstructor() ||
-        baseCtor->isMoveConstructor())
-      continue;
-    getClangSema().findInheritingConstructor(shadow->getLocation(), baseCtor,
-                                             shadow);
+  if (hasInheritedCtors) {
+    // findInheritingConstructor() adds the constructors it declares to the
+    // record, so collect the shadows of the using-declarations before calling
+    // it. (It returns the existing constructor if it has already declared one.)
+    llvm::SmallVector<clang::ConstructorUsingShadowDecl *, 4> shadows;
+    for (auto *member : record->decls())
+      if (auto *shadow = dyn_cast<clang::ConstructorUsingShadowDecl>(member))
+        shadows.push_back(shadow);
+
+    for (auto *shadow : shadows) {
+      auto *baseCtor =
+          dyn_cast<clang::CXXConstructorDecl>(shadow->getTargetDecl());
+      if (!baseCtor || baseCtor->isDeleted() || baseCtor->isCopyConstructor() ||
+          baseCtor->isMoveConstructor())
+        continue;
+      getClangSema().findInheritingConstructor(shadow->getLocation(), baseCtor,
+                                               shadow);
+    }
   }
 }
 
@@ -3364,11 +3394,10 @@ namespace {
       }
 
       bool needsEmptyInitializer = true;
-      if (cxxRecordDecl) {
+      if (cxxRecordDecl && Impl.SwiftContext.LangOpts.EnableCXXInterop) {
         needsEmptyInitializer = cxxRecordDecl->isCompleteDefinition() &&
                                 !cxxRecordDecl->isAbstract() &&
-                                (!cxxRecordDecl->hasDefaultConstructor() ||
-                                 cxxRecordDecl->ctors().empty());
+                                !hasImportedDefaultConstructor(cxxRecordDecl);
       }
 
       // TODO: builtin "zeroInitializer" does not work with non-escapable
@@ -3695,12 +3724,7 @@ namespace {
       // Declare the implicit special members we look for among the record's
       // members, which Clang only declares lazily.
       assert(!decl->isBeingDefined() && "can only import fully defined decls");
-      if (!decl->isDependentContext() && areRecordFieldsComplete(decl)) {
-        if (decl->needsImplicitDefaultConstructor()) {
-          clangSema.DeclareImplicitDefaultConstructor(
-              const_cast<clang::CXXRecordDecl *>(decl));
-        }
-
+      if (canDeclareSpecialMembers(decl)) {
         // If the C++ struct is annotated as non-copyable, we should not try to
         // instantiate its copy constructor.
         bool isExplicitlyNonCopyable = hasNonCopyableAttr(decl);
