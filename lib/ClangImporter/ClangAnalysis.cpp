@@ -1661,6 +1661,9 @@ ClangImporter::Implementation::validateRefCountedPtr(NominalTypeDecl *Record) {
         continue;
       }
 
+      if (!defineConstructorIfNeeded(clangCtor))
+        continue;
+
       auto *ctor = dyn_cast_or_null<ConstructorDecl>(
           importDecl(clangCtor, CurrentVersion));
       if (!ctor || ctor->getParameters()->size() != 1)

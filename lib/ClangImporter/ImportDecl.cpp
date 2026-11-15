@@ -3662,11 +3662,10 @@ namespace {
         return nullptr;
 
       auto &clangSema = Impl.getClangSema();
-      // Make Clang define any implicit constructors it may need (copy,
-      // default). Make sure we only do this if the class has been fully defined
-      // with complete fields, and we're not in a dependent context(this is
-      // equivalent to the logic in CanDeclareSpecialMemberFunction in Clang's
-      // SemaLookup.cpp).
+      // Clang declares implicit special members lazily, but we look for them
+      // among the record's members, so declare them now (if the record is
+      // complete enough for Clang to do so). Constructors are only defined once
+      // they are needed, by defineConstructorIfNeeded().
       assert(!decl->isBeingDefined() && "can only import fully defined decls");
       if (!decl->isDependentContext() && areRecordFieldsComplete(decl)) {
         if (decl->hasInheritedConstructor()) {
@@ -3682,20 +3681,14 @@ namespace {
                       baseCtorDecl->isCopyConstructor() ||
                       baseCtorDecl->isMoveConstructor())
                     continue;
-                  auto loc = ctorUsingShadowDecl->getLocation();
-
-                  auto derivedCtorDecl = clangSema.findInheritingConstructor(
-                      loc, baseCtorDecl, ctorUsingShadowDecl);
-                  if (!derivedCtorDecl->isDefined() &&
-                      !derivedCtorDecl->isDeleted())
-                    clangSema.DefineInheritingConstructor(loc, derivedCtorDecl);
+                  clangSema.findInheritingConstructor(
+                      ctorUsingShadowDecl->getLocation(), baseCtorDecl,
+                      ctorUsingShadowDecl);
                 }
               }
             }
           }
         }
-        // Declare the implicit default constructor so that it can be looked up
-        // in lookupClangConstructors() (which defines it)
         if (decl->needsImplicitDefaultConstructor()) {
           clangSema.DeclareImplicitDefaultConstructor(
               const_cast<clang::CXXRecordDecl *>(decl));

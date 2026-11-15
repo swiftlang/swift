@@ -55,6 +55,7 @@ struct Ken {};
 // instantiated when its default constructor is defined.
 template <typename K>
 struct BadInit {       // expected-swift-note {{requested here}}
+                       // expected-swift-note@-1 {{needed here}}
   int iAm = K::enough; // expected-swift-error {{no member named 'enough'}}
 };
 using BadInitKen = BadInit<Ken>;
@@ -70,9 +71,24 @@ struct __attribute__((swift_attr("import_reference")))
        __attribute__((swift_attr("retain:immortal")))
        __attribute__((swift_attr("release:immortal")))
 BadInitRef {           // expected-swift-note {{requested here}}
+                       // expected-swift-note@-1 {{needed here}}
   int iAm = K::enough; // expected-swift-error {{no member named 'enough'}}
 };
 using BadInitRefKen = BadInitRef<Ken>;
+
+struct IntCtorBase {
+  IntCtorBase(int) {}
+};
+
+// NOTE: like BadInit, but its default member initializer is only instantiated
+// when its inherited constructor is defined.
+template <typename K>
+struct BadInheritor : IntCtorBase {
+  using IntCtorBase::IntCtorBase; // expected-swift-note {{requested here}}
+                                  // expected-swift-note@-1 {{needed here}}
+  int iAm = K::enough; // expected-swift-error {{no member named 'enough'}}
+};
+using BadInheritorKen = BadInheritor<Ken>;
 
 // None of GoodStruct's members should prevent it from being imported sans error
 struct GoodStruct {
@@ -252,6 +268,7 @@ void ok(void) {
   // Instantiates BadInit<Ken> but not its default member initializer.
   (void)sizeof(BadInitKen);
   (void)sizeof(BadInitRefKen);
+  (void)sizeof(BadInheritorKen);
 }
 
 //--- err.cpp
@@ -304,6 +321,9 @@ func ok() {
 
   // Importing BadInitRefKen should not synthesize its static factories.
   let _: BadInitRefKen? = nil
+
+  // Importing BadInheritorKen should not define its inherited constructor.
+  let _: UnsafePointer<BadInheritorKen>
 
   let gs = GoodStruct()
   // TODO: calling overloadsDiffNumArgs(_:_) should work since we should never
@@ -389,12 +409,14 @@ func err() {
   _ = HasTemplateMembers.badStaticTemplate(42 as CInt) // expected-swift-error {{is unavailable}}
 
   // Defining BadInit<Ken>'s default constructor instantiates the bad default
-  // member initializer while resolving its exception spec, at no source location.
+  // member initializer while resolving its exception spec.
   let _ = BadInitKen()
-  // expected-swift-note@<unknown> {{in evaluation of exception specification for 'BadInit<Ken>::BadInit' needed here}}
 
   // Synthesizing BadInitRef<Ken>'s static factory defines its default
   // constructor, the same way as for BadInit<Ken>.
   let _ = BadInitRefKen()
-  // expected-swift-note@<unknown> {{in evaluation of exception specification for 'BadInitRef<Ken>::BadInitRef' needed here}}
+
+  // Looking up BadInheritor<Ken>'s initializers defines its inherited
+  // constructor, which instantiates the bad default member initializer.
+  let _ = BadInheritorKen(42)
 }

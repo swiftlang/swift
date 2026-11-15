@@ -839,6 +839,15 @@ public:
   llvm::ArrayRef<ValueDecl *>
   lookupAndImportSynthesizedFactories(ClassDecl *Record);
 
+  /// Define \a ctor if it is a defaulted or inheriting constructor that Clang
+  /// has declared but not defined, so that it can be called from Swift.
+  ///
+  /// Clang only defines these by itself when they are ODR-used from C++.
+  ///
+  /// Returns false if \a ctor is invalid and should not be imported,
+  /// e.g., because defining it failed.
+  bool defineConstructorIfNeeded(const clang::CXXConstructorDecl *ctor);
+
   /// Info about a Clang record decl possibly annotated with REFCOUNTED_PTR.
   ///
   /// Records three pieces of information: the name of the toRawPtr operation,

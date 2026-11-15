@@ -340,6 +340,25 @@ void importer::forEachCXXNamespaceMember(
   }
 }
 
+bool ClangImporter::Implementation::defineConstructorIfNeeded(
+    const clang::CXXConstructorDecl *ctor) {
+  if (!ctor->isDeleted() && !ctor->isInvalidDecl()) {
+    auto *mutableCtor = const_cast<clang::CXXConstructorDecl *>(ctor);
+    // Note: we check doesThisDeclarationHaveABody() here because that's what
+    // DefineImplicitDefaultConstructor() checks.
+    if (ctor->isDefaultConstructor() && ctor->isDefaulted() &&
+        !ctor->doesThisDeclarationHaveABody()) {
+      getClangSema().DefineImplicitDefaultConstructor(ctor->getLocation(),
+                                                      mutableCtor);
+    } else if (ctor->isInheritingConstructor() && !ctor->isDefined()) {
+      getClangSema().DefineInheritingConstructor(
+          ctor->getInheritedConstructor().getShadowDecl()->getLocation(),
+          mutableCtor);
+    }
+  }
+  return !ctor->isInvalidDecl();
+}
+
 /// Look up the initializers of \a recordDecl, i.e., the members that are
 /// imported under the base name 'init', including constructors of value types
 /// and static factory functions of foreign reference types.
@@ -407,16 +426,8 @@ lookupClangConstructors(ClangImporter::Implementation &Impl,
       continue;
 
     if (auto *ctor = dyn_cast<clang::CXXConstructorDecl>(method);
-        ctor && ctor->isDefaultConstructor() && ctor->isDefaulted() &&
-        !ctor->isDeleted() && !ctor->isInvalidDecl() &&
-        !ctor->doesThisDeclarationHaveABody()) {
-      // Note: we check doesThisDeclarationHaveABody() here because that's what
-      // DefineImplicitDefaultConstructor() checks.
-      Impl.getClangSema().DefineImplicitDefaultConstructor(
-          {}, const_cast<clang::CXXConstructorDecl *>(ctor));
-      if (ctor->isInvalidDecl())
-        continue;
-    }
+        ctor && !Impl.defineConstructorIfNeeded(ctor))
+      continue;
 
     if (auto *imported = cast_or_null<ValueDecl>(Impl.importDecl(
             cast<clang::NamedDecl>(member), Impl.CurrentVersion)))
@@ -580,6 +591,9 @@ createFRTFactoryDecl(ClangImporter::Implementation &Impl,
 static bool buildFRTFactoryBody(ClangImporter::Implementation &Impl,
                                 clang::CXXMethodDecl *factory,
                                 clang::CXXConstructorDecl *ctor) {
+  if (!Impl.defineConstructorIfNeeded(ctor))
+    return false;
+
   clang::ASTContext &clangCtx = factory->getASTContext();
   clang::Sema &S = Impl.getClangSema();
   const clang::CXXRecordDecl *record = factory->getParent();
