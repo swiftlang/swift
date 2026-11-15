@@ -67,12 +67,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(_embedded_platform_swift_flags
     ${swift_stdlib_compile_flags}
     "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
-    "-Xcc" "-I${CMAKE_CURRENT_SOURCE_DIR}/include"
-    "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/include/swift/EmbeddedPlatform.h
     -enable-experimental-feature Extern
     -enable-experimental-feature AllowRuntimeSymbolDeclarations
-    "-enable-builtin-module"
-    "-disable-bridging-pch")
+    "-enable-builtin-module")
 
   # The clock functions need POSIX clocks, which bare-metal and Windows
   # triples lack, and Apple triples need an Apple SDK. Keep this list separate

@@ -1,10 +1,12 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded %target-embedded-posix-shim -Xcc -I%S/../../stdlib/public/EmbeddedPlatform/include -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/include/swift/EmbeddedPlatform.h -wmo)
+// RUN: %target-run-simple-swift(-enable-experimental-feature Embedded %target-embedded-posix-shim -wmo)
 
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu || OS=wasip1
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_embedded_platform
+
+import SwiftPlatform
 
 func test() {
   var major = 0
