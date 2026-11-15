@@ -7,6 +7,7 @@
 //   - `assign undef to [init]`                          -> use-before-init
 //   - `diagnose [let_reinit]`                           -> repeated `let` initialization
 //   - `diagnose [unpermitted_copy]` on a `copy_value` of a borrowed value -> not yet diagnosed
+//   - `diagnose [unpermitted_copy]` on a `load [copy]` from a borrowed box -> missing reinitialization
 //
 // (The variable name renders empty here because hand-written SIL has no backing
 // VarDecl; from real Swift source the name resolves normally.)
@@ -171,6 +172,21 @@ bb0(%0 : @guaranteed $K):
   %1 = copy_value %0
   diagnose [unpermitted_copy] %1
   apply %consFn(%1) : $@convention(thin) (@owned K) -> ()
+  %t = tuple ()
+  return %t
+}
+
+// A captured box's contents must be initialized when the closure returns.
+sil [ossa] @diagnose_consume_of_borrowed_box : $@convention(thin) (@guaranteed { var K }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var K }):
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  specify_test "diagnose_resolved_lifetimes"
+  %1 = project_box %0, 0
+  %2 = begin_access [deinit] [unknown] %1
+  %3 = load [copy] %2 // expected-error {{missing reinitialization of closure capture '' after consume}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
+  diagnose [unpermitted_copy] %3
+  end_access %2
+  apply %consFn(%3) : $@convention(thin) (@owned K) -> ()
   %t = tuple ()
   return %t
 }

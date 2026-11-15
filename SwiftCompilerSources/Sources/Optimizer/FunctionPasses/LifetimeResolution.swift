@@ -456,6 +456,9 @@ private struct MultiDefResolver {
     }
   }
 
+  // TODO: the memory is uninitialized from the take until its reinitialization, or a Never-returning call for an
+  //   `inout`, so the access must be extended to cover that point. For a borrowed box, which can be reentrantly
+  //   accessed, that extended access must be a dynamically enforced modify.
   func adjustAccessForTake(_ addr: Value) {
     assert(addr.type.isAddress)
 

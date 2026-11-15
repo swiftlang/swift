@@ -2233,3 +2233,159 @@ bb0(%0 : @owned $DSelf):
   dealloc_stack %1
   return %l
 }
+
+// The contents of a box captured by a closure are initialized on entry, and must be on exit.
+
+// CHECK-LABEL: sil [ossa] @borrowed_box_copy_noimplicitcopy :
+// CHECK:          [[BA:%.*]] = begin_access [read] [unknown]
+// CHECK-NEXT:     [[LD:%.*]] = load [copy] [[BA]]
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[LD]]
+// CHECK-NEXT:     end_access [[BA]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @borrowed_box_copy_noimplicitcopy : $@convention(thin) (@guaranteed { var K }) -> () {
+bb0(%0 : @noImplicitCopy @closureCapture @guaranteed ${ var K }):
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  %1 = project_box %0, 0
+  %2 = begin_access [read] [unknown] %1
+  %3 = load [copy] %2
+  end_access %2
+  %5 = move_value [lexical] [var_decl] %3
+  %6 = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  %7 = apply %6(%5) : $@convention(thin) (@guaranteed K) -> ()
+  destroy_value %5
+  %9 = tuple ()
+  return %9
+}
+
+// Only a copy of the whole `@noImplicitCopy` parameter is unpermitted.
+// CHECK-LABEL: sil [ossa] @borrowed_box_copy_noimplicitcopy_field :
+// CHECK:          [[SEA:%.*]] = struct_element_addr
+// CHECK-NEXT:     load [copy] [[SEA]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @borrowed_box_copy_noimplicitcopy_field : $@convention(thin) (@guaranteed { var C }) -> () {
+bb0(%0 : @noImplicitCopy @closureCapture @guaranteed ${ var C }):
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  %1 = project_box %0, 0
+  %2 = begin_access [read] [unknown] %1
+  %3 = struct_element_addr %2, #C.k
+  %4 = load [copy] %3
+  end_access %2
+  %6 = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@owned K) -> ()
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_box_explicit_copy :
+// CHECK:          [[LD:%.*]] = load [copy]
+// CHECK-NEXT:     explicit_copy_value [[LD]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @borrowed_box_explicit_copy : $@convention(thin) (@guaranteed { var K }) -> () {
+bb0(%0 : @noImplicitCopy @closureCapture @guaranteed ${ var K }):
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  %1 = project_box %0, 0
+  %2 = begin_access [read] [unknown] %1
+  %3 = load [copy] %2
+  %4 = explicit_copy_value %3
+  end_access %2
+  %6 = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %7 = apply %6(%4) : $@convention(thin) (@owned K) -> ()
+  destroy_value %3
+  %9 = tuple ()
+  return %9
+}
+
+// A consume without reinitialization, e.g. by the `consume` operator, becomes a copy.
+// CHECK-LABEL: sil [ossa] @borrowed_box_take :
+// CHECK:          [[BA:%.*]] = begin_access [deinit] [unknown]
+// CHECK-NEXT:     [[LD:%.*]] = load [copy] [[BA]]
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[LD]]
+// CHECK:          apply {{%.*}}([[LD]])
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @borrowed_box_take : $@convention(thin) (@guaranteed { var K }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var K }):
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  %1 = project_box %0, 0
+  %2 = begin_access [deinit] [unknown] %1
+  %3 = load [take] %2
+  end_access %2
+  %5 = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@owned K) -> ()
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_box_take_reinit :
+// CHECK:          [[BOX:%.*]] = project_box
+// CHECK:          [[BA:%.*]] = begin_access [deinit] [unknown] [[BOX]]
+// CHECK-NEXT:     load [take] [[BA]]
+// CHECK:          [[MA:%.*]] = begin_access [modify] [unknown] [[BOX]]
+// CHECK-NEXT:     assign {{%.*}} to [init] [[MA]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @borrowed_box_take_reinit : $@convention(thin) (@guaranteed { var K }) -> () {
+bb0(%0 : @noImplicitCopy @closureCapture @guaranteed ${ var K }):
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  %1 = project_box %0, 0
+  %2 = begin_access [deinit] [unknown] %1
+  %3 = load [take] %2
+  %4 = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  %5 = apply %4(%3) : $@convention(thin) (@owned K) -> ()
+  end_access %2
+  %7 = function_ref @getK : $@convention(thin) () -> @owned K
+  %8 = apply %7() : $@convention(thin) () -> @owned K
+  %9 = begin_access [modify] [unknown] %1
+  assign %8 to %9
+  end_access %9
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_box_noncopyable :
+// CHECK:          [[MU:%.*]] = mark_unresolved_non_copyable_value [no_consume_or_assign]
+// CHECK-NEXT:     [[LB:%.*]] = load_borrow [[MU]]
+// CHECK:          end_borrow [[LB]]
+// CHECK:          [[MU2:%.*]] = mark_unresolved_non_copyable_value [assignable_but_not_consumable]
+// CHECK-NEXT:     [[LD:%.*]] = load [copy] [[MU2]]
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[LD]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @borrowed_box_noncopyable : $@convention(thin) (@guaranteed { var NC }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var NC }):
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  %1 = project_box %0, 0
+  %2 = begin_access [read] [unknown] %1
+  %3 = mark_unresolved_non_copyable_value [no_consume_or_assign] %2
+  %4 = load [copy] %3
+  %5 = function_ref @useNC : $@convention(thin) (@guaranteed NC) -> ()
+  %6 = apply %5(%4) : $@convention(thin) (@guaranteed NC) -> ()
+  destroy_value %4
+  end_access %2
+  %9 = begin_access [deinit] [unknown] %1
+  %10 = mark_unresolved_non_copyable_value [assignable_but_not_consumable] %9
+  %11 = load [take] %10
+  %12 = function_ref @consumeNC : $@convention(thin) (@owned NC) -> ()
+  %13 = apply %12(%11) : $@convention(thin) (@owned NC) -> ()
+  end_access %9
+  %15 = tuple ()
+  return %15
+}
+
+// CHECK-LABEL: sil [ossa] @borrowed_box_copy_addr_take :
+// CHECK:          [[BA:%.*]] = begin_access [deinit] [unknown]
+// CHECK-NEXT:     [[TMP:%.*]] = alloc_stack $C
+// CHECK-NEXT:     copy_addr [[BA]] to [init] [[TMP]]
+// CHECK-NEXT:     diagnose [unpermitted_copy] [[BA]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @borrowed_box_copy_addr_take : $@convention(thin) (@guaranteed { var C }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var C }):
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  %1 = project_box %0, 0
+  %2 = begin_access [deinit] [unknown] %1
+  %3 = alloc_stack $C
+  copy_addr [take] %2 to [init] %3
+  end_access %2
+  %6 = function_ref @consumeC_addr : $@convention(thin) (@in C) -> ()
+  %7 = apply %6(%3) : $@convention(thin) (@in C) -> ()
+  dealloc_stack %3
+  %9 = tuple ()
+  return %9
+}
