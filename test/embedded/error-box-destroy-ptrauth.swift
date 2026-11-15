@@ -1,7 +1,7 @@
 // Check that the error box metadata's destroy function is signed for its slot
 // (IA key, address-diversified, 0xbbbf), as the release path authenticates it.
 
-// RUN: %target-swift-frontend -emit-ir -O -wmo -parse-as-library -enable-experimental-feature Embedded %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-ir -O -wmo -parse-as-library -module-name main -enable-experimental-feature Embedded %s | %FileCheck %s
 
 // REQUIRES: CPU=arm64e
 // REQUIRES: swift_feature_Embedded
