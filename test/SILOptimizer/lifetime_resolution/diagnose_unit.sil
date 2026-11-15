@@ -6,6 +6,7 @@
 //   - `diagnose [unpermitted_copy]` on a `load [copy]`  -> use-after-consume
 //   - `assign undef to [init]`                          -> use-before-init
 //   - `diagnose [let_reinit]`                           -> repeated `let` initialization
+//   - `diagnose [unpermitted_copy]` on a `copy_value` of a borrowed value -> not yet diagnosed
 //
 // (The variable name renders empty here because hand-written SIL has no backing
 // VarDecl; from real Swift source the name resolves normally.)
@@ -18,6 +19,7 @@ import Swift
 class K {}
 
 sil @getK : $@convention(thin) () -> @owned K
+sil @consumeK : $@convention(thin) (@owned K) -> ()
 
 sil_global hidden @globalK : $K
 
@@ -157,6 +159,18 @@ bb0:
   %a = apply %getFn() : $@convention(thin) () -> @owned K
   diagnose [let_reinit] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
   store %a to [assign] %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+// A consume of a borrowed value isn't diagnosed yet, so its marker is dropped without an error.
+sil [ossa] @diagnose_consume_of_borrow : $@convention(thin) (@guaranteed K) -> () {
+bb0(%0 : @guaranteed $K):
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  specify_test "diagnose_resolved_lifetimes"
+  %1 = copy_value %0
+  diagnose [unpermitted_copy] %1
+  apply %consFn(%1) : $@convention(thin) (@owned K) -> ()
   %t = tuple ()
   return %t
 }

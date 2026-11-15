@@ -44,6 +44,47 @@ func resolveSingleDef(_ root: Value, _ context: FunctionPassContext) {
   uses.fixupDestroys()
 }
 
+// A borrowed value can't be consumed, so each consume of it was given a copy. Marks the copies that the language
+// does not permit: of a noncopyable value, or of a whole `@noImplicitCopy` parameter.
+func resolveGuaranteed(_ value: Value, _ context: FunctionPassContext) {
+  assert(value.ownership == .guaranteed)
+  log("\n\nLifetimeResolution.resolveGuaranteed(\(value))\n\n")
+
+  // Copying a box doesn't copy its contents.
+  if value.type.isBox {
+    return
+  }
+
+  let isNoImplicitCopyParameter = isWholeNoImplicitCopyParameter(value)
+  for copy in value.uses.users(ofType: CopyValueInst.self) where copy.type.isMoveOnly || isNoImplicitCopyParameter {
+    LifetimeResolutionMarker.markUnpermittedCopy(copy, context)
+  }
+}
+
+/// Whether `value` is all of a borrowed `@noImplicitCopy` parameter, or of the contents of its captured box.
+private func isWholeNoImplicitCopyParameter(_ value: Value) -> Bool {
+  switch value.lookThroughBorrow {
+  case let arg as FunctionArgument:
+    return arg.isNoImplicitCopy && arg.ownership == .guaranteed
+  case let loadBorrow as LoadBorrowInst:
+    guard let box = capturedBox(backing: loadBorrow.address) else {
+      return false
+    }
+    return box.isNoImplicitCopy && loadBorrow.address.projectionPathFromRoot.isEmpty
+  default:
+    return false
+  }
+}
+
+/// The box argument of a closure whose contents hold `address`.
+private func capturedBox(backing address: Value) -> FunctionArgument? {
+  guard case .box(let projectBox) = address.accessPath.base,
+        let box = projectBox.box.referenceRoot as? FunctionArgument else {
+    return nil
+  }
+  return box
+}
+
 struct PartitionedUses: CustomStringConvertible {
   // The uses of this value that are partitioned.
   let root: Value

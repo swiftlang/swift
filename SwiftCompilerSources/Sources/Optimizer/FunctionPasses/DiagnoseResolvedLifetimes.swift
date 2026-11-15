@@ -24,8 +24,15 @@ let diagnoseResolvedLifetimesPass = FunctionPass(name: "diagnose-resolved-lifeti
 
 private func diagnoseLifetimeViolations(_ function: Function, _ context: FunctionPassContext) {
   var markers: [LifetimeResolutionMarker] = []
+  var ignoredMarkers: [DiagnoseInst] = []
   for inst in function.instructions {
     if let marker = LifetimeResolutionMarker(inst) {
+      // TODO: diagnose once SILGen's copies of borrowed values are eliminated before LifetimeResolution.
+      if case .unpermittedCopy(let diagnose) = marker, let copy = diagnose.operand.value as? CopyValueInst,
+         copy.fromValue.ownership == .guaranteed {
+        ignoredMarkers.append(diagnose)
+        continue
+      }
       markers.append(marker)
       continue
     }
@@ -48,7 +55,7 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
   diagnoser.diagnoseUsesAfterConsume()
 
   // The `diagnose` markers are erased last, as they identify which copies were demoted consumes.
-  for case let diagnose? in markers.map({ $0.diagnose }) {
+  for case let diagnose? in markers.map({ $0.diagnose }) + ignoredMarkers {
     context.erase(instruction: diagnose)
   }
 

@@ -63,10 +63,13 @@ private struct Resolver {
         return
       }
 
-      // TODO: resolve `.guaranteed` values too. It should amount to having all consuming uses
-      //   require a copy, including those on the boundary, and inserting end_access/end_borrow.
-      if value.ownership == .owned {
+      switch value.ownership {
+      case .owned:
         resolveSingleDef(value, context)
+      case .guaranteed:
+        resolveGuaranteed(value, context)
+      default:
+        break
       }
       return
     }
