@@ -398,18 +398,14 @@ public:
       IndexSubset *inheritIndices = nullptr;
       if (deps.inheritIndices.any()) {
         inheritIndices = IndexSubset::get(ctx, deps.inheritIndices);
-        ASSERT(
-            !deps.flags.hasImmortalSpecifier() ||
-            deps.isInout() &&
-                "cannot combine immortal lifetime with parameter dependency");
+        ASSERT(!deps.flags.hasImmortalSpecifier() &&
+               "cannot combine immortal lifetime with parameter dependency");
       }
       IndexSubset *scopeIndices = nullptr;
       if (deps.scopeIndices.any()) {
         scopeIndices = IndexSubset::get(ctx, deps.scopeIndices);
-        ASSERT(
-            !deps.flags.hasImmortalSpecifier() ||
-            deps.isInout() &&
-                "cannot combine immortal lifetime with parameter dependency");
+        ASSERT(!deps.flags.hasImmortalSpecifier() &&
+               "cannot combine immortal lifetime with parameter dependency");
       }
       lifetimeDependencies.push_back(LifetimeDependenceInfo(
           /*inheritLifetimeParamIndices*/ inheritIndices,
@@ -1361,6 +1357,32 @@ protected:
       for (auto source : entry->getSources()) {
         initializeDescriptorDeps(targetIndex, *deps, source);
       }
+      diagnoseImmortalSource(*entry, *deps);
+    }
+  }
+
+  // Diagnose 'immortal' on a parameter target or with any other source in
+  // `entry`.
+  void diagnoseImmortalSource(const LifetimeEntry &entry,
+                              const TargetDeps &deps) {
+    if (!deps.flags.hasImmortalSpecifier())
+      return;
+
+    auto sources = entry.getSources();
+    if (!deps.isInout() && sources.size() == 1)
+      return;
+
+    auto immortalSource = llvm::find_if(
+        sources, [](auto source) { return source.isImmortalSpecifier(); });
+    if (deps.isInout()) {
+      diagnose(immortalSource->getLoc(),
+               diag::lifetime_dependence_immortal_param_target,
+               entry.getTargetDescriptor()->getString());
+      return;
+    }
+    for (auto &source : sources) {
+      if (&source != immortalSource)
+        diagnose(source.getLoc(), diag::lifetime_dependence_immortal_alone);
     }
   }
 
@@ -1400,17 +1422,7 @@ protected:
       // Record the immortal dependency even if it is invalid to suppress other
       // diagnostics.
       deps.flags.setImmortalSpecifier(true);
-      auto immortalParam = findAndDiagnoseConflictingName("immortal");
-      if (immortalParam != parameterInfos.end())
-        return;
-
-      // @_lifetime(target: immortal, copy source) is allowed for inout targets.
-      if (!deps.isInout()) {
-        if (deps.inheritIndices.any() || deps.scopeIndices.any()) {
-          ctx.Diags.diagnose(immortalParam->loc,
-                             diag::lifetime_dependence_immortal_alone);
-        }
-      }
+      findAndDiagnoseConflictingName("immortal");
       return;
     }
 
@@ -1455,11 +1467,6 @@ protected:
                             LifetimeDescriptor descriptor,
                             unsigned paramIndexToSet,
                             LifetimeDependenceKind lifetimeKind) {
-    // @_lifetime(target: immortal, copy source) is allowed for inout targets.
-    if (deps.flags.hasImmortalSpecifier() && !deps.isInout()) {
-      diagnose(descriptor.getLoc(), diag::lifetime_dependence_immortal_alone);
-      return;
-    }
     if (deps.inheritIndices.test(paramIndexToSet)
         || deps.scopeIndices.test(paramIndexToSet)) {
       diagnose(descriptor.getLoc(),

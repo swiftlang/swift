@@ -220,14 +220,6 @@ struct BorrowMismatchS2: S { // expected-error {{type 'BorrowMismatchS2' does no
   // expected-note@-1 {{candidate has a lifetime dependence not specified by the protocol}}
 }
 
-struct SubsetImmortalS: S { // OK
-  typealias T = NE
-  @_lifetime(a: immortal)
-  @_lifetime(b: immortal)
-  @_lifetime(immortal)
-  func foo(a: inout T, b: inout T, c: T) -> T { fatalError() }
-}
-
 struct SubsetAS: S { // OK
   typealias T = NE
   @_lifetime(a: copy a)
@@ -356,10 +348,6 @@ protocol SM {
 struct ExactMatchSM: SM { // OK
   @_lifetime(ne0: copy ne0)
   static func f(ne0: inout NE, ne1: borrowing NE) {}
-}
-struct SubsetSM: SM { // OK
-  @_lifetime(ne0: immortal)
-  static func f(ne0: inout NE, ne1: borrowing NE) { fatalError() }
 }
 struct SupersetSM: SM { // expected-error{{type 'SupersetSM' does not conform to protocol 'SM'}} expected-note{{add stubs for conformance}}
   @_lifetime(ne0: copy ne0, copy ne1)
