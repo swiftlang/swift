@@ -15,22 +15,16 @@ extension P where Self : Derived {
 
 // CHECK-LABEL: Requirement machine for fresh signature < Self >
 // CHECK-NEXT: Rewrite system: {
-// CHECK-NEXT: - [P].[P] => [P] [permanent]
 // CHECK-NEXT: - [P].[superclass: Base] => [P]
 // CHECK-NEXT: - [P].[layout: _NativeClass] => [P]
-// CHECK-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]
 // CHECK-NEXT: - [Copyable].[Deinitable] => [Copyable] [explicit]
-// CHECK-NEXT: - [Escapable].[Escapable] => [Escapable] [permanent]
-// CHECK-NEXT: - [Deinitable].[Deinitable] => [Deinitable] [permanent]
 // CHECK-NEXT: - τ_0_0.[P] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[superclass: Derived] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[superclass: Base] => τ_0_0
 // CHECK-NEXT: - τ_0_0.[layout: _NativeClass] => τ_0_0
 // CHECK-NEXT: }
 // CHECK: Property map: {
-// CHECK-NEXT:   [P] => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Base] }
-// CHECK-NEXT:   [Copyable] => { conforms_to: [Copyable Deinitable] }
-// CHECK-NEXT:   [Escapable] => { conforms_to: [Escapable] }
-// CHECK-NEXT:   [Deinitable] => { conforms_to: [Deinitable] }
+// CHECK-NEXT:   [P] => { layout: _NativeClass superclass: [superclass: Base] }
+// CHECK-NEXT:   [Copyable] => { conforms_to: [Deinitable] }
 // CHECK-NEXT:   τ_0_0 => { conforms_to: [P] layout: _NativeClass superclass: [superclass: Derived] }
 // CHECK-NEXT: }

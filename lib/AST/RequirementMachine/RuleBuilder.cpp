@@ -210,20 +210,10 @@ void RuleBuilder::initWithConditionalRequirements(
 
 /// Add permanent rules for a protocol, consisting of:
 ///
-/// - The identity conformance rule [P].[P] => [P].
 /// - An associated type introduction rule for each associated type.
 /// - An inherited associated type introduction rule for each associated
 ///   type of each inherited protocol.
 void RuleBuilder::addPermanentProtocolRules(const ProtocolDecl *proto) {
-  MutableTerm lhs;
-  lhs.add(Symbol::forProtocol(proto, Context));
-  lhs.add(Symbol::forProtocol(proto, Context));
-
-  MutableTerm rhs;
-  rhs.add(Symbol::forProtocol(proto, Context));
-
-  PermanentRules.emplace_back(lhs, rhs);
-
   for (auto *assocType : proto->getAssociatedTypeMembers())
     addAssociatedType(assocType, proto);
 

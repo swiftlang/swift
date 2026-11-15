@@ -19,14 +19,10 @@ extension G where X : Base, X : P, X == Derived {}
 // RULE: + (requirement "τ_0_0" same_type "Derived")
 
 // RULE: Rewrite system: {
-// RULE-NEXT: - [Copyable].[Copyable] => [Copyable] [permanent]
 // RULE-NEXT: - [Copyable].[Deinitable] => [Copyable] [explicit]
-// RULE-NEXT: - [Escapable].[Escapable] => [Escapable] [permanent]
-// RULE-NEXT: - [P].[P] => [P] [permanent]
 // RULE-NEXT: - [P].[Copyable] => [P] [explicit]
 // RULE-NEXT: - [P].[Escapable] => [P] [explicit]
 // RULE-NEXT: - [P].[Deinitable] => [P]
-// RULE-NEXT: - [Deinitable].[Deinitable] => [Deinitable] [permanent]
 // RULE-NEXT: - τ_0_0.[Copyable] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[Escapable] => τ_0_0 [explicit]
 // RULE-NEXT: - τ_0_0.[superclass: Base] => τ_0_0 [explicit]
