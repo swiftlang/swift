@@ -102,12 +102,12 @@
 //               |
 //               v
 //   /------------------------------------------------------------------------\
-//  |                      Complete RequirementMachine                         |
-//  |                                                 +------ optional ----+   |
-//  |  /-------------------------\   /-------------\  |  /--------------\  |   |
-//  | |  Confluent RewriteSystem  | |  PropertyMap  | | |  RewriteLoops  | |   |
-//  |  \-------------------------/   \-------------/  |  \--------------/  |   |
-//  |                                                 +--------------------+   |
+//  |                      Complete RequirementMachine                        |
+//  |                                                +------ optional ----+   |
+//  |  /------------------------\   /-------------\  |  /--------------\  |   |
+//  | |  Complete RewriteSystem  | |  PropertyMap  | | |  RewriteLoops  | |   |
+//  |  \------------------------/   \-------------/  |  \--------------/  |   |
+//  |                                                +--------------------+   |
 //   \------------------------------------------------------------------------/
 //
 //
@@ -465,7 +465,7 @@ RequirementMachine::initWithWrittenRequirements(
   return result;
 }
 
-/// Attempt to obtain a confluent rewrite system by iterating the Knuth-Bendix
+/// Attempt to construct a complete rewrite system by iterating the Knuth-Bendix
 /// completion procedure together with property map construction until fixed
 /// point.
 ///
