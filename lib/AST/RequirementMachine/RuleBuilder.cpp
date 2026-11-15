@@ -11,9 +11,8 @@
 //===----------------------------------------------------------------------===//
 //
 // This file implements lowering of desugared requirements to rewrite rules,
-// as well as rule sharing, which imports confluent rewrite rules from a
-// protocol connected component into a rewrite system which references that
-// protocol.
+// as well as rule sharing, which imports all rewrite rules from a protocol
+// component into a rewrite system which references that protocol.
 //
 //===----------------------------------------------------------------------===//
 

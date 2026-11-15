@@ -1768,7 +1768,7 @@ Debugging:
 A list of \IndexSource{monoid presentation!of requirement machine}rewrite rules in a monoid presentation together with some additional state. Every \texttt{RequirementMachine} has a \texttt{RewriteSystem}. See also \SecRef{src:completion}.
 \begin{itemize}
 \item \texttt{initialize()} adds the initial list of \IndexSource{imported rule}imported and local rules.
-\item \texttt{simplify()} computes the normal form of a term using \AlgRef{term reduction trie algo}. Modifies the given \texttt{MutableTerm} in place, and optionally outputs a \texttt{RewritePath} from the original term to the reduced term.
+\item \texttt{reduce()} computes the normal form of a term using \AlgRef{term reduction trie algo}. Modifies the given \texttt{MutableTerm} in place, and optionally outputs a \texttt{RewritePath} from the original term to the reduced term.
 \item \texttt{addRule()} reduces and orients both sides, and records a new \IndexSource{local rule}local rule. Returns \texttt{false} if both sides have the same normal form, in which case no rule is added. This implements both \AlgRef{add rewrite rule}, and \AlgRef{add rule derived algo} from \ChapRef{chap:minimization}.
 \item \texttt{addPermanentRule()} attempts to record a new rewrite rule, and immediately marks it \textbf{permanent} if a rule was added.
 \item \texttt{addExplicitRule()} attempts to record a new rewrite rule, and immediately marks it \textbf{explicit} if a rule was added.
