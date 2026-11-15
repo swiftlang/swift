@@ -59,7 +59,7 @@ func testPublicStructs() {
 
 extension PublicStruct {
   @_dynamicReplacement(for: publicDynamicProperty)
-  var replacementVar: Int
+  var replacementVar: Int { 0 }
 }
 
 func testPublicClasses() {
@@ -83,7 +83,7 @@ func testPublicClasses() {
   let _: Int = PublicDerivedClass.publicStaticPropertyInferred
 
   class DerivedFromPublicClassSynthesizedDesignatedInit: PublicClassSynthesizedDesignatedInit {
-    init() {}
+    init() { fatalError() }
   }
   let _ = DerivedFromPublicClassSynthesizedDesignatedInit()
 }
@@ -129,17 +129,19 @@ func testMainActorConstraint() {
 
 func takesEmptyProto<T: EmptyPublicProto>(_ t: T) {}
 
+#if DIAGS
 @available(*, unavailable)
 func testConditionalConformance<T>(_ s: PublicGenericStruct<T>) {
   takesEmptyProto(s) // expected-error {{global function 'takesEmptyProto' requires}}
 }
+#endif
 
 func testTypealiases() {
   let _: PublicStruct = PublicStructAlias(x: 1)
 }
 
 func testOperators() {
-  var a: PublicStruct
+  var a: PublicStruct = .init(x: 0)
   a <<< PublicStruct(x: 2)
 }
 
