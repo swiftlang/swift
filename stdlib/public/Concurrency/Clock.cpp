@@ -15,7 +15,7 @@
 
 #if SWIFT_CONCURRENCY_EMBEDDED
 
-#include "swift/SwiftPlatform/Clocks.h"
+#include "SwiftPlatform/Clocks.h"
 
 #include "Error.h"
 

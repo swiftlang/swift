@@ -183,7 +183,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(_embedded_synchronization_swift_flags
     ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
     "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
-    -internal-import-bridging-header ${CMAKE_CURRENT_SOURCE_DIR}/../EmbeddedPlatform/swift/EmbeddedPlatform.h
+    -Xcc -I${CMAKE_CURRENT_SOURCE_DIR}/../EmbeddedPlatform/include
+    -internal-import-bridging-header ${CMAKE_CURRENT_SOURCE_DIR}/../EmbeddedPlatform/include/swift/EmbeddedPlatform.h
     # Precompile the bridging header into a stable, per-module location rather
     # than a randomly-named temporary directory. Without this the transient PCH
     # path leaks into the debug info (the DW_AT_LLVM_include_path of the __ObjC

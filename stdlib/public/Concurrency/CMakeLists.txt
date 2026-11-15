@@ -13,7 +13,7 @@
 # ExecutorImpl.h includes SwiftPlatform/ExecutorTypes.h from the
 # EmbeddedPlatform headers.
 set(SWIFT_RUNTIME_CONCURRENCY_C_FLAGS
-  -I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift)
+  -I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/include)
 set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS -I${CMAKE_CURRENT_SOURCE_DIR}/InternalShims)
 
 set(swift_concurrency_private_link_libraries)
@@ -502,8 +502,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     COMPONENT compiler)
 
   swift_install_in_component(FILES
-    "${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/swift/SwiftPlatform/ExecutorTypes.h"
-    DESTINATION "include/swift/SwiftPlatform"
+    "${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/include/SwiftPlatform/ExecutorTypes.h"
+    DESTINATION "include/SwiftPlatform"
     COMPONENT compiler)
 
   add_dependencies(embedded-concurrency "copy_executor_impl_header")

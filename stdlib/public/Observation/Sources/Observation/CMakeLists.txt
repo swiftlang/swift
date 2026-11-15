@@ -78,8 +78,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
     "-enable-experimental-feature" "LiteralExpressions"
     -Xfrontend -disable-implicit-string-processing-module-import
     "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
+    -Xcc -I${CMAKE_CURRENT_SOURCE_DIR}/../../../EmbeddedPlatform/include
     -internal-import-bridging-header
-      ${CMAKE_CURRENT_SOURCE_DIR}/../../../EmbeddedPlatform/swift/EmbeddedPlatform.h
+      ${CMAKE_CURRENT_SOURCE_DIR}/../../../EmbeddedPlatform/include/swift/EmbeddedPlatform.h
     -pch-output-dir ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedObservationPCH
     -Xfrontend -enable-sil-opaque-values)
 

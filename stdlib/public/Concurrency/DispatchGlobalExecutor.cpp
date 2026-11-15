@@ -53,7 +53,7 @@ extern "C" void dispatch_async_swift_job(dispatch_queue_t queue, void *obj,
 #include "TaskPrivate.h"
 
 #if SWIFT_CONCURRENCY_EMBEDDED
-#include "swift/SwiftPlatform/Concurrency.h"
+#include "SwiftPlatform/Concurrency.h"
 #endif
 
 #ifndef NSEC_PER_SEC

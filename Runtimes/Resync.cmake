@@ -98,7 +98,7 @@ endforeach()
 
 # ExecutorImpl.h includes SwiftPlatform/ExecutorTypes.h relative to its
 # own directory.
-copy_files("public/EmbeddedPlatform/swift" "Core/Concurrency"
+copy_files("public/EmbeddedPlatform/include" "Core/Concurrency"
   FILES "SwiftPlatform/ExecutorTypes.h")
 
 # copying Core/core separately, so we can specify the case of the target folder

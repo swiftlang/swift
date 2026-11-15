@@ -20,7 +20,7 @@
 #include "swift/shims/Visibility.h"
 
 #include "swift/Basic/PriorityQueue.h"
-#include "swift/SwiftPlatform/Concurrency.h"
+#include "SwiftPlatform/Concurrency.h"
 
 #include "ExecutorImpl.h"
 
