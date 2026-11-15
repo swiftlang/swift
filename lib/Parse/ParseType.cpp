@@ -20,6 +20,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/Parser.h"
@@ -2008,6 +2009,8 @@ bool Parser::canParseType() {
 }
 
 bool Parser::canParseStartOfInlineArrayType() {
+  SWIFT_FUNC_STAT_NAMED("Parse");
+
   // We must have at least '[<type> of', which cannot be any other kind of
   // expression or type. We specifically look for any type, not just integers
   // for better recovery in e.g cases where the user writes '[Int of 2]'. We
@@ -2036,21 +2039,40 @@ bool Parser::canParseCollectionType() {
   if (!consumeIf(tok::l_square))
     return false;
 
-  // Check to see if we have an InlineArray sugar type.
-  {
+  // A parenthesized literal expression can be an inline-array count without
+  // being a type. This lookahead only skips the parenthesized group.
+  bool hasParenthesizedCountPrefix =
+      Context.LangOpts.hasFeature(Feature::LiteralExpressions) &&
+      Tok.is(tok::l_paren);
+  if (hasParenthesizedCountPrefix) {
     CancellableBacktrackingScope backtrack(*this);
     if (canParseStartOfInlineArrayType()) {
       backtrack.cancelBacktrack();
-      if (!canParseType())
-        return false;
-      if (!consumeIf(tok::r_square))
-        return false;
-      return true;
+      return canParseType() && consumeIf(tok::r_square);
     }
   }
 
-  if (!canParseType())
+  // Scan the first type once, then distinguish an inline array from an array
+  // or dictionary. Speculatively scanning it for 'of' and then scanning it
+  // again as an ordinary element type causes exponential nested lookahead.
+  bool isPackExpansion = consumeIf(tok::kw_repeat);
+  if (!canParseTypeScalar())
     return false;
+
+  // Parenthesized counts were handled above; a postfix on that group must not
+  // be reinterpreted as a type-based count. Counts also exclude pack
+  // expansions.
+  if (!isPackExpansion && !hasParenthesizedCountPrefix &&
+      !Tok.isAtStartOfLine() && Tok.isContextualKeyword("of")) {
+    consumeToken();
+    return canParseType() && consumeIf(tok::r_square);
+  }
+
+  // Complete the ordinary type production, as in canParseType().
+  if (Tok.isEllipsis()) {
+    Tok.setKind(tok::ellipsis);
+    consumeToken();
+  }
 
   if (consumeIf(tok::colon)) {
     if (!canParseType())

@@ -1,0 +1,6 @@
+// RUN: %scale-test -parse --begin 4 --end 16 --step 2 --select canParseStartOfInlineArrayType %s
+// REQUIRES: asserts
+
+// Inline-array probes should grow linearly with the number of collection
+// types, rather than recursively probing the same nested types twice.
+func consume(_: ${'[' * N}Int${']' * N}) {}
