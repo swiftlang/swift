@@ -364,10 +364,10 @@ struct ResolvableRoot {
         startsInitialized = true
       case .indirectOut:
         startsInitialized = false
-      case .indirectInout:
+      case .indirectInout, .indirectInoutAliasable:
         startsInitialized = true
 
-        // For an inout parameter, all function exit terminators are considered uses.
+        // For an inout parameter or a non-escaping closure capture, all function exit terminators are considered uses.
         function.exitingBlocks.forEach { extraUses.append(.functionExit($0.terminator)) }
 
       default:

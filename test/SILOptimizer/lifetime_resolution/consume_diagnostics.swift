@@ -13,7 +13,7 @@ struct NC: ~Copyable {
   consuming func eat() {}
   borrowing func look() {}
 }
-func takeNC(_ x: consuming NC) {} // expected-note 9 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}} {{18-27=borrowing}}
+func takeNC(_ x: consuming NC) {} // expected-note 11 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}} {{18-27=borrowing}}
 func useNC(_ x: borrowing NC) {}
 func takeAndUse(_ a: consuming NC, _ b: borrowing NC) {} // expected-note {{consider making this parameter 'borrowing' if 'takeAndUse' does not need ownership of it}} {{22-31=borrowing}}
 func takeGeneric<T: ~Copyable>(_ t: consuming T) {} // expected-note {{consider making this parameter 'borrowing' if 'takeGeneric' does not need ownership of it}}
@@ -324,8 +324,75 @@ func severalErrors(_ b: Bool) {
 
 // --- closure captures must be reinitialized before the closure returns ---
 
+func callNonEscaping(_ f: () -> ()) { f() }
 var escapedClosure: () -> () = {}
 func callEscaping(_ f: @escaping () -> ()) { escapedClosure = f }
+
+func captureNotReinitialized() {
+  var x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  callNonEscaping {
+    takeNC(x) // expected-error {{missing reinitialization of closure capture 'x' after consume}}
+  }
+  x = NC(c: C())
+  useNC(x)
+}
+
+func captureReinitialized() {
+  var x = NC(c: C())
+  callNonEscaping {
+    takeNC(x)
+    x = NC(c: C())
+  }
+  useNC(x)
+}
+
+func captureConsumedBeforeTrap() {
+  var x = NC(c: C())
+  callNonEscaping {
+    takeNC(x)
+    fatalError()
+  }
+  x = NC(c: C())
+  useNC(x)
+}
+
+func consumingCaptureNotReinitialized(_ x: consuming NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  callNonEscaping {
+    takeNC(x) // expected-error {{missing reinitialization of closure capture 'x' after consume}}
+  }
+}
+
+func consumingCaptureBorrowed(_ x: consuming NC) {
+  callNonEscaping { useNC(x) }
+}
+
+func copyableCaptureConsumeOperator() {
+  var c = C()
+  callNonEscaping {
+    _ = consume c // expected-error {{missing reinitialization of closure capture 'c' after consume}} // expected-note {{write 'copy c' to keep 'c' valid after this consume}}
+  }
+  c = C()
+  use(c)
+}
+
+func copyableCaptureConsumeOperatorReinitialized() {
+  var c = C()
+  callNonEscaping {
+    _ = consume c
+    c = C()
+  }
+  use(c)
+}
+
+func consumingCopyableCapture(_ c: consuming C) {
+  callNonEscaping {
+    take(c) // expected-error {{missing reinitialization of closure capture 'c' after consume}} // expected-note {{write 'copy c' to keep 'c' valid after this consume}}
+  }
+}
+
+func consumingCopyableCaptureExplicitCopy(_ c: consuming C) {
+  callNonEscaping { take(copy c) }
+}
 
 func escapingCaptureNotReinitialized(_ x: consuming NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
   callEscaping {
