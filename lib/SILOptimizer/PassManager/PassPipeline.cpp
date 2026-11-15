@@ -91,6 +91,11 @@ static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
 static void addLifetimeResolutionPasses(SILPassPipelinePlan &P) {
   P.addClosureLifetimeFixup();
 
+  // Eliminate SILGen's copies of borrowed values that are only used as borrows.
+  P.addMergeBorrowScopes();
+  P.addCopyToBorrowOptimization();
+  P.addCopySinking();
+
   // Main sequence for LifetimeResolution
   P.addRemoveSILGenLifetimes();
   P.addLifetimeResolution();
