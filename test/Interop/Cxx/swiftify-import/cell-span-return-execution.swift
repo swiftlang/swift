@@ -17,7 +17,9 @@ module CellSpanReturn {
 //--- Inputs/cell-span-return.h
 #pragma once
 
-#include <ptrcheck.h>
+// Spell out the attribute instead of using ptrcheck.h's __counted_by: on Linux,
+// newer kernel headers define an empty __counted_by that the std module
+// exports, and it can win over ptrcheck.h's definition.
 #include <span>
 
 using IntSpan = std::span<int>;
@@ -33,8 +35,8 @@ struct Container {
   int sum() const { return data[0] + data[1] + data[2] + data[3]; }
 };
 
-inline int *__counted_by(n) countedView(Container &c [[clang::lifetimebound]],
-                                        int n) {
+inline int *__attribute__((__counted_by__(n)))
+countedView(Container &c [[clang::lifetimebound]], int n) {
   return c.data;
 }
 
