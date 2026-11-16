@@ -150,6 +150,33 @@ bb0(%0 : @owned $NCWrapper):
   return %17
 }
 
+sil @Holder_inlineInt_unsafeAddressor : $@convention(method) (@guaranteed Holder) -> UnsafePointer<InlineInt>
+
+// rdar://155572008 ([nonescapable] Fix dependency on unsafeAddress projection)
+//
+// OK: A dependence on an unsafeAddress projection (pointer_to_address + mark_dependence) is forwarded to the
+// addressor's 'self', so returning it is valid within the caller's borrow of %0.
+//
+// CHECK-LABEL: sil [ossa] @testUnsafeAddressProjection : {{.*}} {
+// CHECK: [[ADR:%.*]] = mark_dependence [nonescaping] %{{.*}} on %0
+// CHECK: [[SPAN:%.*]] = apply %{{.*}}([[ADR]])
+// CHECK: mark_dependence [nonescaping] [[SPAN]] on [[ADR]]
+// CHECK-LABEL: } // end sil function 'testUnsafeAddressProjection'
+sil [ossa] @testUnsafeAddressProjection : $@convention(thin) (@in_guaranteed Holder) -> @lifetime(borrow address_for_deps 0) @owned Span<Int> {
+bb0(%0 : $*Holder):
+  %1 = load_borrow %0
+  %2 = function_ref @Holder_inlineInt_unsafeAddressor : $@convention(method) (@guaranteed Holder) -> UnsafePointer<InlineInt>
+  %3 = apply %2(%1) : $@convention(method) (@guaranteed Holder) -> UnsafePointer<InlineInt>
+  %4 = struct_extract %3, #UnsafePointer._rawValue
+  %5 = pointer_to_address %4 to [strict] $*InlineInt
+  %6 = mark_dependence [unresolved] %5 on %0
+  %7 = function_ref @addressInt : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %8 = apply %7(%6) : $@convention(thin) (@in_guaranteed InlineInt) -> @lifetime(borrow address_for_deps 0) @owned Span<Int>
+  %9 = mark_dependence [unresolved] %8 on %6
+  end_borrow %1
+  return %9
+}
+
 // Test that LifetimeDependence.Scope recognizes a singly-initialized alloc_stack.
 sil [ossa] @testStackInit : $@convention(thin) () -> () {
 bb0:
