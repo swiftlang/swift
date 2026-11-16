@@ -22,6 +22,10 @@ protocol SwiftP {
 
 class Klass {}
 
+struct NonCopyableStruct: ~Copyable {
+  var k: Klass
+}
+
 protocol FakeProtocol {
   func requirement()
 }
@@ -1062,6 +1066,75 @@ bb2:
 bb3:
   destroy_value [dead_end] %4
   unreachable
+}
+
+sil @callOnceCapture : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> ()) -> ()
+
+// Every apply of an on-stack closure that's called on more than one path is
+// combined with the closure's capture, which it consumes.
+//
+// CHECK-LABEL: sil @combine_once_closure_called_on_two_paths :
+// CHECK:         [[F:%.*]] = function_ref @callOnceCapture
+// CHECK-NOT:     partial_apply
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[F]](%2, %1)
+// CHECK:       bb2:
+// CHECK-NEXT:    apply [[F]](%2, %1)
+// CHECK-NOT:     dealloc_stack
+// CHECK-LABEL: } // end sil function 'combine_once_closure_called_on_two_paths'
+sil @combine_once_closure_called_on_two_paths : $@convention(thin) (Builtin.Int1, @owned @noescape @once @callee_owned (Int) -> (), Int) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $@noescape @once @callee_owned (Int) -> (), %2 : $Int):
+  %3 = function_ref @callOnceCapture : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> ()) -> ()
+  %4 = partial_apply [on_stack] [called_once] %3(%1) : $@convention(thin) (Int, @owned @noescape @once @callee_owned (Int) -> ()) -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  %6 = apply %4(%2) : $@noescape @once @callee_owned (Int) -> ()
+  br bb3
+
+bb2:
+  %8 = apply %4(%2) : $@noescape @once @callee_owned (Int) -> ()
+  br bb3
+
+bb3:
+  dealloc_stack %4 : $@noescape @once @callee_owned (Int) -> ()
+  %11 = tuple ()
+  return %11 : $()
+}
+
+sil @callNoncopyableCapture : $@convention(thin) (Int, @owned NonCopyableStruct) -> ()
+
+// The same for an at-most-once closure, which is deleted with its release once
+// both of its applies are combined.
+//
+// CHECK-LABEL: sil @combine_at_most_once_closure_called_on_two_paths :
+// CHECK:         [[F:%.*]] = function_ref @callNoncopyableCapture
+// CHECK-NOT:     partial_apply
+// CHECK:       bb1:
+// CHECK-NEXT:    apply [[F]](%2, %1)
+// CHECK:       bb2:
+// CHECK-NEXT:    apply [[F]](%2, %1)
+// CHECK-NOT:     {{strong_release|release_value|dealloc_stack}}
+// CHECK-LABEL: } // end sil function 'combine_at_most_once_closure_called_on_two_paths'
+sil @combine_at_most_once_closure_called_on_two_paths : $@convention(thin) (Builtin.Int1, @owned NonCopyableStruct, Int) -> () {
+bb0(%0 : $Builtin.Int1, %1 : $NonCopyableStruct, %2 : $Int):
+  %3 = function_ref @callNoncopyableCapture : $@convention(thin) (Int, @owned NonCopyableStruct) -> ()
+  %4 = partial_apply [callee_guaranteed] [on_stack] [called_at_most_once] %3(%1) : $@convention(thin) (Int, @owned NonCopyableStruct) -> ()
+  cond_br %0, bb1, bb2
+
+bb1:
+  %6 = apply %4(%2) : $@noescape @callable(once) @callee_guaranteed (Int) -> ()
+  br bb3
+
+bb2:
+  %8 = apply %4(%2) : $@noescape @callable(once) @callee_guaranteed (Int) -> ()
+  br bb3
+
+bb3:
+  strong_release %4 : $@noescape @callable(once) @callee_guaranteed (Int) -> ()
+  dealloc_stack %4 : $@noescape @callable(once) @callee_guaranteed (Int) -> ()
+  %12 = tuple ()
+  return %12 : $()
 }
 
 sil @callAtMostOnceKlassCapture : $@convention(thin) (Int, @guaranteed Klass) -> ()

@@ -111,3 +111,41 @@ func testForwardEscaping(_ c: Counter) -> Int {
 
 print("forward escaping: \(testForwardEscaping(Counter()))")
 // CHECK-NEXT: forward escaping: 1
+
+// An inlined exactly-once closure that consumes a noncopyable capture and is
+// called on either of two paths.
+
+struct Resource: ~Copyable {
+  let tag: String
+  init(_ tag: String) { self.tag = tag }
+  deinit { print("Resource(\(tag)) deinit") }
+}
+
+@inline(never)
+func useResource(_ r: consuming Resource) { print("Resource(\(r.tag)) used") }
+
+@inline(__always)
+func callOnEitherPath(_ first: Bool, _ body: @once () -> Void) {
+  if first {
+    print("first path")
+    body()
+  } else {
+    print("second path")
+    body()
+  }
+}
+
+@inline(never)
+func testCalledOnEitherPath(_ first: Bool, _ tag: String) {
+  let r = Resource(tag)
+  callOnEitherPath(first) { useResource(r) }
+}
+
+testCalledOnEitherPath(true, "either first")
+// CHECK-NEXT: first path
+// CHECK-NEXT: Resource(either first) used
+// CHECK-NEXT: Resource(either first) deinit
+testCalledOnEitherPath(false, "either second")
+// CHECK-NEXT: second path
+// CHECK-NEXT: Resource(either second) used
+// CHECK-NEXT: Resource(either second) deinit
