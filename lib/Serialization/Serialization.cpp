@@ -6967,7 +6967,8 @@ void Serializer::writeHiddenTypeLayout(const Decl *decl) {
           "hidden type declaration has no abstract layout");
     layout = hidden->Layout;
   } else if (auto *nominal = dyn_cast<NominalTypeDecl>(decl)) {
-    computedLayout = getLayoutProvider().getAbstractTypeLayout(nominal);
+    computedLayout = getLayoutProvider().getAbstractTypeLayout(
+        nominal->getDeclaredTypeInContext());
     layout = &computedLayout;
   } else {
     llvm::report_fatal_error(
