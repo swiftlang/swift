@@ -4214,7 +4214,8 @@ public:
       MF.diagnoseAndConsumeError(overridden.takeError());
 
       return llvm::make_error<OverrideError>(
-          name, getErrorFlags(), numVTableEntries);
+          name, getErrorFlags(), numVTableEntries,
+          memberAbstractTypeLayoutID);
     }
 
     // Extract the accessor IDs.
@@ -4232,7 +4233,8 @@ public:
       if (!dependency) {
         return llvm::make_error<TypeError>(
             name, takeErrorInfo(dependency.takeError()),
-            getErrorFlags(), numVTableEntries);
+            getErrorFlags(), numVTableEntries,
+            memberAbstractTypeLayoutID);
       }
     }
 
@@ -4255,7 +4257,10 @@ public:
 
     auto interfaceTypeOrError = MF.getTypeChecked(interfaceTypeID);
     if (!interfaceTypeOrError)
-      return interfaceTypeOrError.takeError();
+      return llvm::make_error<TypeError>(
+          name, takeErrorInfo(interfaceTypeOrError.takeError()),
+          getErrorFlags(), numVTableEntries,
+          memberAbstractTypeLayoutID);
     Type interfaceType = interfaceTypeOrError.get();
     var->setInterfaceType(interfaceType);
     var->setImplicitlyUnwrappedOptional(isIUO);
@@ -9363,6 +9368,26 @@ Decl *handleErrorAndSupplyMissingProtoMember(ASTContext &context,
   return suppliedMissingMember;
 }
 
+Decl *ModuleFile::handleErrorAndSupplyMissingStructMember(
+    ASTContext &context, llvm::Error &&error,
+    StructDecl *containingStruct) {
+  Decl *suppliedMissingMember = nullptr;
+  auto errorInfo = takeErrorInfo(std::move(error));
+  if (errorInfo->isA<DeclDeserializationError>()) {
+    auto *declError = static_cast<DeclDeserializationError *>(errorInfo.get());
+    if (auto layoutID = declError->getMemberAbstractTypeLayoutID()) {
+      auto layout = getAbstractMemberTypeLayout(layoutID);
+      if (!layout)
+        fatal(layout.takeError());
+      suppliedMissingMember = MissingMemberDecl::create(
+          context, containingStruct, declError->getName(), 0,
+          declError->needsFieldOffsetVectorEntry(), layout.get());
+    }
+  }
+  diagnoseAndConsumeError(std::move(errorInfo));
+  return suppliedMissingMember;
+}
+
 Decl *
 ModuleFile::handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const {
   diagnoseAndConsumeError(std::move(error));
@@ -9372,7 +9397,7 @@ ModuleFile::handleErrorAndSupplyMissingMiscMember(llvm::Error &&error) const {
 Decl *
 ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
                                               Decl *container,
-                                              llvm::Error &&error) const {
+                                              llvm::Error &&error) {
   // Drop the member if it had a problem.
   // FIXME: Handle overridable members in class extensions too, someday.
   if (auto *containingClass = dyn_cast<ClassDecl>(container)) {
@@ -9382,6 +9407,11 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
   if (auto *containingProto = dyn_cast<ProtocolDecl>(container)) {
     return handleErrorAndSupplyMissingProtoMember(context, std::move(error),
                                                   containingProto);
+  }
+
+  if (auto *containingStruct = dyn_cast<StructDecl>(container)) {
+    return handleErrorAndSupplyMissingStructMember(
+        context, std::move(error), containingStruct);
   }
   return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }
