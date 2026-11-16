@@ -1198,7 +1198,7 @@ extension Collection {
       return []
     }
 
-    let result = _ContiguousArrayBuffer<T>(
+    var result = _ContiguousArrayBuffer<T>(
       _uninitializedCount: 0, minimumCapacity: n)
     let base = unsafe result.firstElementAddress
     var written = 0
@@ -1215,6 +1215,7 @@ extension Collection {
     }
     _expectEnd(of: self, is: i)
     result.mutableCount = n
+    result.endCOWMutation()
     return Array(ContiguousArray(_buffer: result))
   }
 
