@@ -993,7 +993,10 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
         // `pai.isPartialApplyOfThunk` implies that the captured closure (`closure` here) is applied in the thunk.
         // If the thunk closure (`pai` here) is applied by itself as well, the closure captured by
         // the thunk closure also becomes effectively applied transitively.
-        return checkRecursivelyIfClosureIsApplied(pai, &handledFuncs)
+        if checkRecursivelyIfClosureIsApplied(pai, &handledFuncs) {
+          return true
+        }
+        continue
       }
 
       guard let callee = pai.referencedFunction,
@@ -1015,7 +1018,9 @@ private func checkRecursivelyIfClosureIsApplied(_ closure: Value, _ handledFuncs
         //     %closure2 = partial_apply @wrapper(%closure1)
         //     apply %closure2(%arg1, %arg2)
         //   }
-        return checkRecursivelyIfClosureIsApplied(pai, &handledFuncs)
+        if checkRecursivelyIfClosureIsApplied(pai, &handledFuncs) {
+          return true
+        }
       }
 
     case let apply as FullApplySite:
