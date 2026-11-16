@@ -12,7 +12,8 @@
 // Check count expressions that use C++ reference parameters. A reference
 // parameter is imported as the type it refers to, so `const size_t &` is
 // imported as `Int`, and is converted like a `size_t` parameter. This test
-// emits a module, so the wrappers' bodies are type-checked too.
+// emits a module, so the wrappers' bodies are type-checked too. Rvalue
+// references are checked in count-expr-cxx-rvalue-reference-params.swift.
 
 //--- test.h
 #pragma once

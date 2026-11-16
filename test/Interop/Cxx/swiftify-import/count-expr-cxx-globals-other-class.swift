@@ -10,8 +10,9 @@
 // too, so the member would be imported twice.
 //
 // This test only checks that importing `S::f` doesn't crash and that `S::f`
-// gets a wrapper. `-typecheck` doesn't type-check the wrapper's body, which
-// doesn't compile because it refers to `T::kCount` as just `kCount`
+// gets a wrapper. count-expr-cxx-globals-wrong-name.swift checks the
+// expansion. `-typecheck` doesn't type-check the wrapper's body, which doesn't
+// compile because it refers to `T::kCount` as just `kCount`
 // (https://github.com/swiftlang/swift/issues/94220).
 
 //--- test.h
