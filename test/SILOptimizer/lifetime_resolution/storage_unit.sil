@@ -2520,3 +2520,40 @@ bb0:
   %t = tuple ()
   return %t
 }
+
+// Demand above the allocation, from a use before initialization, doesn't reach the previous
+// iteration's take.
+// CHECK-LABEL: sil [ossa] @loop_alloc_use_before_init :
+// CHECK:       bb1:
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $NC
+// CHECK-NEXT:    [[K:%.*]] = struct_element_addr [[ROOT]] : $*NC, #NC.k
+// CHECK-NEXT:    assign undef to [init] [[K]]
+// CHECK:         load [take] [[ROOT]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @loop_alloc_use_before_init : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %0 = alloc_stack [lexical] [var_decl] $NC, var, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  %useFn = function_ref @useNC : $@convention(thin) (@guaranteed NC) -> ()
+  %b = load_borrow %0 : $*NC
+  apply %useFn(%b) : $@convention(thin) (@guaranteed NC) -> ()
+  end_borrow %b : $NC
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %v = apply %getFn() : $@convention(thin) () -> @owned NC
+  store %v to [init] %0 : $*NC
+  %consumeFn = function_ref @consumeNC : $@convention(thin) (@owned NC) -> ()
+  %t = load [take] %0 : $*NC
+  apply %consumeFn(%t) : $@convention(thin) (@owned NC) -> ()
+  dealloc_stack %0 : $*NC
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}

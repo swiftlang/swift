@@ -1279,7 +1279,7 @@ private struct MultiDefResolver {
       var demandKill: Demand {
         switch self {
         case .def, .superInit: .all
-        case .root(_, initialized: true): .all // A root that starts initialized is a def.
+        case .root: .all  // Nothing can be demanded of the storage before it exists.
         default: .nothing
         }
       }
