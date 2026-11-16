@@ -627,6 +627,18 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M,
   return getEnumElementType(elt, M.Types, context);
 }
 
+SILType SILType::getEnumElementType(MissingMemberDecl *elt,
+                                    TypeConverter &TC,
+                                    TypeExpansionContext context) const {
+  auto loweredType = getLoweredAbstractMemberType(*this, elt, TC, context);
+  return SILType(loweredType, getCategory()).copyingMoveOnlyWrapper(*this);
+}
+
+SILType SILType::getEnumElementType(MissingMemberDecl *elt, SILModule &M,
+                                    TypeExpansionContext context) const {
+  return getEnumElementType(elt, M.Types, context);
+}
+
 SILType SILType::getEnumElementType(EnumElementDecl *elt,
                                     SILFunction *fn) const {
   return getEnumElementType(elt, fn->getModule(),

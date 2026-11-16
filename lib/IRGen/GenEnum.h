@@ -15,6 +15,7 @@
 
 #include "TypeInfo.h"
 #include "LoadableTypeInfo.h"
+#include "llvm/ADT/PointerUnion.h"
 #include <optional>
 
 namespace llvm {
@@ -41,6 +42,7 @@ namespace irgen {
 
 namespace swift {
   class EnumElementDecl;
+  class MissingMemberDecl;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
 
@@ -135,9 +137,39 @@ llvm::APInt scatterBits(const llvm::APInt &mask, unsigned value);
 class EnumImplStrategy {
 public:
   struct Element {
-    EnumElementDecl *decl;
+    using Member =
+        llvm::PointerUnion<EnumElementDecl *, MissingMemberDecl *>;
+
+    /// Either the semantic case declaration or a layout-only missing member.
+    Member member;
     const TypeInfo *ti;
     const TypeInfo *origTI;
+
+    Element(Member member, const TypeInfo *ti, const TypeInfo *origTI)
+        : member(member), ti(ti), origTI(origTI) {
+      assert(!member.isNull() && "enum member must not be null");
+    }
+
+    Element(EnumElementDecl *decl, const TypeInfo *ti, const TypeInfo *origTI)
+        : Element(Member(decl), ti, origTI) {}
+
+    Element(MissingMemberDecl *missing, const TypeInfo *ti,
+            const TypeInfo *origTI)
+        : Element(Member(missing), ti, origTI) {}
+
+    EnumElementDecl *getEnumElementDeclOrNull() const {
+      return member.dyn_cast<EnumElementDecl *>();
+    }
+
+    EnumElementDecl *getEnumElementDecl() const {
+      return llvm::cast<EnumElementDecl *>(member);
+    }
+
+    MissingMemberDecl *getMissingMemberDecl() const {
+      return llvm::cast<MissingMemberDecl *>(member);
+    }
+
+    SILType getPayloadType(IRGenModule &IGM, SILType enumType) const;
   };
   
   enum TypeInfoKind {
@@ -147,6 +179,8 @@ public:
   };
   
 protected:
+  using ElementIterator = std::vector<Element>::const_iterator;
+
   std::vector<Element> ElementsWithPayload;
   std::vector<Element> ElementsWithNoPayload;
   IRGenModule &IGM;
@@ -158,6 +192,11 @@ protected:
   IsCopyable_t Copyable;
   IsBitwiseTakable_t BitwiseTakable;
   unsigned NumElements;
+
+  /// Find a semantic enum element without removing layout-only elements from
+  /// the ABI-significant element sequence.
+  static ElementIterator findElement(const std::vector<Element> &elements,
+                                     EnumElementDecl *decl);
   
   EnumImplStrategy(IRGenModule &IGM,
                    TypeInfoKind tik,

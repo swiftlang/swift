@@ -3524,6 +3524,11 @@ SILType irgen::getSingletonAggregateFieldType(IRGenModule &IGM, SILType t,
     if (IGM.isResilient(enumDecl, expansion))
       return SILType();
 
+    for (auto *member : enumDecl->getMembers())
+      if (auto *missing = dyn_cast<MissingMemberDecl>(member))
+        if (missing->getStorageLayout())
+          return SILType();
+
     auto allCases = enumDecl->getAllElements();
     
     auto theCase = allCases.begin();
