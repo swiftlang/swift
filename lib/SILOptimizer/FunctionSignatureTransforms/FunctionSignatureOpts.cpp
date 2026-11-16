@@ -312,8 +312,7 @@ static bool usesGenerics(SILFunction *F,
       }
 
       if (auto *DVI = dyn_cast<DebugValueInst>(&I)) {
-        if (std::optional<SILType> VarType = DVI->getVarInfo()->Type)
-          VarType->getASTType().visit(FindArchetypesAndGenericTypes);
+        DVI->getVarType().getASTType().visit(FindArchetypesAndGenericTypes);
 
         // If there are only debug uses of the generic, don't keep it.
         if (UsesGenerics) {
