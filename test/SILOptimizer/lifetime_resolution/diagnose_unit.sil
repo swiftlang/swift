@@ -170,12 +170,12 @@ bb0:
   return %t
 }
 
-// A consume of a borrowed value isn't diagnosed by its own diagnostic yet, so it hits the backstop.
+// A consume of a borrowed value is reported at the copy.
 sil [ossa] @diagnose_consume_of_borrow : $@convention(thin) (@guaranteed K) -> () {
 bb0(%0 : @guaranteed $K):
   %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
   specify_test "diagnose_resolved_lifetimes"
-  %1 = copy_value %0 // expected-error {{LifetimeResolution missed diagnosing a copy}}
+  %1 = copy_value %0 // expected-error {{'' is borrowed and cannot be consumed without an explicit 'copy'}} // expected-note {{write 'copy ' to consume a copy instead}}
   diagnose [unpermitted_copy] %1
   apply %consFn(%1) : $@convention(thin) (@owned K) -> ()
   %t = tuple ()
