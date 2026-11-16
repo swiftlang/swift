@@ -1382,6 +1382,9 @@ public:
   void visitUncheckedOwnershipInst(UncheckedOwnershipInst *i) {
     llvm_unreachable("unimplemented");
   }
+  void visitValueToAddressInst(ValueToAddressInst *i) {
+    llvm_unreachable("value_to_address is removed by AddressLowering");
+  }
   void visitMergeIsolationRegionInst(MergeIsolationRegionInst *i) {
     llvm_unreachable("Valid only when ownership is enabled");
   }

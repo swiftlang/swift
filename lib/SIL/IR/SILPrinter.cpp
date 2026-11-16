@@ -2597,6 +2597,10 @@ public:
     printForwardingOwnershipKind(I);
   }
 
+  void visitValueToAddressInst(ValueToAddressInst *I) {
+    *this << getIDAndType(I->getOperand());
+  }
+
   void visitUnownedCopyValueInst(UnownedCopyValueInst *I) {
     *this << getIDAndType(I->getOperand());
   }

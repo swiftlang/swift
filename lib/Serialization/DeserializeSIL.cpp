@@ -3481,6 +3481,14 @@ llvm::Error SILDeserializer::readSILInstruction(
     ResultInst = Builder.createCopyableToMoveOnlyWrapperAddr(Loc, op);
     break;
   }
+  case SILInstructionKind::ValueToAddressInst: {
+    assert(RecordKind == SIL_ONE_OPERAND);
+    SILValue op = getLocalValue(
+        Builder.maybeGetFunction(), ValID,
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
+    ResultInst = Builder.createValueToAddress(Loc, op);
+    break;
+  }
   case SILInstructionKind::EndAccessInst: {
     SILValue op = getLocalValue(
         Builder.maybeGetFunction(), ValID,

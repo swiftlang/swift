@@ -8282,6 +8282,21 @@ public:
   }
 };
 
+// Derive the address of an addressable object.
+class ValueToAddressInst
+    : public UnaryInstructionBase<SILInstructionKind::ValueToAddressInst,
+                                  SingleValueInstruction> {
+  friend SILBuilder;
+
+  ValueToAddressInst(SILDebugLocation DebugLoc, SILValue Operand)
+      : UnaryInstructionBase(DebugLoc, Operand,
+                             Operand->getType().getAddressType()) {
+    assert(Operand->getType().isObject() &&
+           Operand->getType().isAddressOnly(*Operand->getFunction()) &&
+           "Expected an address-only object operand");
+  }
+};
+
 /// RefElementAddrInst - Derive the address of a named element in a reference
 /// type instance.
 class RefElementAddrInst

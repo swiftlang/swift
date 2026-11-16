@@ -1590,6 +1590,11 @@ public:
         getSILDebugLocation(loc), src));
   }
 
+  ValueToAddressInst *createValueToAddress(SILLocation loc, SILValue src) {
+    return insert(new (getModule())
+                      ValueToAddressInst(getSILDebugLocation(loc), src));
+  }
+
   MoveOnlyWrapperToCopyableValueInst *
   createOwnedMoveOnlyWrapperToCopyableValue(SILLocation loc, SILValue src) {
     return insert(new (getModule()) MoveOnlyWrapperToCopyableValueInst(
