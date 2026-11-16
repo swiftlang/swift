@@ -31,6 +31,41 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
   return %6 : $()
 }
 
+// Both variants also eliminate a temporary which is deallocated after a merge.
+//
+// CHECK-LABEL:      sil [ossa] @eliminate_temp_deallocated_after_merge :
+// CHECK-NOT:          alloc_stack
+// CHECK:            bb1:
+// CHECK-NEXT:         [[E:%[0-9]+]] = init_enum_data_addr %0
+// CHECK-NEXT:         copy_addr [take] %1 to [init] [[E]]
+// CHECK-NEXT:         inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt
+// CHECK-ONONE-NEXT:   debug_step
+// CHECK-NEXT:         br bb3
+// CHECK-NOT:          dealloc_stack
+// CHECK-LABEL:      } // end sil function 'eliminate_temp_deallocated_after_merge'
+sil [ossa] @eliminate_temp_deallocated_after_merge : $@convention(thin) (@in Any) -> @out Optional<Any> {
+bb0(%0 : $*Optional<Any>, %1 : $*Any):
+  %2 = alloc_stack $Optional<Any>
+  cond_br undef, bb1, bb2
+
+bb1:
+  %4 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
+  copy_addr [take] %1 to [init] %4 : $*Any
+  inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
+  br bb3
+
+bb2:
+  destroy_addr %1 : $*Any
+  inject_enum_addr %0 : $*Optional<Any>, #Optional.none!enumelt
+  br bb3
+
+bb3:
+  dealloc_stack %2 : $*Optional<Any>
+  %6 = tuple ()
+  return %6 : $()
+}
+
 // A temporary backed by a user variable is eliminated under -O (with the debug
 // variable salvaged onto the destination), but preserved by the mandatory pass.
 //

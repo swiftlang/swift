@@ -33,6 +33,7 @@ class CliArguments(argparse.Namespace):
     # add-worktree) still resolve max_retries; parse_args overrides it.
     max_retries: int = 3
     restart: str = "all"
+    retry_base_delay: float = 10.0
 
     @staticmethod
     def parse_args() -> "CliArguments":
@@ -161,6 +162,13 @@ repositories.
             " 'all' also restarts the whole script when it changes.",
             choices=["never", "config", "all"],
             default=CliArguments.restart,
+        )
+        parser.add_argument(
+            "--retry-base-delay",
+            help="Initial delay in seconds before retrying a git operation"
+            " The delay grows exponentially between retries.",
+            type=float,
+            default=CliArguments.retry_base_delay,
         )
         parser.add_argument(
             "-j",

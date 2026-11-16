@@ -766,7 +766,7 @@ def update_all_repositories(
             for repo_name in locked_repositories
         ]
     _move_llvm_project_to_first_index(pool_args)
-    retried_update = exponential_retry(max_retries=args.max_retries)(
+    retried_update = exponential_retry(max_retries=args.max_retries, base_delay=args.retry_base_delay)(
         update_single_repository
     )
     return (
@@ -936,7 +936,7 @@ def obtain_all_additional_swift_sources(
 ):
     skipped_repositories = []
     pool_args = []
-    retried_obtain = exponential_retry(max_retries=args.max_retries)(
+    retried_obtain = exponential_retry(max_retries=args.max_retries, base_delay=args.retry_base_delay)(
         obtain_additional_swift_sources
     )
     for repo_name, repo_info in config["repos"].items():
@@ -1278,7 +1278,7 @@ def main() -> int:
     # configuration, so remember what they looked like when we started.
     script_hashes = hash_files(script_file_paths())
 
-    @exponential_retry(max_retries=args.max_retries)
+    @exponential_retry(max_retries=args.max_retries, base_delay=args.retry_base_delay)
     def do_checkout() -> int:
         nonlocal config, scheme_map, script_hashes
         clone_results = None
