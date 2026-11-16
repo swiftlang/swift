@@ -202,6 +202,11 @@ public:
   const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
 
+  /// Whether values of the given type can never be 'Transferable', however its
+  /// archetypes are bound. Unlike '!isTransferable()', this is false when an
+  /// archetype could make the type 'Transferable'.
+  static bool isNeverTransferable(CanType type);
+
   const TypeLayoutEntry
   &getTypeLayoutEntry(SILType T, bool useStructLayouts);
   const LoadableTypeInfo &getNativeObjectTypeInfo();

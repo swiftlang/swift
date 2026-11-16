@@ -4437,6 +4437,14 @@ namespace {
       case ClassMetadataStrategy::Update:
       case ClassMetadataStrategy::FixedOrUpdate:
       case ClassMetadataStrategy::Fixed: {
+        // Instances of a class that can never be 'Transferable' have their
+        // own, non-atomic, value witnesses.
+        if (!Target->canBeTransferable()) {
+          auto type = Target->getDeclaredInterfaceType()->getCanonicalType();
+          return irgen::emitValueWitnessTable(IGM, type, /*isPattern=*/false,
+                                              /*relativeReference=*/false);
+        }
+
         // FIXME: Should this check HasImported instead?
         auto type = (Target->checkAncestry(AncestryFlags::ObjC)
                     ? IGM.Context.getAnyObjectType()

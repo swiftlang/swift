@@ -2330,6 +2330,24 @@ const LoadableTypeInfo &TypeConverter::getNativeObjectTypeInfo() {
   return *NativeObjectTI;
 }
 
+bool TypeConverter::isNeverTransferable(CanType type) {
+  if (auto *nominal = type->getAnyNominal()) {
+    switch (nominal->canBeTransferable()) {
+    case TypeDecl::CanBeInvertible::Never:
+      return true;
+    case TypeDecl::CanBeInvertible::Always:
+      return false;
+    case TypeDecl::CanBeInvertible::Conditionally:
+      break;
+    }
+  }
+
+  if (type->hasArchetype() || type->hasOpaqueArchetype())
+    return false;
+
+  return !type->isTransferable();
+}
+
 const LoadableTypeInfo &IRGenModule::getUnknownObjectTypeInfo() {
   return Types.getUnknownObjectTypeInfo();
 }
