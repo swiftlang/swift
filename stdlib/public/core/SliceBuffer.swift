@@ -298,7 +298,7 @@ internal struct _SliceBuffer<Element>
   @inlinable
   internal var count: Int {
     get {
-      return endIndex - startIndex
+      return _assumeNonNegative(endIndex - startIndex)
     }
     set {
       let growth = newValue - count
