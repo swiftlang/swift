@@ -305,6 +305,7 @@ private:
   MutableArrayRef<SerializedIdentifier> Identifiers;
 
   MutableArrayRef<Serialized<Decl *>> HiddenTypeLayoutInfoDecls;
+  MutableArrayRef<Serialized<AbstractTypeLayout *>> AbstractMemberTypeLayouts;
   llvm::DenseMap<uint32_t, uint32_t> HiddenTypeFallbackMap;
   std::vector<std::unique_ptr<AbstractTypeLayout>> DeserializedHiddenTypeLayouts;
 
@@ -368,6 +369,10 @@ private:
   Decl *handleErrorAndSupplyMissingClassMember(
       ASTContext &context, llvm::Error &&error,
       ClassDecl *containingClass) const;
+
+  llvm::Expected<AbstractTypeLayout *>
+  deserializeAbstractTypeLayout(serialization::BitOffset offset,
+                                serialization::DeclID &parentDeclID);
 
 public:
   /// Change the status of the current module.
@@ -1076,6 +1081,12 @@ public:
 
   llvm::Expected<HiddenTypeLayoutInfoDecl *>
   getHiddenTypeLayoutInfoDecl(serialization::DeclID DID);
+
+  llvm::Expected<AbstractTypeLayout *>
+  getAbstractMemberTypeLayout(serialization::MemberAbstractTypeLayoutID ID);
+
+  llvm::Expected<Type>
+  getAbstractMemberType(serialization::MemberAbstractTypeLayoutID ID);
 
   void consumeHiddenTypeXRefPathPieces(
       llvm::BitstreamCursor &cursor, uint32_t pathLen,
