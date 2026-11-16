@@ -10,9 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_PLUGIN_SERVER_SUPPORTS_WASM
+
 import SystemPackage
-import WASI
-import WasmTypes
 
 typealias WasmFunction = () throws -> Void
 
@@ -22,6 +22,8 @@ protocol WasmEngine {
   func function(named name: String) throws -> WasmFunction?
 
   func writeToPlugin(_ storage: some Sequence<UInt8>) throws
+  /// Copies the plugin's oldest unread output into `storage` and returns how many bytes it
+  /// copied, fewer than `storage.count` only when the plugin has written no more.
   func readFromPlugin(into storage: UnsafeMutableRawBufferPointer) throws -> Int
 
   func shutDown() throws
@@ -35,43 +37,55 @@ struct WasmEnginePlugin<Engine: WasmEngine>: WasmPlugin {
   let engine: Engine
 
   init(path: FilePath) throws {
-    self.engine = try Engine(pluginPath: path)
+    let engine = try Engine(pluginPath: path)
+    do {
+      self.pumpFunction = try Self.start(engine)
+    } catch {
+      try Cleanup.throwAfterRunning(engine.shutDown, error: error)
+    }
+    self.engine = engine
+  }
 
+  private static func start(_ engine: Engine) throws -> WasmFunction {
     let exportName = "swift_wasm_macro_v1_pump"
     guard let pump = try engine.function(named: exportName) else {
       throw WasmEngineError(message: "Wasm plugin has an unknown ABI (could not find '\(exportName)')")
     }
-    self.pumpFunction = pump
 
     guard let start = try engine.function(named: "_start") else {
       throw WasmEngineError(message: "Wasm plugin does not have a '_start' entrypoint")
     }
     try start()
+    return pump
   }
 
   func handleMessage(_ json: [UInt8]) throws -> [UInt8] {
     try withUnsafeBytes(of: UInt64(json.count).littleEndian) {
-      _ = try engine.writeToPlugin($0)
+      try engine.writeToPlugin($0)
     }
     try engine.writeToPlugin(json)
 
     try self.pumpFunction()
 
-    let lengthRaw = try withUnsafeTemporaryAllocation(of: UInt8.self, capacity: 8) { buffer in
-      let lengthCount = try engine.readFromPlugin(into: UnsafeMutableRawBufferPointer(buffer))
-      guard lengthCount == 8 else {
-        throw WasmEngineError(message: "Wasm plugin sent invalid response")
-      }
-      return buffer.withMemoryRebound(to: UInt64.self, \.baseAddress!.pointee)
+    var lengthRaw: UInt64 = 0
+    let lengthCount = try withUnsafeMutableBytes(of: &lengthRaw) { try engine.readFromPlugin(into: $0) }
+    guard lengthCount == 8 else {
+      throw WasmEngineError(message: "Wasm plugin sent invalid response")
     }
-    let length = Int(UInt64(littleEndian: lengthRaw))
-    return try [UInt8](unsafeUninitializedCapacity: length) { buffer, size in
-      let received = try engine.readFromPlugin(into: UnsafeMutableRawBufferPointer(buffer))
-      guard received == length else {
-        throw WasmEngineError(message: "Wasm plugin sent truncated response")
+    let length = UInt64(littleEndian: lengthRaw)
+    // Do not allocate the guest-supplied length before the bytes arrive.
+    var response: [UInt8] = []
+    try withUnsafeTemporaryAllocation(byteCount: 64 * 1024, alignment: 1) { chunk in
+      while UInt64(response.count) < length {
+        let wanted = Int(min(length - UInt64(response.count), UInt64(chunk.count)))
+        let received = try engine.readFromPlugin(into: UnsafeMutableRawBufferPointer(rebasing: chunk[..<wanted]))
+        guard received == wanted else {
+          throw WasmEngineError(message: "Wasm plugin sent truncated response")
+        }
+        response.append(contentsOf: chunk[..<received])
       }
-      size = received
     }
+    return response
   }
 
   func shutDown() throws {
@@ -87,29 +101,4 @@ struct WasmEngineError: Error, CustomStringConvertible {
   }
 }
 
-// `pipe` support on Windows is not included in the latest swift-system release 1.3.1
-// but it is available in the latest main branch. Remove the following code when we
-// update to the next release of swift-system.
-#if os(Windows)
-  import ucrt
-
-  var system_errno: CInt {
-    var value: CInt = 0
-    _ = ucrt._get_errno(&value)
-    return value
-  }
-
-  extension FileDescriptor {
-    static func pipe() throws -> (readEnd: FileDescriptor, writeEnd: FileDescriptor) {
-      var fds: (Int32, Int32) = (-1, -1)
-      return try withUnsafeMutablePointer(to: &fds) { pointer in
-        try pointer.withMemoryRebound(to: Int32.self, capacity: 2) { fds in
-          guard _pipe(fds, 4096, _O_BINARY | _O_NOINHERIT) == 0 else {
-            throw Errno(rawValue: system_errno)
-          }
-          return (FileDescriptor(rawValue: fds[0]), FileDescriptor(rawValue: fds[1]))
-        }
-      }
-    }
-  }
-#endif
+#endif // SWIFT_PLUGIN_SERVER_SUPPORTS_WASM

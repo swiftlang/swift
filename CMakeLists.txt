@@ -1523,6 +1523,22 @@ swift_get_host_triple(SWIFT_HOST_TRIPLE)
 set(SWIFT_HOST_MODULE_TRIPLE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE}")
 set(SWIFT_HOST_LIBRARIES_DEST_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
 
+# WasmKit uses the Synchronization module, which macOS ships from 15.0.
+if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND NOT
+   (SWIFT_HOST_VARIANT_SDK STREQUAL "OSX" AND
+    SWIFT_SDK_OSX_DEPLOYMENT_VERSION VERSION_GREATER_EQUAL "15.0"))
+  if(SWIFT_ENABLE_WASM_PLUGINS)
+    message(FATAL_ERROR "SWIFT_ENABLE_WASM_PLUGINS on Darwin needs a macOS host with a deployment target of 15.0 or later")
+  endif()
+  set(SWIFT_ENABLE_WASM_PLUGINS FALSE)
+elseif(NOT DEFINED SWIFT_ENABLE_WASM_PLUGINS)
+  if(SWIFT_BUILD_SWIFT_SYNTAX AND NOT SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
+    set(SWIFT_ENABLE_WASM_PLUGINS TRUE)
+  else()
+    set(SWIFT_ENABLE_WASM_PLUGINS FALSE)
+  endif()
+endif()
+
 message(STATUS "Building with pedantic diagnostics: ${SWIFT_PEDANTIC_DIAGNOSTICS}")
 message(STATUS "")
 
@@ -1535,6 +1551,7 @@ if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "  C++ Bridging:   ${BRIDGING_MODE}")
   message(STATUS "  Swift parser:   ${SWIFT_BUILD_SWIFT_SYNTAX}")
   message(STATUS "  SARIF support:  ${SWIFT_BUILD_SARIF}")
+  message(STATUS "  Wasm plugins:   ${SWIFT_ENABLE_WASM_PLUGINS}")
   message(STATUS "")
 else()
   message(STATUS "Not building host Swift tools")
