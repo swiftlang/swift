@@ -115,6 +115,40 @@ public struct UnownedJob: Sendable {
   public var isResumption: Bool {
     return _jobIsResumption(context)
   }
+
+  /// Claim a scheduled job for its timer.
+  ///
+  /// A scheduler calls this when the job's timer has fired, before it runs or
+  /// enqueues the job.  If it returns `true`, the timer owns the job: the
+  /// scheduler must run or enqueue it, and the runtime will not ask it to
+  /// cancel the job (see ``JobCanceller/cancel(jobWithToken:)``).  If it
+  /// returns `false`, the job has been cancelled and the scheduler has been (or
+  /// is about to be) asked to cancel it, so the scheduler must leave the job
+  /// alone and let `cancel(jobWithToken:)` run it.
+  ///
+  /// This is what lets a scheduler whose timer and cancellation are serialised
+  /// (an event loop, say, which handles a cancellation from another thread by
+  /// putting it in an inbox) avoid keeping an atomic of its own to decide which
+  /// of the two gets the job: exactly one of "the claim succeeded" and "the
+  /// scheduler is asked to cancel" happens for any job that the runtime
+  /// scheduled itself, as `Task.sleep()` does, and until one has, the job is
+  /// not run, freed or invalidated.  A scheduler that is asked to cancel a
+  /// job can therefore rely on it being there.
+  ///
+  /// A scheduler must make the claim while nothing else can run the job, so a
+  /// scheduler on which cancellation can run the job on another thread while
+  /// its timer fires (the Dispatch executor's is one) cannot use it in place
+  /// of its own claim: the job may already have been run, and freed, by the
+  /// time that the claim is made.
+  ///
+  /// A job that the runtime did not schedule itself has no such state, so for
+  /// those this always returns `true`, and it remains the scheduler's job to
+  /// see that it doesn't run twice.  It is safe to call this more than once.
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 6.5, *)
+  public func claimForTimer() -> Bool {
+    return _jobClaimForTimer(context)
+  }
   #endif
 
 
@@ -408,6 +442,40 @@ public struct ExecutorJob: Sendable, ~Copyable {
   @available(StdlibDeploymentTarget 6.5, *)
   public var isResumption: Bool {
     return _jobIsResumption(self.context)
+  }
+
+  /// Claim a scheduled job for its timer.
+  ///
+  /// A scheduler calls this when the job's timer has fired, before it runs or
+  /// enqueues the job.  If it returns `true`, the timer owns the job: the
+  /// scheduler must run or enqueue it, and the runtime will not ask it to
+  /// cancel the job (see ``JobCanceller/cancel(jobWithToken:)``).  If it
+  /// returns `false`, the job has been cancelled and the scheduler has been (or
+  /// is about to be) asked to cancel it, so the scheduler must leave the job
+  /// alone and let `cancel(jobWithToken:)` run it.
+  ///
+  /// This is what lets a scheduler whose timer and cancellation are serialised
+  /// (an event loop, say, which handles a cancellation from another thread by
+  /// putting it in an inbox) avoid keeping an atomic of its own to decide which
+  /// of the two gets the job: exactly one of "the claim succeeded" and "the
+  /// scheduler is asked to cancel" happens for any job that the runtime
+  /// scheduled itself, as `Task.sleep()` does, and until one has, the job is
+  /// not run, freed or invalidated.  A scheduler that is asked to cancel a
+  /// job can therefore rely on it being there.
+  ///
+  /// A scheduler must make the claim while nothing else can run the job, so a
+  /// scheduler on which cancellation can run the job on another thread while
+  /// its timer fires (the Dispatch executor's is one) cannot use it in place
+  /// of its own claim: the job may already have been run, and freed, by the
+  /// time that the claim is made.
+  ///
+  /// A job that the runtime did not schedule itself has no such state, so for
+  /// those this always returns `true`, and it remains the scheduler's job to
+  /// see that it doesn't run twice.  It is safe to call this more than once.
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 6.5, *)
+  public borrowing func claimForTimer() -> Bool {
+    return _jobClaimForTimer(self.context)
   }
   #endif
 

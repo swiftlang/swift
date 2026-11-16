@@ -189,6 +189,13 @@ internal func _scheduleUsingTrampoline<Clk: SchedulingClock>(
 
 /// A canceller for work that was handed to the runtime's global enqueue
 /// functions, which can't cancel a timer.
+///
+/// This is the one canceller that is allowed to report `false` for a job that is
+/// still waiting for its timer (see `JobCanceller.cancel(jobWithToken:)`): the
+/// job stays queued until its deadline, and cancelling a continuation
+/// scheduled this way throws when the timer fires rather than at once.
+/// `Task.sleep()` doesn't schedule that way, because it uses a helper task when
+/// there is no `SchedulingExecutor` to hand its continuation to.
 @available(StdlibDeploymentTarget 6.5, *)
 private final class _NonCancellingCanceller: JobCanceller, @unchecked Sendable {
   static let shared = _NonCancellingCanceller()

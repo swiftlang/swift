@@ -23,8 +23,33 @@ actor MyActor {
   }
 }
 
+
+/// Delayed jobs that haven't run or been cancelled yet.  Whoever removes a job
+/// from here owns it, which is how the timer and `cancel` decide between them.
+@available(SwiftStdlib 6.5, *)
+final class PendingJobs: @unchecked Sendable {
+  private let queue = DispatchQueue(label: "PendingJobs")
+  private var jobs: [UInt64: UnownedJob] = [:]
+  private var nextID: UInt64 = 1
+
+  func add(_ job: UnownedJob) -> UInt64 {
+    return queue.sync {
+      let id = nextID
+      nextID += 1
+      jobs[id] = job
+      return id
+    }
+  }
+
+  func take(_ id: UInt64) -> UnownedJob? {
+    return queue.sync { jobs.removeValue(forKey: id) }
+  }
+}
+
 @available(SwiftStdlib 6.5, *)
 final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
+  let pending = PendingJobs()
+
   var asScheduling: SchedulingExecutor? {
     return self
   }
@@ -56,17 +81,28 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
       + .seconds(Int(seconds))
       + .nanoseconds(Int(nanoseconds))
 
-    let job = UnownedJob(_job)
+    let id = pending.add(UnownedJob(_job))
     DispatchQueue.main.asyncAfter(deadline: deadline) {
-      job.runSynchronously(on: self.asUnownedTaskExecutor())
+      if let job = self.pending.take(id) {
+        job.runSynchronously(on: self.asUnownedTaskExecutor())
+      }
     }
 
-    return JobCancellationToken(canceller: self, opaqueData: [0, 0])
+    return JobCancellationToken(canceller: self, opaqueData: [Int(id), 0])
   }
 
-  // We can't remove jobs from `asyncAfter`, so we never cancel.
-  public func cancel(jobWithToken: borrowing JobCancellationToken) -> Bool {
-    return false
+  // We can't remove jobs from `asyncAfter`, but we can make its closure do
+  // nothing, and run the job now instead.
+  public func cancel(jobWithToken token: borrowing JobCancellationToken) -> Bool {
+    guard let job = pending.take(UInt64(token.opaqueData[0])) else {
+      return false
+    }
+    if job.isResumption {
+      job.runSynchronously(on: self.asUnownedTaskExecutor())
+    } else {
+      enqueue(ExecutorJob(job))
+    }
+    return true
   }
 }
 

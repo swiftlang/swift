@@ -13,6 +13,11 @@
 // REQUIRES: concurrency_runtime
 
 import Dispatch
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 import StdlibUnittest
 @_spi(ExperimentalScheduling) import _Concurrency
 
@@ -107,6 +112,136 @@ final class CancellableExecutor: TaskExecutor, SchedulingExecutor,
       job.runSynchronously(on: asUnownedTaskExecutor())
     } else {
       enqueue(ExecutorJob(job))
+    }
+    return true
+  }
+}
+
+/// An executor that handles its timers and its cancellations on one serial
+/// queue, which stands in for an event loop's thread.  Because they are
+/// serialised, it needs no atomic of its own to decide which of the timer and
+/// `cancel` gets a job: it asks the job, with `claimForTimer()`.  It also
+/// identifies a job in its tokens by its address, instead of by an ID that it
+/// has to look up, which is only safe because a job that is cancelled is not
+/// run or freed until `cancel` runs it.
+@available(SwiftStdlib 6.5, *)
+final class LoopExecutor: TaskExecutor, SchedulingExecutor,
+                          @unchecked Sendable {
+  private let loop = DispatchQueue(label: "LoopExecutor")
+
+  // These are only touched on `loop`.  A job's address can be reused once it
+  // has run, so a timer is identified by the address and a generation number.
+  private var timers: [UInt: UInt64] = [:]
+  private var _refusals = 0
+
+  private let generationQueue = DispatchQueue(label: "LoopExecutor.generation")
+  private var nextGeneration: UInt64 = 1
+
+  /// The number of timers that haven't fired or been cancelled.
+  var pendingCount: Int {
+    return loop.sync { timers.count }
+  }
+
+  /// How many times a timer found that it had lost the job to a cancellation.
+  var refusals: Int {
+    return loop.sync { _refusals }
+  }
+
+  /// Wait, by polling, until there are `count` timers pending.
+  func waitForPendingCount(_ count: Int) {
+    var attempts = 0
+    while pendingCount != count && attempts < 5000 {
+      usleep(1000)
+      attempts += 1
+    }
+  }
+
+  /// Stop the loop from running anything until the returned function is
+  /// called.  Anything that is queued in the meantime, including timers that
+  /// fire, runs in the order that it was queued when the loop resumes.
+  func pauseLoop() -> () -> Void {
+    let paused = DispatchSemaphore(value: 0)
+    let resume = DispatchSemaphore(value: 0)
+    loop.async {
+      paused.signal()
+      resume.wait()
+    }
+    paused.wait()
+    return { resume.signal() }
+  }
+
+  public func enqueue(_ _job: consuming ExecutorJob) {
+    let job = UnownedJob(_job)
+    loop.async {
+      job.runSynchronously(on: self.asUnownedTaskExecutor())
+    }
+  }
+
+  public func supportsScheduling(on clock: SystemClockID) -> Bool {
+    return true
+  }
+
+  public func schedule<C: Clock>(_ _job: consuming ExecutorJob,
+                                 at fireTime: SchedulingExecutorFireTime<C>,
+                                 tolerance: C.Duration?,
+                                 clock: C) -> JobCancellationToken {
+    let duration = fireTime.asDuration(clock: clock) as! Swift.Duration
+    let (seconds, attoseconds) = duration.components
+    let deadline = DispatchTime.now()
+      + .seconds(Int(seconds))
+      + .nanoseconds(Int(attoseconds / 1_000_000_000))
+
+    let job = UnownedJob(_job)
+    let address = unsafeBitCast(job, to: UInt.self)
+    let generation: UInt64 = generationQueue.sync {
+      let generation = nextGeneration
+      nextGeneration += 1
+      return generation
+    }
+
+    loop.async {
+      self.timers[address] = generation
+    }
+    loop.asyncAfter(deadline: deadline) {
+      // `cancel` has already taken the job if it isn't here, and it may have
+      // been run and freed, so we mustn't touch it.
+      guard self.timers[address] == generation else {
+        return
+      }
+      self.timers[address] = nil
+
+      if job.claimForTimer() {
+        job.runSynchronously(on: self.asUnownedTaskExecutor())
+      } else {
+        // The job was cancelled first, so `cancel` has been, or is about to be,
+        // called, and it will run the job.
+        self._refusals += 1
+      }
+    }
+
+    return JobCancellationToken(
+      canceller: self,
+      opaqueData: [Int(bitPattern: address), Int(generation)])
+  }
+
+  public func cancel(jobWithToken token: borrowing JobCancellationToken)
+    -> Bool {
+    let address = UInt(bitPattern: token.opaqueData[0])
+    let generation = UInt64(token.opaqueData[1])
+    let job = unsafeBitCast(address, to: UnownedJob.self)
+
+    // Do this on the loop, which is the only place that the timers are
+    // touched, and don't wait for it: we mustn't block here.  The job runs
+    // whether or not the timer has already taken it out of `timers`.
+    loop.async {
+      if self.timers[address] == generation {
+        self.timers[address] = nil
+      }
+      if job.isResumption {
+        job.runSynchronously(on: self.asUnownedTaskExecutor())
+      } else {
+        self.enqueue(ExecutorJob(job))
+      }
     }
     return true
   }
@@ -276,6 +411,91 @@ func waitUntil(_ condition: () -> Bool) async throws {
       }
 
       expectEqual(0, executor.pendingCount)
+    }
+
+    tests.test("A timer that loses the job to a cancellation leaves it to cancel") {
+      let executor = LoopExecutor()
+
+      for _ in 0..<10 {
+        let refusals = executor.refusals
+        let task = Task(executorPreference: executor) {
+          try await Task.sleep(for: .milliseconds(100))
+        }
+        executor.waitForPendingCount(1)
+
+        // Hold the loop while the deadline passes, so that the timer's
+        // closure is queued before anything that cancelling queues; then
+        // cancel, so that the timer finds the job already claimed.
+        let resume = executor.pauseLoop()
+        usleep(250_000)
+        task.cancel()
+        resume()
+
+        switch await task.result {
+        case .success:
+          expectUnreachable("the cancellation should have won")
+        case .failure(let error):
+          expectTrue(error is CancellationError)
+        }
+        expectEqual(refusals + 1, executor.refusals)
+        expectEqual(0, executor.pendingCount)
+      }
+    }
+
+    tests.test("A cancellation that is queued before its timer fires runs the job") {
+      let executor = LoopExecutor()
+
+      for _ in 0..<10 {
+        let refusals = executor.refusals
+        let task = Task(executorPreference: executor) {
+          try await Task.sleep(for: .milliseconds(100))
+        }
+        executor.waitForPendingCount(1)
+
+        // This time `cancel` is queued first, so the timer's closure finds
+        // the timer gone, and must leave the job, which may be gone too,
+        // alone.
+        let resume = executor.pauseLoop()
+        task.cancel()
+        usleep(250_000)
+        resume()
+
+        switch await task.result {
+        case .success:
+          expectUnreachable("the cancellation should have won")
+        case .failure(let error):
+          expectTrue(error is CancellationError)
+        }
+        expectEqual(refusals, executor.refusals)
+        expectEqual(0, executor.pendingCount)
+      }
+    }
+
+    tests.test("A scheduler that serialises its timers needs no claim of its own") {
+      let executor = LoopExecutor()
+
+      for i in 0..<1000 {
+        let task = Task(executorPreference: executor) {
+          try await Task.sleep(for: .microseconds(100))
+        }
+
+        // Vary when we cancel, so that it lands before, around and after the
+        // time that the timer fires.
+        let start = ContinuousClock.now
+        while ContinuousClock.now - start < .microseconds((i * 7) % 200) {}
+        task.cancel()
+
+        // Either outcome is fine, but we must always get exactly one.
+        switch await task.result {
+        case .success:
+          break
+        case .failure(let error):
+          expectTrue(error is CancellationError)
+        }
+      }
+
+      expectEqual(0, executor.pendingCount)
+      print("timer lost the job to a cancellation \(executor.refusals) times")
     }
 
     await runAllTestsAsync()

@@ -127,22 +127,32 @@ public protocol JobCanceller: AnyObject, Sendable {
   ///
   /// Every job must be run exactly once, so cancelling a job means running it
   /// early: if the job identified by the token has not yet started, take it
-  /// off the timer, enqueue it to run now, where it would have run had the
+  /// off the timer, run it (or enqueue it) now, where it would have run had the
   /// timer fired, and return `true`.  If the job's `isResumption` is `true`,
   /// run it here instead of enqueuing it (see below).  The job, not the
   /// scheduler, deals with having been cancelled; the job that resumes a
   /// scheduled continuation, for instance, has been told before it runs that
   /// it is to resume by throwing.
   ///
-  /// Return `false` if the job has already started running or has finished,
-  /// or if you can't run it early; it will then run (or has run) when its
-  /// timer fires.  `false` is always a safe answer, so a scheduler that is
-  /// unable to cancel jobs may always return it, but then cancelling a
-  /// `Task.sleep()` will not wake the task until its timer fires.  Nor need
-  /// cancelling be synchronous: a scheduler may hand the request to whatever
-  /// owns its timers (another thread, say) and return `false`, so long as the
-  /// job still runs exactly once, whether early or when its timer fires.
-  /// Callers use the result only to learn whether the job will run promptly.
+  /// Return `true` when you have taken responsibility for running the job now,
+  /// rather than when its timer fires.  That doesn't have to happen before
+  /// `cancel` returns: a scheduler whose timers belong to another thread can
+  /// pass the request to that thread (through an inbox, say) and return `true`,
+  /// provided that the job then runs promptly, without waiting for its
+  /// deadline, and that nothing is left in the scheduler's timer structures
+  /// for it once it has.  Waiting until the deadline is not allowed: a
+  /// cancelled `Task.sleep()` would not return until then, and a timer that
+  /// has been cancelled would stay in the scheduler until it fired, which is
+  /// the problem that cancellation exists to solve.
+  ///
+  /// Return `false` only if there is nothing to run early: the job has already
+  /// started running or has finished, has already been cancelled, or is due to
+  /// run now in any case.  `false` does not mean "I can't cancel jobs"; a
+  /// scheduler has to be able to run a pending job early.  (The one place where
+  /// a `JobCanceller` cannot is for work that has been handed to the runtime's
+  /// global enqueue functions, which have no way to cancel; `Task.sleep()`
+  /// does not use them if it can help it, and falls back to a helper task that
+  /// wakes the sleeper when it has to.)
   ///
   /// This may be called from any thread, unless the scheduler is documented as
   /// being for use from a single thread only, as the cooperative executor is,
@@ -181,13 +191,44 @@ public protocol JobCanceller: AnyObject, Sendable {
   /// lock: do the bookkeeping under it, and drop it before you enqueue or run
   /// anything, so that no one can wait for the status record lock with your
   /// lock held.  Then `cancel` can take the lock, briefly.  If you cannot
-  /// arrange that, use a claim that doesn't need the lock: an atomic exchange
-  /// that decides whether `cancel` or the timer gets the job (as the Dispatch
-  /// executor does) lets `cancel` enqueue the job, or return `false`, without
-  /// waiting for anything.  And as a last resort, `cancel` may try to take
-  /// the lock and, if it can't, return `false`, or pass the request on to be
-  /// dealt with later: either way the job still runs, and only promptness is
-  /// lost.
+  /// arrange that, don't take the lock in `cancel`: either use a claim that
+  /// doesn't need it (an atomic exchange that decides whether `cancel` or the
+  /// timer gets the job, as the Dispatch executor does), or pass the request to
+  /// whatever owns the lock or the timers (an inbox that the thread running
+  /// your timers empties, say) and return `true`.
+  ///
+  /// ### Deciding between the timer and `cancel`
+  ///
+  /// The timer and `cancel` can both want the job, and exactly one may run it.
+  /// For a job that the runtime scheduled, which is to say a continuation that
+  /// was scheduled by `schedule(_:at:tolerance:clock:)` (as `Task.sleep()`
+  /// does), the runtime does the deciding.  When your timer fires, call
+  /// `claimForTimer()` on the job before running or enqueuing it:
+  ///
+  /// * If it returns `true`, the timer owns the job, and the runtime will not
+  ///   call `cancel` for it.
+  /// * If it returns `false`, the job was cancelled first.  Leave it alone:
+  ///   `cancel` has been, or is about to be, called, and it must run the job.
+  ///   That means `cancel` must run the job *even if your timer has already
+  ///   taken the job out of your timer structures*, and must not decide
+  ///   whether the job is still there by looking it up, as the job is there
+  ///   whether or not you can find it.
+  ///
+  /// Either way, then, a job is never both claimed by its timer and
+  /// cancelled, and a job that is cancelled is not run, freed or invalidated
+  /// until `cancel` runs it, so a scheduler that serialises its timers and its
+  /// cancellations (an event loop, or anything that takes a lock for both) needs
+  /// no atomic of its own to decide between them, and can use the address of
+  /// the job in the token.  A scheduler whose timer can fire on one thread while
+  /// `cancel` runs the job on another cannot use the claim on its own, since
+  /// the job may be gone by the time that it makes it; it needs its own claim,
+  /// as the Dispatch executor has.
+  ///
+  /// A job that the runtime did not schedule itself, because a client gave it to
+  /// `schedule(_:at:tolerance:clock:)` as a job, is not arbitrated: for those,
+  /// `claimForTimer()` always returns `true` and it is up to the scheduler to
+  /// see that the job is run only once, and to cope with a token for a job that
+  /// has run already.
   ///
   /// An implementation can rely on the tokens that it issued itself, and must
   /// not trust any other, since the data in a token is not checked (see
@@ -197,8 +238,8 @@ public protocol JobCanceller: AnyObject, Sendable {
   ///
   /// - jobWithToken: The token returned when the job was scheduled.
   ///
-  /// Returns `true` if the job had not started, and has been run, or enqueued
-  /// to run now.
+  /// Returns `true` if the job had not started, and has been, or will promptly
+  /// be, run or enqueued to run now; `false` if there was nothing to run early.
   func cancel(jobWithToken: borrowing JobCancellationToken) -> Bool
 
   /// Called when a token that this canceller issued is destroyed, so that it
@@ -268,10 +309,10 @@ public struct JobCancellationToken: ~Copyable, Sendable {
   /// Cancel the scheduled job.
   ///
   /// If the job had not started running, the executor takes it off the timer
-  /// and runs it (or enqueues it to run) now, and this returns `true`.  Returns `false` if
-  /// the job has started, has finished, has already been cancelled, or cannot
-  /// be run early by the executor, in which case it will run (or has run) when
-  /// its timer fires.  Either way, the job runs exactly once.
+  /// and runs it (or enqueues it to run) now, perhaps by way of another thread,
+  /// and this returns `true`.  Returns `false` if the job has started, has
+  /// finished, or has already been cancelled, in which case there is nothing
+  /// to run early.  Either way, the job runs exactly once.
   ///
   /// This does not consume the token, so that it can be used from a closure
   /// that only borrows it (such as a cancellation handler), and it is safe to
@@ -527,8 +568,11 @@ public struct ScheduledContinuation<Failure: Error>: ~Copyable, Sendable {
     guard unsafe _continuationCancelScheduled(continuation.context, error) else {
       return
     }
-    // Get the executor to run it now, rather than when the timer fires.  If it
-    // can't, it will throw then instead.
+    // Get the executor to run it now, rather than when the timer fires.  The
+    // executor has to do that (it is not allowed to wait for the deadline),
+    // and it has to run the job exactly once, whichever of the timer and this
+    // gets there first: either it decides that itself, or it asks the job to,
+    // with `claimForTimer()`, which fails now that we have recorded the error.
     token.cancel()
   }
 }
@@ -553,9 +597,9 @@ extension ContinuationWaiter
   /// If the task is cancelled while we wait (or already has been), and the
   /// timer hasn't fired, the continuation is made to throw a
   /// `CancellationError` with the reason the task was cancelled with, and
-  /// the executor is asked to fire the timer now.  If it can't, the error is
-  /// thrown when the timer would have fired.  If the timer has already fired,
-  /// this returns normally.
+  /// the executor is asked to fire the timer now, which it has to do without
+  /// waiting for the deadline.  If the timer has already fired, this returns
+  /// normally.
   ///
   /// - Parameters:
   ///   - scheduled: The scheduled continuation, which must be the one that

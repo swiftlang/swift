@@ -121,7 +121,9 @@ struct SplitContinuationStorage : public Job {
     auto *continuation = reinterpret_cast<AsyncTask *>(storage);
     SwiftError *error = storage->Outcome.exchange(fired(),
                                                   std::memory_order_acquire);
-    if (error)
+    // `fired()` here means that the timer claimed the job first (see
+    // swift_job_claimForTimer), which resumes it normally.
+    if (error && error != fired())
       swift_continuation_throwingResumeWithError(continuation, error);
     else
       swift_continuation_resume(continuation);
@@ -411,4 +413,25 @@ bool swift::swift_continuation_cancelScheduled(SplitContinuation *continuation,
   // The job has already run, or another cancellation got there first.
   swift_errorRelease(error);
   return false;
+}
+
+/// Called by a scheduler when the timer for a job has fired, before it runs or
+/// enqueues the job.  See `UnownedJob.claimForTimer()`.
+extern "C" SWIFT_CC(swift)
+bool swift_job_claimForTimer(Job *job) {
+  // Only a split continuation has any state to arbitrate with; for any other
+  // job it is up to the scheduler to make sure that the timer and
+  // cancellation don't both run it.
+  if (!SplitContinuationStorage::classof(job))
+    return true;
+
+  auto *storage = cast<SplitContinuationStorage>(job);
+  SwiftError *expected = nullptr;
+  if (storage->Outcome.compare_exchange_strong(
+          expected, SplitContinuationStorage::fired(),
+          std::memory_order_acq_rel, std::memory_order_acquire))
+    return true;
+
+  // Claiming twice is harmless; anything else is a cancellation.
+  return expected == SplitContinuationStorage::fired();
 }
