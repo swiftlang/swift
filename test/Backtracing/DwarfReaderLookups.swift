@@ -19,6 +19,15 @@
 // RUN: %yaml2obj %S/Inputs/DwarfRelativeDirs.yaml -o %t/relativedirs.o
 // RUN: %target-run %t/DwarfReaderLookups %t/relativedirs.o 0x1008 0x1018 0x1028 0x2008 | %FileCheck %s --check-prefix=PATHS
 
+// RUN: %yaml2obj %S/Inputs/DwarfNoRanges.yaml -o %t/noranges.o
+// RUN: %target-run %t/DwarfReaderLookups %t/noranges.o 0x1008 0x1018 0x1020 | %FileCheck %s --check-prefix=LINES
+
+// RUN: %yaml2obj %S/Inputs/DwarfLineOnly.yaml -o %t/lineonly.o
+// RUN: %target-run %t/DwarfReaderLookups %t/lineonly.o 0x1008 0x1018 0x1020 | %FileCheck %s --check-prefix=LINES
+
+// RUN: %yaml2obj %S/Inputs/DwarfOverlap.yaml -o %t/overlap.o
+// RUN: %target-run %t/DwarfReaderLookups %t/overlap.o 0x1008 0x1018 0x1028 0x1030 | %FileCheck %s --check-prefix=OVERLAP
+
 // REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: backtracing
 // REQUIRES: executable_test
@@ -152,6 +161,33 @@ struct DwarfReaderLookups {
     // PATHS-NEXT: address 0x2008:
     // PATHS-NEXT: location: /other/nodir.c:5:0
     // PATHS-NEXT: function: <none>
+
+    // A unit with no address ranges, or no DIEs at all, can still be found
+    // using its line number program, which is all that we get from
+    // -gline-tables-only on some producers.
+
+    // LINES: address 0x1008:
+    // LINES-NEXT: location: /src/file.c:42:0
+    // LINES-NEXT: function: <none>
+    // LINES-NEXT: address 0x1018:
+    // LINES-NEXT: location: /src/file.c:50:0
+    // LINES-NEXT: function: <none>
+    // LINES-NEXT: address 0x1020:
+    // LINES-NEXT: function: <none>
+
+    // Units whose ranges overlap are all candidates for an address.
+
+    // OVERLAP: address 0x1008:
+    // OVERLAP-NEXT: location: /src/file.c:10:0
+    // OVERLAP-NEXT: function: <none>
+    // OVERLAP-NEXT: address 0x1018:
+    // OVERLAP-NEXT: location: /src/file.c:10:0
+    // OVERLAP-NEXT: function: <none>
+    // OVERLAP-NEXT: address 0x1028:
+    // OVERLAP-NEXT: location: /src/file.c:20:0
+    // OVERLAP-NEXT: function: <none>
+    // OVERLAP-NEXT: address 0x1030:
+    // OVERLAP-NEXT: function: <none>
 
     if !testDwarfLookupsFor(path: CommandLine.arguments[1],
                             addresses: addresses) {
