@@ -1052,6 +1052,9 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
     PointerAuthSchema(codeKey, /*address*/ false, Discrimination::Decl);
   opts.HeapDestructors =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  opts.EmbeddedHeapObjectMetadata =
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Constant,
+                      SpecialPointerAuthDiscriminators::ObjCISA);
 
   // Partial-apply captures are not ABI and can use a more aggressive key.
   opts.PartialApplyCapture =

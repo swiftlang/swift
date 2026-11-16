@@ -331,7 +331,9 @@ namespace {
     *buildTypeLayoutEntry(IRGenModule &IGM,
                           SILType T,
                           bool useStructLayouts) const override {
-      if (!useStructLayouts) {
+      // A scalar entry would release the context instead of destroying it.
+      if (!useStructLayouts ||
+          isClosureContextDestroyedDirectly(IGM, FormalType)) {
         return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
       } else if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
@@ -378,6 +380,8 @@ namespace {
         IRGenFunction &IGF, llvm::Value *data,
         std::optional<Atomicity> atomicity = std::nullopt) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+        assert(!isClosureContextDestroyedDirectly(IGF.IGM, FormalType) &&
+               "retaining a context that is destroyed without a release");
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRetain(data, *atomicity);
       }
@@ -386,16 +390,27 @@ namespace {
         IRGenFunction &IGF, llvm::Value *data,
         std::optional<Atomicity> atomicity = std::nullopt) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
+        // In Embedded Swift, a noncopyable closure owns its context, so drop
+        // it without the runtime, which isn't available with -no-allocations.
+        if (isClosureContextDestroyedDirectly(IGF.IGM, FormalType)) {
+          emitDestroyEmbeddedNoncopyableClosureContext(IGF, data);
+          return;
+        }
         if (!atomicity) atomicity = IGF.getDefaultAtomicity();
         IGF.emitNativeStrongRelease(data, *atomicity);
       }
     }
     void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
                                  Address dataAddr) const {
-      if (isTriviallyDestroyable(ResilienceExpansion::Maximal))
+      if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         IGF.Builder.CreateStore(context, dataAddr);
-      else
+      } else if (isClosureContextDestroyedDirectly(IGF.IGM, FormalType)) {
+        llvm::Value *oldContext = IGF.Builder.CreateLoad(dataAddr);
+        IGF.Builder.CreateStore(context, dataAddr);
+        emitDestroyEmbeddedNoncopyableClosureContext(IGF, oldContext);
+      } else {
         IGF.emitNativeStrongAssign(context, dataAddr);
+      }
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
@@ -2741,8 +2756,11 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
 
   // A nondeinitable closure always gets a context of its own so that its
   // destructor can trap when the closure is dropped. That means it can't take
-  // advantage of the single ref-counted object optimization.
-  if (outType->isNondeinitable())
+  // advantage of the single ref-counted object optimization. Neither can a
+  // noncopyable closure in Embedded Swift, which is dropped by calling the
+  // destructor of its context directly.
+  if (outType->isNondeinitable() ||
+      isClosureContextDestroyedDirectly(IGF.IGM, outType))
     hasSingleSwiftRefcountedContext = No;
 
   auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);

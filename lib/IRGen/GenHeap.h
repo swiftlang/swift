@@ -236,6 +236,20 @@ llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
                                               SILType objectType,
                                               bool suppressCast = false);
 
+/// Returns true if destroying a value of function type \p fnType destroys its
+/// context with emitDestroyEmbeddedNoncopyableClosureContext() instead of
+/// releasing it. Partial application gives every such value a context of its
+/// own, so that the destructor of a captured object never runs in its place.
+bool isClosureContextDestroyedDirectly(IRGenModule &IGM,
+                                       CanSILFunctionType fnType);
+
+/// Destroy the context of a noncopyable closure in Embedded Swift by calling
+/// the destructor in its metadata, without going through the runtime. Only the
+/// closure refers to such a context, so this is equivalent to releasing it,
+/// except that it also works with -no-allocations.
+void emitDestroyEmbeddedNoncopyableClosureContext(IRGenFunction &IGF,
+                                                  llvm::Value *context);
+
 /// What isa-encoding mechanism does a type use?
 IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 
