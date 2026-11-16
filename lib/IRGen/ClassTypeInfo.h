@@ -44,6 +44,8 @@ class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
   /// objc_retain/release?
   const ReferenceCounting Refcount;
 
+  const CanType ClassType;
+
   ClassLayout generateLayout(IRGenModule &IGM, SILType classType,
                              bool forBackwardDeployment) const;
 
@@ -62,12 +64,15 @@ public:
 
   ClassTypeInfo(llvm::PointerType *irType, Size size, SpareBitVector spareBits,
                 Alignment align, ClassDecl *theClass,
-                ReferenceCounting refcount, llvm::StructType *classLayoutType)
+                ReferenceCounting refcount, llvm::StructType *classLayoutType,
+                CanType classType)
       : HeapTypeInfo(refcount, irType, size, std::move(spareBits), align),
         TheClass(theClass), classLayoutType(classLayoutType),
-        Refcount(refcount) {}
+        Refcount(refcount), ClassType(classType) {}
 
   ReferenceCounting getReferenceCounting() const { return Refcount; }
+
+  bool isNonTransferable() const;
 
   ClassDecl *getClass() const { return TheClass; }
 

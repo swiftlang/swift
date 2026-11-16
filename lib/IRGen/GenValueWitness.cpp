@@ -1024,6 +1024,17 @@ valueWitnessRequiresCopyability(ValueWitness index) {
 
 
 
+/// Whether reference counting operations on values of \p type could be
+/// non-atomic, because they could reference an instance that is confined to a
+/// single isolation domain.
+static bool mayUseNonAtomicReferenceCounting(CanType type) {
+  // SIL boxes don't have conformances and are always counted atomically.
+  if (isa<SILBoxType>(type))
+    return false;
+
+  return !type->isTransferable();
+}
+
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
 static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
@@ -1036,6 +1047,11 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     fn = llvm::ConstantExpr::getBitCast(fn, IGM.Int8PtrTy);
     B.addSignedPointer(fn, IGM.getOptions().PointerAuth.ValueWitnesses, index);
   };
+
+  // The standard witnesses for a single strong reference are atomic.
+  bool usesStandardStrongWitnesses =
+      concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal) &&
+      !mayUseNonAtomicReferenceCounting(concreteType.getASTType());
 
   // Copyable and noncopyable types share a value witness table layout. It
   // should normally be statically impossible to generate a call to a copy
@@ -1052,7 +1068,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::Destroy:
     if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
       return addFunction(getNoOpVoidFunction(IGM));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
+    } else if (usesStandardStrongWitnesses) {
       return addFunction(getDestroyStrongFunction(IGM));
     } else if (layoutStringsEnabled(IGM) &&
                concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
@@ -1079,7 +1095,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
     if (packing == FixedPacking::OffsetZero) {
       if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         return addFunction(getMemCpyFunction(IGM, concreteTI));
-      } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
+      } else if (usesStandardStrongWitnesses) {
         return addFunction(getInitWithCopyStrongFunction(IGM));
       }
     }
@@ -1139,7 +1155,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::AssignWithCopy:
     if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
+    } else if (usesStandardStrongWitnesses) {
       return addFunction(getAssignWithCopyStrongFunction(IGM));
     } else if (layoutStringsEnabled(IGM) &&
                concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
@@ -1166,7 +1182,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::AssignWithTake:
     if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
+    } else if (usesStandardStrongWitnesses) {
       return addFunction(getAssignWithTakeStrongFunction(IGM));
     } else if (layoutStringsEnabled(IGM) &&
                concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
@@ -1193,7 +1209,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   case ValueWitness::InitializeWithCopy:
     if (concreteTI.isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
       return addFunction(getMemCpyFunction(IGM, concreteTI));
-    } else if (concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
+    } else if (usesStandardStrongWitnesses) {
       return addFunction(getInitWithCopyStrongFunction(IGM));
     } else if (layoutStringsEnabled(IGM) &&
                concreteTI.isCopyable(ResilienceExpansion::Maximal)) {
@@ -1505,7 +1521,8 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
       break;
     }
   } else if (fixedTI->isSingleRetainablePointer(ResilienceExpansion::Maximal,
-                                                &refCounting)) {
+                                                &refCounting) &&
+             !mayUseNonAtomicReferenceCounting(type)) {
     switch (refCounting) {
     case ReferenceCounting::Native:
       witnessSurrogate = C.TheNativeObjectType;
