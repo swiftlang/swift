@@ -804,9 +804,11 @@ extension _ArrayBuffer {
   /// - Precondition: `_isNative`.
   @inlinable
   internal var _native: NativeBuffer {
-    return NativeBuffer(
-      _isClassOrObjCExistential(Element.self)
-      ? _storage.nativeInstance : _storage.unflaggedNativeInstance)
+    @inline(__always) get {
+      return NativeBuffer(
+        _isClassOrObjCExistential(Element.self)
+        ? _storage.nativeInstance : _storage.unflaggedNativeInstance)
+    }
   }
 
   /// Fast access to the native representation.
