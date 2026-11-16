@@ -1,0 +1,21 @@
+// RUN: not %target-sil-opt -enable-experimental-feature OnceFunctions -enable-sil-verify-all %s -performance-diagnostics -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_feature_OnceFunctions
+
+sil_stage canonical
+
+import Swift
+import Builtin
+
+// Destroying a noncopyable function can release its context, but doesn't need
+// metadata, since a function has no deinit.
+//
+// CHECK-NOT:   metadata
+// CHECK:       error: ending the lifetime of a value of type '@callable(once) @callee_owned () -> ()' can cause a deallocation
+// CHECK-NOT:   metadata
+sil [no_locks] [ossa] @destroy_at_most_once_closure : $@convention(thin) (@owned @callable(once) @callee_owned () -> ()) -> () {
+bb0(%0 : @owned $@callable(once) @callee_owned () -> ()):
+  destroy_value %0 : $@callable(once) @callee_owned () -> ()
+  %2 = tuple ()
+  return %2 : $()
+}
