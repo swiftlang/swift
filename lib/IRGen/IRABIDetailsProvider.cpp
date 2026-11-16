@@ -37,6 +37,7 @@
 #include "swift/Subsystems.h"
 #include "clang/CodeGen/SwiftCallingConv.h"
 #include "llvm/IR/DerivedTypes.h"
+#include <algorithm>
 #include <optional>
 
 using namespace swift;
@@ -371,6 +372,7 @@ bool LoweredFunctionSignature::DirectResultType::enumerateRecordMembers(
     const {
   auto &schema = typeDetails.nativeReturnValueSchema(owner.IGM);
   assert(!schema.requiresIndirect());
+  clang::CharUnits size = cast<FixedTypeInfo>(&typeDetails)->getFixedSize();
   bool hasError = false;
   schema.enumerateComponents(
       [&](clang::CharUnits offset, clang::CharUnits end, llvm::Type *type) {
@@ -380,7 +382,7 @@ bool LoweredFunctionSignature::DirectResultType::enumerateRecordMembers(
           hasError = true;
           return;
         }
-        callback(offset, end, *primitiveType);
+        callback(offset, std::min(end, size), *primitiveType);
       });
   return hasError;
 }
@@ -400,6 +402,7 @@ bool LoweredFunctionSignature::DirectParameter::enumerateRecordMembers(
     const {
   auto &schema = typeDetails.nativeParameterValueSchema(owner.IGM);
   assert(!schema.requiresIndirect());
+  clang::CharUnits size = cast<FixedTypeInfo>(&typeDetails)->getFixedSize();
   bool hasError = false;
   schema.enumerateComponents(
       [&](clang::CharUnits offset, clang::CharUnits end, llvm::Type *type) {
@@ -409,7 +412,7 @@ bool LoweredFunctionSignature::DirectParameter::enumerateRecordMembers(
           hasError = true;
           return;
         }
-        callback(offset, end, *primitiveType);
+        callback(offset, std::min(end, size), *primitiveType);
       });
   return hasError;
 }

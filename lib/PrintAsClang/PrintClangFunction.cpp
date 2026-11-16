@@ -802,6 +802,9 @@ static bool printDirectReturnOrParamCType(
          << " swift_interop_passDirect_" << minimalStubName;
       os << "(const char * _Nonnull value) {\n";
       os << "  struct " << stubName << " result;\n";
+      // A record member's ABI type can extend past the Swift value's storage.
+      // Initialize any bytes that will not be filled by the bounded copies.
+      os << "  memset(&result, 0, sizeof(result));\n";
       for (size_t i = 0; i < fields.size(); ++i) {
         os << "  memcpy(&result._" << (i + 1) << ", value + "
            << fields[i].first.getQuantity() << ", "

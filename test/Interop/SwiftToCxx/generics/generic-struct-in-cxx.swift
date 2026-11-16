@@ -193,6 +193,7 @@ public func inoutConcretePair(_ x: UInt16, _ y: inout GenericPair<UInt16, UInt16
 // CHECK-EMPTY:
 // CHECK-NEXT: static SWIFT_C_INLINE_THUNK struct swift_interop_passStub_Generics_uint32_t_0_4 swift_interop_passDirect_Generics_uint32_t_0_4(const char * _Nonnull value) {
 // CHECK-NEXT:   struct swift_interop_passStub_Generics_uint32_t_0_4 result;
+// CHECK-NEXT:   memset(&result, 0, sizeof(result));
 // CHECK-NEXT:   memcpy(&result._1, value + 0, 4);
 // CHECK-NEXT:   return result;
 // CHECK-NEXT: }

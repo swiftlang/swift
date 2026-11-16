@@ -80,6 +80,7 @@ public func inoutSmall(_ en: inout Small, _ x: Int) {
 
 // CHECK: static SWIFT_C_INLINE_THUNK struct swift_interop_passStub_Enums_uint8_t_0_1 swift_interop_passDirect_Enums_uint8_t_0_1(const char * _Nonnull value) {
 // CHECK-NEXT: struct swift_interop_passStub_Enums_uint8_t_0_1 result;
+// CHECK-NEXT: memset(&result, 0, sizeof(result));
 // CHECK-NEXT: memcpy(&result._1, value + 0, 1);
 // CHECK-NEXT: return result;
 // CHECK-NEXT: }
