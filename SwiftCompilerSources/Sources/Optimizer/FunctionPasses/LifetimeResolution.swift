@@ -703,6 +703,8 @@ private struct MultiDefResolver {
       tupleAddrConstructor.set(isInitializationOfDestination: initialization, context)
     case is FullApplySite:
       return initialization
+    case let builtin as BuiltinInst where builtin.id == .PrepareInitialization:
+      return initialization
     default:
       // TODO: handle assign_or_init, store_weak, store_unowned, etc.
       log("unhandled def: \(inst)")
@@ -1020,6 +1022,8 @@ private struct MultiDefResolver {
       case let tac as TupleAddrConstructorInst where tac.destinationOperand == operand:
         addUse(.def(operand), range(of: operand))
       case let srcDestInst as SourceDestAddrInstruction where srcDestInst.destinationOperand == operand:
+        addUse(.def(operand), range(of: operand))
+      case let builtin as BuiltinInst where builtin.id == .PrepareInitialization:
         addUse(.def(operand), range(of: operand))
       case is DestroyAddrInst:
         addUse(.end(operand), range(of: operand))

@@ -301,9 +301,10 @@ struct ResolvableRoot {
 
         let indices = indexCache.fieldIndices(for: storage.type.objectType)
 
-        // If this is the 'self' for an empty type in its initializer, we don't have any fields to initialize.
-        // So, treat the storage as being born initialized
-        startsInitialized = mu.kind == .rootSelf && !indices.hasFields
+        // If this is the 'self' for an empty Copyable type in its initializer, we don't have any fields to initialize.
+        // We just treat the storage as being born initialized.
+        // TODO: have SILGen emit an initializing store?
+        startsInitialized = mu.kind == .rootSelf && !indices.hasFields && !storage.type.isMoveOnly
 
         if mu.kind == .derivedSelf {
           initialStore = Self.findInitialStoreOfDerivedSelf(mu)
