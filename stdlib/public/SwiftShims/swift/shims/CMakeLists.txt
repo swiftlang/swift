@@ -64,28 +64,35 @@ foreach(input ${sources})
   list(APPEND outputs "${output_dir_static}/${input}")
 endforeach()
 if (SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS)
-  # Copy the module map into the parent directory. Using "parent.modulemap"
-  # instead of putting "module.modulemap" into the parent module to avoid
-  # module redefinition conflicts with the toolchain.
-  add_custom_command(
-      OUTPUT "${output_dir}/../module.modulemap"
-      DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap"
-      COMMAND
-        "${CMAKE_COMMAND}" "-E" "copy_if_different"
-        "${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap"
-        "${output_dir}/../module.modulemap"
-      COMMENT "Copying parent.modulemap to ${output_dir}")
-  list(APPEND outputs "${output_dir}/../module.modulemap")
+  # Generate the module map in the parent directory. It is generated from
+  # "parent.modulemap.in" (rather than being "module.modulemap" in the source
+  # tree) to avoid module redefinition conflicts with the toolchain.
+  function(swift_generate_parent_modulemap output_modulemap platform_modulemap)
+    get_filename_component(modulemap_dir "${output_modulemap}" DIRECTORY)
+    get_filename_component(modulemap_dir "${modulemap_dir}" ABSOLUTE)
+    file(RELATIVE_PATH SWIFT_PLATFORM_MODULEMAP_PATH
+         "${modulemap_dir}" "${platform_modulemap}")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap.in"
+                   "${output_modulemap}" @ONLY)
+  endfunction()
+
+  set(platform_modulemap_in_build_tree
+      "${SWIFT_INCLUDE_DIR}/SwiftPlatform/module.modulemap")
+  swift_generate_parent_modulemap(
+      "${output_dir}/../module.modulemap" "${platform_modulemap_in_build_tree}")
+  # The installed module maps are laid out as <prefix>/lib/swift/module.modulemap
+  # and <prefix>/lib/swift_static/module.modulemap, with the headers in
+  # <prefix>/include.
+  swift_generate_parent_modulemap(
+      "${CMAKE_CURRENT_BINARY_DIR}/install/lib/swift/module.modulemap"
+      "${CMAKE_CURRENT_BINARY_DIR}/install/include/SwiftPlatform/module.modulemap")
   if(SWIFT_BUILD_STATIC_STDLIB)
-    add_custom_command(
-        OUTPUT "${output_dir_static}/../module.modulemap"
-        DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap"
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy_if_different"
-          "${CMAKE_CURRENT_SOURCE_DIR}/parent.modulemap"
-          "${output_dir_static}/../module.modulemap"
-        COMMENT "Copying parent.modulemap to ${output_dir_static}")
-    list(APPEND outputs "${output_dir_static}/../module.modulemap")
+    swift_generate_parent_modulemap(
+        "${output_dir_static}/../module.modulemap"
+        "${platform_modulemap_in_build_tree}")
+    swift_generate_parent_modulemap(
+        "${CMAKE_CURRENT_BINARY_DIR}/install/lib/swift_static/module.modulemap"
+        "${CMAKE_CURRENT_BINARY_DIR}/install/include/SwiftPlatform/module.modulemap")
   endif()
 endif()
 # Put the output dir itself last so that it isn't considered the primary output.
@@ -227,7 +234,7 @@ swift_install_in_component(FILES ${sources}
                            DESTINATION "lib/swift/shims"
                            COMPONENT stdlib)
 if (SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS)
-  swift_install_in_component(FILES "${output_dir}/../module.modulemap"
+  swift_install_in_component(FILES "${CMAKE_CURRENT_BINARY_DIR}/install/lib/swift/module.modulemap"
                              DESTINATION "lib/swift"
                              COMPONENT stdlib)
 endif()
@@ -237,7 +244,7 @@ swift_install_in_component(FILES ${sources}
                            DESTINATION "lib/swift_static/shims"
                            COMPONENT stdlib)
 if (SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS)
-  swift_install_in_component(FILES "${output_dir_static}/../module.modulemap"
+  swift_install_in_component(FILES "${CMAKE_CURRENT_BINARY_DIR}/install/lib/swift_static/module.modulemap"
                              DESTINATION "lib/swift_static"
                              COMPONENT stdlib)
 endif()
