@@ -886,7 +886,7 @@ void CompilerInstance::setUpDiagnosticOptions() {
   // the diagnostic engine. However, it needs to be reconfigured here in case
   // there is any new configuration that should effect diagnostics for the rest
   // of the compile.
-  Invocation.setUpDiagnosticEngine(Diagnostics);
+  Invocation.setUpDiagnosticEngine(Diagnostics, *SourceMgr.getFileSystem());
 }
 
 // The ordering of ModuleLoaders is important!

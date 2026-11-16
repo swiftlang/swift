@@ -180,8 +180,14 @@ public:
                               StringRef SDKPath,
                               StringRef ResourceDir);
 
-  /// Configures the diagnostic engine for the invocation's options.
-  void setUpDiagnosticEngine(DiagnosticEngine &diags);
+  /// Configures the diagnostic engine for the invocation's options. Files
+  /// needed by the diagnostic engine are read from \p FS.
+  void setUpDiagnosticEngine(DiagnosticEngine &diags,
+                             llvm::vfs::FileSystem &FS);
+
+  /// Returns the directory that localized diagnostic messages are read from,
+  /// or an empty string if diagnostics are not localized.
+  std::string getLocalizationPath(llvm::vfs::FileSystem &FS) const;
 
   void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);

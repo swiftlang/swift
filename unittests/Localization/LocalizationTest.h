@@ -84,6 +84,13 @@ public:
   /// Random number in [0,n)
   unsigned RandNumber(unsigned n) { return unsigned(rand()) % n; }
 
+  /// Read the generated `.strings` file.
+  std::unique_ptr<llvm::MemoryBuffer> getDiagsBuffer() {
+    auto buffer = llvm::MemoryBuffer::getFile(DiagsPath);
+    assert(buffer && "failed to read the `.strings` file");
+    return std::move(*buffer);
+  }
+
 protected:
   static bool convertDefIntoStrings(std::string outputPath) {
     std::error_code error;

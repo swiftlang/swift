@@ -1042,10 +1042,11 @@ namespace swift {
       statsReporter = stats;
     }
 
-    void setLocalization(StringRef locale, StringRef path) {
+    void setLocalization(StringRef locale, StringRef path,
+                         llvm::vfs::FileSystem &fs) {
       assert(!locale.empty());
       assert(!path.empty());
-      localization = diag::LocalizationProducer::producerFor(locale, path);
+      localization = diag::LocalizationProducer::producerFor(locale, path, fs);
     }
 
     /// Whether the specified SourceFile enables a given diagnostic group

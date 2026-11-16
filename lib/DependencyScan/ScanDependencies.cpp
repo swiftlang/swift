@@ -221,6 +221,21 @@ private:
       commandline.push_back(mapPath(inProcPluginServerPath));
     }
 
+    // If the localized messages in the toolchain are used, pass their
+    // directory so the main module reads them from the CASFS.
+    auto &invocation = instance.getInvocation();
+    if (depInfo.isSwiftSourceModule() &&
+        invocation.getCASOptions().EnableCaching) {
+      std::string localizationPath = invocation.getLocalizationPath(
+          *instance.getSourceMgr().getFileSystem());
+      if (!localizationPath.empty() &&
+          localizationPath !=
+              invocation.getDiagnosticOptions().LocalizationPath) {
+        commandline.push_back("-localization-path");
+        commandline.push_back(scanner.remapPath(localizationPath));
+      }
+    }
+
     // Update CAS dependencies.
     if (auto err = collectCASDependencies(depInfo))
       return err;

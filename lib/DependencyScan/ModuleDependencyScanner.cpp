@@ -749,6 +749,18 @@ SwiftDependencyTracker::SwiftDependencyTracker(
   StringRef AccessNotePath = CI.getLangOptions().AccessNotesPath;
   if (!AccessNotePath.empty())
     addCommonFile(AccessNotePath);
+
+  // Add localized diagnostic messages.
+  std::string LocalizationPath = CI.getLocalizationPath(*FS);
+  if (!LocalizationPath.empty()) {
+    SmallString<256> LocalizationFile(LocalizationPath);
+    llvm::sys::path::append(LocalizationFile,
+                            CI.getDiagnosticOptions().LocalizationCode);
+    for (StringRef Ext : {".db", ".strings"}) {
+      llvm::sys::path::replace_extension(LocalizationFile, Ext);
+      addCommonFile(LocalizationFile);
+    }
+  }
 }
 
 void SwiftDependencyTracker::startTracking(bool includeCommonDeps) {
