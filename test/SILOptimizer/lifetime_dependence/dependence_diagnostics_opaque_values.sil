@@ -1,0 +1,103 @@
+// RUN: %target-sil-opt %s \
+// RUN:   -enable-sil-opaque-values \
+// RUN:   -lifetime-dependence-diagnostics \
+// RUN:   -address-lowering \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   | %FileCheck %s
+
+// REQUIRES: swift_feature_Lifetimes
+
+// With opaque values, SILGen builds the addressable buffer of a guaranteed argument by store_borrow'ing the argument
+// into a temporary. AddressLowering replaces that temporary with the argument's own address. The diagnostics run
+// before AddressLowering, so they must treat a dependence on the temporary as a dependence on the argument, whose
+// scope is in the caller. A dependence on any other temporary is still local.
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+class C {}
+
+struct NE: ~Escapable {
+  var p: UnsafeRawPointer
+}
+
+sil @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+sil @getNEFromC : $@convention(thin) (@in_guaranteed C) -> @lifetime(borrow address_for_deps 0) @owned NE
+
+// The buffer holds the argument.
+//
+// CHECK-LABEL: sil hidden [ossa] @borrowSelf :
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NOT:     store_borrow
+// CHECK:         [[DEP:%.*]] = mark_dependence [nonescaping] {{%.*}} on %0
+// CHECK:         return [[DEP]]
+// CHECK-LABEL: } // end sil function 'borrowSelf'
+sil hidden [ossa] [opaque] @borrowSelf : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE {
+bb0(%0 : @guaranteed $T):
+  %2 = alloc_stack $T
+  %3 = store_borrow %0 to %2
+  %4 = function_ref @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = apply %4<T>(%0) : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %6 = mark_dependence [unresolved] %5 on %3
+  end_borrow %3
+  dealloc_stack %2
+  return %6
+}
+
+// The buffer holds the argument under a move-only wrapper.
+//
+// CHECK-LABEL: sil hidden [ossa] @borrowSelfWrapped :
+// CHECK:       bb0(%0 : @noImplicitCopy $*T):
+// CHECK:         [[WRAPPED:%.*]] = copyable_to_moveonlywrapper_addr %0
+// CHECK-NOT:     store_borrow
+// CHECK:         mark_dependence [nonescaping] {{%.*}} on [[WRAPPED]]
+// CHECK-LABEL: } // end sil function 'borrowSelfWrapped'
+sil hidden [ossa] [opaque] @borrowSelfWrapped : $@convention(thin) <T> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE {
+bb0(%0 : @noImplicitCopy @guaranteed $T):
+  %1 = copyable_to_moveonlywrapper [guaranteed] %0
+  %2 = alloc_stack $@moveOnly T
+  %3 = store_borrow %1 to %2
+  %4 = function_ref @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = load_borrow %3
+  %6 = moveonlywrapper_to_copyable [guaranteed] %5
+  %7 = apply %4<T>(%6) : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %8 = mark_dependence [unresolved] %7 on %3
+  end_borrow %5
+  end_borrow %3
+  dealloc_stack %2
+  return %8
+}
+
+// The buffer holds a local copy of the argument, which is destroyed before the return.
+sil hidden [ossa] [opaque] @escapesLocalCopy : $@convention(thin) <T> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE { // expected-note {{it depends on the lifetime of an argument of 'escapesLocalCopy'}}
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0
+  %2 = alloc_stack $T
+  %3 = store_borrow %1 to %2
+  %4 = function_ref @getNE : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %5 = apply %4<T>(%1) : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> @lifetime(borrow address_for_deps 0) @owned NE // expected-error {{lifetime-dependent value escapes its scope}}
+  %6 = mark_dependence [unresolved] %5 on %3
+  end_borrow %3
+  dealloc_stack %2
+  destroy_value %1
+  return %6 // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+// A direct guaranteed argument is not passed by address, so the caller has no address to depend on.
+sil hidden [ossa] [opaque] @escapesDirectArgument : $@convention(thin) (@guaranteed C) -> @lifetime(borrow address_for_deps 0) @owned NE { // expected-note {{it depends on the lifetime of an argument of 'escapesDirectArgument'}}
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1
+  %3 = function_ref @getNEFromC : $@convention(thin) (@in_guaranteed C) -> @lifetime(borrow address_for_deps 0) @owned NE
+  %4 = load_borrow %2
+  %5 = apply %3(%4) : $@convention(thin) (@in_guaranteed C) -> @lifetime(borrow address_for_deps 0) @owned NE // expected-error {{lifetime-dependent value escapes its scope}}
+  %6 = mark_dependence [unresolved] %5 on %2
+  end_borrow %4
+  end_borrow %2
+  dealloc_stack %1
+  return %6 // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
