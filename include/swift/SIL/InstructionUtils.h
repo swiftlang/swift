@@ -181,6 +181,14 @@ bool onlyUsedByAssignOrInit(PartialApplyInst *PAI);
 /// in `impactType`. That's useful for diagnostics.
 RuntimeEffect getRuntimeEffect(SILInstruction *inst, SILType &impactType);
 
+/// If \p slot holds nothing but the value that a single `store` initializes
+/// it with, returns the stored value.
+SILValue getStoredValueOfStackSlot(AllocStackInst *slot);
+
+/// If \p value is loaded from a stack slot that holds nothing but the value
+/// that a single `store` initializes it with, returns the stored value.
+SILValue getStoredValueOfLoadedStackSlot(SILValue value);
+
 /// If V is a function closure, return the reaching set of partial_apply's.
 void findClosuresForFunctionValue(SILValue V,
                                   TinyPtrVector<PartialApplyInst *> &results);

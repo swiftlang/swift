@@ -635,9 +635,22 @@ func testAllocatingOnceClosure(_ x: Int) -> Int {
   }
 }
 
-// Calling the closure is fine, but dropping it releases its context.
+// Dropping the closure ends the lifetime of its stack-allocated context, which
+// releases nothing when the captures are trivial.
 @_noLocks
 func testDroppedAtMostOnceClosure(_ x: Int, _ y: Int) -> Bool {
-  and(x > 0, y > 0) // expected-once-error {{ending the lifetime of a value of type '@noescape @callable(once) @callee_owned () -> Bool' can cause a deallocation}}
+  and(x > 0, y > 0)
+}
+
+final class OnceBox {
+  let value: Int
+  init(_ value: Int) { self.value = value }
+}
+
+// The closure's context retains a nontrivial capture, and releases it when the
+// closure is dropped.
+@_noLocks
+func testDroppedAtMostOnceClosureWithNontrivialCapture(_ x: Int, _ b: OnceBox) -> Bool {
+  and(x > 0, b.value > 0) // expected-once-error {{this code performs reference counting operations which can cause locking}}
 }
 #endif
