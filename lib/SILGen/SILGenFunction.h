@@ -591,6 +591,13 @@ public:
     ~AddressableBuffer();
   };
   llvm::DenseMap<ValueDecl *, AddressableBuffer> AddressableBuffers;
+
+  /// The function argument of an address-only parameter that the caller passes
+  /// by address but that opaque values represent as a guaranteed object. The
+  /// address of such a parameter is value_to_address of this argument. The
+  /// value that the parameter is bound to can be a copy of it, which has a
+  /// different address.
+  llvm::DenseMap<ParamDecl *, SILFunctionArgument *> AddressOnlyGuaranteedArguments;
     
   AddressableBuffer *getAddressableBufferInfo(ValueDecl *vd);
   

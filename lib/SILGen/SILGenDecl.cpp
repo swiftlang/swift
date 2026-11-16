@@ -2792,7 +2792,28 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
   }
   
   assert(ownership == ValueOwnership::Shared);
-  
+
+  // The address of an address-only argument is value_to_address of the
+  // argument. A buffer that holds a copy of it would have a different address.
+  if (auto *param = dyn_cast<ParamDecl>(decl)) {
+    auto found = AddressOnlyGuaranteedArguments.find(param);
+    if (found != AddressOnlyGuaranteedArguments.end() &&
+        isFullyAbstractedLowering(*this,
+                                  decl->getTypeInContext()->getRValueType(),
+                                  found->second->getType())) {
+      SILValue address = B.createValueToAddress(curLoc, found->second);
+      if (value->getType().isMoveOnlyWrapped()) {
+        address = B.createCopyableToMoveOnlyWrapperAddr(curLoc, address);
+      }
+      if (address->getType().isMoveOnly()) {
+        address = B.createMarkUnresolvedNonCopyableValueInst(
+            address.getLoc(), address,
+            MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+      }
+      return address;
+    }
+  }
+
   // Check whether the in-memory representation has already been forced.
   if (state) {
     return state->storeBorrow;
