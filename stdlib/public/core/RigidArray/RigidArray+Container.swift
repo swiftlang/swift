@@ -26,7 +26,7 @@ extension _RigidArray where Element: ~Copyable {
   @export(implementation)
   @_transparent
   internal var count: Int {
-    _count
+    _assumeNonNegative(_count)
   }
 }
 
