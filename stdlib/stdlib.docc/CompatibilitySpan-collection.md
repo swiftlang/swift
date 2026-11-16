@@ -1,5 +1,6 @@
 # CompatibilitySpan
 
+Perform safe access to contiguous regions of memory.
 
 ## Topics
 
