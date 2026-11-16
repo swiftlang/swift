@@ -582,8 +582,9 @@ static Accessors getAccessors(const AbstractStorageDecl *storage) {
   accessors.ReadImpl = getRawReadImplKind(impl.getReadImpl());
   accessors.WriteImpl = getRawWriteImplKind(impl.getWriteImpl());
   accessors.ReadWriteImpl = getRawReadWriteImplKind(impl.getReadWriteImpl());
-  auto decls = storage->getAllAccessors();
-  accessors.Decls.append(decls.begin(), decls.end());
+  storage->visitEmittedAccessors([&](auto *accessor) {
+    accessors.Decls.push_back(accessor);
+  });
   return accessors;
 }
 
