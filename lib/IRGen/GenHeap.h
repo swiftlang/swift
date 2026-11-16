@@ -239,8 +239,11 @@ llvm::Value *emitHeapMetadataRefForHeapObject(IRGenFunction &IGF,
 /// What isa-encoding mechanism does a type use?
 IsaEncoding getIsaEncodingForType(IRGenModule &IGM, CanType type);
 
+/// The header at the start of an allocation.
+enum class HeapHeaderKind { None, Swift, ObjC };
+
 std::optional<uint64_t>
-computeTypedMallocTypeDescriptor(IRGenModule &IGM,
+computeTypedMallocTypeDescriptor(IRGenModule &IGM, HeapHeaderKind header,
                                  llvm::SmallVectorImpl<SILType> &fieldTypes,
                                  bool isArray = false);
 
