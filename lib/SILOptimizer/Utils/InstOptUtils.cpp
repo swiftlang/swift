@@ -1009,6 +1009,29 @@ static bool isDeadOnStackClosureUser(SILInstruction *user) {
          isa<StrongReleaseInst>(user);
 }
 
+bool swift::isCaptureOwnedByOnStackClosure(Operand &argOp) {
+  auto *pai = dyn_cast<PartialApplyInst>(argOp.getUser());
+  if (!pai || !pai->isOnStack() || !pai->isNoncopyable())
+    return false;
+  ApplySite site(pai);
+  if (!site.isArgumentOperand(argOp))
+    return false;
+  if (site.hasContextOwnedAddressArgument(argOp))
+    return true;
+  SILValue arg = argOp.get();
+  SILFunction *function = pai->getFunction();
+  if (function->hasOwnership())
+    return argOp.isConsuming();
+
+  // Without ownership, follow IRGen: the context owns each nontrivial value
+  // that it captures, except for a borrowed noncopyable value.
+  if (arg->getType().isAddress() || arg->getType().isTrivial(*function))
+    return false;
+  return !arg->getType().isMoveOnly() ||
+         site.getArgumentConvention(argOp) !=
+             SILArgumentConvention::Direct_Guaranteed;
+}
+
 static bool
 deadMarkDependenceUser(Operand *use,
                        SmallVectorImpl<SILInstruction *> &deleteInsts) {
@@ -1217,8 +1240,9 @@ bool swift::tryDeleteDeadClosure(SingleValueInstruction *closure,
     if (pa->isNoncopyable()) {
       SILBuilderContext builderCtxt(pa->getModule());
       for (Operand &argOp : pa->getArgumentOperands()) {
-        if (!argOp.isConsuming() &&
-            !ApplySite(pa).hasContextOwnedAddressArgument(argOp))
+        // A capture that was transferred to a combined apply is undef.
+        if (!isCaptureOwnedByOnStackClosure(argOp) ||
+            isa<SILUndef>(argOp.get()))
           continue;
 
         SILBuilderWithScope builder(pa, builderCtxt);

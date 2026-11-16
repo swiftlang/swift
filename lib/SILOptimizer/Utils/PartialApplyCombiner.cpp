@@ -69,7 +69,14 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
     // A noncopyable on-stack closure can own (consume)
     // captures, so they have to be copied when possible.
     for (Operand &argOp : pai->getArgumentOperands()) {
-      if (argOp.isConsuming())
+      // Without ownership, a noncopyable capture that the callee consumes is
+      // transferred to the combined apply instead (see processSingleApply()).
+      bool isTransferred = !pai->getFunction()->hasOwnership() &&
+                           argOp.get()->getType().isMoveOnly() &&
+                           ApplySite(pai)
+                               .getArgumentConvention(argOp)
+                               .isOwnedConventionInCaller();
+      if (isCaptureOwnedByOnStackClosure(argOp) && !isTransferred)
         argsToHandle.push_back(&argOp);
 
       // The closure owns a noncopyable address-only value, which can't be
