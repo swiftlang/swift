@@ -28,6 +28,7 @@ sil @barrier : $@convention(thin) () -> ()
 sil @useC_addr : $@convention(thin) (@in_guaranteed C) -> ()
 sil @consumeC_addr : $@convention(thin) (@in C) -> ()
 sil @consumeK_addr : $@convention(thin) (@in K) -> ()
+sil @readK_addr : $@yield_once @convention(thin) (@in_guaranteed K) -> @yields @guaranteed K
 sil @produceC : $@convention(thin) () -> @out C
 
 // CHECK-LABEL: sil [ossa] @basic_take_of_uninit_box :
@@ -2488,4 +2489,34 @@ bb0(%0 : @noImplicitCopy @closureCapture $*K):
   %6 = function_ref @barrier : $@convention(thin) () -> ()
   %7 = apply %6() : $@convention(thin) () -> ()
   unreachable
+}
+
+// A coroutine may access the memory until its scope ends, so a load within that scope must
+// be a copy instead of a take.
+// CHECK-LABEL: sil [ossa] @take_within_coroutine_scope :
+// CHECK:          [[A:%.*]] = alloc_stack [lexical] $K
+// CHECK:          ({{%.*}}, [[TOK:%.*]]) = begin_apply {{%.*}}([[A]])
+// CHECK-NEXT:     load [copy] [[A]] : $*K
+// CHECK:          end_apply [[TOK]]
+// CHECK-NEXT:     destroy_addr [[A]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @take_within_coroutine_scope : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $K
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+  %v = apply %getK() : $@convention(thin) () -> @owned K
+  store %v to [init] %a
+  %read = function_ref @readK_addr : $@yield_once @convention(thin) (@in_guaranteed K) -> @yields @guaranteed K
+  (%y, %tok) = begin_apply %read(%a) : $@yield_once @convention(thin) (@in_guaranteed K) -> @yields @guaranteed K
+  %l = load [copy] %a
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %consumeK(%l) : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  apply %useK(%y) : $@convention(thin) (@guaranteed K) -> ()
+  end_apply %tok as $()
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
 }

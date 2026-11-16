@@ -1042,7 +1042,11 @@ private struct MultiDefResolver {
       case .indirectIn:
         addUse(.take(operand, .own), range(of: operand))
       default:
-        addLiveness(operand)
+        // A coroutine may access the memory until its scope ends.
+        let range = self.range(of: operand)
+        for end in apply.endInstructions {
+          addUse(.liveness(end), range)
+        }
       }
       return .continueWalk
     }
