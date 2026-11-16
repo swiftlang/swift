@@ -977,16 +977,24 @@ private struct MultiDefResolver {
         addLiveness(operand)
         return .continueWalk
       }
-      // If the loaded SSA value is consumed by some non-destroying instruction, its demand is "own".
-      func hasConsumingUser(_ op: Operand) -> Bool {
-        return op.ownership == .forwardingConsume || op.instruction is MoveValueInst
+      // If the loaded SSA value is consumed by anything other than a plain clean-up, its demand is "own".
+      // This includes forwarding consumes and destroying consumes such as stores, move_value, and owned call arguments.
+      func hasConsumingLoadUser(_ op: Operand) -> Bool {
+        switch op.ownership {
+        case .forwardingConsume:
+          return true
+        case .destroyingConsume:
+          return !(op.instruction is DestroyValueInst || op.instruction is EndLifetimeInst)
+        default:
+          return false
+        }
       }
       let range = self.range(of: operand)
       switch load.loadOwnership {
       case .take:
           addUse(.take(operand, .own), range)   // TODO: what about a take where all non-destroy users borrow?
       case .unqualified, .copy:
-        if load.uses.filter(hasConsumingUser).isEmpty {
+        if load.uses.filter(hasConsumingLoadUser).isEmpty {
           addUse(.use(operand, .borrow), range)
         } else {
           addUse(.use(operand, .own), range)
