@@ -1451,6 +1451,25 @@ public:
            kind == ConventionsKind::Deallocator;
   }
 
+  /// Whether these are the conventions of a C, C++ or Objective-C function,
+  /// which consumes a parameter only if its declaration says so.
+  bool isForeign() const {
+    switch (kind) {
+    case ConventionsKind::ObjCMethod:
+    case ConventionsKind::CFunctionType:
+    case ConventionsKind::CFunction:
+    case ConventionsKind::ObjCSelectorFamily:
+    case ConventionsKind::CXXMethod:
+      return true;
+    case ConventionsKind::Default:
+    case ConventionsKind::DefaultBlock:
+    case ConventionsKind::Deallocator:
+    case ConventionsKind::Capture:
+      return false;
+    }
+    llvm_unreachable("unhandled conventions kind");
+  }
+
   virtual ParameterConvention
   getIndirectParameter(unsigned index,
                        const AbstractionPattern &type,
@@ -1531,6 +1550,18 @@ public:
     case ValueOwnership::Owned:
       if (kind == ConventionsKind::ObjCSelectorFamily ||
           kind == ConventionsKind::ObjCMethod) {
+        if (forSelf)
+          return getDirectSelfParameter(type);
+        return getDirectParameter(index, type, substTL);
+      }
+      // The importer makes an rvalue `this` of a foreign reference type
+      // `consuming`, but a C++ method never releases it. Take a foreign
+      // reference at +1 only where the C conventions say so, e.g. `cf_consumed`.
+      if ((kind == ConventionsKind::CFunction ||
+           kind == ConventionsKind::CFunctionType ||
+           kind == ConventionsKind::CXXMethod) &&
+          substTL.getLoweredType().unwrapOptionalType()
+              .isForeignReferenceType()) {
         if (forSelf)
           return getDirectSelfParameter(type);
         return getDirectParameter(index, type, substTL);
@@ -2201,16 +2232,21 @@ private:
       convention = Convs.getIndirect(ownership, forSelf, origParamIndex,
                                      origType, substTLConv);
       assert(isIndirectFormalParameter(convention));
-    } else if (substTL.isTrivial() ||
-               // Foreign reference types are passed trivially.
-               (substType->getClassDecl() &&
-                substType->isForeignReferenceType())) {
+    } else if (substTL.isTrivial()) {
       convention = ParameterConvention::Direct_Unowned;
     } else {
       // If we are no implicit copy, our ownership is always Owned.
       convention = Convs.getDirect(ownership, forSelf, origParamIndex, origType,
                                    substTLConv);
       assert(!isIndirectFormalParameter(convention));
+      // A Swift function has always taken a foreign reference at +0. Keep it
+      // there where a class is taken at +1, such as a consuming, initializer
+      // or setter parameter, so that the ABI of those functions doesn't change.
+      // An optional one already had the Swift conventions.
+      if (convention == ParameterConvention::Direct_Owned &&
+          !Convs.isForeign() && substType->getClassDecl() &&
+          substType->isForeignReferenceType())
+        convention = ParameterConvention::Direct_Unowned;
     }
 
     addParameter(formalParamIndex, loweredType, convention, origFlags);
@@ -4371,6 +4407,22 @@ public:
       return getIndirectSelfParameter(type);
     }
     return super::getIndirectParameter(index, type, substTL);
+  }
+
+  ParameterConvention
+  getDirectSelfParameter(const AbstractionPattern &type) const override {
+    // Only a foreign reference type passes `this` directly. The caller keeps
+    // it alive for the whole call, like a pointer argument.
+    return ParameterConvention::Direct_Guaranteed;
+  }
+
+  ParameterConvention
+  getDirectParameter(unsigned int index, const AbstractionPattern &type,
+                     const TypeLowering &substTL) const override {
+    // `self` is the last parameter.
+    if (index == TheDecl->getNumParams())
+      return getDirectSelfParameter(type);
+    return super::getDirectParameter(index, type, substTL);
   }
   ResultConvention getResult(const TypeLowering &resultTL) const override {
     if (isa<clang::CXXConstructorDecl>(TheDecl)) {
