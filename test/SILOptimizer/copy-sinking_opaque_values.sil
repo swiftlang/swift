@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -copy-sinking %s | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+// In opaque-values mode, an address-only phi cannot be guaranteed.
+// CHECK-LABEL: sil [ossa] [opaque] @dont_sink_copies_over_address_only_phi :
+// CHECK:       bb1:
+// CHECK-NEXT:    [[C1:%.*]] = copy_value %0
+// CHECK-NEXT:    br bb3([[C1]])
+// CHECK:       bb2:
+// CHECK-NEXT:    [[C2:%.*]] = copy_value %1
+// CHECK-NEXT:    br bb3([[C2]])
+// CHECK:       bb3([[P:%.*]] : @owned $T):
+// CHECK-NEXT:    return [[P]]
+// CHECK:       } // end sil function 'dont_sink_copies_over_address_only_phi'
+sil [ossa] @dont_sink_copies_over_address_only_phi : $@convention(thin) <T> (@in_guaranteed T, @in_guaranteed T, Builtin.Int1) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $T, %2 : $Builtin.Int1):
+  cond_br %2, bb1, bb2
+
+bb1:
+  %4 = copy_value %0
+  br bb3(%4)
+
+bb2:
+  %6 = copy_value %1
+  br bb3(%6)
+
+bb3(%8 : @owned $T):
+  return %8
+}

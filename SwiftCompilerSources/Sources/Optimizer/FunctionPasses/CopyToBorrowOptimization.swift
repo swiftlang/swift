@@ -555,7 +555,7 @@ private extension ForwardingInstruction {
     if !preservesReferenceCounts {
       return false
     }
-    if !canForwardGuaranteedValues {
+    if !canForwardGuaranteedValues || !canForwardGuaranteedAddressOnlyValues {
       return false
     }
     // For simplicity only support a single owned operand. Otherwise we would have to check if the other

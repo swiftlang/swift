@@ -166,6 +166,12 @@ let copySinking = FunctionPass(name: "copy-sinking") {
 }
 
 private func trySinkCopiesOverPhi(phi: Phi, _ context: FunctionPassContext) -> Bool {
+  // Before address lowering, an address-only phi can't be guaranteed.
+  let function = phi.value.parentFunction
+  if !function.hasLoweredAddresses && !phi.value.type.isLoadable(in: function) {
+    return false
+  }
+
   for incomingOp in phi.incomingOperands {
     guard let copy = incomingOp.value as? CopyValueInst,
           copy.uses.isSingleUse,
@@ -240,6 +246,9 @@ private extension Value {
 private func trySinkCopiesOver(terminator: ForwardingInstruction & UnaryInstruction & TermInst,
                                _ context: FunctionPassContext) -> Bool
 {
+  if !terminator.canForwardGuaranteedAddressOnlyValues {
+    return false
+  }
   switch terminator.operand.value {
   case let copy as CopyValueInst:
     guard copy.uses.isSingleUse,
