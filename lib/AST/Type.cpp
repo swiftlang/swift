@@ -120,6 +120,7 @@ bool TypeBase::isUninhabited() {
       // Objective-C enums may be allowed to hold any value representable by
       // the underlying type, but only if they come from clang.
       if (enumDecl->getAllElements().empty() &&
+          enumDecl->getExpandedElements().empty() &&
           !(enumDecl->isObjC() && enumDecl->hasClangNode()))
         return true;
   return false;

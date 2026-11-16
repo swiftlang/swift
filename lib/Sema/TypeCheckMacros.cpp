@@ -2045,8 +2045,36 @@ swift::expandAttributes(CustomAttr *attr, MacroDecl *macro, Decl *member) {
 
 // Collect the protocol conformances that the macro asked about but were
 // not already present on the declaration.
+// A member macro sees the implicit conformance of the enum as written.
+// Computing it from expanded members would make the macro input depend on
+// its own output or on which file triggered expansion.
+static bool hasParsedSimpleEnumConformance(NominalTypeDecl *nominal,
+                                           ProtocolDecl *protocol) {
+  auto *ed = dyn_cast<EnumDecl>(nominal);
+  if (!ed || !(protocol->isSpecificProtocol(KnownProtocolKind::Equatable) ||
+               protocol->isSpecificProtocol(KnownProtocolKind::Hashable)))
+    return false;
+  if (ed->getAttrs().hasAttribute<MoveOnlyAttr>() ||
+      ed->getAttrs().hasAttribute<NonEscapableAttr>())
+    return false;
+  for (auto kind : InvertibleProtocolSet::allKnown())
+    if (ed->suppressesConformance(getKnownProtocolKind(kind)))
+      return false;
+
+  bool hasCase = false;
+  for (auto *member : ed->getParsedMembers()) {
+    if (auto *elt = dyn_cast<EnumElementDecl>(member)) {
+      hasCase = true;
+      if (elt->hasAssociatedValues())
+        return false;
+    }
+  }
+  return hasCase;
+}
+
 static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
     NominalTypeDecl *nominal, MacroRole role, MacroDecl *macro,
+    bool expandingEnumBody,
     SmallVectorImpl<ProtocolDecl *> *potentialConformances = nullptr) {
   SmallVector<ProtocolDecl *, 2> potentialConformancesBuffer;
   if (!potentialConformances)
@@ -2055,8 +2083,14 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
 
   TinyPtrVector<ProtocolDecl *> introducedConformances;
   for (auto protocol : *potentialConformances) {
+    if (expandingEnumBody && hasParsedSimpleEnumConformance(nominal, protocol))
+      continue;
+
     SmallVector<ProtocolConformance *, 2> existingConformances;
-    nominal->lookupConformance(protocol, existingConformances);
+    // A member macro can change whether an enum is simple. Do not try to
+    // derive a conformance from the cases this expansion has yet to produce.
+    nominal->lookupConformance(protocol, existingConformances,
+                               /*includeSimpleEnumConformances=*/!expandingEnumBody);
 
     bool hasExistingConformance = llvm::any_of(
         existingConformances,
@@ -2098,7 +2132,7 @@ std::optional<unsigned> swift::expandMembers(CustomAttr *attr, MacroDecl *macro,
       return std::nullopt;
   }
   auto introducedConformances = getIntroducedConformances(
-      nominal, MacroRole::Member, macro);
+      nominal, MacroRole::Member, macro, /*expandingEnumBody=*/isa<EnumDecl>(decl));
 
   // Evaluate the macro.
   auto macroSourceFile =
@@ -2178,7 +2212,8 @@ std::optional<unsigned> swift::expandExtensions(CustomAttr *attr,
 
   SmallVector<ProtocolDecl *, 2> potentialConformances;
   auto introducedConformances = getIntroducedConformances(
-      nominal, MacroRole::Extension, macro, &potentialConformances);
+      nominal, MacroRole::Extension, macro, /*expandingEnumBody=*/false,
+      &potentialConformances);
   auto macroSourceFile = ::evaluateAttachedMacro(macro, nominal, attr,
                                                  /*passParentContext=*/false,
                                                  role, introducedConformances);

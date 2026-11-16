@@ -1351,11 +1351,13 @@ void NominalTypeDecl::prepareConformanceTable() const {
 
   // Add any implicit conformances.
   if (auto theEnum = dyn_cast<EnumDecl>(mutableThis)) {
-    if (theEnum->hasCases() && theEnum->hasOnlyCasesWithoutAssociatedValues()) {
-      // Simple enumerations conform to Equatable.
+    // A member macro may query unrelated conformances before its cases have
+    // been added. Classify the completed enum when these conformances are used.
+    if (theEnum->getExpandedAttrs().hasAttribute<CustomAttr>()) {
+      ConformanceTable->deferSimpleEnumConformances();
+    } else if (theEnum->hasCases() &&
+               theEnum->hasOnlyCasesWithoutAssociatedValues()) {
       addSynthesized(ctx.getProtocol(KnownProtocolKind::Equatable));
-
-      // Simple enumerations conform to Hashable.
       addSynthesized(ctx.getProtocol(KnownProtocolKind::Hashable));
     }
 
@@ -1403,7 +1405,8 @@ static bool lookupSpecialProtocolToProtocolConformance(
 
 bool NominalTypeDecl::lookupConformance(
        ProtocolDecl *protocol,
-       SmallVectorImpl<ProtocolConformance *> &conformances) const {
+       SmallVectorImpl<ProtocolConformance *> &conformances,
+       bool includeSimpleEnumConformances) const {
 
   // In general, protocols cannot conform to other protocols, however there are
   // exceptions, special handle those.
@@ -1422,7 +1425,7 @@ bool NominalTypeDecl::lookupConformance(
   return ConformanceTable->lookupConformance(
            const_cast<NominalTypeDecl *>(this),
            protocol,
-           conformances);
+           conformances, includeSimpleEnumConformances);
 }
 
 SmallVector<ProtocolDecl *, 2>

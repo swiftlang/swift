@@ -3122,7 +3122,7 @@ namespace {
 
       // [is_or_contains_pack_unsubstituted] Visit the elements of the
       // unsubstituted type to find pack types which would be substituted away.
-      for (auto elt : D->getAllElements()) {
+      for (auto elt : D->getExpandedElements()) {
         if (!elt->hasAssociatedValues())
           continue;
         auto eltInterfaceTy = elt->getInterfaceType()->getCanonicalType();
@@ -3151,7 +3151,7 @@ namespace {
       auto subMap = enumType->getContextSubstitutionMap();
 
       // Accumulate the properties of all direct payloads.
-      for (auto elt : D->getAllElements()) {
+      for (auto elt : D->getExpandedElements()) {
         // No-payload elements do not affect any recursive properties.
         if (!elt->hasAssociatedValues())
           continue;
@@ -3644,7 +3644,7 @@ bool TypeConverter::visitAggregateLeaves(
         }
       } else if (auto *decl = ty.getEnumDecl()) {
         auto subMap = ty->getContextSubstitutionMap();
-        for (auto *element : decl->getAllElements()) {
+        for (auto *element : decl->getExpandedElements()) {
           if (!element->hasAssociatedValues())
             continue;
           // TODO: Callback for indirect elements.
@@ -5998,7 +5998,7 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
            "types at all");
     unsigned fieldsCountBefore = fieldsCount;
     unsigned maxEnumCount = 0;
-    for (auto elt : enumDecl->getAllElements()) {
+    for (auto elt : enumDecl->getExpandedElements()) {
       if (!elt->hasAssociatedValues())
         continue;
 

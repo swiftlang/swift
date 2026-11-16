@@ -7249,6 +7249,15 @@ EnumDecl::EnumDecl(SourceLoc EnumLoc,
     = false;
 }
 
+EnumDecl::ElementRange EnumDecl::getExpandedElements() const {
+  if (getExpandedAttrs().hasAttribute<CustomAttr>()) {
+    auto &ctx = getASTContext();
+    (void)evaluateOrDefault(ctx.evaluator,
+        ExpandSynthesizedMemberMacroRequest{const_cast<EnumDecl *>(this)}, {});
+  }
+  return getAllElements();
+}
+
 Type EnumDecl::getRawType() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(

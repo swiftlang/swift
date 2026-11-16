@@ -96,6 +96,7 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     TypeRepr *inheritedTypeRepr;
 
     ConformanceEntryKind Kind;
+    bool inferredOnDemand = false;
 
     ConformanceAttributes attributes;
 
@@ -139,6 +140,14 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     static ConformanceSource forSynthesized(DeclContext *dc) {
       return ConformanceSource(dc, ConformanceEntryKind::Synthesized);
     }
+
+    static ConformanceSource forInferredConformance(DeclContext *dc) {
+      auto source = forSynthesized(dc);
+      source.inferredOnDemand = true;
+      return source;
+    }
+
+    bool isInferredOnDemand() const { return inferredOnDemand; }
 
     static ConformanceSource forUnexpandedMacro(DeclContext *dc) {
       return ConformanceSource(dc, ConformanceEntryKind::PreMacroExpansion);
@@ -499,7 +508,12 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   void registerProtocolConformances(DeclContext *dc,
                                   ArrayRef<ProtocolConformance *> conformances);
 
+  bool PendingSimpleEnumConformances = false;
+  void addSimpleEnumConformancesIfNeeded(NominalTypeDecl *nominal);
+
 public:
+  void deferSimpleEnumConformances() { PendingSimpleEnumConformances = true; }
+
   /// Create a new conformance lookup table.
   ConformanceLookupTable(ASTContext &ctx);
 
@@ -524,7 +538,8 @@ public:
   /// \returns true if any conformances were found. 
   bool lookupConformance(NominalTypeDecl *nominal,
                          ProtocolDecl *protocol, 
-                         SmallVectorImpl<ProtocolConformance *> &conformances);
+                         SmallVectorImpl<ProtocolConformance *> &conformances,
+                         bool includeSimpleEnumConformances);
 
   /// Look for all of the conformances within the given declaration context.
   void lookupConformances(NominalTypeDecl *nominal,

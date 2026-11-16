@@ -286,6 +286,10 @@ static bool checkBitwiseCopyableInstanceStorage(NominalTypeDecl *nominal,
     return true;
   }
 
+  // The storage check must include payloads introduced by enum member macros.
+  if (ed)
+    (void)ed->getExpandedElements();
+
   BitwiseCopyableStorageVisitor visitor(nominal, dc, check);
 
   return visitor.visit(nominal, dc) || visitor.invalid;
