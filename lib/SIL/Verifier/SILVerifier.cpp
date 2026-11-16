@@ -5907,10 +5907,24 @@ public:
     // function argument or Builtin.Borrow.
     if (F.getFunctionStage() >= SILStage::Canonical &&
         functionResultType.isAddress()) {
-      auto base = AccessBase::compute(RI->getOperand());
-      auto root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
-                                            : base.getBaseAddress()
-                       : SILValue();
+      SILValue root;
+      SILValue address = RI->getOperand();
+      while (true) {
+        auto base = AccessBase::compute(address);
+        root = base ? base.isReference() ? base.getOwnershipReferenceRoot()
+                                         : base.getBaseAddress()
+                    : SILValue();
+        // The address result of an accessor with an address self is derived
+        // from self.
+        auto *apply = dyn_cast_or_null<ApplyInst>(root);
+        auto *selfOp = apply
+            ? apply->getAddressSelfOfAddressBorrowMutateAccessorResult()
+            : nullptr;
+        if (!selfOp) {
+          break;
+        }
+        address = selfOp->get();
+      }
       require(!root || !root->getType().isAddress() ||
                   isa<SILFunctionArgument>(root) ||
                   (isa<ApplyInst>(root) &&
