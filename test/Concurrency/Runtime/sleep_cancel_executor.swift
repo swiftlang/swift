@@ -136,6 +136,51 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
 
   private let generationQueue = DispatchQueue(label: "LoopExecutor.generation")
   private var nextGeneration: UInt64 = 1
+  private var _storageChecks = 0
+  private var _storageProblems = 0
+
+  /// How many times we have checked the scheduled storage that jobs have, and
+  /// how many of those found something wrong with it.
+  var storageChecks: Int { generationQueue.sync { _storageChecks } }
+  var storageProblems: Int { generationQueue.sync { _storageProblems } }
+
+  private func checked(_ ok: Bool) {
+    generationQueue.sync {
+      _storageChecks += 1
+      if !ok { _storageProblems += 1 }
+    }
+  }
+
+  /// Keep `generation` in the job's own storage for us, instead of in a
+  /// dictionary, checking that the job has eight words of it, and that it
+  /// starts out zeroed.
+  private func store(_ generation: UInt64, in job: UnownedJob) {
+    let ok: Bool = job.withUnsafeScheduledPrivateData { storage in
+      guard let storage else {
+        return false
+      }
+      var zeroed = true
+      for i in 0..<8 {
+        zeroed = zeroed && storage.load(fromByteOffset: i * MemoryLayout<UInt>.stride,
+                                        as: UInt.self) == 0
+      }
+      storage.storeBytes(of: generation, as: UInt64.self)
+      return storage.count == 8 * MemoryLayout<UInt>.stride && zeroed
+    }
+    checked(ok)
+  }
+
+  /// Check that the job still has the generation that we stored in it.  This
+  /// can only be done when we know that the job hasn't been run.
+  private func expect(_ generation: UInt64, in job: UnownedJob) {
+    let ok: Bool = job.withUnsafeScheduledPrivateData { storage in
+      guard let storage else {
+        return false
+      }
+      return storage.load(as: UInt64.self) == generation
+    }
+    checked(ok)
+  }
 
   /// The number of timers that haven't fired or been cancelled.
   var pendingCount: Int {
@@ -172,6 +217,8 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
 
   public func enqueue(_ _job: consuming ExecutorJob) {
     let job = UnownedJob(_job)
+    // A job that isn't a scheduled continuation has no storage of this kind.
+    checked(job.withUnsafeScheduledPrivateData { $0 == nil })
     loop.async {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
@@ -199,6 +246,7 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
       return generation
     }
 
+    store(generation, in: job)
     loop.async {
       self.timers[address] = generation
     }
@@ -211,6 +259,8 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
       self.timers[address] = nil
 
       if job.claimForTimer() {
+        // The job is ours, so its storage is too.
+        self.expect(generation, in: job)
         job.runSynchronously(on: self.asUnownedTaskExecutor())
       } else {
         // The job was cancelled first, so `cancel` has been, or is about to be,
@@ -237,6 +287,8 @@ final class LoopExecutor: TaskExecutor, SchedulingExecutor,
       if self.timers[address] == generation {
         self.timers[address] = nil
       }
+      // The job can't have been run, so it is still there.
+      self.expect(generation, in: job)
       if job.isResumption {
         job.runSynchronously(on: self.asUnownedTaskExecutor())
       } else {
@@ -439,6 +491,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
         }
         expectEqual(refusals + 1, executor.refusals)
         expectEqual(0, executor.pendingCount)
+        expectEqual(0, executor.storageProblems)
       }
     }
 
@@ -468,6 +521,7 @@ func waitUntil(_ condition: () -> Bool) async throws {
         }
         expectEqual(refusals, executor.refusals)
         expectEqual(0, executor.pendingCount)
+        expectEqual(0, executor.storageProblems)
       }
     }
 
@@ -495,6 +549,8 @@ func waitUntil(_ condition: () -> Bool) async throws {
       }
 
       expectEqual(0, executor.pendingCount)
+      expectEqual(0, executor.storageProblems)
+      expectTrue(executor.storageChecks > 0)
       print("timer lost the job to a cancellation \(executor.refusals) times")
     }
 

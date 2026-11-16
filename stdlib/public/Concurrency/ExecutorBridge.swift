@@ -105,6 +105,10 @@ internal func _jobIsResumption(_ job: Builtin.Job) -> Bool
 @_silgen_name("swift_job_claimForTimer")
 internal func _jobClaimForTimer(_ job: Builtin.Job) -> Bool
 
+@available(StdlibDeploymentTarget 6.5, *)
+@_silgen_name("swift_job_getScheduledPrivateData")
+internal func _jobGetScheduledPrivateData(_ job: Builtin.Job) -> UnsafeMutableRawPointer?
+
 /// Returns the job's flags; works for any job, not only tasks
 @available(SwiftStdlib 5.1, *)
 @usableFromInline

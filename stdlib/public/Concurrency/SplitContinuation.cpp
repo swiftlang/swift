@@ -99,6 +99,18 @@ struct SplitContinuationStorage : public Job {
   /// `swift_continuation_cancelScheduled` claimed it with, at +1.
   std::atomic<SwiftError *> Outcome;
 
+  /// Storage for the executor that a continuation has been scheduled on, to
+  /// use for its own bookkeeping (a link, a heap index, a deadline, and so on)
+  /// instead of allocating, from when it is scheduled until it is run or
+  /// claimed.  This is in addition to the job's `SchedulerPrivate` words,
+  /// which the header leaves too little of, and which can't be extended
+  /// without moving the fields after them.  It is on the end of the storage
+  /// because nothing outside this file knows about anything after `Outcome`.
+  ///
+  /// The size is part of the API (see `ExecutorJob.withUnsafeScheduledPrivateData`
+  /// and `swift_job_getScheduledPrivateData`); it is eight words.
+  void *ExecutorPrivate[8];
+
   /// The value of `Outcome` once the job has run without being cancelled.
   static SwiftError *fired() { return reinterpret_cast<SwiftError *>(1); }
 
@@ -106,7 +118,7 @@ struct SplitContinuationStorage : public Job {
       : Job({JobKind::SplitContinuation, priority}, &process,
             jobHeapMetadataPtr, /*captureCurrentVoucher=*/false),
         ResumeContext(nullptr), AwaitingTask(nullptr),
-        ResultIsEmpty(resultIsEmpty), Outcome(nullptr) {}
+        ResultIsEmpty(resultIsEmpty), Outcome(nullptr), ExecutorPrivate() {}
 
   /// Running the job resumes the continuation: normally, unless it was
   /// cancelled first, in which case by throwing the error it was cancelled
@@ -434,4 +446,14 @@ bool swift_job_claimForTimer(Job *job) {
 
   // Claiming twice is harmless; anything else is a cancellation.
   return expected == SplitContinuationStorage::fired();
+}
+
+/// The storage that an executor can use for a continuation that it has been
+/// asked to schedule: `nullptr` if the job is not a split continuation, and so
+/// doesn't have any.  Eight words long; see `SplitContinuationStorage`.
+extern "C" SWIFT_CC(swift)
+void *swift_job_getScheduledPrivateData(Job *job) {
+  if (!SplitContinuationStorage::classof(job))
+    return nullptr;
+  return cast<SplitContinuationStorage>(job)->ExecutorPrivate;
 }

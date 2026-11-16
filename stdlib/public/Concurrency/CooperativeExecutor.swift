@@ -20,14 +20,77 @@ import Swift
 struct WaitQueue {
   /// A job waiting for its deadline.
   ///
-  /// We keep the deadline and a slot alongside the job, rather than in the
-  /// job's executor private data, so that a cancelled job can be moved to the
-  /// run queue exactly as we received it, and so that a stale cancellation can never
-  /// match a different entry that happens to reuse the same address.
+  /// We keep the deadline alongside the job, rather than in the job's executor
+  /// private data, so that a cancelled job can be moved to the run queue
+  /// exactly as we received it.
+  ///
+  /// Where it is in the heap, so that cancelling it doesn't have to look for
+  /// it, is kept in one of two places, which `handle` says.  A job that the
+  /// runtime scheduled itself (a sleeping task's continuation) has storage for
+  /// us, which is where we keep that: `handle` is the address of that storage,
+  /// which we fetch once, when the job is scheduled, since every swap in the
+  /// heap has to update it.  For any other job we use a slot (see `Slots`),
+  /// and `handle` is the number of the slot, shifted left and with the low bit
+  /// set (an address is never odd).
   struct Entry {
     var job: UnownedJob
     var deadline: CooperativeExecutor.Timestamp
-    var slot: Int
+    var handle: Int
+
+    init(job: UnownedJob, deadline: CooperativeExecutor.Timestamp, slot: Int) {
+      self.job = job
+      self.deadline = deadline
+      self.handle = (slot << 1) | 1
+    }
+
+    init(job: UnownedJob, deadline: CooperativeExecutor.Timestamp,
+         storage: UnsafeMutableRawPointer) {
+      self.job = job
+      self.deadline = deadline
+      self.handle = Int(bitPattern: storage)
+    }
+
+    /// The slot that keeps this entry's place in the heap, if it uses one.
+    var slot: Int? {
+      return (handle & 1) != 0 ? handle >> 1 : nil
+    }
+
+    /// The storage that keeps this entry's place in the heap, if it uses it.
+    var storage: UnsafeMutableRawPointer? {
+      return (handle & 1) == 0 ? unsafe UnsafeMutableRawPointer(bitPattern: handle)
+                               : nil
+    }
+  }
+
+  /// What we keep in a job's own storage, which is the first two of its words:
+  /// where the job is in the heap, plus one so that the zero that the storage
+  /// starts out as means that it isn't (and is again once the job is taken
+  /// off the heap), and which of our wait queues the job is in.
+  private static func heapIndex(of job: UnownedJob) -> Int? {
+    let stored: Int = job.withUnsafeScheduledPrivateData { storage in
+      unsafe storage?.load(as: Int.self) ?? 0
+    }
+    return stored > 0 ? stored - 1 : nil
+  }
+
+  private static func setHeapIndex(_ index: Int?,
+                                   in storage: UnsafeMutableRawPointer) {
+    unsafe storage.storeBytes(of: index.map { $0 + 1 } ?? 0, as: Int.self)
+  }
+
+  /// Which of the executor's clocks a job in the heap is waiting on (see
+  /// `CooperativeExecutor.continuousClockToken`), kept next to its heap index.
+  static func clockToken(of job: UnownedJob) -> Int {
+    return job.withUnsafeScheduledPrivateData { storage in
+      unsafe storage?.load(fromByteOffset: MemoryLayout<Int>.stride,
+                           as: Int.self) ?? 0
+    }
+  }
+
+  static func setClockToken(_ token: Int, in storage: UnsafeMutableRawPointer) {
+    unsafe storage.storeBytes(of: token,
+                              toByteOffset: MemoryLayout<Int>.stride,
+                              as: Int.self)
   }
 
   /// Where each waiting job is in the heap, so that cancelling one doesn't
@@ -97,7 +160,13 @@ struct WaitQueue {
     let slots = self.slots
     queue = PriorityQueue(
       compare: { $0.deadline < $1.deadline },
-      didPlace: { slots.setHeapIndex($1, of: $0.slot) })
+      didPlace: {
+        if let slot = $0.slot {
+          slots.setHeapIndex($1, of: slot)
+        } else {
+          unsafe Self.setHeapIndex($1, in: $0.storage!)
+        }
+      })
     self.clock = clock
   }
 
@@ -118,12 +187,39 @@ struct WaitQueue {
     return slots.id(of: slot)
   }
 
+  /// Wait for a job that has storage of its own, which keeps where it is in
+  /// the heap, so that there is no ID and no slot.  The job is the token.
+  mutating func enqueueScheduled(_ job: UnownedJob,
+                                 storage: UnsafeMutableRawPointer,
+                                 after delay: CooperativeExecutor.Duration) {
+    let deadline = currentTime + delay
+    unsafe queue.push(Entry(job: job, deadline: deadline, storage: storage))
+  }
+
   mutating func forEachReadyJob(body: (consuming ExecutorJob) -> ()) {
     let now = currentTime
     while let entry = queue.pop(when: { $0.deadline < now }) {
-      slots.release(entry.slot)
+      if let slot = entry.slot {
+        slots.release(slot)
+      } else {
+        unsafe Self.setHeapIndex(nil, in: entry.storage!)
+      }
       body(ExecutorJob(entry.job))
     }
+  }
+
+  /// Remove a job that has its own storage, if it is still waiting.
+  ///
+  /// The job must not have been run, as it will have been freed if it has,
+  /// which is true of a job that the runtime scheduled for a `Task.sleep()`
+  /// and cancels it from its cancellation handler.
+  mutating func cancelScheduled(_ job: UnownedJob) -> ExecutorJob? {
+    guard let index = Self.heapIndex(of: job) else {
+      return nil
+    }
+    let entry = queue.remove(at: index)
+    unsafe Self.setHeapIndex(nil, in: entry.storage!)
+    return ExecutorJob(entry.job)
   }
 
   /// Remove the job with the specified ID, if it is still waiting.
@@ -169,6 +265,11 @@ struct WaitQueue {
 @available(StdlibDeploymentTarget 6.5, *)
 public final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
+
+  /// The queue that `runUntil(_:)` takes the jobs to run from.  It is swapped
+  /// with `runQueue` rather than replaced by a new queue, so that both keep
+  /// their storage and running a job allocates nothing once they have grown.
+  var runningQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   var suspendingWaitQueue = WaitQueue(clock: .suspending)
   var continuousWaitQueue = WaitQueue(clock: .continuous)
@@ -243,6 +344,7 @@ public final class CooperativeExecutor: Executor, @unchecked Sendable {
 
   public init() {
     runQueue = PriorityQueue(compare: { $0.priority > $1.priority })
+    runningQueue = PriorityQueue(compare: { $0.priority > $1.priority })
   }
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -291,6 +393,29 @@ extension CooperativeExecutor: SchedulingExecutor {
                                          : continuousClockToken)
   }
 
+  /// The second word of a token for a job that has its own storage, in which
+  /// the first word is the address of the job.  It can't be the second word
+  /// of any other token, whose halves are 32 bits and which has a generation
+  /// of at most 0x7fff_ffff in the high one, shifted left by one.
+  private static var addressTokenMarker: Int {
+    return Int(truncatingIfNeeded: UInt32.max)
+  }
+
+  /// A token for a job that has its own storage, which it refers to by address.
+  private static func tokenData(address job: UnownedJob) -> InlineArray<2, Int> {
+    return [unsafe unsafeBitCast(job, to: Int.self), addressTokenMarker]
+  }
+
+  /// The job that a token refers to by address, or nil if it isn't one.
+  private static func jobAddressed(by token: borrowing JobCancellationToken)
+    -> UnownedJob? {
+    guard UInt32(truncatingIfNeeded: token.opaqueData[1])
+            == UInt32(truncatingIfNeeded: addressTokenMarker) else {
+      return nil
+    }
+    return unsafe unsafeBitCast(token.opaqueData[0], to: UnownedJob.self)
+  }
+
   /// Returns `true` if `clock` is one of the clocks that we schedule ourselves.
   private func isKnown<C: Clock>(_ clock: C) -> Bool {
     return clock is ContinuousClock || clock is SuspendingClock
@@ -324,6 +449,25 @@ extension CooperativeExecutor: SchedulingExecutor {
     }
 
     let (delay, clockToken) = delay(run: fireTime, clock: clock)
+
+    // A job that the runtime scheduled has storage of its own, which is
+    // where we keep our bookkeeping for it, so that we don't need a slot or an
+    // ID, and the token is just the job.
+    if let storage = job.withUnsafeScheduledPrivateData(
+         body: { unsafe $0?.baseAddress }) {
+      unsafe WaitQueue.setClockToken(clockToken, in: storage)
+      let scheduled = UnownedJob(job)
+      if clockToken == Self.continuousClockToken {
+        unsafe continuousWaitQueue.enqueueScheduled(scheduled, storage: storage,
+                                                    after: delay)
+      } else {
+        unsafe suspendingWaitQueue.enqueueScheduled(scheduled, storage: storage,
+                                                    after: delay)
+      }
+      return unsafe JobCancellationToken(
+        canceller: self, opaqueData: Self.tokenData(address: scheduled))
+    }
+
     let id: UInt64
     if clockToken == Self.continuousClockToken {
       id = continuousWaitQueue.enqueue(job, after: delay)
@@ -341,15 +485,28 @@ extension CooperativeExecutor: SchedulingExecutor {
 
   public func cancel(jobWithToken token: borrowing JobCancellationToken)
     -> Bool {
-    let (id, clockToken) = Self.decode(token)
     let job: ExecutorJob?
-    switch clockToken {
-    case Self.continuousClockToken:
-      job = continuousWaitQueue.cancel(id: id)
-    case Self.suspendingClockToken:
-      job = suspendingWaitQueue.cancel(id: id)
-    default:
-      job = nil
+    if let scheduled = Self.jobAddressed(by: token) {
+      // A job with storage of its own, which the runtime only cancels while it
+      // is still waiting (and so while it is still there to look at).
+      switch WaitQueue.clockToken(of: scheduled) {
+      case Self.continuousClockToken:
+        job = continuousWaitQueue.cancelScheduled(scheduled)
+      case Self.suspendingClockToken:
+        job = suspendingWaitQueue.cancelScheduled(scheduled)
+      default:
+        job = nil
+      }
+    } else {
+      let (id, clockToken) = Self.decode(token)
+      switch clockToken {
+      case Self.continuousClockToken:
+        job = continuousWaitQueue.cancel(id: id)
+      case Self.suspendingClockToken:
+        job = suspendingWaitQueue.cancel(id: id)
+      default:
+        job = nil
+      }
     }
     // Run the job now, rather than when its timer fires.
     switch consume job {
@@ -396,8 +553,11 @@ extension CooperativeExecutor: RunLoopExecutor {
       #endif
 
       // Now run any queued jobs
-      var runQ = runQueue.take()
-      while let job = runQ.pop() {
+      // Jobs that are enqueued while we do that go in `runQueue`, which is
+      // empty (and keeps the storage that the queue that we have just drained
+      // had) after the swap.
+      swap(&runQueue, &runningQueue)
+      while let job = runningQueue.pop() {
         unsafe ExecutorJob(job).runSynchronously(
           on: self.asUnownedSerialExecutor()
         )

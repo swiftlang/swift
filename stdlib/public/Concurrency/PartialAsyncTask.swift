@@ -149,6 +149,46 @@ public struct UnownedJob: Sendable {
   public func claimForTimer() -> Bool {
     return _jobClaimForTimer(context)
   }
+
+  /// Execute a closure, passing it the executor's own storage for a job that
+  /// has been scheduled, if it has any.
+  ///
+  /// A job that the runtime scheduled itself, as `Task.sleep()` does with the
+  /// continuation that it is waiting on, has eight words of storage, zeroed
+  /// when the job is created, for the scheduler that it was given to: enough
+  /// for a scheduler to keep what it needs for the timer (links, a heap index,
+  /// the deadline) in the job, instead of allocating something.  Any other
+  /// job has none, and the closure is passed `nil`; a scheduler then has to
+  /// keep what it needs somewhere else, such as the job's executor private
+  /// data (see `withUnsafeExecutorPrivateData`), which is two words long, or
+  /// in an allocation of its own.
+  ///
+  /// The storage belongs to the scheduler from when it is given the job (when
+  /// `schedule` is called) until it runs the job, or until a cancellation that
+  /// it was asked for has run it, so it can be used for whatever the scheduler
+  /// likes in that time.  It is not valid after the job has run, since running
+  /// it can free it; and, as with the executor private data, the scheduler is
+  /// responsible for making sure that anything that it refers to is cleaned up
+  /// before the job is run.
+  ///
+  /// Parameters:
+  ///
+  /// - body: The closure to execute.  It is given `nil` for a job with no
+  ///         storage; otherwise the storage, which is aligned for a pointer.
+  ///
+  /// Returns the result of executing the closure.
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 6.5, *)
+  @safe public func withUnsafeScheduledPrivateData<R, E>(
+    body: (UnsafeMutableRawBufferPointer?) throws(E) -> R
+  ) throws(E) -> R {
+    guard let base = unsafe _jobGetScheduledPrivateData(context) else {
+      return try body(nil)
+    }
+    let size = unsafe 8 * MemoryLayout<OpaquePointer>.stride
+    return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
+                                                         count: size))
+  }
   #endif
 
 
@@ -476,6 +516,46 @@ public struct ExecutorJob: Sendable, ~Copyable {
   @available(StdlibDeploymentTarget 6.5, *)
   public borrowing func claimForTimer() -> Bool {
     return _jobClaimForTimer(self.context)
+  }
+
+  /// Execute a closure, passing it the executor's own storage for a job that
+  /// has been scheduled, if it has any.
+  ///
+  /// A job that the runtime scheduled itself, as `Task.sleep()` does with the
+  /// continuation that it is waiting on, has eight words of storage, zeroed
+  /// when the job is created, for the scheduler that it was given to: enough
+  /// for a scheduler to keep what it needs for the timer (links, a heap index,
+  /// the deadline) in the job, instead of allocating something.  Any other
+  /// job has none, and the closure is passed `nil`; a scheduler then has to
+  /// keep what it needs somewhere else, such as the job's executor private
+  /// data (see `withUnsafeExecutorPrivateData`), which is two words long, or
+  /// in an allocation of its own.
+  ///
+  /// The storage belongs to the scheduler from when it is given the job (when
+  /// `schedule` is called) until it runs the job, or until a cancellation that
+  /// it was asked for has run it, so it can be used for whatever the scheduler
+  /// likes in that time.  It is not valid after the job has run, since running
+  /// it can free it; and, as with the executor private data, the scheduler is
+  /// responsible for making sure that anything that it refers to is cleaned up
+  /// before the job is run.
+  ///
+  /// Parameters:
+  ///
+  /// - body: The closure to execute.  It is given `nil` for a job with no
+  ///         storage; otherwise the storage, which is aligned for a pointer.
+  ///
+  /// Returns the result of executing the closure.
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 6.5, *)
+  @safe public func withUnsafeScheduledPrivateData<R, E>(
+    body: (UnsafeMutableRawBufferPointer?) throws(E) -> R
+  ) throws(E) -> R {
+    guard let base = unsafe _jobGetScheduledPrivateData(self.context) else {
+      return try body(nil)
+    }
+    let size = unsafe 8 * MemoryLayout<OpaquePointer>.stride
+    return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
+                                                         count: size))
   }
   #endif
 
