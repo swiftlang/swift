@@ -858,7 +858,7 @@ public:
   std::optional<ScopeRef> lookUpScopeParam(ScopeName name) const;
 
   /// The scope of the access of the declaration's parameter \p index relative
-  /// to this binder, or `nullopt` if its binding was diagnosed.
+  /// to this binder, or an error scope if its binding was diagnosed.
   ScopeRef lookUpParamAccess(unsigned index) const;
 
   /// The scope of the access of `self` relative to this binder, which the
