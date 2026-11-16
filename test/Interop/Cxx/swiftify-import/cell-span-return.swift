@@ -37,7 +37,9 @@ module CellSpanReturn {
 //--- Inputs/cell-span-return.h
 #pragma once
 
-#include <ptrcheck.h>
+// Spell out the attribute instead of using ptrcheck.h's __counted_by: on Linux,
+// newer kernel headers define an empty __counted_by that the std module
+// exports, and it can win over ptrcheck.h's definition.
 #include <span>
 
 using IntSpan = std::span<int>;
@@ -96,7 +98,7 @@ struct Container {
 // }}
 inline IntSpan viewOf(Container &c [[clang::lifetimebound]]) { return c.view(); }
 
-// expected-cells-expansion@+22:85{{
+// expected-cells-expansion@+22:104{{
 //   expected-cells-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-cells-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(&c) @_disfavoredOverload public func countedView(_ c: inout Container, _ n: CInt) -> Span<Swift::Cell<CInt>> {|}}
 //   expected-cells-remark@3{{macro content: |    let _resultValue: UnsafeMutablePointer<CInt>? = unsafe countedView(&c, n)|}}
@@ -107,7 +109,7 @@ inline IntSpan viewOf(Container &c [[clang::lifetimebound]]) { return c.view(); 
 //   expected-cells-remark@8{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span<Swift::Cell<CInt>>(_unsafeStart: UnsafeRawPointer(_resultValue!).assumingMemoryBound(to: Swift::Cell<CInt>.self), count: Int(n)), copying: ())|}}
 //   expected-cells-remark@9{{macro content: |}|}}
 // }}
-// expected-legacy-expansion@+11:85{{
+// expected-legacy-expansion@+11:104{{
 //   expected-legacy-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-legacy-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(&c) @_disfavoredOverload public func countedView(_ c: inout Container, _ n: CInt) -> MutableSpan<CInt> {|}}
 //   expected-legacy-remark@3{{macro content: |    let _resultValue: UnsafeMutablePointer<CInt>? = unsafe countedView(&c, n)|}}
@@ -118,9 +120,9 @@ inline IntSpan viewOf(Container &c [[clang::lifetimebound]]) { return c.view(); 
 //   expected-legacy-remark@8{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(n)), copying: ())|}}
 //   expected-legacy-remark@9{{macro content: |}|}}
 // }}
-inline int *__counted_by(n) countedView(Container &c [[clang::lifetimebound]], int n) { return c.data; }
+inline int *__attribute__((__counted_by__(n))) countedView(Container &c [[clang::lifetimebound]], int n) { return c.data; }
 
-// expected-cells-expansion@+22:102{{
+// expected-cells-expansion@+22:121{{
 //   expected-cells-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-cells-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow c) @_disfavoredOverload public func constCountedView(_ c: borrowing @_addressable Container, _ n: CInt) -> Span<Swift::ConstCell<CInt>> {|}}
 //   expected-cells-remark@3{{macro content: |    let _resultValue: UnsafePointer<CInt>? = unsafe constCountedView(c, n)|}}
@@ -131,7 +133,7 @@ inline int *__counted_by(n) countedView(Container &c [[clang::lifetimebound]], i
 //   expected-cells-remark@8{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span<Swift::ConstCell<CInt>>(_unsafeStart: UnsafeRawPointer(_resultValue!).assumingMemoryBound(to: Swift::ConstCell<CInt>.self), count: Int(n)), copying: ())|}}
 //   expected-cells-remark@9{{macro content: |}|}}
 // }}
-// expected-legacy-expansion@+11:102{{
+// expected-legacy-expansion@+11:121{{
 //   expected-legacy-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-legacy-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow c) @_disfavoredOverload public func constCountedView(_ c: borrowing @_addressable Container, _ n: CInt) -> Span<CInt> {|}}
 //   expected-legacy-remark@3{{macro content: |    let _resultValue: UnsafePointer<CInt>? = unsafe constCountedView(c, n)|}}
@@ -142,7 +144,7 @@ inline int *__counted_by(n) countedView(Container &c [[clang::lifetimebound]], i
 //   expected-legacy-remark@8{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span<CInt>(_unsafeStart: _resultValue!, count: Int(n)), copying: ())|}}
 //   expected-legacy-remark@9{{macro content: |}|}}
 // }}
-inline const int *__counted_by(n) constCountedView(const Container &c [[clang::lifetimebound]], int n) { return c.data; }
+inline const int *__attribute__((__counted_by__(n))) constCountedView(const Container &c [[clang::lifetimebound]], int n) { return c.data; }
 
 // expected-wrapped-expansion@+6:31{{
 //   expected-wrapped-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
@@ -153,7 +155,7 @@ inline const int *__counted_by(n) constCountedView(const Container &c [[clang::l
 inline int &refOf(Container &c [[clang::lifetimebound]]) { return c.data[0]; }
 
 // A lifetimebound parameter with bounds info becomes a Span.
-// expected-cells-expansion@+36:91{{
+// expected-cells-expansion@+36:129{{
 //   expected-cells-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-cells-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func forward(_ p: inout MutableSpan<CInt>) -> Span<Swift::Cell<CInt>> {|}}
 //   expected-cells-remark@3{{macro content: |    let n = CInt(exactly: p.count)!|}}
@@ -171,7 +173,7 @@ inline int &refOf(Container &c [[clang::lifetimebound]]) { return c.data[0]; }
 //   expected-cells-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(Span<Swift::Cell<CInt>>(_unsafeStart: UnsafeRawPointer(_resultValue!).assumingMemoryBound(to: Swift::Cell<CInt>.self), count: Int(n)), copying: ())|}}
 //   expected-cells-remark@16{{macro content: |}|}}
 // }}
-// expected-legacy-expansion@+18:91{{
+// expected-legacy-expansion@+18:129{{
 //   expected-legacy-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-legacy-remark@2{{macro content: |@_alwaysEmitIntoClient @inline(always) @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func forward(_ p: inout MutableSpan<CInt>) -> MutableSpan<CInt> {|}}
 //   expected-legacy-remark@3{{macro content: |    let n = CInt(exactly: p.count)!|}}
@@ -189,7 +191,7 @@ inline int &refOf(Container &c [[clang::lifetimebound]]) { return c.data[0]; }
 //   expected-legacy-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(n)), copying: ())|}}
 //   expected-legacy-remark@16{{macro content: |}|}}
 // }}
-inline int *__counted_by(n) forward(int *__counted_by(n) p [[clang::lifetimebound]], int n) { return p; }
+inline int *__attribute__((__counted_by__(n))) forward(int *__attribute__((__counted_by__(n))) p [[clang::lifetimebound]], int n) { return p; }
 
 // A noescape std::span parameter becomes a Span.
 // expected-cells-expansion@+17:73{{
@@ -213,7 +215,7 @@ inline IntSpan withSpanParam(IntSpan s [[clang::noescape]], Container &c [[clang
 
 // The count cannot be expressed in Swift, so the return value is not a Span and
 // lifetimebound is not supported outside the legacy mode.
-inline int *__counted_by(*len) unprintableCount(Container &c [[clang::lifetimebound]], const int *__counted_by(m) p, int m, int *len) { return c.data; }
+inline int *__attribute__((__counted_by__(*len))) unprintableCount(Container &c [[clang::lifetimebound]], const int *__attribute__((__counted_by__(m))) p, int m, int *len) { return c.data; }
 
 // Cell requires an Escapable element.
 struct __attribute__((swift_attr("~Escapable"))) View {
