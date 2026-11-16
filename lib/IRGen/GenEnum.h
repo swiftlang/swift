@@ -13,6 +13,7 @@
 #ifndef SWIFT_IRGEN_GENENUM_H
 #define SWIFT_IRGEN_GENENUM_H
 
+#include "swift/AST/Decl.h"
 #include "TypeInfo.h"
 #include "LoadableTypeInfo.h"
 #include <optional>
@@ -41,6 +42,7 @@ namespace irgen {
 
 namespace swift {
   class EnumElementDecl;
+  class MissingMemberDecl;
   enum IsInitialization_t : bool;
   enum IsTake_t : bool;
 
@@ -135,9 +137,16 @@ llvm::APInt scatterBits(const llvm::APInt &mask, unsigned value);
 class EnumImplStrategy {
 public:
   struct Element {
-    EnumElementDecl *decl;
+    /// Either the semantic case declaration or a layout-only missing member.
+    EnumElementLayoutMemberView layoutMember;
     const TypeInfo *ti;
     const TypeInfo *origTI;
+
+    Element(EnumElementLayoutMemberView layoutMember, const TypeInfo *ti,
+            const TypeInfo *origTI)
+        : layoutMember(layoutMember), ti(ti), origTI(origTI) {}
+
+    SILType getPayloadType(IRGenModule &IGM, SILType enumType) const;
   };
   
   enum TypeInfoKind {
@@ -147,6 +156,8 @@ public:
   };
   
 protected:
+  using ElementIterator = std::vector<Element>::const_iterator;
+
   std::vector<Element> ElementsWithPayload;
   std::vector<Element> ElementsWithNoPayload;
   IRGenModule &IGM;
@@ -158,6 +169,13 @@ protected:
   IsCopyable_t Copyable;
   IsBitwiseTakable_t BitwiseTakable;
   unsigned NumElements;
+
+  /// Find a semantic enum element without removing layout-only elements from
+  /// the ABI-significant element sequence.
+  static ElementIterator findElement(const std::vector<Element> &elements,
+                                     EnumElementDecl *decl);
+  static ElementIterator findElement(const std::vector<Element> &elements,
+                                     const Element &target);
   
   EnumImplStrategy(IRGenModule &IGM,
                    TypeInfoKind tik,
@@ -236,6 +254,7 @@ public:
   }
 
   /// Return a tag index in the range [0..NumElements].
+  unsigned getTagIndex(const Element &element) const;
   unsigned getTagIndex(EnumElementDecl *Case) const;
 
   /// Map the given element to the appropriate index in the
@@ -259,7 +278,7 @@ public:
   
   /// Return the bit pattern used for the given no-payload case.
   virtual ClusteredBitVector
-  getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const = 0;
+  getBitPatternForNoPayloadElement(const Element &element) const = 0;
 
   /// Return the bit mask used to test for no-payload cases.
   virtual ClusteredBitVector

@@ -1141,13 +1141,11 @@ private:
     B.addInt32(strategy.getElementsWithPayload().size()
                + strategy.getElementsWithNoPayload().size());
 
-    for (auto enumCase : strategy.getElementsWithPayload()) {
-      addField(enumDecl, enumCase.decl, /*has payload*/ true);
-    }
+    for (auto enumCase : strategy.getElementsWithPayload())
+      addField(enumDecl, enumCase.getEnumElementDecl(), /*has payload*/ true);
 
-    for (auto enumCase : strategy.getElementsWithNoPayload()) {
-      addField(enumDecl, enumCase.decl, /*has payload*/ false);
-    }
+    for (auto enumCase : strategy.getElementsWithNoPayload())
+      addField(enumDecl, enumCase.getEnumElementDecl(), /*has payload*/ false);
   }
 
   void layoutProtocol() {

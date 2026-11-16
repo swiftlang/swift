@@ -5380,7 +5380,9 @@ public:
         // For a resilient enum, we don't care and just drop the element
         // and continue.
         return llvm::make_error<TypeError>(
-          name, takeErrorInfo(dependency.takeError()));
+            name, takeErrorInfo(dependency.takeError()),
+            DeclDeserializationError::Flags(), 0,
+            memberAbstractTypeLayoutID);
       }
     }
 
@@ -5400,9 +5402,13 @@ public:
 
     // Read payload parameter list, if it exists.
     if (hasPayload) {
-      ParameterList *paramList;
-      SET_OR_RETURN_ERROR(paramList, MF.readParameterList());
-      elem->setParameterList(paramList);
+      auto paramList = MF.readParameterList();
+      if (!paramList)
+        return llvm::make_error<TypeError>(
+            name, takeErrorInfo(paramList.takeError()),
+            DeclDeserializationError::Flags(), 0,
+            memberAbstractTypeLayoutID);
+      elem->setParameterList(paramList.get());
     }
 
     // Deserialize the literal raw value, if any.
@@ -9483,7 +9489,7 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
                                                   containingProto);
   }
 
-  if (auto *containingStruct = dyn_cast<StructDecl>(container)) {
+  if (isa<StructDecl, EnumDecl>(container)) {
     auto errorInfo = takeErrorInfo(std::move(error));
     if (errorInfo->isA<DeclDeserializationError>()) {
       auto *declError = static_cast<DeclDeserializationError *>(errorInfo.get());
@@ -9491,9 +9497,16 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
         auto layout = getAbstractMemberTypeLayout(layoutID);
         if (!layout)
           fatal(layout.takeError());
+        bool hasStorage = false;
+        if (isa<StructDecl>(container)) {
+          hasStorage = declError->needsFieldOffsetVectorEntry();
+        } else {
+          assert(!declError->needsFieldOffsetVectorEntry() &&
+                 "enum elements do not have field-offset vector entries");
+        }
         auto *missing = MissingMemberDecl::create(
-            context, containingStruct, declError->getName(), 0,
-            declError->needsFieldOffsetVectorEntry(), layout.get());
+            context, cast<NominalTypeDecl>(container), declError->getName(), 0,
+            hasStorage, layout.get());
         diagnoseAndConsumeError(std::move(errorInfo));
         return missing;
       }

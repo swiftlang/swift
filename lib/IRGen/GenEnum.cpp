@@ -192,6 +192,33 @@ void EnumImplStrategy::initializeFromParams(IRGenFunction &IGF,
 
 bool EnumImplStrategy::isReflectable() const { return true; }
 
+SILType EnumImplStrategy::Element::getPayloadType(IRGenModule &IGM,
+                                                  SILType enumType) const {
+  return enumType.getEnumElementType(
+      layoutMember, IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+}
+
+EnumImplStrategy::ElementIterator
+EnumImplStrategy::findElement(const std::vector<Element> &elements,
+                              EnumElementDecl *decl) {
+  assert(decl && "cannot find a null enum element declaration");
+  return std::find_if(elements.begin(), elements.end(),
+                      [&](const Element &element) {
+                        return element.layoutMember.getEnumElementDeclOrNull() ==
+                               decl;
+                      });
+}
+
+EnumImplStrategy::ElementIterator
+EnumImplStrategy::findElement(const std::vector<Element> &elements,
+                              const Element &target) {
+  return std::find_if(elements.begin(), elements.end(),
+                      [&](const Element &element) {
+                        return element.layoutMember.getDecl() ==
+                               target.layoutMember.getDecl();
+                      });
+}
+
 unsigned EnumImplStrategy::getPayloadSizeForMetadata() const {
   llvm_unreachable("don't need payload size for this enum kind");
 }
@@ -204,17 +231,13 @@ loadRefcountedPtr(IRGenFunction &IGF, SourceLoc loc, Address addr) const {
 }
 
 const TypeInfo &EnumImplStrategy::getTypeInfoForPayloadCase(EnumElementDecl *theCase) const {
-  auto payloadI = std::find_if(ElementsWithPayload.begin(),
-                               ElementsWithPayload.end(),
-   [&](const Element &e) { return e.decl == theCase; });
+  auto payloadI = findElement(ElementsWithPayload, theCase);
   assert (payloadI != ElementsWithPayload.end());
   return *(payloadI->ti);
 }
 
 bool EnumImplStrategy::isPayloadCase(EnumElementDecl *theCase) const {
-  auto payloadI = std::find_if(ElementsWithPayload.begin(),
-                               ElementsWithPayload.end(),
-   [&](const Element &e) { return e.decl == theCase; });
+  auto payloadI = findElement(ElementsWithPayload, theCase);
   return (payloadI != ElementsWithPayload.end());
 }
 
@@ -223,9 +246,7 @@ EnumImplStrategy::projectDataForStore(IRGenFunction &IGF,
                                       EnumElementDecl *elt,
                                       Address enumAddr)
 const {
-  auto payloadI = std::find_if(ElementsWithPayload.begin(),
-                               ElementsWithPayload.end(),
-     [&](const Element &e) { return e.decl == elt; });
+  auto payloadI = findElement(ElementsWithPayload, elt);
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
@@ -246,9 +267,7 @@ EnumImplStrategy::destructiveProjectDataForLoad(IRGenFunction &IGF,
                                                 Address enumAddr,
                                                 EnumElementDecl *Case)
 const {
-  auto payloadI = std::find_if(ElementsWithPayload.begin(),
-                           ElementsWithPayload.end(),
-                           [&](const Element &e) { return e.decl == Case; });
+  auto payloadI = findElement(ElementsWithPayload, Case);
 
   // Empty payload addresses can be left undefined.
   if (payloadI == ElementsWithPayload.end()) {
@@ -266,19 +285,28 @@ const {
 }
 
 unsigned
-EnumImplStrategy::getTagIndex(EnumElementDecl *Case) const {
-  unsigned tagIndex = 0;
-  for (auto &payload : ElementsWithPayload) {
-    if (payload.decl == Case)
-      return tagIndex;
-    ++tagIndex;
-  }
-  for (auto &payload : ElementsWithNoPayload) {
-    if (payload.decl == Case)
-      return tagIndex;
-    ++tagIndex;
-  }
+EnumImplStrategy::getTagIndex(const Element &element) const {
+  auto payload = findElement(ElementsWithPayload, element);
+  if (payload != ElementsWithPayload.end())
+    return payload - ElementsWithPayload.begin();
+
+  auto noPayload = findElement(ElementsWithNoPayload, element);
+  if (noPayload != ElementsWithNoPayload.end())
+    return ElementsWithPayload.size() +
+           (noPayload - ElementsWithNoPayload.begin());
+
   llvm_unreachable("couldn't find case");
+}
+
+unsigned
+EnumImplStrategy::getTagIndex(EnumElementDecl *Case) const {
+  auto payload = findElement(ElementsWithPayload, Case);
+  if (payload != ElementsWithPayload.end())
+    return getTagIndex(*payload);
+
+  auto noPayload = findElement(ElementsWithNoPayload, Case);
+  assert(noPayload != ElementsWithNoPayload.end() && "case not in enum");
+  return getTagIndex(*noPayload);
 }
 
 static void emitResilientTagIndex(IRGenModule &IGM,
@@ -295,11 +323,15 @@ static void emitResilientTagIndex(IRGenModule &IGM,
 
 void
 EnumImplStrategy::emitResilientTagIndices(IRGenModule &IGM) const {
+  // Resilient tag-index globals are emitted only by the enum's defining
+  // module, so every strategy element must have a complete EnumElementDecl.
   for (auto &payload : ElementsWithPayload) {
-    emitResilientTagIndex(IGM, this, payload.decl);
+    emitResilientTagIndex(IGM, this,
+                          payload.layoutMember.getEnumElementDecl());
   }
   for (auto &noPayload : ElementsWithNoPayload) {
-    emitResilientTagIndex(IGM, this, noPayload.decl);
+    emitResilientTagIndex(IGM, this,
+                          noPayload.layoutMember.getEnumElementDecl());
   }
 }
 
@@ -375,9 +407,7 @@ namespace {
     SILType getSingletonType(IRGenModule &IGM, SILType T) const {
       assert(!ElementsWithPayload.empty());
 
-      return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  IGM.getSILModule(),
-                                  IGM.getMaximalTypeExpansionContext());
+      return ElementsWithPayload[0].getPayloadType(IGM, T);
     }
 
   public:
@@ -723,9 +753,7 @@ namespace {
       assert(ElementsWithPayload.size() == 1 &&
              "empty singleton enum should not be dynamic!");
 
-      auto payloadTy = T.getEnumElementType(
-          ElementsWithPayload[0].decl, IGM.getSILModule(),
-          IGM.getMaximalTypeExpansionContext());
+      auto payloadTy = ElementsWithPayload[0].getPayloadType(IGM, T);
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto flags = emitEnumLayoutFlags(IGF.IGM, isVWTMutable);
       IGF.Builder.CreateCall(
@@ -754,9 +782,7 @@ namespace {
       assert(ElementsWithPayload.size() == 1 &&
              "empty singleton enum should not be dynamic!");
 
-      auto payloadTy =
-          T.getEnumElementType(ElementsWithPayload[0].decl, IGM.getSILModule(),
-                               IGM.getMaximalTypeExpansionContext());
+      auto payloadTy = ElementsWithPayload[0].getPayloadType(IGM, T);
 
       auto request = DynamicMetadataRequest::getNonBlocking(
           MetadataState::LayoutComplete, collector);
@@ -888,7 +914,7 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
+    getBitPatternForNoPayloadElement(const Element &element) const override {
       // There's only a no-payload element if the type is empty.
       return {};
     }
@@ -1148,9 +1174,9 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
+    getBitPatternForNoPayloadElement(const Element &element) const override {
       Size size = cast<FixedTypeInfo>(TI)->getFixedSize();
-      auto val = getDiscriminatorIdxConst(theCase)->getValue();
+      APInt val(getDiscriminatorType()->getBitWidth(), getTagIndex(element));
       return ClusteredBitVector::fromAPInt(zextOrSelf(val, size.getValueInBits()));
     }
 
@@ -1813,14 +1839,12 @@ namespace {
                                                       T, getTypeInfo());
     }
 
-    EnumElementDecl *getPayloadElement() const {
-      return ElementsWithPayload[0].decl;
+    EnumElementDecl *getPayloadElementOrNull() const {
+      return ElementsWithPayload[0].layoutMember.getEnumElementDeclOrNull();
     }
 
     SILType getPayloadType(IRGenModule &IGM, SILType T) const {
-      return T.getEnumElementType(ElementsWithPayload[0].decl,
-                                  IGM.getSILModule(),
-                                  IGM.getMaximalTypeExpansionContext());
+      return ElementsWithPayload[0].getPayloadType(IGM, T);
     }
 
     const TypeInfo &getPayloadTypeInfo() const {
@@ -2280,14 +2304,18 @@ namespace {
       // If we're testing for the payload element, we cannot directly check to
       // see whether it is present (in full generality) without doing a switch.
       // Try some easy cases, then bail back to the general case.
-      if (Case == getPayloadElement()) {
+      if (Case == getPayloadElementOrNull()) {
         // If the Enum only contains two cases, test for the non-payload case
         // and invert the result.
         assert(ElementsWithPayload.size() == 1 && "Should have one payload");
         if (ElementsWithNoPayload.size() == 1) {
-          auto *InvertedResult = emitValueCaseTest(IGF, value,
-                                                 ElementsWithNoPayload[0].decl);
-          return IGF.Builder.CreateNot(InvertedResult);
+          if (auto *noPayloadDecl =
+                  ElementsWithNoPayload[0]
+                      .layoutMember.getEnumElementDeclOrNull()) {
+            auto *InvertedResult =
+                emitValueCaseTest(IGF, value, noPayloadDecl);
+            return IGF.Builder.CreateNot(InvertedResult);
+          }
         }
         
         // Otherwise, just fall back to emitting a switch to decide.  Maybe LLVM
@@ -2312,7 +2340,7 @@ namespace {
         return Phi;
       }
 
-      assert(Case != getPayloadElement());
+      assert(Case != getPayloadElementOrNull());
 
       // Destructure the value into its payload + tag bit components, each is
       // optional.
@@ -2399,6 +2427,8 @@ namespace {
         defaultDest = unreachableBB;
 
       auto blockForCase = [&](EnumElementDecl *theCase) -> llvm::BasicBlock* {
+        if (!theCase)
+          return defaultDest;
         auto found = destMap.find(theCase);
         if (found == destMap.end())
           return defaultDest;
@@ -2407,7 +2437,8 @@ namespace {
       };
 
       auto payload = EnumPayload::fromExplosion(IGF.IGM, value, PayloadSchema);
-      llvm::BasicBlock *payloadDest = blockForCase(getPayloadElement());
+      llvm::BasicBlock *payloadDest =
+          blockForCase(getPayloadElementOrNull());
       unsigned extraInhabitantCount = getNumExtraInhabitantTagValues();
 
       auto elements = ElementsWithNoPayload;
@@ -2418,7 +2449,7 @@ namespace {
         assert(elti != eltEnd);
         Element elt = *elti;
         ++elti;
-        return elt.decl;
+        return elt.layoutMember.getEnumElementDeclOrNull();
       };
       
       // If there are extra tag bits, switch over them first.
@@ -2579,11 +2610,15 @@ namespace {
                          dests.size());
 
       auto emitCase = [&](Element elt) {
-        auto tagVal =
-            llvm::ConstantInt::get(IGF.IGM.Int32Ty, getTagIndex(elt.decl));
-        auto found = destMap.find(elt.decl);
-        if (found != destMap.end())
+        auto *decl = elt.layoutMember.getEnumElementDeclOrNull();
+        if (!decl)
+          return;
+        auto found = destMap.find(decl);
+        if (found != destMap.end()) {
+          auto tagVal =
+              llvm::ConstantInt::get(IGF.IGM.Int32Ty, getTagIndex(decl));
           swi->addCase(tagVal, found->second);
+        }
       };
 
       for (auto &elt : ElementsWithPayload)
@@ -2623,7 +2658,7 @@ namespace {
                           Explosion &out) const override {
       // Only the payload case has anything to project. The other cases are
       // empty.
-      if (theCase != getPayloadElement()) {
+      if (theCase != getPayloadElementOrNull()) {
         (void)inEnum.claim(getExplosionSize());
         return;
       }
@@ -2639,9 +2674,7 @@ namespace {
     // Get the payload and extra tag (if any) parts of the discriminator for
     // a no-data case.
     std::pair<APInt, APInt>
-    getNoPayloadCaseValue(EnumElementDecl *elt) const {
-      assert(elt != getPayloadElement());
-
+    getNoPayloadCaseValue(const Element &elt) const {
       unsigned payloadSize
         = getFixedPayloadTypeInfo().getFixedSize().getValueInBits();
 
@@ -2683,6 +2716,14 @@ namespace {
       return {payload, extraTag};
     }
 
+    std::pair<APInt, APInt>
+    getNoPayloadCaseValue(EnumElementDecl *elt) const {
+      assert(elt != getPayloadElementOrNull());
+      auto element = findElement(ElementsWithNoPayload, elt);
+      assert(element != ElementsWithNoPayload.end() && "case not in enum");
+      return getNoPayloadCaseValue(*element);
+    }
+
   public:
     void emitValueInjection(IRGenModule &IGM,
                             IRBuilder &builder,
@@ -2691,7 +2732,7 @@ namespace {
                             Explosion &out) const override {
       // The payload case gets its native representation. If there are extra
       // tag bits, set them to zero.
-      if (elt == getPayloadElement()) {
+      if (elt == getPayloadElementOrNull()) {
         auto payload = EnumPayload::zero(IGM, PayloadSchema);
         auto &loadablePayloadTI = getLoadablePayloadTypeInfo();
         loadablePayloadTI.packIntoEnumPayload(IGM, builder, payload, params, 0);
@@ -2749,11 +2790,10 @@ namespace {
         
         SmallVector<std::pair<APInt, llvm::BasicBlock*>, 4> cases;
         
-        auto elements = getPayloadElement()->getParentEnum()->getAllElements();
         unsigned inhabitant = 0;
-        for (auto i = elements.begin(), end = elements.end();
-             i != end && inhabitant < numExtraInhabitants;
-             ++i, ++inhabitant) {
+        for (; inhabitant < NumElements &&
+               inhabitant < numExtraInhabitants;
+             ++inhabitant) {
           auto xi = getFixedPayloadTypeInfo()
             .getFixedExtraInhabitantValue(IGF.IGM, bitWidth, inhabitant);
           cases.push_back({xi, nonzeroBB});
@@ -3481,12 +3521,10 @@ namespace {
       if (TIK < Fixed) {
         // If the enum isn't fixed-layout, get the runtime to do this for us.
         llvm::Value *caseIndex;
-        if (Case == getPayloadElement()) {
+        if (Case == getPayloadElementOrNull()) {
           caseIndex = llvm::ConstantInt::get(IGM.Int32Ty, 0);
         } else {
-          auto found = std::find_if(ElementsWithNoPayload.begin(),
-                                    ElementsWithNoPayload.end(),
-                                    [&](Element a) { return a.decl == Case; });
+          auto found = findElement(ElementsWithNoPayload, Case);
           assert(found != ElementsWithNoPayload.end() &&
                  "case not in enum?!");
           unsigned caseIndexVal = found - ElementsWithNoPayload.begin() + 1;
@@ -3506,7 +3544,7 @@ namespace {
         return;
       }
 
-      if (Case == getPayloadElement()) {
+      if (Case == getPayloadElementOrNull()) {
         // The data occupies the entire payload. If we have extra tag bits,
         // zero them out.
         if (ExtraTagBitCount > 0)
@@ -3553,9 +3591,7 @@ namespace {
 
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
-      auto payloadTy =
-          T.getEnumElementType(ElementsWithPayload[0].decl, IGM.getSILModule(),
-                               IGM.getMaximalTypeExpansionContext());
+      auto payloadTy = ElementsWithPayload[0].getPayloadType(IGM, T);
       auto payloadLayout = emitTypeLayoutRef(IGF, payloadTy, collector);
       auto emptyCasesVal = llvm::ConstantInt::get(IGM.Int32Ty,
                                                   ElementsWithNoPayload.size());
@@ -3574,9 +3610,7 @@ namespace {
 
       // Ask the runtime to do our layout using the payload metadata and number
       // of empty cases.
-      auto payloadTy =
-          T.getEnumElementType(ElementsWithPayload[0].decl, IGM.getSILModule(),
-                               IGM.getMaximalTypeExpansionContext());
+      auto payloadTy = ElementsWithPayload[0].getPayloadType(IGM, T);
 
       auto request = DynamicMetadataRequest::getNonBlocking(
           MetadataState::LayoutComplete, collector);
@@ -3806,9 +3840,9 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
+    getBitPatternForNoPayloadElement(const Element &element) const override {
       APInt payloadPart, extraPart;
-      std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(theCase);
+      std::tie(payloadPart, extraPart) = getNoPayloadCaseValue(element);
       auto value = BitPatternBuilder(IGM.Triple.isLittleEndian());
       if (PayloadBitCount > 0)
         value.append(payloadPart);
@@ -3923,8 +3957,7 @@ namespace {
       unsigned emptyCases = ElementsWithNoPayload.size();
       std::vector<TypeLayoutEntry*> nonEmptyCases;
       for (auto &elt : ElementsWithPayload) {
-        auto eltPayloadType = T.getEnumElementType(
-            elt.decl, IGM.getSILModule(), IGM.getMaximalTypeExpansionContext());
+        auto eltPayloadType = elt.getPayloadType(IGM, T);
 
         nonEmptyCases.push_back(
             elt.ti->buildTypeLayoutEntry(IGM, eltPayloadType, useStructLayouts));
@@ -3991,9 +4024,7 @@ namespace {
         projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
         lti.consume(IGF, value, IGF.getDefaultAtomicity(),
-                    type.getEnumElementType(elt.decl,
-                                          IGM.getSILTypes(),
-                                          IGM.getMaximalTypeExpansionContext()));
+                    elt.getPayloadType(IGM, type));
       });
 
       IGF.Builder.CreateRetVoid();
@@ -4424,7 +4455,7 @@ namespace {
       // testing the tag. Scan until we find the right one.
       unsigned tagIndex = 0;
       for (auto &payloadCasePair : ElementsWithPayload) {
-        if (payloadCasePair.decl == Case) {
+        if (payloadCasePair.layoutMember.getEnumElementDeclOrNull() == Case) {
           llvm::Value *caseValue
             = llvm::ConstantInt::get(C, APInt(numTagBits,tagIndex));
           return IGF.Builder.CreateICmpEQ(parts.tag, caseValue);
@@ -4447,7 +4478,7 @@ namespace {
 
         // Look through the cases for this tag.
         for (unsigned idx = 0; idx < casesPerTag && elti != eltEnd; ++idx) {
-          if (elti->decl == Case) {
+          if (elti->layoutMember.getEnumElementDeclOrNull() == Case) {
             tagValue = llvm::ConstantInt::get(C, APInt(numTagBits,tagIndex));
             payloadValue = getEmptyCasePayload(IGM, tagIndex, idx);
             goto found_empty_case;
@@ -4460,6 +4491,7 @@ namespace {
       llvm_unreachable("Didn't find case decl");
       
     found_empty_case:
+
       llvm::Value *match = IGF.Builder.CreateICmpEQ(parts.tag, tagValue);
       if (!CommonSpareBits.empty()) {
         auto payloadMatch = parts.payload
@@ -4499,7 +4531,8 @@ namespace {
       unsigned numPayloadBranches = std::count_if(ElementsWithPayload.begin(),
                                                   ElementsWithPayload.end(),
         [&](const Element &e) -> bool {
-          return destMap.find(e.decl) != destMap.end();
+          auto *decl = e.layoutMember.getEnumElementDeclOrNull();
+          return decl && destMap.find(decl) != destMap.end();
         });
       // We have one for each group of empty tags corresponding to a tag value
       // for which we have a case corresponding to at least one member of the
@@ -4511,8 +4544,9 @@ namespace {
         for (unsigned i = 0;
              i < casesPerTag && noPayloadI < ElementsWithNoPayload.size();
              ++i, ++noPayloadI) {
-          if (destMap.find(ElementsWithNoPayload[noPayloadI].decl)
-              != destMap.end()) {
+          auto *decl = ElementsWithNoPayload[noPayloadI]
+                           .layoutMember.getEnumElementDeclOrNull();
+          if (decl && destMap.find(decl) != destMap.end()) {
             ++numEmptyBranches;
             noPayloadI += casesPerTag - i;
             goto nextTag;
@@ -4531,7 +4565,12 @@ namespace {
       // Switch over the tag bits for payload cases.
       unsigned tagIndex = 0;
       for (auto &payloadCasePair : ElementsWithPayload) {
-        EnumElementDecl *payloadCase = payloadCasePair.decl;
+        EnumElementDecl *payloadCase =
+            payloadCasePair.layoutMember.getEnumElementDeclOrNull();
+        if (!payloadCase) {
+          ++tagIndex;
+          continue;
+        }
         auto found = destMap.find(payloadCase);
         if (found != destMap.end())
           tagSwitch->addCase(llvm::ConstantInt::get(C,APInt(numTagBits,tagIndex)),
@@ -4551,9 +4590,12 @@ namespace {
         
         // If the payload is empty, there's only one case per tag.
         if (CommonSpareBits.empty()) {
-          auto found = destMap.find(elti->decl);
-          if (found != destMap.end())
-            tagSwitch->addCase(tagVal, found->second);
+          if (auto *decl =
+                  elti->layoutMember.getEnumElementDeclOrNull()) {
+            auto found = destMap.find(decl);
+            if (found != destMap.end())
+              tagSwitch->addCase(tagVal, found->second);
+          }
         
           ++elti;
           ++tagIndex;
@@ -4565,9 +4607,12 @@ namespace {
         // Switch over the cases for this tag.
         for (unsigned idx = 0; idx < casesPerTag && elti != eltEnd; ++idx) {
           auto val = getEmptyCasePayload(IGM, tagIndex, idx);
-          auto found = destMap.find(elti->decl);
-          if (found != destMap.end())
-            cases.push_back({val, found->second});
+          if (auto *decl =
+                  elti->layoutMember.getEnumElementDeclOrNull()) {
+            auto found = destMap.find(decl);
+            if (found != destMap.end())
+              cases.push_back({val, found->second});
+          }
           ++elti;
         }
         
@@ -4628,11 +4673,15 @@ namespace {
          dests.size());
 
       auto emitCase = [&](Element elt) {
-        auto tagVal =
-            llvm::ConstantInt::get(IGM.Int32Ty, getTagIndex(elt.decl));
-        auto found = destMap.find(elt.decl);
-        if (found != destMap.end())
+        auto *decl = elt.layoutMember.getEnumElementDeclOrNull();
+        if (!decl)
+          return;
+        auto found = destMap.find(decl);
+        if (found != destMap.end()) {
+          auto tagVal =
+              llvm::ConstantInt::get(IGM.Int32Ty, getTagIndex(decl));
           tagSwitch->addCase(tagVal, found->second);
+        }
       };
 
       for (auto &elt : ElementsWithPayload)
@@ -4701,9 +4750,7 @@ namespace {
                           Explosion &inValue,
                           EnumElementDecl *theCase,
                           Explosion &out) const override {
-      auto foundPayload = std::find_if(ElementsWithPayload.begin(),
-                                       ElementsWithPayload.end(),
-             [&](const Element &e) { return e.decl == theCase; });
+      auto foundPayload = findElement(ElementsWithPayload, theCase);
 
       // Non-payload cases project to an empty explosion.
       if (foundPayload == ElementsWithPayload.end()) {
@@ -4958,17 +5005,13 @@ namespace {
                             Explosion &params,
                             Explosion &out) const override {
       // See whether this is a payload or empty case we're emitting.
-      auto payloadI = std::find_if(ElementsWithPayload.begin(),
-                                   ElementsWithPayload.end(),
-                               [&](const Element &e) { return e.decl == elt; });
+      auto payloadI = findElement(ElementsWithPayload, elt);
       if (payloadI != ElementsWithPayload.end())
         return emitPayloadInjection(builder, cast<FixedTypeInfo>(*payloadI->ti),
                                     params, out,
                                     payloadI - ElementsWithPayload.begin());
 
-      auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
-                                 ElementsWithNoPayload.end(),
-                               [&](const Element &e) { return e.decl == elt; });
+      auto emptyI = findElement(ElementsWithNoPayload, elt);
       assert(emptyI != ElementsWithNoPayload.end() && "case not in enum");
       emitNoPayloadInjection(out, emptyI - ElementsWithNoPayload.begin());
     }
@@ -5071,9 +5114,7 @@ namespace {
                 projectPayloadValue(IGF, parts.payload, tagIndex, lti, value);
 
                 lti.consume(IGF, value, IGF.getDefaultAtomicity(),
-                            T.getEnumElementType(elt.decl,
-                                    IGF.IGM.getSILTypes(),
-                                    IGF.IGM.getMaximalTypeExpansionContext()));
+                            elt.getPayloadType(IGF.IGM, T));
               });
           return;
         }
@@ -5267,9 +5308,7 @@ namespace {
 
         unsigned tagIndex = 0;
         for (auto &payloadCasePair : ElementsWithPayload) {
-          SILType PayloadT =
-              T.getEnumElementType(payloadCasePair.decl, IGF.getSILModule(),
-                                   IGF.IGM.getMaximalTypeExpansionContext());
+          SILType PayloadT = payloadCasePair.getPayloadType(IGF.IGM, T);
           auto &payloadTI = *payloadCasePair.ti;
           // Trivial and, in the case of a take, bitwise-takable payloads,
           // can all share the default path.
@@ -5391,9 +5430,8 @@ namespace {
                                      SILType T) const override {
       if (CopyDestroyKind == Normal) {
         for (auto &payloadCasePair : ElementsWithPayload) {
-          SILType payloadT = T.getEnumElementType(
-              payloadCasePair.decl, collector.IGF.getSILModule(),
-              collector.IGF.IGM.getMaximalTypeExpansionContext());
+          SILType payloadT =
+              payloadCasePair.getPayloadType(collector.IGF.IGM, T);
           auto &payloadTI = *payloadCasePair.ti;
           payloadTI.collectMetadataForOutlining(collector, payloadT);
         }
@@ -5441,9 +5479,7 @@ namespace {
                 // Destroy the data.
                 Address dataAddr = IGF.Builder.CreateElementBitCast(
                     addr, elt.ti->getStorageType());
-                SILType payloadT = T.getEnumElementType(
-                    elt.decl, IGF.getSILModule(),
-                    IGF.IGM.getMaximalTypeExpansionContext());
+                SILType payloadT = elt.getPayloadType(IGF.IGM, T);
                 elt.ti->destroy(IGF, dataAddr, payloadT, true /*isOutlined*/);
               });
           return;
@@ -5683,9 +5719,7 @@ namespace {
                                                   IGM.getPointerSize() * i);
         if (i == 0) firstAddr = eltAddr.getAddress();
 
-        auto payloadTy =
-            T.getEnumElementType(elt.decl, IGF.getSILModule(),
-                                 IGF.IGM.getMaximalTypeExpansionContext());
+        auto payloadTy = elt.getPayloadType(IGF.IGM, T);
 
         auto metadata = emitTypeLayoutRef(IGF, payloadTy, collector);
         
@@ -5711,9 +5745,7 @@ namespace {
                                                   IGM.getPointerSize() * i);
         if (i == 0) firstAddr = eltAddr.getAddress();
 
-        auto payloadTy =
-            T.getEnumElementType(elt.decl, IGF.getSILModule(),
-                                 IGF.IGM.getMaximalTypeExpansionContext());
+        auto payloadTy = elt.getPayloadType(IGF.IGM, T);
 
         auto request = DynamicMetadataRequest::getNonBlocking(
           MetadataState::LayoutComplete, collector);
@@ -6047,12 +6079,10 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(EnumElementDecl *theCase) const override {
+    getBitPatternForNoPayloadElement(const Element &element) const override {
       assert(TIK >= Fixed);
 
-      auto emptyI = std::find_if(ElementsWithNoPayload.begin(),
-                                 ElementsWithNoPayload.end(),
-                           [&](const Element &e) { return e.decl == theCase; });
+      auto emptyI = findElement(ElementsWithNoPayload, element);
       assert(emptyI != ElementsWithNoPayload.end() && "case not in enum");
 
       unsigned index = emptyI - ElementsWithNoPayload.begin();
@@ -6256,13 +6286,16 @@ namespace {
       unsigned numCasesEmitted = 0;
 
       auto emitCase = [&](Element elt) {
-        auto found = destMap.find(elt.decl);
+        auto *decl = elt.layoutMember.getEnumElementDeclOrNull();
+        if (!decl)
+          return;
+        auto found = destMap.find(decl);
         if (found != destMap.end()) {
           if (continuationBB)
             IGF.Builder.emitBlock(continuationBB);
 
           // Check the tag.
-          auto matchesTag = testResilientTag(IGF, tag, elt.decl);
+          auto matchesTag = testResilientTag(IGF, tag, decl);
 
           // If we are not the last block create a continuation block.
           if (++numCasesEmitted < dests.size())
@@ -6348,7 +6381,7 @@ namespace {
     }
 
     ClusteredBitVector
-    getBitPatternForNoPayloadElement(EnumElementDecl *theCase)
+    getBitPatternForNoPayloadElement(const Element &element)
     const override {
       llvm_unreachable("resilient enums are always indirect");
     }
@@ -6582,24 +6615,28 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
   ResilienceExpansion layoutScope =
       TC.IGM.getResilienceExpansionForLayout(theEnum);
   // TODO: [availability] Only enumerate the elements available during lowering.
-  for (auto elt : theEnum->getAllElements()) {
+  for (auto elt : theEnum->getAllElementsForLayout()) {
+    assert(elt.hasKnownLayout() &&
+           "missing enum element must have a fallback payload layout");
     ++numElements;
 
-    if (!elt->hasAssociatedValues()) {
+    if (!elt.hasAssociatedValues()) {
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
       continue;
     }
 
     // For the purposes of memory layout, treat unavailable cases as if they do
     // not have a payload.
-    if (!elt->isAvailableDuringLowering()) {
+    if (!elt.isAvailableDuringLowering()) {
+      // FIXME: Preserve runtime availability when recovering a missing member
+      // so this query agrees with the original enum element.
       elementsWithNoPayload.push_back({elt, nullptr, nullptr});
       continue;
     }
 
     // If the payload is indirect, we can use the NativeObject type metadata
     // without recurring. The box won't affect loadability or fixed-ness.
-    if (elt->isIndirect() || theEnum->isIndirect()) {
+    if (elt.isIndirect() || theEnum->isIndirect()) {
       auto *nativeTI = &TC.getNativeObjectTypeInfo();
       notePayloadType(*nativeTI);
       // FIXME: indirect noncopyable elements might need to check copyable
@@ -6607,14 +6644,14 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
       elementsWithPayload.push_back({elt, nativeTI, nativeTI});
       continue;
     }
-    
+
     // Compute whether this gives us an apparent payload or dynamic layout.
     // Note that we do *not* apply substitutions from a bound generic instance
     // yet. We want all instances of a generic enum to share an implementation
     // strategy. If the abstract layout of the enum is dependent on generic
     // parameters, then we additionally need to constrain any layout
     // optimizations we perform to things that are reproducible by the runtime.
-    Type origPayloadType = elt->getPayloadInterfaceType();
+    Type origPayloadType = elt.getPayloadInterfaceType();
     origPayloadType = theEnum->mapTypeIntoEnvironment(origPayloadType);
 
     auto origArgLoweredTy = TC.IGM.getLoweredType(origPayloadType);
@@ -7684,12 +7721,17 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
                displayBitMask(spareBits));
 
     for (auto &elt : strategy->getElementsWithNoPayload()) {
-      auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt.decl);
+      auto bitPattern = strategy->getBitPatternForNoPayloadElement(elt);
       assert(bitPattern.size() == fixedTI->getFixedSize().getValueInBits());
-      LLVM_DEBUG(llvm::dbgs() << "  no-payload case "
-                              << elt.decl->getBaseIdentifier().str()
-                              << ":\t";
-            displayBitMask(bitPattern));
+      LLVM_DEBUG({
+        llvm::dbgs() << "  no-payload case ";
+        if (auto *decl = elt.layoutMember.getEnumElementDeclOrNull())
+          llvm::dbgs() << decl->getBaseIdentifier().str();
+        else
+          llvm::dbgs() << "<missing>";
+        llvm::dbgs() << ":\t";
+        displayBitMask(bitPattern);
+      });
 
       auto maskedBitPattern = bitPattern;
       maskedBitPattern &= spareBits;

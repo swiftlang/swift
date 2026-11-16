@@ -196,7 +196,13 @@ public:
     auto &enumImplStrat = getEnumImplStrategy(
         IGM, ED->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
 
-    for (auto *element : ED->getAllElements()) {
+    auto allElements = ED->getAllElements();
+    assert(static_cast<size_t>(
+               std::distance(allElements.begin(), allElements.end())) ==
+               enumImplStrat.getElementsWithPayload().size() +
+                   enumImplStrat.getElementsWithNoPayload().size() &&
+           "cannot emit an enum tag mapping with missing elements");
+    for (auto *element : allElements) {
       auto tagIdx = enumImplStrat.getTagIndex(element);
       auto *global = cast<llvm::GlobalVariable>(
           IGM.getAddrOfEnumCase(element, NotForDefinition).getAddress());

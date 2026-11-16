@@ -30,7 +30,7 @@
 namespace swift {
 
 class ASTContext;
-class MissingMemberDecl;
+class EnumElementLayoutMemberView;
 class StoredPropertyLayoutMemberView;
 class VarDecl;
 class SILFunction;
@@ -664,6 +664,13 @@ public:
                              TypeExpansionContext context) const;
 
   SILType getEnumElementType(EnumElementDecl *elt, SILModule &M,
+                             TypeExpansionContext context) const;
+
+  SILType getEnumElementType(EnumElementLayoutMemberView elt,
+                             Lowering::TypeConverter &TC,
+                             TypeExpansionContext context) const;
+
+  SILType getEnumElementType(EnumElementLayoutMemberView elt, SILModule &M,
                              TypeExpansionContext context) const;
 
   /// Given that this is an enum type, return the lowered type of the

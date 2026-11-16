@@ -508,16 +508,17 @@ static SILType formFieldType(SILType baseType, CanType loweredFieldType) {
 }
 
 static CanType getLoweredAbstractMemberType(
-    SILType baseType, MissingMemberDecl *member, TypeConverter &TC,
+    SILType baseType, LayoutMemberView member, TypeConverter &TC,
     TypeExpansionContext context) {
+  assert(member.isMissing() && "complete members use AST lowering");
   auto substitutions =
-      baseType.getASTType()->getContextSubstitutionMap(member->getDeclContext());
-  auto *layout = member->getStorageLayout();
+      baseType.getASTType()->getContextSubstitutionMap(member.getDeclContext());
+  auto *layout = member.getFallbackLayout();
   assert(layout && "missing member must have a storage layout");
-  layout = layout->getWithSubstitutions(member->getASTContext(),
+  layout = layout->getWithSubstitutions(member.getASTContext(),
                                         substitutions);
   Type memberType =
-      HiddenType::get(member->getASTContext(), layout, CanType());
+      HiddenType::get(member.getASTContext(), layout, CanType());
   return TC.getLoweredRValueType(context, memberType);
 }
 
@@ -569,9 +570,8 @@ SILType SILType::getFieldType(StoredPropertyLayoutMemberView field,
   if (auto *var = field.getVarDeclOrNull())
     return getFieldType(var, TC, context);
 
-  return formFieldType(*this,
-                       getLoweredAbstractMemberType(
-                           *this, field.getMissingMemberDecl(), TC, context));
+  return formFieldType(
+      *this, getLoweredAbstractMemberType(*this, field, TC, context));
 }
 
 SILType SILType::getFieldType(StoredPropertyLayoutMemberView field,
@@ -626,6 +626,22 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
 }
 
 SILType SILType::getEnumElementType(EnumElementDecl *elt, SILModule &M,
+                                    TypeExpansionContext context) const {
+  return getEnumElementType(elt, M.Types, context);
+}
+
+SILType SILType::getEnumElementType(EnumElementLayoutMemberView elt,
+                                    TypeConverter &TC,
+                                    TypeExpansionContext context) const {
+  if (auto *element = elt.getEnumElementDeclOrNull())
+    return getEnumElementType(element, TC, context);
+
+  auto loweredType = getLoweredAbstractMemberType(*this, elt, TC, context);
+  return SILType(loweredType, getCategory()).copyingMoveOnlyWrapper(*this);
+}
+
+SILType SILType::getEnumElementType(EnumElementLayoutMemberView elt,
+                                    SILModule &M,
                                     TypeExpansionContext context) const {
   return getEnumElementType(elt, M.Types, context);
 }

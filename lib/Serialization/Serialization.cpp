@@ -6991,7 +6991,11 @@ void Serializer::writeAbstractMemberTypeLayout(const Decl *decl) {
   if (auto *var = dyn_cast<VarDecl>(decl)) {
     type = var->getInterfaceType();
   } else {
-    type = cast<EnumElementDecl>(decl)->getPayloadInterfaceType();
+    auto *element = cast<EnumElementDecl>(decl);
+    if (element->isIndirect() || element->getParentEnum()->isIndirect())
+      type = getASTContext().TheNativeObjectType;
+    else
+      type = element->getPayloadInterfaceType();
   }
   auto layout = getLayoutProvider().getAbstractTypeLayout(type);
   writeAbstractTypeLayout(DeclID(), layout);

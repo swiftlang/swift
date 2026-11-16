@@ -106,6 +106,7 @@ namespace swift {
   class NamedPattern;
   class EnumCaseDecl;
   class EnumElementDecl;
+  class EnumElementLayoutMemberRange;
   class ParameterList;
   class ParameterTypeFlags;
   class Pattern;
@@ -5189,6 +5190,10 @@ public:
   ElementRange getAllElements() const {
     return ElementRange(getMembers());
   }
+
+  /// Return a range that includes complete enum elements and layout-only
+  /// placeholders for enum elements that could not be deserialized.
+  EnumElementLayoutMemberRange getAllElementsForLayout() const;
 
   unsigned getNumElements() const {
     auto eltRange = getAllElements();
@@ -10379,6 +10384,83 @@ public:
 
   VarDecl *getVarDeclOrNull() const { return dyn_cast<VarDecl>(getDecl()); }
 };
+
+/// A layout member that represents an enum element.
+class EnumElementLayoutMemberView : public LayoutMemberView {
+public:
+  explicit EnumElementLayoutMemberView(EnumElementDecl *element)
+      : LayoutMemberView(element) {}
+
+  explicit EnumElementLayoutMemberView(MissingMemberDecl *element)
+      : LayoutMemberView(element) {}
+
+  EnumElementDecl *getEnumElementDeclOrNull() const {
+    return dyn_cast<EnumElementDecl>(getDecl());
+  }
+
+  EnumElementDecl *getEnumElementDecl() const {
+    return cast<EnumElementDecl>(getDecl());
+  }
+
+  bool hasAssociatedValues() const {
+    if (auto *element = getEnumElementDeclOrNull())
+      return element->hasAssociatedValues();
+
+    // A payload type must fail to deserialize before an enum element needs a
+    // layout-only placeholder. Cases without payloads cannot require one.
+    assert(getFallbackLayout() &&
+           "missing enum element must have a fallback payload layout");
+    return true;
+  }
+
+  bool isIndirect() const {
+    if (auto *element = getEnumElementDeclOrNull())
+      return element->isIndirect();
+
+    // An indirect missing element's fallback layout already describes its
+    // effective NativeObject payload representation.
+    return false;
+  }
+
+  Type getPayloadInterfaceType() const {
+    if (auto *element = getEnumElementDeclOrNull())
+      return element->getPayloadInterfaceType();
+
+    auto *layout = getFallbackLayout();
+    assert(layout &&
+           "missing enum element must have a fallback payload layout");
+    return HiddenType::get(getASTContext(), layout, CanType());
+  }
+};
+
+/// A range over the complete and layout-only elements of an enum.
+class EnumElementLayoutMemberRange {
+  struct AsLayoutMember {
+    std::optional<EnumElementLayoutMemberView> operator()(Decl *member) const {
+      if (auto *element = dyn_cast<EnumElementDecl>(member))
+        return EnumElementLayoutMemberView(element);
+      if (auto *missing = dyn_cast<MissingMemberDecl>(member))
+        return EnumElementLayoutMemberView(missing);
+      return std::nullopt;
+    }
+  };
+
+  using Range = OptionalTransformRange<DeclRange, AsLayoutMember>;
+  Range Members;
+
+public:
+  using iterator = Range::iterator;
+
+  explicit EnumElementLayoutMemberRange(DeclRange members)
+      : Members(members, AsLayoutMember()) {}
+
+  iterator begin() const { return Members.begin(); }
+  iterator end() const { return Members.end(); }
+};
+
+inline EnumElementLayoutMemberRange EnumDecl::getAllElementsForLayout() const {
+  return EnumElementLayoutMemberRange(getMembers());
+}
 
 /// Provides a declaration of a macro.
 ///
