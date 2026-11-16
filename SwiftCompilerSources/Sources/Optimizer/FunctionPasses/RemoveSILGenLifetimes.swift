@@ -18,6 +18,9 @@ import SIL
 let removeSILGenLifetimesPass = FunctionPass(name: "remove-silgen-lifetimes") {
   (function: Function, context: FunctionPassContext) in
 
+  guard function.hasOwnership else { return }
+  defer { function.set(hasUnresolvedLifetimes: true, context) }
+
   func processInst(_ inst: Instruction) {
     switch inst {
     case let marker as MarkUnresolvedNonCopyableValueInst:

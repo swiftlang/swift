@@ -31,7 +31,7 @@ bool ForwardingOperation::preservesOwnership() {
   return ForwardingInstruction::get(forwardingInst)->preservesOwnership();
 }
 
-// See ForwardingInstruction.swift preservesRepresentation().
+// ForwardingInstruction.swift preservesRepresentation mirrors this implementation.
 bool ForwardingOperation::hasSameRepresentation() const {
   switch (forwardingInst->getKind()) {
   default:

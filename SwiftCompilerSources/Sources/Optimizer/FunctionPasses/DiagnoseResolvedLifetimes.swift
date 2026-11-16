@@ -24,8 +24,15 @@ let diagnoseResolvedLifetimesPass = FunctionPass(name: "diagnose-resolved-lifeti
 
 private func diagnoseLifetimeViolations(_ function: Function, _ context: FunctionPassContext) {
   var markers: [LifetimeResolutionMarker] = []
+  var borrowedConsumes: [ConsumeSite] = []
+  var copiesOfNoncopyable: [Instruction] = []
   for inst in function.instructions {
     if let marker = LifetimeResolutionMarker(inst) {
+      if case .unpermittedCopy(let diagnose) = marker, let copy = diagnose.operand.value as? CopyValueInst,
+         copy.fromValue.ownership == .guaranteed, let consume = ConsumeSite(diagnose) {
+        borrowedConsumes.append(consume)
+        continue
+      }
       markers.append(marker)
       continue
     }
@@ -35,24 +42,37 @@ private func diagnoseLifetimeViolations(_ function: Function, _ context: Functio
     case let loadBorrow as LoadBorrowInst where loadBorrow.isUnchecked:
       loadBorrow.set(isUnchecked: false, context)
 
-    // TODO: add missed copy of noncopyable backstop
+    case let copy as CopyValueInst where copy.type.isMoveOnly:
+      copiesOfNoncopyable.append(copy)
+    case let load as LoadInst where load.loadOwnership == .copy && load.type.isMoveOnly:
+      copiesOfNoncopyable.append(load)
+    case let copyAddr as CopyAddrInst where !copyAddr.isTakeOfSource && copyAddr.source.type.isMoveOnly:
+      copiesOfNoncopyable.append(copyAddr)
 
     default:
       break
     }
   }
 
+  // As a backstop, every copy of a noncopyable value must have been marked by LifetimeResolution.
+  let markedCopies = Set(markers.compactMap { $0.copy } + borrowedConsumes.map { $0.instruction })
+  let missedCopies = copiesOfNoncopyable.filter { !markedCopies.contains($0) }
+  for copy in missedCopies {
+    context.diagnosticEngine.diagnose(.sil_lifetime_resolution_bug_missed_copy, at: copy.location)
+  }
+
   var diagnoser = Diagnoser(function, markers, context)
   diagnoser.diagnoseUsesBeforeInit(markers)
   diagnoser.diagnoseLetReinits(markers)
   diagnoser.diagnoseUsesAfterConsume()
+  diagnoser.diagnoseBorrowedConsumes(borrowedConsumes)
 
   // The `diagnose` markers are erased last, as they identify which copies were demoted consumes.
-  for case let diagnose? in markers.map({ $0.diagnose }) {
+  for case let diagnose? in markers.map({ $0.diagnose }) + borrowedConsumes.map({ $0.marker }) {
     context.erase(instruction: diagnose)
   }
 
-  if !markers.isEmpty {
+  if !markers.isEmpty || !borrowedConsumes.isEmpty || !missedCopies.isEmpty {
     // Ensure we actually did emit an error.
     guard context.hadError else {
       fatalError("DiagnoseResolvedLifetimes didn't emit an error when it should have! \n\(function)")
@@ -90,28 +110,7 @@ private struct Storage {
 
   /// The user-facing name of the subelement at `path`, e.g. `p.a`, `t.1`, or `self.b`.
   func name(of path: SmallProjectionPath) -> String {
-    var name = rootName
-    var type = self.type
-    var remaining = path
-    while true {
-      let (kind, index, rest) = remaining.pop()
-      switch kind {
-      case .structField, .classField:
-        guard let fields = type.getNominalFields(in: function), index < fields.count else { return name }
-        let fieldName = fields.getUserFacingFieldDecl(withIndex: index)?.userFacingName
-                          ?? fields.getNameOfField(withIndex: index)
-        name += "." + fieldName.string
-        type = fields[index]
-      case .tupleField:
-        guard type.isTuple, index < type.tupleElements.count else { return name }
-        let label = type.tupleElements.labelName(at: index)
-        name += "." + (label.count == 0 ? String(index) : label.string)
-        type = type.tupleElements[index]
-      default:
-        return name
-      }
-      remaining = rest
-    }
+    subelementName(of: path, in: rootName, ofType: type, function)
   }
 
   /// The stored property of `self` that `path` projects into, if any.
@@ -137,6 +136,33 @@ private struct Storage {
   /// The elements among `leaves` that are fields, which have a path.
   func fieldLeaves(_ leaves: Set<Int>) -> Set<Int> {
     leaves.filter { space.fieldRange.contains($0) }
+  }
+}
+
+/// The user-facing name of the subelement at `path` within a value of `type` named `rootName`, e.g. `p.a`.
+private func subelementName(of path: SmallProjectionPath, in rootName: String, ofType type: Type,
+                            _ function: Function) -> String {
+  var name = rootName
+  var type = type
+  var remaining = path
+  while true {
+    let (kind, index, rest) = remaining.pop()
+    switch kind {
+    case .structField, .classField:
+      guard let fields = type.getNominalFields(in: function), index < fields.count else { return name }
+      let fieldName = fields.getUserFacingFieldDecl(withIndex: index)?.userFacingName
+                        ?? fields.getNameOfField(withIndex: index)
+      name += "." + fieldName.string
+      type = fields[index]
+    case .tupleField:
+      guard type.isTuple, index < type.tupleElements.count else { return name }
+      let label = type.tupleElements.labelName(at: index)
+      name += "." + (label.count == 0 ? String(index) : label.string)
+      type = type.tupleElements[index]
+    default:
+      return name
+    }
+    remaining = rest
   }
 }
 
@@ -563,6 +589,84 @@ private enum ConsumeViolation: Equatable {
 }
 
 //===----------------------------------------------------------------------===//
+//                              Borrowed values
+//===----------------------------------------------------------------------===//
+
+/// The borrowed value that a consumed value is part of, such as a `borrowing` parameter or a closure capture.
+private struct BorrowedRoot {
+  let value: Value
+
+  /// The path of the consumed part within `value`.
+  let path: SmallProjectionPath
+
+  /// Walks up from `borrowed` to the nearest value with a binding of its own.
+  init(of borrowed: Value) {
+    var value = borrowed
+    var path = SmallProjectionPath()
+    walk: while bindingDecl(of: value) == nil {
+      switch value {
+      case let borrow as BeginBorrowInst:
+        value = borrow.borrowedValue
+      case let borrowedFrom as BorrowedFromInst:
+        value = borrowedFrom.borrowedValue
+      case let extract as StructExtractInst:
+        path = path.push(.structField, index: extract.fieldIndex)
+        value = extract.struct
+      case let extract as TupleExtractInst:
+        path = path.push(.tupleField, index: extract.fieldIndex)
+        value = extract.tuple
+      case let enumData as UncheckedEnumDataInst:
+        path = path.push(.enumCase, index: enumData.caseIndex)
+        value = enumData.enum
+      case let result as MultipleValueInstructionResult:
+        switch result.parentInstruction {
+        case let destructure as DestructureStructInst:
+          path = path.push(.structField, index: result.index)
+          value = destructure.struct
+        case let destructure as DestructureTupleInst:
+          path = path.push(.tupleField, index: result.index)
+          value = destructure.tuple
+        default:
+          break walk
+        }
+      default:
+        guard let payload = TerminatorResult(value), let switchEnum = payload.terminator as? SwitchEnumInst,
+              let caseIndex = switchEnum.getUniqueCase(forSuccessor: payload.successor) else {
+          break walk
+        }
+        path = path.push(.enumCase, index: caseIndex)
+        value = switchEnum.enumOp
+      }
+    }
+    self.value = value
+    self.path = path
+  }
+
+  /// The variable or parameter that holds the value.
+  var decl: VarDecl? { bindingDecl(of: value) }
+
+  var argument: FunctionArgument? { value as? FunctionArgument }
+
+  /// Whether the value is a capture of the closure, which only borrows it.
+  var isClosureCapture: Bool { argument?.isClosureCapture ?? false }
+
+  var rootName: String { decl?.userFacingName.string ?? "" }
+
+  /// The user-facing name of the consumed part, e.g. `o.a`.
+  func consumedName(in function: Function) -> String {
+    subelementName(of: path, in: rootName, ofType: value.type, function)
+  }
+}
+
+/// The variable declared for `value`, e.g. by a parameter, a `debug_value`, or a `var_decl` instruction.
+private func bindingDecl(of value: Value) -> VarDecl? {
+  if let inst = value as? SingleValueInstruction {
+    return inst.findVarDecl()
+  }
+  return value.findVarDecl()
+}
+
+//===----------------------------------------------------------------------===//
 //                                 Diagnoser
 //===----------------------------------------------------------------------===//
 
@@ -585,6 +689,7 @@ private struct Diagnoser {
 
   /// Explanatory notes that are only worth seeing once: per variable, or per callee parameter.
   private var explainedStorage: [Value] = []
+  private var explainedBorrows: [Value] = []
   private var suggestedParameters: Set<ParamDecl> = []
 
   init(_ function: Function, _ markers: [LifetimeResolutionMarker], _ context: FunctionPassContext) {
@@ -941,14 +1046,14 @@ private struct Diagnoser {
   /// Diagnoses the `unpermittedCopy` markers.
   mutating func diagnoseUsesAfterConsume() {
     for marker in unrecognizedConsumes {
-      diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: marker.location)
+      diagnostics.diagnose(.sil_lifetime_resolution_bug_missed_copy, at: marker.location)
     }
 
     // Each use is reported once, noting every consume that reaches it.
     var reports: [UseAfterConsume] = []
     for consume in consumes {
       guard let report = analyze(consume) else {
-        diagnostics.diagnose(.sil_movechecking_bug_missed_copy, at: consume.marker.location)
+        diagnostics.diagnose(.sil_lifetime_resolution_bug_missed_copy, at: consume.marker.location)
         continue
       }
       if !report.violation.isReportedAtConsume,
@@ -1090,6 +1195,74 @@ private struct Diagnoser {
     }
     for consume in report.consumes {
       if suggestBorrowingParameter(for: consume) { break }
+    }
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                           Consume of a borrow
+  //===--------------------------------------------------------------------===//
+
+  /// Diagnoses the `unpermittedCopy` markers on copies of borrowed values, each of which is a consume of a value
+  /// that the function only borrows.
+  mutating func diagnoseBorrowedConsumes(_ consumes: [ConsumeSite]) {
+    for consume in consumes {
+      let copy = consume.instruction as! CopyValueInst
+      let root = BorrowedRoot(of: copy.fromValue)
+      let location = copy.location
+      guard shouldEmitError(for: root.value, at: location) else { continue }
+
+      let name = root.consumedName(in: function)
+      let isNoncopyable = !consume.isCopyable
+      let isEscapingCapture = consume.consumer?.instruction is PartialApplyInst
+      if isEscapingCapture {
+        diagnostics.diagnose(.sil_movechecking_borrowed_value_captured_by_escaping_closure, name, at: location)
+      } else if isNoncopyable {
+        diagnostics.diagnose(.sil_movechecking_guaranteed_value_consumed, name, at: location)
+      } else {
+        diagnostics.diagnose(.sil_movechecking_borrowed_value_consumed_without_copy, name, at: location)
+        noteExplicitCopy(of: name, at: consume)
+      }
+
+      if !explainedBorrows.contains(where: { $0 == root.value }) {
+        explainedBorrows.append(root.value)
+        noteBorrow(of: root, isNoncopyable: isNoncopyable)
+      }
+      if isNoncopyable && !isEscapingCapture {
+        _ = suggestBorrowingParameter(for: consume)
+      }
+    }
+  }
+
+  /// Suggests writing `copy` before the consumed expression. Only a call argument is known to be exactly
+  /// the borrowed value, as opposed to e.g. the base of a method call, so only it gets a fix-it.
+  private func noteExplicitCopy(of name: String, at consume: ConsumeSite) {
+    let location = consume.instruction.location
+    guard let consumer = consume.consumer, let apply = consumer.instruction as? FullApplySite,
+          let argIndex = apply.calleeArgumentIndex(of: consumer),
+          argIndex != apply.calleeArgumentConventions.selfIndex, let start = location.startSourceLoc else {
+      diagnostics.diagnose(.sil_movechecking_consume_explicit_copy, name, at: location)
+      return
+    }
+    diagnostics.diagnose(.sil_movechecking_consume_explicit_copy, [name], at: start,
+                         fixIts: [DiagnosticFixIt(start: start, byteLength: 0, replacement: "copy ")])
+  }
+
+  /// Explains why `root` is only borrowed, and how to take ownership of it if it is noncopyable.
+  private func noteBorrow(of root: BorrowedRoot, isNoncopyable: Bool) {
+    if root.isClosureCapture {
+      diagnostics.diagnose(.sil_movechecking_captured_by_borrowing_closure, root.rootName,
+                           function.location.isClosureExpr ? 1 : 0, at: function.location)
+      return
+    }
+    guard isNoncopyable, let argument = root.argument else { return }
+
+    if argument.isSelf {
+      if let method = function.location.decl as? FuncDecl, !(method is AccessorDecl) {
+        diagnostics.diagnose(.sil_movechecking_make_method_consuming, method, at: function.location)
+      }
+    } else if let param = argument.findVarDecl() as? ParamDecl, let specifierLoc = param.borrowingSpecifierLoc {
+      diagnostics.diagnose(.sil_movechecking_make_parameter_consuming, [root.rootName], at: specifierLoc,
+        fixIts: [DiagnosticFixIt(start: specifierLoc, byteLength: "borrowing".utf8.count, replacement: "consuming")])
     }
   }
 

@@ -91,10 +91,18 @@ static void addMandatoryDebugSerialization(SILPassPipelinePlan &P) {
 static void addLifetimeResolutionPasses(SILPassPipelinePlan &P) {
   P.addClosureLifetimeFixup();
 
+  // Eliminate SILGen's copies of borrowed values that are only used as borrows.
+  P.addMergeBorrowScopes();
+  P.addCopyToBorrowOptimization();
+  P.addCopySinking();
+
   // Main sequence for LifetimeResolution
   P.addRemoveSILGenLifetimes();
   P.addLifetimeResolution();
   P.addDiagnoseResolvedLifetimes();
+
+  // Run the verifier in non-asserts builds to double-check LifetimeResolution.
+  P.addVerifier();
 
   // Remaining pieces of DefiniteInitialization we still rely-on.
   P.addLetPropertyLowering();

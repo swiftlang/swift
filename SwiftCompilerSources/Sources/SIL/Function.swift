@@ -73,6 +73,13 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     bridged.setOwnershipForTrivialValues(hasOwnershipForTrivialValues)
   }
 
+  /// True between RemoveSILGenLifetimes and LifetimeResolution, while a value may be consumed
+  /// more than once or not at all.
+  public var hasUnresolvedLifetimes: Bool { bridged.hasUnresolvedLifetimes() }
+  public func set(hasUnresolvedLifetimes: Bool, _ context: some MutatingContext) {
+    bridged.setHasUnresolvedLifetimes(hasUnresolvedLifetimes)
+  }
+
   /// The module which defines this function, or nil if it's not known.
   ///
   /// This is nil for functions which are created by the optimizer from a function of another module,

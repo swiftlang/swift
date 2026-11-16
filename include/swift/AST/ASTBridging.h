@@ -363,7 +363,6 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool Var_isLet() const;
   BRIDGED_INLINE bool Var_hasInitialValue() const;
   BRIDGED_INLINE void Var_emitLetToVarNoteIfSimple() const;
-  SWIFT_IMPORT_UNSAFE swift::SourceLoc Param_getConsumingSpecifierLoc() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
   BRIDGED_INLINE bool NominalType_hasNonUniqueDefinition() const;
@@ -1566,6 +1565,11 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParamSpecifier {
 };
 
 BRIDGED_INLINE swift::ParamSpecifier unbridge(BridgedParamSpecifier kind);
+
+/// The location of an explicit `specifier` on the parameter, or an invalid location.
+SWIFT_NAME("BridgedParamDecl.getSpecifierLoc(self:_:)")
+swift::SourceLoc BridgedParamDecl_getSpecifierLoc(BridgedParamDecl cDecl,
+                                                  BridgedParamSpecifier cSpecifier);
 
 SWIFT_NAME("BridgedParamDecl.setSpecifier(self:_:)")
 BRIDGED_INLINE void

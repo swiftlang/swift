@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -verify -sil-verify-none -sil-disable-input-verify -o /dev/null
+// RUN: %target-sil-opt %s -test-runner -verify -o /dev/null
 
 // Unit tests for the DiagnoseResolvedLifetimes pass. Each function is hand-written
 // with the markers that LifetimeResolution's `legalize` would leave behind, so the
@@ -6,6 +6,9 @@
 //   - `diagnose [unpermitted_copy]` on a `load [copy]`  -> use-after-consume
 //   - `assign undef to [init]`                          -> use-before-init
 //   - `diagnose [let_reinit]`                           -> repeated `let` initialization
+//   - `diagnose [unpermitted_copy]` on a `copy_value` of a borrowed value -> missed-copy backstop
+//   - a copy of a noncopyable value without a marker                       -> missed-copy backstop
+//   - `diagnose [unpermitted_copy]` on a `load [copy]` from a borrowed box -> missing reinitialization
 //
 // (The variable name renders empty here because hand-written SIL has no backing
 // VarDecl; from real Swift source the name resolves normally.)
@@ -17,7 +20,13 @@ import Swift
 
 class K {}
 
+struct NC : ~Copyable {
+  var k: K
+}
+
 sil @getK : $@convention(thin) () -> @owned K
+sil @getNC : $@convention(thin) () -> @owned NC
+sil @consumeK : $@convention(thin) (@owned K) -> ()
 
 sil_global hidden @globalK : $K
 
@@ -157,6 +166,80 @@ bb0:
   %a = apply %getFn() : $@convention(thin) () -> @owned K
   diagnose [let_reinit] %0 : $*K // expected-error {{initialization of this value cannot be verified}}
   store %a to [assign] %0 : $*K
+  %t = tuple ()
+  return %t
+}
+
+// A consume of a borrowed value is reported at the copy.
+sil [ossa] @diagnose_consume_of_borrow : $@convention(thin) (@guaranteed K) -> () {
+bb0(%0 : @guaranteed $K):
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  specify_test "diagnose_resolved_lifetimes"
+  %1 = copy_value %0 // expected-error {{'' is borrowed and cannot be consumed without an explicit 'copy'}} // expected-note {{write 'copy ' to consume a copy instead}}
+  diagnose [unpermitted_copy] %1
+  apply %consFn(%1) : $@convention(thin) (@owned K) -> ()
+  %t = tuple ()
+  return %t
+}
+
+// A captured box's contents must be initialized when the closure returns.
+sil [ossa] @diagnose_consume_of_borrowed_box : $@convention(thin) (@guaranteed { var K }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var K }):
+  %consFn = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  specify_test "diagnose_resolved_lifetimes"
+  %1 = project_box %0, 0
+  %2 = begin_access [deinit] [unknown] %1
+  %3 = load [copy] %2 // expected-error {{missing reinitialization of closure capture '' after consume}} // expected-note {{write 'copy ' to keep '' valid after this consume}}
+  diagnose [unpermitted_copy] %3
+  end_access %2
+  apply %consFn(%3) : $@convention(thin) (@owned K) -> ()
+  %t = tuple ()
+  return %t
+}
+
+// The backstop: every copy of a noncopyable value must be accompanied by a
+// `diagnose [unpermitted_copy]`, or else LifetimeResolution missed it.
+
+sil [ossa] @missed_copy_load : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %0 = alloc_stack $NC
+  specify_test "diagnose_resolved_lifetimes"
+  %v = apply %getFn() : $@convention(thin) () -> @owned NC
+  store %v to [init] %0
+  %c = load [copy] %0 // expected-error {{LifetimeResolution missed diagnosing a copy}}
+  destroy_value %c
+  destroy_addr %0
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+sil [ossa] @missed_copy_addr : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %0 = alloc_stack $NC
+  %1 = alloc_stack $NC
+  specify_test "diagnose_resolved_lifetimes"
+  %v = apply %getFn() : $@convention(thin) () -> @owned NC
+  store %v to [init] %0
+  copy_addr %0 to [init] %1 // expected-error {{LifetimeResolution missed diagnosing a copy}}
+  destroy_addr %1
+  destroy_addr %0
+  dealloc_stack %1
+  dealloc_stack %0
+  %t = tuple ()
+  return %t
+}
+
+sil [ossa] @missed_copy_value : $@convention(thin) () -> () {
+bb0:
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  specify_test "diagnose_resolved_lifetimes"
+  %0 = apply %getFn() : $@convention(thin) () -> @owned NC
+  %c = copy_value %0 // expected-error {{LifetimeResolution missed diagnosing a copy}}
+  destroy_value %c
+  destroy_value %0
   %t = tuple ()
   return %t
 }

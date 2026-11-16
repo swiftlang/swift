@@ -656,6 +656,8 @@ struct BridgedFunction {
   BRIDGED_INLINE bool isExportedSpecialization() const;
   BRIDGED_INLINE bool hasOwnershipForTrivialValues() const;
   BRIDGED_INLINE void setOwnershipForTrivialValues(bool hotv) const;
+  BRIDGED_INLINE bool hasUnresolvedLifetimes() const;
+  BRIDGED_INLINE void setHasUnresolvedLifetimes(bool unresolved) const;
   bool isTrapNoReturn() const;
   bool isConvertPointerToPointerArgument() const;
   bool isAddressor() const;

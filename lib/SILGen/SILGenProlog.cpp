@@ -1314,8 +1314,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
 
   bool isNoImplicitCopy;
 
-  if (ty.isTrivial(SGF.F) || ty.isMoveOnly() ||
-      !SGF.usingWrapperTypeImplicitCopyEnforcement()) {
+  if (ty.isTrivial(SGF.F) || ty.isMoveOnly()) {
     isNoImplicitCopy = false;
   } else if (VD->isNoImplicitCopy()) {
     isNoImplicitCopy = true;
@@ -1336,7 +1335,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
   } else {
     isNoImplicitCopy = false;
   }
-    
+  bool useWrapper =
+      isNoImplicitCopy && SGF.usingWrapperTypeImplicitCopyEnforcement();
+
   SILValue arg;
   SILFunctionArgument *box = nullptr;
 
@@ -1350,6 +1351,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // Constant decls are captured by value.
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
+    fArg->setNoImplicitCopy(isNoImplicitCopy && !useWrapper);
 
     ManagedValue val = ManagedValue::forBorrowedRValue(fArg);
 
@@ -1373,7 +1375,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       val = addr->getManagedAddress();
     }
     
-    if (isNoImplicitCopy && !val.getType().isMoveOnly()) {
+    if (useWrapper && !val.getType().isMoveOnly()) {
       val = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(Loc, val);
     }
 
@@ -1452,8 +1454,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
+    box->setNoImplicitCopy(isNoImplicitCopy && !useWrapper);
     arg = SGF.B.createProjectBox(Loc, box, 0);
-    if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
+    if (useWrapper && !arg->getType().isMoveOnly()) {
       arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(Loc, arg);
     }
     enforcement = isMutable
@@ -1476,6 +1479,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     }
     auto *fArg = SGF.F.begin()->createFunctionArgument(ty, VD);
     fArg->setClosureCapture(true);
+    fArg->setNoImplicitCopy(isNoImplicitCopy && !useWrapper);
     arg = SILValue(fArg);
     
     // With opaque values the capture is an object. A noncopyable one must not
@@ -1490,7 +1494,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
                 .getValue();
     }
 
-    if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
+    if (useWrapper && !arg->getType().isMoveOnly()) {
       if (fnConv.isSILIndirect(paramInfo)) {
         arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(Loc, arg);
 
