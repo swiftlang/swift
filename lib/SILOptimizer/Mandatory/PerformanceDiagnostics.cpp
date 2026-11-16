@@ -157,9 +157,15 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
     return false;
 
   for (SILBasicBlock &block : *function) {
-    // Exclude fatal-error blocks.
+    // Exclude fatal-error blocks, including a block that branches to a block
+    // that ends in an `unreachable`, such as one that ends the lifetimes of
+    // values on the paths of several fatal errors.
     if (isa<UnreachableInst>(block.getTerminator()))
       continue;
+    if (auto *br = dyn_cast<BranchInst>(block.getTerminator())) {
+      if (isa<UnreachableInst>(br->getDestBB()->getTerminator()))
+        continue;
+    }
 
     for (SILInstruction &inst : block) {
       if (visitInst(&inst, perfConstr, parentLoc)) {

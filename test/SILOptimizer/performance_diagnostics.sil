@@ -19,3 +19,26 @@ bb0(%0 : @owned $@callable(once) @callee_owned () -> ()):
   %2 = tuple ()
   return %2 : $()
 }
+
+sil @unknownCallee : $@convention(thin) () -> ()
+
+// A block that only branches to a block that ends in an `unreachable` is on the
+// path of a fatal error.
+//
+// CHECK-NOT:   error: called function is not available in this module
+sil [no_locks] [ossa] @branch_to_fatal_error : $@convention(thin) (Builtin.Int1) -> () {
+bb0(%0 : $Builtin.Int1):
+  cond_br %0, bb1, bb2
+
+bb1:
+  %2 = function_ref @unknownCallee : $@convention(thin) () -> ()
+  %3 = apply %2() : $@convention(thin) () -> ()
+  br bb3
+
+bb2:
+  %5 = tuple ()
+  return %5 : $()
+
+bb3:
+  unreachable
+}
