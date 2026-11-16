@@ -1,6 +1,6 @@
 // VJP inlining tests.
 
-// RUN: %target-swift-frontend -emit-sil -O -verify -Xllvm -debug-only=sil-inliner %s 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -O -verify -Xllvm -debug-only=sil-inliner -Xllvm -sil-print-pass-name %s 2>&1 | %FileCheck %s
 
 // REQUIRES: asserts
 // UNSUPPORTED: OS=windows-msvc
@@ -42,6 +42,25 @@ func wrapperOnWithControlFlow(x: Float) -> Float {
 }
 // CHECK-LABEL: decision {{.*}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
 // CHECK-NEXT: "reverse-mode derivative of vjp_inlining.with_control_flow(_:)" inlined into "reverse-mode derivative of vjp_inlining.wrapperOnWithControlFlow(x:)"
+
+// =========================================================================== //
+// Single-use transparent pullback adapters do not prevent early VJP inlining
+// =========================================================================== //
+@differentiable(reverse)
+func minimum<T: Differentiable & Comparable>(_ x: T, _ y: T) -> T {
+    x < y ? x : y
+}
+
+@differentiable(reverse)
+func clamp(_ x: Float) -> Float {
+    minimum(x > 0 ? x : 0, 1)
+}
+
+// CHECK: Run #[[#]], stage HighLevel,Function+EarlyLoopOpt, pass [[#]]: EarlyPerfInliner (early-inline), Function: $s12vjp_inlining5clampyS2fFTJrSpSr
+// CHECK-NOT: stage MidLevel,Function
+// CHECK-NOT: stage LowLevel,Function
+// CHECK: decision {c={{.*}} $s12vjp_inlining7minimum{{.*}}TJr{{.*}}_Tg5
+// CHECK-NEXT: "specialized reverse-mode derivative of vjp_inlining.minimum<A>(_:_:)" inlined into "reverse-mode derivative of vjp_inlining.clamp(_:)"
 
 // CHECK-LABEL: decision {{.*}} $s12vjp_inlining17with_control_flowyS2fFTJrSpSr
 // CHECK-NEXT: "reverse-mode derivative of vjp_inlining.with_control_flow(_:)" inlined into "caller_of_with_control_flow"
