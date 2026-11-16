@@ -933,6 +933,20 @@ ERROR(sil_movechecking_borrowed_parameter_captured_by_closure, none,
       "'%0' cannot be captured by an escaping closure since it is a borrowed "
       "parameter",
       (StringRef))
+ERROR(sil_movechecking_borrowed_value_consumed_without_copy, none,
+      "'%0' is borrowed and cannot be consumed without an explicit 'copy'",
+      (StringRef))
+ERROR(sil_movechecking_borrowed_value_captured_by_escaping_closure, none,
+      "borrowed '%0' cannot be captured by an escaping closure", (StringRef))
+NOTE(sil_movechecking_consume_explicit_copy, none,
+     "write 'copy %0' to consume a copy instead", (StringRef))
+NOTE(sil_movechecking_make_parameter_consuming, none,
+     "make '%0' a 'consuming' parameter to take ownership of it", (StringRef))
+NOTE(sil_movechecking_make_method_consuming, none,
+     "make %0 a 'consuming' method to take ownership of 'self'", (DeclName))
+NOTE(sil_movechecking_captured_by_borrowing_closure, none,
+     "'%0' is captured by this %select{local function|closure}1, which only "
+     "borrows it", (StringRef, bool))
 ERROR(sil_movechecking_capture_consumed, none,
       "non-'Copyable' '%0' cannot be consumed when captured by an escaping closure or borrowed by a non-'Escapable' type",
       (StringRef))
@@ -1036,6 +1050,8 @@ ERROR(sil_movechecking_not_understand_moveonly, none,
       "usage of a non-'Copyable' type that compiler can't verify. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_missed_copy, none,
       "copy of non-'Copyable' typed value. This is a compiler bug. Please file a bug with a small example of the bug", ())
+ERROR(sil_lifetime_resolution_bug_missed_copy, none,
+      "LifetimeResolution missed diagnosing a copy. This is a compiler bug. Please file a bug with a small example of the bug", ())
 ERROR(sil_movechecking_bug_exclusivity_violation, none,
       "'%0' has an unexpected exclusivity violation. This is a compiler bug. Please file a bug with a small example of the bug", (StringRef))
 ERROR(sil_movekillscopyablevalue_move_applied_to_unsupported_move, none,

@@ -43,6 +43,8 @@ let lifetimeResolutionPass = FunctionPass(name: "lifetime-resolution") {
       resolver.run(on: argument, &indexCache)
     }
   }
+
+  function.set(hasUnresolvedLifetimes: false, context)
 }
 
 private struct Resolver {
@@ -61,10 +63,13 @@ private struct Resolver {
         return
       }
 
-      // TODO: resolve `.guaranteed` values too. It should amount to having all consuming uses
-      //   require a copy, including those on the boundary, and inserting end_access/end_borrow.
-      if value.ownership == .owned {
+      switch value.ownership {
+      case .owned:
         resolveSingleDef(value, context)
+      case .guaranteed:
+        resolveGuaranteed(value, context)
+      default:
+        break
       }
       return
     }
@@ -451,6 +456,9 @@ private struct MultiDefResolver {
     }
   }
 
+  // TODO: the memory is uninitialized from the take until its reinitialization, or a Never-returning call for an
+  //   `inout`, so the access must be extended to cover that point. For a borrowed box, which can be reentrantly
+  //   accessed, that extended access must be a dynamically enforced modify.
   func adjustAccessForTake(_ addr: Value) {
     assert(addr.type.isAddress)
 
@@ -1498,4 +1506,8 @@ let lifetimeResolutionResolveTest = FunctionTest("lifetime_resolution_resolve") 
   var indexCache = FieldIndexTrieCache(for: function)
   let root = arguments.takeValue()
   resolver.run(on: root, &indexCache)
+
+  // Assume the whole function has been resolved otherwise.
+  // This ensures we get extra verification for unit tests.
+  function.set(hasUnresolvedLifetimes: false, context)
 }

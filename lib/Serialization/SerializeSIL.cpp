@@ -510,6 +510,8 @@ ValueID SILSerializer::addValueRef(const ValueBase *Val) {
 
 void SILSerializer::writeSILFunction(const SILFunction &F, bool DeclOnly) {
   PrettyStackTraceSILFunction stackTrace("Serializing", &F);
+  ASSERT(!F.hasUnresolvedLifetimes() &&
+         "serializing a function whose lifetimes are unresolved");
 
   ValueIDs.clear();
   InstID = 0;

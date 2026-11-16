@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -sil-verify-none | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner | %FileCheck %s
 
 // XFAIL: *
 
@@ -27,7 +27,7 @@ sil @barrierK : $@convention(thin) () -> ()
 // CHECK-NEXT: [[COPY:%.*]] = copy_value [[V]]
 // CHECK-NEXT: apply {{%.*}}({{.*}}[[COPY]]{{.*}}) : $@convention(thin) (@owned Kl, @owned Kl) -> ()
 // CHECK-LABEL: } // end sil function
-sil [ossa] @test_two_consumes_one_instruction : $@convention(thin) () -> () {
+sil [ossa] [unresolved] @test_two_consumes_one_instruction : $@convention(thin) () -> () {
 bb0:
   %getFn = function_ref @getK : $@convention(thin) () -> @owned Kl
   %consTwoFn = function_ref @consumeTwoK : $@convention(thin) (@owned Kl, @owned Kl) -> ()
@@ -36,4 +36,26 @@ bb0:
   apply %consTwoFn(%0, %0) : $@convention(thin) (@owned Kl, @owned Kl) -> ()
   %t = tuple ()
   return %t
+}
+
+
+// The contents of a borrowed box must be initialized at a dead end too.
+
+// CHECK-LABEL: sil [ossa] @borrowed_box_take_before_unreachable :
+// CHECK:      [[BA:%.*]] = begin_access [deinit] [unknown]
+// CHECK-NEXT: [[LD:%.*]] = load [copy] [[BA]]
+// CHECK-NEXT: diagnose [unpermitted_copy] [[LD]]
+// CHECK-LABEL: } // end sil function
+sil [ossa] [unresolved] @borrowed_box_take_before_unreachable : $@convention(thin) (@guaranteed { var Kl }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Kl }):
+  specify_test "lifetime_resolution_resolve @argument[0]"
+  %1 = project_box %0, 0
+  %2 = begin_access [deinit] [unknown] %1
+  %3 = load [take] %2
+  end_access %2
+  %5 = function_ref @consumeK : $@convention(thin) (@owned Kl) -> ()
+  %6 = apply %5(%3) : $@convention(thin) (@owned Kl) -> ()
+  %7 = function_ref @barrierK : $@convention(thin) () -> ()
+  %8 = apply %7() : $@convention(thin) () -> ()
+  unreachable
 }

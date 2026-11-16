@@ -267,7 +267,14 @@ public class VarDecl: AbstractStorageDecl {
 
 final public class ParamDecl: VarDecl {
   /// The location of an explicit `consuming` specifier on this parameter, if present.
-  public var consumingSpecifierLoc: SourceLoc? { SourceLoc(bridged: bridged.Param_getConsumingSpecifierLoc()) }
+  public var consumingSpecifierLoc: SourceLoc? { specifierLoc(.consuming) }
+
+  /// The location of an explicit `borrowing` specifier on this parameter, if present.
+  public var borrowingSpecifierLoc: SourceLoc? { specifierLoc(.borrowing) }
+
+  private func specifierLoc(_ specifier: BridgedParamSpecifier) -> SourceLoc? {
+    SourceLoc(bridged: BridgedParamDecl(raw: bridged.obj).getSpecifierLoc(specifier))
+  }
 
   public func cloneWithoutType() -> ParamDecl {
     BridgedParamDecl(raw: bridged.obj).cloneWithoutType().asDecl.declObj.getAs(ParamDecl.self)

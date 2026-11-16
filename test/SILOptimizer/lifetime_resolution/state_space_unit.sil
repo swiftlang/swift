@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -test-runner -sil-disable-input-verify -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt %s -test-runner -o /dev/null 2>&1 | %FileCheck %s
 
 // The elements of the dataflow state that LifetimeResolution tracks for each kind of root.
 
@@ -273,4 +273,22 @@ bb0(%0 : @owned $Derived):
   destroy_addr %2
   dealloc_stack %1
   return %10
+}
+
+// The contents of a box captured by a closure start initialized.
+// CHECK-LABEL: begin running test {{.*}} on borrowed_box: lifetime_resolution_state_space
+// CHECK:      mode: storage
+// CHECK-NEXT: count: 2
+// CHECK-NEXT: elements:
+// CHECK-NEXT:   0: field s0
+// CHECK-NEXT:   1: field s1
+// CHECK-NEXT: initiallyInitialized: 0..<2
+// CHECK:      immutableLeaves: []
+// CHECK-LABEL: end running test {{.*}} on borrowed_box: lifetime_resolution_state_space
+sil [ossa] @borrowed_box : $@convention(thin) (@guaranteed { var Two }) -> () {
+bb0(%0 : @closureCapture @guaranteed ${ var Two }):
+  specify_test "lifetime_resolution_state_space @argument[0]"
+  %1 = project_box %0, 0
+  %t = tuple ()
+  return %t
 }

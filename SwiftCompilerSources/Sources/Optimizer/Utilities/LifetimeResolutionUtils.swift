@@ -201,7 +201,7 @@ struct ResolvableRoot {
 
   /// An instruction requiring the whole root to be initialized, which is not found by walking uses of the address.
   enum ExtraLivenessUse {
-    /// The function exits, at which point an `inout` parameter must be initialized.
+    /// The function exits, at which point an `inout` parameter or the contents of a borrowed box must be initialized.
     case functionExit(TermInst)
     /// The lifetime of the `alloc_box` ends.
     case boxLifetimeEnd(Instruction)
@@ -282,9 +282,9 @@ struct ResolvableRoot {
     }
   }
 
-  /// Build from a storage allocation (`alloc_box` / `alloc_stack`), an address argument, or the `self` argument of a
-  /// root class initializer. Callers holding only an address must first walk up to the allocation, e.g. with
-  /// `allocation(backing:)`.
+  /// Build from a storage allocation (`alloc_box` / `alloc_stack`), an address or borrowed box argument, or the `self`
+  /// argument of a root class initializer. Callers holding only an address must first walk up to the allocation, e.g.
+  /// with `allocation(backing:)`.
   init?(_ val: Value, _ indexCache: inout FieldIndexTrieCache) {
     let function = val.parentFunction
     var extraUses: [ExtraLivenessUse] = []
@@ -335,6 +335,22 @@ struct ResolvableRoot {
       box.uses.endingLifetime.forEach { extraUses.append(.boxLifetimeEnd($0.instruction)) }
       // TODO: add copies of the box too
 
+    case let arg as FunctionArgument where arg.type.isBox && arg.ownership == .guaranteed:
+      // A box captured by a closure, whose contents may be consumed only if reinitialized before the function exits.
+      guard let (projectBox, _) = Self.findProjectBox(of: arg) else {
+        return nil
+      }
+      storage = arg
+      address = projectBox
+      markUninitialized = nil
+      varDecl = arg.findVarDecl()
+      isLexical = arg.isLexical
+      startsInitialized = true
+      mode = .storage
+
+      // TODO: the contents must also be initialized where a dead-end block is reached, i.e., before an `unreachable`.
+      function.exitingBlocks.forEach { extraUses.append(.functionExit($0.terminator)) }
+
     case let arg as FunctionArgument where arg.type.isAddress:
       storage = arg
       address = arg
@@ -348,10 +364,10 @@ struct ResolvableRoot {
         startsInitialized = true
       case .indirectOut:
         startsInitialized = false
-      case .indirectInout:
+      case .indirectInout, .indirectInoutAliasable:
         startsInitialized = true
 
-        // For an inout parameter, all function exit terminators are considered uses.
+        // For an inout parameter or a non-escaping closure capture, all function exit terminators are considered uses.
         function.exitingBlocks.forEach { extraUses.append(.functionExit($0.terminator)) }
 
       default:

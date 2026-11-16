@@ -145,6 +145,11 @@ bool SILValueOwnershipChecker::check() {
     return false;
   }
 
+  // Until its lifetimes are resolved, a value may be consumed any number of
+  // times, so skip the LinearLifetimeChecker.
+  if (value->getFunction()->hasUnresolvedLifetimes())
+    return true;
+
   SmallVector<Operand *, 32> allLifetimeEndingUsers;
   llvm::copy(lifetimeEndingUsers, std::back_inserter(allLifetimeEndingUsers));
   SmallVector<Operand *, 32> allRegularUsers;
