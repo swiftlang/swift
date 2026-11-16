@@ -8,6 +8,16 @@
 // RUN: %FileCheck %s < %t/generics.h
 // RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
+// CHECK: template<class T_0_0, class T_0_1>
+// CHECK-NEXT: #ifdef __cpp_concepts
+// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
+// CHECK-NEXT: #endif
+// CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair;
+
+// CHECK: template<class T_0_0, class T_0_1>
+
+// CHECK: #undef SWIFT_SYMBOL
+
 // CHECK: namespace Generics SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Generics") {
 // CHECK: // Stub struct to be used to pass/return values to/from Swift functions.
 // CHECK-NEXT: struct swift_interop_passStub_Generics_[[PTRPTRENC:void_ptr_[0-9]_[0-9]_void_ptr_[0-9]_[0-9]+]] {
@@ -75,13 +85,6 @@
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics16takeConcretePairyyAA07GenericD0Vys6UInt16VAFGF(struct swift_interop_passStub_Generics_[[PTRPTRENC]] x) SWIFT_NOEXCEPT SWIFT_CALL; // takeConcretePair(_:)
 // CHECK-NEXT: SWIFT_EXTERN void $s8Generics15takeGenericPairyyAA0cD0Vyxq_Gr0_lF(struct swift_interop_passStub_Generics_[[PTRPTRENC]] x, void * _Nonnull , void * _Nonnull ) SWIFT_NOEXCEPT SWIFT_CALL; // takeGenericPair(_:)
 
-// CHECK: template<class T_0_0, class T_0_1>
-// CHECK-NEXT: #ifdef __cpp_concepts
-// CHECK-NEXT: requires swift::isUsableInGenericContext<T_0_0> && swift::isUsableInGenericContext<T_0_1>
-// CHECK-NEXT: #endif
-// CHECK-NEXT: class SWIFT_SYMBOL("s:8Generics11GenericPairV") GenericPair;
-
-// CHECK: template<class T_0_0, class T_0_1>
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK: template<class T_0_0, class T_0_1>
 // CHECK-NEXT: #ifdef __cpp_concepts

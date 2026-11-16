@@ -26,6 +26,9 @@ public struct B {
 
 // CHECK: class SWIFT_SYMBOL({{.*}}) B;
 // CHECK: class SWIFT_SYMBOL({{.*}}) A;
+// CHECK: #undef SWIFT_SYMBOL
+// CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
+// CHECK: namespace Structs SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Structs") {
 // CHECK: namespace _impl {
 // CHECK-EMPTY:
 // CHECK-NEXT: class _impl_A;

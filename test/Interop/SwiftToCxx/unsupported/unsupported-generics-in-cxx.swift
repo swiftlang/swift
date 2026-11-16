@@ -107,7 +107,6 @@ public func returnsNestedInGenericClass() -> OuterGeneric<Int>.NestedClass { fat
 // CHECK: private:
 
 // CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
-// CHECK: namespace Decls SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Decls") {
 // CHECK: SWIFT_INLINE_THUNK void supportedFunc(const T_0_0& x) noexcept SWIFT_SYMBOL("s:5Decls13supportedFuncyyxlF") {
 
 // CHECK: class DerivedFromDerivedFromGeneric { } SWIFT_UNAVAILABLE_MSG("class 'DerivedFromDerivedFromGeneric' inherits from a generic class and can not yet be exposed to C++");
