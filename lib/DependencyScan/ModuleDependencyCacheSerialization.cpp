@@ -256,7 +256,7 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
        &swiftOverlayDependenciesIDs](ModuleDependencyInfo &moduleDep) {
         moduleDep.setImportedSwiftDependencies(importedSwiftDependenciesIDs);
         moduleDep.setCrossImportOverlayDependencies(
-            crossImportOverlayDependenciesIDs);
+            ArrayRef(crossImportOverlayDependenciesIDs));
         moduleDep.setSwiftOverlayDependencies(swiftOverlayDependenciesIDs);
       };
 

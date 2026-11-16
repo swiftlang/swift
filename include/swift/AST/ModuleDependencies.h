@@ -146,11 +146,10 @@ public:
   Iterator begin() const { return Iterator(this, 0, 0); }
   Iterator end() const { return Iterator(this, memberCollections.size(), 0); }
 
-  template <typename... Arrays>
-  JoinedArrayRefView(Arrays ...arrs) {
-    memberCollections.reserve(sizeof...(arrs));
-    (memberCollections.push_back(arrs), ...);
-  }
+  // Takes ArrayRefs rather than arbitrary containers, so that converting a
+  // container happens at the call site, where it is alive.
+  template <typename... Ts>
+  JoinedArrayRefView(ArrayRef<Ts>... arrs) : memberCollections{arrs...} {}
 
 private:
   std::vector<ArrayRef<T>> memberCollections;
