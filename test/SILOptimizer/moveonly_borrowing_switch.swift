@@ -243,6 +243,20 @@ func testOuterAO(consuming bas: consuming AOBas) { // expected-error{{'bas' used
     }
 }
 
+struct Tagged: ~Copyable { var tag: Int }
+
+// A `where` clause that only reads a whole-value binding of a borrowed subject
+// does not consume the subject.
+func testWholeValueWhereBorrowedStruct(_ x: borrowing Tagged) -> Int {
+    switch x {
+    case let y where y.tag > 0:
+        _ = y.tag
+        return 1
+    case _:
+        return 0
+    }
+}
+
 enum E<T>: ~Copyable {
     case a(T)
 }
