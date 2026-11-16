@@ -57,6 +57,13 @@ def _apply_default_arguments(args):
        args.lldb_build_with_xcode is not None:
         args.build_lldb = True
 
+    # Specifying the path to a compiler dylib implies linking LLDB against it,
+    # and linking LLDB against it implies building LLDB.
+    if args.lldb_compiler_dylib_path is not None:
+        args.lldb_link_against_compiler_dylib = True
+    if args.lldb_link_against_compiler_dylib:
+        args.build_lldb = True
+
     # Build libc++ if fully static Linux was specified.
     if args.build_linux_static and args.build_libcxx is None:
         args.build_libcxx = True
@@ -1058,6 +1065,20 @@ def create_argument_parser():
     option('--lldb-build-with-cmake', store('lldb_build_with_xcode'),
            const='0',
            help='build LLDB using CMake')
+
+    option('--lldb-link-against-compiler-dylib',
+           toggle_true('lldb_link_against_compiler_dylib'),
+           help='link LLDB against the Swift compiler dylib '
+                '(libSwiftCompilerShared) instead of against the LLVM, Clang '
+                'and Swift libraries. Only the parts of LLVM and Clang that '
+                'LLDB needs to build are built, and Swift is configured but '
+                'not built. Requires --lldb-compiler-dylib-path')
+
+    option('--lldb-compiler-dylib-path', store_path,
+           metavar='PATH',
+           help='path to the Swift compiler dylib (libSwiftCompilerShared) '
+                'that LLDB links against. Implies '
+                '--lldb-link-against-compiler-dylib')
 
     option('--debug-cmark', store('cmark_build_variant'),
            const='Debug',

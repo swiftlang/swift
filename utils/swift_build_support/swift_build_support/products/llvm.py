@@ -246,6 +246,11 @@ class LLVM(cmake_product.CMakeProduct):
             # override everything.
             build_targets = []
             build = False
+        elif self.args.lldb_link_against_compiler_dylib:
+            # LLDB gets LLVM and Clang from the Swift compiler dylib, so only
+            # build what is needed to configure and build LLDB itself.
+            build_targets = ['llvm-tblgen', 'clang-tblgen', 'clangTooling',
+                             'llvm-nm', 'clang-resource-headers']
         elif self.args.skip_build or not self.args.build_llvm:
             # We can't skip the build completely because the standalone
             # build of Swift depends on these.
@@ -410,7 +415,8 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define('LLVM_INCLUDE_TESTS', 'NO')
             llvm_cmake_options.define('CLANG_INCLUDE_TESTS', 'NO')
 
-        if ("-DLLVM_INCLUDE_TESTS=NO" not in llvm_cmake_options
+        if (not self.args.lldb_link_against_compiler_dylib
+            and "-DLLVM_INCLUDE_TESTS=NO" not in llvm_cmake_options
             and "-DLLVM_INCLUDE_TESTS:BOOL=FALSE" not in llvm_cmake_options):
             # This supports scenarios where tests are run
             # outside of `build-script` (e.g. with `run-test`)
