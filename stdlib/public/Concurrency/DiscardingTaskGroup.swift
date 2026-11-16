@@ -212,8 +212,8 @@ public struct DiscardingTaskGroup {
   /// however one should be very careful to not keep a reference to the
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
-  /// - SeeAlso: `Task.isCancelled`
-  /// - SeeAlso: `DiscardingTaskGroup.isCancelled`
+  /// - SeeAlso: ``Task/isCancelled-type.property``
+  /// - SeeAlso: ``DiscardingTaskGroup/isCancelled``
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
@@ -236,13 +236,16 @@ public struct DiscardingTaskGroup {
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
   ///
-  /// ### Interaction with task cancellation shields
+  /// ### Interaction with Task Cancellation Shields
   ///
-  /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)-(()->Value)``), which may cause `isCancelled`
-  /// to return `false` even though the task has been cancelled externally.
+  /// If cancellation has been suppressed by an active task cancellation shield,
+  /// reading `isCancelled` on a cancelled task returns `false`.
   ///
-  /// - SeeAlso: ``withTaskCancellationShield(operation:)-(()->Value)``
+  /// Refer to ``withTaskCancellationShield(operation:)-2lzl8`` documentation
+  /// for detailed semantics.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-8zlgh``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -520,8 +523,8 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// however one should be very careful to not keep a reference to the
   /// group longer than the `with...TaskGroup(...) { ... }` method body is executing.
   ///
-  /// - SeeAlso: `Task.isCancelled`
-  /// - SeeAlso: `ThrowingDiscardingTaskGroup.isCancelled`
+  /// - SeeAlso: ``Task/isCancelled-type.property``
+  /// - SeeAlso: ``ThrowingDiscardingTaskGroup/isCancelled``
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
@@ -544,13 +547,16 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
   ///
-  /// ### Interaction with task cancellation shields
+  /// ### Interaction with Task Cancellation Shields
   ///
-  /// Cancellation may be suppressed by an active task cancellation shield
-  /// (``withTaskCancellationShield(operation:)-2lzl8``), which may cause `isCancelled`
-  /// to return `false` even though the task has been cancelled externally.
+  /// If cancellation has been suppressed by an active task cancellation shield,
+  /// reading `isCancelled` on a cancelled task returns `false`.
+  ///
+  /// Refer to ``withTaskCancellationShield(operation:)-2lzl8`` documentation
+  /// for detailed semantics.
   ///
   /// - SeeAlso: ``withTaskCancellationShield(operation:)-2lzl8``
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)-8zlgh``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
