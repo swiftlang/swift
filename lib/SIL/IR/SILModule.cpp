@@ -851,9 +851,11 @@ void SILModule::registerDeserializationNotificationHandler(
 
 SILValue SILModule::getLocalGenericEnvironmentDef(GenericEnvironment *genericEnv,
                                                   SILFunction *inFunction) {
-  SILValue &def = RootLocalArchetypeDefs[{genericEnv, inFunction}];
+  LocalArchetypeKey key = {genericEnv, inFunction};
+  SILValue &def = RootLocalArchetypeDefs[key];
   if (!def) {
     numUnresolvedLocalArchetypes++;
+    UnresolvedLocalArchetypeKeys.insert(key);
     def = ::new PlaceholderValue(inFunction,
                                  SILType::getPrimitiveAddressType(
                                     inFunction->getASTContext().TheEmptyTupleType));
@@ -869,25 +871,31 @@ SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
 }
 
 void SILModule::reclaimUnresolvedLocalArchetypeDefinitions() {
-  llvm::DenseMap<LocalArchetypeKey, SILValue> newLocalArchetypeDefs;
-
-  for (auto pair : RootLocalArchetypeDefs) {
-    if (auto *placeholder = dyn_cast<PlaceholderValue>(pair.second)) {
-      // If a placeholder has no uses, the instruction that introduced it
-      // was deleted before the local archetype was resolved. Reclaim the
-      // placeholder so that we don't complain.
-      if (placeholder->use_empty()) {
-        assert(numUnresolvedLocalArchetypes > 0);
-        --numUnresolvedLocalArchetypes;
-        ::delete placeholder;
-        continue;
-      }
+  // Only visit the placeholders, not all of RootLocalArchetypeDefs. This is
+  // called once per function by some clients, so its cost must not depend on
+  // the number of local archetypes in the whole module.
+  llvm::SmallVector<LocalArchetypeKey, 4> reclaimed;
+  for (LocalArchetypeKey key : UnresolvedLocalArchetypeKeys) {
+    auto *placeholder = dyn_cast_or_null<PlaceholderValue>(
+        RootLocalArchetypeDefs.lookup(key));
+    if (!placeholder) {
+      // The entry no longer holds a placeholder; drop the stale key.
+      reclaimed.push_back(key);
+      continue;
     }
-
-    newLocalArchetypeDefs.insert(pair);
+    // If a placeholder has no uses, the instruction that introduced it
+    // was deleted before the local archetype was resolved. Reclaim the
+    // placeholder so that we don't complain.
+    if (placeholder->use_empty()) {
+      assert(numUnresolvedLocalArchetypes > 0);
+      --numUnresolvedLocalArchetypes;
+      ::delete placeholder;
+      RootLocalArchetypeDefs.erase(key);
+      reclaimed.push_back(key);
+    }
   }
-
-  std::swap(newLocalArchetypeDefs, RootLocalArchetypeDefs);
+  for (LocalArchetypeKey key : reclaimed)
+    UnresolvedLocalArchetypeKeys.erase(key);
 }
 
 bool SILModule::hasUnresolvedLocalArchetypeDefinitions() {
@@ -964,6 +972,7 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
 
       assert(numUnresolvedLocalArchetypes > 0);
       numUnresolvedLocalArchetypes--;
+      UnresolvedLocalArchetypeKeys.erase({genericEnv, inst->getFunction()});
     }
     val = dependency;
   });

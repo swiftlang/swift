@@ -3700,7 +3700,6 @@ llvm::DINode::DIFlags IRGenDebugInfoImpl::getCallSiteRelatedAttrs() const {
   if (!Opts.DebugCallsiteInfo)
     return llvm::DINode::FlagZero;
 
-  auto SwiftLangOpts = IGM.Context.LangOpts;
   auto Loader = IGM.getSILModule().getASTContext().getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter *>(&*Loader);
   auto &CGO = Importer->getCodeGenOpts();
