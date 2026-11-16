@@ -176,6 +176,7 @@ public:
   bool ExplicitModuleBuild = false;
   bool EnableSerializationRemarks = false;
   bool EnableHiddenTypeLayoutSerializationRemarks = false;
+  bool SkipWritingAbstractTypeLayouts = false;
   bool IsInterfaceSDKRelative = false;
 };
 

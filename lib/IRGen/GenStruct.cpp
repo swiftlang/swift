@@ -2020,8 +2020,9 @@ namespace {
   createRecordFieldTypeInfoFromSerializableRepresentation(
       IRGenModule &IGM,
       const SerializableRecordFieldRepresentation &field) {
-    if (field.type) {
-      auto loweredType = IGM.getLoweredType(field.type->getCanonicalType());
+    if (field.resolvedType) {
+      auto loweredType =
+          IGM.getLoweredType(field.resolvedType->getCanonicalType());
       return IGM.getTypeInfo(loweredType);
     }
     if (!field.typeInfo)

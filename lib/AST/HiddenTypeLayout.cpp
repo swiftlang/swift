@@ -60,22 +60,92 @@ void swift::forEachRequiredHiddenTypeLayout(
         return importedModule->isClangBridgingHeaderImportModule();
       };
 
-  // Traverse a type that contributes to an ABI-accessible layout. If it is
-  // hidden from clients, schedule it to receive a hidden representation.
-  // Otherwise, recurse into non-resilient structs and enums, or the public
-  // class root, looking for hidden component types.
+  struct HiddenTypeReference {
+    const Decl *LayoutDecl;
+    HiddenTypeLayoutOrigin Origin;
+  };
+
+  auto getHiddenTypeReference =
+      [&](Type type,
+          DeclContext *useDC) -> std::optional<HiddenTypeReference> {
+    if (auto *hiddenType = type->getAs<HiddenType>()) {
+      if (auto *layoutInfo = hiddenType->getLayoutInfoDecl())
+        return HiddenTypeReference{
+            layoutInfo, HiddenTypeLayoutOrigin::RecoveredHiddenType};
+      return std::nullopt;
+    }
+
+    auto *nominal = type->getAnyNominal();
+    if (!nominal)
+      return std::nullopt;
+
+    auto *typeModule = nominal->getModuleContext();
+    if (module->isImportedImplementationOnly(typeModule,
+                                             /*assumeImported=*/false))
+      return HiddenTypeReference{
+          nominal, HiddenTypeLayoutOrigin::ImplementationOnly};
+
+    if (nominal->hasClangNode() &&
+        isInternalBridgingHeaderImportedType(nominal, useDC))
+      return HiddenTypeReference{
+          nominal, HiddenTypeLayoutOrigin::InternalBridgingHeader};
+
+    return std::nullopt;
+  };
+
+  // Find declarations anywhere in the complete type expression that must be
+  // available before a layout-bearing member can be deserialized. This is
+  // deliberately broader than physical layout traversal: function parameters,
+  // phantom generic arguments, and generic requirements can prevent the member
+  // declaration from loading without contributing storage themselves.
+  auto processTypeReferencedFromABIContributingType =
+      [&](Type type, DeclContext *useDC, NominalTypeDecl *abiExposedType,
+          ValueDecl *layoutAffectingStorage) {
+        llvm::SmallPtrSet<const Decl *, 8> reportedHiddenDecls;
+        llvm::SmallPtrSet<const NominalTypeDecl *, 8> visitedSignatures;
+
+        std::function<void(Type, DeclContext *)> visitTypeReferences =
+            [&](Type referencedType, DeclContext *referenceDC) {
+          if (!referencedType)
+            return;
+
+          referencedType.visit([&](Type componentType) {
+            if (auto hidden =
+                    getHiddenTypeReference(componentType, referenceDC)) {
+              if (reportedHiddenDecls.insert(hidden->LayoutDecl).second)
+                reportHiddenType(hidden->LayoutDecl, componentType,
+                                 hidden->Origin, abiExposedType,
+                                 layoutAffectingStorage);
+            }
+
+            auto *nominal = componentType->getAnyNominal();
+            if (!nominal || nominal->getModuleContext() != module ||
+                !visitedSignatures.insert(nominal).second)
+              return;
+
+            auto signature = nominal->getGenericSignature();
+            if (!signature)
+              return;
+            for (auto requirement : signature.getRequirements()) {
+              visitTypeReferences(requirement.getFirstType(), nominal);
+              if (requirement.getKind() != RequirementKind::Layout)
+                visitTypeReferences(requirement.getSecondType(), nominal);
+            }
+          });
+        };
+
+        visitTypeReferences(type, useDC);
+      };
+
+  // Traverse a type that contributes to an ABI-accessible layout to find the
+  // local stored members that clients may need to deserialize.
   std::function<void(Type, DeclContext *, NominalTypeDecl *, ValueDecl *)>
       processTypeForHiddenLayouts =
           [&](Type type, DeclContext *useDC,
               NominalTypeDecl *abiExposedType,
               ValueDecl *layoutAffectingStorage) {
-        if (auto *hiddenType = type->getAs<HiddenType>()) {
-          if (auto *layoutInfo = hiddenType->getLayoutInfoDecl())
-            reportHiddenType(layoutInfo, type,
-                             HiddenTypeLayoutOrigin::RecoveredHiddenType,
-                             abiExposedType, layoutAffectingStorage);
+        if (getHiddenTypeReference(type, useDC))
           return;
-        }
 
         if (auto *tupleType = type->getAs<TupleType>()) {
           for (auto elt : tupleType->getElements())
@@ -88,29 +158,9 @@ void swift::forEachRequiredHiddenTypeLayout(
         if (!nominal)
           return;
 
-        // We schedule a hidden representation for types
-        // that contribute to ABI and will not be visible to clients
-        // for some reason.
-
-        // @_implementationOnly imported types will not be provided to clients
         ModuleDecl *typeModule = nominal->getModuleContext();
-        if (module->isImportedImplementationOnly(typeModule,
-                                                 /*assumeImported=*/false)) {
-          reportHiddenType(nominal, type,
-                           HiddenTypeLayoutOrigin::ImplementationOnly,
-                           abiExposedType, layoutAffectingStorage);
+        if (nominal->hasClangNode())
           return;
-        }
-
-        // Types from internally imported bridging headers will not be provided to clients
-        if (nominal->hasClangNode()) {
-          if (isInternalBridgingHeaderImportedType(nominal, useDC))
-            reportHiddenType(
-                nominal, type,
-                HiddenTypeLayoutOrigin::InternalBridgingHeader, abiExposedType,
-                layoutAffectingStorage);
-          return;
-        }
 
         // We intentionally do not handle the other disallowed origin kinds that
         // sema's exportability analysis diagnoses:
@@ -157,24 +207,28 @@ void swift::forEachRequiredHiddenTypeLayout(
         if (isa<StructDecl>(nominal) ||
             (isa<ClassDecl>(nominal) && nominal == abiExposedType)) {
           for (auto *prop : nominal->getStoredProperties()) {
-            auto storedType = prop->getInterfaceType().subst(substitutions);
+            auto declaredType = prop->getInterfaceType();
             auto *storage = prop->getModuleContext() == module
                                 ? prop
                                 : layoutAffectingStorage;
-            processTypeForHiddenLayouts(storedType, prop->getDeclContext(),
-                                        abiExposedType, storage);
+            processTypeReferencedFromABIContributingType(
+                declaredType, prop->getDeclContext(), abiExposedType, storage);
+            processTypeForHiddenLayouts(declaredType.subst(substitutions),
+                                        prop->getDeclContext(), abiExposedType,
+                                        storage);
           }
         } else if (auto *innerEnum = dyn_cast<EnumDecl>(nominal)) {
           for (auto *elt : innerEnum->getAllElements()) {
-            if (elt->isIndirect() || innerEnum->isIndirect())
-              continue;
             if (auto payloadType = elt->getPayloadInterfaceType()) {
               auto *storage = elt->getModuleContext() == module
                                   ? elt
                                   : layoutAffectingStorage;
-              processTypeForHiddenLayouts(payloadType.subst(substitutions),
-                                          elt->getDeclContext(), abiExposedType,
-                                          storage);
+              processTypeReferencedFromABIContributingType(
+                  payloadType, elt->getDeclContext(), abiExposedType, storage);
+              if (!elt->isIndirect() && !innerEnum->isIndirect())
+                processTypeForHiddenLayouts(
+                    payloadType.subst(substitutions), elt->getDeclContext(),
+                    abiExposedType, storage);
             }
           }
         }
