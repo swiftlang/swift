@@ -155,13 +155,11 @@ public:
                             llvm::Function *Fn,
                             StringRef outlinedFromName);
 
-  /// Emit a dbg.declare intrinsic at the current insertion point and
-  /// the Builder's current debug location.
+  /// Emit a dbg.declare intrinsic at the current insertion point. The record
+  /// gets the scope and location of \p VarInfo, which must have a scope.
   void emitVariableDeclaration(IRBuilder &Builder,
                                ArrayRef<llvm::Value *> Storage,
-                               DebugTypeInfo Ty, const SILDebugScope *DS,
-                               std::optional<SILLocation> VarLoc,
-                               SILDebugVariable VarInfo,
+                               DebugTypeInfo Ty, SILDebugVariable VarInfo,
                                bool InCoroContext = false,
                                ArtificialKind Artificial = RealValue,
                                AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
