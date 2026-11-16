@@ -105,6 +105,8 @@ class Swift(product.Product):
 
         self._handle_swift_debuginfo_non_lto_args()
 
+        self._handle_swift_enable_wasm_plugins()
+
         self.cmake_options.extend(
             self._enable_new_runtime_build)
 
@@ -338,6 +340,15 @@ updated without updating swift.py?")
             self.cmake_options.extend(
                 [('SWIFT_DEBUGINFO_NON_LTO_ARGS:STRING',
                  ";".join(self.args.swift_debuginfo_non_lto_args))])
+
+    def _handle_swift_enable_wasm_plugins(self):
+        if self.args.swift_enable_wasm_plugins is None:
+            # Lets CMake pick the default instead of a value cached by an
+            # earlier build-script invocation.
+            self.cmake_options.undefine('SWIFT_ENABLE_WASM_PLUGINS')
+        else:
+            self.cmake_options.define('SWIFT_ENABLE_WASM_PLUGINS:BOOL',
+                                      self.args.swift_enable_wasm_plugins)
 
     @property
     def _caching_flags(self):

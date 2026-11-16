@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_PLUGIN_SERVER_SUPPORTS_WASM
+
 import SystemPackage
-import WASI
+@_spi(WASIPlatform) import WASI
 import WasmKit
 import WasmKitWASI
 
@@ -20,37 +22,37 @@ typealias DefaultWasmEngine = WasmKitEngine
 struct WasmKitEngine: WasmEngine {
   private let engine: Engine
   private let functions: [String: Function]
-  private let hostToPlugin: FileDescriptor
-  private let pluginToHost: FileDescriptor
+  private let stdin: WasmStdioBuffer
+  private let stdout: WasmStdioBuffer
+  private let wasi: WASIBridgeToHost
 
   init(pluginPath: FilePath) throws {
-    let hostToPluginPipe = try FileDescriptor.pipe()
-    let pluginToHostPipe = try FileDescriptor.pipe()
-    self.hostToPlugin = hostToPluginPipe.writeEnd
-    self.pluginToHost = pluginToHostPipe.readEnd
-
-    var configuration = EngineConfiguration()
-    configuration.stackSize = 1 << 20
-    self.engine = Engine(configuration: configuration)
-    let store = Store(engine: engine)
-
-    let module = try parseWasm(filePath: pluginPath)
-    var moduleImports = Imports()
-
-    let imports = try WASIBridgeToHost(
-      stdin: hostToPluginPipe.readEnd,
-      stdout: pluginToHostPipe.writeEnd,
-      stderr: .standardError
+    let module = try parseWasm(filePath: pluginPath.string)
+    let stdin = WasmStdioBuffer(accessMode: .read)
+    let stdout = WasmStdioBuffer(accessMode: .write)
+    let wasi = try WASIBridgeToHost(
+      fileSystem: .host().withStdio(stdin: stdin, stdout: stdout, stderr: WasmStandardError())
     )
-    imports.link(to: &moduleImports, store: store)
-    let instance = try module.instantiate(store: store, imports: moduleImports)
-    var functions = [String: Function]()
-    for (name, export) in instance.exports {
-      guard case let .function(function) = export else { continue }
-      functions[name] = function
+    do {
+      var configuration = EngineConfiguration()
+      configuration.stackSize = 1 << 20
+      self.engine = Engine(configuration: configuration)
+      let store = Store(engine: engine)
+      var moduleImports = Imports()
+      wasi.link(to: &moduleImports, store: store)
+      let instance = try module.instantiate(store: store, imports: moduleImports)
+      var functions = [String: Function]()
+      for (name, export) in instance.exports {
+        guard case let .function(function) = export else { continue }
+        functions[name] = function
+      }
+      self.functions = functions
+    } catch {
+      try Cleanup.throwAfterRunning(wasi.close, error: error)
     }
-
-    self.functions = functions
+    self.stdin = stdin
+    self.stdout = stdout
+    self.wasi = wasi
   }
 
   func function(named name: String) throws -> WasmFunction? {
@@ -59,15 +61,16 @@ struct WasmKitEngine: WasmEngine {
   }
 
   func writeToPlugin(_ storage: some Sequence<UInt8>) throws {
-    try self.hostToPlugin.writeAll(storage)
+    self.stdin.append(storage)
   }
 
   func readFromPlugin(into storage: UnsafeMutableRawBufferPointer) throws -> Int {
-    try self.pluginToHost.read(into: storage)
+    self.stdout.take(into: storage)
   }
 
   func shutDown() throws {
-    try self.hostToPlugin.close()
-    try self.pluginToHost.close()
+    try self.wasi.close()
   }
 }
+
+#endif // SWIFT_PLUGIN_SERVER_SUPPORTS_WASM

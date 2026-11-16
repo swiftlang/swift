@@ -10,43 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_PLUGIN_SERVER_SUPPORTS_WASM
+
 @testable import swift_plugin_server
 import Testing
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
 
-/// A base handler that answers `getCapability` with the server's version and
-/// produces a benign result for anything else, so the intercepting handler is
-/// exercised in isolation.
-private final class NoopBaseHandler: PluginMessageHandler {
-  func handleMessage(_ message: HostToPluginMessage) -> PluginToHostMessage {
-    switch message {
-    case .getCapability:
-      return .getCapabilityResult(
-        capability: PluginMessage.PluginCapability(
-          protocolVersion: PluginMessage.PROTOCOL_VERSION_NUMBER,
-          features: ["load-plugin-library"]
-        )
-      )
-    default:
-      return .expandMacroResult(expandedSource: nil, diagnostics: [])
-    }
-  }
-  func shutDown() throws {}
-}
+private let moduleName = "MacroDefinition"
 
-private func makeSyntax(kind: PluginMessage.Syntax.Kind, source: String) -> PluginMessage.Syntax {
-  PluginMessage.Syntax(
-    kind: kind,
-    source: source,
-    location: PluginMessage.SourceLocation(
-      fileID: "MyApp/test.swift", fileName: "test.swift", offset: 0, line: 1, column: 1
-    )
-  )
-}
-
-private let macroRef = PluginMessage.MacroReference(
-  moduleName: "MacroDefinition", typeName: "ConstMacro", name: "constInt"
-)
+private let accessorSkewMessage = """
+  cannot expand macro 'constInt' from 'MacroDefinition.ConstMacro': the Wasm macro plugin reports \
+  protocol version 7, but the host requires protocol version 8 to send 'accessor' syntax; rebuild \
+  the plugin against a newer swift-syntax
+  """
 
 @Suite
 struct WasmCapabilityForwardingTests {
@@ -56,9 +32,9 @@ struct WasmCapabilityForwardingTests {
     _ mock: MockWasmPlugin,
     sendGetCapability: Bool = true,
     hostProtocolVersion: Int = PluginMessage.PROTOCOL_VERSION_NUMBER
-  ) -> (WasmInterceptingMessageHandler<NoopBaseHandler>, PluginToHostMessage) {
+  ) -> (WasmInterceptingMessageHandler<MockBaseHandler>, PluginToHostMessage) {
     let handler = WasmInterceptingMessageHandler(
-      base: NoopBaseHandler(),
+      base: MockBaseHandler(),
       makePlugin: { _ in mock }
     )
     if sendGetCapability {
@@ -67,91 +43,65 @@ struct WasmCapabilityForwardingTests {
       )
     }
     let loadResult = handler.handleMessage(
-      .loadPluginLibrary(libraryPath: "/tmp/Plugin.wasm", moduleName: macroRef.moduleName)
+      .loadPluginLibrary(libraryPath: "/tmp/Plugin.wasm", moduleName: moduleName)
     )
     return (handler, loadResult)
-  }
-
-  private func attachedAccessorMessage(declKind: PluginMessage.Syntax.Kind) -> HostToPluginMessage {
-    .expandAttachedMacro(
-      macro: macroRef,
-      macroRole: .accessor,
-      discriminator: "$disc",
-      attributeSyntax: makeSyntax(kind: .attribute, source: "@Foo"),
-      declSyntax: makeSyntax(kind: declKind, source: "var x: Int"),
-      parentDeclSyntax: nil,
-      extendedTypeSyntax: nil,
-      conformanceListSyntax: nil
-    )
-  }
-
-  private func freestandingMessage(
-    syntaxKind: PluginMessage.Syntax.Kind,
-    lexicalContext: [PluginMessage.Syntax]? = nil
-  ) -> HostToPluginMessage {
-    .expandFreestandingMacro(
-      macro: macroRef,
-      macroRole: .expression,
-      discriminator: "$disc",
-      syntax: makeSyntax(kind: syntaxKind, source: "#constInt"),
-      lexicalContext: lexicalContext
-    )
   }
 
   // The guest must receive a forwarded `getCapability` (carrying the host version) on load.
   @Test
   func forwardsHostCapabilityToGuestOnLoad() throws {
     let mock = MockWasmPlugin(reportedProtocolVersion: PluginMessage.PROTOCOL_VERSION_NUMBER)
-    _ = handlerLoadingMock(mock)
+    let (_, loadResult) = handlerLoadingMock(mock, hostProtocolVersion: 7)
 
+    try #require(loadResult.isSuccessfulLoad)
     #expect(mock.receivedMessages.count == 1)
-    #expect(mock.receivedForwardedCapability)
+    #expect(mock.forwardedProtocolVersions == [7])
     if case .getCapability = mock.receivedMessages.first {} else {
       Issue.record("first guest message should be getCapability, got \(String(describing: mock.receivedMessages.first))")
     }
   }
 
-  // A protocol-7 guest receiving an `.accessor` declSyntax gets a clear skew diagnostic, not the forward.
+  // A protocol-7 guest receiving an `.accessor` declSyntax gets a skew error at the attribute, not the forward.
   @Test
   func diagnosesAccessorSkew_inDeclSyntax() throws {
     let mock = MockWasmPlugin(reportedProtocolVersion: 7)
-    let (handler, _) = handlerLoadingMock(mock)
+    let (handler, loadResult) = handlerLoadingMock(mock)
+    try #require(loadResult.isSuccessfulLoad)
 
-    let response = handler.handleMessage(attachedAccessorMessage(declKind: .accessor))
+    let response = handler.handleMessage(.attachedExpansion(moduleName: moduleName, declKind: .accessor))
 
     guard case .expandMacroResult(let expandedSource, let diagnostics) = response else {
       Issue.record("expected expandMacroResult, got \(response)")
       return
     }
     #expect(expandedSource == nil)
-    #expect(diagnostics.count == 1)
-    let message = diagnostics.first?.message ?? ""
-    #expect(message.contains("protocol version 7"))
-    #expect(message.contains("protocol version \(PluginMessage.PROTOCOL_VERSION_NUMBER)"))
-    #expect(message.contains("rebuild"))
+    #expect(diagnostics.map(\.message) == [accessorSkewMessage])
+    #expect(diagnostics.map(\.severity) == [.error])
+    #expect(diagnostics.map(\.position.fileName) == ["test.swift"])
+    #expect(diagnostics.map(\.position.offset) == [0])
     #expect(!mock.receivedExpand)
   }
 
   // `.accessor` in lexicalContext, not just the root syntax, must also be caught.
-  @Test
-  func diagnosesAccessorSkew_inLexicalContext() throws {
+  @Test(arguments: [false, true])
+  func diagnosesAccessorSkew_inLexicalContext(attached: Bool) throws {
     let mock = MockWasmPlugin(reportedProtocolVersion: 7)
-    let (handler, _) = handlerLoadingMock(mock)
+    let (handler, loadResult) = handlerLoadingMock(mock)
+    try #require(loadResult.isSuccessfulLoad)
+    let lexicalContext: [PluginMessage.Syntax] = [.fixture(kind: .accessor, source: "get")]
+    let request: HostToPluginMessage = attached
+      ? .attachedExpansion(moduleName: moduleName, declKind: .declaration, lexicalContext: lexicalContext)
+      : .freestandingExpansion(moduleName: moduleName, syntaxKind: .expression, lexicalContext: lexicalContext)
 
-    let response = handler.handleMessage(
-      freestandingMessage(
-        syntaxKind: .expression,
-        lexicalContext: [makeSyntax(kind: .accessor, source: "get")]
-      )
-    )
+    let response = handler.handleMessage(request)
 
     guard case .expandMacroResult(let expandedSource, let diagnostics) = response else {
       Issue.record("expected expandMacroResult, got \(response)")
       return
     }
     #expect(expandedSource == nil)
-    #expect(diagnostics.count == 1)
-    #expect((diagnostics.first?.message ?? "").contains("rebuild"))
+    #expect(diagnostics.map(\.message) == [accessorSkewMessage])
     #expect(!mock.receivedExpand)
   }
 
@@ -159,9 +109,10 @@ struct WasmCapabilityForwardingTests {
   @Test
   func protocol7GuestExpandsNonAccessorMacro() throws {
     let mock = MockWasmPlugin(reportedProtocolVersion: 7)
-    let (handler, _) = handlerLoadingMock(mock)
+    let (handler, loadResult) = handlerLoadingMock(mock)
+    try #require(loadResult.isSuccessfulLoad)
 
-    let response = handler.handleMessage(freestandingMessage(syntaxKind: .expression))
+    let response = handler.handleMessage(.freestandingExpansion(moduleName: moduleName, syntaxKind: .expression))
 
     guard case .expandMacroResult(let expandedSource, let diagnostics) = response else {
       Issue.record("expected expandMacroResult, got \(response)")
@@ -176,9 +127,10 @@ struct WasmCapabilityForwardingTests {
   @Test
   func protocol8GuestForwardsAccessorMacro() throws {
     let mock = MockWasmPlugin(reportedProtocolVersion: 8)
-    let (handler, _) = handlerLoadingMock(mock)
+    let (handler, loadResult) = handlerLoadingMock(mock)
+    try #require(loadResult.isSuccessfulLoad)
 
-    let response = handler.handleMessage(attachedAccessorMessage(declKind: .accessor))
+    let response = handler.handleMessage(.attachedExpansion(moduleName: moduleName, declKind: .accessor))
 
     guard case .expandMacroResult(let expandedSource, let diagnostics) = response else {
       Issue.record("expected expandMacroResult, got \(response)")
@@ -195,7 +147,7 @@ struct WasmCapabilityForwardingTests {
     let mock = MockWasmPlugin(reportedProtocolVersion: PluginMessage.PROTOCOL_VERSION_NUMBER)
     let (_, loadResult) = handlerLoadingMock(mock, sendGetCapability: false)
 
-    #expect(mock.receivedForwardedCapability)
+    #expect(mock.forwardedProtocolVersions == [PluginMessage.PROTOCOL_VERSION_NUMBER])
     guard case .loadPluginLibraryResult(let loaded, _) = loadResult else {
       Issue.record("expected loadPluginLibraryResult, got \(loadResult)")
       return
@@ -216,3 +168,5 @@ struct WasmCapabilityForwardingTests {
     #expect(!loaded)
   }
 }
+
+#endif // SWIFT_PLUGIN_SERVER_SUPPORTS_WASM

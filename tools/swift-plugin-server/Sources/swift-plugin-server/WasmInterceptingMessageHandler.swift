@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if SWIFT_PLUGIN_SERVER_SUPPORTS_WASM
+
 import SystemPackage
 @_spi(PluginMessage) import SwiftCompilerPluginMessageHandling
 
@@ -18,6 +20,7 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
   /// A loaded Wasm guest plus the protocol version it reported via `getCapability`.
   struct LoadedWasmPlugin {
     let plugin: any WasmPlugin
+    let libraryPath: String
     let protocolVersion: Int
   }
 
@@ -25,6 +28,7 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
   typealias WasmPluginFactory = (FilePath) throws -> any WasmPlugin
 
   private var loadedWasmPlugins: [String: LoadedWasmPlugin] = [:]
+  private var loadedLibraryPaths: [String: String] = [:]
 
   /// Host capability captured from the incoming `getCapability`, forwarded to each guest on load.
   private var capturedHostCapability: PluginMessage.HostCapability?
@@ -42,31 +46,7 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
   func handleMessage(_ message: HostToPluginMessage) -> PluginToHostMessage {
     switch message {
     case let .loadPluginLibrary(libraryPath, moduleName):
-      guard libraryPath.hasSuffix(".wasm") else { break }
-      let libraryFilePath = FilePath(libraryPath)
-      var builtPlugin: (any WasmPlugin)?
-      do {
-        let plugin = try self.makePlugin(libraryFilePath)
-        builtPlugin = plugin
-        // Forward the host capability so the guest negotiates against the real host
-        // version (not the protocol floor), and learn the guest's own protocol version.
-        let guestVersion = try self.forwardCapability(to: plugin)
-        self.loadedWasmPlugins[moduleName] = LoadedWasmPlugin(plugin: plugin, protocolVersion: guestVersion)
-      } catch {
-        // A plugin built but failing the handshake never entered loadedWasmPlugins, so
-        // shutDown() can't reclaim its pipes. Release them here and surface any error.
-        var diagnostics = [PluginMessage.Diagnostic(errorMessage: "\(error)")]
-        if let builtPlugin {
-          do {
-            try builtPlugin.shutDown()
-          } catch let shutdownError {
-            diagnostics.append(PluginMessage.Diagnostic(
-              errorMessage: "additionally, shutting down the failed Wasm plugin errored: \(shutdownError)"))
-          }
-        }
-        return .loadPluginLibraryResult(loaded: false, diagnostics: diagnostics)
-      }
-      return .loadPluginLibraryResult(loaded: true, diagnostics: [])
+      return self.loadPlugin(libraryPath: libraryPath, moduleName: moduleName, message: message)
     case let .expandAttachedMacro(macro, _, _, attributeSyntax, _, _, _, _, _, _):
       if let response = self.expandMacro(macro, message: message, location: attributeSyntax.location) {
         return response
@@ -88,11 +68,60 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
   }
 
   func shutDown() throws {
-    for loaded in self.loadedWasmPlugins.values {
-      try loaded.plugin.shutDown()
-    }
-
+    let plugins = self.loadedWasmPlugins.values.map(\.plugin)
     self.loadedWasmPlugins = [:]
+    try Cleanup.runAll(plugins.map { $0.shutDown } + [self.base.shutDown])
+  }
+
+  private func loadPlugin(
+    libraryPath: String,
+    moduleName: String,
+    message: HostToPluginMessage
+  ) -> PluginToHostMessage {
+    if let loaded = self.loadedWasmPlugins[moduleName] {
+      guard loaded.libraryPath == libraryPath else {
+        return Self.alreadyLoadedResult("Wasm plugin", moduleName: moduleName, path: loaded.libraryPath)
+      }
+      return .loadPluginLibraryResult(loaded: true, diagnostics: [])
+    }
+    guard libraryPath.hasSuffix(".wasm") else {
+      let response = self.base.handleMessage(message)
+      if case .loadPluginLibraryResult(loaded: true, _) = response {
+        self.loadedLibraryPaths[moduleName] = libraryPath
+      }
+      return response
+    }
+    if let loadedLibraryPath = self.loadedLibraryPaths[moduleName] {
+      return Self.alreadyLoadedResult("library plugin", moduleName: moduleName, path: loadedLibraryPath)
+    }
+    let libraryFilePath = FilePath(libraryPath)
+    var builtPlugin: (any WasmPlugin)?
+    do {
+      let plugin = try self.makePlugin(libraryFilePath)
+      builtPlugin = plugin
+      let guestVersion = try self.forwardCapability(to: plugin)
+      self.loadedWasmPlugins[moduleName] = LoadedWasmPlugin(
+        plugin: plugin, libraryPath: libraryPath, protocolVersion: guestVersion)
+    } catch {
+      // A plugin built but failing the handshake never entered loadedWasmPlugins, so
+      // shutDown() would not reach it.
+      var diagnostics = [PluginMessage.Diagnostic(errorMessage: "\(error)")]
+      if let builtPlugin {
+        do {
+          try builtPlugin.shutDown()
+        } catch let shutdownError {
+          diagnostics.append(PluginMessage.Diagnostic(
+            errorMessage: "additionally, shutting down the failed Wasm plugin errored: \(shutdownError)"))
+        }
+      }
+      return .loadPluginLibraryResult(loaded: false, diagnostics: diagnostics)
+    }
+    return .loadPluginLibraryResult(loaded: true, diagnostics: [])
+  }
+
+  private static func alreadyLoadedResult(_ kind: String, moduleName: String, path: String) -> PluginToHostMessage {
+    .loadPluginLibraryResult(loaded: false, diagnostics: [PluginMessage.Diagnostic(
+      errorMessage: "\(kind) for module '\(moduleName)' is already loaded from different path '\(path)'")])
   }
 
   /// Forwards the captured host capability to a freshly loaded guest and returns the
@@ -167,13 +196,13 @@ final class WasmInterceptingMessageHandler<Base: PluginMessageHandler>: PluginMe
   }
 
   /// True if any syntax node in the message, including lexicalContext, has kind `.accessor`.
-  /// Checks every syntax field, not only the ones that carry `.accessor` today (declSyntax,
-  /// parentDeclSyntax, lexicalContext), so the guard still holds if the host version-gates
-  /// other fields.
+  /// Checks every syntax field, not only the ones that carry `.accessor` today (declSyntax
+  /// and lexicalContext), so the guard still holds if the host version-gates other fields.
   private static func messageContainsAccessorKind(_ message: HostToPluginMessage) -> Bool {
     switch message {
     case let .expandAttachedMacro(_, _, _, attr, decl, parent, ext, conf, lexical, _):
-      return [attr, decl, parent, ext, conf].contains { $0?.kind == .accessor }
+      return attr.kind == .accessor || decl.kind == .accessor || parent?.kind == .accessor
+        || ext?.kind == .accessor || conf?.kind == .accessor
         || (lexical ?? []).contains { $0.kind == .accessor }
     case let .expandFreestandingMacro(_, _, _, syntax, lexical, _):
       return syntax.kind == .accessor || (lexical ?? []).contains { $0.kind == .accessor }
@@ -205,10 +234,4 @@ fileprivate extension PluginMessage.SourceLocation {
   }
 }
 
-protocol WasmPlugin {
-  init(path: FilePath) throws
-
-  func handleMessage(_ json: [UInt8]) throws -> [UInt8]
-
-  func shutDown() throws
-}
+#endif // SWIFT_PLUGIN_SERVER_SUPPORTS_WASM
