@@ -4565,6 +4565,32 @@ protected:
     pass.deleter.forceDelete(sbi);
   }
 
+  // Whether the storage of \p value is an alloc_stack, an indirect argument,
+  // an address that a callee returned or yielded, or a projection of one.
+  // Assign that storage and keep it for as long as the value's.
+  bool hasStableStorage(SILValue value) {
+    while (Operand *reusedOper = getReusedStorageOperand(value))
+      value = reusedOper->get();
+    SILValue rootAddr =
+        pass.valueStorageMap.getBaseStorage(value).storageAddress;
+    return rootAddr &&
+           (isa<AllocStackInst>(rootAddr) ||
+            isa<SILFunctionArgument>(rootAddr) || isa<ApplyInst>(rootAddr) ||
+            isa_and_nonnull<BeginApplyInst>(
+                rootAddr->getDefiningInstruction()));
+  }
+
+  // The address of an opaque value is the address of its storage.
+  void visitValueToAddressInst(ValueToAddressInst *vta) {
+    SILValue addr = addrMat.materializeAddress(use->get());
+    assert(hasStableStorage(use->get()) &&
+           "value_to_address operand's storage must be an alloc_stack, an "
+           "indirect argument, or an address returned or yielded by a callee, "
+           "or a projection of one");
+    vta->replaceAllUsesWith(addr);
+    pass.deleter.forceDelete(vta);
+  }
+
   void rewriteStore(SILValue srcVal, SILValue destAddr,
                     IsInitialization_t isInit);
 
@@ -5748,6 +5774,7 @@ protected:
   NO_OPAQUE_RESULT(UncheckedBorrowEnumDataAddr)
   NO_OPAQUE_RESULT(UncheckedInPlaceEnumDataAddr)
   NO_OPAQUE_RESULT(UncheckedTakeEnumDataAddr)
+  NO_OPAQUE_RESULT(ValueToAddress)
   NO_OPAQUE_RESULT(VectorBaseAddr)
 
   // Results are references, boxes, metatypes, functions, or other loadable

@@ -145,6 +145,7 @@
    ;; Unchecked Conversions
    `(,(regexp-opt '("upcast"
                     "address_to_pointer" "pointer_to_address"
+                    "value_to_address"
                     "unchecked_addr_cast"
                     "unchecked_ref_cast"
                     "unchecked_trivial_bit_cast"
