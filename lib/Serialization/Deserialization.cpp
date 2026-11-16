@@ -9482,6 +9482,25 @@ ModuleFile::handleErrorAndSupplyMissingMember(ASTContext &context,
     return handleErrorAndSupplyMissingProtoMember(context, std::move(error),
                                                   containingProto);
   }
+
+  if (auto *containingStruct = dyn_cast<StructDecl>(container)) {
+    auto errorInfo = takeErrorInfo(std::move(error));
+    if (errorInfo->isA<DeclDeserializationError>()) {
+      auto *declError = static_cast<DeclDeserializationError *>(errorInfo.get());
+      if (auto layoutID = declError->getMemberAbstractTypeLayoutID()) {
+        auto layout = getAbstractMemberTypeLayout(layoutID);
+        if (!layout)
+          fatal(layout.takeError());
+        auto *missing = MissingMemberDecl::create(
+            context, containingStruct, declError->getName(), 0,
+            declError->needsFieldOffsetVectorEntry(), layout.get());
+        diagnoseAndConsumeError(std::move(errorInfo));
+        return missing;
+      }
+    }
+    diagnoseAndConsumeError(std::move(errorInfo));
+    return nullptr;
+  }
   return handleErrorAndSupplyMissingMiscMember(std::move(error));
 }
 
