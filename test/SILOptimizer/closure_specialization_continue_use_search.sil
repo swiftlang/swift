@@ -1,0 +1,179 @@
+// RUN: %target-sil-opt -enable-sil-verify-all -closure-specialization %s | %FileCheck %s
+
+// This SIL is derived from the following Swift:
+//
+// public protocol Observer {
+//   func observe(_ result: Float, recompute: () -> Float)
+// }
+//
+// @inline(never)
+// func applyAndObserve(_ value: Float, _ body: (Float) -> Float, observer: any Observer) -> Float {
+//   let result = body(value)
+//   observer.observe(result, recompute: { body(value) })
+//   return result
+// }
+//
+// public func transform(_ value: Float, _ factor: Float, observer: any Observer) -> Float {
+//   applyAndObserve(value, { $0 * factor }, observer: observer)
+// }
+//
+// public protocol Visitor {
+//   func visit<T>(_ value: T, transform: (T) -> T)
+// }
+//
+// @inline(never)
+// func applyAndVisit(_ value: Float, _ transform: (Float) -> Float, _ visitor: any Visitor) -> Float {
+//   let result = transform(value)
+//   visitor.visit(value, transform: transform)
+//   return result
+// }
+//
+// public func updateVisited(_ value: Float, _ factor: Float, _ visitor: any Visitor) -> Float {
+//   applyAndVisit(value, { $0 * factor }, visitor)
+// }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+public protocol Observer {
+  func observe(_ result: Float, recompute: () -> Float)
+}
+
+public protocol Visitor {
+  func visit<T>(_ value: T, transform: (T) -> T)
+}
+
+// CHECK:       {{^}}// specialized applyAndObserve(_:_:observer:)
+// CHECK-LABEL: {{^}}sil shared [noinline] [ossa] @$s2CS15applyAndObserve__8observerS2f_S2fXEAA8Observer_ptF018$s2CS9transform__8e9S2f_SfAA8F12_ptFS2fXEfU_SfTf1ncn_n : $@convention(thin) (Float, @in_guaranteed any Observer, Float) -> Float {
+// CHECK:       bb0(%0 : $Float, %1 : $*any Observer, %2 : $Float):
+// CHECK:         // function_ref closure #1 in transform(_:_:observer:)
+// CHECK-NEXT:    %[[#OBS_CLOSURE:]] = function_ref @$s2CS9transform__8observerS2f_SfAA8Observer_ptFS2fXEfU_ : $@convention(thin) (Float, Float) -> Float
+// CHECK:         %[[#OBS_RESULT:]] = apply %[[#OBS_CLOSURE]](%0, %2) : $@convention(thin) (Float, Float) -> Float
+// CHECK:         return %[[#OBS_RESULT]]
+// CHECK-NEXT:  {{^}}} // end sil function
+
+// applyAndObserve(_:_:observer:)
+sil hidden [noinline] [ossa] @$s2CS15applyAndObserve__8observerS2f_S2fXEAA8Observer_ptF : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float, @in_guaranteed any Observer) -> Float {
+bb0(%0 : $Float, %1 : @guaranteed $@noescape @callee_guaranteed (Float) -> Float, %2 : $*any Observer):
+  %3 = apply %1(%0) : $@noescape @callee_guaranteed (Float) -> Float
+  %4 = open_existential_addr immutable_access %2 to $*@opened(1, any Observer) Self
+  // function_ref closure #1 in applyAndObserve(_:_:observer:)
+  %5 = function_ref @$s2CS15applyAndObserve__8observerS2f_S2fXEAA8Observer_ptFSfyXEfU_ : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Float) -> Float, Float) -> Float
+  %6 = partial_apply [callee_guaranteed] [on_stack] %5(%1, %0) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Float) -> Float, Float) -> Float
+  %7 = witness_method $@opened(1, any Observer) Self, #Observer.observe : <Self where Self : Observer> (Self) -> (Float, () -> Float) -> (), %4 : $*@opened(1, any Observer) Self : $@convention(witness_method: Observer) <τ_0_0 where τ_0_0 : Observer> (Float, @guaranteed @noescape @callee_guaranteed () -> Float, @in_guaranteed τ_0_0) -> ()
+  %8 = apply %7<@opened(1, any Observer) Self>(%3, %6, %4) : $@convention(witness_method: Observer) <τ_0_0 where τ_0_0 : Observer> (Float, @guaranteed @noescape @callee_guaranteed () -> Float, @in_guaranteed τ_0_0) -> ()
+  destroy_value %6
+  return %3
+}
+
+// closure #1 in applyAndObserve(_:_:observer:)
+sil private [ossa] @$s2CS15applyAndObserve__8observerS2f_S2fXEAA8Observer_ptFSfyXEfU_ : $@convention(thin) (@guaranteed @noescape @callee_guaranteed (Float) -> Float, Float) -> Float {
+bb0(%0 : @closureCapture @guaranteed $@noescape @callee_guaranteed (Float) -> Float, %1 : @closureCapture $Float):
+  %2 = apply %0(%1) : $@noescape @callee_guaranteed (Float) -> Float
+  return %2
+}
+
+// CHECK:       {{^}}// transform(_:_:observer:)
+// CHECK-LABEL: {{^}}sil [ossa] @$s2CS9transform__8observerS2f_SfAA8Observer_ptF :
+// CHECK:       bb0(%0 : $Float, %1 : $Float, %2 : $*any Observer):
+// CHECK-NOT:     partial_apply
+// CHECK:         // function_ref specialized applyAndObserve(_:_:observer:)
+// CHECK-NEXT:    %[[#OBS_ARG_USE:]] = function_ref @$s2CS15applyAndObserve__8observerS2f_S2fXEAA8Observer_ptF018$s2CS9transform__8e9S2f_SfAA8F12_ptFS2fXEfU_SfTf1ncn_n : $@convention(thin) (Float, @in_guaranteed any Observer, Float) -> Float
+// CHECK-NEXT:    %[[#OBS_ARG_RESULT:]] = apply %[[#OBS_ARG_USE]](%0, %2, %1) : $@convention(thin) (Float, @in_guaranteed any Observer, Float) -> Float
+// CHECK-NEXT:    return %[[#OBS_ARG_RESULT]]
+// CHECK-NEXT:  {{^}}} // end sil function '$s2CS9transform__8observerS2f_SfAA8Observer_ptF'
+
+// transform(_:_:observer:)
+sil [ossa] @$s2CS9transform__8observerS2f_SfAA8Observer_ptF : $@convention(thin) (Float, Float, @in_guaranteed any Observer) -> Float {
+bb0(%0 : $Float, %1 : $Float, %2 : $*any Observer):
+  // function_ref closure #1 in transform(_:_:observer:)
+  %3 = function_ref @$s2CS9transform__8observerS2f_SfAA8Observer_ptFS2fXEfU_ : $@convention(thin) (Float, Float) -> Float
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%1) : $@convention(thin) (Float, Float) -> Float
+  // function_ref applyAndObserve(_:_:observer:)
+  %5 = function_ref @$s2CS15applyAndObserve__8observerS2f_S2fXEAA8Observer_ptF : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float, @in_guaranteed any Observer) -> Float
+  %6 = apply %5(%0, %4, %2) : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float, @in_guaranteed any Observer) -> Float
+  destroy_value %4
+  return %6
+}
+
+// closure #1 in transform(_:_:observer:)
+sil private [ossa] @$s2CS9transform__8observerS2f_SfAA8Observer_ptFS2fXEfU_ : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : $Float, %1 : @closureCapture $Float):
+  %2 = struct_extract %0, #Float._value
+  %3 = struct_extract %1, #Float._value
+  %4 = builtin "fmul_FPIEEE32"(%2, %3) : $Builtin.FPIEEE32
+  %5 = struct $Float (%4)
+  return %5
+}
+
+// CHECK:       {{^}}// specialized applyAndVisit(_:_:_:)
+// CHECK-LABEL: {{^}}sil shared [noinline] [ossa] @$s2CS13applyAndVisityS2f_S2fXEAA7Visitor_ptF030$s2CS13updateVisitedyS2f_SfAA7E12_ptFS2fXEfU_SfTf1ncn_n : $@convention(thin) (Float, @in_guaranteed any Visitor, Float) -> Float {
+// CHECK:       bb0(%0 : $Float, %1 : $*any Visitor, %2 : $Float):
+// CHECK:         // function_ref closure #1 in updateVisited(_:_:_:)
+// CHECK-NEXT:    %[[#VIS_CLOSURE:]] = function_ref @$s2CS13updateVisitedyS2f_SfAA7Visitor_ptFS2fXEfU_ : $@convention(thin) (Float, Float) -> Float
+// CHECK:         %[[#VIS_RESULT:]] = apply %[[#VIS_CLOSURE]](%0, %2) : $@convention(thin) (Float, Float) -> Float
+// CHECK:         return %[[#VIS_RESULT]]
+// CHECK-NEXT:  {{^}}} // end sil function
+
+// applyAndVisit(_:_:_:)
+sil hidden [noinline] [ossa] @$s2CS13applyAndVisityS2f_S2fXEAA7Visitor_ptF : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float, @in_guaranteed any Visitor) -> Float {
+bb0(%0 : $Float, %1 : @guaranteed $@noescape @callee_guaranteed (Float) -> Float, %2 : $*any Visitor):
+  %3 = apply %1(%0) : $@noescape @callee_guaranteed (Float) -> Float
+  %4 = open_existential_addr immutable_access %2 to $*@opened(2, any Visitor) Self
+  %5 = alloc_stack $Float
+  store %0 to [trivial] %5
+  // function_ref thunk for @callee_guaranteed (@unowned Float) -> (@unowned Float)
+  %6 = function_ref @$sS2fIgyd_S2fIegnr_TR : $@convention(thin) (@in_guaranteed Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float) -> @out Float
+  %7 = partial_apply [callee_guaranteed] [on_stack] %6(%1) : $@convention(thin) (@in_guaranteed Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float) -> @out Float
+  %8 = convert_function %7 to $@noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <Float, Float>
+  %9 = witness_method $@opened(2, any Visitor) Self, #Visitor.visit : <Self where Self : Visitor><T> (Self) -> (T, (T) -> T) -> (), %4 : $*@opened(2, any Visitor) Self : $@convention(witness_method: Visitor) <τ_0_0 where τ_0_0 : Visitor><τ_1_0> (@in_guaranteed τ_1_0, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_1_0, τ_1_0>, @in_guaranteed τ_0_0) -> ()
+  %10 = apply %9<@opened(2, any Visitor) Self, Float>(%5, %8, %4) : $@convention(witness_method: Visitor) <τ_0_0 where τ_0_0 : Visitor><τ_1_0> (@in_guaranteed τ_1_0, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0, τ_0_1> (@in_guaranteed τ_0_0) -> @out τ_0_1 for <τ_1_0, τ_1_0>, @in_guaranteed τ_0_0) -> ()
+  destroy_value %8
+  dealloc_stack %5
+  return %3
+}
+
+// thunk for @callee_guaranteed (@unowned Float) -> (@unowned Float)
+sil shared [transparent] [reabstraction_thunk] [ossa] @$sS2fIgyd_S2fIegnr_TR : $@convention(thin) (@in_guaranteed Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float) -> @out Float {
+bb0(%0 : $*Float, %1 : $*Float, %2 : @guaranteed $@noescape @callee_guaranteed (Float) -> Float):
+  %3 = load [trivial] %1
+  %4 = apply %2(%3) : $@noescape @callee_guaranteed (Float) -> Float
+  store %4 to [trivial] %0
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK:       {{^}}// updateVisited(_:_:_:)
+// CHECK-LABEL: {{^}}sil [ossa] @$s2CS13updateVisitedyS2f_SfAA7Visitor_ptF :
+// CHECK:       bb0(%0 : $Float, %1 : $Float, %2 : $*any Visitor):
+// CHECK-NOT:     partial_apply
+// CHECK:         // function_ref specialized applyAndVisit(_:_:_:)
+// CHECK-NEXT:    %[[#VIS_ARG_USE:]] = function_ref @$s2CS13applyAndVisityS2f_S2fXEAA7Visitor_ptF030$s2CS13updateVisitedyS2f_SfAA7E12_ptFS2fXEfU_SfTf1ncn_n : $@convention(thin) (Float, @in_guaranteed any Visitor, Float) -> Float
+// CHECK-NEXT:    %[[#VIS_ARG_RESULT:]] = apply %[[#VIS_ARG_USE]](%0, %2, %1) : $@convention(thin) (Float, @in_guaranteed any Visitor, Float) -> Float
+// CHECK-NEXT:    return %[[#VIS_ARG_RESULT]]
+// CHECK-NEXT:  {{^}}} // end sil function '$s2CS13updateVisitedyS2f_SfAA7Visitor_ptF'
+
+// updateVisited(_:_:_:)
+sil [ossa] @$s2CS13updateVisitedyS2f_SfAA7Visitor_ptF : $@convention(thin) (Float, Float, @in_guaranteed any Visitor) -> Float {
+bb0(%0 : $Float, %1 : $Float, %2 : $*any Visitor):
+  // function_ref closure #1 in updateVisited(_:_:_:)
+  %3 = function_ref @$s2CS13updateVisitedyS2f_SfAA7Visitor_ptFS2fXEfU_ : $@convention(thin) (Float, Float) -> Float
+  %4 = partial_apply [callee_guaranteed] [on_stack] %3(%1) : $@convention(thin) (Float, Float) -> Float
+  // function_ref applyAndVisit(_:_:_:)
+  %5 = function_ref @$s2CS13applyAndVisityS2f_S2fXEAA7Visitor_ptF : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float, @in_guaranteed any Visitor) -> Float
+  %6 = apply %5(%0, %4, %2) : $@convention(thin) (Float, @guaranteed @noescape @callee_guaranteed (Float) -> Float, @in_guaranteed any Visitor) -> Float
+  destroy_value %4
+  return %6
+}
+
+// closure #1 in updateVisited(_:_:_:)
+sil private [ossa] @$s2CS13updateVisitedyS2f_SfAA7Visitor_ptFS2fXEfU_ : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : $Float, %1 : @closureCapture $Float):
+  %2 = struct_extract %0, #Float._value
+  %3 = struct_extract %1, #Float._value
+  %4 = builtin "fmul_FPIEEE32"(%2, %3) : $Builtin.FPIEEE32
+  %5 = struct $Float (%4)
+  return %5
+}
