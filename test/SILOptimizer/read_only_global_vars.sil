@@ -28,6 +28,17 @@ sil_global public_external @external_var : $Int32 = {
   %initval = struct $Int32 (%0 : $Builtin.Int32)
 }
 
+struct AccessorS {
+  @_hasStorage var i: Int32
+}
+
+// CHECK-LABEL: sil_global private @written_through_accessor_var : $AccessorS = {
+sil_global private @written_through_accessor_var : $AccessorS = {
+  %0 = integer_literal $Builtin.Int32, 27
+  %1 = struct $Int32 (%0 : $Builtin.Int32)
+  %initval = struct $AccessorS (%1 : $Int32)
+}
+
 sil @unknown_read_func : $@convention(thin) (@in Int32) -> ()
 
 sil @read_var : $@convention(thin) (@inout Int32) -> Int32 {
@@ -48,3 +59,14 @@ bb0(%0 : $Int32):
   return %r : $()
 }
 
+sil @nonmutating_mutate_accessor : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int32
+
+sil @write_through_accessor : $@convention(thin) (Int32) -> () {
+bb0(%0 : $Int32):
+  %1 = global_addr @written_through_accessor_var : $*AccessorS
+  %2 = function_ref @nonmutating_mutate_accessor : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int32
+  %3 = apply %2(%1) : $@convention(method) (@in_guaranteed AccessorS) -> @inout Int32
+  store %0 to %3 : $*Int32
+  %r = tuple ()
+  return %r : $()
+}

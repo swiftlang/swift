@@ -1588,10 +1588,13 @@ bb0(%0 : $*S):
   return %1
 }
 
+// The uses of the borrow accessor result are not visited, so the destroy of %0 is not hoisted.
+//
 // CHECK-LABEL: sil [ossa] @test_borrow2 :
 // CHECK:         [[RESULT:%[0-9]+]] = apply {{%[0-9]+}}(%0)
 // CHECK-NEXT:    [[COPY:%[0-9]+]] = load [copy] [[RESULT]]
-// CHECK:         destroy_addr %0
+// CHECK-NOT:     destroy_addr
+// CHECK:         store {{%[0-9]+}} to [assign] %0
 // CHECK-LABEL: } // end sil function 'test_borrow2'
 sil [ossa] @test_borrow2 : $@convention(thin) (@inout S) -> () {
 bb0(%0 : $*S):

@@ -258,6 +258,9 @@ transformCalleeStorage(const StorageAccessInfo &storage,
     // Continue to hold on to yields from the callee because we don't have
     // any better placeholder in the callee.
     return storage;
+  case AccessStorage::BorrowMutateAccessor:
+    // Likewise, continue to hold on to accessor results from the callee.
+    return storage;
   case AccessStorage::Unidentified:
     // For unidentified storage, continue to reference the value in the callee
     // because we don't have any better placeholder for a callee-defined object.
