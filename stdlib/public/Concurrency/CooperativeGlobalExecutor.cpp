@@ -13,14 +13,14 @@
 /// The implementation of the cooperative global executor.
 ///
 /// It defines the executor entrypoints declared in
-/// EmbeddedPlatform+Concurrency.h and ExecutorImpl.h.
+/// SwiftPlatform/Concurrency.h and ExecutorImpl.h.
 ///
 ///===------------------------------------------------------------------===///
 
 #include "swift/shims/Visibility.h"
 
 #include "swift/Basic/PriorityQueue.h"
-#include "swift/EmbeddedPlatform+Concurrency.h"
+#include "SwiftPlatform/Concurrency.h"
 
 #include "ExecutorImpl.h"
 

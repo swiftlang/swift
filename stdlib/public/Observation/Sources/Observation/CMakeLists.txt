@@ -65,10 +65,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
   add_dependencies(embedded-observation embedded-concurrency)
 
   # `Locking.swift` reads EMBEDDED_SWIFT_MUTEX_NUM_WORDS from the
-  # EmbeddedPlatform bridging header. `LiteralExpressions` is what lets the
-  # importer bring that macro across as a usable constant; without it the macro
-  # is invisible to Swift. See Synchronization's embedded build for the
-  # -pch-output-dir and -plugin-path rationale.
+  # SwiftPlatform module. `LiteralExpressions` is what lets the importer bring
+  # that macro across as a usable constant; without it the macro is invisible
+  # to Swift. See Synchronization's embedded build for the -plugin-path
+  # rationale.
   set(_embedded_observation_swift_flags
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
     "-enable-experimental-feature" "Macros"
@@ -78,9 +78,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
     "-enable-experimental-feature" "LiteralExpressions"
     -Xfrontend -disable-implicit-string-processing-module-import
     "-plugin-path" "${SWIFT_HOST_PLUGINS_DIR}"
-    -internal-import-bridging-header
-      ${CMAKE_CURRENT_SOURCE_DIR}/../../../EmbeddedPlatform/swift/EmbeddedPlatform.h
-    -pch-output-dir ${CMAKE_CURRENT_BINARY_DIR}/EmbeddedObservationPCH
     -Xfrontend -enable-sil-opaque-values)
 
   set(_embedded_observation_all_triples "${EMBEDDED_STDLIB_TARGET_TRIPLES}")

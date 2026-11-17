@@ -1,0 +1,4 @@
+module SwiftPlatform {
+  umbrella header "SwiftPlatform.h"
+  module * { }
+}

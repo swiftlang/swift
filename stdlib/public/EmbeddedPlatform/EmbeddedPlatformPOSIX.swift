@@ -1,4 +1,5 @@
 import Builtin
+internal import SwiftPlatform
 
 // POSIX dependencies
 @_extern(c, "posix_memalign")
