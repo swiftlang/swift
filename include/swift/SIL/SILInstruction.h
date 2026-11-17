@@ -448,8 +448,11 @@ class SILInstruction : public llvm::ilist_node<SILInstruction> {
   bool hasIdenticalState(const SILInstruction *RHS) const;
 
   /// Update this instruction's SILDebugScope. This function should
-  /// never be called directly. Use SILBuilder, SILBuilderWithScope or
+  /// **never** be called directly. Use SILBuilder, SILBuilderWithScope or
   /// SILClonerWithScope instead.
+  /// This private function may only be called by SILBasicBlock when an
+  /// instruction is moved to a new function, using the ScopeCloner, and
+  /// updating the variable scope with the same cloner.
   void setDebugScope(const SILDebugScope *DS);
 
   /// Total number of created and deleted SILInstructions.
@@ -488,6 +491,15 @@ protected:
 
   ~SILInstruction() {
     NumDeletedInstructions++;
+  }
+
+  /// Private function to initialize the debug location.
+  /// Called from the constructors and `setDebugLocation`.
+  void setDebugLocationUnchecked(SILDebugLocation debugLoc) {
+    debugScope = debugLoc.getScope();
+    SILLocation loc = debugLoc.getLocation();
+    asSILNode()->locationKindAndFlags = loc.kindAndFlags.packedKindAndFlags;
+    locationStorage = loc.storage;
   }
 
 public:
@@ -534,14 +546,17 @@ public:
     return SILDebugLocation(getLoc(), debugScope);
   }
 
+  bool canSetDebugLocation() const;
+
   /// Sets the debug location.
   /// Note: Usually it should not be needed to use this function as the location
   /// is already set in when creating an instruction.
+  /// Calling this function on a variable-carrying instruction will assert,
+  /// as changing the scope of a variable is not allowed.
   void setDebugLocation(SILDebugLocation debugLoc) {
-    debugScope = debugLoc.getScope();
-    SILLocation loc = debugLoc.getLocation();
-    asSILNode()->locationKindAndFlags = loc.kindAndFlags.packedKindAndFlags;
-    locationStorage = loc.storage;
+    ASSERT(canSetDebugLocation() &&
+           "Cannot change scope of variable-carrying instruction");
+    setDebugLocationUnchecked(debugLoc);
   }
 
   /// Return the previous instruction, or nullptr if this is the first
@@ -1007,7 +1022,7 @@ class NonSingleValueInstruction : public SILInstruction, public SILNode {
 public:
   NonSingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc)
       : SILInstruction(), SILNode((SILNodeKind)kind) {
-    setDebugLocation(loc);
+    setDebugLocationUnchecked(loc);
   }
 
   using SILInstruction::operator new;
@@ -1223,7 +1238,7 @@ public:
   SingleValueInstruction(SILInstructionKind kind, SILDebugLocation loc,
                          SILType type)
         : SILInstruction(), ValueBase(ValueKind(kind), type) {
-    setDebugLocation(loc);
+    setDebugLocationUnchecked(loc);
   }
 
   using SILInstruction::operator new;
