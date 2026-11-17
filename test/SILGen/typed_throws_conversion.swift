@@ -78,3 +78,51 @@ func testGenericError<Err: Error>(_: Err.Type) {
   func take(_ fn: () throws(Err) -> Void) {}
   take {}
 }
+
+// A non-throwing closure literal passed to a parameter whose thrown error is
+// a generic parameter of the callee is emitted directly at the destination
+// type (with an unused indirect error result) when that generic parameter is
+// bound to a concrete type, rather than being emitted at its own type and
+// wrapped in a reabstraction thunk.
+struct OpaqueErrorBox<Failure: Error> {
+  init(_ fn: @escaping () throws(Failure) -> Void) {}
+  init(async fn: sending @escaping @isolated(any) () async throws(Failure) -> Void) {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testNonThrowingClosureToOpaqueAnyErroryyF :
+// CHECK-NOT:     _TR
+// CHECK:         function_ref @$s{{.*}}testNonThrowingClosureToOpaqueAnyErroryyFyyYKcfU_ : $@convention(thin) @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <any Error>
+// CHECK-NOT:     _TR
+// CHECK:       } // end sil function '$s{{.*}}testNonThrowingClosureToOpaqueAnyErroryyF'
+func testNonThrowingClosureToOpaqueAnyError() {
+  let _: OpaqueErrorBox<any Error> = OpaqueErrorBox {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testNonThrowingClosureToOpaqueConcreteErroryyF :
+// CHECK-NOT:     _TR
+// CHECK:         function_ref @$s{{.*}}testNonThrowingClosureToOpaqueConcreteErroryyFyyAA1EVYKcfU_ : $@convention(thin) @substituted <τ_0_0> () -> @error_indirect τ_0_0 for <E>
+// CHECK-NOT:     _TR
+// CHECK:       } // end sil function '$s{{.*}}testNonThrowingClosureToOpaqueConcreteErroryyF'
+func testNonThrowingClosureToOpaqueConcreteError() {
+  let _: OpaqueErrorBox<E> = OpaqueErrorBox {}
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testNonThrowingIsolatedAnyClosureToOpaqueAnyErroryyF :
+// CHECK-NOT:     _TR
+// CHECK:         [[FN:%.*]] = function_ref @$s{{.*}}testNonThrowingIsolatedAnyClosureToOpaqueAnyErroryyF{{.*}}fU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>) -> @error_indirect τ_0_0 for <any Error>
+// CHECK:         partial_apply [callee_guaranteed] [isolated_any] [[FN]]
+// CHECK-NOT:     _TR
+// CHECK:       } // end sil function '$s{{.*}}testNonThrowingIsolatedAnyClosureToOpaqueAnyErroryyF'
+func testNonThrowingIsolatedAnyClosureToOpaqueAnyError() {
+  let _: OpaqueErrorBox<any Error> = OpaqueErrorBox(async: {})
+}
+
+// A throwing closure literal whose thrown error differs from the opaque
+// destination error still needs a thunk.
+// CHECK-LABEL: sil hidden [ossa] @$s{{.*}}testTypedThrowingClosureToOpaqueAnyErroryyF :
+// CHECK:         function_ref @$s{{.*}}testTypedThrowingClosureToOpaqueAnyErroryyF{{.*}}fU_ : $@convention(thin) () -> @error E
+// CHECK:         function_ref @$s{{.*}}_TR
+// CHECK:       } // end sil function '$s{{.*}}testTypedThrowingClosureToOpaqueAnyErroryyF'
+func testTypedThrowingClosureToOpaqueAnyError() {
+  let _: OpaqueErrorBox<any Error> = OpaqueErrorBox { () throws(E) in }
+}

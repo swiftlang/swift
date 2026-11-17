@@ -4767,6 +4767,30 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
           funcTy = funcTy.withExtInfo(newExtInfo);
         }
       }
+
+      // SILGen may emit a non-throwing closure literal directly under a
+      // conversion to a throwing type whose thrown error is opaque in the
+      // abstraction pattern, e.g. a 'throws(Failure)' parameter with 'Failure'
+      // bound by the caller (see canEmitSpecializedClosureFunction). The
+      // thrown error of the lowered type is then substituted from the
+      // closure's formal type, so lower the closure as if it had been written
+      // with the destination's thrown error. Otherwise the substitution would
+      // be 'Never', which disagrees with the error the prolog sets up.
+      auto closureInfo = ClosureInfos.find(ACE);
+      if (closureInfo != ClosureInfos.end() && !funcTy->isThrowing()) {
+        auto destTy = closureInfo->second.FormalType;
+        auto origThrownError =
+            closureInfo->second.OrigType.getFunctionThrownErrorType();
+        if (destTy->isThrowing() && origThrownError &&
+            origThrownError->isTypeParameterOrOpaqueArchetype()) {
+          auto destThrownError = destTy->getThrownError();
+          if (!destThrownError || !destThrownError->hasArchetype()) {
+            auto newExtInfo =
+                funcTy->getExtInfo().withThrows(true, destThrownError);
+            funcTy = funcTy.withExtInfo(newExtInfo);
+          }
+        }
+      }
     } else {
       funcTy = cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
     }

@@ -3477,10 +3477,20 @@ static bool canEmitSpecializedClosureFunction(const AbstractClosureExpr *closure
 
   // If the abstraction pattern has an abstract thrown error, we are
   // currently unable to emit the literal with a difference in the thrown
-  // error type.
+  // error type: the prolog/epilog would have to reabstract the errors thrown
+  // by the body.
+  //
+  // A non-throwing literal has no throw sites, so there is nothing to
+  // reabstract. Emitting it directly at the destination type only adds an
+  // (unused) error result: TypeConverter::makeConstantInterfaceType lowers
+  // the closure as if it had the destination's thrown error, and the prolog
+  // derives the error from the destination type. This is the same shape we
+  // emit when the opaque thrown error is bound to 'Never'. Avoiding the
+  // reabstraction thunk matters because it hides the closure from region
+  // isolation, e.g. when the closure is passed to a 'sending @isolated(any)
+  // () async throws(Failure) -> Success' parameter with 'Failure == any Error'.
   if (hasOpaqueThrownError(contextInfo.OrigType) &&
-      (closureType->isThrowing() != destType->isThrowing() ||
-       thrownErrorDiffers))
+      closureType->isThrowing() && thrownErrorDiffers)
     return false;
 
   // If the closure has a different thrown error type than the destination,
