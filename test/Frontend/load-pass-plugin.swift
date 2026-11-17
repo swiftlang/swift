@@ -3,16 +3,8 @@
 // RUN: %target-swift-frontend -load-pass-plugin=nonexistent.dylib %s -emit-ir -o /dev/null 2>&1 | %FileCheck -check-prefix=CHECK-UNABLE-LOAD %s
 // CHECK-UNABLE-LOAD: error: unable to load plugin 'nonexistent.dylib': 'Could not load library{{.*}}'
 
-// RUN: %empty-directory(%t)
-// RUN: %clangxx %S/Inputs/TestPlugin.cpp -std=c++17 -stdlib=libc++ \
-// RUN:     -isysroot %sdk -I %llvm_src_root/include -I %llvm_obj_root/include -L %llvm_obj_root/lib \
-// RUN:     -Wl,-hidden-lLLVMSupport -Wl,-undefined -Wl,dynamic_lookup -Wl,-flat_namespace \
-// RUN:     -dynamiclib -o %t/libTestPlugin.dylib
-
-// RUN: %target-swift-frontend -load-pass-plugin=%t/libTestPlugin.dylib %s -emit-ir -o /dev/null 2>&1 | %swift-demangle | %FileCheck %s
-// CHECK: TestPlugin: main
-// CHECK: TestPlugin: null.empty() -> ()
-
-// REQUIRES: executable_test
+// swift-frontend is linked with -no_exported_symbols on Darwin, so a pass
+// plugin that expects to resolve LLVM symbols from the executable cannot be
+// loaded. Only the diagnostic for a plugin that fails to load is tested here.
 
 func empty() {}
