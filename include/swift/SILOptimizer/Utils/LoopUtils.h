@@ -18,6 +18,7 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_LOOPUTILS_H
 #define SWIFT_SILOPTIMIZER_UTILS_LOOPUTILS_H
 
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include "llvm/ADT/SmallVector.h"
 
 namespace swift {
@@ -48,6 +49,13 @@ bool canDuplicateLoopInstruction(SILLoop *L, SILInstruction *Inst, DeadEndBlocks
 bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
                                SILLoopInfo *loopInfo, SILPassManager *pm,
                                bool ignoreCost);
+
+/// Check whether it is safe to duplicate this instruction when duplicating a
+/// region of code which contains it. \p isInRegion returns whether an
+/// instruction is in the region.
+bool canDuplicateRegionInstruction(
+    SILInstruction *Inst, DeadEndBlocks *deb,
+    llvm::function_ref<bool(SILInstruction *)> isInRegion);
 
 /// A visitor that visits loops in a function in a bottom up order. It only
 /// performs the visit.
