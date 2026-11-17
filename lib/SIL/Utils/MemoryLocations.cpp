@@ -342,7 +342,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
         break;
       case SILInstructionKind::ApplyInst: {
         auto *apply = cast<ApplyInst>(user);
-        if (use == apply->getAddressSelfOfAddressBorrowMutateAccessorResult()) {
+        if (use == apply->getSelfAddressOfAddressBorrowMutateAccessorResult()) {
           if (!analyzeAddrProjection(apply, locIdx, 0, collectedVals,
                                      subLocationMap))
             return false;
@@ -420,7 +420,7 @@ bool MemoryLocations::analyzeAddrProjection(
   // sub-location of its own, which doesn't cover any field of self.
   if (auto *applyAddressResult = dyn_cast<ApplyInst>(projection)) {
     assert(applyAddressResult
-               ->getAddressSelfOfAddressBorrowMutateAccessorResult() &&
+               ->getSelfAddressOfAddressBorrowMutateAccessorResult() &&
            "an apply sub-location must be a borrow/mutate accessor with an "
            "address self and an address result");
     unsigned subLocIdx = addSubLocation(projection, parentLocIdx);

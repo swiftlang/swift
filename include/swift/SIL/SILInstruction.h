@@ -3428,7 +3428,7 @@ public:
 
   /// If this is a borrow or mutate accessor with an address result and an
   /// address-typed self, return the self operand. Otherwise return nullptr.
-  Operand *getAddressSelfOfAddressBorrowMutateAccessorResult() {
+  Operand *getSelfAddressOfAddressBorrowMutateAccessorResult() {
     if (!hasAddressResult() || !hasSelfArgument()) {
       return nullptr;
     }
