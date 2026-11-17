@@ -4,9 +4,10 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_NontransferableTypes
 
-// The reference counts of instances of a non-'Transferable' class are updated
-// non-atomically. Check that they are still balanced, including when values
-// are copied through value witnesses and mixed with 'Transferable' instances.
+// The reference counts of instances of a non-'Transferable' class and of the
+// contexts of @nontransferable functions are updated non-atomically. Check
+// that they are still balanced, including when values are copied through
+// value witnesses and mixed with 'Transferable' instances.
 
 final class NT: ~Transferable {
   let id: Int
@@ -73,6 +74,20 @@ func testUnowned() {
   print("unowned \(u.id)")
 }
 
+func testClosures() {
+  let nt = NT(7)
+  let t = T(7)
+  let f: @nontransferable () -> Void = { print("closure NT \(nt.id)") }
+  let g = f
+  let (a, b) = duplicate(f)
+  let converted: @nontransferable () -> Void = { print("closure T \(t.id)") }
+    as () -> Void
+  g()
+  a()
+  b()
+  converted()
+}
+
 func testTree() {
   let tree = Tree<Int>.node(NT(5), .leaf(0), .node(NT(6), .leaf(0), .leaf(0)))
   let (a, b) = duplicate(tree)
@@ -103,6 +118,16 @@ print("done mixed")
 testUnowned()
 print("done unowned")
 // CHECK-NEXT: done unowned
+
+// CHECK-NEXT: closure NT 7
+// CHECK-NEXT: closure NT 7
+// CHECK-NEXT: closure NT 7
+// CHECK-NEXT: closure T 7
+// CHECK-DAG: deinit NT 7
+// CHECK-DAG: deinit T 7
+testClosures()
+print("done closures")
+// CHECK: done closures
 
 // CHECK-NEXT: tree 11 11
 // CHECK-DAG: deinit NT 5
