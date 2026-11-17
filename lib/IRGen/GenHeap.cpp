@@ -186,6 +186,9 @@ namespace {
     Atomicity getAtomicity(Atomicity defaultAtomicity) const {                 \
       return IsNonTransferable ? Atomicity::NonAtomic : defaultAtomicity;      \
     }                                                                          \
+    bool usesNonAtomicReferenceCounting() const override {                     \
+      return IsNonTransferable;                                                \
+    }                                                                          \
     void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,              \
                           Atomicity defaultAtomicity) const {                  \
       IGF.emit##Nativeness##Name##Retain(value,                                \
@@ -917,6 +920,8 @@ llvm::Value *IRGenFunction::emitUnmanagedAlloc(
 namespace {
   class BuiltinNativeObjectTypeInfo
     : public HeapTypeInfo<BuiltinNativeObjectTypeInfo> {
+    bool IsNonTransferable;
+
   public:
     void printForAbstractTypeLayoutInfo(
         IRGenModule &IGM, llvm::raw_ostream &OS,
@@ -930,24 +935,27 @@ namespace {
       unsupportedSerializableHiddenTypeInfoRepresentation();
     }
 
-    BuiltinNativeObjectTypeInfo(llvm::PointerType *storage,
-                                 Size size, SpareBitVector spareBits,
-                                 Alignment align)
-    : HeapTypeInfo(ReferenceCounting::Native, storage, size, spareBits,
-                   align) {}
+    BuiltinNativeObjectTypeInfo(llvm::PointerType *storage, Size size,
+                                SpareBitVector spareBits, Alignment align,
+                                bool isNonTransferable)
+        : HeapTypeInfo(ReferenceCounting::Native, storage, size, spareBits,
+                       align),
+          IsNonTransferable(isNonTransferable) {}
 
     /// Builtin.NativeObject uses Swift native reference-counting.
     ReferenceCounting getReferenceCounting() const {
       return ReferenceCounting::Native;
     }
+
+    bool isNonTransferable() const { return IsNonTransferable; }
   };
 } // end anonymous namespace
 
-const LoadableTypeInfo *TypeConverter::convertBuiltinNativeObject() {
-  return new BuiltinNativeObjectTypeInfo(IGM.RefCountedPtrTy,
-                                      IGM.getPointerSize(),
-                                      IGM.getHeapObjectSpareBits(),
-                                      IGM.getPointerAlignment());
+const LoadableTypeInfo *
+TypeConverter::convertBuiltinNativeObject(bool isNonTransferable) {
+  return new BuiltinNativeObjectTypeInfo(
+      IGM.RefCountedPtrTy, IGM.getPointerSize(), IGM.getHeapObjectSpareBits(),
+      IGM.getPointerAlignment(), isNonTransferable);
 }
 
 unsigned IRGenModule::getReferenceStorageExtraInhabitantCount(
@@ -1835,17 +1843,23 @@ llvm::Value *IRGenFunction::emitIsEscapingClosureCall(
 namespace {
 /// Basic layout and common operations for box types.
 class BoxTypeInfo : public HeapTypeInfo<BoxTypeInfo> {
+  bool IsNonTransferable;
+
 public:
-  BoxTypeInfo(IRGenModule &IGM)
-    : HeapTypeInfo(ReferenceCounting::Native, IGM.RefCountedPtrTy,
-                   IGM.getPointerSize(), IGM.getHeapObjectSpareBits(),
-                   IGM.getPointerAlignment())
-  {}
+  BoxTypeInfo(IRGenModule &IGM, bool isNonTransferable)
+      : HeapTypeInfo(ReferenceCounting::Native, IGM.RefCountedPtrTy,
+                     IGM.getPointerSize(), IGM.getHeapObjectSpareBits(),
+                     IGM.getPointerAlignment()),
+        IsNonTransferable(isNonTransferable) {}
 
   ReferenceCounting getReferenceCounting() const {
     // Boxes are always native-refcounted.
     return ReferenceCounting::Native;
   }
+
+  /// Contents that use non-atomic reference counting aren't 'Transferable',
+  /// so a box of them can't be referenced by a 'Transferable' value either.
+  bool isNonTransferable() const { return IsNonTransferable; }
 
   /// Allocate a box of the given type.
   virtual OwnedAddress
@@ -1876,7 +1890,8 @@ public:
     unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
-  EmptyBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
+  EmptyBoxTypeInfo(IRGenModule &IGM)
+      : BoxTypeInfo(IGM, /*isNonTransferable=*/false) {}
 
   OwnedAddress
   allocate(IRGenFunction &IGF, GenericEnvironment *env, SILBoxType *box,
@@ -1916,7 +1931,8 @@ public:
     unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
-  NonFixedBoxTypeInfo(IRGenModule &IGM) : BoxTypeInfo(IGM) {}
+  NonFixedBoxTypeInfo(IRGenModule &IGM, bool isNonTransferable)
+      : BoxTypeInfo(IGM, isNonTransferable) {}
 
   OwnedAddress
   allocate(IRGenFunction &IGF, GenericEnvironment *env, SILBoxType *boxType,
@@ -1957,9 +1973,9 @@ class FixedBoxTypeInfoBase : public BoxTypeInfo {
   HeapLayout layout;
 
 public:
-  FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout)
-    : BoxTypeInfo(IGM), layout(std::move(layout))
-  {
+  FixedBoxTypeInfoBase(IRGenModule &IGM, HeapLayout &&layout,
+                       bool isNonTransferable)
+      : BoxTypeInfo(IGM, isNonTransferable), layout(std::move(layout)) {
     // Trivial empty layouts should always use EmptyBoxTypeInfo instead
     assert(!layout.isKnownEmpty()
            || !layout.isTriviallyDestroyable());
@@ -2037,9 +2053,11 @@ public:
   }
 
   PODBoxTypeInfo(IRGenModule &IGM, Size stride, Alignment alignment)
-    : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
-                             IGM.getOpaqueStorageTypeInfo(stride, alignment))) {
-  }
+      : FixedBoxTypeInfoBase(
+            IGM,
+            getHeapLayoutForSingleTypeInfo(
+                IGM, IGM.getOpaqueStorageTypeInfo(stride, alignment)),
+            /*isNonTransferable=*/false) {}
 };
 
 /// Common implementation for single-refcounted boxes.
@@ -2057,10 +2075,16 @@ public:
     unsupportedSerializableHiddenTypeInfoRepresentation();
   }
 
-  SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting)
-    : FixedBoxTypeInfoBase(IGM, getHeapLayoutForSingleTypeInfo(IGM,
-                                   IGM.getReferenceObjectTypeInfo(refcounting)))
-  {
+  SingleRefcountedBoxTypeInfo(IRGenModule &IGM, ReferenceCounting refcounting,
+                              bool isNonTransferable)
+      : FixedBoxTypeInfoBase(
+            IGM,
+            getHeapLayoutForSingleTypeInfo(
+                IGM, isNonTransferable
+                         ? IGM.getNonTransferableNativeObjectTypeInfo()
+                         : IGM.getReferenceObjectTypeInfo(refcounting)),
+            isNonTransferable) {
+    ASSERT(!isNonTransferable || refcounting == ReferenceCounting::Native);
   }
 };
 
@@ -2109,8 +2133,9 @@ public:
   }
 
   FixedBoxTypeInfo(IRGenModule &IGM, SILBoxType *T)
-    : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T))
-  {}
+      : FixedBoxTypeInfoBase(IGM, getHeapLayout(IGM, T),
+                             IGM.getTypeInfo(getFieldType(IGM, T))
+                                 .usesNonAtomicReferenceCounting()) {}
 };
 
 } // end anonymous namespace
@@ -2159,10 +2184,13 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
   auto eltTy = getSILBoxFieldLoweredType(
     IGM.getMaximalTypeExpansionContext(), T, IGM.getSILModule().Types, 0);
   auto &eltTI = IGM.getTypeInfoForLowered(eltTy);
+  bool isNonTransferable = eltTI.usesNonAtomicReferenceCounting();
   if (!eltTI.isFixedSize()) {
-    if (!NonFixedBoxTI)
-      NonFixedBoxTI = new NonFixedBoxTypeInfo(IGM);
-    return NonFixedBoxTI;
+    auto *&boxTI =
+        isNonTransferable ? NonTransferableNonFixedBoxTI : NonFixedBoxTI;
+    if (!boxTI)
+      boxTI = new NonFixedBoxTypeInfo(IGM, isNonTransferable);
+    return boxTI;
   }
 
   // For fixed-sized types, we can emit concrete box metadata.
@@ -2200,10 +2228,13 @@ const TypeInfo *TypeConverter::convertBoxType(SILBoxType *T) {
 
   // We can share box info for all single-refcounted types.
   if (fixedTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal)) {
-    if (!SwiftRetainablePointerBoxTI)
-      SwiftRetainablePointerBoxTI
-        = new SingleRefcountedBoxTypeInfo(IGM, ReferenceCounting::Native);
-    return SwiftRetainablePointerBoxTI;
+    auto *&boxTI = isNonTransferable
+                       ? NonTransferableSwiftRetainablePointerBoxTI
+                       : SwiftRetainablePointerBoxTI;
+    if (!boxTI)
+      boxTI = new SingleRefcountedBoxTypeInfo(IGM, ReferenceCounting::Native,
+                                              isNonTransferable);
+    return boxTI;
   }
 
   // TODO: Other common shapes? Optional-of-Refcounted would be nice.

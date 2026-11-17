@@ -2819,6 +2819,13 @@ namespace {
       llvm_unreachable("Not a valid CopyDestroyStrategy");
     }
 
+    /// The atomicity of reference counting operations on the payload pointer.
+    Atomicity getPayloadAtomicity(IRGenFunction &IGF) const {
+      return getPayloadTypeInfo().usesNonAtomicReferenceCounting()
+                 ? Atomicity::NonAtomic
+                 : IGF.getDefaultAtomicity();
+    }
+
     void retainRefcountedPayload(IRGenFunction &IGF,
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
@@ -2831,7 +2838,7 @@ namespace {
           return;
         }
 
-        IGF.emitStrongRetain(ptr, Refcounting, IGF.getDefaultAtomicity());
+        IGF.emitStrongRetain(ptr, Refcounting, getPayloadAtomicity(IGF));
         return;
       }
       case ForwardToPayload:
@@ -2868,7 +2875,7 @@ namespace {
           return;
         }
 
-        IGF.emitStrongRelease(ptr, Refcounting, IGF.getDefaultAtomicity());
+        IGF.emitStrongRelease(ptr, Refcounting, getPayloadAtomicity(IGF));
         return;
       }
       case ForwardToPayload:
@@ -4169,11 +4176,21 @@ namespace {
       llvm_unreachable("Not a valid CopyDestroyStrategy.");
     }
 
+    /// The atomicity of reference counting operations on a payload pointer,
+    /// which apply to the payload of any case.
+    Atomicity getPayloadAtomicity(IRGenFunction &IGF) const {
+      bool allNonAtomic =
+          llvm::all_of(ElementsWithPayload, [](const Element &element) {
+            return element.ti->usesNonAtomicReferenceCounting();
+          });
+      return allNonAtomic ? Atomicity::NonAtomic : IGF.getDefaultAtomicity();
+    }
+
     void retainRefcountedPayload(IRGenFunction &IGF,
                                  llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
-        IGF.emitStrongRetain(ptr, Refcounting, IGF.getDefaultAtomicity());
+        IGF.emitStrongRetain(ptr, Refcounting, getPayloadAtomicity(IGF));
         return;
       case TriviallyDestroyable:
       case BitwiseTakable:
@@ -4201,7 +4218,7 @@ namespace {
                                   llvm::Value *ptr) const {
       switch (CopyDestroyKind) {
       case TaggedRefcounted:
-        IGF.emitStrongRelease(ptr, Refcounting, IGF.getDefaultAtomicity());
+        IGF.emitStrongRelease(ptr, Refcounting, getPayloadAtomicity(IGF));
         return;
       case TriviallyDestroyable:
       case BitwiseTakable:
@@ -6604,7 +6621,10 @@ EnumImplStrategy::get(TypeConverter &TC, SILType type, EnumDecl *theEnum) {
     // If the payload is indirect, we can use the NativeObject type metadata
     // without recurring. The box won't affect loadability or fixed-ness.
     if (elt->isIndirect() || theEnum->isIndirect()) {
-      auto *nativeTI = &TC.getNativeObjectTypeInfo();
+      // The box is only referenced by values of this enum type.
+      auto *nativeTI = TC.isNeverTransferable(type.getASTType())
+                           ? &TC.getNonTransferableNativeObjectTypeInfo()
+                           : &TC.getNativeObjectTypeInfo();
       notePayloadType(*nativeTI);
       // FIXME: indirect noncopyable elements might need to check copyable
       // on the element type as well.
@@ -6757,6 +6777,13 @@ namespace {
 
     llvm::StructType *getStorageType() const {
       return cast<llvm::StructType>(TypeInfo::getStorageType());
+    }
+
+    bool usesNonAtomicReferenceCounting() const override {
+      return llvm::any_of(Strategy.getElementsWithPayload(),
+                          [](const EnumImplStrategy::Element &element) {
+                            return element.ti->usesNonAtomicReferenceCounting();
+                          });
     }
 
     /// \group Methods delegated to the EnumImplStrategy

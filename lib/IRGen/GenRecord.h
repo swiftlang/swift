@@ -215,6 +215,12 @@ public:
     return this->getTrailingObjects(NumFields);
   }
 
+  bool usesNonAtomicReferenceCounting() const override {
+    return llvm::any_of(getFields(), [](const FieldImpl &field) {
+      return field.getTypeInfo().usesNonAtomicReferenceCounting();
+    });
+  }
+
   /// The standard schema is just all the fields jumbled together.
   void getSchema(ExplosionSchema &schema) const override {
     for (auto &field : getFields()) {
