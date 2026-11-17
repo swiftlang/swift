@@ -1,4 +1,5 @@
 // RUN: %target-typecheck-verify-swift -strict-memory-safety
+// RUN: %if swift_feature_OnceFunctions %{ %target-typecheck-verify-swift -strict-memory-safety -enable-experimental-feature OnceFunctions -D ONCE_FUNCTIONS -verify-additional-prefix once- %}
 
 // The feature flag should be enabled.
 #if !hasFeature(StrictMemorySafety)
@@ -392,10 +393,82 @@ func superDuperUnsafe(_ bytes: UnsafeRawBufferPointer) {
   _ = unsafe bytes.first ?? 0
 }
 
-// Calling a consuming closure parameter is still diagnosed.
+// Calling a consuming closure parameter only diagnoses the arguments, like
+// calling any other closure parameter.
 func callConsumingUnsafeClosure(
-  _ body: consuming @escaping (UnsafeRawPointer?) -> Void
+  _ body: consuming @escaping (UnsafeRawPointer?) -> Void,
+  _ pointer: UnsafeRawPointer
 ) {
-  body(nil) // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-  // expected-note@-1{{reference to parameter 'body' involves unsafe type 'UnsafeRawPointer'}}
+  body(nil)
+  body(pointer) // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1{{reference to parameter 'pointer' involves unsafe type 'UnsafeRawPointer'}}
+  // expected-note@-2{{argument #0 in call has unsafe type 'UnsafeRawPointer?'}}
+  (copy body)(nil)
+  (consume body)(nil)
 }
+
+func callConsumingOptionalUnsafeClosure(
+  _ body: consuming ((UnsafeRawPointer?) -> Void)?
+) {
+  body?(nil)
+  body!(nil)
+}
+
+func callInoutUnsafeClosure(_ body: inout (UnsafeRawPointer?) -> Void) {
+  body(nil)
+}
+
+// Replacing a consuming closure parameter is still diagnosed.
+func assignConsumingUnsafeClosure(
+  _ body: consuming @escaping (UnsafeRawPointer?) -> Void,
+  _ other: @escaping (UnsafeRawPointer?) -> Void
+) {
+  body = other // expected-warning 2{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-note@-1{{reference to parameter 'body' involves unsafe type 'UnsafeRawPointer'}}
+  // expected-note@-2{{reference to parameter 'other' involves unsafe type 'UnsafeRawPointer'}}
+  body(nil)
+}
+
+#if ONCE_FUNCTIONS
+// Exactly-once and at-most-once closure parameters are implicitly consuming, so
+// calling them also only diagnoses the arguments.
+func callOnceUnsafeClosure<R>(
+  _ body: @once (UnsafeRawPointer?) throws -> R
+) rethrows -> R {
+  return try body(nil)
+}
+
+func callOnceUnsafeClosureWithUnsafeArgument(
+  _ body: @once (UnsafeRawPointer?) -> Void,
+  _ pointer: UnsafeRawPointer
+) {
+  body(pointer) // expected-once-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-once-note@-1{{reference to parameter 'pointer' involves unsafe type 'UnsafeRawPointer'}}
+  // expected-once-note@-2{{argument #0 in call has unsafe type 'UnsafeRawPointer?'}}
+}
+
+func consumeOnceUnsafeClosure(_ body: @once (UnsafeRawPointer?) -> Void) {
+  (consume body)(nil)
+}
+
+func callAtMostOnceUnsafeClosure<R>(
+  _ body: @callable(once) (UnsafeRawPointer?) throws -> R
+) rethrows -> R {
+  return try body(nil)
+}
+
+func callAtMostOnceUnsafeClosureWithUnsafeArgument(
+  _ body: @callable(once) (UnsafeRawPointer?) -> Void,
+  _ pointer: UnsafeRawPointer
+) {
+  body(pointer) // expected-once-warning{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  // expected-once-note@-1{{reference to parameter 'pointer' involves unsafe type 'UnsafeRawPointer'}}
+  // expected-once-note@-2{{argument #0 in call has unsafe type 'UnsafeRawPointer?'}}
+}
+
+func callOptionalAtMostOnceUnsafeClosure(
+  _ body: consuming (@callable(once) (UnsafeRawPointer?) -> Void)?
+) {
+  body?(nil)
+}
+#endif

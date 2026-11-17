@@ -336,12 +336,12 @@ private:
   PolymorphicEffectKind ReasyncKind = PolymorphicEffectKind::None;
   SubstitutionMap Substitutions;
   SelfApplyExpr *AppliedSelf = nullptr;
-  ParamDecl *LoadedParameter = nullptr;
+  DeclRefExpr *LoadedParameterRef = nullptr;
 
 public:
   explicit AbstractFunction(Kind kind, Expr *fn,
-                            ParamDecl *loadedParameter = nullptr)
-      : TheKind(kind), LoadedParameter(loadedParameter) {
+                            DeclRefExpr *loadedParameterRef = nullptr)
+      : TheKind(kind), LoadedParameterRef(loadedParameterRef) {
     TheExpr = fn;
   }
 
@@ -466,8 +466,15 @@ public:
   /// The function-typed parameter that an opaque function loads, consumes, or
   /// copies, if any.
   ParamDecl *getLoadedParameter() const {
+    if (auto *ref = getLoadedParameterRef())
+      return cast<ParamDecl>(ref->getDecl());
+    return nullptr;
+  }
+
+  /// The reference to the parameter returned by getLoadedParameter(), if any.
+  DeclRefExpr *getLoadedParameterRef() const {
     assert(getKind() == Kind::Opaque);
-    return LoadedParameter;
+    return LoadedParameterRef;
   }
   Expr *getOpaqueFunction() const {
     assert(getKind() == Kind::Opaque);
@@ -592,11 +599,11 @@ public:
       if (!param || !param->getInterfaceType()
                          ->lookThroughAllOptionalTypes()
                          ->is<AnyFunctionType>())
-        param = nullptr;
+        declRef = nullptr;
       fn = calleeBeforeLookThrough;
       if (calleeFn)
         *calleeFn = fn;
-      return AbstractFunction(Kind::Opaque, fn, param);
+      return AbstractFunction(Kind::Opaque, fn, declRef);
     }
 
     // Tell our caller about the callee, if they asked for it.
@@ -1757,8 +1764,13 @@ public:
       // @unsafe, we diagnose the safety of the arguments---not the function
       // itself.
       if (fnRef.getExplicitSafety() == ExplicitSafety::Unspecified) {
-        if (calleeFn)
+        if (calleeFn) {
           assumedSafeArguments->insert(calleeFn);
+
+          if (fnRef.getKind() == AbstractFunction::Opaque)
+            if (auto *paramRef = fnRef.getLoadedParameterRef())
+              assumedSafeArguments->insert(paramRef);
+        }
 
         if (auto appliedSelf = fnRef.getAppliedSelf())
           assumedSafeArguments->insert(appliedSelf);
