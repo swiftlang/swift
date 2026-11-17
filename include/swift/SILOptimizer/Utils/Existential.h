@@ -44,6 +44,10 @@ struct OpenedArchetypeInfo {
   // `load_borrow`. In this case the concrete value of the init_existential is
   // not available at the opened value and must not be used directly.
   bool isExistentialValueFromValueHint = false;
+  // True if a copy_value was looked through to find the
+  // ExistentialValue of an open_existential_ref. In this case the opened value
+  // may outlive a guaranteed concrete value of the init_existential_ref.
+  bool isExistentialValueCopied = false;
 
   // Construct a valid instance if the given use originates from a recognizable
   // OpenedArchetype instruction.

@@ -14,6 +14,7 @@ protocol P : AnyObject {
 }
 
 sil @consume_p : $@convention(thin) (@owned any P) -> ()
+sil @consume_t : $@convention(thin) <T where T : P> (@owned T) -> ()
 
 // CHECK-LABEL: sil [ossa] @borrowed_owned_init_existential :
 // CHECK:         [[B:%.*]] = begin_borrow [lexical] %1
@@ -48,4 +49,34 @@ bb0(%0 : @guaranteed $T):
   %5 = apply %4<@opened(2, any P) Self>(%3) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
   end_borrow %2
   return %5
+}
+
+// Check that a guaranteed concrete value is not used at an apply if the
+// existential is copied out of the concrete value's borrow scope.
+
+// CHECK-LABEL: sil [ossa] @copied_guaranteed_init_existential :
+// CHECK:         [[E:%.*]] = copy_value
+// CHECK:         [[B:%.*]] = begin_borrow [lexical] [[E]]
+// CHECK:         [[O:%.*]] = open_existential_ref [[B]]
+// CHECK:         [[W:%.*]] = witness_method $T, #P.foo
+// CHECK:         [[C:%.*]] = unchecked_ref_cast [[O]] to $T
+// CHECK:         apply [[W]]<T>([[C]])
+// CHECK:       } // end sil function 'copied_guaranteed_init_existential'
+sil [ossa] @copied_guaranteed_init_existential : $@convention(thin) <T where T : P> (@owned T) -> Int {
+bb0(%0 : @owned $T):
+  %b0 = begin_borrow [lexical] %0
+  %1 = init_existential_ref %b0 : $T : $T, $any P
+  debug_value %1, let, name "p"
+  %2 = copy_value %1
+  end_borrow %b0
+  %3 = begin_borrow [lexical] %2
+  %4 = open_existential_ref %3 to $@opened(3, any P) Self
+  %5 = witness_method $@opened(3, any P) Self, #P.foo, %4 : $@opened(3, any P) Self : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  %6 = apply %5<@opened(3, any P) Self>(%4) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@guaranteed τ_0_0) -> Int
+  end_borrow %3
+  %8 = function_ref @consume_p : $@convention(thin) (@owned any P) -> ()
+  %9 = apply %8(%2) : $@convention(thin) (@owned any P) -> ()
+  %10 = function_ref @consume_t : $@convention(thin) <T where T : P> (@owned T) -> ()
+  %11 = apply %10<T>(%0) : $@convention(thin) <T where T : P> (@owned T) -> ()
+  return %6
 }
