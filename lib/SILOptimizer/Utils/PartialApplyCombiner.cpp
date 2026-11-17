@@ -69,7 +69,14 @@ bool PartialApplyCombiner::copyArgsToTemporaries(
     // A noncopyable on-stack closure can own (consume)
     // captures, so they have to be copied when possible.
     for (Operand &argOp : pai->getArgumentOperands()) {
-      if (argOp.isConsuming())
+      // Without ownership, a noncopyable capture that the callee consumes is
+      // transferred to the combined apply instead (see processSingleApply()).
+      bool isTransferred = !pai->getFunction()->hasOwnership() &&
+                           argOp.get()->getType().isMoveOnly() &&
+                           ApplySite(pai)
+                               .getArgumentConvention(argOp)
+                               .isOwnedConventionInCaller();
+      if (isCaptureOwnedByOnStackClosure(argOp) && !isTransferred)
         argsToHandle.push_back(&argOp);
 
       // The closure owns a noncopyable address-only value, which can't be
@@ -187,16 +194,13 @@ void PartialApplyCombiner::processSingleApply(FullApplySite paiAI) {
     if (argToTmpCopy.count(arg))
       arg = argToTmpCopy.lookup(arg);
 
+    // A move-only `arg` cannot be copied, so it is moved into the combined
+    // apply instead. `pai`'s own operand is severed once every apply is
+    // combined (see combine()).
     if (paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
-            .isConsumedInCaller()) {
-      // A move-only `arg` has no copy to make, this can only happen for
-      // an at-most-once on-stack closure's consuming capture. Transfer
-      // it directly instead, and sever `pai`'s own operand so its later
-      // teardown doesn't try to release the same value again. `pai` is
-      // left with no real uses and gets cleaned up as a dead closure.
-      if (arg->getType().isMoveOnly()) {
-        pai->setArgument(i, SILUndef::get(arg));
-      } else if (arg->getType().isAddress()) {
+            .isConsumedInCaller() &&
+        !arg->getType().isMoveOnly()) {
+      if (arg->getType().isAddress()) {
         // Copy the argument as the callee may consume it.
         auto *ASI = builder.createAllocStack(pai->getLoc(), arg->getType());
         builder.createCopyAddr(pai->getLoc(), arg, ASI, IsTake_t::IsNotTake,
@@ -392,6 +396,21 @@ bool PartialApplyCombiner::combine() {
 
   for (FullApplySite ai : foundApplySites) {
     processSingleApply(ai);
+  }
+
+  // Sever `pai`'s operand for each move-only capture that was transferred to
+  // the combined applies, so its later teardown doesn't try to release the
+  // same value again. This waits until every apply is combined, because each
+  // later apply still needs the capture. `pai` is left with no real uses and
+  // gets cleaned up as a dead closure.
+  auto paramInfo = pai->getSubstCalleeType()->getParameters();
+  auto partialApplyArgs = pai->getArguments();
+  for (unsigned i : indices(partialApplyArgs)) {
+    SILValue arg = partialApplyArgs[i];
+    if (arg->getType().isMoveOnly() &&
+        paramInfo[paramInfo.size() - partialApplyArgs.size() + i]
+            .isConsumedInCaller())
+      pai->setArgument(i, SILUndef::get(arg));
   }
 
   return true;
