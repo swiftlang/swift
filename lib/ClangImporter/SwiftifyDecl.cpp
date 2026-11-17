@@ -133,7 +133,6 @@ static Type getImportedParamType(const AbstractFunctionDecl *MappedDecl,
 struct SwiftCountExprEmitter
     : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
   ClangImporter::Implementation &CI;
-  const clang::ASTContext &ctx;
   /// The imported function whose count expression is being emitted.
   const AbstractFunctionDecl *MappedDecl;
   /// Whether the count expression is just a reference to a declaration, such as
@@ -147,9 +146,8 @@ struct SwiftCountExprEmitter
   llvm::raw_svector_ostream out;
 
   SwiftCountExprEmitter(ClangImporter::Implementation &Impl,
-                        const clang::ASTContext &ctx,
                         const AbstractFunctionDecl *MappedDecl)
-      : CI(Impl), ctx(ctx), MappedDecl(MappedDecl), out(result) {}
+      : CI(Impl), MappedDecl(MappedDecl), out(result) {}
 
   /// Computes Swift representation of \p countExpr as a string.
   /// Use `str()` to get access to the computed string.
@@ -606,7 +604,7 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   bool canPrintCountedBy(const clang::CountAttributedType *CAT,
                          Type swiftType) {
     return isSupportedCountedByPointer(CAT, swiftType) &&
-           SwiftCountExprEmitter(Impl, ctx, MappedDecl)
+           SwiftCountExprEmitter(Impl, MappedDecl)
                .computeSwiftCountExpr(CAT->getCountExpr());
   }
 
@@ -616,7 +614,7 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     if (!isSupportedCountedByPointer(CAT, swiftType))
       return false;
     bool isSizedBy = CAT->isCountInBytes();
-    SwiftCountExprEmitter emitter(Impl, ctx, MappedDecl);
+    SwiftCountExprEmitter emitter(Impl, MappedDecl);
     if (!emitter.computeSwiftCountExpr(CAT->getCountExpr())) {
       hasSwiftNewtypeCount |= emitter.usesSwiftNewtype;
       return false;
