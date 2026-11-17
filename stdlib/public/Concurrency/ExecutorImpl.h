@@ -24,7 +24,7 @@
 #ifndef SWIFT_CONCURRENCY_EXECUTORIMPL_H
 #define SWIFT_CONCURRENCY_EXECUTORIMPL_H
 
-#include "ExecutorTypes.h"
+#include "SwiftPlatform/ExecutorTypes.h"
 
 #include <inttypes.h>
 #include <stddef.h>
@@ -189,7 +189,7 @@ SWIFT_CC(swift) void
                                                    void * _Nullable conditionContext);
 
 // -- Main executor functions that Embedded Swift executors must implement ----
-// EmbeddedPlatform+Concurrency.h declares the other functions such an executor
+// SwiftPlatform/Concurrency.h declares the other functions such an executor
 // implements.
 
 /// Enqueue a job on the main executor, which may be the global executor.

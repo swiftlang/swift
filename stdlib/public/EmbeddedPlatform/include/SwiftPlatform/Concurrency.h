@@ -1,4 +1,4 @@
-/*===--- EmbeddedPlatform+Concurrency.h - Embedded Swift executor --*- C -*-===*
+/*===--- SwiftPlatform/Concurrency.h - Executor hooks --------------*- C -*-===*
  *
  * This source file is part of the Swift.org open source project
  *
@@ -10,10 +10,10 @@
  *
  *===----------------------------------------------------------------------===*/
 
-#ifndef EMBEDDED_SWIFT_PLATFORM_CONCURRENCY_H
-#define EMBEDDED_SWIFT_PLATFORM_CONCURRENCY_H
+#ifndef SWIFT_PLATFORM_CONCURRENCY_H
+#define SWIFT_PLATFORM_CONCURRENCY_H
 
-#include "EmbeddedPlatform.h"
+#include "Types.h"
 #include "ExecutorTypes.h"
 
 #if defined(__cplusplus)
@@ -38,6 +38,25 @@ void _swift_concurrency_enqueueGlobal(SwiftJob * EMBEDDED_SWIFT_NONNULL job);
  * `_swift_exit`.
  */
 void _swift_concurrency_asyncMain(void) EMBEDDED_SWIFT_NORETURN;
+
+/**
+ * Returns nonzero when the current execution context is the platform's main
+ * execution context.
+ */
+__swift_ptrdiff_t _swift_thread_isMain(void);
+
+/**
+ * Exit the program.
+ *
+ * - Parameters:
+ *   - code: The exit code, which is typically 0 for normal termination.
+ *
+ * This function must not return.
+ *
+ * This function can be implemented directly with a call to the POSIX exit()
+ * function.
+ */
+void _swift_exit(int code) EMBEDDED_SWIFT_NORETURN;
 
 #if defined(__cplusplus)
 }

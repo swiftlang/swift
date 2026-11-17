@@ -468,7 +468,7 @@ function(_add_target_variant_c_compile_flags)
   string(TOUPPER "${SWIFT_SDK_${CFLAGS_SDK}_THREADING_PACKAGE}" _threading_package)
   list(APPEND result "-DSWIFT_THREADING_${_threading_package}")
   if(CFLAGS_SDK STREQUAL "embedded" AND _threading_package STREQUAL "EMBEDDED")
-    list(APPEND result "-I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform")
+    list(APPEND result "-I${SWIFT_SOURCE_DIR}/stdlib/public/EmbeddedPlatform/include")
   endif()
 
   if(SWIFT_STDLIB_OS_VERSIONING)

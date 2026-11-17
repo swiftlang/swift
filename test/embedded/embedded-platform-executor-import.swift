@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -parse-as-library -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/swift/EmbeddedPlatform+Concurrency.h
-// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/swift/EmbeddedPlatform+Concurrency.h %s -c -o %t/executor.o
-// RUN: not %target-swift-frontend -typecheck -D NOT_IMPORTED -enable-experimental-feature Embedded -parse-as-library -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/swift/EmbeddedPlatform+Concurrency.h %s 2>&1 | %FileCheck %s --check-prefix=NOT-IMPORTED
-// RUN: not %target-swift-frontend -typecheck -enable-experimental-feature Embedded -parse-as-library -import-bridging-header %S/../../stdlib/public/EmbeddedPlatform/swift/EmbeddedPlatform.h %s 2>&1 | %FileCheck %s --check-prefix=PLATFORM-ONLY
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature Embedded -parse-as-library
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %s -c -o %t/executor.o
+// RUN: not %target-swift-frontend -typecheck -D NOT_IMPORTED -enable-experimental-feature Embedded -parse-as-library %s 2>&1 | %FileCheck %s --check-prefix=NOT-IMPORTED
 
 // REQUIRES: swift_feature_Embedded
 
 // NOT-IMPORTED: error: cannot find '_swift_job_run_c' in scope
-// PLATFORM-ONLY: error: cannot find type 'SwiftJob' in scope
+
+import SwiftPlatform
 
 nonisolated(unsafe) var queue: UnsafeMutablePointer<SwiftJob>? = nil
 

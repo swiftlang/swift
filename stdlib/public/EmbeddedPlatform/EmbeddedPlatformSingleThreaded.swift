@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+internal import SwiftPlatform
+
 @implementation @c
 public func _swift_lockStandardOutput() {
 }

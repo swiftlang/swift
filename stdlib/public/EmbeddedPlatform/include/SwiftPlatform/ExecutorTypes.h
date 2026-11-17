@@ -11,8 +11,8 @@
  *===----------------------------------------------------------------------===*
  *
  * The C view of the jobs and executor references that the Swift Concurrency
- * runtime passes to a global executor. `EmbeddedPlatform+Concurrency.h` and
- * `ExecutorImpl.h` both include this file, which must compile without C
+ * runtime passes to a global executor. `SwiftPlatform/Concurrency.h`
+ * and `ExecutorImpl.h` both include this file, which must compile without C
  * library headers.
  *
  *===----------------------------------------------------------------------===*/

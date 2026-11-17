@@ -20,7 +20,7 @@
 
 #if SWIFT_CONCURRENCY_EMBEDDED
 #include "ExecutorImpl.h"
-#include "swift/EmbeddedPlatform+Concurrency.h"
+#include "SwiftPlatform/Concurrency.h"
 #endif
 
 using namespace swift;
