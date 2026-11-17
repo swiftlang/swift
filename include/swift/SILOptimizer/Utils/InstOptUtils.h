@@ -263,6 +263,11 @@ void emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 bool collectDestroys(SingleValueInstruction *inst,
                      SmallVectorImpl<Operand *> &destroys);
 
+/// Returns true if the context of a noncopyable on-stack closure owns the
+/// capture \p argOp of its partial_apply, so destroying the closure destroys
+/// the capture.
+bool isCaptureOwnedByOnStackClosure(Operand &argOp);
+
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:
 ///

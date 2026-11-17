@@ -3087,31 +3087,39 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
       Opts.LocalizationCode = localeCode;
     }
   }
-  if (Arg *A = Args.getLastArg(OPT_localization_path)) {
-    if (!llvm::sys::fs::exists(A->getValue())) {
-      Diags.diagnose(SourceLoc(), diag::warning_locale_path_not_found,
-                     A->getValue());
-    } else if (!Opts.LocalizationCode.empty()) {
-      // Check if the localization path exists but it doesn't have a file
-      // for the specified locale code.
-      llvm::SmallString<128> localizationPath(A->getValue());
-      llvm::sys::path::append(localizationPath, Opts.LocalizationCode);
-      llvm::sys::path::replace_extension(localizationPath, ".strings");
-      if (!llvm::sys::fs::exists(localizationPath)) {
-        Diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
-                       Opts.LocalizationCode, localizationPath);
-      }
-
-      Opts.LocalizationPath = A->getValue();
-    }
-  }
+  // The localization path is validated once the file system is set up.
+  if (Arg *A = Args.getLastArg(OPT_localization_path))
+    Opts.LocalizationPath = A->getValue();
   return false;
+}
+
+static std::string computeLocalizationPath(const DiagnosticOptions &Options,
+                                           StringRef mainExecutablePath,
+                                           llvm::vfs::FileSystem &FS) {
+  if (Options.LocalizationCode.empty())
+    return {};
+  if (!Options.LocalizationPath.empty() && FS.exists(Options.LocalizationPath))
+    return Options.LocalizationPath;
+
+  // Fall back to the localized messages in the toolchain.
+  llvm::SmallString<128> locPathBuffer(mainExecutablePath);
+  llvm::sys::path::remove_filename(locPathBuffer); // Remove /swift
+  llvm::sys::path::remove_filename(locPathBuffer); // Remove /bin
+  llvm::sys::path::append(locPathBuffer, "share", "swift", "diagnostics");
+  return std::string(locPathBuffer);
+}
+
+std::string
+CompilerInvocation::getLocalizationPath(llvm::vfs::FileSystem &FS) const {
+  return computeLocalizationPath(DiagnosticOpts,
+                                 FrontendOpts.MainExecutablePath, FS);
 }
 
 static void configureDiagnosticEngine(
     const DiagnosticOptions &Options,
     std::optional<version::Version> effectiveLanguageVersion,
-    StringRef mainExecutablePath, DiagnosticEngine &Diagnostics) {
+    StringRef mainExecutablePath, DiagnosticEngine &Diagnostics,
+    llvm::vfs::FileSystem &FS) {
   if (Options.ShowDiagnosticsAfterFatalError) {
     Diagnostics.setShowDiagnosticsAfterFatalError();
   }
@@ -3149,31 +3157,45 @@ static void configureDiagnosticEngine(
   llvm::sys::path::append(localDocsPath, "share", "doc", "swift", "diagnostics");
   Diagnostics.setLocalDiagnosticDocumentationPath(std::string(localDocsPath));
 
-  if (!Options.LocalizationCode.empty()) {
-    std::string locPath = Options.LocalizationPath;
-    if (locPath.empty()) {
-      llvm::SmallString<128> locPathBuffer(mainExecutablePath);
-      llvm::sys::path::remove_filename(locPathBuffer); // Remove /swift
-      llvm::sys::path::remove_filename(locPathBuffer); // Remove /bin
-      llvm::sys::path::append(locPathBuffer, "share", "swift", "diagnostics");
-      locPath = locPathBuffer.str();
-    }
-    Diagnostics.setLocalization(Options.LocalizationCode, locPath);
-  }
+  std::string localizationPath =
+      computeLocalizationPath(Options, mainExecutablePath, FS);
+  if (!localizationPath.empty())
+    Diagnostics.setLocalization(Options.LocalizationCode, localizationPath, FS);
 
   if (effectiveLanguageVersion)
     Diagnostics.setLanguageVersion(*effectiveLanguageVersion);
 }
 
 /// Configures the diagnostic engine for the invocation's options.
-void CompilerInvocation::setUpDiagnosticEngine(DiagnosticEngine &diags) {
+void CompilerInvocation::setUpDiagnosticEngine(DiagnosticEngine &diags,
+                                               llvm::vfs::FileSystem &FS) {
   configureDiagnosticEngine(DiagnosticOpts, LangOpts.EffectiveLanguageVersion,
-                            FrontendOpts.MainExecutablePath, diags);
+                            FrontendOpts.MainExecutablePath, diags, FS);
 
   // Once configured, immediately diagnose any unknown warning groups that were
   // encountered while parsing the diagnostic options.
   for (const auto &unknownGroup : DiagnosticOpts.UnknownWarningGroups) {
     diags.diagnose(SourceLoc(), diag::unknown_warning_group, unknownGroup);
+  }
+
+  if (!DiagnosticOpts.LocalizationPath.empty()) {
+    if (!FS.exists(DiagnosticOpts.LocalizationPath)) {
+      diags.diagnose(SourceLoc(), diag::warning_locale_path_not_found,
+                     DiagnosticOpts.LocalizationPath);
+    } else if (!DiagnosticOpts.LocalizationCode.empty()) {
+      // Check if the localization path exists but it doesn't have a file
+      // for the specified locale code.
+      llvm::SmallString<128> localizationPath(DiagnosticOpts.LocalizationPath);
+      llvm::sys::path::append(localizationPath,
+                              DiagnosticOpts.LocalizationCode);
+      llvm::sys::path::replace_extension(localizationPath, ".db");
+      bool hasSerializedFile = FS.exists(localizationPath);
+      llvm::sys::path::replace_extension(localizationPath, ".strings");
+      if (!hasSerializedFile && !FS.exists(localizationPath)) {
+        diags.diagnose(SourceLoc(), diag::warning_cannot_find_locale_file,
+                       DiagnosticOpts.LocalizationCode, localizationPath);
+      }
+    }
   }
 }
 
@@ -4642,7 +4664,8 @@ bool CompilerInvocation::parseArgs(
   }
   configureDiagnosticEngine(DiagnosticOpts,
                             /*effectiveLanguageVersion=*/std::nullopt,
-                            mainExecutablePath, Diags);
+                            mainExecutablePath, Diags,
+                            *llvm::vfs::getRealFileSystem());
 
   ParseAssertionArgs(ParsedArgs);
 

@@ -741,3 +741,35 @@ func testForwardConsumedCapture(_ tag: String) -> Int {
 // CHECK-NEXT: Resource(forwarded) deinit
 // CHECK-NEXT: forwarded consumed capture: 9
 print("forwarded consumed capture: \(testForwardConsumedCapture("forwarded"))")
+
+// An inlined at-most-once closure that consumes a noncopyable capture and is
+// called on either of two paths.
+
+@inline(never)
+func useResource(_ r: consuming Resource) { r.use() }
+
+@inline(__always)
+func callOnEitherPath(_ first: Bool, _ body: @callable(once) () -> Void) {
+  if first {
+    print("first path")
+    body()
+  } else {
+    print("second path")
+    body()
+  }
+}
+
+@inline(never)
+func testCalledOnEitherPath(_ first: Bool, _ tag: String) {
+  let r = Resource(tag)
+  callOnEitherPath(first) { useResource(r) }
+}
+
+// CHECK-NEXT: first path
+// CHECK-NEXT: Resource(either first) used
+// CHECK-NEXT: Resource(either first) deinit
+testCalledOnEitherPath(true, "either first")
+// CHECK-NEXT: second path
+// CHECK-NEXT: Resource(either second) used
+// CHECK-NEXT: Resource(either second) deinit
+testCalledOnEitherPath(false, "either second")
