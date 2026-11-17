@@ -51,6 +51,25 @@ public func testClosureToFuncPtr() {
   cfunc2({N in})
 }
 
+// A named function converted to a C function pointer gets the same C entry
+// point as a closure.
+// CHECK: sil @$s4main26testNamedFunctionToFuncPtryyF : $@convention(thin) () -> () {
+// CHECK: %[[V0:.*]] = function_ref @$s4main14takeNonTrivialyySo0cD0VFTo : $@convention(c) (@in_cxx NonTrivial) -> ()
+// CHECK: apply %{{.*}}(%[[V0]]) : $@convention(c) (@convention(c) (@in_cxx NonTrivial) -> ()) -> ()
+
+// CHECK: sil shared [thunk] @$s4main14takeNonTrivialyySo0cD0VFTo : $@convention(c) (@in_cxx NonTrivial) -> () {
+// CHECK: bb0(%[[V0:.*]] : $*NonTrivial):
+// CHECK: %[[V1:.*]] = function_ref @$s4main14takeNonTrivialyySo0cD0VF : $@convention(thin) (@in_guaranteed NonTrivial) -> ()
+// CHECK: apply %[[V1]](%[[V0]]) : $@convention(thin) (@in_guaranteed NonTrivial) -> ()
+// CHECK-NOT: destroy_addr
+// CHECK: } // end sil function '$s4main14takeNonTrivialyySo0cD0VFTo'
+
+func takeNonTrivial(_ n: NonTrivial) {}
+
+public func testNamedFunctionToFuncPtr() {
+  cfunc2(takeNonTrivial)
+}
+
 // CHECK: sil @$s4main13returnFuncPtrySo10NonTrivialVcyF : $@convention(thin) () -> @owned @callee_guaranteed (@in_guaranteed NonTrivial) -> () {
 // CHECK: %[[V0:.*]] = function_ref @$sSo8getFnPtrySo10NonTrivialVXCyFTo : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
 // CHECK: %[[V1:.*]] = apply %[[V0]]() : $@convention(c) () -> @convention(c) (@in_cxx NonTrivial) -> ()
