@@ -278,6 +278,7 @@ public:
     case OverloadChoiceKind::KeyPathApplication:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Determine whether this choice is for a declaration.

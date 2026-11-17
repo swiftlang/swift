@@ -387,6 +387,7 @@ public:
     case Context::RawLayoutAttr:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Whether pack expansion types are supported in this context.
@@ -430,6 +431,7 @@ public:
     case Context::RawLayoutAttr:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Whether we are resolving a type in a generic argument list.
@@ -474,6 +476,7 @@ public:
     case Context::RawLayoutAttr:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Whether we are resolving a type in a `where` clause, generic parameter
@@ -519,6 +522,7 @@ public:
     case Context::RawLayoutAttr:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Determine whether all of the given options are set.

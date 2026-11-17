@@ -1253,6 +1253,7 @@ namespace {
       case FunctionTypeIsolation::Kind::NonIsolatedNonsending:
         return ActorIsolation::forNonisolatedNonsending();
       }
+      llvm_unreachable("covered switch");
     }
 
     /// Build a "{ args in base.fn(args) }" single-expression curry thunk.
@@ -8896,6 +8897,7 @@ bool ExprRewriter::isDistributedThunk(ConcreteDeclRef ref, Expr *context) {
   case ActorReferenceResult::EntersActor:
     return refResult.options.contains(ActorReferenceResult::Flags::Distributed);
   }
+  llvm_unreachable("covered switch");
 }
 
 // Return the precedence-yielding parent of 'expr', along with the index of

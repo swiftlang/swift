@@ -420,6 +420,7 @@ SolverTrail::Change::getSyntacticElementTargetKey() const {
   case SyntacticElementTargetKey::Kind::functionRef:
     return SyntacticElementTargetKey(TheDeclContext);
   }
+  llvm_unreachable("covered switch");
 }
 
 void SolverTrail::Change::undo(ConstraintSystem &cs) const {

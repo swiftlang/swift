@@ -789,6 +789,7 @@ private:
       ENTRY(Float, "float");
       ENTRY(Atom, "atom");
     }
+    llvm_unreachable("covered switch");
 #undef ENTRY
   }
 };

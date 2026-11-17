@@ -243,6 +243,7 @@ static bool classifyWitness(ModuleDecl *module,
       // If something was invalid, just assume it has the effect.
       return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool ConformanceHasEffectRequest::evaluate(
@@ -426,6 +427,7 @@ public:
       return params->get(origIndex)->getInterfaceType();
     }
     }
+    llvm_unreachable("covered switch");
   }
 
   Type getOrigParamSelfType() const {
@@ -442,6 +444,7 @@ public:
 
       return Type();
     }
+    llvm_unreachable("covered switch");
   }
 
   bool isAutoClosure() const {
@@ -492,6 +495,7 @@ public:
     case Kind::Function:
       return getFunction()->getExplicitSafety();
     }
+    llvm_unreachable("covered switch");
   }
 
   static AbstractFunction getAppliedFn(ApplyExpr *apply,
@@ -521,6 +525,7 @@ public:
     case Kind::Parameter:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   static AbstractFunction decomposeFunction(Expr *fn,
@@ -1178,6 +1183,7 @@ public:
     case EffectKind::Throws: return onlyThrowing();
     case EffectKind::Unsafe: return onlyUnsafe();
     }
+    llvm_unreachable("covered switch");
   }
 
   static Classification forConditionalPlaceholder(
@@ -1194,6 +1200,7 @@ public:
     case EffectKind::Unsafe:
       llvm_unreachable("Never propagate unsafe through function bodies");
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Return a throwing classification.
@@ -1476,6 +1483,7 @@ public:
     case EffectKind::Async: return ReasyncDC;
     case EffectKind::Unsafe: return nullptr;
     }
+    llvm_unreachable("covered switch");
   }
 
   Classification classifyConformance(ProtocolConformanceRef conformanceRef,
@@ -2109,6 +2117,7 @@ public:
       // the pointers does not introduce a memory-safety issue.
       return Classification();
     }
+    llvm_unreachable("covered switch");
   }
 
 private:
@@ -3319,6 +3328,7 @@ public:
     case PotentialEffectReason::Kind::SubscriptAccess:
       return "subscript access";
     }
+    llvm_unreachable("covered switch");
   }
 
   void diagnoseUncoveredThrowSite(ASTContext &ctx, ASTNode E,
@@ -3565,6 +3575,7 @@ public:
     case PotentialEffectReason::Kind::SubscriptAccess:
       return 5;
     }
+    llvm_unreachable("covered switch");
   }
 
   void diagnoseAsyncInIllegalContext(DiagnosticEngine &Diags, ASTNode node) {

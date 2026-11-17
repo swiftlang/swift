@@ -294,6 +294,7 @@ public:
     case Kind::uninitializedVar:
       return getAsUninitializedVar();
     }
+    llvm_unreachable("covered switch");
   }
 
   Expr *getAsExpr() const {

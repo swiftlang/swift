@@ -1031,6 +1031,7 @@ static AllowedBindingKind flipBindingKind(AllowedBindingKind kind) {
   case AllowedBindingKind::Fallback:
     return AllowedBindingKind::Fallback;
   }
+  llvm_unreachable("covered switch");
 }
 
 void BindingSet::inferTransitiveKeyPathBindingFrom(
@@ -2942,6 +2943,7 @@ bool LiteralRequirement::isCoveredBy(AllowedBindingKind kind, Type type,
         return false;
       return canConvertTo(CS.CC, type, defaultType);
     }
+    llvm_unreachable("covered switch");
   }
 }
 

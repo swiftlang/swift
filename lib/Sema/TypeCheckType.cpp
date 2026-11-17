@@ -7523,6 +7523,7 @@ private:
     case TypeReprKind::NonisolatedNonsending:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   void emitInsertAnyFixit(InFlightDiagnostic &diag, DeclRefTypeRepr *T) const {

@@ -268,6 +268,7 @@ static bool shouldSuppressExportabilityDiagnosticsForHiddenTypes(
     case DisallowedOriginKind::FragileCxxAPI:
       return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 DiagnosticBehavior
@@ -2347,6 +2348,7 @@ class ExprAvailabilityWalker : public BaseDiagnosticWalker {
     case MemberAccessContext::Writeback:
       return StorageAccessKind::GetSet;
     }
+    llvm_unreachable("covered switch");
   }
 
 public:
@@ -2710,6 +2712,7 @@ private:
       // context.
       return getMemberStorageAccessKind();
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Walk a keypath expression, checking all of its components for
