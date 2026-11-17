@@ -7472,7 +7472,6 @@ public:
       Printer.printSimpleAttr("@yield_once") << " ";
     }
 
-    SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:
       return;
@@ -7569,7 +7568,6 @@ public:
       }
     }
 
-    SmallString<64> buf;
     switch (Options.PrintFunctionRepresentationAttrs) {
     case PrintOptions::FunctionRepresentationMode::None:
       break;
