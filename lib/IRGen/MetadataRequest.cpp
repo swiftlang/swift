@@ -2123,6 +2123,10 @@ namespace {
 
     MetadataResponse visitDynamicSelfType(CanDynamicSelfType type,
                                           DynamicMetadataRequest request) {
+      // A partial application forwarder restores the dynamic Self metadata
+      // from its context.
+      if (auto cached = tryGetLocal(type, request))
+        return cached;
       return MetadataResponse::forComplete(IGF.getDynamicSelfMetadata());
     }
       

@@ -70,7 +70,9 @@ public:
 
   void addRequirement(GenericRequirement requirement) {
     auto type = requirement.getTypeParameter().subst(SubMap);
-    if (!type->hasArchetype())
+    // Only an archetype or a dynamic Self type (which is local to the caller
+    // like an archetype's) needs to be bound.
+    if (!type->hasArchetype() && !type->hasDynamicSelfType())
       return;
 
     RequirementsSet.insert(requirement);
