@@ -1073,6 +1073,13 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   P.addSemanticARCOpts();
   P.addCopyToBorrowOptimization();
 
+  // Remove dynamic access enforcement before serialization: after
+  // serialization, functions which can be inlined into client modules may be
+  // removed. Then AccessEnforcementWMO would not see all accesses of non-public
+  // declarations anymore (which matters with aggressive CMO and in Embedded
+  // Swift). This also lets client modules benefit from the optimization.
+  P.addAccessEnforcementWMO();
+
   P.addCrossModuleOptimization();
   P.addConformanceCheckOptimization();
 

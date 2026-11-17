@@ -102,12 +102,66 @@ getDisjointAccessLocation(AccessStorageWithBase storageAndBase) {
   llvm_unreachable("unhandled kind");
 }
 
+/// Returns true if the declaration of a global variable or class property can
+/// be accessed from outside this module.
+static bool isDeclVisibleExternally(const VarDecl *decl, SILModule *mod) {
+  // Non-public declarations of other modules can be accessed by code of their
+  // defining module (and in Embedded Swift by code inlined from that module).
+  if (decl->getModuleContext() != mod->getSwiftModule())
+    return true;
+
+  // With aggressive cross-module-optimization (which is always enabled in
+  // Embedded Swift), non-public declarations can be accessed by serialized
+  // functions, which can be inlined into client modules. Some of those
+  // serialized functions may have been removed from this module after
+  // serialization, e.g. by dead function elimination. Therefore we cannot see
+  // all accesses anymore and must be conservative. The run of this pass before
+  // serialization takes care of those declarations.
+  if (mod->isSerialized() && mod->getSwiftModule()->isAggressiveCMOEnabled())
+    return true;
+
+  return mod->isVisibleExternally(decl);
+}
+
+/// Returns true if \p global can be referenced by its symbol name from outside
+/// the module, regardless of the access level of its declaration.
+static bool isReferencedBySymbolName(const SILGlobalVariable *global,
+                                     const VarDecl *decl) {
+  // A declaration refers to a symbol which is defined elsewhere, e.g. a
+  // `@_extern(c)` global.
+  if (!global->isDefinition())
+    return true;
+
+  // The global is kept alive or placed in a specific section, e.g. to be
+  // referenced by a linker script.
+  if (global->markedAsUsed() || !global->section().empty())
+    return true;
+
+  // The global has a custom symbol name.
+  if (!global->asmName().empty())
+    return true;
+  return decl->getAttrs().hasAttribute<SILGenNameAttr>() ||
+         decl->getAttrs().hasAttribute<ExternAttr>();
+}
+
 static bool isVisibleExternally(DisjointAccessLocationKey key, SILModule *mod) {
   if (auto *decl = key.dyn_cast<const VarDecl *>())
-    return mod->isVisibleExternally(decl);
+    return isDeclVisibleExternally(decl, mod);
 
   auto *global = cast<const SILGlobalVariable *>(key);
-  return isPossiblyUsedExternally(global->getLinkage(), mod->isWholeModule());
+  if (!isPossiblyUsedExternally(global->getLinkage(), mod->isWholeModule()))
+    return false;
+
+  // With aggressive cross-module-optimization (which is always enabled in
+  // Embedded Swift) all global variables get public linkage, regardless of
+  // their declared access level. Therefore, like for class properties, check
+  // the declaration instead.
+  // This is not possible for globals which can be referenced by symbol name.
+  VarDecl *decl = global->getDecl();
+  if (!decl || isReferencedBySymbolName(global, decl))
+    return true;
+
+  return isDeclVisibleExternally(decl, mod);
 }
 
 static StringRef getName(DisjointAccessLocationKey key) {
