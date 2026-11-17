@@ -40,7 +40,8 @@ Perform asynchronous and parallel operations.
 - ``Swift/Task/checkCancellation()``
 - ``Swift/CancellationError``
 - ``Swift/CancellationError/Reason``
-- ``Swift/withTaskCancellationHandler(operation:onCancel:)``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:)-(_,()->Void)``
+- ``Swift/withTaskCancellationHandler(operation:onCancel:)-(_,(CancellationError.Reason)->Void)``
 - ``Swift/withTaskCancellationHandler(operation:onCancel:isolation:)``
 - ``Swift/withTaskCancellationShield(operation:)-8zlgh``
 - ``Swift/withTaskCancellationShield(operation:)-2lzl8``
@@ -85,18 +86,8 @@ Perform asynchronous and parallel operations.
 - ``Swift/JobPriority``
 - ``Swift/UnownedSerialExecutor``
 - ``Swift/UnownedTaskExecutor``
-- ``Swift/UnimplementedMainExecutor``
-- ``Swift/UnimplementedTaskExecutor``
-- ``SchedulingExecutor``
 - ``Swift/globalConcurrentExecutor``
 - ``Swift/withTaskExecutorPreference(_:isolation:operation:)``
-
-### Main and Task Executors
-
-- ``Swift/MainExecutor``
-- ``Swift/RunLoopExecutor``
-- ``Swift/ExecutorFactory``
-- ``Swift/PlatformExecutorFactory``
 
 
 ### Deprecated

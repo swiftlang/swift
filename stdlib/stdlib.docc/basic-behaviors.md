@@ -42,3 +42,7 @@ Store your custom types in sets or use them as dictionary keys.
 
 - ``Swift/CaseIterable``
 - ``Swift/RawRepresentable``
+
+### Lifecycle
+
+- ``Swift/Deinitable``
