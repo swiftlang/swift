@@ -133,3 +133,24 @@ class DeinitAsFunction {
 // CHECK-LABEL: sil_vtable DeinitAsFunction {
 // CHECK:         #DeinitAsFunction.`deinit`:
 // CHECK:         #DeinitAsFunction.deinit!deallocator
+
+// An override has the same opaque read accessors as the property it
+// overrides, so that dispatch through the base reaches the override
+// (rdar://192958686).
+
+class OpaqueReadBase {
+  @_borrowed var borrowed: Int { get { 0 } }
+  var owned: Int { get { 0 } }
+}
+
+class OpaqueReadDerived: OpaqueReadBase {
+  override var borrowed: Int { get { 1 } }
+  @_borrowed override var owned: Int { get { 1 } }
+}
+
+// CHECK-LABEL: sil_vtable OpaqueReadDerived {
+// CHECK-NEXT:    #OpaqueReadBase.borrowed!read: {{.*}} : @$s7vtables17OpaqueReadDerivedC8borrowedSivr [override]
+// CHECK-NEXT:    #OpaqueReadBase.owned!getter: {{.*}} : @$s7vtables17OpaqueReadDerivedC5ownedSivg [override]
+// CHECK-NEXT:    #OpaqueReadBase.init!allocator: {{.*}} [override]
+// CHECK-NEXT:    #OpaqueReadDerived.deinit!deallocator:
+// CHECK-NEXT:  }

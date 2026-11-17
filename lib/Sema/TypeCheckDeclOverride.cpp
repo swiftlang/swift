@@ -2028,6 +2028,32 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       return true;
     }
 
+    // A class member override has the same opaque read ownership as the
+    // overridden storage (see OpaqueReadOwnershipRequest), unless it cannot
+    // provide the overridden storage's opaque read accessors. Then dispatch
+    // through the base would not reach the override.
+    //
+    // This runs while computing the override's overridden declarations, so it
+    // must not request the override's own opaque read ownership.
+    if (overrideASD->getDeclContext()->getSelfClassDecl()) {
+      auto baseOwnership = baseASD->getOpaqueReadOwnership();
+      if (!canProvideOpaqueRead(overrideASD, baseOwnership)) {
+        if (baseOwnership == OpaqueReadOwnership::Borrow) {
+          diags.diagnose(overrideASD, diag::override_needs_borrow_accessor,
+                         overrideASD);
+        } else {
+          bool hasBorrowAccessor =
+              overrideASD->getAccessor(AccessorKind::Borrow) != nullptr;
+          ASSERT(hasBorrowAccessor ||
+                 hasScopedReadCoroutineDependence(overrideASD));
+          diags.diagnose(overrideASD, diag::override_needs_getter, overrideASD,
+                         hasBorrowAccessor);
+        }
+        diags.diagnose(baseASD, diag::property_override_here);
+        return true;
+      }
+    }
+
     // Make sure that if we're overriding a `@dynamicMemberLookup` subscript, it
     // remains as valid as its parent. `@dynamicMemberLookup`-annotated types
     // normally go through `AttributeChecker` for validation, but if

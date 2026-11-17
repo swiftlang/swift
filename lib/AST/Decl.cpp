@@ -4181,12 +4181,12 @@ bool AbstractStorageDecl::requiresOpaqueYieldingBorrowCoroutine() const {
     return true;
   }
   
-  // If a borrow accessor is present, we don't need a read coroutine.
-  if (getParsedAccessor(AccessorKind::Borrow)) {
-    return false;
-  }
-
-  return getOpaqueReadOwnership() !=  OpaqueReadOwnership::Owned;
+  // Storage read with a borrow accessor doesn't need a read coroutine. An
+  // override with a borrow accessor might still need one because it has the
+  // opaque read ownership of the storage it overrides.
+  auto ownership = getOpaqueReadOwnership();
+  return ownership == OpaqueReadOwnership::YieldingBorrow ||
+         ownership == OpaqueReadOwnership::OwnedOrBorrowed;
 }
 
 bool AbstractStorageDecl::requiresOpaqueBorrowAccessor() const {

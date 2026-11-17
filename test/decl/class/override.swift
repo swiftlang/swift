@@ -505,3 +505,30 @@ class OverrideTypoSubclass: OverrideTypoBaseClass {
 class InvalidSubclass: GenericBase { // expected-error {{reference to generic type 'GenericBase' requires arguments in <...>}}
   var values: Float { 0 } // expected-error {{property 'values' with type 'Float' cannot override a property with type 'Int'}}
 }
+
+// rdar://192958686: An override has the opaque read accessors of the property
+// it overrides. A borrow accessor cannot be synthesized, and a getter cannot
+// (yet) be synthesized from a borrow accessor.
+class BorrowAccessorBase {
+  let storage = 0
+  var borrowed: Int { borrow { return storage } } // expected-note 2 {{attempt to override property here}}
+  var borrowedMatching: Int { borrow { return storage } }
+  var getter: Int { get { 0 } } // expected-note {{attempt to override property here}}
+  var readCoroutine: Int { _read { yield 0 } } // expected-note {{attempt to override property here}}
+  @_borrowed var borrowedGetter: Int { get { 0 } }
+}
+
+class BorrowAccessorDerived: BorrowAccessorBase {
+  let derivedStorage = 1
+  override var borrowed: Int { get { 1 } } // expected-error {{property 'borrowed' must have a 'borrow' accessor because the overridden property has one}}
+  override var borrowedMatching: Int { borrow { return derivedStorage } }
+  override var getter: Int { borrow { return derivedStorage } } // expected-error {{property 'getter' cannot override a property that is read through a getter, because it has a 'borrow' accessor}}
+  override var readCoroutine: Int { borrow { return derivedStorage } } // expected-error {{property 'readCoroutine' cannot override a property that is read through a getter, because it has a 'borrow' accessor}}
+  // The base is read through a '_read', which is synthesized from the borrow
+  // accessor.
+  override var borrowedGetter: Int { borrow { return derivedStorage } }
+}
+
+class BorrowAccessorDerived2: BorrowAccessorBase {
+  override var borrowed: Int { _read { yield 1 } } // expected-error {{property 'borrowed' must have a 'borrow' accessor because the overridden property has one}}
+}

@@ -1378,6 +1378,16 @@ Type getMemberTypeForComparison(const ValueDecl *member,
 bool isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
                            const ValueDecl *parentDecl);
 
+/// Whether the storage has a '_read' or 'yielding borrow' coroutine whose
+/// yielded value has a scoped lifetime dependence. Such a coroutine borrows its
+/// source, so no getter can be synthesized from it.
+bool hasScopedReadCoroutineDependence(AbstractStorageDecl *storage);
+
+/// Whether the storage can provide the opaque read accessors for the given
+/// opaque read ownership, possibly by synthesizing them from its own accessors.
+bool canProvideOpaqueRead(AbstractStorageDecl *storage,
+                          OpaqueReadOwnership required);
+
 /// Determine whether the given declaration is an operator defined in a
 /// protocol. If \p type is not null, check specifically whether \p decl
 /// could fulfill a protocol requirement for it.
