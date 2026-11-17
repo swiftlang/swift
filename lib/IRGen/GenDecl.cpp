@@ -1659,6 +1659,12 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
       if (isa<ClassDecl>(type) || isa<ProtocolDecl>(type))
         return false;
 
+      // The generated C++ header references the metadata of the structs and
+      // enums it prints.
+      if (isa<StructDecl, EnumDecl>(type) &&
+          SILDeclRef::declMayBePrintedInCxxHeader(type, SIL))
+        return false;
+
       switch (type->getEffectiveAccess()) {
       case AccessLevel::Open:
       case AccessLevel::Public:
@@ -1681,6 +1687,24 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   HasLazyMetadata[type] = isLazy;
 
   return isLazy;
+}
+
+bool IRGenerator::mayDispatchFromCxxHeader(SILDeclRef method) {
+  if (!SIL.getOptions().CxxHeaderMinAccess)
+    return false;
+  if (!CxxHeaderDispatchedMethods) {
+    CxxHeaderDispatchedMethods.emplace();
+    for (auto *vtable : SIL.getVTables()) {
+      for (auto &entry : vtable->getEntries()) {
+        if (entry.getMethod().mayBeCalledFromCxxHeader(SIL) ||
+            entry.getImplementation()->getDeclRef().mayBeCalledFromCxxHeader(
+                SIL))
+          CxxHeaderDispatchedMethods->insert(entry.getMethod());
+      }
+    }
+  }
+  return method.mayBeCalledFromCxxHeader(SIL) ||
+         CxxHeaderDispatchedMethods->contains(method);
 }
 
 void IRGenerator::noteUseOfClassMetadata(CanType classType) {

@@ -249,6 +249,10 @@ private:
   /// A map recording if metadata can be emitted lazily for each nominal type.
   llvm::DenseMap<TypeDecl *, bool> HasLazyMetadata;
 
+  /// The class methods that introduce a vtable slot that the generated C++
+  /// header may dispatch through, computed on first use.
+  std::optional<llvm::DenseSet<SILDeclRef>> CxxHeaderDispatchedMethods;
+
   struct LazyTypeGlobalsInfo {
     /// Is there a use of the type metadata?
     bool IsMetadataUsed = false;
@@ -476,6 +480,11 @@ public:
   /// non-public types as well as imported types, except for classes and
   /// protocols which are always emitted eagerly.
   bool hasLazyMetadata(TypeDecl *type);
+
+  /// Whether the generated C++ header may dispatch through the vtable slot
+  /// that \p method introduces, because it may call the method or one of its
+  /// overrides.
+  bool mayDispatchFromCxxHeader(SILDeclRef method);
 
   /// Emit everything which is reachable from already emitted IR.
   void emitLazyDefinitions();
