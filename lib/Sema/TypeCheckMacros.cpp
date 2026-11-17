@@ -2055,6 +2055,16 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
 
   TinyPtrVector<ProtocolDecl *> introducedConformances;
   for (auto protocol : *potentialConformances) {
+    // An extension macro attached to a protocol cannot add new conformances.
+    // Instead, treat the protocols this protocol already inherits from as
+    // already present, so the macro is not asked to add them. Protocols have
+    // no conformance table, so don't use 'lookupConformance' for them.
+    if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
+      if (!proto->inheritsFrom(protocol))
+        introducedConformances.push_back(protocol);
+      continue;
+    }
+
     SmallVector<ProtocolConformance *, 2> existingConformances;
     nominal->lookupConformance(protocol, existingConformances);
 
