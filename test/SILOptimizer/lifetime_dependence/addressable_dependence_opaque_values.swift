@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-sil -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes -verify %s
+// RUN: %target-swift-emit-sil -enable-lifetime-resolution -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes -verify %s
 // RUN: %target-swift-emit-sil -enable-experimental-feature Lifetimes -enable-experimental-feature AddressableTypes -enable-sil-opaque-values -verify %s
 
 // REQUIRES: swift_feature_AddressableTypes

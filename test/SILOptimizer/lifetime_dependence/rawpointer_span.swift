@@ -6,6 +6,14 @@
 // RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
 // RUN:   -strict-memory-safety \
 // RUN:   -enable-experimental-feature Lifetimes
+// RUN: %target-swift-frontend -enable-lifetime-resolution -primary-file %s -parse-as-library -emit-sil \
+// RUN:   -o /dev/null \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -module-name test \
+// RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
+// RUN:   -strict-memory-safety \
+// RUN:   -enable-experimental-feature Lifetimes
 
 // REQUIRES: swift_feature_Lifetimes
 

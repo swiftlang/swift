@@ -2,6 +2,10 @@
 // RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableTypes
+// RUN: %target-swift-frontend -enable-lifetime-resolution %s -emit-sil -o /dev/null -verify \
+// RUN:   -disable-availability-checking \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature AddressableTypes
 
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableTypes

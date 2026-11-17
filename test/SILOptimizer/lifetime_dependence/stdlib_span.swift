@@ -5,6 +5,13 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes
+// RUN: %target-swift-frontend -enable-lifetime-resolution %s -emit-sil \
+// RUN:   -target %target-swift-6.2-abi-triple \
+// RUN:   -o /dev/null \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -module-name test \
+// RUN:   -enable-experimental-feature Lifetimes
 
 // REQUIRES: swift_feature_Lifetimes
 

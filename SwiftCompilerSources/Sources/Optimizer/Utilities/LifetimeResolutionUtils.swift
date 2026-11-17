@@ -203,7 +203,8 @@ struct ResolvableRoot {
   enum ExtraLivenessUse {
     /// The function exits, at which point an `inout` parameter or the contents of a borrowed box must be initialized.
     case functionExit(TermInst)
-    /// The lifetime of the `alloc_box` ends.
+    /// The destroys of an initialized `alloc_box` that are treated as artificial liveness uses to ensure we don't
+    /// take a contents out of the box without reinitializing it.
     case boxLifetimeEnd(Instruction)
 
     var instruction: Instruction {
@@ -301,9 +302,10 @@ struct ResolvableRoot {
 
         let indices = indexCache.fieldIndices(for: storage.type.objectType)
 
-        // If this is the 'self' for an empty type in its initializer, we don't have any fields to initialize.
-        // So, treat the storage as being born initialized
-        startsInitialized = mu.kind == .rootSelf && !indices.hasFields
+        // If this is the 'self' for an empty Copyable type in its initializer, we don't have any fields to initialize.
+        // We just treat the storage as being born initialized.
+        // TODO: have SILGen emit an initializing store?
+        startsInitialized = mu.kind == .rootSelf && !indices.hasFields && !storage.type.isMoveOnly
 
         if mu.kind == .derivedSelf {
           initialStore = Self.findInitialStoreOfDerivedSelf(mu)
@@ -332,7 +334,10 @@ struct ResolvableRoot {
 
       // Treat any lifetime ends or copies of the box itself as extra uses.
       let box: Value = markUninitialized ?? storage
-      box.uses.endingLifetime.forEach { extraUses.append(.boxLifetimeEnd($0.instruction)) }
+      // A `dealloc_box` frees a box whose contents are uninitialized, so it demands nothing.
+      for end in box.uses.endingLifetime where !(end.instruction is DeallocBoxInst) {
+        extraUses.append(.boxLifetimeEnd(end.instruction))
+      }
       // TODO: add copies of the box too
 
     case let arg as FunctionArgument where arg.type.isBox && arg.ownership == .guaranteed:

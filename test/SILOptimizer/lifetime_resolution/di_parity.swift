@@ -233,3 +233,28 @@ func entirelyUninitialized() {
   let m: (Int, Int) // expected-note {{constant defined here}}
   use(m) // expected-error {{constant 'm' used before being initialized}}
 }
+
+struct NC: ~Copyable {}
+func borrowNC(_ x: borrowing NC) {}
+func consumeNC(_ x: consuming NC) {}
+
+// A variable declared in a loop is new in each iteration, so a use before its initialization doesn't
+// make the previous iteration's consume a use after consume.
+func useBeforeInitInLoop(_ n: Int) {
+  for _ in 0..<n {
+    var x: NC // expected-note {{variable defined here}}
+    borrowNC(x) // expected-error {{variable 'x' used before being initialized}}
+    x = NC()
+    consumeNC(x)
+  }
+}
+
+func getInt() throws -> Int { 0 }
+func keep(_ f: @escaping () -> Int) {}
+
+// The box is deallocated without being initialized on the path where the call throws.
+func escapingInitializedByThrowingCall() throws {
+  var x = try getInt()
+  keep { x }
+  x = 1
+}
