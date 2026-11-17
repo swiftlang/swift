@@ -718,3 +718,26 @@ do {
 // An at-most-once function has the layout of an ordinary function.
 // CHECK-NEXT: layout: true
 print("layout: \(MemoryLayout<@callable(once) () -> Void>.size == MemoryLayout<() -> Void>.size && MemoryLayout<@callable(once) () -> Void>.alignment == MemoryLayout<() -> Void>.alignment)")
+
+// An at-most-once closure with a consumed noncopyable capture, which is
+// forwarded to a generic function through a heap-allocated re-abstraction
+// thunk.
+
+@inline(never)
+func runGeneric<R>(_ fn: @callable(once) () -> R) -> R { fn() }
+
+@inline(__always)
+func forwardToGeneric(_ fn: @callable(once) () -> Int) -> Int { runGeneric(fn) }
+
+@inline(never)
+func consumeResource(_ r: consuming Resource) -> Int { r.tag.count }
+
+@inline(never)
+func testForwardConsumedCapture(_ tag: String) -> Int {
+  let r = Resource(tag)
+  return forwardToGeneric { consumeResource(r) }
+}
+
+// CHECK-NEXT: Resource(forwarded) deinit
+// CHECK-NEXT: forwarded consumed capture: 9
+print("forwarded consumed capture: \(testForwardConsumedCapture("forwarded"))")

@@ -16,6 +16,8 @@
 // RUN: %target-run %t/opt.out callOrForwardDirect | %FileCheck %s --check-prefix=CALL-callOrForward
 // RUN: %target-run %t/onone.out callOrForwardForwarded | %FileCheck %s --check-prefix=CALL-callOrForward
 // RUN: %target-run %t/opt.out callOrForwardForwarded | %FileCheck %s --check-prefix=CALL-callOrForward
+// RUN: %target-run %t/onone.out forwardOrDropForwarded | %FileCheck %s --check-prefix=CALL-forwardOrDrop
+// RUN: %target-run %t/opt.out forwardOrDropForwarded | %FileCheck %s --check-prefix=CALL-forwardOrDrop
 // RUN: %target-run %t/onone.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/opt.out callEscaping | %FileCheck %s --check-prefix=CALL-callEscaping
 // RUN: %target-run %t/onone.out callGlobal | %FileCheck %s --check-prefix=CALL-callGlobal
@@ -59,6 +61,8 @@
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out drop 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropWithResource 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropWithResource 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out forwardOrDropDropped 2>&1 | %FileCheck %s --check-prefix=DROP
+// RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out forwardOrDropDropped 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropEscaping 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/opt.out dropEscaping 2>&1 | %FileCheck %s --check-prefix=DROP
 // RUN: not --crash env %env-SWIFT_BACKTRACE=enable=no %target-run %t/onone.out dropCaptureless 2>&1 | %FileCheck %s --check-prefix=DROP
@@ -136,6 +140,21 @@ func callEscaping(_ f: @escaping @once () -> Void) {
 @inline(never)
 func drop(_ f: consuming @once () -> Void) {
   withoutActuallyDeiniting(f) { _ in }
+}
+
+@inline(never)
+func callAtMostOnce(_ f: @callable(once) () -> Void) {
+  f()
+  print("called")
+}
+
+// One path forwards the closure and the other drops it, so the drop must not
+// be deleted after the forwarded call is specialized.
+@inline(__always)
+func forwardOrDrop(_ doForward: Bool, _ f: consuming @once () -> Void) {
+  withoutActuallyDeiniting(f) { g in
+    if doForward { callAtMostOnce(g) }
+  }
 }
 
 @inline(never)
@@ -362,6 +381,8 @@ func run(_ which: String, _ box: Box, _ resource: consuming Resource) {
     drop { _ = consume resource }
   case "dropEscaping":
     dropEscaping { box.count += 1 }
+  case "forwardOrDropForwarded", "forwardOrDropDropped":
+    forwardOrDrop(which == "forwardOrDropForwarded") { box.count += 1 }
   case "callCaptureless":
     call { print("body") }
   case "callBorrowed":
@@ -440,6 +461,9 @@ default:
 
 // CALL-callOrForward: Resource r deinit
 // CALL-callOrForward-NEXT: called
+
+// CALL-forwardOrDrop: called
+// CALL-forwardOrDrop-NEXT: Resource r deinit
 
 // CALL-callEscaping: called
 // CALL-callEscaping-NEXT: Resource r deinit
