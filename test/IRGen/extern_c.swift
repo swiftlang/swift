@@ -40,3 +40,25 @@ test()
 
 // CHECK: declare void @default_arg_value(i32)
 @_extern(c) func default_arg_value(_: Int32 = 42)
+
+typealias Callback = @Sendable @convention(c) (Int32) -> Void
+
+// Static members, as in swift-corelibs-xctest.
+enum StaticExternC {
+  @_extern(c, "static_extern_c_int")
+  static func int(_ x: Int32) -> CBool
+
+  @_extern(c, "static_extern_c_callback")
+  static func callback(_ fn: Callback) -> CBool
+}
+
+// CHECK-LABEL: define {{.*}}10testStatic
+func testStatic(_ fn: Callback) {
+  // CHECK: call {{.*}}@static_extern_c_int(i32 1
+  _ = StaticExternC.int(1)
+  // CHECK: call {{.*}}@static_extern_c_callback(ptr
+  _ = StaticExternC.callback(fn)
+}
+
+// CHECK: declare {{.*}}@static_extern_c_int(i32
+// CHECK: declare {{.*}}@static_extern_c_callback(ptr
