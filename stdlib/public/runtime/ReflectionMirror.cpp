@@ -692,8 +692,30 @@ struct EnumImpl : ReflectionMirrorImpl {
 };
 
 
+
+/// The number of stored properties synthesized for every distributed actor
+/// (`id`, `actorSystem`, `unownedExecutor`) which are backed by the allocation
+/// of a remote proxy. User-defined stored properties follow and are not
+/// allocated for remote proxies.
+static constexpr intptr_t DistributedActorSynthesizedFieldCount = 3;
+
 // Implementation for classes.
 struct ClassImpl : ReflectionMirrorImpl {
+  /// A remote distributed actor proxy is allocated with room for only the
+  /// synthesized fields, so the user-defined fields must not be enumerated or
+  /// read.
+  bool isRemoteDistributedActorProxy() {
+    if (!value || !_swift_distributedActorIsRemoteHook)
+      return false;
+
+    auto *Clazz = static_cast<const ClassMetadata *>(type);
+    if (!Clazz->getDescription()->isActor())
+      return false;
+
+    auto *object = *reinterpret_cast<HeapObject * const *>(value);
+    return object && _swift_distributedActorIsRemoteHook(object);
+  }
+
   bool isReflectable() {
     const auto *Class = static_cast<const ClassMetadata *>(type);
     const auto &Description = Class->getDescription();
@@ -734,7 +756,11 @@ struct ClassImpl : ReflectionMirrorImpl {
 
     auto *Clazz = static_cast<const ClassMetadata*>(type);
     auto description = Clazz->getDescription();
-    auto count = description->NumFields;
+    intptr_t count = description->NumFields;
+
+    if (count > DistributedActorSynthesizedFieldCount &&
+        isRemoteDistributedActorProxy())
+      count = DistributedActorSynthesizedFieldCount;
 
     return count;
   }
