@@ -193,7 +193,7 @@ namespace swift {
     readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch);
     /// Decode a location written by SILSerializer::encodeLoc.
     SILLocation::FilenameAndLocation *
-    decodeLoc(unsigned Row, unsigned Column,
+    decodeLoc(unsigned Line, unsigned Column,
               serialization::IdentifierID FNameID);
     /// Read the debug variable in \p ListOfValues, the values of a
     /// SIL_DEBUG_VALUE record after its operands.

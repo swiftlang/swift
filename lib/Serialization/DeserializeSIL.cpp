@@ -475,10 +475,10 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
 }
 
 SILLocation::FilenameAndLocation *
-SILDeserializer::decodeLoc(unsigned Row, unsigned Column,
+SILDeserializer::decodeLoc(unsigned Line, unsigned Column,
                            IdentifierID FNameID) {
   return SILLocation::FilenameAndLocation::alloc(
-      Row, Column, MF->getIdentifierText(FNameID), SILMod);
+      Line, Column, MF->getIdentifierText(FNameID), SILMod);
 }
 
 llvm::Expected<std::optional<SILLocation>>
@@ -497,11 +497,11 @@ SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
       return llvm::createStringError("Source location reference out of range\n");
     FNameLoc = ParsedLocs[LocID - 1];
   } else {
-    ValueID Row = 0, Col = 0, FNameID = 0;
-    SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind,
+    ValueID Line = 0, Col = 0, FNameID = 0;
+    SourceLocLayout::readRecord(scratch, Line, Col, FNameID, LocationKind,
                                 Implicit);
 
-    FNameLoc = decodeLoc(Row, Col, FNameID);
+    FNameLoc = decodeLoc(Line, Col, FNameID);
 
     ParsedLocs.push_back(FNameLoc);
   }
@@ -540,23 +540,23 @@ SILDeserializer::readDebugScopes(SILFunction *F,
   BCOffsetRAII restoreOffset(SILCursor);
   const SILDebugScope *Scope = nullptr;
   do {
-    ValueID ParentID = 0, InlinedID = 0, Row = 0, Column = 0, FName = 0;
+    ValueID ParentID = 0, InlinedID = 0, Line = 0, Column = 0, FName = 0;
     TypeID FuncType = 0;
     unsigned FuncCategory = 0;
     unsigned isFuncParent = false;
 
     SILDebugScopeLayout::readRecord(scratch, isFuncParent, ParentID, InlinedID,
-                                    Row, Column, FName, FuncType, FuncCategory);
+                                    Line, Column, FName, FuncType, FuncCategory);
     assert(ParentID);
 
     PointerUnion<const SILDebugScope *, SILFunction *> Parent = nullptr;
     const SILDebugScope *InlinedCallSite = nullptr;
 
     std::optional<SILLocation> Loc;
-    if (!Row && !Column && !FName)
+    if (!Line && !Column && !FName)
       Loc = SILLocation::invalid();
     else
-      Loc = RegularLocation(decodeLoc(Row, Column, FName));
+      Loc = RegularLocation(decodeLoc(Line, Column, FName));
 
     if (isFuncParent) {
       Parent = getFuncForReference(MF->getIdentifierText(ParentID), true);

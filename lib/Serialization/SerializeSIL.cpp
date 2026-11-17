@@ -364,7 +364,7 @@ namespace {
     void writeDebugScopes(const SILDebugScope *Scope, const SourceManager &SM);
     /// The line, column and filename of a serialized location.
     struct EncodedLoc {
-      unsigned Row, Column;
+      unsigned Line, Column;
       IdentifierID FNameID;
     };
     /// Encode \p Loc's position, or std::nullopt if it has none.
@@ -3560,7 +3560,7 @@ void SILSerializer::writeSourceLoc(SILLocation Loc, const SourceManager &SM) {
   SourceLocMap.insert({OpaquePtr, SourceLocMap.size() + 1});
   SourceLocLayout::emitRecord(Out, ScratchRecord,
                               SILAbbrCodes[SourceLocLayout::Code],
-                              Encoded->Row, Encoded->Column, Encoded->FNameID,
+                              Encoded->Line, Encoded->Column, Encoded->FNameID,
                               LocationKind, (unsigned)Loc.isImplicit());
 }
 
@@ -3647,7 +3647,7 @@ void SILSerializer::writeDebugVariable(const SILInstruction &SI,
     if (DebugVar->Loc) {
       if (auto Encoded = encodeLoc(*DebugVar->Loc, SM)) {
         attrs |= 1 << 7;
-        ListOfValues.push_back(Encoded->Row);
+        ListOfValues.push_back(Encoded->Line);
         ListOfValues.push_back(Encoded->Column);
         ListOfValues.push_back(Encoded->FNameID);
       }
@@ -3736,12 +3736,12 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
     InlinedID = DebugScopeMap[Inlined];
   }
 
-  ValueID Row = 0;
+  ValueID Line = 0;
   ValueID Column = 0;
   ValueID FNameID = 0;
   // TODO: we can emit SourceLocRef here
   if (auto Encoded = encodeLoc(Scope->getLoc(), SM)) {
-    Row = Encoded->Row;
+    Line = Encoded->Line;
     Column = Encoded->Column;
     FNameID = Encoded->FNameID;
   }
@@ -3750,7 +3750,7 @@ void SILSerializer::writeDebugScopes(const SILDebugScope *Scope,
 
   SILDebugScopeLayout::emitRecord(
       Out, ScratchRecord, SILAbbrCodes[SILDebugScopeLayout::Code], isFuncParent,
-      ParentID, InlinedID, Row, Column, FNameID, ParentType,
+      ParentID, InlinedID, Line, Column, FNameID, ParentType,
       (unsigned)ParentCat);
 }
 
