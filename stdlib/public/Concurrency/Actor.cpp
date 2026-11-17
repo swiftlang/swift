@@ -2933,7 +2933,7 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
     return swift_defaultActor_enqueue(job, serialExecutorRef.getDefaultActor());
   }
 
-#if SWIFT_CONCURRENCY_EMBEDDED && defined(__wasi__)
+#if SWIFT_CONCURRENCY_EMBEDDED_CUSTOM_SERIAL_EXECUTORS
   auto serialExecutorIdentity = serialExecutorRef.getIdentity();
   auto serialExecutorWtable = serialExecutorRef.getSerialExecutorWitnessTable();
   _swift_task_enqueueOnExecutor(job, serialExecutorIdentity, serialExecutorWtable);

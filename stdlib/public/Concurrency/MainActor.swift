@@ -12,7 +12,7 @@
 
 import Swift
 
-#if os(WASI) || os(Emscripten) || !$Embedded
+#if !$Embedded || !os(none)
 
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
@@ -211,4 +211,4 @@ public func _deinitOnExecutorMainActorBackDeploy(
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-#endif // os(WASI) || os(Emscripten) || !$Embedded
+#endif // !$Embedded || !os(none)
