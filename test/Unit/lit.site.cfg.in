@@ -4,6 +4,7 @@ config.llvm_src_root = "@LLVM_MAIN_SRC_DIR@"
 config.llvm_obj_root = "@LLVM_BINARY_DIR@"
 config.llvm_tools_dir = "@LLVM_TOOLS_DIR@"
 config.llvm_libs_dir = "@LLVM_LIBS_DIR@"
+config.shlibdir = "@SHLIBDIR@"
 config.build_mode = lit_config.params.get('build_mode', "@SWIFT_BUILD_MODE@")
 config.swift_obj_root = "@SWIFT_BINARY_DIR@"
 config.target_triple = "@LLVM_TARGET_TRIPLE@"

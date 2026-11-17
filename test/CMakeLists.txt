@@ -20,6 +20,13 @@ function(swift_configure_lit_site_cfg source_path destination_path installed_nam
 
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_TOOLS_DIR ${LLVM_TOOLS_BINARY_DIR})
   string(REPLACE ${CMAKE_CFG_INTDIR} ${SWIFT_BUILD_MODE} LLVM_LIBS_DIR  ${LLVM_LIBRARY_DIR})
+  # Where the LLVM shared libraries live: DLL platforms put them in bin, like
+  # LLVM_SHLIB_OUTPUT_INTDIR does.
+  if(WIN32 OR CYGWIN)
+    set(SHLIBDIR ${LLVM_TOOLS_DIR})
+  else()
+    set(SHLIBDIR ${LLVM_LIBS_DIR})
+  endif()
 
   set(LIT_SWIFTLIB_DIR ${SWIFTLIB_DIR})
 

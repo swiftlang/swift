@@ -1374,21 +1374,21 @@ bb0(%0 : $*Int, %1 : $*NoncopyableCapture, %2 : $Int, %3 : @guaranteed $Builtin.
   return %10 : $()
 }
 
-// The convert_function makes the closure noncopyable, so the conversions
-// after it still consume the closure, which the new apply would also consume.
+// The closure is noncopyable, so the conversions after it still consume the
+// closure, which the new apply would also consume.
 //
-// CHECK-LABEL: sil [ossa] @test_owned_callee_converted_to_noncopyable :
-// CHECK:         [[PA:%.*]] = partial_apply %{{[0-9]+}}(%1)
+// CHECK-LABEL: sil [ossa] @test_converted_noncopyable_owned_callee :
+// CHECK:         [[PA:%.*]] = partial_apply [called_at_most_once] %{{[0-9]+}}(%1)
 // CHECK:         [[CONVERTED:%.*]] = convert_function [[PA]]
 // CHECK:         [[NOESCAPE:%.*]] = convert_escape_to_noescape [[CONVERTED]]
 // CHECK:         destroy_value [dead_end] [[NOESCAPE]]
 // CHECK:         apply [[NOESCAPE]]
-// CHECK:       } // end sil function 'test_owned_callee_converted_to_noncopyable'
-sil [ossa] @test_owned_callee_converted_to_noncopyable : $@convention(thin) (@owned Builtin.NativeObject, Int, Builtin.Int1) -> @out Int {
+// CHECK:       } // end sil function 'test_converted_noncopyable_owned_callee'
+sil [ossa] @test_converted_noncopyable_owned_callee : $@convention(thin) (@owned Builtin.NativeObject, Int, Builtin.Int1) -> @out Int {
 bb0(%0 : $*Int, %1 : @owned $Builtin.NativeObject, %2 : $Int, %3 : $Builtin.Int1):
   %4 = function_ref @plainThunk : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @out Int
-  %5 = partial_apply %4(%1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @out Int
-  %6 = convert_function %5 : $@callee_owned (Int) -> @out Int to $@callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
+  %5 = partial_apply [called_at_most_once] %4(%1) : $@convention(thin) (Int, @owned Builtin.NativeObject) -> @out Int
+  %6 = convert_function %5 : $@callable(once) @callee_owned (Int) -> @out Int to $@callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
   %7 = convert_escape_to_noescape %6 : $@callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int> to $@noescape @callable(once) @callee_owned @substituted <τ_0_0> (Int) -> @out τ_0_0 for <Int>
   cond_br %3, bb1, bb2
 

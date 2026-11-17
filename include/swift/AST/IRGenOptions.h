@@ -140,6 +140,9 @@ struct PointerAuthOptions : clang::PointerAuthOptions {
   /// Swift heap metadata destructors.
   PointerAuthSchema HeapDestructors;
 
+  /// The metadata pointer in the header of an Embedded Swift heap object.
+  PointerAuthSchema EmbeddedHeapObjectMetadata;
+
   /// Non-constant function pointers captured in a partial-apply context.
   PointerAuthSchema PartialApplyCapture;
 

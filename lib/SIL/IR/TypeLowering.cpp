@@ -5582,12 +5582,14 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   if (fnTy2->hasErasedIsolation() && !fnTy1->hasErasedIsolation())
     return ABIDifference::NeedsThunk;
 
-  // A nondeinitable value needs a context of its own, so forming one from any
-  // other thick function value needs a thunk, even from a noncopyable value
-  // with the same ABI. A thin function has no context, so thin-to-thick can
-  // form the value directly.
-  if (fnTy2->isNondeinitable() && !fnTy1->isNondeinitable() &&
-      fnTy1->getExtInfo().hasContext())
+  // A noncopyable value needs a context of its own, which only it refers to,
+  // so forming one from a copyable thick function value needs a thunk. So
+  // does forming a nondeinitable value from any other thick function value,
+  // even from a noncopyable value with the same ABI. A thin function has no
+  // context, so thin-to-thick can form the value directly.
+  if (fnTy1->getExtInfo().hasContext() &&
+      ((fnTy2->isNoncopyable() && !fnTy1->isNoncopyable()) ||
+       (fnTy2->isNondeinitable() && !fnTy1->isNondeinitable())))
     return ABIDifference::NeedsThunk;
 
   if (fnTy1->getParameters().size() != fnTy2->getParameters().size())
