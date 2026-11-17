@@ -3696,17 +3696,25 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     }
 
     Build-CMakeProject @BuildCMakeArgs -BuildTargets @("swift-test-stdlib")
-    if ($Targets) {
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
+    foreach ($Target in $Targets) {
+      Record-OperationTime $Platform $Target {
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets @($Target)
+      }
     }
     if ($TestSwift) {
-      Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+      Record-OperationTime $Platform "check-swift" {
+        Build-CMakeProject @BuildCMakeArgs -BuildTargets @("check-swift")
+      }
     }
 
     if ($LLDBTargets) {
       Invoke-IsolatingEnvVars {
         $env:SDKROOT = $SwiftSDK
-        Build-CMakeProject @BuildCMakeArgs -BuildTargets $LLDBTargets
+        foreach ($Target in $LLDBTargets) {
+          Record-OperationTime $Platform $Target {
+            Build-CMakeProject @BuildCMakeArgs -BuildTargets @($Target)
+          }
+        }
       }
     }
   }
