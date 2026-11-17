@@ -1653,6 +1653,7 @@ getGeneratedSourceInfoMacroName(const GeneratedSourceInfo &info) {
   case GeneratedSourceInfo::SyntheticMacro:
     return DeclName();
   }
+  llvm_unreachable("covered switch");
 }
 
 std::vector<Diagnostic>

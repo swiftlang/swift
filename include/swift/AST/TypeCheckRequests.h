@@ -145,6 +145,7 @@ public:
     case Default:
       return Type();
     }
+    llvm_unreachable("covered switch");
   }
   Type getInheritedType() { return payload.get<Inherited_>().ty; }
   std::pair<Type, InverseTypeRepr *> getSuppressed() {

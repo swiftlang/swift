@@ -1271,6 +1271,7 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::SyntheticMacro:
     return std::nullopt;
   }
+  llvm_unreachable("covered switch");
 }
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {

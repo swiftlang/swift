@@ -164,6 +164,7 @@ public:
     case ResultKind::Dynamic:
       return std::nullopt;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Returns true if the query is guaranteed to evaluate to true at runtime

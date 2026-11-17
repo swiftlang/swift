@@ -1247,6 +1247,7 @@ protected:
       return std::nullopt;
     }
   }
+  llvm_unreachable("covered switch");
   }
 
   // @lifetime(copy x) is only valid if 'x' has a ~Escapable type.
@@ -1320,6 +1321,7 @@ protected:
       return &implicitSelfParamInfo.value();
     }
     }
+    llvm_unreachable("covered switch");
   }
 
   // Initialize 'depBuilder' based on the function's @_lifetime attributes.

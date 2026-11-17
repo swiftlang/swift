@@ -425,6 +425,7 @@ swift::ASTNode BridgedASTNode::unbridged() const {
   case BridgedASTNodeKindDecl:
     return castToDecl().unbridged();
   }
+  llvm_unreachable("covered switch");
 }
 
 //===----------------------------------------------------------------------===//
@@ -499,6 +500,7 @@ swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
     CASE(ImplicitlyCopyableConsuming)
 #undef CASE
   }
+  llvm_unreachable("covered switch");
 }
 
 BridgedParamDecl BridgedParamDecl_cloneWithoutType(BridgedParamDecl cDecl) {
@@ -1089,6 +1091,7 @@ unbridge(BridgedMacroIntroducedDeclNameKind kind) {
     CASE(Arbitrary)
 #undef CASE
   }
+  llvm_unreachable("covered switch");
 }
 
 bool BridgedMacroRole_isAttached(BridgedMacroRole role) {

@@ -101,6 +101,7 @@ RequirementRepr BridgedRequirementRepr::unbridged() const {
         {LayoutConstraint.unbridged(), LayoutConstraintLoc},
         IsExpansionPattern);
   }
+  llvm_unreachable("covered switch");
 }
 
 BridgedRequirementRepr BridgedRequirementRepr_createTypeConstraint(

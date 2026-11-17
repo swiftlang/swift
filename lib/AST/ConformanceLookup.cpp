@@ -315,6 +315,7 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
   case FunctionTypeRepresentation::Thin:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Whether the given function type conforms to Copyable.
@@ -378,6 +379,7 @@ static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
   case SILFunctionTypeRepresentation::KeyPathAccessorHash:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Synthesize a builtin function type conformance to the given protocol, if
