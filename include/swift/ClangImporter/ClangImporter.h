@@ -50,6 +50,7 @@ namespace clang {
   class DiagnosticConsumer;
   class EnumConstantDecl;
   class EnumDecl;
+  class GlobalDecl;
   class MacroInfo;
   class Module;
   class ModuleMacro;
@@ -677,6 +678,12 @@ public:
 
   /// Writes the mangled name of \p clangDecl to \p os.
   void getMangledName(raw_ostream &os, const clang::NamedDecl *clangDecl) const;
+
+  void getMangledBaseObjectConstructorName(
+      raw_ostream &os, const clang::CXXConstructorDecl *ctor) const;
+
+  clang::GlobalDecl
+  getBaseObjectConstructor(const clang::CXXConstructorDecl *ctor) const;
 
   // Print statistics from the Clang AST reader.
   void printStatistics() const override;
