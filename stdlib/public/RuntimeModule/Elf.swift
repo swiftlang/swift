@@ -1974,6 +1974,7 @@ func getElfImageInfo<R: MemoryReader, Traits: ElfTraits>(
 
 // .. SymbolSource .............................................................
 
+@available(BacktracingDT 6.2, *)
 extension ElfImage: SymbolSource {
   func lookupSymbol(address: SymbolSource.Address) -> SymbolSource.Symbol? {
     let relativeAddress = Traits.Address(address - baseAddress)
@@ -2031,6 +2032,7 @@ extension ElfImage: SymbolSource {
 // .. SymbolLocator.Image ......................................................
 
 @_spi(SymbolLocation)
+@available(BacktracingDT 6.2, *)
 extension ElfImage: SymbolLocator.Image {
 
   public var name: String? {
