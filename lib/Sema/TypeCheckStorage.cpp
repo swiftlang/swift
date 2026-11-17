@@ -221,7 +221,8 @@ static void enumerateStoredPropertiesAndMissing(
     member->visitAuxiliaryDecls(visitMember);
 
     if (auto missing = dyn_cast<MissingMemberDecl>(member))
-      if (missing->getNumberOfFieldOffsetVectorEntries() > 0)
+      if (missing->getStorageLayout() ||
+          missing->getNumberOfFieldOffsetVectorEntries() > 0)
         addMissing(missing);
   };
 

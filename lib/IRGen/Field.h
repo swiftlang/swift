@@ -83,6 +83,11 @@ public:
   /// imported declarations.
   bool isConcrete() const { return getKind() != MissingMember; }
 
+  /// Whether the field's storage layout is known.
+  bool hasKnownLayout() const {
+    return isConcrete() || getMissingMemberDecl()->getStorageLayout();
+  }
+
   /// Return the type of this concrete field.
   SILType getType(IRGenModule &IGM, SILType baseType) const;
 

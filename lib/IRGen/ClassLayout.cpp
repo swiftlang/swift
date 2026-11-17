@@ -105,7 +105,7 @@ void ClassLayout::collectAllStoredPropertyTypes(
   auto &classLayout = classTI.getClassLayout(IGM, classType,
                                              /*forBackwardDeployment=*/false);
   for (Field field : classLayout.AllStoredProperties) {
-    assert(field.isConcrete() && "Missing member on fixed size class");
+    assert(field.hasKnownLayout() && "Missing member on fixed size class");
     fieldTypes.push_back(field.getType(IGM, classType).getObjectType());
   }
 }
