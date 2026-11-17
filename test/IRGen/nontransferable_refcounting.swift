@@ -90,6 +90,53 @@ public func copyTransferableSubclass(
   _ c: TransferableSubclass
 ) -> TransferableSubclass { c }
 
+// The context of a @nontransferable function is never shared with a
+// 'Transferable' function, so it is confined too.
+// CHECK-LABEL: define {{.*}} @"$s1m19copyNontransferableyyyYdcyyYdcF"(
+// CHECK:   call ptr @swift_nonatomic_retain(
+// CHECK: }
+public func copyNontransferable(
+  _ f: @escaping @nontransferable () -> Void
+) -> @nontransferable () -> Void { f }
+
+// CHECK-LABEL: define {{.*}} @"$s1m19dropNontransferableyyyyYdcnF"(
+// CHECK:   call void @swift_nonatomic_release(
+// CHECK: }
+public func dropNontransferable(_ f: consuming @escaping @nontransferable () -> Void) {}
+
+// CHECK-LABEL: define {{.*}} @"$s1m24copyTransferableFunctionyyycyycF"(
+// CHECK:   call ptr @swift_retain(
+// CHECK-NOT: swift_nonatomic_
+// CHECK: }
+public func copyTransferableFunction(_ f: @escaping () -> Void) -> () -> Void { f }
+
+// The thunk forms a context of its own that holds the 'Transferable'
+// function, whose context is still shared.
+// CHECK-LABEL: define {{.*}} @"$s1m24convertToNontransferableyyyYdcyycF"(
+// CHECK:   call ptr @swift_retain(
+// CHECK:   call noalias ptr @swift_allocObject(
+// CHECK: }
+public func convertToNontransferable(
+  _ f: @escaping () -> Void
+) -> @nontransferable () -> Void { f }
+
+// The context of a @nontransferable closure is retained and released
+// non-atomically, so a single captured instance can only be its context if it
+// is confined as well.
+// CHECK-LABEL: define {{.*}} @"$s1m22captureTransferableRefyyyYdcAA1CCF"(
+// CHECK:   call noalias ptr @swift_allocObject(
+// CHECK: }
+public func captureTransferableRef(_ c: C) -> @nontransferable () -> Void {
+  { _ = c }
+}
+
+// CHECK-LABEL: define {{.*}} @"$s1m12captureNTRefyyyYdcAA3NTCCF"(
+// CHECK-NOT: swift_allocObject
+// CHECK: }
+public func captureNTRef(_ c: NTC) -> @nontransferable () -> Void {
+  { _ = c }
+}
+
 // Generic code copies values through the value witnesses of their types.
 public func copyGeneric<T: ~Transferable>(_ x: borrowing T) -> T { copy x }
 public func callGeneric(_ c: NTC) -> NTC { copyGeneric(c) }

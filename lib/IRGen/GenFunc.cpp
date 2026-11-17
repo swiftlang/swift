@@ -376,19 +376,32 @@ namespace {
     bool isSecondElementTrivial() const {
       return isTriviallyDestroyable(ResilienceExpansion::Maximal);
     }
+
+    /// The atomicity of reference counting operations on the context of a
+    /// function of this type, given the atomicity that the operation would
+    /// use by default.
+    ///
+    /// The context of a @nontransferable function is never shared with a
+    /// 'Transferable' function, so it's confined to a single isolation domain.
+    Atomicity getAtomicity(Atomicity defaultAtomicity) const {
+      return FormalType->isNonTransferable() ? Atomicity::NonAtomic
+                                             : defaultAtomicity;
+    }
+
     void emitRetainSecondElement(
         IRGenFunction &IGF, llvm::Value *data,
-        std::optional<Atomicity> atomicity = std::nullopt) const {
+        std::optional<Atomicity> defaultAtomicity = std::nullopt) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         assert(!isClosureContextDestroyedDirectly(IGF.IGM, FormalType) &&
                "retaining a context that is destroyed without a release");
-        if (!atomicity) atomicity = IGF.getDefaultAtomicity();
-        IGF.emitNativeStrongRetain(data, *atomicity);
+        IGF.emitNativeStrongRetain(
+            data, getAtomicity(defaultAtomicity.value_or(
+                      IGF.getDefaultAtomicity())));
       }
     }
     void emitReleaseSecondElement(
         IRGenFunction &IGF, llvm::Value *data,
-        std::optional<Atomicity> atomicity = std::nullopt) const {
+        std::optional<Atomicity> defaultAtomicity = std::nullopt) const {
       if (!isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         // In Embedded Swift, a noncopyable closure owns its context, so drop
         // it without the runtime, which isn't available with -no-allocations.
@@ -396,21 +409,21 @@ namespace {
           emitDestroyEmbeddedNoncopyableClosureContext(IGF, data);
           return;
         }
-        if (!atomicity) atomicity = IGF.getDefaultAtomicity();
-        IGF.emitNativeStrongRelease(data, *atomicity);
+        IGF.emitNativeStrongRelease(
+            data, getAtomicity(defaultAtomicity.value_or(
+                      IGF.getDefaultAtomicity())));
       }
     }
     void emitAssignSecondElement(IRGenFunction &IGF, llvm::Value *context,
                                  Address dataAddr) const {
       if (isTriviallyDestroyable(ResilienceExpansion::Maximal)) {
         IGF.Builder.CreateStore(context, dataAddr);
-      } else if (isClosureContextDestroyedDirectly(IGF.IGM, FormalType)) {
-        llvm::Value *oldContext = IGF.Builder.CreateLoad(dataAddr);
-        IGF.Builder.CreateStore(context, dataAddr);
-        emitDestroyEmbeddedNoncopyableClosureContext(IGF, oldContext);
-      } else {
-        IGF.emitNativeStrongAssign(context, dataAddr);
+        return;
       }
+
+      llvm::Value *oldContext = IGF.Builder.CreateLoad(dataAddr);
+      IGF.Builder.CreateStore(context, dataAddr);
+      emitReleaseSecondElement(IGF, oldContext);
     }
 
     Address projectFunction(IRGenFunction &IGF, Address address) const {
@@ -2771,6 +2784,15 @@ std::optional<StackAddress> irgen::emitFunctionPartialApplication(
   // destructor of its context directly.
   if (outType->isNondeinitable() ||
       isClosureContextDestroyedDirectly(IGF.IGM, outType))
+    hasSingleSwiftRefcountedContext = No;
+
+  // The context of an escaping @nontransferable closure is retained and
+  // released non-atomically, so it can only be a captured value that might be
+  // shared if that value is confined as well.
+  if (outType->isNonTransferable() && !outType->isNoEscape() &&
+      !llvm::all_of(argTypeInfos, [](const TypeInfo *ti) {
+        return ti->usesNonAtomicReferenceCounting();
+      }))
     hasSingleSwiftRefcountedContext = No;
 
   auto outAuthInfo = PointerAuthInfo::forFunctionPointer(IGF.IGM, outType);
