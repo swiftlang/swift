@@ -13,7 +13,13 @@ function(includeSwiftSyntax)
   set(CMAKE_C_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
   set(CMAKE_CXX_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
   set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
-  set(BUILD_SHARED_LIBS ON)
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    set(BUILD_SHARED_LIBS OFF)
+  else()
+    # Statically link swift-syntax for faster compiler startup
+    set(BUILD_SHARED_LIBS ON)
+  endif()
+  set(SWIFT_COMPILER_SWIFT_SYNTAX_SHARED ${BUILD_SHARED_LIBS} PARENT_SCOPE)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}/compiler")
   set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}/compiler")
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
@@ -71,8 +77,10 @@ if(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS" AND
   endforeach()
 endif()
 
-swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}
-  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
-  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
-  RUNTIME DESTINATION "bin" COMPONENT compiler-swift-syntax-lib)
+if(SWIFT_COMPILER_SWIFT_SYNTAX_SHARED)
+  swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}
+    ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
+    LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
+    RUNTIME DESTINATION "bin" COMPONENT compiler-swift-syntax-lib)
+endif()
 add_dependencies(compiler-swift-syntax-lib ${compiler_swiftsyntax_libs})
