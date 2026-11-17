@@ -80,6 +80,7 @@ inline bool allowArcOptimizations(StringRef name) {
   case RT_EndBorrow:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Take a look at the specified instruction and classify it into what kind of

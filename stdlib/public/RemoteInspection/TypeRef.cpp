@@ -1495,6 +1495,7 @@ public:
       // Not implemented.
       return nullptr;
     }
+    llvm_unreachable("covered switch");
   }
 
   Demangle::NodePointer

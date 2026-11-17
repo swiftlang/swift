@@ -1533,6 +1533,7 @@ bool LinkEntity::isText() const {
   case Kind::KnownCoroFunctionPointer:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool LinkEntity::isDistributedThunk() const {

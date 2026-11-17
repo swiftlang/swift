@@ -635,6 +635,7 @@ struct AllocationKind {
     case Frame:
       return "_swift_coro_alloc_frame";
     }
+    llvm_unreachable("covered switch");
   }
 
   StringRef getDeallocationFunctionName() {
@@ -644,6 +645,7 @@ struct AllocationKind {
     case Frame:
       return "_swift_coro_dealloc_frame";
     }
+    llvm_unreachable("covered switch");
   }
 };
 
@@ -674,6 +676,7 @@ struct Allocator {
       case Field::AllocateFrame:
         return true;
       }
+      llvm_unreachable("covered switch");
     }
 
     llvm::Type *getType(IRGenModule &IGM) {
@@ -686,6 +689,7 @@ struct Allocator {
       case Field::DeallocateFrame:
         return IGM.PtrTy;
       }
+      llvm_unreachable("covered switch");
     }
 
     Alignment getAlignment(IRGenModule &IGM) {
@@ -698,6 +702,7 @@ struct Allocator {
       case Field::DeallocateFrame:
         return IGM.getPointerAlignment();
       }
+      llvm_unreachable("covered switch");
     }
 
     StringRef getName() {
@@ -713,6 +718,7 @@ struct Allocator {
       case Field::DeallocateFrame:
         return "deallocate_frame_fn";
       }
+      llvm_unreachable("covered switch");
     }
 
     bool isFunctionPointer() {
@@ -725,6 +731,7 @@ struct Allocator {
       case Field::DeallocateFrame:
         return true;
       }
+      llvm_unreachable("covered switch");
     }
 
     llvm::FunctionType *getFunctionType(IRGenModule &IGM) {
@@ -738,6 +745,7 @@ struct Allocator {
       case Field::DeallocateFrame:
         return IGM.CoroDeallocateFnTy;
       }
+      llvm_unreachable("covered switch");
     }
 
     llvm::AttributeList getFunctionAttributeList(IRGenModule &IGM) {
@@ -752,6 +760,7 @@ struct Allocator {
         IGM.addSwiftCoroAttributes(attrs, 1);
         return attrs;
       }
+      llvm_unreachable("covered switch");
     }
 
     const PointerAuthSchema &getSchema(IRGenModule &IGM) {
@@ -767,6 +776,7 @@ struct Allocator {
       case Field::DeallocateFrame:
         return IGM.getOptions().PointerAuth.CoroFrameDeallocationFunction;
       }
+      llvm_unreachable("covered switch");
     }
 
     const PointerAuthEntity getEntity(IRGenModule &IGM) {
@@ -782,6 +792,7 @@ struct Allocator {
       case Field::DeallocateFrame:
         return PointerAuthEntity::Special::CoroFrameDeallocationFunction;
       }
+      llvm_unreachable("covered switch");
     }
   };
 
@@ -839,6 +850,7 @@ struct Allocator {
     case AllocationKind::Frame:
       return getAllocateFrame();
     }
+    llvm_unreachable("covered switch");
   }
 
   FunctionPointer getDeallocate(AllocationKind kind) {
@@ -848,6 +860,7 @@ struct Allocator {
     case AllocationKind::Frame:
       return getDeallocateFrame();
     }
+    llvm_unreachable("covered switch");
   }
 
   void emitOnNullAllocator(StringRef nullBlockName, StringRef nonnullBlockName,
@@ -1093,6 +1106,7 @@ static llvm::Constant *getAddrOfGlobalCoroAllocator(
               case Allocator::Field::DeallocateFrame:
                 return deallocFrameFn;
               }
+              llvm_unreachable("covered switch");
             });
       },
       [&](llvm::GlobalVariable *var) { var->setConstant(true); });

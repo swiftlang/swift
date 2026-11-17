@@ -100,6 +100,7 @@ struct FieldDescriptorBase {
     case FieldDescriptorKind::COMProtocol:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   bool isClass() const {
