@@ -148,6 +148,7 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
     case AccessLevel::Open:
       return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
   }
+  llvm_unreachable("covered switch");
 }
 
 bool SILModule::isTypeMetadataAccessible(CanType type) {

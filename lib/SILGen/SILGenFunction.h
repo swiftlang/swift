@@ -198,6 +198,7 @@ static inline bool isBorrowAccess(SGFAccessKind kind) {
   case SGFAccessKind::OwnedObjectConsume:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 static inline bool isReadAccess(SGFAccessKind kind) {
@@ -218,6 +219,7 @@ static inline bool isConsumeAccess(SGFAccessKind kind) {
   case SGFAccessKind::OwnedObjectConsume:
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Given a read access kind, does it require an owned result?

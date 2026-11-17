@@ -296,6 +296,7 @@ private:
       handleBarrier();
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   void handleBarrier() {

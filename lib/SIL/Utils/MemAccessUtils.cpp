@@ -609,6 +609,7 @@ getReferenceFromBase(SILValue base, AccessRepresentation::Kind kind) {
   case AccessBase::Class:
     return cast<RefElementAddrInst>(base)->getOperand();
   }
+  llvm_unreachable("covered switch");
 }
 
 SILValue AccessBase::getReference() const {
@@ -703,7 +704,8 @@ bool AccessBase::hasLocalOwnershipLifetime() const {
     return getReference()->getOwnershipKind() != OwnershipKind::None;
   case AccessBase::Nested:
     llvm_unreachable("unexpected storage");
-  };
+  }
+  llvm_unreachable("covered switch");
 }
 
 void AccessBase::print(raw_ostream &os) const {

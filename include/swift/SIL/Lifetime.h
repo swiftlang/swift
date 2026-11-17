@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/LifetimeAnnotation.h"
+#include "llvm/Support/ErrorHandling.h"
 
 #ifndef SWIFT_SIL_LIFETIME_H
 #define SWIFT_SIL_LIFETIME_H
@@ -63,6 +64,7 @@ struct Lifetime {
     case LifetimeAnnotation::Lexical:
       return Lifetime::Lexical;
     }
+    llvm_unreachable("covered switch");
   }
 };
 

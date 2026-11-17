@@ -2374,6 +2374,7 @@ RValue RValueEmitter::visitFunctionConversionExpr(FunctionConversionExpr *e,
     return RValue(SGF, e, result);
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 RValue RValueEmitter::visitCovariantFunctionConversionExpr(

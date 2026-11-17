@@ -10009,6 +10009,7 @@ public:
     case CheckKind::InitableButNotConsumable:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   IsStrict_t isStrict() const {

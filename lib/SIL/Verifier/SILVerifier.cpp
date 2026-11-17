@@ -7192,6 +7192,7 @@ public:
                          case ParameterConvention::Pack_Inout:
                            return true;
                          }
+                         llvm_unreachable("covered switch");
                        }),
             "entry point address argument must have an indirect calling "
             "convention");

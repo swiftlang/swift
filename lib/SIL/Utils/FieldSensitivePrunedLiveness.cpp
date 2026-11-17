@@ -1233,6 +1233,7 @@ static StringRef getStringRef(FieldSensitivePrunedLiveBlocks::IsLive isLive) {
   case FieldSensitivePrunedLiveBlocks::LiveOut:
     return "LiveOut";
   }
+  llvm_unreachable("covered switch");
 }
 
 template <typename LivenessWithDefs>

@@ -422,6 +422,7 @@ bool AbstractionPattern::conformsToKnownProtocol(
   case Kind::Invalid:
     llvm_unreachable("asking invalid abstraction pattern");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AbstractionPattern::isNoncopyable(CanType substTy) const {
@@ -2331,6 +2332,7 @@ AbstractionPattern::getResultConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractionPattern::CallingConventionKind
@@ -2373,6 +2375,7 @@ AbstractionPattern::getParameterConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 AbstractionPattern::CallingConventionKind
@@ -2408,6 +2411,7 @@ AbstractionPattern::getErrorConvention(TypeConverter &TC) const {
   case Kind::ObjCCompletionHandlerArgumentsType:
     llvm_unreachable("should not get here");
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AbstractionPattern::arePackElementsPassedIndirectly(TypeConverter &TC) const {
@@ -2486,6 +2490,7 @@ AbstractionPattern::operator==(const AbstractionPattern &other) const {
       && CXXMethod == other.CXXMethod
       && OtherData == other.OtherData;
   }
+  llvm_unreachable("covered switch");
 }
 
 namespace {

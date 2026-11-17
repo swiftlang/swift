@@ -676,6 +676,7 @@ static PartialApplyInst *getUnderlyingPartialApply(SILValue closure) {
     case ClosureUseKind::Unsupported:
       return SILValue();
     }
+    llvm_unreachable("covered switch");
   };
 
   while (SILValue unwrapped = tryLookthroughClosureUse(closure))
@@ -3708,6 +3709,7 @@ public:
     return visit##ID(cast<ID>(inst));
 #include "swift/SIL/SILNodes.def"
       }
+      llvm_unreachable("covered switch");
     };
 
     auto kind = computeOpKind();
