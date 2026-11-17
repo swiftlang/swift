@@ -1,4 +1,4 @@
-// rdar://192175631 (https://github.com/swiftlang/swift/issues/57616)
+// rdar://79092863 (https://github.com/swiftlang/swift/issues/57077)
 // RUN: %target-typecheck-verify-swift
 
 protocol P {}
@@ -24,6 +24,15 @@ enum E {
       S1()
     case .b:
       S2()
+    }
+  }
+
+  @Builder
+  var sameType: some P { // expected-error {{failed to produce diagnostic for expression; please submit a bug report}}
+    if true {
+      S1()
+    } else {
+      S1()
     }
   }
 }
