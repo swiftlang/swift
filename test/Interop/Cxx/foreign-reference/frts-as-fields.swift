@@ -19,9 +19,8 @@ func go() {
 
 go()
 
+// The memberwise initializer takes `frt` at +1, so the last call moves it.
 // CHECK:      RefCount: 1, message: Ctor
-// CHECK-NEXT: RefCount: 2, message: retain
-// CHECK-NEXT: RefCount: 1, message: release
 // CHECK-NEXT: RefCount: 2, message: retain
 // CHECK-NEXT: RefCount: 1, message: release
 // CHECK-NEXT: RefCount: 2, message: retain

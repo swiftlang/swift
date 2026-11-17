@@ -1099,10 +1099,13 @@ RValue RValueEmitter::visitSuperRefExpr(SuperRefExpr *E, SGFContext C) {
          "RValueEmitter shouldn't be called on lvalues");
 
   // If we have a normal self call, then use the emitRValueForDecl call. This
-  // will emit self at +0 since it is guaranteed.
+  // emits self at +0 if the context allows it, since it is guaranteed.
   ManagedValue Self =
       SGF.emitRValueForDecl(E, E->getSelf(), E->getSelf()->getTypeInContext(),
-                            AccessSemantics::Ordinary)
+                            AccessSemantics::Ordinary,
+                            C.isGuaranteedPlusZeroOk()
+                                ? SGFContext::AllowGuaranteedPlusZero
+                                : SGFContext())
           .getScalarValue();
 
   // Perform an upcast to convert self to the indicated super type.

@@ -1019,6 +1019,11 @@ public:
     return it->second;
   }
 
+  /// Maps a shared foreign reference type's Clang record to the retain
+  /// operation its annotation names, which C++ code can call directly.
+  llvm::DenseMap<const clang::RecordDecl *, const clang::FunctionDecl *>
+      FRTAnnotatedRetainFunctions;
+
   /// Cache for getLibkernSubclass(), which classifies a CXXRecordDecl against
   /// libkern's OSObject hierarchy.
   llvm::DenseMap<const clang::CXXRecordDecl *, LibkernSubclass>
