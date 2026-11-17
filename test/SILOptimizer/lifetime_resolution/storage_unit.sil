@@ -2557,3 +2557,36 @@ bb3:
   %r = tuple ()
   return %r
 }
+
+// A box deallocated where it was never initialized demands nothing there.
+// CHECK-LABEL: sil [ossa] @box_dealloc_on_uninit_path :
+// CHECK-NOT:     assign undef
+// CHECK:         store {{%.*}} to [init]
+// CHECK:         destroy_value
+// CHECK:         dealloc_box
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @box_dealloc_on_uninit_path : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var K }, var, name "a"
+  %1 = begin_borrow [lexical] [var_decl] %0 : ${ var K }
+  %root = project_box %1 : ${ var K }, 0
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %k = apply %getFn() : $@convention(thin) () -> @owned K
+  store %k to [init] %root : $*K
+  end_borrow %1
+  destroy_value %0
+  br bb3
+
+bb2:
+  end_borrow %1
+  dealloc_box %0
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t
+}

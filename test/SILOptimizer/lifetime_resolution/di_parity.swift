@@ -248,3 +248,13 @@ func useBeforeInitInLoop(_ n: Int) {
     consumeNC(x)
   }
 }
+
+func getInt() throws -> Int { 0 }
+func keep(_ f: @escaping () -> Int) {}
+
+// The box is deallocated without being initialized on the path where the call throws.
+func escapingInitializedByThrowingCall() throws {
+  var x = try getInt()
+  keep { x }
+  x = 1
+}

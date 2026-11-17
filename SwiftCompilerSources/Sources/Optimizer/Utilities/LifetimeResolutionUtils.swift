@@ -203,7 +203,8 @@ struct ResolvableRoot {
   enum ExtraLivenessUse {
     /// The function exits, at which point an `inout` parameter or the contents of a borrowed box must be initialized.
     case functionExit(TermInst)
-    /// The lifetime of the `alloc_box` ends.
+    /// The destroys of an initialized `alloc_box` that are treated as artificial liveness uses to ensure we don't
+    /// take a contents out of the box without reinitializing it.
     case boxLifetimeEnd(Instruction)
 
     var instruction: Instruction {
@@ -333,7 +334,10 @@ struct ResolvableRoot {
 
       // Treat any lifetime ends or copies of the box itself as extra uses.
       let box: Value = markUninitialized ?? storage
-      box.uses.endingLifetime.forEach { extraUses.append(.boxLifetimeEnd($0.instruction)) }
+      // A `dealloc_box` frees a box whose contents are uninitialized, so it demands nothing.
+      for end in box.uses.endingLifetime where !(end.instruction is DeallocBoxInst) {
+        extraUses.append(.boxLifetimeEnd(end.instruction))
+      }
       // TODO: add copies of the box too
 
     case let arg as FunctionArgument where arg.type.isBox && arg.ownership == .guaranteed:
