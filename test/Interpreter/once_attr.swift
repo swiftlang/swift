@@ -1,5 +1,5 @@
 // RUN: %target-run-simple-swift(-enable-experimental-feature OnceFunctions) | %FileCheck %s
-// RUN: %target-run-simple-swift(-enable-experimental-feature OnceFunctions -O) | %FileCheck %s
+// RUN: %target-run-simple-swift(-enable-experimental-feature OnceFunctions -O -Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_OnceFunctions
@@ -52,6 +52,29 @@ testInlinedThrowing(true, "a")
 // CHECK-NEXT: inlined throwing: caught
 testInlinedThrowing(false, "bc")
 // CHECK-NEXT: inlined throwing: 2
+
+// A function reference passed for an exactly-once parameter that's captured by
+// another exactly-once closure.
+
+@inline(__always)
+func callInlined<R>(_ x: Int, _ body: @once (Int) -> R) -> R {
+  body(x)
+}
+
+@inline(never)
+func forwardToInlined<R>(_ x: Int, _ body: @once (Int) -> R) -> R {
+  callInlined(x) { body($0) }
+}
+
+func increment(_ x: Int) -> Int { x + 1 }
+
+@inline(never)
+func testCapturedFunctionReference(_ x: Int) -> Int {
+  forwardToInlined(x, increment)
+}
+
+print("captured function reference: \(testCapturedFunctionReference(41))")
+// CHECK-NEXT: captured function reference: 42
 
 // A plain closure converted to an exactly-once closure, which is called on one
 // path and forwarded on another.
