@@ -14,9 +14,10 @@ function(includeSwiftSyntax)
   set(CMAKE_CXX_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
   set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    # Statically link swift-syntax for faster compiler startup
     set(BUILD_SHARED_LIBS OFF)
   else()
-    # Statically link swift-syntax for faster compiler startup
+    # Dynamically link for smaller overall code size
     set(BUILD_SHARED_LIBS ON)
   endif()
   set(SWIFT_COMPILER_SWIFT_SYNTAX_SHARED ${BUILD_SHARED_LIBS} PARENT_SCOPE)
