@@ -123,7 +123,7 @@ extension ContiguousArray {
   @inlinable
   @_semantics("array.get_element_address")
   internal func _getElementAddress(_ index: Int) -> UnsafeMutablePointer<Element> {
-    return unsafe _buffer.firstElementAddress + index
+    return unsafe _buffer.firstElementAddress.project(index)
   }
 }
 
@@ -426,7 +426,7 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
     _modify {
       _makeMutableAndUnique()
       _checkSubscript_mutating(index)
-      let address = unsafe _buffer.mutableFirstElementAddress + index
+      let address = unsafe _buffer.mutableFirstElementAddress.project(index)
       defer { _endMutation() }
       yield unsafe &address.pointee
     }
@@ -494,8 +494,8 @@ extension ContiguousArray: RandomAccessCollection, MutableCollection {
     _makeMutableAndUnique()
     _checkSubscript_mutating(i)
     _checkSubscript_mutating(j)
-    let pi = unsafe _buffer.mutableFirstElementAddress + i
-    let pj = unsafe _buffer.mutableFirstElementAddress + j
+    let pi = unsafe _buffer.mutableFirstElementAddress.project(i)
+    let pj = unsafe _buffer.mutableFirstElementAddress.project(j)
     let tmp = unsafe pi.move()
     unsafe pi.initialize(to: pj.move())
     unsafe pj.initialize(to: tmp)
