@@ -3312,8 +3312,8 @@ emitInitializeFieldOffsetVector(SILType T, llvm::Value *metadata,
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
-    assert(field.isConcrete() &&
-           "initializing offset vector for type with missing member?");
+    assert(field.hasKnownLayout() &&
+           "initializing offset vector for field without layout?");
     if (!isExportableField(field))
       return;
 
@@ -3445,8 +3445,8 @@ static void emitInitializeFieldOffsetVectorWithLayoutString(
 
   unsigned index = 0;
   forEachField(IGM, target, [&](Field field) {
-    assert(field.isConcrete() &&
-           "initializing offset vector for type with missing member?");
+    assert(field.hasKnownLayout() &&
+           "initializing offset vector for field without layout?");
     if (!isExportableField(field))
       return;
 
@@ -4257,9 +4257,12 @@ static void emitFieldOffsetGlobals(IRGenModule &IGM,
     case Field::Var:
       break;
 
-    // We should never be in this case when emitting a type.
+    // We cannot emit an offset global for a missing member, even if we know
+    // the offset, as we lack a VarDecl to mangle. Even if we could do this,
+    // MissingMembers themselves shouldn't be accessed directly, so we don't
+    // expect anyone to use the global anyways.
     case Field::MissingMember:
-      llvm_unreachable("unexpected missing member when emitting type");
+      return;
 
     // We don't need to emit an offset global for the default-actor
     // storage, which is never accessed directly.
@@ -4909,7 +4912,15 @@ namespace {
 
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
       assert(!isPureObjC());
-      llvm_unreachable("Fixed class metadata cannot have missing members");
+      assert(placeholder->getStorageLayout() &&
+             placeholder->getNumberOfFieldOffsetVectorEntries() == 1 &&
+             "fixed metadata requires one layout-backed field");
+      auto *declaringClass = cast<ClassDecl>(placeholder->getDeclContext());
+      SILType baseType = SILType::getPrimitiveObjectType(
+          declaringClass->getDeclaredTypeInContext()->getCanonicalType());
+      B.addInt(IGM.SizeTy,
+               getClassFieldOffset(IGM, baseType, Field(placeholder))
+                   .getValue());
     }
 
     void addGenericRequirement(GenericRequirement requirement,
@@ -6144,6 +6155,21 @@ namespace {
       }
     }
 
+    void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+      assert(placeholder->getNumberOfFieldOffsetVectorEntries() == 1 &&
+             placeholder->getStorageLayout() &&
+             "missing struct field must have a storage layout");
+      SILType structType = asImpl().getLoweredType();
+      llvm::Constant *offset = emitPhysicalStructMemberFixedOffset(
+          IGM, structType, Field(placeholder));
+      if (offset) {
+        B.add(offset);
+      } else {
+        asImpl().flagUnfilledFieldOffset();
+        B.addInt(IGM.Int32Ty, 0);
+      }
+    }
+
     void noteEndOfFieldOffsets() {
       B.addAlignmentPadding(super::IGM.getPointerAlignment());
     }
@@ -6349,6 +6375,18 @@ namespace {
                                           TypeExpansionContext::minimal()))
                      .isKnownEmpty(ResilienceExpansion::Maximal));
           B.addInt32(0);
+        }
+
+        void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
+          if (!Outer.hasKnownFieldOffsets())
+            return;
+          assert(placeholder->getNumberOfFieldOffsetVectorEntries() == 1 &&
+                 placeholder->getStorageLayout() &&
+                 "missing struct field must have a storage layout");
+          auto offset = emitPhysicalStructMemberFixedOffset(
+              IGM, Type, Field(placeholder));
+          assert(offset && "fixed struct field must have a fixed offset");
+          B.add(offset);
         }
 
         void noteEndOfFieldOffsets() {

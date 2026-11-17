@@ -226,8 +226,8 @@ public:
   /// single native Swift reference, even outside its resilience domain.
   bool isSingleSwiftRetainablePointer(const NominalTypeDecl *TD);
 
-  /// Returns the abstract layout for a hidden nominal type.
-  AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD);
+  /// Returns the abstract layout for a type used by a serialized declaration.
+  AbstractTypeLayout getAbstractTypeLayout(Type type);
 
   /// An representation of a single type, or a C struct with multiple members
   /// with specified types. The C struct is expected to be passed via swiftcc

@@ -30,6 +30,7 @@
 namespace swift {
 
 class ASTContext;
+class MissingMemberDecl;
 class VarDecl;
 class SILFunction;
 class SILModule;
@@ -637,6 +638,13 @@ public:
 
   SILType getFieldType(VarDecl *field, SILFunction *fn) const;
 
+  SILType getFieldType(MissingMemberDecl *field,
+                       Lowering::TypeConverter &TC,
+                       TypeExpansionContext context) const;
+
+  SILType getFieldType(MissingMemberDecl *field, SILModule &M,
+                       TypeExpansionContext context) const;
+
   SILType getFieldType(intptr_t fieldIndex, SILFunction *function) const;
 
   SWIFT_IMPORT_UNSAFE
@@ -655,6 +663,13 @@ public:
                              TypeExpansionContext context) const;
 
   SILType getEnumElementType(EnumElementDecl *elt, SILModule &M,
+                             TypeExpansionContext context) const;
+
+  SILType getEnumElementType(MissingMemberDecl *elt,
+                             Lowering::TypeConverter &TC,
+                             TypeExpansionContext context) const;
+
+  SILType getEnumElementType(MissingMemberDecl *elt, SILModule &M,
                              TypeExpansionContext context) const;
 
   /// Given that this is an enum type, return the lowered type of the

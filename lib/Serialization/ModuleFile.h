@@ -304,8 +304,7 @@ private:
   /// Identifiers referenced by this module.
   MutableArrayRef<SerializedIdentifier> Identifiers;
 
-  MutableArrayRef<Serialized<Decl *>> HiddenTypeLayoutInfoDecls;
-  llvm::DenseMap<uint32_t, uint32_t> HiddenTypeFallbackMap;
+  MutableArrayRef<Serialized<AbstractTypeLayout *>> AbstractMemberTypeLayouts;
   std::vector<std::unique_ptr<AbstractTypeLayout>> DeserializedHiddenTypeLayouts;
 
   using SerializedDeclMembersTable =
@@ -364,10 +363,10 @@ private:
 
   Decl *handleErrorAndSupplyMissingMember(ASTContext &context,
                                           Decl *container,
-                                          llvm::Error &&error) const;
+                                          llvm::Error &&error);
   Decl *handleErrorAndSupplyMissingClassMember(
       ASTContext &context, llvm::Error &&error,
-      ClassDecl *containingClass) const;
+      ClassDecl *containingClass);
 
 public:
   /// Change the status of the current module.
@@ -1074,12 +1073,18 @@ public:
     serialization::DeclID DID,
     llvm::function_ref<bool(DeclAttributes)> matchAttributes = nullptr);
 
-  llvm::Expected<HiddenTypeLayoutInfoDecl *>
-  getHiddenTypeLayoutInfoDecl(serialization::DeclID DID);
+  llvm::Expected<AbstractTypeLayout *>
+  getAbstractMemberTypeLayout(serialization::MemberAbstractTypeLayoutID ID);
 
-  void consumeHiddenTypeXRefPathPieces(
-      llvm::BitstreamCursor &cursor, uint32_t pathLen,
-      SmallVectorImpl<HiddenTypeLayoutInfoDecl::XRefPathPiece> &pieces);
+  serialization::BitOffset
+  getSerializedTypeOffset(serialization::TypeID ID) const;
+  serialization::BitOffset
+  getSerializedDeclOffset(serialization::DeclID ID) const;
+  llvm::BitstreamCursor getDeclTypeCursorForReplay() const;
+
+  llvm::Expected<AbstractTypeLayout *>
+  deserializeAbstractTypeLayout(serialization::BitOffset offset,
+                                serialization::DeclID &parentDeclID);
 
   /// Returns the decl context with the given ID, deserializing it if needed.
   DeclContext *getDeclContext(serialization::DeclContextID DID);
@@ -1112,6 +1117,10 @@ public:
   /// Returns the generic environment for the given ID or the first error.
   llvm::Expected<GenericEnvironment *>
   getGenericEnvironmentChecked(serialization::GenericEnvironmentID ID);
+
+  /// Returns the SIL layout for the given ID or the first error.
+  llvm::Expected<SILLayout *>
+  getSILLayoutChecked(serialization::SILLayoutID ID);
 
   /// Returns the substitution map for the given ID, deserializing it if
   /// needed.

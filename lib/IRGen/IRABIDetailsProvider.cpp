@@ -139,22 +139,29 @@ public:
            typeInfo.isSingleSwiftRetainablePointer(ResilienceExpansion::Minimal);
   }
 
-  AbstractTypeLayout getAbstractTypeLayout(const NominalTypeDecl *TD) {
-    auto &typeInfo =
-        IGM.getTypeInfoForUnlowered(TD->getDeclaredTypeInContext());
-
+  AbstractTypeLayout getAbstractTypeLayout(Type type) {
+    auto canonicalType = type->getCanonicalType();
+    auto mangledName =
+        Mangle::ASTMangler(type->getASTContext())
+            .mangleTypeWithPrefix(canonicalType);
     if (IGM.getOptions().DumpAbstractTypeLayoutInfo !=
         IRGenOptions::AbstractTypeLayoutInfoDumpKind::None) {
-      auto type = TD->getDeclaredTypeInContext()->getCanonicalType();
-      auto mangledName =
-          Mangle::ASTMangler(TD->getASTContext()).mangleNominalType(TD);
-      IGM.dumpAbstractTypeLayoutInfo(type, mangledName, "serialization");
+      IGM.dumpAbstractTypeLayoutInfo(canonicalType, mangledName,
+                                     "serialization");
     }
 
+    if (auto *hiddenType = type->getAs<HiddenType>()) {
+      auto *layout = hiddenType->getLayout();
+      assert(layout && layout->typeInfoRepresentation &&
+             "HiddenType must carry an abstract layout");
+      return *layout;
+    }
+
+    auto &typeInfo = IGM.getTypeInfoForUnlowered(type);
     AbstractTypeLayout layout;
-    auto type = TD->getDeclaredInterfaceType();
+    layout.mangledName = std::move(mangledName);
     auto properties = typeConverter.getTypeProperties(
-        TD->getDeclaredTypeInContext(), TypeExpansionContext::minimal());
+        type, TypeExpansionContext::minimal());
     layout.typeProperties = properties;
     if (type->hasReferenceSemantics())
       layout.referenceCountingSystem = type->getReferenceCounting();
@@ -195,7 +202,13 @@ public:
     auto &enumImplStrat = getEnumImplStrategy(
         IGM, ED->DeclContext::getDeclaredTypeInContext()->getCanonicalType());
 
-    for (auto *element : ED->getAllElements()) {
+    auto allElements = ED->getAllElements();
+    assert(static_cast<size_t>(
+               std::distance(allElements.begin(), allElements.end())) ==
+               enumImplStrat.getElementsWithPayload().size() +
+                   enumImplStrat.getElementsWithNoPayload().size() &&
+           "cannot emit an enum tag mapping with missing elements");
+    for (auto *element : allElements) {
       auto tagIdx = enumImplStrat.getTagIndex(element);
       auto *global = cast<llvm::GlobalVariable>(
           IGM.getAddrOfEnumCase(element, NotForDefinition).getAddress());
@@ -546,9 +559,8 @@ bool IRABIDetailsProvider::isSingleSwiftRetainablePointer(
   return impl->isSingleSwiftRetainablePointer(TD);
 }
 
-AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(
-    const NominalTypeDecl *TD) {
-  return impl->getAbstractTypeLayout(TD);
+AbstractTypeLayout IRABIDetailsProvider::getAbstractTypeLayout(Type type) {
+  return impl->getAbstractTypeLayout(type);
 }
 
 std::optional<LoweredFunctionSignature>

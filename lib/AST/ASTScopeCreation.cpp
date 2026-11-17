@@ -401,8 +401,6 @@ public:
   VISIT_AND_IGNORE(MissingDecl)
   VISIT_AND_IGNORE(MissingMemberDecl)
   VISIT_AND_IGNORE(FileDefaultDecl)
-  VISIT_AND_IGNORE(HiddenTypeLayoutInfoDecl)
-
   // This declaration is handled from the PatternBindingDecl
   VISIT_AND_IGNORE(VarDecl)
 
