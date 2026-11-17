@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix swift%language_mode-
+// RUN: %target-typecheck-verify-swift -language-mode 4 -verify-additional-prefix swift4-
 
 var var_redecl1: Int // expected-note {{previously declared here}}
 var_redecl1 = 0
@@ -472,6 +473,31 @@ protocol r21783216b {
   associatedtype `Protocol` // ok
 }
 
+// https://github.com/apple/swift/issues/49799
+
+struct S_49799<T> {
+  struct j {}
+  // expected-note@-1 {{previously declared here}}
+  static var k: Int { get {} }
+  // expected-note@-1 {{previously declared here}}
+}
+extension S_49799 {
+  static var i: Int { get {} }
+  // expected-note@-1 {{previously declared here}}
+  // expected-note@-2 {{previously declared here}}
+  struct i {}
+  // expected-swift5-error@-1{{invalid redeclaration of 'i'}}
+  // expected-swift4-warning@-2{{redeclaration of 'i' is deprecated and will be an error in Swift 5}}
+  typealias i = Int
+  // expected-swift5-error@-1{{invalid redeclaration of 'i'}}
+  // expected-swift4-warning@-2{{redeclaration of 'i' is deprecated and will be an error in Swift 5}}
+  static var j: Int { get {} }
+  // expected-swift5-error@-1{{invalid redeclaration of 'j'}}
+  // expected-swift4-warning@-2{{redeclaration of 'j' is deprecated and will be an error in Swift 5}}
+  struct k {}
+  // expected-error@-1{{invalid redeclaration of 'k'}}
+}
+
 // https://github.com/apple/swift/issues/49797
 
 struct S_49797<T> {
@@ -481,8 +507,12 @@ struct S_49797<T> {
 }
 
 extension S_49797 {
-  var x: Int { get {} } // expected-warning{{redeclaration of 'x' is deprecated and will be an error in Swift 5}}
-  var y: T { get {} } // expected-warning{{redeclaration of 'y' is deprecated and will be an error in Swift 5}}
+  var x: Int { get {} }
+  // expected-swift5-error@-1{{invalid redeclaration of 'x'}}
+  // expected-swift4-warning@-2{{redeclaration of 'x' is deprecated and will be an error in Swift 5}}
+  var y: T { get {} }
+  // expected-swift5-error@-1{{invalid redeclaration of 'y'}}
+  // expected-swift4-warning@-2{{redeclaration of 'y' is deprecated and will be an error in Swift 5}}
   var z: Int { get {} } // expected-error{{invalid redeclaration of 'z'}}
 }
 

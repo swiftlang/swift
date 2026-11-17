@@ -1295,8 +1295,8 @@ do {
   }
 }
 
-protocol WFI_P1 : class {}
-protocol WFI_P2 : class {}
+protocol WFI_P1 : AnyObject {}
+protocol WFI_P2 : AnyObject {}
 
 class WeakFixItTest {
   init() {}

@@ -12,7 +12,7 @@ import simd
 
 public func swiftThingScalar(a: Float) {}
 
-public func swiftThingSIMD(a: float3) {
+public func swiftThingSIMD(a: float3) { // expected-warning {{'float3' is deprecated: Use SIMD3<Float>}}
     print(a)
 }
 
@@ -20,8 +20,8 @@ public func swiftThingSIMD2(a: simd_float3) {
     print(a)
 }
 
-public func swiftThingSIMD3() -> float3 {
-    float3(4, 5, 6)
+public func swiftThingSIMD3() -> float3 { // expected-warning {{'float3' is deprecated: Use SIMD3<Float>}}
+    float3(4, 5, 6) // expected-warning {{'float3' is deprecated: Use SIMD3<Float>}}
 }
 
 public func swiftThingSIMD4() -> simd_float3 {

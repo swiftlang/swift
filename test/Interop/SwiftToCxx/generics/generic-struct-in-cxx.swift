@@ -26,13 +26,14 @@ public struct PairOfUInt64 {
     }
 }
 
+@usableFromInline
 class ClassWithT<T>: CustomStringConvertible {
     var val: T
 
     init(_ x: T) {
         val = x
     }
-    var description: String {
+    @usableFromInline var description: String {
       return "ClassWithT(\(val))"
     }
 }

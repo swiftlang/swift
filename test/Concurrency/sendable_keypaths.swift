@@ -268,7 +268,7 @@ public final class TestSetterRef {
   public func test3(_ kp: KeyPath<TestSetterRef, Int> & Sendable = \.v) {} // Ok
 
   public func test_err(_ kp: WritableKeyPath<TestSetterRef, Int> = \.v) {}
-  // expected-warning@-1 {{setter for property 'v' is internal and should not be referenced from a default argument value}}
+  // expected-error@-1 {{setter for property 'v' is internal and cannot be referenced from a default argument value}}
 }
 
 // Property wrapper declaration with Sendable key paths

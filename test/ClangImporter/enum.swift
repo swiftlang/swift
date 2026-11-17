@@ -7,7 +7,7 @@
 
 // At one point we diagnosed enum case aliases that referred to unavailable 
 // cases in their (synthesized) implementation.
-// CHECK-NOT: unknown
+// CHECK-NOT: <unknown>
 
 import Foundation
 import user_objc
@@ -68,7 +68,8 @@ var alias2 = NSAliasesEnum.byEquivalentValue
 var alias3 = NSAliasesEnum.byName
 var aliasOriginal = NSAliasesEnum.original
 
-switch aliasOriginal {
+switch aliasOriginal { // expected-warning {{switch covers known cases, but 'NSAliasesEnum' may have additional unknown values}}
+// expected-note@-1 {{handle unknown values using "@unknown default"}}
 case .original:
   break
 case .differentValue:

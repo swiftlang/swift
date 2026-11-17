@@ -15,7 +15,7 @@ public protocol Environment : class {
 }
 
 open class UI {
-  open unowned let environment: Environment
+  public unowned let environment: Environment
 
   init(e: Environment) {
     environment = e

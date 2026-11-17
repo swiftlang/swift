@@ -1,6 +1,7 @@
 
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s --check-prefixes=CHECK,SWIFT5
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop -language-mode 4 %s | %FileCheck %s --check-prefixes=CHECK,SWIFT4
 
 var zero: Int = 0
 
@@ -896,5 +897,143 @@ public var myglobal3 : Int = 1 {
   }
   didSet {
     print("myglobal.didSet")
+  }
+}
+
+protocol ForceAccessors {
+  var a: Int { get set }
+}
+
+struct DidSetWillSetTests: ForceAccessors {
+  static var defaultValue: DidSetWillSetTests {
+    return DidSetWillSetTests(a: 0)
+  }
+
+  var a: Int {
+    // CHECK-LABEL: sil private [ossa] @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vw
+    willSet(newA) {
+      // CHECK: bb0(%0 : $Int, %1 : $*DidSetWillSetTests):
+
+      a = zero  // reassign, but don't infinite loop, as accessing on 'self'.
+
+      // CHECK: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
+      // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s10properties4zero{{[_0-9a-zA-Z]*}}vau
+      // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
+      // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
+      // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+      // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+      // CHECK-NEXT: end_access [[READ]] : $*Int
+      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %1
+      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
+
+      var unrelatedValue = DidSetWillSetTests.defaultValue
+
+      // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "unrelatedValue"
+      // CHECK-NEXT: [[BOXLIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOXLIFETIME]] : ${ var DidSetWillSetTests }, 0
+      // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin DidSetWillSetTests.Type
+      // CHECK-NEXT: // function_ref static properties.DidSetWillSetTests.defaultValue.getter : properties.DidSetWillSetTests
+      // CHECK-NEXT: [[DEFAULTVALUE_FN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}vgZ : $@convention(method) (@thin DidSetWillSetTests.Type) -> DidSetWillSetTests
+      // CHECK-NEXT: [[DEFAULTRESULT:%.*]] = apply [[DEFAULTVALUE_FN]]([[METATYPE]]) : $@convention(method) (@thin DidSetWillSetTests.Type) -> DidSetWillSetTests
+      // CHECK-NEXT: store [[DEFAULTRESULT]] to [trivial] [[BOXADDR]] : $*DidSetWillSetTests
+
+      // In Swift 5 mode, if we re-assign to the property when 'self' is not the base, we should not access directly
+      // (even though in this example, we *will* infinitely recurse).
+      // In Swift 4 mode, access directly even when calling on another instance in order to maintain < Swift 5 behaviour.
+      unrelatedValue.a = zero
+
+      // CHECK-NEXT: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
+      // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s10properties4zero{{[_0-9a-zA-Z]*}}vau
+      // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
+      // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
+      // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+      // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+      // CHECK-NEXT: end_access [[READ]] : $*Int
+
+      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[BOXADDR]] : $*DidSetWillSetTests
+      // SWIFT5-NEXT: // function_ref properties.DidSetWillSetTests.a.setter : Swift.Int
+      // SWIFT5-NEXT: [[SETTERFN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}Sivs : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+      // SWIFT5-NEXT: apply [[SETTERFN]]([[ZERO]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+      // SWIFT4-NEXT: [[ELEMADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // SWIFT4-NEXT: assign [[ZERO]] to [[ELEMADDR]] : $*Int
+      // CHECK-NEXT: end_access [[WRITE]] : $*DidSetWillSetTests
+    }
+
+    // CHECK-LABEL: sil private [ossa] @$s10properties010DidSetWillC5TestsV1a{{[_0-9a-zA-Z]*}}vW
+    didSet {
+      (self).a = zero  // reassign, but don't infinite loop, as accessing on 'self'.
+
+      // CHECK: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
+      // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s10properties4zero{{[_0-9a-zA-Z]*}}vau
+      // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
+      // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
+      // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+      // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+      // CHECK-NEXT: end_access [[READ]] : $*Int
+      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] %0
+      // CHECK-NEXT: [[AADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // CHECK-NEXT: assign [[ZERO]] to [[AADDR]]
+
+      var unrelatedValue = DidSetWillSetTests.defaultValue
+
+      // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "unrelatedValue"
+      // CHECK-NEXT: [[BOXLIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOXLIFETIME]] : ${ var DidSetWillSetTests }, 0
+      // CHECK-NEXT: [[METATYPE:%.*]] = metatype $@thin DidSetWillSetTests.Type
+      // CHECK-NEXT: // function_ref static properties.DidSetWillSetTests.defaultValue.getter : properties.DidSetWillSetTests
+      // CHECK-NEXT: [[DEFAULTVALUE_FN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}vgZ : $@convention(method) (@thin DidSetWillSetTests.Type) -> DidSetWillSetTests
+      // CHECK-NEXT: [[DEFAULTRESULT:%.*]] = apply [[DEFAULTVALUE_FN]]([[METATYPE]]) : $@convention(method) (@thin DidSetWillSetTests.Type) -> DidSetWillSetTests
+      // CHECK-NEXT: store [[DEFAULTRESULT]] to [trivial] [[BOXADDR]] : $*DidSetWillSetTests
+
+      // In Swift 5 mode, if we re-assign to the property when 'self' is not the base, we should not access directly
+      // (even though in this example, we *will* infinitely recurse).
+      // In Swift 4 mode, access directly even when calling on another instance in order to maintain < Swift 5 behaviour.
+      unrelatedValue.a = zero
+
+      // CHECK-NEXT: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
+      // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s10properties4zero{{[_0-9a-zA-Z]*}}vau
+      // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
+      // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
+      // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+      // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+      // CHECK-NEXT: end_access [[READ]] : $*Int
+
+      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[BOXADDR]] : $*DidSetWillSetTests
+      // SWIFT5-NEXT: // function_ref properties.DidSetWillSetTests.a.setter : Swift.Int
+      // SWIFT5-NEXT: [[SETTERFN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}Sivs : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+      // SWIFT5-NEXT: apply [[SETTERFN]]([[ZERO]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+      // SWIFT4-NEXT: [[ELEMADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // SWIFT4-NEXT: assign [[ZERO]] to [[ELEMADDR]] : $*Int
+      // CHECK-NEXT: end_access [[WRITE]] : $*DidSetWillSetTests
+
+      // Even if the value of the base happens to be self...
+      var other = self
+
+      // CHECK: [[BOX:%.*]] = alloc_box ${ var DidSetWillSetTests }, var, name "other"
+      // CHECK-NEXT: [[BOXLIFETIME:%.*]] = begin_borrow [var_decl] [[BOX]]
+      // CHECK-NEXT: [[BOXADDR:%.*]] = project_box [[BOXLIFETIME]] : ${ var DidSetWillSetTests }, 0
+      // CHECK-NEXT: [[READ_SELF:%.*]] = begin_access [read] [unknown] %0 : $*DidSetWillSetTests
+      // CHECK-NEXT: copy_addr [[READ_SELF]] to [init] [[BOXADDR]] : $*DidSetWillSetTests
+      // CHECK-NEXT: end_access [[READ_SELF]] : $*DidSetWillSetTests
+
+      other.a = zero
+
+      // CHECK-NEXT: // function_ref properties.zero.unsafeMutableAddressor : Swift.Int
+      // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s10properties4zero{{[_0-9a-zA-Z]*}}vau
+      // CHECK-NEXT: [[ZERORAW:%.*]] = apply [[ZEROFN]]() : $@convention(thin) () -> Builtin.RawPointer
+      // CHECK-NEXT: [[ZEROADDR:%.*]] = pointer_to_address [[ZERORAW]] : $Builtin.RawPointer to [strict] $*Int
+      // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [dynamic] [[ZEROADDR]] : $*Int
+      // CHECK-NEXT: [[ZERO:%.*]] = load [trivial] [[READ]]
+      // CHECK-NEXT: end_access [[READ]] : $*Int
+
+      // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [unknown] [[BOXADDR]] : $*DidSetWillSetTests
+      // SWIFT5-NEXT: // function_ref properties.DidSetWillSetTests.a.setter : Swift.Int
+      // SWIFT5-NEXT: [[SETTERFN:%.*]] = function_ref @$s10properties{{[_0-9a-zA-Z]*}}Sivs : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+      // SWIFT5-NEXT: apply [[SETTERFN]]([[ZERO]], [[WRITE]]) : $@convention(method) (Int, @inout DidSetWillSetTests) -> ()
+      // SWIFT4-NEXT: [[ELEMADDR:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
+      // SWIFT4-NEXT: assign [[ZERO]] to [[ELEMADDR]] : $*Int
+      // CHECK-NEXT: end_access [[WRITE]] : $*DidSetWillSetTests
+    }
   }
 }

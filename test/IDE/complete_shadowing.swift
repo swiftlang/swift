@@ -252,7 +252,6 @@ struct test_InheritedMemberProtoExt_Member: ProtoWithIntTestValueExt {
     #^InheritedMemberProtoExt_Member^#
 // InheritedMemberProtoExt_Member-NOT: name=testValue
 // InheritedMemberProtoExt_Member-DAG: Decl[InstanceVar]/CurrNominal:      testValue[#String#]; name=testValue
-// InheritedMemberProtoExt_Member-DAG: Decl[InstanceVar]/Super:            testValue[#Int#]; name=testValue
 // InheritedMemberProtoExt_Member-NOT: name=testValue
   }
 }

@@ -10,7 +10,7 @@ class X {}
 
 protocol P {}
 protocol Q {}
-protocol CP: class {}
+protocol CP: AnyObject {}
 
 let any: Any.Type = Int.self
 use(any as! Int.Type)

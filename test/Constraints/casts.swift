@@ -140,7 +140,7 @@ func conditional_cast(_ b: B) -> D? {
 
 @objc protocol ObjCProto1 {}
 @objc protocol ObjCProto2 {}
-protocol NonObjCProto : class {}
+protocol NonObjCProto : AnyObject {}
 
 @objc class ObjCClass {}
 class NonObjCClass {}

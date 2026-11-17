@@ -99,7 +99,8 @@ func makeProgress<T: NSProgressReporting>(thing: T) {} // expected-error {{'NSPr
 
 func useLowercasedEnumCase(x: NSRuncingMode) {
   switch x { // expected-error {{switch must be exhaustive}}
-    // expected-note@-1 {{add missing cases: '.mince', '.quince'}}
+    // expected-note@-1 {{add missing cases: '.mince', '.quince', '@unknown default'}}
+    // expected-note@-2 {{handle unknown values using "@unknown default"}}
     case .Mince: return // expected-error {{'Mince' has been renamed to 'mince'}} {{11-16=mince}}
     case .Quince: return // expected-error {{'Quince' has been renamed to 'quince'}} {{11-17=quince}}
   }

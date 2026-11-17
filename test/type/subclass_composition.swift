@@ -40,7 +40,7 @@ class Other : Base<Int> {}
 
 typealias OtherAndP2 = Other & P2
 
-protocol P3 : class {}
+protocol P3 : AnyObject {}
 
 protocol P4 {}
 

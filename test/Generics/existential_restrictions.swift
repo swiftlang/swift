@@ -2,7 +2,7 @@
 
 protocol P { }
 @objc protocol OP { }
-protocol CP : class { }
+protocol CP : AnyObject { }
 
 @objc protocol SP : OP {
   static func createNewOne() -> SP

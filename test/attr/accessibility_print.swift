@@ -337,7 +337,7 @@ fileprivate protocol IB_FilePrivateAssocTypeProto {
 public class IC_PublicAssocTypeImpl: IA_PublicAssocTypeProto, IB_FilePrivateAssocTypeProto {
   public var publicValue: Int = 0
   public var filePrivateValue: Int = 0
-  // CHECK-DAG: {{^}} public typealias FilePrivateValue
+  // CHECK-DAG: {{^}} fileprivate typealias FilePrivateValue
   // CHECK-DAG: {{^}} public typealias PublicValue
 } // CHECK: {{^[}]}}
 

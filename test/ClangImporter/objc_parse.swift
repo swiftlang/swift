@@ -260,17 +260,29 @@ func almostSubscriptableKeyMismatch(_ bc: BadCollection, key: NSString) {
   // FIXME: We end up importing this as read-only due to the mismatch between
   // getter/setter element types.
   var _ : Any = bc[key]
+  // expected-warning@-1 {{coercion of implicitly unwrappable value of type 'Any?' to 'Any' does not unwrap optional}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ bc: BadCollectionChild,
                                              key: String) {
   var value : Any = bc[key]
+  // expected-warning@-1 {{coercion of implicitly unwrappable value of type 'Any?' to 'Any' does not unwrap optional}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   bc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
 func almostSubscriptableKeyMismatchInherited(_ roc: ReadOnlyCollectionChild,
                                              key: String) {
   var value : Any = roc[key]
+  // expected-warning@-1 {{coercion of implicitly unwrappable value of type 'Any?' to 'Any' does not unwrap optional}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   roc[key] = value // expected-error{{cannot assign through subscript: subscript is get-only}}
 }
 
@@ -418,9 +430,25 @@ func testPropertyAndMethodCollision(_ obj: PropertyAndMethodCollision,
 
   var value: Any
   value = obj.protoProp()
+  // expected-warning@-1 {{coercion of implicitly unwrappable value of type 'Any?' to 'Any' does not unwrap optional}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   value = obj.protoPropRO()
+  // expected-warning@-1 {{coercion of implicitly unwrappable value of type 'Any?' to 'Any' does not unwrap optional}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   value = type(of: obj).protoClassProp()
+  // expected-warning@-1 {{coercion of implicitly unwrappable value of type 'Any?' to 'Any' does not unwrap optional}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   value = type(of: obj).protoClassPropRO()
+  // expected-warning@-1 {{coercion of implicitly unwrappable value of type 'Any?' to 'Any' does not unwrap optional}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-4 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   _ = value
 }
 

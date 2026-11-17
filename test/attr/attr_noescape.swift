@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -language-mode 4
+// RUN: %target-typecheck-verify-swift -verify-additional-prefix swift%language_mode-
 
 @noescape var fn : () -> Int = { 4 }  // expected-error {{attribute can only be applied to types, not declarations}}
 
@@ -259,7 +260,7 @@ class NoEscapeImmediatelyApplied {
 public func XCTAssertTrue(_ expression: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #file, line: UInt = #line) -> Void {
 }
 public func XCTAssert(_ expression: @autoclosure () -> Bool, _ message: String = "", file: StaticString = #file, line: UInt = #line)  -> Void {
-  XCTAssertTrue(expression, message, file: file, line: line);
+  XCTAssertTrue(expression, message, file: file, line: line); // expected-swift5-error {{add () to forward '@autoclosure' parameter}}
 }
 
 

@@ -4,7 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/inits.h -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
-// RUN: %target-swift-frontend %s -module-name Init -clang-header-expose-decls=all-public -swift-version 5 -typecheck -verify -emit-clang-header-path %t/inits2.h
+// RUN: %target-swift-frontend %s -module-name Init -clang-header-expose-decls=all-public -language-mode 4 -typecheck -verify -emit-clang-header-path %t/inits2.h
 // RUN: %FileCheck %s < %t/inits2.h
 
 

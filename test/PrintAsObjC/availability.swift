@@ -172,7 +172,7 @@
 
 // CHECK-LABEL: @interface AvailabilitySub
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
-// CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
+// CHECK-NEXT: + (nonnull instancetype)new SWIFT_UNAVAILABLE_MSG("-init is unavailable");
 // CHECK-NEXT: - (nonnull instancetype)initWithX:(NSInteger)x SWIFT_UNAVAILABLE;
 // CHECK-NEXT: - (nonnull instancetype)initWithDeprecatedZ:(NSInteger)deprecatedZ OBJC_DESIGNATED_INITIALIZER SWIFT_DEPRECATED_MSG("init(deprecatedZ:) was deprecated. Use the new one instead", "initWithNewZ:")
 // CHECK-NEXT: - (nonnull instancetype)initWithNewZ:(NSInteger)z OBJC_DESIGNATED_INITIALIZER;

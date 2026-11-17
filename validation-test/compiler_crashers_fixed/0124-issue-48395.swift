@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir %s -language-mode 4
 
 // https://github.com/apple/swift/issues/48395
 

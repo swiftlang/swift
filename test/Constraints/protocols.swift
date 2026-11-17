@@ -109,7 +109,7 @@ protocol P : Initable {
   typealias G = Array
 }
 
-protocol ClassP : class {
+protocol ClassP : AnyObject {
   func bas(_ x: Int)
   func quux(_ x: Int)
 }

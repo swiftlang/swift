@@ -1,5 +1,6 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -module-name failable_initializers | %FileCheck %s --check-prefixes=CHECK,SWIFT5
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-objc-attr-requires-foundation-module -enable-objc-interop %s -language-mode 4 -module-name failable_initializers | %FileCheck %s --check-prefixes=CHECK,SWIFT4
 
 // High-level tests that silgen properly emits code for failable and throwing
 // initializers.
@@ -320,48 +321,60 @@ struct ThrowStruct {
   // CHECK-NEXT: try_apply [[DELEG_INIT]]([[SELF_META]]) : $@convention(method) (@thin ThrowStruct.Type) -> (@owned Optional<ThrowStruct>, @error any Error), normal [[SUCC_BB:bb[0-9]+]], error [[ERROR_BB:bb[0-9]+]]
   //
   // CHECK: [[SUCC_BB]]([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
-  // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum {{.*}}, #Optional.some!enumelt, [[OPT_RESULT]]
-  // CHECK-NEXT: br bb2([[INJECT_INTO_OPT]] : $Optional<Optional<ThrowStruct>>)
+  // SWIFT5-NEXT: br bb2([[OPT_RESULT]] : $Optional<ThrowStruct>)
+  // SWIFT4-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum {{.*}}, #Optional.some!enumelt, [[OPT_RESULT]]
+  // SWIFT4-NEXT: br bb2([[INJECT_INTO_OPT]] : $Optional<Optional<ThrowStruct>>)
   //
-  // CHECK: bb2([[OPT_OPT_RESULT:%[0-9]+]] : @owned $Optional<Optional<ThrowStruct>>):
-  // CHECK-NEXT: switch_enum [[OPT_OPT_RESULT]] : {{.*}}, case #Optional.some!enumelt: [[OPT_OPT_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[OPT_OPT_NONE_BB:bb[0-9]+]]
+  // SWIFT4: bb2([[OPT_OPT_RESULT:%[0-9]+]] : @owned $Optional<Optional<ThrowStruct>>):
+  // SWIFT4-NEXT: switch_enum [[OPT_OPT_RESULT]] : {{.*}}, case #Optional.some!enumelt: [[OPT_OPT_SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[OPT_OPT_NONE_BB:bb[0-9]+]]
   //
-  // CHECK: [[OPT_OPT_SOME_BB]]([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
-  // CHECK-NEXT: br bb5([[OPT_RESULT]] : $Optional<ThrowStruct>)
+  // SWIFT4: [[OPT_OPT_SOME_BB]]([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // SWIFT4-NEXT: br bb5([[OPT_RESULT]] : $Optional<ThrowStruct>)
   //
-  // CHECK: [[OPT_OPT_NONE_BB]]:
-  // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
-  // CHECK-NEXT: br bb5([[NIL]] : $Optional<ThrowStruct>)
+  // SWIFT4: [[OPT_OPT_NONE_BB]]:
+  // SWIFT4-NEXT: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
+  // SWIFT4-NEXT: br bb5([[NIL]] : $Optional<ThrowStruct>)
   //
-  // CHECK: bb5([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // SWIFT4: bb5([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  //
+  // SWIFT5: bb2([[OPT_RESULT:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK: [[SELECT:%[0-9]+]] = select_enum [[OPT_RESULT]]
   // CHECK-NEXT: cond_br [[SELECT]], [[OPT_SOME_BB:bb[0-9]+]], [[OPT_NONE_BB:bb[0-9]+]]
   //
   // CHECK: [[OPT_NONE_BB]]:
   // CHECK-NEXT: destroy_value [[OPT_RESULT]]
-  // CHECK-NEXT: br bb8
+  // SWIFT5-NEXT: br bb5
+  // SWIFT4-NEXT: br bb8
   //
   // CHECK: [[OPT_SOME_BB]]:
   // CHECK-NEXT: [[RESULT:%[0-9]+]] = unchecked_enum_data [[OPT_RESULT]] : {{.*}}, #Optional.some!enumelt
   // CHECK-NEXT: assign [[RESULT]] to [[DEST:%[0-9]+]]
   // CHECK-NEXT: [[RESULT_CP:%[0-9]+]] = load [copy] [[DEST]]
   // CHECK-NEXT: [[INJECT_INTO_OPT:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.some!enumelt, [[RESULT_CP]]
-  // CHECK: br bb9([[INJECT_INTO_OPT]] : $Optional<ThrowStruct>)
+  // SWIFT5: br bb6([[INJECT_INTO_OPT]] : $Optional<ThrowStruct>)
+  // SWIFT4: br bb9([[INJECT_INTO_OPT]] : $Optional<ThrowStruct>)
   //
-  // CHECK: bb8:
+  // SWIFT5: bb5:
+  // SWIFT4: bb8:
   // CHECK: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
-  // CHECK-NEXT: br bb9([[NIL]] : $Optional<ThrowStruct>)
+  // SWIFT5-NEXT: br bb6([[NIL]] : $Optional<ThrowStruct>)
+  // SWIFT4-NEXT: br bb9([[NIL]] : $Optional<ThrowStruct>)
   //
-  // CHECK: bb9([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // SWIFT5: bb6([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
+  // SWIFT4: bb9([[RET:%[0-9]+]] : @owned $Optional<ThrowStruct>):
   // CHECK-NEXT: return [[RET]]
   //
-  // CHECK: bb10:
-  // CHECK-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<ThrowStruct>>, #Optional.none!enumelt
-  // CHECK-NEXT: br bb2([[NIL]] : $Optional<Optional<ThrowStruct>>)
+  // SWIFT5: bb7:
+  // SWIFT5-NEXT: [[NIL:%[0-9]+]] = enum $Optional<ThrowStruct>, #Optional.none!enumelt
+  // SWIFT5-NEXT: br bb2([[NIL]] : $Optional<ThrowStruct>)
+  // SWIFT4: bb10:
+  // SWIFT4-NEXT: [[NIL:%[0-9]+]] = enum $Optional<Optional<ThrowStruct>>, #Optional.none!enumelt
+  // SWIFT4-NEXT: br bb2([[NIL]] : $Optional<Optional<ThrowStruct>>)
   //
   // CHECK: [[ERROR_BB]]([[ERR:%[0-9]+]] : @owned $any Error):
   // CHECK-NEXT: destroy_value [[ERR]]
-  // CHECK-NEXT: br bb10
+  // SWIFT5-NEXT: br bb7
+  // SWIFT4-NEXT: br bb10
   // CHECK-NEXT: }
   init?(failable4: ()) {
     try? self.init(failableAndThrows: ())

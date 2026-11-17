@@ -1,25 +1,43 @@
-// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -solver-disable-enumerate-supertypes
-// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -solver-enable-enumerate-supertypes
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -solver-disable-enumerate-supertypes -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -solver-enable-enumerate-supertypes -verify-additional-prefix swift5-
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -solver-disable-enumerate-supertypes -language-mode 4 -verify-additional-prefix swift4-
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s -solver-enable-enumerate-supertypes -language-mode 4 -verify-additional-prefix swift4-
 // REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct S {
   let i: Int
 
   init() {
-    let _: WritableKeyPath<S, Int> = \.i // no error for Swift 3/4
+    let _: WritableKeyPath<S, Int> = \.i // expected-swift5-error {{cannot convert key path type 'KeyPath<S, Int>' to contextual type 'WritableKeyPath<S, Int>'}}
 
     S()[keyPath: \.i] = 1
-    // expected-error@-1 {{cannot assign through subscript: function call returns immutable value}}
+    // expected-swift5-error@-1 {{cannot assign through subscript: key path is read-only}}
+    // expected-swift4-error@-2 {{cannot assign through subscript: function call returns immutable value}}
   }
 }
 
 func test() {
-  let _: WritableKeyPath<C, Int> = \.i // no error for Swift 3/4
+  let _: WritableKeyPath<C, Int> = \.i // expected-swift5-error {{cannot convert key path type 'KeyPath<C, Int>' to contextual type 'WritableKeyPath<C, Int>'}}
 
-  C()[keyPath: \.i] = 1   // warning on write with literal keypath
-  // expected-warning@-1 {{forming a writable keypath to property}}
+  C()[keyPath: \.i] = 1
+  // expected-swift5-error@-1 {{cannot assign through subscript: key path is read-only}}
+  // expected-swift4-warning@-2 {{forming a writable keypath to property}}
 
   let _ = C()[keyPath: \.i] // no warning for a read
+}
+
+struct T {
+  private(set) var a: Int
+  init(a: Int) {
+    self.a = a
+  }
+}
+
+func testReadOnlyKeyPathDiagnostics() {
+  let path = \T.a
+  var t = T(a: 3)
+  t[keyPath: path] = 4 // expected-swift5-error {{cannot assign through subscript: 'path' is a read-only key path}}
+  t[keyPath: \T.a] = 4 // expected-swift5-error {{cannot assign through subscript: key path is read-only}} expected-swift4-warning {{forming a writable keypath to property}}
 }
 
 // https://github.com/apple/swift/issues/49887

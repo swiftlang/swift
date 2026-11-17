@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -verify-additional-prefix copytuples- -verify-ignore-unrelated
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -verify-additional-prefix copytuples- -verify-ignore-unrelated -swift-version 5
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -verify-additional-prefix copytuples- -verify-ignore-unrelated -language-mode 4
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -enable-experimental-feature MoveOnlyTuples -verify-additional-prefix movetuples- -verify-ignore-unrelated
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature NondeinitableTypes -enable-experimental-feature OnceFunctions -enable-experimental-feature MoveOnlyClasses -verify-additional-prefix copytuples- -verify-ignore-unrelated
 

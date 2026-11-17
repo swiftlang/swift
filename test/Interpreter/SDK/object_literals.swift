@@ -5,6 +5,9 @@
 // RUN: %target-build-swift %s -o %t/Test.app/Contents/MacOS/main -module-cache-path %t/cache
 // RUN: %target-codesign %t/Test.app/Contents/MacOS/main
 // RUN: %target-run %t/Test.app/Contents/MacOS/main %t/Test.app/Contents/Resources/*
+// RUN: %target-build-swift %s -o %t/Test.app/Contents/MacOS/main -module-cache-path %t/cache -language-mode 4
+// RUN: %target-codesign %t/Test.app/Contents/MacOS/main
+// RUN: %target-run %t/Test.app/Contents/MacOS/main %t/Test.app/Contents/Resources/*
 
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
@@ -23,7 +26,11 @@ LiteralsTestSuite.test("file") {
 }
 
 LiteralsTestSuite.test("image") {
+  #if swift(>=5)
+  let image = #imageLiteral(resourceName: NSImage.computerName)
+  #else
   let image = #imageLiteral(resourceName: NSImage.Name.computer.rawValue)
+  #endif
   expectTrue(image.isValid)
 }
 

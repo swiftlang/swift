@@ -198,7 +198,7 @@ public func funcWithComplexSpecializeRequirements<T: ProtocolWithDep>(t: T) -> I
   return 55555
 }
 
-public protocol Proto: class {
+public protocol Proto: AnyObject {
 }
 
 @_specialize(where T: _RefCountedObject)

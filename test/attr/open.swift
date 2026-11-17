@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -emit-module %S/Inputs/OpenHelpers.swift -o %t/OpenHelpers.swiftmodule
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -verify-additional-prefix swift5-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %t -language-mode 4 -verify-additional-prefix swift4-
 
 import OpenHelpers
 
@@ -56,6 +57,21 @@ open class AnOpenClass {
   open subscript(_: MarkerForOpenSubscripts) -> Int {
     return 0
   }
+  open let openLet: Int = 1
+  // expected-swift4-warning@-1 {{'let' properties are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
+  // expected-swift5-error@-2 {{'let' properties are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
+  open static func test() {}
+  // expected-swift4-warning@-1 {{static declarations are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
+  // expected-swift5-error@-2 {{static declarations are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
+}
+
+final public class NonOpenClass {
+  open func test() {}
+  // expected-swift4-warning@-1 {{members of 'final' classes are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
+  // expected-swift5-error@-2 {{members of 'final' classes are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
+  open static func test() {}
+  // expected-swift4-warning@-1 {{static declarations are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
+  // expected-swift5-error@-2 {{static declarations are implicitly 'final'; use 'public' instead of 'open'}} {{3-7=public}}
 }
 
 internal class NonOpenClassesCanHaveOpenMembers {

@@ -187,7 +187,7 @@ class DiscardableResult : NSObject {
 // CHECK-LABEL: @interface InheritedInitializersRequired
 // CHECK-NEXT: - (nonnull instancetype)initWithEvenMoreFun OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
-// CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
+// CHECK-NEXT: + (nonnull instancetype)new SWIFT_UNAVAILABLE_MSG("-init is unavailable");
 // CHECK-NEXT: @end
 @objc class InheritedInitializersRequired : InheritedInitializers {
   @objc required init(evenMoreFun: ()) { super.init() }
@@ -490,7 +490,7 @@ class MyObject : NSObject {}
 // CHECK-LABEL: @interface NewBanned
 // CHECK-NEXT: - (nonnull instancetype)initWithArbitraryArgument:(NSInteger)arbitraryArgument OBJC_DESIGNATED_INITIALIZER;
 // CHECK-NEXT: - (nonnull instancetype)init SWIFT_UNAVAILABLE;
-// CHECK-NEXT: + (nonnull instancetype)new SWIFT_DEPRECATED_MSG("-init is unavailable");
+// CHECK-NEXT: + (nonnull instancetype)new SWIFT_UNAVAILABLE_MSG("-init is unavailable");
 // CHECK-NEXT: @end
 @objc @objcMembers class NewBanned : NSObject {
   init(arbitraryArgument: Int) { super.init() }

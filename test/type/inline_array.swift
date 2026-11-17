@@ -90,12 +90,12 @@ let _ = S<[_?of 3]>()
 // expected-error@-2 {{could not infer type for placeholder}}
 let _ = S<[_! of 3]>()
 // expected-error@-1 {{element count must precede inline array element type}}
-// expected-warning@-2 {{using '!' here is deprecated; this is an error in the Swift 5 language mode}}
+// expected-error@-2 {{using '!' is not allowed here}}
 // expected-note@-3 {{use '?' instead}}
 // expected-error@-4 {{could not infer type for placeholder}}
 let _ = S<[_!of 3]>()
 // expected-error@-1 {{element count must precede inline array element type}}
-// expected-warning@-2 {{using '!' here is deprecated; this is an error in the Swift 5 language mode}}
+// expected-error@-2 {{using '!' is not allowed here}}
 // expected-note@-3 {{use '?' instead}}
 // expected-error@-4 {{could not infer type for placeholder}}
 let _ = S<[Int?of 3]>()

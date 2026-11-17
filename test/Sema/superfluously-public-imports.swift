@@ -187,7 +187,7 @@ public func useConformance(_ a: any Proto = ConformingType()) {}
 // expected-remark @-3 {{struct 'ConformingType' is imported via 'ConformanceBaseTypes'}}
 // expected-remark @-4 {{initializer 'init()' is imported via 'ConformanceBaseTypes'}}
 
-@usableFromInline internal func usableFromInlineFunc(_ a: TypeUsedInSignature) {}
+@usableFromInline internal func usableFromInlineFunc(_ a: TypeUsedInSignature) {} // expected-remark {{struct 'TypeUsedInSignature' is imported via 'DepUsedInSignature'}}
 
 @inlinable
 public func publicFuncUsesPrivate() {

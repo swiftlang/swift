@@ -92,6 +92,7 @@ func testPublicEnum(_ e: PublicEnum) {
   switch e {
   case .a: ()
   case .b(let x): let _: Int = x
+  @unknown default: ()
   }
 
   let _: Int = e.publicMethod()

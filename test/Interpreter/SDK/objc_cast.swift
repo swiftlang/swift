@@ -271,7 +271,7 @@ if let strArr = nsarrOpt as? [String] {
 }
 
 // CHECK-NEXT: NSArray!-to-bridged-array cast produced ["Hello", "Swift", "World"]
-var nsarrImplicitOpt = words as NSArray!
+var nsarrImplicitOpt: NSArray! = words as NSArray
 if let strArr = nsarrImplicitOpt as? [String] {
   print("NSArray!-to-bridged-array cast produced \(strArr)")
 } else {
@@ -391,7 +391,7 @@ if let strArr = objOpt as? [String] {
 
 // Optional of object to array casts.
 // CHECK-NEXT: Object-to-bridged-array cast produced ["Hello", "Swift", "World"]
-objImplicitOpt = words as AnyObject!
+objImplicitOpt = words as AnyObject
 if let strArr = objImplicitOpt as? [String] {
   print("Object-to-bridged-array cast produced \(strArr)")
 } else {

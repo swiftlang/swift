@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -verify-additional-prefix swift%language_mode-
+// RUN: %target-typecheck-verify-swift -enable-objc-interop -language-mode 4 -verify-additional-prefix swift4-
 
 protocol EmptyProtocol { }
 
@@ -342,7 +343,7 @@ extension Int : IndexValue {}
 // Class protocols
 //===----------------------------------------------------------------------===//
 
-protocol IntrusiveListNode : class {
+protocol IntrusiveListNode : AnyObject {
   var next : Self { get }
 }
 
@@ -403,7 +404,7 @@ struct StructDNode : IntrusiveDListNode { // expected-error{{non-class type 'Str
 @objc protocol ObjCProtocol {
   func foo() // expected-note{{protocol requires function 'foo()' with type '() -> ()'}}
 }
-protocol NonObjCProtocol : class { //expected-note{{protocol 'NonObjCProtocol' declared here}}
+protocol NonObjCProtocol : AnyObject { //expected-note{{protocol 'NonObjCProtocol' declared here}}
   func bar()
 }
 
@@ -447,7 +448,8 @@ protocol ShouldntCrash {
 
 // rdar://problem/18168866
 protocol FirstProtocol {
-    // expected-warning@+1 {{'weak' cannot be applied to a property declaration in a protocol; this is an error in the Swift 5 language mode}}
+    // expected-swift5-error@+2 {{'weak' cannot be applied to a property declaration in a protocol}}
+    // expected-swift4-warning@+1 {{'weak' cannot be applied to a property declaration in a protocol; this is an error in the Swift 5 language mode}}
     weak var delegate : SecondProtocol? { get } // expected-error{{'weak' must not be applied to non-class-bound 'any SecondProtocol'; consider adding a protocol conformance that has a class bound}}
 }
 

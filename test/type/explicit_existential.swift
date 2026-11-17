@@ -1,17 +1,14 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated \
-// RUN:   -verify-additional-prefix default-swift-mode-
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 6 \
 // RUN:   -verify-additional-prefix swift-6-
 
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature ExistentialAny \
-// RUN:   -verify-additional-prefix default-swift-mode- \
 // RUN:   -verify-additional-prefix explicit-any-
 
 // RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-upcoming-feature ExistentialAny:migrate \
 //        To verify that the message is not followed by
 //        "; this will be an error ...".
-// RUN:   -verify-additional-prefix default-swift-mode- \
 // RUN:   -verify-additional-prefix explicit-any-adopt-
 
 // REQUIRES: swift_feature_ExistentialAny
@@ -479,9 +476,8 @@ func testAnyFixIt() {
   let _: (~Copyable)?
   // expected-warning@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=any HasAssoc}}
   let _: HasAssoc!
-  // expected-note@+4 {{use '?' instead}}{{19-20=?}}
-  // expected-default-swift-mode-warning@+3 {{using '!' here is deprecated}}
-  // expected-swift-6-error@+2 {{using '!' is not allowed here}}
+  // expected-note@+3 {{use '?' instead}}{{19-20=?}}
+  // expected-error@+2 {{using '!' is not allowed here}}
   // expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
   let _: ~Copyable!
   // expected-warning@+1 {{constraint that suppresses conformance requires 'any'}}{{11-20=any ~Copyable}}

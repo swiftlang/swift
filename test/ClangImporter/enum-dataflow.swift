@@ -8,13 +8,15 @@ import user_objc
 let aliasOriginal = NSAliasesEnum.byName
 
 switch aliasOriginal { // expected-error {{switch must be exhaustive}}
-// expected-note@-1 {{add missing case: '.differentValue'}}
+// expected-note@-1 {{add missing cases: '.differentValue', '@unknown default'}}
+// expected-note@-2 {{handle unknown values using "@unknown default"}}
 case .original:
   break
 }
 
 switch aliasOriginal { // expected-error {{switch must be exhaustive}}
-// expected-note@-1 {{add missing cases: '.original', '.differentValue'}}
+// expected-note@-1 {{add missing cases: '.original', '.differentValue', '@unknown default'}}
+// expected-note@-2 {{handle unknown values using "@unknown default"}}
 case .bySameValue:
   break
 }

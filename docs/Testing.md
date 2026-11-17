@@ -122,8 +122,8 @@ out with ``lit.py -h``. We document some of the more useful ones below:
 
 * ``--param gmalloc`` will run all tests under Guard Malloc (macOS only). See
   ``man libgmalloc`` for more information.
-* ``--param swift-version=<MAJOR>`` overrides the default Swift language
-  version used by swift/swiftc and swift-ide-test.
+* ``--param swift-version=<MAJOR>`` overrides the language mode that the test
+  suite passes to swift, swiftc, and swift-ide-test.
 * ``--param interpret`` is an experimental option for running execution tests
   using Swift's interpreter rather than compiling them first. Note that this
   does not affect all substitutions.

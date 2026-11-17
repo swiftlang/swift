@@ -67,8 +67,7 @@ struct FileDescriptor: ~Copyable {
   var fd = 1
 }
 
-// FIXME: warning for 'class'
-protocol ClassOnly: class {}
+protocol ClassOnly: class {} // expected-warning {{using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead}}
 
 actor SomeActor { }
 @globalActor

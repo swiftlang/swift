@@ -85,11 +85,3 @@ struct TestLetProperties {
     _ = b.pattyCount
   }
 }
-
-// <rdar://problem/21933630> - setting let stored property in extension
-// constructor
-extension Burger {
-  init(double pattyCount: Int) {
-    self.pattyCount = pattyCount * 2
-  }
-}

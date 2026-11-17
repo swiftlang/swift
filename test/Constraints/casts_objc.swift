@@ -31,10 +31,13 @@ func nsobject_as_class_cast<T>(_ x: NSObject, _: T) {
 
 
 // <rdar://problem/20294245> QoI: Error message mentions value rather than key for subscript
-func test(_ a : CFString!, b : CFString) {
+func test(_ a : CFString!, b : CFString) { // expected-note {{implicitly unwrapped parameter 'a' declared here}}
   let dict = NSMutableDictionary()
   let object = NSObject()
-  dict[a] = object
+  dict[a] = object // expected-warning {{coercion of implicitly unwrappable value of type 'CFString?' to 'Any' does not unwrap optional}}
+  // expected-note@-1 {{force-unwrap the value to avoid this warning}}
+  // expected-note@-2 {{provide a default value to avoid this warning}}
+  // expected-note@-3 {{explicitly cast to 'Any' with 'as Any' to silence this warning}}
   dict[b] = object
 }
 

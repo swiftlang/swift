@@ -1,5 +1,7 @@
 // RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,SWIFT5
+// RUN: %target-swift-emit-silgen-ossa -o /dev/null -enable-sil-opaque-values -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -language-mode 4 %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library -language-mode 4 %s | %FileCheck %s --check-prefixes=CHECK,SWIFT4
 
 import Swift // just for Optional
 
@@ -135,9 +137,11 @@ func calls(_ i:Int, j:Int, k:Int) {
 
   // -- Use of unapplied struct methods as values.
 
-  // CHECK: [[THUNK:%.*]] = function_ref @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA10SomeStructVzcfu_
+#if swift(<5)
+  // SWIFT4: [[THUNK:%.*]] = function_ref @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA10SomeStructVzcfu_
   var stm1 = SomeStruct.method
   stm1(&st)(i)
+#endif
 
   // -- Curry 'self' onto method argument lists dispatched using class_method.
 
@@ -163,12 +167,14 @@ func calls(_ i:Int, j:Int, k:Int) {
   c.method(i)
 
   // -- Curry 'self' onto unapplied methods dispatched using class_method.
-  // CHECK: [[METHOD_CURRY_THUNK:%.*]] = function_ref @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu1_
+  // SWIFT5: [[METHOD_CURRY_THUNK:%.*]] = function_ref @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu_
+  // SWIFT4: [[METHOD_CURRY_THUNK:%.*]] = function_ref @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu1_
   // CHECK: apply [[METHOD_CURRY_THUNK]]
   var cm1 = SomeClass.method(c)
   cm1(i)
 
-  // CHECK: [[METHOD_CURRY_THUNK:%.*]] = function_ref @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu3_
+  // SWIFT5: [[METHOD_CURRY_THUNK:%.*]] = function_ref @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu1_
+  // SWIFT4: [[METHOD_CURRY_THUNK:%.*]] = function_ref @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu3_
   // CHECK: apply [[METHOD_CURRY_THUNK]]
   SomeClass.method(c)(i)
 
@@ -360,10 +366,11 @@ func calls(_ i:Int, j:Int, k:Int) {
 }
 
 // -- Curried entry points
-// CHECK-LABEL: sil private [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA10SomeStructVzcfu_yBi64_cfu0_ : $@convention(thin) (Builtin.Int64, @inout_aliasable SomeStruct) -> () {
-// CHECK: function_ref @$s9functions10SomeStructV6methodyyBi64_F : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> ()
+// SWIFT4-LABEL: sil private [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA10SomeStructVzcfu_yBi64_cfu0_ : $@convention(thin) (Builtin.Int64, @inout_aliasable SomeStruct) -> () {
+// SWIFT4: function_ref @$s9functions10SomeStructV6methodyyBi64_F : $@convention(method) (Builtin.Int64, @inout SomeStruct) -> ()
 
-// CHECK-LABEL: sil private [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu1_yBi64_cfu2_ : $@convention(thin) (Builtin.Int64, @guaranteed SomeClass) -> ()
+// SWIFT5-LABEL: sil private [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu_yBi64_cfu0_ : $@convention(thin) (Builtin.Int64, @guaranteed SomeClass) -> ()
+// SWIFT4-LABEL: sil private [ossa] @$s9functions5calls_1j1kyBi64__Bi64_Bi64_tFyBi64_cAA9SomeClassCcfu1_yBi64_cfu2_ : $@convention(thin) (Builtin.Int64, @guaranteed SomeClass) -> ()
 // CHECK: class_method %1 : $SomeClass, #SomeClass.method : (SomeClass) -> (Builtin.Int64) -> (), $@convention(method) (Builtin.Int64, @guaranteed SomeClass) -> ()
 
 func return_func() -> (_ x: Builtin.Int64, _ y: Builtin.Int64) -> Builtin.Int64 {

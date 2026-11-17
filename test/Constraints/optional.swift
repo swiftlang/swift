@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -language-mode 4
+// RUN: %target-typecheck-verify-swift -solver-enable-promote-supertypes -verify-additional-prefix swift%language_mode-
 
 func markUsed<T>(_ t: T) {}
 
@@ -87,7 +88,7 @@ func testVoidOptional() {
   voidOptional(noop)
 
   let optNoop: (()?) -> ()? = { return $0 }
-  voidOptional(optNoop)
+  voidOptional(optNoop) // expected-swift5-error {{cannot convert value of type '(()?) -> ()?' to expected argument type '() -> ()?'}}
 }
 
 protocol Proto1 {}
@@ -254,8 +255,10 @@ func se0213() {
     }
   }
 
-  _ = Q("why")?.foo // Ok
-  _ = Q("who")!.foo // Ok
+  _ = Q("why")?.foo // Ok in Swift 4
+  // expected-swift5-error@-1 {{cannot use optional chaining on non-optional value of type 'Q'}}
+  _ = Q("who")!.foo // Ok in Swift 4
+  // expected-swift5-error@-1 {{cannot force unwrap value of non-optional type 'Q'}}
   _ = Q?("how") // Ok
 }
 
