@@ -72,6 +72,7 @@ static bool collectRangeStartRefactorings(const ResolvedRangeInfo &Info) {
   case RangeKind::Invalid:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef swift::ide::

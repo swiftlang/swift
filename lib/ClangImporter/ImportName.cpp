@@ -84,6 +84,7 @@ Identifier importer::getOperatorName(ASTContext &ctx,
     return ctx.getIdentifier("__operator" #Name);
 #include "clang/Basic/OperatorKinds.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 Identifier importer::getOperatorName(ASTContext &ctx, Identifier op) {

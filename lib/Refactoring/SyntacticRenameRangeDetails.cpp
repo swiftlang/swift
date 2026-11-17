@@ -374,6 +374,7 @@ RegionType RenameRangeDetailCollector::getSyntacticRenameRegionType(
   case ResolvedLocContext::StringLiteral:
     return RegionType::String;
   }
+  llvm_unreachable("covered switch");
 }
 
 enum class SpecialBaseName {

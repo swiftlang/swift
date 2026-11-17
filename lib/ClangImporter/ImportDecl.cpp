@@ -6096,6 +6096,7 @@ namespace {
       case ImportedAccessorKind::DereferenceSetter:
         llvm_unreachable("dereference operators only exist in C++");
       }
+      llvm_unreachable("covered switch");
     }
 
     /// Check whether we have already imported a method with the given

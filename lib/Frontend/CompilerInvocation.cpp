@@ -427,6 +427,7 @@ void CompilerInvocation::computeCXXStdlibOptions() {
       case clang::driver::ToolChain::CST_Libstdcxx:
         return CXXStdlibKind::Libstdcxx;
       }
+      llvm_unreachable("covered switch");
     };
 
     LangOpts.CXXStdlib = toCXXStdlibKind(cxxStdlibKind);

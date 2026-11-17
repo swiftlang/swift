@@ -2675,6 +2675,7 @@ public:
       printHelp();
       return 1;
     }
+    llvm_unreachable("covered switch");
   }
 };
 
