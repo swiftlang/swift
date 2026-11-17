@@ -2055,6 +2055,19 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
 
   TinyPtrVector<ProtocolDecl *> introducedConformances;
   for (auto protocol : *potentialConformances) {
+    // Protocols have no conformance table, so 'lookupConformance' cannot be
+    // used for them (it asserts). For a protocol, the equivalent of an
+    // existing conformance is inheritance: every type that conforms to it also
+    // conforms to the protocols it inherits from, so those count as already
+    // present. Reporting them as missing would lead a macro to emit
+    // 'extension Proto: Inherited', which is an error, because a protocol
+    // extension cannot declare inheritance.
+    if (auto *proto = dyn_cast<ProtocolDecl>(nominal)) {
+      if (!proto->inheritsFrom(protocol))
+        introducedConformances.push_back(protocol);
+      continue;
+    }
+
     SmallVector<ProtocolConformance *, 2> existingConformances;
     nominal->lookupConformance(protocol, existingConformances);
 
