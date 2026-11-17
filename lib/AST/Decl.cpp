@@ -1998,6 +1998,7 @@ GenericParamList *GenericContext::getParsedGenericParams() const {
   case GenericParamsState::TypeChecked:
     return nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool GenericContext::hasComputedGenericSignature() const {
@@ -11314,6 +11315,7 @@ bool AbstractFunctionDecl::hasBody() const {
   case BodyKind::TypeChecked:
     return BodyAndFP.getBody() != nullptr;
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AbstractFunctionDecl::bodyHasExplicitReturnStmt() const {
@@ -11428,6 +11430,7 @@ BraceStmt *AbstractFunctionDecl::getMacroExpandedBody() const {
   case BodyKind::Deserialized:
     return getBody(/*canSynthesize=*/true);
   }
+  llvm_unreachable("covered switch");
 }
 
 BraceStmt *AbstractFunctionDecl::getBody(bool canSynthesize) const {
@@ -12616,6 +12619,7 @@ StringRef AccessorDecl::implicitParameterNameFor(AccessorKind kind) {
   case AccessorKind::Mutate:
     return StringRef();
   }
+  llvm_unreachable("covered switch");
 }
 
 bool AccessorDecl::isAssumedNonMutating() const {
@@ -13856,6 +13860,7 @@ StringRef swift::getMacroRoleString(MacroRole role) {
     return Description;
 #include "swift/Basic/MacroRoles.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 std::vector<MacroIntroducedDeclNameKind>
@@ -13882,6 +13887,7 @@ bool swift::macroIntroducedNameRequiresArgument(
   case MacroIntroducedDeclNameKind::Arbitrary:
     return false;
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef swift::getMacroIntroducedDeclNameString(
@@ -13902,6 +13908,7 @@ StringRef swift::getMacroIntroducedDeclNameString(
   case MacroIntroducedDeclNameKind::Arbitrary:
     return "arbitrary";
   }
+  llvm_unreachable("covered switch");
 }
 
 static MacroRoles freestandingMacroRoles =
@@ -13952,6 +13959,7 @@ bool swift::isMacroSupported(MacroRole role, ASTContext &ctx) {
 #include "swift/Basic/MacroRoles.def"
     return true;
   }
+  llvm_unreachable("covered switch");
 }
 
 void MissingDecl::forEachMacroExpandedDecl(MacroExpandedDeclCallback callback) {
@@ -14372,6 +14380,7 @@ MacroDiscriminatorContext::getInnermostMacroContext(DeclContext *dc) {
     // their context.
     return getInnermostMacroContext(dc->getParent());
   }
+  llvm_unreachable("covered switch");
 }
 
 /// Retrieve the parent discriminator context for the given macro.
@@ -14423,6 +14432,7 @@ MacroDiscriminatorContext MacroDiscriminatorContext::getParentOf(
   case GeneratedSourceInfo::SyntheticMacro:
     return origDC;
   }
+  llvm_unreachable("covered switch");
 }
 
 MacroDiscriminatorContext

@@ -280,6 +280,7 @@ public:
     case NonisolatedUnsafe:
       return false;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// In the debugger return the index for the stored actorInstance pointer

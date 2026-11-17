@@ -1346,6 +1346,7 @@ public:
     case BuiltinConformanceKind::Missing:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   SourceLoc getLoc() const {

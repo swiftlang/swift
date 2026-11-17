@@ -656,6 +656,7 @@ static StringRef getDumpString(OptimizationMode mode) {
   case OptimizationMode::ForSize:
     return "ForSize";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(NonSendableKind kind) {
   switch (kind) {
@@ -664,6 +665,7 @@ static StringRef getDumpString(NonSendableKind kind) {
   case NonSendableKind::Specific:
     return "Specific";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(FunctionRefInfo::ApplyLevel applyLevel) {
   switch (applyLevel) {
@@ -674,6 +676,7 @@ static StringRef getDumpString(FunctionRefInfo::ApplyLevel applyLevel) {
   case FunctionRefInfo::ApplyLevel::DoubleApply:
     return "double_apply";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(ExplicitSafety safety) {
   switch (safety) {
@@ -684,6 +687,7 @@ static StringRef getDumpString(ExplicitSafety safety) {
   case ExplicitSafety::Unsafe:
     return "unsafe";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(ExecutionSemantics semantics) {
   switch (semantics) {
@@ -692,6 +696,7 @@ static StringRef getDumpString(ExecutionSemantics semantics) {
   case ExecutionSemantics::Once:
     return "exactly_once";
   }
+  llvm_unreachable("covered switch");
 }
 static StringRef getDumpString(ConformanceEntryKind kind) {
   switch (kind) {

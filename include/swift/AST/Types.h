@@ -5737,6 +5737,7 @@ public:
     case SILCoroutineKind::YieldOnce2:
       return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   bool isSendable() const { return getExtInfo().isSendable(); }

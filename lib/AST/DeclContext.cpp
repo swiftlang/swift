@@ -1013,6 +1013,7 @@ SourceRange IterableDeclContext::getBraces() const {
     return cast<ExtensionDecl>(this)->getBraces();
     break;
   }
+  llvm_unreachable("covered switch");
 }
 
 DeclRange IterableDeclContext::getCurrentMembersWithoutLoading() const {

@@ -40,6 +40,7 @@ FunctionRefInfo FunctionRefInfo::addingApplicationLevel() const {
     case ApplyLevel::DoubleApply:
       return ApplyLevel::DoubleApply;
     }
+    llvm_unreachable("covered switch");
   };
   return FunctionRefInfo(withApply(), isCompoundName(), hasModuleSelector());
 }

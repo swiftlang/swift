@@ -262,6 +262,7 @@ GenericParamListRequest::getCachedResult() const {
   case GenericParamsState::Parsed:
     return std::nullopt;
   }
+  llvm_unreachable("covered switch");
 }
 
 void GenericParamListRequest::cacheResult(GenericParamList *params) const {

@@ -104,6 +104,7 @@ AvailabilityQuery AvailabilityQuery::forDomain(
       return dynamic(domain, primaryRange, variantRange);
     }
   }
+  llvm_unreachable("covered switch");
 }
 
 static void unpackVersion(const llvm::VersionTuple &version,
@@ -235,6 +236,7 @@ FuncDecl *AvailabilityQuery::getDynamicQueryDeclAndArguments(
   case AvailabilityDomain::Kind::Custom:
     return domain.getCustomDomain()->getPredicateFunc();
   }
+  llvm_unreachable("covered switch");
 }
 
 llvm::StringRef swift::getOSVersionQueryKindName(OSVersionQueryKind kind) {

@@ -81,6 +81,7 @@ LLVM_ATTRIBUTE_USED StringRef swift::getDeclAttrKindID(DeclAttrKind kind) {
     return #CLASS;
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef swift::getAccessLevelSpelling(AccessLevel value) {
@@ -518,6 +519,7 @@ DeclAttribute *DeclAttribute::clone(ASTContext &ctx) const {
   case DeclAttrKind::CLASS: return static_cast<const CLASS##Attr *>(this)->clone(ctx);
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 bool DeclAttribute::canClone() const {
@@ -529,6 +531,7 @@ bool DeclAttribute::canClone() const {
     return static_cast<const CLASS##Attr *>(this)->canClone();
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 // Ensure that every DeclAttribute subclass implements its own isEquivalent().
@@ -550,6 +553,7 @@ bool DeclAttribute::isEquivalent(const DeclAttribute *other, Decl *attachedTo) c
                 static_cast<const CLASS##Attr *>(other), attachedTo);
 #include "swift/AST/DeclAttr.def"
   }
+  llvm_unreachable("covered switch");
 }
 
 const BackDeployedAttr *

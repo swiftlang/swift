@@ -499,6 +499,7 @@ MacroSyntax unbridge(BridgedMacroSyntax cSyntax) {
   case BridgedMacroSyntaxFreestanding:
     return MacroSyntax::Freestanding;
   }
+  llvm_unreachable("covered switch");
 }
 
 BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(

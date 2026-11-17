@@ -533,4 +533,5 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
   case UnrepresentableZeroSizedValueType:
     return Diagnostic(diag::expose_zero_size_to_cxx, vd);
   }
+  llvm_unreachable("covered switch");
 }

@@ -244,6 +244,7 @@ private:
     case Kind::ResolvedPluginConfig:
       return Members::indexOf<ResolvedPluginConfig>();
     }
+    llvm_unreachable("covered switch");
   };
   using Storage = ExternalUnion<Kind, Members, getIndexForKind>;
 

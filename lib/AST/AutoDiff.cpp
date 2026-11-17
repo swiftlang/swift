@@ -702,6 +702,7 @@ Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
     return Demangle::AutoDiffFunctionKind::JVP;
   case AutoDiffDerivativeFunctionKind::VJP: return Demangle::AutoDiffFunctionKind::VJP;
   }
+  llvm_unreachable("covered switch");
 }
 
 Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
@@ -712,6 +713,7 @@ Demangle::AutoDiffFunctionKind Demangle::getAutoDiffFunctionKind(
   case AutoDiffLinearMapKind::Pullback:
     return Demangle::AutoDiffFunctionKind::Pullback;
   }
+  llvm_unreachable("covered switch");
 }
 
 Demangle::MangledDifferentiabilityKind
@@ -727,4 +729,5 @@ Demangle::getMangledDifferentiabilityKind(DifferentiabilityKind kind) {
   SIMPLE_CASE(Linear)
   #undef SIMPLE_CASE
   }
+  llvm_unreachable("covered switch");
 }

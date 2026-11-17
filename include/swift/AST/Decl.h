@@ -6515,6 +6515,7 @@ public:
       case StorageMutability::Initializable:
         return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Determine the mutability of this storage declaration when
@@ -6548,6 +6549,7 @@ public:
       case StorageMutability::Initializable:
         return true;
     }
+    llvm_unreachable("covered switch");
   }
 
   /// Does this storage declaration have explicitly-defined accessors
@@ -6883,6 +6885,7 @@ public:
     case VarDecl::Introducer::Borrowing:
       return "_borrowing";
     }
+    llvm_unreachable("covered switch");
   }
 
 protected:

@@ -921,6 +921,7 @@ SemanticAvailableAttr::getIntroducedDomainAndRange(
   case AvailableAttr::Kind::NoAsync:
     return std::nullopt;
   }
+  llvm_unreachable("covered switch");
 }
 
 std::optional<llvm::VersionTuple> SemanticAvailableAttr::getDeprecated() const {

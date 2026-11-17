@@ -3947,6 +3947,7 @@ bool BuiltinType::isBitwiseCopyable() const {
         C.getProtocol(KnownProtocolKind::BitwiseCopyable));
   }
   }
+  llvm_unreachable("covered switch");
 }
 
 StringRef BuiltinType::getTypeName(SmallVectorImpl<char> &result,
