@@ -235,12 +235,6 @@ struct ModulePassContext : Context, CustomStringConvertible {
     return String(taking: bridgedPassContext.mangleAsyncRemoved(function.bridged))
   }
 
-  func mangle(withDeadArguments: [Int], from function: Function) -> String {
-    withDeadArguments.withBridgedArrayRef { bridgedArgIndices in
-      String(taking: bridgedPassContext.mangleWithDeadArgs(bridgedArgIndices, function.bridged))
-    }
-  }
-
   func erase(function: Function) {
     bridgedPassContext.eraseFunction(function.bridged)
   }
