@@ -40,7 +40,8 @@ public final actor ActorWithField {
 
 // CHECK: class SWIFT_SYMBOL("s:5Actor0A9WithFieldC") ActorWithField final : public swift::_impl::RefCountedClass {
 // CHECK:   static SWIFT_INLINE_THUNK ActorWithField init() noexcept SWIFT_SYMBOL("s:5Actor0A9WithFieldCACycfc");
-// CHECK:   SWIFT_INLINE_THUNK void method() noexcept SWIFT_SYMBOL("s:5Actor0A9WithFieldC6methodyyF");
+// CHECK-NEXT: // Unavailable in C++: Swift instance method 'isolatedMethod()'. actor-isolated instance method 'isolatedMethod()' can not be exposed to C++.
+// CHECK-NEXT: SWIFT_INLINE_THUNK void method() noexcept SWIFT_SYMBOL("s:5Actor0A9WithFieldC6methodyyF");
 
 @_expose(Cxx)
 public func takeActorWithIntField(_ x: ActorWithField) {
