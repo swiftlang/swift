@@ -9,6 +9,17 @@
 // RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature AddressableParameters
+// RUN: %target-swift-frontend -enable-lifetime-resolution %s -emit-module -emit-module-interface-path %t/test.swiftmodule \
+// RUN:   -swift-version 5 \
+// RUN:   -o /dev/null \
+// RUN:   -enable-library-evolution \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -enable-builtin-module \
+// RUN:   -module-name test \
+// RUN:   -define-availability "Span 0.1:macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999" \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature AddressableParameters
 
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_AddressableParameters

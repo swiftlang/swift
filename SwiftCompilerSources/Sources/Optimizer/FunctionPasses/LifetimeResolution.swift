@@ -703,6 +703,8 @@ private struct MultiDefResolver {
       tupleAddrConstructor.set(isInitializationOfDestination: initialization, context)
     case is FullApplySite:
       return initialization
+    case let builtin as BuiltinInst where builtin.id == .PrepareInitialization:
+      return initialization
     default:
       // TODO: handle assign_or_init, store_weak, store_unowned, etc.
       log("unhandled def: \(inst)")
@@ -977,16 +979,24 @@ private struct MultiDefResolver {
         addLiveness(operand)
         return .continueWalk
       }
-      // If the loaded SSA value is consumed by some non-destroying instruction, its demand is "own".
-      func hasConsumingUser(_ op: Operand) -> Bool {
-        return op.ownership == .forwardingConsume || op.instruction is MoveValueInst
+      // If the loaded SSA value is consumed by anything other than a plain clean-up, its demand is "own".
+      // This includes forwarding consumes and destroying consumes such as stores, move_value, and owned call arguments.
+      func hasConsumingLoadUser(_ op: Operand) -> Bool {
+        switch op.ownership {
+        case .forwardingConsume:
+          return true
+        case .destroyingConsume:
+          return !(op.instruction is DestroyValueInst || op.instruction is EndLifetimeInst)
+        default:
+          return false
+        }
       }
       let range = self.range(of: operand)
       switch load.loadOwnership {
       case .take:
           addUse(.take(operand, .own), range)   // TODO: what about a take where all non-destroy users borrow?
       case .unqualified, .copy:
-        if load.uses.filter(hasConsumingUser).isEmpty {
+        if load.uses.filter(hasConsumingLoadUser).isEmpty {
           addUse(.use(operand, .borrow), range)
         } else {
           addUse(.use(operand, .own), range)
@@ -1013,6 +1023,8 @@ private struct MultiDefResolver {
         addUse(.def(operand), range(of: operand))
       case let srcDestInst as SourceDestAddrInstruction where srcDestInst.destinationOperand == operand:
         addUse(.def(operand), range(of: operand))
+      case let builtin as BuiltinInst where builtin.id == .PrepareInitialization:
+        addUse(.def(operand), range(of: operand))
       case is DestroyAddrInst:
         addUse(.end(operand), range(of: operand))
       case is DeallocStackInst:
@@ -1030,7 +1042,11 @@ private struct MultiDefResolver {
       case .indirectIn:
         addUse(.take(operand, .own), range(of: operand))
       default:
-        addLiveness(operand)
+        // A coroutine may access the memory until its scope ends.
+        let range = self.range(of: operand)
+        for end in apply.endInstructions {
+          addUse(.liveness(end), range)
+        }
       }
       return .continueWalk
     }
@@ -1263,7 +1279,7 @@ private struct MultiDefResolver {
       var demandKill: Demand {
         switch self {
         case .def, .superInit: .all
-        case .root(_, initialized: true): .all // A root that starts initialized is a def.
+        case .root: .all  // Nothing can be demanded of the storage before it exists.
         default: .nothing
         }
       }

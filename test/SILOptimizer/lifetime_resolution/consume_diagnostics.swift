@@ -13,7 +13,7 @@ struct NC: ~Copyable {
   consuming func eat() {}
   borrowing func look() {}
 }
-func takeNC(_ x: consuming NC) {} // expected-note 11 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}} {{18-27=borrowing}}
+func takeNC(_ x: consuming NC) {} // expected-note 12 {{consider making this parameter 'borrowing' if 'takeNC' does not need ownership of it}} {{18-27=borrowing}}
 func useNC(_ x: borrowing NC) {}
 func takeAndUse(_ a: consuming NC, _ b: borrowing NC) {} // expected-note {{consider making this parameter 'borrowing' if 'takeAndUse' does not need ownership of it}} {{22-31=borrowing}}
 func takeGeneric<T: ~Copyable>(_ t: consuming T) {} // expected-note {{consider making this parameter 'borrowing' if 'takeGeneric' does not need ownership of it}}
@@ -23,6 +23,32 @@ func usedAfterConsume() {
   let x = NC(c: C()) // expected-note {{'x' declared here with noncopyable type 'NC'}}
   takeNC(x) // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
   useNC(x) // expected-error {{'x' used after consume}}
+}
+
+func usedAfterConsumeLets() {
+  let x = NC(c: C())     // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  let y = x              // expected-note {{consumed here}}
+  useNC(x)                    // expected-error {{'x' used after consume}}
+  _ = y
+}
+
+func multiAssignConsume(_ x: inout NC) {  // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  var y = NC(c: C())
+  y = x            // expected-note {{consumed here}}
+  y = x            // expected-error {{'x' consumed more than once}}
+  _ = y
+}
+
+func inoutOwnedArgConsumedTwice(_ x: inout NC) { // expected-note {{'x' declared here with noncopyable type 'NC'}}
+  takeNC(x)  // expected-note {{consumed here; 'takeNC' takes ownership of this argument}}
+  takeNC(x)  // expected-error {{'x' consumed more than once}}
+  x = NC(c: C())
+}
+
+func inoutReturned(_ x: inout NC) -> NC {
+  let y = x
+  x = NC(c: C())
+  return y
 }
 
 func consumedTwice() {

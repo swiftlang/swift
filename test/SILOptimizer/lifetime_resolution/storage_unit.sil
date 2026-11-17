@@ -28,6 +28,7 @@ sil @barrier : $@convention(thin) () -> ()
 sil @useC_addr : $@convention(thin) (@in_guaranteed C) -> ()
 sil @consumeC_addr : $@convention(thin) (@in C) -> ()
 sil @consumeK_addr : $@convention(thin) (@in K) -> ()
+sil @readK_addr : $@yield_once @convention(thin) (@in_guaranteed K) -> @yields @guaranteed K
 sil @produceC : $@convention(thin) () -> @out C
 
 // CHECK-LABEL: sil [ossa] @basic_take_of_uninit_box :
@@ -2488,4 +2489,104 @@ bb0(%0 : @noImplicitCopy @closureCapture $*K):
   %6 = function_ref @barrier : $@convention(thin) () -> ()
   %7 = apply %6() : $@convention(thin) () -> ()
   unreachable
+}
+
+// A coroutine may access the memory until its scope ends, so a load within that scope must
+// be a copy instead of a take.
+// CHECK-LABEL: sil [ossa] @take_within_coroutine_scope :
+// CHECK:          [[A:%.*]] = alloc_stack [lexical] $K
+// CHECK:          ({{%.*}}, [[TOK:%.*]]) = begin_apply {{%.*}}([[A]])
+// CHECK-NEXT:     load [copy] [[A]] : $*K
+// CHECK:          end_apply [[TOK]]
+// CHECK-NEXT:     destroy_addr [[A]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @take_within_coroutine_scope : $@convention(thin) () -> () {
+bb0:
+  %a = alloc_stack [lexical] $K
+  specify_test "lifetime_resolution_resolve %a"
+  %getK = function_ref @getK : $@convention(thin) () -> @owned K
+  %v = apply %getK() : $@convention(thin) () -> @owned K
+  store %v to [init] %a
+  %read = function_ref @readK_addr : $@yield_once @convention(thin) (@in_guaranteed K) -> @yields @guaranteed K
+  (%y, %tok) = begin_apply %read(%a) : $@yield_once @convention(thin) (@in_guaranteed K) -> @yields @guaranteed K
+  %l = load [copy] %a
+  %consumeK = function_ref @consumeK : $@convention(thin) (@owned K) -> ()
+  apply %consumeK(%l) : $@convention(thin) (@owned K) -> ()
+  %useK = function_ref @useK : $@convention(thin) (@guaranteed K) -> ()
+  apply %useK(%y) : $@convention(thin) (@guaranteed K) -> ()
+  end_apply %tok as $()
+  destroy_addr %a
+  dealloc_stack %a
+  %t = tuple ()
+  return %t
+}
+
+// Demand above the allocation, from a use before initialization, doesn't reach the previous
+// iteration's take.
+// CHECK-LABEL: sil [ossa] @loop_alloc_use_before_init :
+// CHECK:       bb1:
+// CHECK:         [[ROOT:%.*]] = alloc_stack [lexical] [var_decl] $NC
+// CHECK-NEXT:    [[K:%.*]] = struct_element_addr [[ROOT]] : $*NC, #NC.k
+// CHECK-NEXT:    assign undef to [init] [[K]]
+// CHECK:         load [take] [[ROOT]]
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @loop_alloc_use_before_init : $@convention(thin) () -> () {
+bb0:
+  br bb1
+
+bb1:
+  %0 = alloc_stack [lexical] [var_decl] $NC, var, name "x"
+  specify_test "lifetime_resolution_resolve %0"
+  %useFn = function_ref @useNC : $@convention(thin) (@guaranteed NC) -> ()
+  %b = load_borrow %0 : $*NC
+  apply %useFn(%b) : $@convention(thin) (@guaranteed NC) -> ()
+  end_borrow %b : $NC
+  %getFn = function_ref @getNC : $@convention(thin) () -> @owned NC
+  %v = apply %getFn() : $@convention(thin) () -> @owned NC
+  store %v to [init] %0 : $*NC
+  %consumeFn = function_ref @consumeNC : $@convention(thin) (@owned NC) -> ()
+  %t = load [take] %0 : $*NC
+  apply %consumeFn(%t) : $@convention(thin) (@owned NC) -> ()
+  dealloc_stack %0 : $*NC
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r
+}
+
+// A box deallocated where it was never initialized demands nothing there.
+// CHECK-LABEL: sil [ossa] @box_dealloc_on_uninit_path :
+// CHECK-NOT:     assign undef
+// CHECK:         store {{%.*}} to [init]
+// CHECK:         destroy_value
+// CHECK:         dealloc_box
+// CHECK:       } // end sil function
+sil [ossa] [unresolved] @box_dealloc_on_uninit_path : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_box ${ var K }, var, name "a"
+  %1 = begin_borrow [lexical] [var_decl] %0 : ${ var K }
+  %root = project_box %1 : ${ var K }, 0
+  specify_test "lifetime_resolution_resolve %0"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %getFn = function_ref @getK : $@convention(thin) () -> @owned K
+  %k = apply %getFn() : $@convention(thin) () -> @owned K
+  store %k to [init] %root : $*K
+  end_borrow %1
+  destroy_value %0
+  br bb3
+
+bb2:
+  end_borrow %1
+  dealloc_box %0
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t
 }
