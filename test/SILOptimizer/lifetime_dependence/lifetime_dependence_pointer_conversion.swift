@@ -4,6 +4,12 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature Lifetimes
+// RUN: %target-swift-frontend -enable-lifetime-resolution %s -emit-sil \
+// RUN:   -o /dev/null \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -module-name test \
+// RUN:   -enable-experimental-feature Lifetimes
 // RUN: %target-swift-frontend %s -emit-sil \
 // RUN:   -o /dev/null \
 // RUN:   -verify \
