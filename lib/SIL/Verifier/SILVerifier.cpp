@@ -5834,6 +5834,9 @@ public:
     require(canConvertExecutionSemantics(opTI->getExecutionSemantics(),
                                          resTI->getExecutionSemantics()),
             "convert_function cannot drop execution semantics");
+    require(!resTI->isNoncopyable() || opTI->isNoncopyable(),
+            "convert_function cannot form a noncopyable value; a thunk must "
+            "form it");
     require(!resTI->isNondeinitable() || opTI->isNondeinitable(),
             "convert_function cannot form a nondeinitable value; a thunk "
             "must form it");
@@ -5863,6 +5866,8 @@ public:
         opTI, resTI->getWithExtInfo(resTI->getExtInfo().withNoEscape(false)),
         "convert_escape_to_noescape cannot change function ABI",
         *ICI->getFunction());
+    require(opTI->getExecutionSemantics() == resTI->getExecutionSemantics(),
+            "convert_escape_to_noescape cannot change execution semantics");
 
     // After mandatory passes convert_escape_to_noescape should not have the
     // '[not_guaranteed]' or '[escaped]' attributes.

@@ -569,6 +569,75 @@ llvm::Function *IRGenModule::getExactlyOnceClosureDestructor() {
   return fn;
 }
 
+bool irgen::isClosureContextDestroyedDirectly(IRGenModule &IGM,
+                                              CanSILFunctionType fnType) {
+  return fnType->isNoncopyable() &&
+         IGM.Context.LangOpts.hasFeature(Feature::Embedded);
+}
+
+void irgen::emitDestroyEmbeddedNoncopyableClosureContext(IRGenFunction &IGF,
+                                                         llvm::Value *context) {
+  auto &IGM = IGF.IGM;
+  assert(IGM.Context.LangOpts.hasFeature(Feature::Embedded));
+
+  // A closure without captures can have a null context.
+  if (isa<llvm::ConstantPointerNull>(context))
+    return;
+
+  // The helper is the same in every module, so the linker can pick any copy.
+  llvm::Type *argTys[] = {IGM.RefCountedPtrTy};
+  auto *helper = IGM.getOrCreateHelperFunction(
+      "__swift_destroy_noncopyable_closure_context", IGM.VoidTy, argTys,
+      [&](IRGenFunction &helperIGF) {
+        auto &Builder = helperIGF.Builder;
+        llvm::Value *object = &*helperIGF.CurFn->arg_begin();
+
+        auto *destroyBB = helperIGF.createBasicBlock("destroy");
+        auto *doneBB = helperIGF.createBasicBlock("done");
+        auto *isNull = Builder.CreateIsNull(object);
+        Builder.CreateCondBr(isNull, doneBB, destroyBB);
+
+        // An Embedded heap object's metadata holds the destructor right after
+        // the superclass pointer. Call it the way that the runtime does when
+        // it releases the last reference, but don't touch the reference count:
+        // the context belongs to the closure alone, and a stack-allocated one
+        // must not be deallocated.
+        Builder.emitBlock(destroyBB);
+        Address metadataSlot(object, IGM.PtrTy, IGM.getPointerAlignment());
+        llvm::Value *metadata = Builder.CreateLoad(metadataSlot);
+        auto metadataAuthInfo = PointerAuthInfo::emit(
+            helperIGF, IGM.getOptions().PointerAuth.EmbeddedHeapObjectMetadata,
+            metadataSlot.getAddress(), PointerAuthEntity());
+        if (metadataAuthInfo)
+          metadata = emitPointerAuthAuth(helperIGF, metadata, metadataAuthInfo);
+        auto destructorSlot = helperIGF.emitAddressAtOffset(
+            metadata, Offset(IGM.getPointerSize()), IGM.PtrTy,
+            IGM.getPointerAlignment());
+        llvm::Value *destructor = Builder.CreateLoad(destructorSlot);
+        auto destructorAuthInfo = PointerAuthInfo::emit(
+            helperIGF, IGM.getOptions().PointerAuth.HeapDestructors,
+            destructorSlot.getAddress(),
+            PointerAuthEntity::Special::HeapDestructor);
+        auto attrs = IGM.constructInitialAttributes();
+        IGM.addSwiftSelfAttributes(attrs, 0);
+        Signature signature(IGM.DeallocatingDtorTy, attrs, IGM.SwiftCC);
+        auto destructorFn = FunctionPointer::createSigned(
+            FunctionPointer::Kind::Function, destructor, destructorAuthInfo,
+            signature);
+        auto *call = Builder.CreateCall(destructorFn, {object});
+        call->setDoesNotThrow();
+        Builder.CreateBr(doneBB);
+
+        Builder.emitBlock(doneBB);
+        Builder.CreateRetVoid();
+      },
+      /*setIsNoInline=*/true);
+
+  auto *call = IGF.Builder.CreateCallWithoutDbgLoc(
+      cast<llvm::Function>(helper)->getFunctionType(), helper, {context});
+  call->setDoesNotThrow();
+}
+
 /// Create the destructor function for a layout.
 /// TODO: give this some reasonable name and possibly linkage.
 static llvm::Function *createDtorFn(IRGenModule &IGM, const HeapLayout &layout,
