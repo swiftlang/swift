@@ -225,7 +225,7 @@ const LoadableTypeInfo *TypeConverter::convertBuiltinUnknownObject() {
   }
   
   // Without ObjC interop, UnknownObject handles just like a NativeObject.
-  return convertBuiltinNativeObject();
+  return convertBuiltinNativeObject(/*isNonTransferable=*/false);
 }
 
 namespace {

@@ -107,6 +107,7 @@ private:
   const TypeInfo *FirstType;
   
   const LoadableTypeInfo *NativeObjectTI = nullptr;
+  const LoadableTypeInfo *NonTransferableNativeObjectTI = nullptr;
   const LoadableTypeInfo *UnknownObjectTI = nullptr;
   const LoadableTypeInfo *BridgeObjectTI = nullptr;
   const LoadableTypeInfo *RawPointerTI = nullptr;
@@ -133,10 +134,12 @@ private:
     OpaqueStorageTypes;
 
   const LoadableTypeInfo *NonFixedBoxTI = nullptr;
+  const LoadableTypeInfo *NonTransferableNonFixedBoxTI = nullptr;
   const LoadableTypeInfo *EmptyBoxTI = nullptr;
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     PODBoxTI;
   const LoadableTypeInfo *SwiftRetainablePointerBoxTI = nullptr,
+                         *NonTransferableSwiftRetainablePointerBoxTI = nullptr,
                          *UnknownObjectRetainablePointerBoxTI = nullptr;
 
   llvm::StringMap<YAMLTypeInfoNode> LegacyTypeInfos;
@@ -177,7 +180,7 @@ private:
   const TypeInfo *convertParameterizedProtocolType(ParameterizedProtocolType *T);
   const TypeInfo *convertExistentialType(ExistentialType *T);
   const TypeInfo *convertPackType(SILPackType *T);
-  const LoadableTypeInfo *convertBuiltinNativeObject();
+  const LoadableTypeInfo *convertBuiltinNativeObject(bool isNonTransferable);
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
   const TypeInfo *convertResilientStruct(IsCopyable_t copyable,
@@ -210,6 +213,8 @@ public:
   const TypeLayoutEntry
   &getTypeLayoutEntry(SILType T, bool useStructLayouts);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
+  /// A native object that can never be 'Transferable'.
+  const LoadableTypeInfo &getNonTransferableNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
   const LoadableTypeInfo &getImplicitActorTypeInfo();

@@ -4,10 +4,11 @@
 // REQUIRES: executable_test
 // REQUIRES: swift_feature_NontransferableTypes
 
-// The reference counts of instances of a non-'Transferable' class and of the
-// contexts of @nontransferable functions are updated non-atomically. Check
-// that they are still balanced, including when values are copied through
-// value witnesses and mixed with 'Transferable' instances.
+// The reference counts of instances of a non-'Transferable' class, of the
+// contexts of @nontransferable functions and of boxes of non-'Transferable'
+// values are updated non-atomically. Check that they are still balanced,
+// including when values are copied through value witnesses and mixed with
+// 'Transferable' instances.
 
 final class NT: ~Transferable {
   let id: Int
@@ -88,6 +89,39 @@ func testClosures() {
   converted()
 }
 
+func testCapturedVar() {
+  var nt = NT(8)
+  let f: @nontransferable () -> Void = {
+    nt = NT(9)
+    print("captured \(nt.id)")
+  }
+  let (a, b) = duplicate(f)
+  a()
+  b()
+  print("after \(nt.id)")
+}
+
+indirect enum List: ~Transferable {
+  case end
+  case cons(NT, List)
+}
+
+@inline(never)
+func count(_ list: List) -> Int {
+  switch list {
+  case .end:
+    return 0
+  case .cons(let nt, let rest):
+    return nt.id + count(rest)
+  }
+}
+
+func testList() {
+  let list = List.cons(NT(10), .cons(NT(11), .end))
+  let (a, b) = duplicate(list)
+  print("list \(count(a)) \(count(b))")
+}
+
 func testTree() {
   let tree = Tree<Int>.node(NT(5), .leaf(0), .node(NT(6), .leaf(0), .leaf(0)))
   let (a, b) = duplicate(tree)
@@ -128,6 +162,23 @@ print("done unowned")
 testClosures()
 print("done closures")
 // CHECK: done closures
+
+// CHECK-NEXT: deinit NT 8
+// CHECK-NEXT: captured 9
+// CHECK-NEXT: deinit NT 9
+// CHECK-NEXT: captured 9
+// CHECK-NEXT: after 9
+// CHECK-NEXT: deinit NT 9
+testCapturedVar()
+print("done captured var")
+// CHECK-NEXT: done captured var
+
+// CHECK-NEXT: list 21 21
+// CHECK-DAG: deinit NT 10
+// CHECK-DAG: deinit NT 11
+testList()
+print("done list")
+// CHECK: done list
 
 // CHECK-NEXT: tree 11 11
 // CHECK-DAG: deinit NT 5

@@ -1024,17 +1024,6 @@ valueWitnessRequiresCopyability(ValueWitness index) {
 
 
 
-/// Whether reference counting operations on values of \p type could be
-/// non-atomic, because they could reference an instance that is confined to a
-/// single isolation domain.
-static bool mayUseNonAtomicReferenceCounting(CanType type) {
-  // SIL boxes don't have conformances and are always counted atomically.
-  if (isa<SILBoxType>(type))
-    return false;
-
-  return !type->isTransferable();
-}
-
 /// Find a witness to the fact that a type is a value type.
 /// Always adds an i8*.
 static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
@@ -1051,7 +1040,7 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
   // The standard witnesses for a single strong reference are atomic.
   bool usesStandardStrongWitnesses =
       concreteTI.isSingleSwiftRetainablePointer(ResilienceExpansion::Maximal) &&
-      !mayUseNonAtomicReferenceCounting(concreteType.getASTType());
+      !concreteTI.usesNonAtomicReferenceCounting();
 
   // Copyable and noncopyable types share a value witness table layout. It
   // should normally be statically impossible to generate a call to a copy
@@ -1522,7 +1511,7 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
     }
   } else if (fixedTI->isSingleRetainablePointer(ResilienceExpansion::Maximal,
                                                 &refCounting) &&
-             !mayUseNonAtomicReferenceCounting(type)) {
+             !fixedTI->usesNonAtomicReferenceCounting()) {
     switch (refCounting) {
     case ReferenceCounting::Native:
       witnessSurrogate = C.TheNativeObjectType;

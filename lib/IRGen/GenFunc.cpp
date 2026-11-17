@@ -388,6 +388,10 @@ namespace {
                                              : defaultAtomicity;
     }
 
+    bool usesNonAtomicReferenceCounting() const override {
+      return FormalType->isNonTransferable();
+    }
+
     void emitRetainSecondElement(
         IRGenFunction &IGF, llvm::Value *data,
         std::optional<Atomicity> defaultAtomicity = std::nullopt) const {

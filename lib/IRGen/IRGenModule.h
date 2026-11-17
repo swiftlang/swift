@@ -1183,6 +1183,7 @@ public:
   const LoadableTypeInfo &
   getReferenceObjectTypeInfo(ReferenceCounting refcounting);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
+  const LoadableTypeInfo &getNonTransferableNativeObjectTypeInfo();
   const LoadableTypeInfo &getImplicitActorTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();

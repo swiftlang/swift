@@ -2324,10 +2324,25 @@ const LoadableTypeInfo &IRGenModule::getNativeObjectTypeInfo() {
 
 const LoadableTypeInfo &TypeConverter::getNativeObjectTypeInfo() {
   if (NativeObjectTI) return *NativeObjectTI;
-  NativeObjectTI = convertBuiltinNativeObject();
+  NativeObjectTI = convertBuiltinNativeObject(/*isNonTransferable=*/false);
   NativeObjectTI->NextConverted = FirstType;
   FirstType = NativeObjectTI;
   return *NativeObjectTI;
+}
+
+const LoadableTypeInfo &IRGenModule::getNonTransferableNativeObjectTypeInfo() {
+  return Types.getNonTransferableNativeObjectTypeInfo();
+}
+
+const LoadableTypeInfo &
+TypeConverter::getNonTransferableNativeObjectTypeInfo() {
+  if (NonTransferableNativeObjectTI)
+    return *NonTransferableNativeObjectTI;
+  NonTransferableNativeObjectTI =
+      convertBuiltinNativeObject(/*isNonTransferable=*/true);
+  NonTransferableNativeObjectTI->NextConverted = FirstType;
+  FirstType = NonTransferableNativeObjectTI;
+  return *NonTransferableNativeObjectTI;
 }
 
 bool TypeConverter::isNeverTransferable(CanType type) {

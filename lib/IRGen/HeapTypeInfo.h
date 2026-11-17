@@ -98,8 +98,8 @@ public:
 
   static const bool IsScalarTriviallyDestroyable = false;
 
-  /// Whether values of this type reference instances of a class that can never
-  /// be 'Transferable'.
+  /// Whether values of this type reference instances that can never be
+  /// 'Transferable'.
   bool isNonTransferable() const { return false; }
 
   /// The atomicity of reference counting operations on values of this type,
@@ -110,6 +110,10 @@ public:
   Atomicity getAtomicity(Atomicity defaultAtomicity) const {
     return asDerived().isNonTransferable() ? Atomicity::NonAtomic
                                            : defaultAtomicity;
+  }
+
+  bool usesNonAtomicReferenceCounting() const override {
+    return asDerived().isNonTransferable();
   }
 
   // Emit the copy/destroy operations required by SingleScalarTypeInfo
